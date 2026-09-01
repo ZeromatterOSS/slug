@@ -207,17 +207,34 @@ pub(crate) fn validate_configured_dependency(
         result.kind(),
         ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
     );
-    if !validation.required_providers.is_empty()
+    if !file
+        && !validation.required_providers.is_empty()
         && !validation.required_providers.iter().any(|alternative| {
-            alternative.iter().all(|provider| {
-                (file && provider.is_builtin("DefaultInfo"))
-                    || result.providers().contains(provider)
-            })
+            alternative
+                .iter()
+                .all(|provider| result.providers().contains(provider))
         })
     {
+        let required = validation
+            .required_providers
+            .iter()
+            .map(|alternative| {
+                alternative
+                    .iter()
+                    .map(|provider| match provider {
+                        ProviderIdentity::Builtin(name) => name.to_string(),
+                        ProviderIdentity::User(id) => id.to_string(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" and ")
+            })
+            .collect::<Vec<_>>()
+            .join(" or ");
         return Err(AnalysisError::message(format!(
-            "configured dependency `{}` does not provide any admitted provider alternative",
-            dependency.attribute
+            "configured dependency `{}` target `{}` does not provide any admitted provider alternative: {}",
+            dependency.attribute,
+            dependency.node.label(),
+            required,
         )));
     }
     validate_file_admissibility(dependency, result, validation, file)?;

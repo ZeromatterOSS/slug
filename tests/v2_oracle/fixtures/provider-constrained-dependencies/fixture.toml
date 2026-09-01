@@ -1,0 +1,63 @@
+[fixture]
+name = "provider-constrained-dependencies"
+description = "Bazel 9.2 provider predicates across every dependency attribute shape, configured rules, aliases, and direct files."
+comparison = "message_shape"
+oracle_notes = "This exact configured-analysis slice covers the five Bazel constructors that expose providers, flat/nested and empty predicates, builtin/user providers, direct input/output-file exemptions, and rule aliases. Invalid declaration shapes are pinned-source Rust regressions because one immutable three-file workspace cannot selectively evaluate invalid top-level declarations. Alias-to-file configured identity remains unsupported/deferred."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkAttrModule.java#buildProviderPredicate",
+  "src/main/java/com/google/devtools/build/lib/packages/Attribute.java#mandatoryProvidersList",
+  "src/main/java/com/google/devtools/build/lib/analysis/RuleContext.java#validateDirectPrerequisiteType",
+  "src/main/java/com/google/devtools/build/lib/analysis/RuleContext.java#checkRuleDependencyMandatoryProviders",
+]
+translation_notes = "Slug retains canonical provider DNF in structural attribute identity and applies it through the shared configured-dependency validator. It checks actual configured providers, forwards rule-alias providers, validates every label in list/dictionary shapes, and follows Bazel's rule-class gate that exempts direct input and output files."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture provider-constrained-dependencies --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture provider-constrained-dependencies --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "dnf_all_shapes_files_and_rule_alias"
+argv = ["build", "//:all_good", "//:conjunction_good", "//:flat_good", "//:builtin_good", "//:empty_good"]
+expected_exit = 0
+
+[[commands]]
+name = "multi_provider_conjunction_requires_every_member"
+argv = ["build", "//:conjunction_bad"]
+expected_exit = 1
+
+[[commands]]
+name = "advertised_provider_is_not_actual_provider"
+argv = ["build", "//:advertised_bad"]
+expected_exit = 1
+
+[[commands]]
+name = "rule_alias_forwards_actual_missing_provider"
+argv = ["build", "//:alias_bad"]
+expected_exit = 1
+
+[[commands]]
+name = "label_list_validates_every_entry"
+argv = ["build", "//:sequence_bad"]
+expected_exit = 1
+
+[[commands]]
+name = "string_keyed_label_dict_validates_every_value"
+argv = ["build", "//:mapped_bad"]
+expected_exit = 1
+
+[[commands]]
+name = "label_keyed_string_dict_validates_every_key"
+argv = ["build", "//:reverse_bad"]
+expected_exit = 1
+
+[[commands]]
+name = "label_list_dict_validates_every_nested_entry"
+argv = ["build", "//:grouped_bad"]
+expected_exit = 1
+
+[[commands]]
+name = "generated_rule_is_not_exempt_like_its_output_file"
+argv = ["build", "//:generated_owner_bad"]
+expected_exit = 1

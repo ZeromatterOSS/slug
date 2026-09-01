@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use slug_build_api_v2::ProviderIdentity;
 use slug_configuration_v2::HostPathFlavor;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
@@ -199,6 +200,7 @@ pub struct AttributeSchema {
     file_admissibility: FileAdmissibility,
     flags: AttributeFlags,
     allowed_values: AllowedAttributeValues,
+    required_providers: Arc<[Arc<[ProviderIdentity]>]>,
     default: Option<Arc<CoercedAttributeValue>>,
     dependency_configuration: AttributeDependencyConfiguration,
     executable: bool,
@@ -230,6 +232,7 @@ impl AttributeSchema {
             file_admissibility: FileAdmissibility::default(),
             flags: AttributeFlags::default(),
             allowed_values: AllowedAttributeValues::None,
+            required_providers: Arc::from([]),
             default: default.map(Arc::new),
             dependency_configuration: AttributeDependencyConfiguration::Target,
             executable: false,
@@ -291,6 +294,9 @@ impl AttributeSchema {
     pub(crate) fn allowed_values(&self) -> &AllowedAttributeValues {
         &self.allowed_values
     }
+    pub fn required_providers(&self) -> &Arc<[Arc<[ProviderIdentity]>]> {
+        &self.required_providers
+    }
     pub(crate) fn with_file_admissibility(mut self, file_admissibility: FileAdmissibility) -> Self {
         self.file_admissibility = file_admissibility;
         self
@@ -301,6 +307,13 @@ impl AttributeSchema {
     }
     pub(crate) fn with_allowed_values(mut self, values: AllowedAttributeValues) -> Self {
         self.allowed_values = values;
+        self
+    }
+    pub(crate) fn with_required_providers(
+        mut self,
+        providers: Arc<[Arc<[ProviderIdentity]>]>,
+    ) -> Self {
+        self.required_providers = providers;
         self
     }
     pub fn default(&self) -> Option<&CoercedAttributeValue> {

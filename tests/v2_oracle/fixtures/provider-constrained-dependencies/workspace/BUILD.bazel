@@ -1,0 +1,44 @@
+load(
+    ":defs.bzl",
+    "absent",
+    "advertised_only",
+    "consumer",
+    "builtin_consumer",
+    "conjunction_consumer",
+    "empty_consumer",
+    "flat_consumer",
+    "generated",
+    "p_rule",
+    "pq_rule",
+    "q_rule",
+)
+
+p_rule(name = "p")
+q_rule(name = "q")
+pq_rule(name = "pq")
+absent(name = "absent")
+advertised_only(name = "advertised")
+generated(name = "owner", out = "generated.txt")
+alias(name = "p_alias", actual = ":p")
+alias(name = "absent_alias", actual = ":absent")
+flat_consumer(name = "flat_good", dep = ":p")
+builtin_consumer(name = "builtin_good", dep = ":absent")
+empty_consumer(name = "empty_good", outer = ":absent", conjunction = ":absent")
+conjunction_consumer(name = "conjunction_good", dep = ":pq")
+conjunction_consumer(name = "conjunction_bad", dep = ":p")
+
+consumer(
+    name = "all_good",
+    scalar = "MODULE.bazel",
+    sequence = [":q", ":generated.txt"],
+    mapped = {"p": ":p", "alias": ":p_alias"},
+    reverse = {":q": "q", ":p": "p"},
+    grouped = {"both": [":p", ":q"]},
+)
+consumer(name = "advertised_bad", scalar = ":advertised")
+consumer(name = "alias_bad", scalar = ":absent_alias")
+consumer(name = "sequence_bad", sequence = [":p", ":absent"])
+consumer(name = "mapped_bad", mapped = {"ok": ":p", "bad": ":absent"})
+consumer(name = "reverse_bad", reverse = {":p": "ok", ":absent": "bad"})
+consumer(name = "grouped_bad", grouped = {"mixed": [":p", ":absent"]})
+consumer(name = "generated_owner_bad", scalar = ":owner")

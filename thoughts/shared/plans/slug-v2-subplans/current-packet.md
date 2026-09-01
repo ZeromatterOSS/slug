@@ -5,14 +5,17 @@ Packet: `WP-6-7A-provider-constrained-dependency-implementation-r1`
 Milestone: M7A generic Starlark/ruleset closure; Stage 4 retained attribute
 schema and Stage 6 configured dependency validation.
 
-Status: R1 architecture review returned `REVISE`: alias-to-file lacked a lawful
-actual-kind owner and the permanent oracle had no path/provenance allowlist.
-Corrected R2 explicitly defers Slug's broader alias-to-file configured-identity
-gap and freezes a bounded five-constructor fixture. Focused rereview returns
-`ACCEPT`; implement only this corrected contract. Commit `096653548`
-terminally accepts complete generic aspect declarations. Its fresh rules_rust
-0.73 replay clears `rust_unpretty_aspect` and stops at ordinary target
-invocation for `rust/private/rust.bzl`'s provider-constrained `link_deps`.
+Status: terminal implementation rereview returns `ACCEPT`. R1 architecture
+review returned `REVISE`: alias-to-file lacked a lawful actual-kind owner and
+the permanent oracle had no path/provenance allowlist. Corrected R2 explicitly
+defers Slug's broader alias-to-file configured-identity gap and freezes a
+bounded five-constructor fixture; focused rereview returned `ACCEPT`. The
+implementation's first terminal review required complete dependency-label/DNF
+diagnostics, a multi-provider conjunction discriminator and a generating-rule
+failure distinct from the generated-file exemption. The corrected proofs and
+production path satisfy all three findings. The rebuilt authentic rules_rust
+0.73 replay clears `rust/private/rust.bzl`'s provider-constrained `link_deps`
+and stops at the independent rule-level Starlark transition-execution frontier.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -191,6 +194,9 @@ Proof allowlist:
   integration/invalidation tests; and
 - `app/slug_analysis_v2/tests/starlark_rule.rs` or the smallest existing
   configured-target test owner for configured provider validation;
+- `app/slug_analysis_v2/tests/subrule.rs` only to update the existing shared
+  validator regression from the prior DefaultInfo-only file rule to Bazel's
+  direct-file exemption;
 - `tests/v2_oracle/fixtures/provider-constrained-dependencies/fixture.toml`,
   `workspace/{MODULE.bazel,BUILD.bazel,defs.bzl}` and
   `expected/oracle.json`; and
@@ -202,10 +208,12 @@ the pinned sources above and the generation command
 --tool bazel --bazel /usr/bin/bazel --update-expected`. Its bounded rows are:
 all-five-constructor success; flat/nested and builtin/user success; missing
 rule provider failure; source and generated-output file exemption; rule-alias
-success/failure; alias-to-file oracle-only exemption; empty-conjunction
-success; mixed/nonprovider/unexported declaration failure; and per-entry
-dictionary failure. Expected stdout is structured row names; failures compare
-the attribute, dependency label and mandatory-provider message shape. No
+success/failure; empty-conjunction success; and per-entry dictionary failure.
+Invalid mixed/nonprovider/unexported declaration shapes remain pinned-source
+Rust regressions: one immutable three-file workspace cannot selectively
+evaluate multiple invalid top-level declarations, and mutating the fixture
+would contradict this packet's fixed-workspace proof boundary. Alias-to-file
+remains unsupported/deferred and therefore is not a Slug replay row. No
 mutation, repository download, action execution or copied ruleset is needed.
 
 The touched `package.rs` and `dice.rs` files exceed the size trigger, but each
@@ -258,3 +266,19 @@ Commit `096653548` terminally accepts
 aspect declarations retain every admitted input, pass terminal review and
 full validation, and advance the authentic replay to provider-constrained
 ordinary dependency invocation.
+
+## Terminal result
+
+One canonical provider DNF now survives descriptor, frozen rule, final package
+schema and ordinary configured-edge ownership across exactly the five Bazel
+9.2 constructors. Direct files bypass provider policy after independent file
+admissibility; configured rules and rule aliases validate actual providers
+through the shared ordinary/hidden validator. The permanent Bazel 9.2 oracle,
+focused Rust proofs, complete loading/analysis/query suites, metadata, format,
+diff, archive, pinned-source, clean-reference and parked-file gates pass. The
+production delta is 42 net / 66 gross Rust lines, the proof delta is 211 net /
+239 gross, and total gross is 305, all below the frozen caps. Independent
+terminal rereview returns `ACCEPT`. A fresh rebuilt one-shot rules_rust replay
+reaches `rule-level Starlark transition execution is not supported for
+@@//pkg:probe`, proving `link_deps` is cleared without widening this packet into
+transition execution.

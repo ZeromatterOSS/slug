@@ -3964,11 +3964,13 @@ impl FrozenRuleDefinition {
     }
 
     fn reject_deferred_attribute_invocation(&self) -> anyhow::Result<()> {
-        if let Some(attribute) = self.schema.iter().find(|attribute| {
-            !attribute.required_providers.is_empty() || attribute.attached_aspect.is_some()
-        }) {
+        if let Some(attribute) = self
+            .schema
+            .iter()
+            .find(|attribute| attribute.attached_aspect.is_some())
+        {
             anyhow::bail!(
-                "target invocation for provider-constrained or aspect-bearing attribute '{}' is not supported",
+                "target invocation for aspect-bearing attribute '{}' is not supported",
                 attribute.name
             );
         }
@@ -6216,6 +6218,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
+        #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
@@ -6230,6 +6233,8 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             None,
             eval,
         )?;
+        definition.required_providers =
+            declaration_required_providers(providers, "attribute providers")?;
         definition.flags = unpack_attribute_flags(flags)?;
         Ok(definition)
     }
@@ -6240,6 +6245,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
+        #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
@@ -6254,6 +6260,8 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             None,
             eval,
         )?;
+        definition.required_providers =
+            declaration_required_providers(providers, "attribute providers")?;
         definition.flags = unpack_attribute_flags(flags)?;
         Ok(definition)
     }
@@ -6312,6 +6320,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
+        #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
@@ -6326,6 +6335,8 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             None,
             eval,
         )?;
+        definition.required_providers =
+            declaration_required_providers(providers, "attribute providers")?;
         definition.flags = unpack_attribute_flags(flags)?;
         Ok(definition)
     }
@@ -6824,6 +6835,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         .with_file_admissibility(declaration.file_admissibility.clone())
                         .with_flags(declaration.flags)
                         .with_allowed_values(declaration.allowed_values.clone())
+                        .with_required_providers(declaration.required_providers.clone())
                     };
                     // Keep the full declaration schema even for an omitted
                     // optional value. Stage 8 must distinguish absent-looking

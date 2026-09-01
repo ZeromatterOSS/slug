@@ -1502,7 +1502,7 @@ async fn high_count_nonrecursive_subrule_calls_share_one_dispatch_payload() {
 }
 
 #[tokio::test]
-async fn configured_subrule_validation_rejects_each_child_before_invocation() {
+async fn configured_subrule_validation_rejects_each_child_and_exempts_direct_files() {
     for (target, expected) in [
         (
             "bad_provider",
@@ -1513,10 +1513,6 @@ async fn configured_subrule_validation_rejects_each_child_before_invocation() {
         ("bad_extension", "does not match its admitted file types"),
         ("bad_executable", "is not executable"),
         ("bad_file", "does not match its admitted file types"),
-        (
-            "bad_file_provider",
-            "does not provide any admitted provider alternative",
-        ),
     ] {
         let tracker = Arc::new(Tracker::default());
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -1535,7 +1531,30 @@ async fn configured_subrule_validation_rejects_each_child_before_invocation() {
             "{target}: {error}"
         );
         assert!(!error.contains("implementation ran"), "{target}: {error}");
+        if target == "bad_provider" {
+            assert!(error.contains("@@//deps:plain"), "{target}: {error}");
+            assert!(error.contains("ProfileInfo"), "{target}: {error}");
+        }
     }
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let error = analyze(
+        &dice,
+        semantic_epoch().build(),
+        "@@//subject:bad_file_provider",
+        configuration(Some("//deps:profile")),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await;
+    assert!(
+        error.contains("must declare 'configured' in 'subrules'"),
+        "{error}"
+    );
+    assert!(
+        !error.contains("does not provide any admitted provider alternative"),
+        "{error}"
+    );
 }
 
 #[tokio::test]

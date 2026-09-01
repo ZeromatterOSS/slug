@@ -1,0 +1,254 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:all_good",
+        "//:conjunction_good",
+        "//:flat_good",
+        "//:builtin_good",
+        "//:empty_good"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:all_good",
+        "//:conjunction_good",
+        "//:flat_good",
+        "//:builtin_good",
+        "//:empty_good"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "dnf_all_shapes_files_and_rule_alias",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 5 targets (5 packages loaded, 6 targets configured)\nAnalyzing: 5 targets (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed 5 targets (5 packages loaded, 19 targets configured).\nINFO: Found 5 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033004-1182016-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 5 targets (5 packages loaded, 6 targets configured)\nAnalyzing: 5 targets (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed 5 targets (5 packages loaded, 19 targets configured).\nINFO: Found 5 targets...\nINFO: Elapsed time: 4.542s, Critical Path: 0.02s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:conjunction_bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:conjunction_bad"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "multi_provider_conjunction_requires_every_member",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:conjunction_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:conjunction_bad (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:28:21: in dep attribute of conjunction_consumer rule //:conjunction_bad: '//:p' does not have mandatory providers: 'Q'\nERROR: <workspace>/BUILD.bazel:28:21: Analysis of target '//:conjunction_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:conjunction_bad' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:conjunction_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:conjunction_bad (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:28:21: in dep attribute of conjunction_consumer rule //:conjunction_bad: '//:p' does not have mandatory providers: 'Q'\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:28:21: Analysis of target '//:conjunction_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:conjunction_bad' failed; build aborted\nINFO: Elapsed time: 0.083s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:advertised_bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:advertised_bad"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "advertised_provider_is_not_actual_provider",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:advertised_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:advertised_bad (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:20:16: in advertised_only rule //:advertised: \n<workspace>/defs.bzl:13:5: rule advertised the 'P' provider, but this provider was not among those returned\nERROR: <workspace>/BUILD.bazel:20:16: Analysis of target '//:advertised' (config: a7a71fd) failed\nERROR: Analysis of target '//:advertised_bad' failed; build aborted: Analysis failed\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:advertised_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:advertised_bad (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:20:16: in advertised_only rule //:advertised: \n/run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/defs.bzl:13:5: rule advertised the 'P' provider, but this provider was not among those returned\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:20:16: Analysis of target '//:advertised' (config: a7a71fd) failed\nERROR: Analysis of target '//:advertised_bad' failed; build aborted: Analysis failed\nINFO: Elapsed time: 0.033s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:alias_bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:alias_bad"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "rule_alias_forwards_actual_missing_provider",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:alias_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:alias_bad (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:39:9: in scalar attribute of consumer rule //:alias_bad: '//:absent' does not have mandatory providers: 'P' or 'Q'\nERROR: <workspace>/BUILD.bazel:39:9: Analysis of target '//:alias_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:alias_bad' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:alias_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:alias_bad (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:39:9: in scalar attribute of consumer rule //:alias_bad: '//:absent' does not have mandatory providers: 'P' or 'Q'\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:39:9: Analysis of target '//:alias_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:alias_bad' failed; build aborted\nINFO: Elapsed time: 0.028s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:sequence_bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:sequence_bad"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "label_list_validates_every_entry",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:sequence_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:sequence_bad (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:40:9: in sequence attribute of consumer rule //:sequence_bad: '//:absent' does not have mandatory providers: 'P' or 'Q'\nERROR: <workspace>/BUILD.bazel:40:9: Analysis of target '//:sequence_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:sequence_bad' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:sequence_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:sequence_bad (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:40:9: in sequence attribute of consumer rule //:sequence_bad: '//:absent' does not have mandatory providers: 'P' or 'Q'\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:40:9: Analysis of target '//:sequence_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:sequence_bad' failed; build aborted\nINFO: Elapsed time: 0.022s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:mapped_bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:mapped_bad"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "string_keyed_label_dict_validates_every_value",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:mapped_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:mapped_bad (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:41:9: in mapped attribute of consumer rule //:mapped_bad: '//:absent' does not have mandatory providers: 'P' or 'Q'\nERROR: <workspace>/BUILD.bazel:41:9: Analysis of target '//:mapped_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:mapped_bad' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:mapped_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:mapped_bad (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:41:9: in mapped attribute of consumer rule //:mapped_bad: '//:absent' does not have mandatory providers: 'P' or 'Q'\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:41:9: Analysis of target '//:mapped_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:mapped_bad' failed; build aborted\nINFO: Elapsed time: 0.022s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:reverse_bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:reverse_bad"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "label_keyed_string_dict_validates_every_key",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:reverse_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:reverse_bad (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:42:9: in reverse attribute of consumer rule //:reverse_bad: '//:absent' does not have mandatory providers: 'P' or 'Q'\nERROR: <workspace>/BUILD.bazel:42:9: Analysis of target '//:reverse_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:reverse_bad' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:reverse_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:reverse_bad (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:42:9: in reverse attribute of consumer rule //:reverse_bad: '//:absent' does not have mandatory providers: 'P' or 'Q'\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:42:9: Analysis of target '//:reverse_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:reverse_bad' failed; build aborted\nINFO: Elapsed time: 0.024s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:grouped_bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:grouped_bad"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "label_list_dict_validates_every_nested_entry",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:grouped_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:grouped_bad (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:43:9: in grouped attribute of consumer rule //:grouped_bad: '//:absent' does not have mandatory providers: 'P' or 'Q'\nERROR: <workspace>/BUILD.bazel:43:9: Analysis of target '//:grouped_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:grouped_bad' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:grouped_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:grouped_bad (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:43:9: in grouped attribute of consumer rule //:grouped_bad: '//:absent' does not have mandatory providers: 'P' or 'Q'\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:43:9: Analysis of target '//:grouped_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:grouped_bad' failed; build aborted\nINFO: Elapsed time: 0.024s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:generated_owner_bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:generated_owner_bad"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "generated_rule_is_not_exempt_like_its_output_file",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:generated_owner_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:generated_owner_bad (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:44:9: in scalar attribute of consumer rule //:generated_owner_bad: '//:owner' does not have mandatory providers: 'P' or 'Q'\nERROR: <workspace>/BUILD.bazel:44:9: Analysis of target '//:generated_owner_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:generated_owner_bad' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:generated_owner_bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:generated_owner_bad (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:44:9: in scalar attribute of consumer rule //:generated_owner_bad: '//:owner' does not have mandatory providers: 'P' or 'Q'\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/provider-constrained-dependencies/20260901-033538-1185248-bazel/workspace/BUILD.bazel:44:9: Analysis of target '//:generated_owner_bad' (config: a7a71fd) failed\nERROR: Analysis of target '//:generated_owner_bad' failed; build aborted\nINFO: Elapsed time: 0.023s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "provider-constrained-dependencies",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

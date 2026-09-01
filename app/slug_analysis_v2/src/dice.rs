@@ -1559,7 +1559,7 @@ async fn root_declared_dependency_keys(
                 validation: Some(ConfiguredDependencyValidation::new(
                     schema.file_admissibility().clone(),
                     schema.executable(),
-                    Arc::from([]),
+                    schema.required_providers().clone(),
                 )),
                 configured_row: None,
             });

@@ -29526,6 +29526,38 @@ async fn advertised_rule_providers_participate_in_loaded_target_equality() {
     assert_ne!(one_rule, two_rule);
 }
 
+#[tokio::test]
+async fn dependency_provider_policy_participates_in_loaded_target_equality_a_b_a() {
+    let build = b"load(':defs.bzl','r')\nr(name='probe',visibility=['//visibility:public'])\n";
+    let fixture =
+        |provider: &'static [u8]| [("BUILD.bazel", build.as_slice()), ("defs.bzl", provider)];
+    let p = fixture(
+        b"P=provider()\nQ=provider()\ndef _impl(ctx): return []\nr=rule(implementation=_impl,attrs={'dep':attr.label(providers=[P])})\n",
+    );
+    let q = fixture(
+        b"P=provider()\nQ=provider()\ndef _impl(ctx): return []\nr=rule(implementation=_impl,attrs={'dep':attr.label(providers=[Q])})\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let p_first = load_repository_package_fixture_on(&dice, &p, 428).await;
+    let q_middle = load_repository_package_fixture_on(&dice, &q, 429).await;
+    let p_restored = load_repository_package_fixture_on(&dice, &p, 430).await;
+    assert!(!RepositoryPackageLoadKey::equality(&p_first, &q_middle));
+    assert!(RepositoryPackageLoadKey::equality(&p_first, &p_restored));
+    let rule = |outcome| {
+        let PackageTargetKind::StarlarkRule(rule) =
+            &repository_package_terminal(outcome).targets[0].kind
+        else {
+            panic!("probe did not retain its Starlark rule")
+        };
+        rule.clone()
+    };
+    let p_first = rule(&p_first);
+    let q_middle = rule(&q_middle);
+    let p_restored = rule(&p_restored);
+    assert_ne!(p_first, q_middle);
+    assert_eq!(p_first, p_restored);
+}
+
 fn assert_rules_rust_allocator_imports(
     module: &FrozenModule,
     children: &[(&'static str, BzlModuleIdentity, FrozenModule)],
@@ -32160,7 +32192,6 @@ fn rustfmt_test_rule_validates_admitted_dependency_schemas() {
     }
     for source in [
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(doc=1)})",
-        "P=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[P], [1]])})",
         "def make_provider(): return provider()\nQ=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[make_provider()], [Q]])})",
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[])})",
         "def aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\nB=aspect(implementation=aspect_impl)\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[A, B])})",
@@ -32172,6 +32203,21 @@ fn rustfmt_test_rule_validates_admitted_dependency_schemas() {
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(cfg=1)})",
     ] {
         assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
+    }
+    for constructor in [
+        "label",
+        "label_list",
+        "string_keyed_label_dict",
+        "label_keyed_string_dict",
+        "label_list_dict",
+    ] {
+        let source = format!(
+            "P=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={{'targets': attr.{constructor}(providers=[[P], [1]])}})"
+        );
+        assert!(
+            eval_global(&source, &loading_globals()).is_err(),
+            "{source}"
+        );
     }
 }
 
@@ -32205,28 +32251,52 @@ async fn repository_package_rejects_provider_or_aspect_dependency_before_recordi
         .unwrap();
     let error = repository_package_error(&outcome);
     assert!(
-        error.contains(
-            "target invocation for provider-constrained or aspect-bearing attribute 'targets' is not supported"
-        ),
+        error.contains("target invocation for aspect-bearing attribute 'targets' is not supported"),
         "{error}"
     );
 }
 
 #[tokio::test]
-async fn repository_package_rejects_scalar_provider_constraint_before_recording() {
+async fn repository_package_retains_provider_constraints_for_all_dependency_shapes() {
     let files: &[(&str, &[u8])] = &[
         (
             "BUILD.bazel",
-            b"load(':defs.bzl','probe')\nprobe(name='blocked')\n",
+            b"load(':defs.bzl','probe')\nprobe(name='retained',visibility=['//visibility:public'])\n",
         ),
         (
             "defs.bzl",
-            b"P=provider()\ndef impl(ctx): return []\nprobe=rule(implementation=impl, attrs={'tool':attr.label(providers=[P])})\n",
+            b"P=provider()\nQ=provider()\ndef impl(ctx): return []\nprobe=rule(implementation=impl, attrs={'scalar':attr.label(providers=[[Q,P],[P,Q]]),'sequence':attr.label_list(providers=[[Q,P],[P,Q]]),'string_values':attr.string_keyed_label_dict(providers=[[Q,P],[P,Q]]),'label_keys':attr.label_keyed_string_dict(providers=[[Q,P],[P,Q]]),'nested':attr.label_list_dict(providers=[[Q,P],[P,Q]])})\n",
         ),
     ];
     let outcome = load_repository_package_fixture(files, 426).await;
-    let error = repository_package_error(&outcome);
-    assert!(error.contains("provider-constrained or aspect-bearing attribute 'tool'"));
+    let package = repository_package_terminal(&outcome);
+    let PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+        panic!("retained did not retain its Starlark rule")
+    };
+    for name in [
+        "scalar",
+        "sequence",
+        "string_values",
+        "label_keys",
+        "nested",
+    ] {
+        let schema = rule
+            .schema()
+            .iter()
+            .find(|schema| schema.declaration_name() == name)
+            .unwrap();
+        let [conjunction] = schema.required_providers().as_ref() else {
+            panic!("{name} did not retain one canonical provider conjunction")
+        };
+        assert_eq!(
+            conjunction
+                .iter()
+                .map(provider_identity_text)
+                .collect::<Vec<_>>(),
+            ["@@dep+//:defs.bzl%P", "@@dep+//:defs.bzl%Q"],
+            "{name}"
+        );
+    }
 }
 
 #[tokio::test]

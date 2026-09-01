@@ -1,0 +1,1 @@
+module(name = "provider_constrained_dependencies", version = "0.1.0")

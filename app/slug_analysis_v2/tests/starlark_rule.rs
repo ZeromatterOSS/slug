@@ -9381,6 +9381,128 @@ async fn ordinary_file_policy_invalidates_and_restores_configured_results_and_er
 }
 
 #[tokio::test]
+async fn ordinary_provider_constraints_cover_dnf_files_aliases_and_dictionary_entries() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"P = provider()
+Q = provider()
+
+def _p(ctx): return [P()]
+def _q(ctx): return [Q()]
+def _pq(ctx): return [P(), Q()]
+def _advertised_only(ctx): return [DefaultInfo()]
+def _absent(ctx): return [DefaultInfo()]
+def _consumer(ctx): return [DefaultInfo()]
+def _generated(ctx):
+    ctx.actions.write(ctx.outputs.out, "generated")
+    return [DefaultInfo(files = depset([ctx.outputs.out]))]
+
+p_rule = rule(implementation = _p)
+q_rule = rule(implementation = _q)
+pq_rule = rule(implementation = _pq)
+advertised_only = rule(implementation = _advertised_only, provides = [P])
+absent = rule(implementation = _absent)
+generated = rule(implementation = _generated, attrs = {"out": attr.output(mandatory = True)})
+consumer = rule(
+    implementation = _consumer,
+    attrs = {
+        "scalar": attr.label(providers = [[P], [Q]], allow_files = True),
+        "sequence": attr.label_list(providers = [[P], [Q]], allow_files = True),
+        "mapped": attr.string_keyed_label_dict(providers = [[P], [Q]], allow_files = True),
+        "reverse": attr.label_keyed_string_dict(providers = [[P], [Q]], allow_files = True),
+        "grouped": attr.label_list_dict(providers = [[P], [Q]], allow_files = True),
+    },
+)
+conjunction_consumer = rule(
+    implementation = _consumer,
+    attrs = {"dep": attr.label(providers = [[P, Q]])},
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "absent", "advertised_only", "conjunction_consumer", "consumer", "generated", "p_rule", "pq_rule", "q_rule")
+p_rule(name = "p")
+q_rule(name = "q")
+pq_rule(name = "pq")
+absent(name = "absent")
+advertised_only(name = "advertised")
+generated(name = "owner", out = "generated.txt")
+alias(name = "p_alias", actual = ":p")
+alias(name = "absent_alias", actual = ":absent")
+conjunction_consumer(name = "conjunction_good", dep = ":pq")
+conjunction_consumer(name = "conjunction_bad", dep = ":p")
+
+consumer(
+    name = "all_good",
+    scalar = "source.txt",
+    sequence = [":q", ":generated.txt"],
+    mapped = {"p": ":p", "alias": ":p_alias"},
+    reverse = {":q": "q", ":p": "p"},
+    grouped = {"both": [":p", ":q"]},
+)
+consumer(name = "advertised_bad", scalar = ":advertised")
+consumer(name = "alias_bad", scalar = ":absent_alias")
+consumer(name = "sequence_bad", sequence = [":p", ":absent"])
+consumer(name = "mapped_bad", mapped = {"ok": ":p", "bad": ":absent"})
+consumer(name = "reverse_bad", reverse = {":p": "ok", ":absent": "bad"})
+consumer(name = "grouped_bad", grouped = {"mixed": [":p", ":absent"]})
+consumer(name = "generated_owner_bad", scalar = ":owner")
+"#,
+    )
+    .unwrap();
+    fs::write(workspace.join("source.txt"), "source\n").unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let configuration = typed_action_test_configuration();
+    let key = |target: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+            configuration.clone(),
+        )
+    };
+    analyze_request(&dice, &workspace, &key("all_good"), None, false)
+        .await
+        .unwrap();
+    analyze_request(&dice, &workspace, &key("conjunction_good"), None, false)
+        .await
+        .unwrap();
+    let error = analyze_request(&dice, &workspace, &key("conjunction_bad"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        error.contains(
+            "target `@@//:p` does not provide any admitted provider alternative: \
+             //:defs.bzl%P and //:defs.bzl%Q"
+        ),
+        "conjunction_bad: {error}"
+    );
+    for (target, dependency) in [
+        ("advertised_bad", "@@//:advertised"),
+        ("alias_bad", "@@//:absent_alias"),
+        ("sequence_bad", "@@//:absent"),
+        ("mapped_bad", "@@//:absent"),
+        ("reverse_bad", "@@//:absent"),
+        ("grouped_bad", "@@//:absent"),
+        ("generated_owner_bad", "@@//:owner"),
+    ] {
+        let error = analyze_request(&dice, &workspace, &key(target), None, false)
+            .await
+            .unwrap_err();
+        assert!(
+            error.contains(&format!(
+                "target `{dependency}` does not provide any admitted provider alternative: \
+                 //:defs.bzl%P or //:defs.bzl%Q"
+            )),
+            "{target}: {error}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn configured_attributes_select_specialize_allocate_dicts_and_predeclare_outputs() {
     let workspace = scratch();
     for package in ["rules", "leaf", "parent"] {

@@ -22238,3 +22238,24 @@ keeps direct files and rule aliases exact, and freezes one bounded fixture with
 provenance, rows and comparison semantics. Focused rereview returns `ACCEPT`.
 Activate only
 `WP-6-7A-provider-constrained-dependency-implementation-r1`.
+
+#### Provider-constrained dependencies terminally accepted (2026-09-01)
+
+The implementation retains the already-canonical provider DNF through all
+five Bazel 9.2 label-bearing constructors and final package schema equality,
+then sends every ordinary configured label edge through the existing shared
+actual-provider validator. Direct source/generated files remain exempt after
+independent file admissibility; rule aliases validate their forwarded actual
+provider collection. Aspect attachment remains separately fail-closed and
+alias-to-file remains explicitly deferred with its broader configured-actual
+identity gap.
+
+Terminal review required three corrections: dependency-label plus canonical
+DNF diagnostics, a true multi-provider conjunction, and a generating-rule
+failure alongside generated-output exemption. The corrected Rust proofs and
+permanent Bazel 9.2 oracle discriminate all three; complete loading, analysis
+and query suites plus every static/provenance gate pass within 66 production,
+239 proof and 305 total gross Rust lines. Independent terminal rereview returns
+`ACCEPT`. The rebuilt one-shot rules_rust 0.73 replay clears the
+provider-constrained `link_deps` invocation and stops at the independent
+rule-level Starlark transition-execution boundary for `@@//pkg:probe`.
