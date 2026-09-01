@@ -2271,6 +2271,9 @@ keys, derive the materialized root from the selected Host BUILD source, and
 reuse the package-attempt retry driver. Zabel's analogous source-root split is
 peer guidance only. New DICE keys, copied listings/trees, caches, locks and
 built-in catalog glob claims remain forbidden; independent review is pending.
+Independent R4 review returned `ACCEPT` on complete source identity, acyclic
+existing-key ownership and unchanged segment-key equality; implementation and
+terminal acceptance remain pending.
 
 Decision: replace the split raw flat-pattern validator and separately retained
 Host pattern with one V2-owned immutable `GlobPattern`: one `Arc<str>` raw

@@ -78,7 +78,8 @@ review only R4's route-aware correction: reuse the existing Host traversal and
 external package-boundary keys, derive the materialized root from the selected
 Host BUILD address, and drive the existing package-attempt retry loop. Add no
 platforms/rules_rust/C++ special case, new DICE key, cache, lock or eager walk;
-built-in catalog globs remain deferred.
+built-in catalog globs remain deferred. Independent review returned `ACCEPT`;
+activate only R4.
 Structured `starlark_doc_extract` output and experimental remote repository
 execution remain separate deferred categories. Bazel 9.2 is sole behavior
 authority; Zabel remains peer architecture and optimization guidance only.

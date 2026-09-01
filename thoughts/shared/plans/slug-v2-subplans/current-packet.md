@@ -4,10 +4,9 @@ Packet: `WP-6-7A-recursive-build-glob-category-implementation-r4`
 
 Milestone: M7A generic Starlark/ruleset closure; BUILD glob loading semantics.
 
-Status: route-aware external-glob correction review active after R3 ended
-`REPLAN` at the authentic replay. The accepted matcher/callable architecture
-and compatibility classes remain unchanged; implementation acceptance is
-paused pending independent review of the bounded external Host adapter.
+Status: implementation active after independent `ACCEPT` of the R4 route-aware
+external Host adapter. The accepted matcher/callable architecture and
+compatibility classes remain unchanged.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -210,6 +209,11 @@ R4's measured starting point is 987 production/626 proof/1,613 total gross.
 The 1,300/1,100/2,200 caps cover only this route-aware extension and its focused
 proof. Stop with `REPLAN` if another crate/file, a new DICE key, or a copied
 repository tree/listing owner is required.
+
+Independent review confirms the route plus selected Host BUILD address is
+complete source identity, the inventory-to-traversal-to-external-boundary edge
+is acyclic, evaluator state is released before DICE work, observed epoch order
+is preserved, and built-in catalog deferral is honest. It returns `ACCEPT`.
 
 ## Required proof and validation
 

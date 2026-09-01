@@ -22759,3 +22759,9 @@ deriving a materialized external glob root from repository source identity;
 copy no Zig route, key, allocator, scheduler, policy, cache or behavior. Resume
 Rust only after independent `ACCEPT`; stop if the bounded existing-key adapter
 is insufficient.
+
+Independent R4 review returns `ACCEPT`. It confirms complete physical/source
+identity, acyclic inventory-to-traversal-to-external-boundary dependencies,
+evaluator release before DICE work, ordered observed-epoch merging, unchanged
+segment-key identity and honest built-in catalog deferral. Resume only the
+bounded R4 implementation.
