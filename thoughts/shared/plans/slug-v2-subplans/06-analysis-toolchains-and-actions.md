@@ -22333,3 +22333,35 @@ R1 blockers. Activate only
 `WP-6-7A-default-exec-configured-label-dependency-implementation-r1` with the
 accepted exact/Slug-native/deferred boundary, typed edge/group owners, DICE
 ordering, oracle matrix, caps and stop conditions unchanged.
+
+#### Default-exec executable-view preflight returns REPLAN (2026-09-01)
+
+Implementation R1 reaches the required cross-configuration executable proof:
+loading, dependency preparation and validation retain the final typed
+`FilesToRunProvider`, but Slug's rule context has no public `ctx.executable`
+struct. Bazel 9.2 publishes the provider's executable `File` there for every
+scalar executable attribute. The accepted production allowlist omitted
+`starlark_rule.rs`, so its explicit stop condition applies; do not silently
+narrow the proof to `ctx.attr[DefaultInfo].files_to_run`.
+
+Review only
+`WP-6-7A-default-exec-configured-label-dependency-architecture-correction-r1`.
+Add `starlark_rule.rs` solely for a token-scoped ordered artifact/`None` view
+derived from the rule schema and already-retained prepared dependency provider,
+including present `None` for an omitted optional executable label and no field
+for nonexecutable declarations. Add no second provider/configuration owner,
+map, cache, DICE key or validation path. Raise only the production/aggregate
+gross caps to 600/1,360. Preserve every accepted exact/Slug-native/deferred
+boundary, all five constructors, Bazel 9.2 authority, BCR rule ownership and
+the existing Zabel/Buck2 classifications. Independent acceptance is required
+before resuming Rust as implementation R2.
+
+#### Default-exec executable-view correction accepted; implementation R2 active (2026-09-01)
+
+Independent correction review returns `ACCEPT`: the schema-derived ordered
+`AnalysisExecutable` slice exactly distinguishes selected executable `File`,
+omitted optional `None` and absent nonexecutable fields while projecting only
+the existing prepared provider's artifact. It adds no second provider owner,
+DICE state or configured-result identity. Resume only
+`WP-6-7A-default-exec-configured-label-dependency-implementation-r2` under the
+corrected `starlark_rule.rs` allowlist and 600/760/1,360 gross caps.

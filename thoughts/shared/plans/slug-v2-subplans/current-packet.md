@@ -1,17 +1,26 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-default-exec-configured-label-dependency-implementation-r1`
+Packet: `WP-6-7A-default-exec-configured-label-dependency-implementation-r2`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 configured dependency,
 execution-platform, and retained edge identity.
 
-Status: implementation active from independently accepted architecture R2.
+Status: implementation active from independently accepted architecture R2 and
+executable-view correction R1.
 Independent R1 review returned `REVISE`: a singular Starlark output
 discriminator could not represent already-admitted zero/multi-output
 transitions, and the production allowlist contained an open-ended
 compiler-required escape. R2 retains the complete immutable canonical output
 slice and names every production file; focused rereview returned `ACCEPT` with
 only the already-deferred named/composed-group residual.
+
+Implementation R1 reached the required executable-attribute proof and exposed
+that `PreparedDependency` already retains the exact `FilesToRunProvider`, but
+the rule context does not publish Bazel's `ctx.executable` struct. The accepted
+allowlist omitted `app/slug_analysis_v2/src/starlark_rule.rs`, so the packet's
+own stop condition returned R1 to a design-only correction. Independent review
+accepted the schema-derived ordered artifact/`None` view, expanded allowlist
+and caps with no remaining finding; resume only implementation R2.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -40,7 +49,12 @@ Exact behavior within the admitted surface:
 - `executable = True` remains scalar-label-only and requires an explicitly
   non-`None` `cfg`. Both explicit `"target"` and `"exec"` are valid. The final
   selected/configured dependency must retain an executable `DefaultInfo`, and
-  `ctx.executable` uses the existing typed FilesToRun projection;
+  `ctx.executable.<attribute>` publishes the executable `File` from the
+  existing typed FilesToRun projection. An omitted optional executable label
+  publishes a present field whose value is `None`; a nonexecutable attribute
+  has no field. A selected dependency whose final provider has no executable
+  still fails existing validation before rule evaluation. The view never
+  publishes the provider object itself and never changes `ctx.attr`;
 - all selectors and label/dictionary values resolve under the owning rule's
   final target configuration after any accepted rule transition. The exec
   transition is applied only to the resulting dependency labels. Dictionary
@@ -126,6 +140,22 @@ Pinned source SHA-256 values are:
 - `RuleContextConstraintSemantics.java`:
   `8ae242015971a1e9434a54214a520ef876a3d73712dd2131571c401253fc4090`.
 
+Correction-specific authority is:
+
+- `StarlarkAttributesCollection.java`:
+  `9b3b300d7e9c25dceafc8a9450dd2511f9b0b83088e11421b6dc3b5086cc7442`;
+- `StarlarkRuleContext.java`:
+  `5200266852f65ca66a958a3adaf82a29f9b5cbbd1a604a4e91d7815476985072`;
+  and
+- `StarlarkRuleContextApi.java`:
+  `eaec2bd51833abccea1551c9fe3cde417178db51f21c331d1306c1fd89e12a2f`.
+
+`StarlarkAttributesCollection.Builder.addAttribute` proves that only scalar
+dependency attributes marked executable contribute fields, that each field is
+the provider's executable artifact rather than the provider, and that missing
+executables map to `None`. `StarlarkRuleContext` and its API prove the public
+`ctx.executable` struct boundary.
+
 The API and `convertCfg` prove the complete five-constructor binding family and
 target/None/exec/Starlark conversion. `ExecutionTransitionFactory` proves
 default-group identity, tool classification, selected-platform finalization,
@@ -185,6 +215,23 @@ derives one configuration from `resolution.execution_platform()`, and prepares
 all rows once. Exec dependencies never mutate the toolchain-resolution key.
 Remove the broad visible exec/executable gate; the existing final
 file/provider/executable validator remains the sole admission gate.
+
+Correction: analysis preparation already computes
+`PreparedDependency.executable: Option<FilesToRunProvider>` for every selected
+visible scalar executable dependency. Before materialized dependencies drop
+that provider, build one evaluator-local ordered `Arc<[AnalysisExecutable]>`
+from the rule schema: each scalar executable declaration contributes its
+public name and either the existing provider's executable artifact, allocated
+as the existing `AnalysisArtifactValue`, or `None` when the label is omitted.
+Add one token-scoped `AnalysisExecutables` view in `starlark_rule.rs`;
+`AnalysisContext.get_attr("executable")` shares that slice and field lookup
+returns its artifact/`None`. Nonexecutable declarations contribute no row.
+Add no second validation, provider value, map, cache, DICE key, runfiles
+association or executable owner. The existing `ctx.actions.run` provenance
+derivation continues to consume the same prepared dependency providers before
+materialization, so publishing the artifact introduces no semantic or
+identity fork. The new ordered slice is synchronous evaluator phase memory and
+never enters a configured result.
 
 Replace action-specific `ConfiguredActionExecGroup` with one public
 `ConfiguredExecGroup::{Default, Named(CompactString)}` in a small dedicated
@@ -256,17 +303,20 @@ Allowed production files:
 
 - `app/slug_loading_v2/src/package.rs`;
 - `app/slug_analysis_v2/src/{exec_group,configured_target,subrule,dice,result,lib}.rs`;
+- `app/slug_analysis_v2/src/starlark_rule.rs`, limited to the token-scoped
+  ordered `ctx.executable` artifact/`None` view derived from rule schema and
+  existing `PreparedDependency.executable` data; and
 - `app/slug_core_v2/src/runtime/file_write_identity.rs`.
 
-No other production file is allowed. Compile preflight finds no production
-consumer beyond those named paths; an additional production consumer or any
-query traversal/formatter behavior change is `REPLAN`.
+No other production file is allowed. Corrected compile preflight finds no
+production consumer beyond those named paths; an additional production
+consumer or any query traversal/formatter behavior change is `REPLAN`.
 
 Allowed proof files are focused loading/analysis/core/query/reapi tests, the
 new oracle fixture and its manifest/expected output, and the Stage 6/Stage
-9/status documents at acceptance. Cap production at 520 gross Rust lines,
+9/status documents at acceptance. Cap production at 600 gross Rust lines,
 proof at 760,
-and total at 1,280. Renames and exhaustive match updates count toward gross
+and total at 1,360. Renames and exhaustive match updates count toward gross
 but not net. `package.rs` and `dice.rs` exceed 2,000 lines: keep the former to
 three sibling bindings plus the shared converter, and extract a cohesive
 dependency-preparation helper from the latter. Do not add more policy inline to
@@ -288,6 +338,14 @@ Validation after implementation:
   authentic rules_rust 0.73 frontier; and
 - independent terminal implementation review of the actual diff and recorded
   validation.
+
+The executable proof must distinguish `ctx.executable.scalar` and
+`ctx.executable.target_tool` as `File` values, verify the selected exec and
+target configurations respectively, and preserve the already-tested provider
+objects under `ctx.attr`. An omitted optional executable label is a present
+`None` field, while a field not declared executable is absent from the view.
+No `ctx.file`, `ctx.files`, split attribute, aspect or subrule public API is
+admitted by this correction.
 
 Residual risk is named/automatic/composed exec-group behavior. The public edge
 can retain that identity, but its loading declaration, toolchain-context

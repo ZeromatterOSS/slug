@@ -38,9 +38,16 @@ and must name the same packet.
 
 [Implement default-exec configured label dependencies](./slug-v2-subplans/current-packet.md).
 
-Implement the independently accepted
-`WP-6-7A-default-exec-configured-label-dependency-architecture-r2` through
-`WP-6-7A-default-exec-configured-label-dependency-implementation-r1`. The
+Implement only
+`WP-6-7A-default-exec-configured-label-dependency-implementation-r2` after
+independent acceptance of
+`WP-6-7A-default-exec-configured-label-dependency-architecture-correction-r1`.
+Implementation R1 reached its executable proof and found that Slug retains the
+typed FilesToRun provider but does not publish Bazel's `ctx.executable` view;
+the accepted production allowlist omitted that public consumer. The bounded
+correction adds only `starlark_rule.rs` for a token-scoped artifact view over
+existing prepared dependency provider plus a schema-derived ordered
+artifact/`None` view, then schedules implementation R2. The
 complete default-group category covers `cfg` conversion and selected
 execution-platform analysis across all five label-bearing attribute shapes,
 including source/null tool-edge identity and executable/provider/file
