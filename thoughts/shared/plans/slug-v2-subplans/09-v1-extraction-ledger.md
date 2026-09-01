@@ -2306,8 +2306,8 @@ scratch. No service-retained cache or asynchronous transfer memory is added.
 
 ### Stage 6 module-extension tag schema utility decision (2026-09-01)
 
-Status: R1 architecture review returned `REPLAN` before Rust; corrected R2
-awaits independent review in
+Status: R1 architecture review returned `REPLAN` before Rust; independent R2
+architecture review returns `ACCEPT` for
 `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r2`.
 
 Decision: no V1 extraction and no second tag-only value family. Extend the
@@ -2324,6 +2324,9 @@ deferring only their precise diagnostic precedence. R2 also corrects tag
 semantics to ignore rule-policy `allow_empty` and keeps `_private` as the
 public supplied/default/runtime/`dir` field name. These corrections do not
 change the no-extraction decision, value owner, lifetime, allowlist or caps.
+Independent R2 review accepts that utility and lifetime decision; Rust is
+authorized, with only precise non-visible-label diagnostic precedence
+remaining explicitly deferred.
 
 Zabel `0795445f...` schema-ordered tag slots, compact typed tag values and
 invocation freezing are peer optimization guidance only. Copy no Zig type,

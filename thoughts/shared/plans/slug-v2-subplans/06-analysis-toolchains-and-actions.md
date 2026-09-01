@@ -22810,4 +22810,6 @@ the rule-attribute `allow_empty` policy to tag conversion and exposed Bazel's
 internal `$private` name. R2 accepts empty tag collections and preserves the
 public `_private` spelling across supplied/default/runtime/`dir` behavior.
 The kind inventory, shared `IntegerList`, frozen invocation representation,
-allowlist and caps are unchanged. Independent R2 review remains the Rust gate.
+allowlist and caps are unchanged. Independent R2 architecture review returns
+`ACCEPT`; Rust implementation is authorized. Its only residual risk is the
+explicitly deferred precise ordering/diagnostics for non-visible labels.

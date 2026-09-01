@@ -96,7 +96,9 @@ R2 preserves exact conversion for all valid/visible values, makes invisible
 labels fail closed while deferring their precise diagnostic precedence,
 accepts empty tag collections regardless of `allow_empty`, and preserves
 public private-field spelling. All other architecture, allowlists and caps are
-unchanged; independent review remains mandatory before Rust.
+unchanged. Independent R2 architecture review returns `ACCEPT`; implement only
+the admitted complete category. The only residual risk is the explicitly
+deferred precise ordering/diagnostics for non-visible labels.
 Structured `starlark_doc_extract` output and experimental remote repository
 execution remain separate deferred categories. Bazel 9.2 is sole behavior
 authority; Zabel remains peer architecture and optimization guidance only.
@@ -7172,4 +7174,5 @@ failure-order claim, incorrect tag enforcement of `allow_empty`, and internal
 instead of public private-field spelling. Corrected R2 admits exact valid and
 visible values, defers only precise invisible-label failure precedence while
 failing closed, ignores `allow_empty` for tags, and preserves `_private`.
-Rust is gated on independent R2 architecture review.
+Independent R2 architecture review returns `ACCEPT`; Rust implementation is
+authorized under the frozen allowlist and caps.
