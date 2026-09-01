@@ -22400,3 +22400,18 @@ deferred. Implement only typed acceptance and nonsemantic discard of
 `repository_rule(doc = ...)` in `package.rs`, with one closed proof owner.
 Stardoc extraction, retained doc output and experimental remote repository
 execution remain deferred; Zabel supplies peer separation guidance only.
+
+#### Repository declaration documentation implementation returns REPLAN (2026-09-01)
+
+Implementation R1 proves starlark-rust `Option<&str>` rejects explicit
+`NoneType`; it does not implement Bazel's omitted/None equivalence. The same
+binding is already used by `tag_class` and `module_extension`, so the accepted
+claim that `repository_rule` was the sole gap is false. The unaccepted Rust diff
+was discarded. Review only
+`WP-6-7A-repository-declaration-documentation-category-design-correction-r1`:
+one typed `Option<NoneOr<&str>>` binding serves exactly these three siblings and
+is discarded. Every retained/extraction/remote-execution boundary stays
+unchanged. Initial correction review returned `REVISE` because a manual
+`Option<Value>` converter weakened the public binding type; the corrected
+design uses starlark-rust's existing typed None-or-string unpacker instead.
+Focused correction rereview returns `ACCEPT`; activate only implementation R2.

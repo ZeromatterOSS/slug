@@ -1,11 +1,14 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-repository-declaration-documentation-category-implementation-r1`
+Packet: `WP-6-7A-repository-declaration-documentation-category-implementation-r2`
 
 Milestone: M7A generic Starlark/ruleset closure; loading declaration metadata.
 
-Status: implementation active after independent design `ACCEPT` for
-`WP-6-7A-repository-declaration-documentation-category-design-r1`.
+Status: implementation R2 active after independent correction `ACCEPT`.
+The accepted design assumed starlark-rust `Option<&str>` made explicit `None`
+equivalent to omission. Focused compilation proves it rejects `NoneType`, so
+the same latent gap affects existing `tag_class` and `module_extension` doc
+bindings. Correct the full three-sibling category before resuming Rust.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -35,8 +38,8 @@ Exact behavior within the admitted loading/build surface:
   `string_list_dict`), plus `rule`, `aspect`, `provider`, symbolic `macro`,
   `module_extension`, `tag_class`, and `repository_rule`. Existing members
   retain their accepted typed binding and ownership. Within this exact Slug
-  inventory, `repository_rule` is the sole declaration-time rejection of a
-  valid non-`None` doc argument; and
+  inventory, `repository_rule` rejects valid strings while `tag_class` and
+  `module_extension` reject explicit `None`; all three gaps close together; and
 - omitted, explicit `None`, empty, whitespace/multiline and ordinary strings
   all reach the same repository build semantics. Source changes still
   invalidate through existing module-source identity.
@@ -113,17 +116,19 @@ retained. Replay proves priority and boundedness, not semantics.
 ## Learned Slug facts and architecture decision
 
 `package_globals::repository_rule` currently binds `doc` as `Option<Value>` and
-explicitly rejects every non-`None` value. Its frozen repository definition and
-projection already own implementation source, attributes, local/configure and
-the canonical environment-name set. Repository instantiation and effect paths
-consume only those semantic fields.
+explicitly rejects every non-`None` value. `tag_class` and `module_extension`
+bind `Option<&str>`; starlark-rust treats explicit `None` as a supplied value of
+the wrong type rather than as `Option::None`. Rule, aspect and all thirteen attr
+constructors already use `Option<Value>` plus explicit string/None validation;
+symbolic macro and provider documentation retain their separate accepted
+owners.
 
-Change the binding to the same typed optional-string shape already used by
-module-extension/tag-class declaration functions, then discard the value in the
-call body. Add no documentation field to `RepositoryRuleDefinition`, frozen
-definition, projection, module selector, repository request, marker, effect or
-DICE key. This makes wrong-type rejection a shared starlark-rust binding fact
-and prevents documentation from perturbing build identity.
+Bind exactly `repository_rule`, `tag_class`, and `module_extension` as
+`Option<NoneOr<&str>>`. The outer option distinguishes omission; starlark-rust's
+existing typed union accepts explicit `None` or a string and keeps every other
+kind in generated call-binding validation. Discard the unpacked value. Add no
+manual converter and no documentation field to any live/frozen definition,
+projection, module selector, repository request, marker, effect or DICE key.
 
 The category audit records, rather than rewrites, the exact inventory above.
 Any additional valid sibling rejection, retained public metadata, extractor
@@ -141,18 +146,20 @@ scheduler, cache, limits or compatibility claim.
 ## Bounded implementation successor
 
 Implement only
-`WP-6-7A-repository-declaration-documentation-category-implementation-r1`.
+`WP-6-7A-repository-declaration-documentation-category-implementation-r2`.
 
 Allowed production file:
 
-- `app/slug_loading_v2/src/package.rs`, limited to the repository-rule `doc`
-  binding and removal of the current rejection.
+- `app/slug_loading_v2/src/package.rs`, limited to the `NoneOr` import and the
+  `repository_rule`, `tag_class`, and `module_extension` doc signatures plus
+  removal of the repository-rule rejection.
 
 `package.rs` is currently 9,580 lines. The existing `package_globals`
-`starlark_module` remains the cohesive owner because the public callable
-signature and the adjacent rejection are the entire change; extracting a
-wrapper would split one generated binding for a two-line conversion. Forbid
-growth or extraction outside that exact function hunk.
+`starlark_module` remains the cohesive owner because all three public callable
+signatures live in this existing globals-registration owner and consume an
+existing starlark-rust unpacker. Extracting a module would split generated
+bindings for a type-only correction. Forbid growth outside the one import and
+three named function hunks.
 
 Allowed proof files:
 
@@ -160,18 +167,20 @@ Allowed proof files:
   repository-rule call/equality/error matrix;
 - Stage 6/current/canonical status documents at acceptance.
 
-Cap Rust production at 12 gross lines, proof at 90 gross lines and total at 102.
+Cap Rust production at 20 gross lines, proof at 110 gross lines and total at
+130.
 No new file, struct field, collection, clone, allocation, cache, interner, task,
 lock, DICE key, extractor model, fixture or command surface is allowed. A
-compiler-required production consumer outside `package.rs`, any valid sibling
-rejection, or any remote-execution coupling is `REPLAN`.
+compiler-required production consumer outside `package.rs`, any fourth valid
+sibling rejection, or any remote-execution coupling is `REPLAN`.
 
 Required proof matrix:
 
-- omitted and explicit `None` compare equal to the existing repository-rule
-  projection and invocation behavior;
+- omitted and explicit `None` load for each of `repository_rule`, `tag_class`
+  and `module_extension`, and compare equal in their existing projections;
 - empty, ordinary and multiline/whitespace strings load and invoke identically;
-- integer, bool, list, dict and callable docs fail at typed call binding;
+- integer, bool, list, dict and callable docs fail at typed call binding for all
+  three siblings;
 - doc variants compare equal in final repository-rule projection and captured
   invocation behavior. The unchanged complete-suite regression
   `repository_context_attributes_restore_warm_effects_for_ordinary_and_innate_owners`
