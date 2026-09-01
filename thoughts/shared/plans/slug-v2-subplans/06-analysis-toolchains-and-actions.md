@@ -22158,3 +22158,42 @@ ignored, 44 BUILD integrations, 28 invalidation integrations and the remaining
 loading integrations; analysis and query each pass 123 tests. Rebuilt authentic
 replay clears the output category and stops at non-fixed generic aspect
 attributes in rules_rust `rust/private/unpretty.bzl:237`.
+
+#### Rule predeclared outputs accepted; generic aspect declaration architecture active (2026-09-01)
+
+Commit `2799030dc` terminally accepts the complete generic default-enabled rule
+predeclared-output category. The next authentic frontier is declaration-time
+aspect breadth, not configured analysis: rules_rust
+`rust/private/unpretty.bzl:237` combines one provider-constrained implicit
+attribute with the eleven generic `RUSTC_ATTRS`, and Slug's fixed rustfmt/
+clippy gate rejects the resulting dictionary.
+
+Activate `WP-6-7A-generic-aspect-declaration-architecture-r2`. Freeze one
+typed live/frozen/importable owner for the full default-enabled Bazel 9.2
+declaration family: generic attrs, fixed/callback attribute and toolchain
+propagation, both provider predicates, multiple `requires`, propagation
+predicate, fragments/toolchains, generating-rule policy, execution constraints
+and attached subrules. Configured aspect selection, callback/implementation
+execution, applied-aspect DICE identity, provider/action publication and query
+projection remain a later Stage 6 category. Nonempty exec groups fail closed
+until the complete `exec_group()` constructor/attachment/projection category
+has a typed owner; no opaque bridge is retained.
+
+Bazel 9.2 remains sole behavior authority. Existing Buck2-derived compact
+strings, immutable slices, small-set scratch and memory accounting are reused.
+Clean Zabel `0795445f...` is peer guidance only: its separation of immutable
+aspect declarations from configured application keys and required-aspect
+topology informs ownership, while its Zig representation, scheduler, limits
+and behavior are excluded. This remains generic Starlark host architecture;
+rules_rust and `cc_common` are downstream consumers, and Bazel 9 BCR Starlark
+continues to own all rule and aspect bodies.
+
+R1 independent architecture pre-review returned `REVISE`: expand the proof
+from private label attrs to every already-owned default-capable private kind;
+do not confuse declaration-time `requires` set retention with Bazel's
+separate recursive `AspectsList` attachment ordering/validation; and name the
+existing strictest-duplicate parser plus transitive subrule-toolchain union as
+the aspect toolchain owner. Corrected R2 makes only those changes. Multi-aspect
+attachment remains fail-closed for its complete future traversal packet.
+Focused R2 rereview returns `ACCEPT`; commit this architecture before
+materializing its implementation successor.

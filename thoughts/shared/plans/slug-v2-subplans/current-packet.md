@@ -1,27 +1,23 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-rule-predeclared-outputs-complete-r3`
+Packet: `WP-6-7A-generic-aspect-declaration-architecture-r2`
 
-Milestone: M7A generic Starlark/ruleset closure; Stage 4 package output facts
-and Stage 6 rule-context output projection.
+Milestone: M7A generic Starlark/ruleset closure; Stage 4 frozen module
+declarations and the future Stage 6 configured-aspect owner.
 
-Status: R1 architecture pre-review returned `REVISE`; focused correction
-rereview accepted R2 for implementation. Terminal R2 implementation review
-returned `REPLAN`: residual callback parameters were omitted, an absent
-`DefaultInfo` lost rule outputs, the reserved executable output key was not
-rejected, and the nonmerged-genfiles branch had no lawful admitted producer.
-Corrected R3 changes only those behaviors and removes the unreachable command-
-configuration branch from this packet. Focused R3 architecture rereview and
-terminal implementation correction rereview return `ACCEPT`; the latter
-required one mixed ordinary/keyword-only/`*args`/`**kwargs` ordering proof.
-Complete loading, analysis and query validation passes within every unchanged
-cap. The rebuilt authentic replay clears this category and stops at the next
-generic frontier, non-fixed aspect declaration attributes in rules_rust
-`rust/private/unpretty.bzl:237`. Base commit `6cb5ab55b` terminally
-accepts generic rule-level regular-transition attachment. Its predecessor
-replay clears that category and stops at the generic named-
-only `rule(outputs = {"rust_doc_zip": "%{name}.zip"})` declaration in
-`rust/private/rustdoc.bzl:319-436`.
+Status: R1 independent architecture pre-review returned `REVISE`: the proof
+matrix was narrower than the generic private descriptor decision, `requires`
+dedup was conflated with Bazel's separate attribute-attached-aspect traversal,
+and the exact strictest-duplicate/subrule-union toolchain owner was unnamed.
+Corrected R2 expands only those proofs and makes multi-aspect attachment
+explicitly fail closed; the retained representation and other boundaries are
+unchanged. Focused R2 rereview returns `ACCEPT`; commit this design before
+materializing its implementation successor. Commit
+`2799030dc` terminally accepts the complete generic rule predeclared-output
+category. A rebuilt authentic replay clears it and stops while freezing
+rules_rust `rust/private/unpretty.bzl:237`: Slug rejects the aspect's generic
+implicit attribute dictionary because loading still admits only the old fixed
+rustfmt and clippy schemas.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -31,303 +27,283 @@ do not edit or stage it.
 
 ## Observable result and compatibility classification
 
-Implement the complete default-enabled Bazel 9.2 Starlark rule predeclared-
-output declaration category, not the one rules_rust dictionary. A generic
-`rule()` accepts omitted/`None`, an ordered string-to-string dictionary, or a
-Starlark callback in `outputs`; retains the adjacent `output_to_genfiles`
-declaration bit; resolves every target's implicit output keys and labels during
-package loading; publishes generated-file targets; and exposes the same files
-through `ctx.outputs` and synthesized `DefaultInfo.files`.
+Freeze the architecture for Bazel 9.2's complete default-enabled Starlark
+`aspect()` declaration family before implementation. This is one generic
+loading abstraction, not the rules_rust dictionary that exposed it. The
+implementation successor will replace the fixed rustfmt/clippy capture with a
+typed, live/frozen/importable aspect declaration that preserves every admitted
+declaration input needed by future configured-aspect evaluation.
 
-Exact admitted behavior:
+Exact declaration-time behavior:
 
-- `outputs` and `output_to_genfiles` are named-only. `outputs` defaults to
-  `None`; `output_to_genfiles` defaults to `False`. Omitted and explicit
-  `outputs = None` are equivalent;
-- a dictionary retains insertion order and requires string keys and string
-  templates. A callback must be a Starlark function, is frozen/importable with
-  the rule definition, and is invoked once for each target during package
-  loading;
-- callback positional arguments follow Bazel's raw parameter-name order:
-  ordinary, keyword-only, residual `*args`, then residual `**kwargs`. Every
-  name is populated from the target's attributes and passed positionally, so
-  defaults do not excuse an absent match; `*args` receives its matched value
-  inside the residual tuple, while a lone `**kwargs` match reaches Bazel's
-  positional-argument rejection. A named attribute containing `select()`
-  fails before the callback body, while unrelated configurable attributes are
-  omitted and do not reject the call. The return value must be an ordered
-  string-to-string dictionary;
-- each dictionary result produces exactly one key/name pair. Templates retain
-  literal percent signs and incomplete `%{` text, expand repeated complete
-  `%{field}` placeholders independently, and require every placeholder to
-  yield exactly one distinct projected value;
-- `%{name}` uses the complete target name. `%{dirname}` is empty or the target
-  name's directory plus `/`; `%{basename}` is its final component. String
-  values are verbatim, label values omit the final filename extension, and
-  output values retain it. The corresponding list kinds use the same
-  conversion and deduplicate equal projected strings: a nonempty list with one
-  distinct projection succeeds, while two distinct projections fail. Boolean,
-  integer, dictionary, absent, unknown, configurable, empty-list, and
-  distinct-multiple substitutions fail with Bazel-shaped diagnostics;
-- output keys need not be valid identifiers and remain available through
-  `getattr(ctx.outputs, key)`. Key and resolved label order are semantic. Each
-  resolved name must form a valid target in the generating rule's package;
-- generated files are package targets owned by the generating rule and inherit
-  its visibility. Duplicate generated names and direct collisions with another
-  ordinary package target fail through the existing target recorder;
-- a nonempty explicit `attr.output`/`attr.output_list` value whose declaration
-  name equals an implicit output key fails during loading. Empty/absent explicit
-  output attributes reach analysis and then fail when `ctx.outputs` would add
-  the duplicate key;
-- `ctx.outputs` exposes explicit output attributes in declaration order and
-  then implicit output keys in dictionary/callback order. Implicit outputs are
-  real derived Files for the current configured owner and may be registered as
-  action outputs; and
-- an omitted `DefaultInfo.files`, and a synthesized `DefaultInfo` when the
-  implementation returns none, contains implicit predeclared outputs before
-  explicit output-attribute files, followed by the existing executable
-  handling. Generated target query/owner behavior uses the same loading facts;
-  and
-- an executable or test rule rejects implicit output key `executable` before
-  rule implementation. Executable-output lazy creation remains deferred, but
-  its Bazel-reserved namespace cannot be exposed as an ordinary implicit key.
+- `implementation` is positional-or-named and must be a Starlark function.
+  All other parameters are named-only with Bazel 9.2 defaults;
+- `attr_aspects` and `toolchains_aspects` each accept either a fixed sequence
+  or a Starlark callback. Fixed entries deduplicate with first encounter order.
+  `"*"` must be the sole fixed item; it is forbidden in a dynamic attribute
+  result. A private attribute spelling semantically propagates over either
+  Bazel computed-default or late-bound native storage. Fixed toolchain entries
+  resolve strings through the defining module's repository mapping, while a
+  dynamic toolchain callback must later return Label values;
+- `attrs` accepts every already-owned descriptor kind. Every private kind
+  requires an explicit literal default, while the existing late-bound Label
+  kind requires its typed configuration-field default; explicit aspect
+  parameters are limited to Boolean, integer, or string descriptors.
+  Explicitly setting
+  `configurable`, materializing/dormant types, and computed defaults fail at
+  declaration time. Public defaults are validated against allowed values, and
+  an absent/intrinsic default or `mandatory=True` marks that parameter
+  required. Name order, typed defaults, file/provider/aspect policy,
+  transitions and required parameter names survive freezing;
+- `required_providers` and `required_aspect_providers` accept Bazel's direct
+  conjunction or nested disjunction-of-conjunctions over builtin and exported
+  user providers. Mixed nesting and nonproviders fail. Each conjunction and
+  the alternative set are canonical set-semantic identities. An empty target
+  predicate accepts any target, while an empty aspect-provider predicate
+  accepts no aspect; the field domain, not a second representation, preserves
+  that distinction. Any empty conjunction collapses to the corresponding
+  default field meaning;
+- `provides` retains the existing ordered, duplicate-free builtin/user
+  provider identity;
+- `requires` accepts any sequence of aspect values, collapses duplicates by
+  declaration identity, retains every direct required aspect, and remains
+  frozen/importable. This declaration-time set normalization is separate from
+  attribute attachment and later required-aspect traversal;
+- `propagation_predicate` is `None` or a Starlark function and is retained.
+  `apply_to_generating_rules=True` is rejected with either a nonempty
+  `required_providers` declaration or a propagation predicate;
+- `fragments`, required `toolchains`, and `exec_compatible_with` retain their
+  existing compact typed identities. Aspect toolchains use the existing
+  `subrule_toolchain_requirements` parser: list/tuple inputs, repository
+  mapping, first-label order, and duplicate-label convergence to the strictest
+  mandatory requirement. Toolchains discovered transitively from attached
+  subrules are unioned into that aspect requirement set with the same strictest
+  rule. Bazel 9.2 accepts and type-checks `host_fragments` but its
+  implementation does not add it to the aspect definition, so Slug validates
+  and discards it as the same exact no-op;
+- `subrules` reuses the accepted transitive `AttachedSubrules` and frozen
+  callable ownership. Its discovered hidden attributes and toolchains remain
+  aspect-owned declaration facts; and
+- `doc` is a string or `None`. `exec_groups=None` and an empty dictionary
+  are equivalent. Nonempty `exec_groups` fails closed until the complete
+  `exec_group()` declaration category supplies a typed value.
 
 Slug-native behavior:
 
-- one `Arc<[PredeclaredOutput]>` of compact key plus canonical same-package
-  label is the final package and analysis identity. It does not claim Java
-  object identity, Java serialization, Bazel configuration checksum, or exact
-  `bazel-out` path bytes;
-- `output_to_genfiles` participates structurally in rule/package equality. At
-  Bazel 9.2's default `--incompatible_merge_genfiles_directory=true`, both
-  values use the admitted merged output root and therefore yield the same
-  relative action path; and
-- the callback is transient definition/package-loading behavior. Final target
-  semantics retain only resolved key/label pairs plus the placement bit, while
-  the loaded frozen module continues to own callback lifetime.
+- immutable `Arc` slices, `CompactString`, `CanonicalLabel`, shared
+  `ProviderIdentity`, existing toolchain/subrule carriers, and frozen Starlark
+  values form the retained representation. Slug does not claim Java object
+  identity, Java serialization, or Bazel checksum bytes; and
+- fixed propagation edges preserve source order for deterministic inspection
+  while equality is set-semantic. Provider predicates use canonical sorted
+  conjunctions/alternatives. Required aspects use first-encounter order for
+  traversal but declaration identity for duplicate collapse. Slug retains one
+  typed private-attribute edge rather than fabricating Bazel's two internal
+  `$`/`:` names; the future consumer must match it against the base schema's
+  retained default source; and
+- normalized aspect documentation is discarded because Slug has no admitted
+  documentation-extraction surface. Declaration-time type validation is exact;
+  documentation retrieval remains unsupported/deferred.
 
 Unsupported/deferred behavior:
 
-- `--incompatible_no_rule_outputs_param=true` remains outside the admitted
-  command-wide build-language-option surface;
-- `--incompatible_merge_genfiles_directory=false` is not an admitted command
-  configuration and cannot be constructed by this packet. No unreachable
-  analysis branch is retained as a parity claim. The future command-category
-  owner must fail closed or implement exact separate bin/genfiles roots before
-  admitting that option; those bytes remain M9 work;
-- parent/rule-extension output inheritance, native implicit-output functions,
-  computed-default callbacks, executable-output lazy creation, aspects,
-  output groups beyond already admitted `OutputGroupInfo`, and action families
-  not already supported remain separate categories; and
-- Bazel's special output-equals-generating-rule warning, output-prefix
-  conflicts, and input/output conflicts remain unsupported/deferred. This
-  packet performs no package-wide output-name scan and makes no parity claim
-  for those surrounding collision categories; and
-- no parser grammar, `set`, rules_rust rule body, ruleset special case,
-  `cc_common`, `cc_internal`, C++ rule, BCR, command, or repository branch is
-  added. Bazel 9 BCR Starlark continues to own all rule bodies.
+- configured aspect selection, propagation callback/predicate invocation,
+  aspect parameter extraction, required-aspect DAG construction, aspect
+  implementation execution, provider publication, toolchain application,
+  generating-rule redirection, aspect action ownership, query/cquery/aquery
+  aspect projection and REAPI execution remain the Stage 6 configured-aspect
+  category. The successor retains their complete declaration inputs but makes
+  no execution-parity claim;
+- attribute `aspects=[...]` attachment remains limited to the already admitted
+  singleton form. Bazel's `AspectsList` recursively inserts required aspects
+  before their parent, deduplicates shared transitive diamonds, and rejects
+  direct duplicates or a direct aspect appearing after it was already reached
+  as required. That complete attachment/traversal category remains fail-closed
+  and must later consume the retained direct `requires` lists; this packet
+  does not add a partial traversal or claim its ordering/errors;
+- nonempty `exec_groups` remains unsupported until one packet admits Bazel
+  9.2's `exec_group()` constructor, typed declaration, rule/aspect attachment
+  and configured execution projection together. No raw dictionary or frozen
+  evaluator value is retained as a bridge;
+- experimental build-language-option gating for dynamic propagation and
+  subrules is outside the currently admitted command-semantics surface. Their
+  declaration shapes may be retained, but Slug does not claim option-toggle
+  parity; and
+- no parser grammar, `set`, rule body, native/C++ rule, rules_rust branch,
+  `cc_common`, `cc_internal`, BCR resolver, DICE key, command, action or
+  execution fallback is added. Bazel 9 BCR Starlark owns every rule/aspect
+  body; `cc_common` is only a future consumer of the generic host API.
 
 ## Bazel 9.2 authority and accepted evidence
 
 Bazel tag `9.2.0` commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` is the sole semantic authority.
-The commit object remains available even though the clean `../bazel` checkout
-has advanced to master. Pinned source SHA-256 values are:
+`8220c6198837d5c13d53fea211cf3282aa12408a` is the sole behavior authority.
+Pinned source SHA-256 values are:
 
-- `StarlarkRuleFunctionsApi.java`: `be73dbda0b5a3e8285a05bb732a0a01441f99e8d20dc29b83759ef972c0392ea`;
-- `StarlarkRuleClassFunctions.java`: `a1f706cfbbc67aa3cd2521df2091dd5ed9af96eb4568049f8eee966d06c622f7`;
-- `StarlarkCallbackHelper.java`: `2d73165555218adb39af0dff93fbbe8b02cb7fabd81dac2498266c76e3174e3f`;
-- `ImplicitOutputsFunction.java`: `31b17c66166808cd7d9f42fb68a8b6eb0e4d1a2c8aa9c130bd8892c75b59fdb0`;
-- `Rule.java`: `64b41387a6f309b61f9090d3566299c5cbefc0c137beae972d8230d2fafb6b87`;
-- `StarlarkRuleContext.java`: `5200266852f65ca66a958a3adaf82a29f9b5cbbd1a604a4e91d7815476985072`;
-- `outputs_test.sh`: `5a19aa62ade7ef56a5a6556ff5e08879848de89f7460451f41d2c8037d2e3dfe`;
-- `ImplicitOutputsFunctionTest.java`: `ec68d9877b95a0eac8429e4d7a21193be7ccd0fdce693d3bcc0598aff61d6517`;
-- `CoreOptions.java`: `89835ed74107b21f7c51b4723e16be8b96b3c1bf43855fc63220b1dd21f5c67a`; and
-- `BuildLanguageOptions.java`: `b01e106ef0ff7af458766248bce7799b49c0f54fc14d023a8297aeb7dbfb44e5`.
+- `StarlarkRuleFunctionsApi.java`:
+  `be73dbda0b5a3e8285a05bb732a0a01441f99e8d20dc29b83759ef972c0392ea`;
+- `StarlarkRuleClassFunctions.java`:
+  `a1f706cfbbc67aa3cd2521df2091dd5ed9af96eb4568049f8eee966d06c622f7`;
+- `AspectDefinition.java`:
+  `a25f551417466121b56242e9e1b3313f306fa0eef4d7e489284722a41dd71d22`;
+- `AspectPropagationEdgesSupplier.java`:
+  `7dc4600caca01b928888e95b564790ede9c1b49252565f8d7745cc39e454d4f7`;
+- `StarlarkDefinedAspect.java`:
+  `5567543ec2ed455cc416aa0d4b612bfe582abdb1117cb29a3420d297c9ea1f6b`;
+- `StarlarkRuleClassFunctionsTest.java`:
+  `e09c93616e096d639ec69b6b0c6a397a8a36bc8a95fa21b986cb5fc7f8f010aa`;
+- `StarlarkAspectsToolchainPropagationTest.java`:
+  `fd7ee2aee61ea687377effa214f70631b5841f4e7661d6aaf0f07e8a410cc2a0`;
+  and
+- `StarlarkAspectsPropagationPredicateTest.java`:
+  `d0cdcdbd43a2f6fa8bfb8fc55af49d943a185dd1f27b2fc63111bef7cc76a524`.
 
-The API supplies the exact union and defaults. `StarlarkRuleClassFunctions`
-distinguishes callbacks from ordered maps. `StarlarkCallbackHelper` owns
-parameter-name order, positional construction, the transient evaluator and
-print handling. `ImplicitOutputsFunction` owns attribute projection, callback
-result conversion, placeholder parsing, type/cardinality conversion and static
-configurable rejection. `Rule` resolves
-implicit outputs before explicit ones, publishes generated files, validates
-labels and loading collisions. `StarlarkRuleContext` constructs `ctx.outputs`
-in explicit-then-implicit order and detects the remaining duplicate-key case.
-The default merge-genfiles option is exact source evidence for the placement
-classification.
-
-`outputs_test.sh` proves static and callback success, call-binding rejection,
-configurable static failure and generated-target reachability. The pure
-placeholder tests prove parsing, percent escaping, cross product and duplicate
-value behavior. Rule/RuleContext source is stronger evidence for retained
-ordering, key ownership and collision phase. No new permanent Bazel fixture is
-justified; Slug focused regressions adapt these pinned cases, and the authentic
-rules_rust replay supplies the imported BCR consumer.
+The API owns the full call signature and defaults. `StarlarkRuleClassFunctions`
+owns attribute validation, both provider predicates, required aspect sets,
+propagation suppliers/predicate, toolchains, constraints, subrules and the two
+generating-rule conflicts. `StarlarkDefinedAspect` proves declaration
+retention, parameter-name ownership and later definition construction;
+`AspectDefinition` proves the final typed member domains. The three test
+classes supply discriminating success/error themes for
+generic private and public attrs, missing defaults, configurable rejection,
+provider DNF, multiple required aspects, fixed/callback and wildcard
+propagation, toolchain propagation, predicate typing and conflict validation.
+No new permanent Bazel fixture is justified: loading-focused Slug regressions
+adapt those cases, and the authentic BCR replay is the real imported consumer.
 
 ## Learned Slug facts and architecture decision
 
-Slug already creates `PackageTargetKind::GeneratedFile` for explicit output
-attributes, retains final package equality under the package load fingerprint,
-materializes explicit output Files through `ctx.outputs`, and synthesizes
-`DefaultInfo.files` from predeclared output attributes. What is missing is a
-rule-definition output producer and a separate final key/label namespace;
-pretending implicit outputs are attributes would leak them through `ctx.attr`,
-query schema and dependency logic.
+Slug already retains live/frozen implementation values, defining-module and
+export identity, fixed attribute propagation, generic rule attribute schemas,
+typed required toolchains/fragments, advertised providers and one required
+aspect. It also owns a complete transitive `AttachedSubrules` carrier. The
+current gaps are artificial fixed-schema validation, a user-provider-only
+two-singleton predicate, single-aspect storage and absent adjacent API fields.
 
-Add a V2-owned `rule_outputs` module with:
+Replace those restrictions with:
 
-- `RuleOutputsDefinitionGen<Value/FrozenValue>` for either ordered compact
-  template pairs or one frozen callback;
-- a pure template parser/substitution function over retained attribute schema
-  and values; and
-- public `PredeclaredOutput { key: CompactString, label: CanonicalLabel }` for
-  final package/analysis handoff.
+- `AspectPropagationEdgesGen<V, T>`, with `Fixed(Arc<[T]>)` and `Callback(V)`,
+  instantiated for
+  `AspectAttributePropagationEdge::{All, Public(CompactString), Private(CompactString)}`
+  and `AspectToolchainPropagationEdge::{All, Type(CanonicalLabel)}`; neither
+  wildcard nor private-source expansion is stored as an inferred or magic user
+  label;
+- `required_aspects: Vec<V>` so the live value remains traceable and the
+  frozen value owns every referenced aspect without an evaluator borrow;
+- the shared canonical `Arc<[Arc<[ProviderIdentity]>]>` predicate carrier for
+  both target and aspect-provider requirements;
+- compact required-parameter names, predicate callback, generating-rule bit,
+  execution constraints, `AttachedSubrules`, and frozen subrule callables on
+  the existing aspect definition; and
+- one generic aspect-schema validator over existing `AttributeDefinition` and
+  `RuleAttributeSchema`, with no synthetic rule schema, special label table or
+  consumer-specific default reconstruction.
 
-`rule()` validates the union and retains the definition. Freezing retains only
-the callback value or shares immutable template pairs. Target invocation first
-coerces all attributes using the existing owner, then executes a callback in a
-fresh synchronous evaluator with the definition's Bzl context and package
-print handler when applicable, resolves templates, checks loading collisions,
-and records the rule plus generated targets atomically through the existing
-recorder. `StarlarkRuleImplementation` retains the resolved output slice and
-placement bit in structural equality. Analysis borrows that slice for
-`ctx.outputs`, default-file synthesis and action-output ownership; it does not
-rerun templates or callbacks.
+Keep the retained aspect definition beside rule/attribute descriptor freezing
+in `package.rs`: those private generic types and the defining-module resolver
+are its cohesive owner. Extracting only this seam would widen private
+interfaces while leaving declaration semantics split. Every new helper must
+remain below 140 lines. A future configured-aspect packet may move the complete
+type once there is a second production owner; this packet does not preemptively
+create a cross-crate aspect crate.
 
-Do not create synthetic `AttributeSchema` rows, a second generated-target
-registry, path inference, callback source text, repository-mapping copy,
-ordinal side table, global interner, cache, DICE key, output-name scan or
-analysis fallback.
+Do not add an opaque exec-group map, second provider identity, aspect registry,
+global interner, cache, DICE key, source-text callback, evaluator borrow,
+ruleset allowlist or hard-coded rules_rust label.
 
-## Lifetime, memory, incremental ownership, and peer guidance
+## Lifetime, incremental ownership, and peer guidance
 
-Static declaration maps use ordered `Arc<[(CompactString, CompactString)]>`;
-resolved outputs use `Arc<[PredeclaredOutput]>`. This preserves observable
-order, gives constant-time slice clones, derives `Allocative`, and avoids a
-retained hash map for the normally tiny collection. Construction and template
-substitution use request-local `Vec`/`SmallSet` scratch only. No new global
-interner is justified; canonical labels retain their existing owner.
+The frozen defining Bzl module owns implementation and callback code, required
+aspect values, subrule callables, and the typed declaration. Fixed lists and
+policies share immutable slices. Evaluation-time maps, duplicate sets and
+label-conversion buffers are scratch dropped before module publication.
+Existing frozen-module/package fingerprints own invalidation and A/B/A
+restoration; no request overlay, filesystem observation, asynchronous task,
+cache, eviction, cancellation or shutdown behavior changes.
 
-The frozen module owns callback code. Its fresh evaluator, argument values,
-callback result dictionary and substitution buffers are synchronous package-
-loading scratch and are dropped before publication. Package publication owns
-resolved outputs and generated targets; structural equality supplies DICE
-cutoff and A/B/A restoration. No evaluator borrow, command scratch, async task,
-cache, eviction, cancellation, shutdown or overlapping-request behavior
-changes.
+The Buck2-utility decision is reuse: `CompactString`, immutable `Arc` slices,
+`SmallSet` construction scratch and `Allocative` are already adopted. No new
+Buck2/V1 code, hasher, interner or collection enters the packet.
 
 Clean Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer
-architecture guidance only. `build_invocation_capture.zig`
-(`4e3bff2cc636a52c26e64346ff4271490d1a7a0cf59917bc46d8578bc7f404d1`)
-supports separate resolved key/name package facts;
-`configured_rule_analysis.zig`
-(`02838bcd7f7aba0743338b61179e8bfeca79378eaf17b6b78d85366280f44126`)
-supports implicit-before-explicit `DefaultInfo` materialization and a separate
-`ctx.outputs` namespace. Slug does not copy its allocator, dense indexes,
-capture stages, or name-only `%{name}` template limitation, and Zabel is not a
-behavior oracle.
+architecture and optimization guidance only. Its
+`src/aspect/session_applied_aspect_node.zig` supports separating immutable
+declaration identity from later per-configured-target application keys,
+retaining required-aspect topology on the applied-aspect side, and keeping
+provider classes typed. Slug adopts those ownership lessons, not Zabel's Zig
+rows, allocator, dense IDs, configured-aspect implementation, scheduler,
+limits, tests or behavior. Bazel 9.2 remains the oracle.
 
-Buck2 supplies no Bazel `rule(outputs=...)` semantic donor. The matching Stage
-9 utility decision is reuse of Slug's already adopted Buck2-derived
-`CompactString`, immutable `Arc` slices and `Allocative`; no Buck2/V1 code,
-interner, map, hasher or new utility enters this packet.
+## Successor implementation boundary, caps, proofs, and stops
 
-## Implementation boundary, caps, and proofs
+After architecture `ACCEPT`, materialize one implementation successor with:
 
 Production allowlist:
 
-- `app/slug_loading_v2/src/rule_outputs.rs` (new pure owner);
-- `app/slug_loading_v2/src/lib.rs`;
-- `app/slug_loading_v2/src/package.rs` only for binding/freeze/invocation and
-  final target handoff;
-- `app/slug_analysis_v2/src/starlark_rule.rs` only for `ctx.outputs`, default
-  files and reserved-key validation.
+- `app/slug_loading_v2/src/package.rs` for the retained type, generic
+  validators, binding and freeze; and
+- `app/slug_loading_v2/src/subrule.rs` only if the existing attached-subrule
+  projection needs a read-only accessor rather than duplicated traversal.
 
 Proof allowlist:
 
-- colocated `rule_outputs.rs` unit tests;
-- `app/slug_loading_v2/tests/build_file_loading.rs`;
-- `app/slug_loading_v2/tests/bzl_invalidation.rs`;
-- `app/slug_loading_v2/src/host_package_load_tests.rs`;
-- `app/slug_analysis_v2/tests/starlark_rule.rs`; and
-- `app/slug_query_v2/tests/loading_query.rs` only for implicit-generated-target
-  lookup, kind and generating-rule ownership over the existing query graph.
+- `app/slug_loading_v2/src/host_package_load_tests.rs`; and
+- existing loading integration/invalidation tests only if module publication
+  or A/B/A needs a public-boundary proof unavailable in the host suite.
 
-Plan/status allowlist is this manifest, the canonical plan, Stage 6, the Stage
-9 ledger and the required orchestration routing log. Caps are 360 net / 520
-gross production Rust lines, 420 net / 650 gross proof Rust lines, and 1,170
-total gross Rust lines. No new function
-may exceed 140 lines.
+Plan/status allowlist is this manifest, the canonical plan, Stage 6 and the
+Stage 9 utility ledger. Caps are 520 net / 680 gross production Rust lines,
+520 net / 700 gross proof Rust lines and 1,380 total gross Rust lines. No new
+function may exceed 140 lines.
 
-`package.rs` exceeds the complexity trigger, so template semantics and retained
-types belong in the new cohesive module; `package.rs` receives only seam code.
-`starlark_rule.rs` is below the 2,000-line trigger and already owns all
-`ctx.outputs`/DefaultInfo projections. No demonstrated hot-path performance
-claim is made; exact ordering and structural equality precede any future
-measurement.
+Focused proofs cover:
 
-Focused proofs must cover:
+1. the full positional/named ABI and defaults, wrong types, doc/no-op host
+   fragments, empty exec groups and nonempty fail-closed behavior;
+2. the complete default-capable private-kind matrix over every already-owned
+   descriptor kind, the late-bound Label case, public bool/int/string
+   parameters, missing/intrinsic/`mandatory` required-parameter cases,
+   bad-allowed defaults, invalid public kinds, configurable/computed rejection,
+   typed schema preservation and required parameter names;
+3. direct and nested provider predicates over builtin/user identities,
+   empty/direct/nested/mixed/error forms, canonical equality, and distinct
+   target-versus-aspect fields;
+4. zero/one/multiple/duplicate direct required aspects across local and
+   imported frozen definitions, plus explicit fail-closed proofs for direct
+   duplicate, reverse-required and multi-attachment forms until the complete
+   `AspectsList` traversal category;
+5. fixed/dynamic attribute and toolchain propagation, wildcard rules,
+   repository-mapped labels, retained callbacks and freeze/import identity;
+6. propagation predicate, generating-rule conflicts, fragments, list/tuple
+   toolchains, optional/mandatory duplicate convergence, repository mapping,
+   transitive subrule-toolchain union, constraints, subrules and all retained-
+   field discrimination;
+7. a same-module or same-DICE A/B/A proving changed declaration inputs
+   invalidate and exact restoration cuts off; and
+8. rebuilt authentic rules_rust replay clears generic `rust_unpretty_aspect`
+   declaration and records the next independent frontier before any ruleset,
+   `cc_common`, `cc_internal` or C++ special case.
 
-1. omitted/`None`/empty, static map, callback and both named-only bindings;
-   wrong union, dictionary member, native-callable and callback-return types;
-2. literal percent/incomplete placeholders, name/dirname/basename, string,
-   label/output extension treatment, singleton lists, duplicate-equal versus
-   distinct-multiple list projections, repeated placeholders,
-   unknown/absent/unsupported/configurable/empty values, and exact error phase;
-3. direct and transitive imported callbacks, complete ordinary/keyword-only/
-   `*args`/`**kwargs` raw parameter ordering and errors, every currently
-   admitted attribute value carrier, defaulted parameters, named configurable
-   rejection, unrelated configurable success, print capture, once-per-target
-   execution and ordered returned dictionaries;
-4. final key/canonical-label order and equality, template/key/placement
-   discrimination, equivalent-result convergence, and same-DICE A/B/A;
-5. generated target ownership/visibility/order, invalid or duplicate names,
-   ordinary target collisions, and nonempty versus empty explicit-output-key
-   collision phases;
-6. `ctx.outputs` explicit-then-implicit access including `getattr` for a
-   nonidentifier key, action registration with an implicit File, omitted-files
-   and absent-provider `DefaultInfo.files` implicit-before-explicit order, and
-   pre-implementation executable/test rejection of implicit key `executable`;
-7. loading-query implicit generated-target lookup, generated-file kind and
-   generating-rule ownership over the same package facts;
-8. false/true `output_to_genfiles` structural identity under Bazel 9.2's
-   admitted default merged-genfiles configuration, plus an inventory proof
-   that the nonmerged command option remains unconstructible and unclaimed;
-9. rebuilt authentic rules_rust replay clears the complete generic output
-   declaration category and stops at the next independent generic frontier,
-   never at parser, `set`, `cc_common`, `cc_internal`, or a ruleset branch.
+Validation is serial: focused and complete loading tests, one direct analysis
+compile/test dependent, `cargo fmt --check`, Cargo metadata,
+`git diff --check`, archive status, pinned source hashes, clean Buck2/Zabel,
+parked-file hash, `cargo build -p slug_cli_v2`, stale-`slugd` cleanup and the
+authentic replay. Independent architecture pre-review and terminal retained-
+representation review are required.
 
-Validation is serial: focused and complete loading/analysis/query
-tests, `cargo fmt --check`, Cargo metadata, `git diff --check`, archive status,
-pinned source-object hashes, clean Buck2/Zabel, parked-file hash,
-`cargo build -p slug_cli_v2`, stale-`slugd` cleanup, and authentic replay.
-Independent architecture pre-review and terminal implementation review are
-required for new retained cross-crate identity and callback lifetime.
-
-There is no fallback. `REPLAN` before implementation if callbacks require a
-retained evaluator borrow, if generated targets cannot be recorded atomically,
-if exact callback parameter projection requires a starlark-rust fork, if
-implicit outputs must masquerade as attributes, or if a new DICE key/global
-registry is required. `REPLAN` during implementation if package equality cannot
-own every key/label/placement input, residual callback names cannot be
-projected without a starlark-rust fork, synthesized defaults need a second
-output owner, the production cap is exceeded, or replay contradicts pinned
-Bazel 9.2 evidence.
-
-Residual risk is explicit: the deprecated API is needed by current BCR rule
-sets, but disabling it and any construction plus exact handling of split bin/
-genfiles roots remain deferred command/configuration categories. Bazel's
-prefix/input/output and own-rule collision cases are also deferred package-
-validation categories.
+There is no fallback. `REPLAN` before Rust if a provider predicate needs a
+second identity, if multiple required aspects require a global registry or
+cycle side table, if callbacks/subrules would borrow an evaluator, if generic
+aspect attributes cannot reuse the ordinary typed schema without lying about
+public parameter policy, or if nonempty exec groups are required by the live
+BCR frontier. `REPLAN` during implementation if any admitted field is dropped
+across freeze/import, package fingerprinting cannot observe it, the production
+cap is exceeded, or replay contradicts pinned Bazel 9.2 evidence.
 
 ## Immediate predecessor
 
-Commit `6cb5ab55b` terminally accepts
-`WP-6-7A-rule-level-transition-attachment-r1`: generic named-only regular
-transition attachment survives live/frozen/imported/final rule ownership,
-shares attribute transition identity and allowlist generation, and fails
-before configured work. Complete loading passed 560 tests with one ignored,
-analysis passed 122, independent terminal correction rereview returned
-`ACCEPT`, and authentic replay advanced to the generic output category selected
-here.
+Commit `2799030dc` accepts
+`WP-6-7A-rule-predeclared-outputs-complete-r3`: generic static/callback rule
+outputs produce package-owned generated targets and final compact key/label
+facts, feed `ctx.outputs` and synthesized defaults, and pass complete loading,
+analysis/query, terminal review and authentic replay gates.
