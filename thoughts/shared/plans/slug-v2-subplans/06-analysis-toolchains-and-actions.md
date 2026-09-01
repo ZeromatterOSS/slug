@@ -21872,3 +21872,37 @@ behavior remain excluded. No DICE, loading, parser, execution, REAPI,
 `cc_common`, ruleset, or C++ production owner changes. Independent retained-
 representation review returned `REPLAN` only for a mistyped pinned
 `SpawnAction.java` digest; focused correction rereview returned `ACCEPT`.
+
+#### FilesToRun Spawn expansion accepted; Bzlmod signature parity active (2026-08-31)
+
+Commit `21db5d7b8` terminally accepts all six direct/root-associated
+FilesToRun executable and tool branches, complete provider File topology,
+top-level versus sequence-nested depset association, root/subrule separation
+and one shared alias-aware publication comparison. Full serial owner and
+downstream validation, warm A/B/A, caps and hygiene pass; independent terminal
+review returned `ACCEPT`. Physical execution/REAPI lowering remains deferred
+and must consume provider roots from both invocation and tool domains without
+flattening or losing alias topology.
+
+A rebuilt, daemon-clean `cquery //app/slug_cli_v2:slug` now advances through
+the accepted generic loading/provider/action closure into authentic rules_cc
+0.2.17. It stops while loading `cc/extensions.bzl:190`, before configured
+analysis: `compatibility_proxy = module_extension(_compat_proxy_impl)` is
+rejected because Slug incorrectly declares `implementation` named-only.
+
+Activate `WP-6-7A-bzlmod-declaration-signature-parity-r1` at `21db5d7b8`.
+Pinned Bazel 9.2 declares the first `repository_rule` and `module_extension`
+parameter and `tag_class.attrs` positional-or-named, with every later parameter
+named-only. Close that complete three-builtin call-signature category through
+the existing starlark-rust generated binder, then replay the real frontier
+twice. Add no manual adapter, effect, retained owner, parser, DICE key,
+`cc_common`, `cc_internal`, rules_cc or C++ branch. Zabel guides only the
+declaration-boundary placement and independently demonstrates the demanded
+rules_cc spelling; its contradictory tag-class positional rejection is not
+adopted. Independent public-ABI review is required before Rust.
+
+Independent public-ABI review returned `ACCEPT`: all three first parameters
+have Bazel's positional-or-named shape, later admitted parameters remain
+named-only, `tag_class.attrs` belongs in the category because
+`Param.positional()` defaults true, and no retained owner changes. Implement
+only the frozen two-annotation correction and its category proof.

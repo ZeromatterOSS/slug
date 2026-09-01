@@ -1,213 +1,158 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-files-to-run-spawn-expansion-design-r1`
+Packet: `WP-6-7A-bzlmod-declaration-signature-parity-r1`
 
-Milestone: M7A generic Starlark/ruleset closure; Stage 6 standard-provider
-action import.
+Milestone: M7A generic Starlark/ruleset closure; Stage 6 Bzlmod declaration
+builtin call binding.
 
-Status: independent retained-representation review returned `REPLAN` only for
-a mistyped pinned `SpawnAction.java` SHA-256; focused correction rereview
-returned `ACCEPT`. All retained-representation, equality, completeness, scope,
-split, cap, and Zabel-role decisions are accepted. Zero Rust. Commit
-`f46a009a0` terminally accepts the four non-Windows
-runfiles-support actions and is this packet's base. The unrelated dirty
+Status: independent public-ABI review returned `ACCEPT`; implementation is
+active. Commit `21db5d7b8` terminally accepts the complete FilesToRun Spawn
+expansion and is this packet's base. The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked;
 do not edit or stage it.
 
 ## Observable result and stop boundary
 
-Complete the fourth and final successor of the accepted typed
-DefaultInfo/runfiles/FilesToRun category. An admitted complete
-`FilesToRunProvider` used as a `ctx.actions.run` executable or tool expands its
-existing stable File depset into the sole retained Spawn tool/input owner. A
-root-scope executable File recovers its scoped provider association; subrules
-continue to require their hidden executable dependency as the provider value.
+Make the admitted call signatures of the complete Bzlmod `.bzl` declaration
+builtin category match Bazel 9.2:
 
-The packet covers the whole already-designed import category in one change:
+1. `repository_rule(implementation, ...)` keeps its already-correct mandatory
+   positional-or-named first parameter;
+2. `module_extension(implementation, ...)` admits its mandatory first
+   parameter positionally or by name; and
+3. `tag_class(attrs, ...)` admits its optional first parameter positionally or
+   by name, with omission retaining the empty-dictionary default.
 
-1. direct FilesToRun executable;
-2. root-associated File executable;
-3. direct FilesToRun sequence tool;
-4. root-associated direct File tool;
-5. root-associated top-level tool-depset leaves; and
-6. the accepted no-inference behavior for sequence-nested tool depsets.
+Every later parameter remains named-only. Duplicate positional-plus-named
+binding, missing mandatory implementation, excess positional arguments and
+existing type/semantic validation continue to fail before publication. Named
+forms remain byte-for-byte behaviorally unchanged.
 
-It also completes `FilesToRunProvider.files` with the runfiles-tree Artifact
-and removes the temporary internal `complete` migration bit. No incomplete
-provider is published after `f46a009a0`: returned Starlark providers are
-finalized transactionally before configured-result publication, while source
-File targets remain the exact supportless singleton category.
+After focused proof, rebuild the V2 CLI and run two daemon-clean
+`cquery //app/slug_cli_v2:slug` replays. Both must pass the authentic rules_cc
+0.2.17 `compatibility_proxy = module_extension(_compat_proxy_impl)` declaration
+and stop identically at the next unsupported boundary, or succeed. The observed
+next boundary selects the successor; do not expand this packet to consume it.
 
-This remains generic provider/action infrastructure. It adds no parser,
-evaluator builtin, `set`, `cc_common`, `cc_internal`, rules_cc, C++ rule,
-ruleset dispatch, execution, aquery, ActionKey, or REAPI behavior. Bazel 9 BCR
-Starlark owns all rule bodies, including `cc_internal`; `cc_common` is only a
-demanding consumer of the reusable host/provider/action ABI.
+This is generic Starlark Host-ABI binding. It adds no parser or evaluator
+language construct, rule implementation, repository/module-extension effect,
+provider, DICE key, configured analysis, action, execution, `cc_common`,
+`cc_internal`, rules_cc or C++ special case. Bazel 9 BCR Starlark continues to
+own rule bodies; `cc_common` is only a downstream consumer.
 
 ## Learned facts and authenticated evidence
 
 Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole
 semantic authority. Pinned sources and SHA-256 values are:
 
-- `FilesToRunProvider.java`
-  `17f3bf0b0428f8ae8c73364209ca51ffbc95afd70fe1ea7a3109ae114d8f7501`;
-- `RuleConfiguredTargetBuilder.java`
-  `c0fade587fb100fffd5cc49a425a3bb00b50f165dd10bfcbbb8fb6c5cc4bad6f`;
-- `SpawnAction.java`
-  `64cbe2b26f16e51cd57f6cefbfb21c76c0b940c0bcd9b0b8109327aa5bf667c2`;
-- `StarlarkActionFactory.java`
-  `bee52fa85442fe668c8573bbd2218dd454485ac8d4451ecf3553201fba6169a2`;
-- `StarlarkAttributesCollection.java`
-  `9b3b300d7e9c25dceafc8a9450dd2511f9b0b83088e11421b6dc3b5086cc7442`;
+- `RepositoryModuleApi.java`
+  `1bb286ec5fe4667c4328081b3ca002e22fbcfb1af8f4ba5d06581a20151ddd8f`;
+- `Param.java`
+  `3014de7bc7fb2bb40b8f1e8f0ec648bd923eb5777963c9d21111e0dfcae28104`;
+- `RunfilesRepoMappingManifestTest.java`
+  `8df1c7f6cc4558fe35405f43e7130ffc4f0588f41e75f18709adf520146545df`;
   and
-- `StarlarkSubrule.java`
-  `9d2115fdf86f1807abaf0405d3a5b36fbb3d9f8abd87aa82440f72e6e46657b6`.
+- selected rules_cc 0.2.17 `cc/extensions.bzl`
+  `a190a467ac48329a76e1a9ccab1fea53519af4bb2202e22346b23fc24dcf9872`.
 
-The pinned constructors establish the complete branch behavior:
+`RepositoryModuleApi` marks the first parameter of `repository_rule` and
+`module_extension` as `named = true` without disabling positional binding;
+`tag_class.attrs` has the same declaration. `Param.positional()` defaults to
+true. All following parameters explicitly set `positional = false`.
+`RunfilesRepoMappingManifestTest` and rules_cc independently exercise the
+single positional `module_extension` spelling.
 
-- `RuleConfiguredTargetBuilder.buildFilesToRun` constructs one stable set from
-  files-to-build, the singleton runfiles-tree set, and the Starlark executable;
-- `SpawnAction.Builder.setExecutable(FilesToRunProvider)` selects the provider
-  executable and adds `getFilesToRun()` as one transitive tool root;
-- `setExecutable(Artifact)` and `addTool(Artifact)` add a direct tool;
-- `addTool(FilesToRunProvider)` adds only the complete files-to-run set
-  transitively;
-- `StarlarkActionFactory` performs root Artifact association before choosing
-  those branches;
-- a top-level tools depset is flattened by Bazel before per-File association,
-  while a depset nested in a sequence is added transitively without per-leaf
-  inference; and
-- subrule executable hidden dependencies are typed FilesToRun values, and a
-  bare associated File is rejected.
-
-Pinned tests are `StarlarkRuleContextTest.java`
-`d195e5d49aae52a92bd3abebfc8de7942aacb252b522cea315985d41277f082d`,
-`StarlarkSubruleTest.java`
-`b4cad33b5eec81f34d53b17d8f7543d51dedbb41a9a8a5359908afd70e8060e9`,
-and `RunfilesRepoMappingManifestTest.java`
-`8df1c7f6cc4558fe35405f43e7130ffc4f0588f41e75f18709adf520146545df`.
-They pin direct executable-provider use, subrule File rejection, and manifest
-fields sourced from the actual provider. Existing Slug Spawn/provenance tests
-are the discriminating regression surface; no new oracle fixture is required.
+A disposable Bazel 9.2 oracle composed all three positional first-parameter
+forms in one extension: `repository_rule(_repo_impl)`,
+`tag_class({"value": attr.string()})`, and
+`module_extension(_extension_impl, tag_classes = {...})`. Querying the
+generated repository returned `@generated//:ok`. The current rebuilt Slug
+binary instead reaches rules_cc and returns the discriminating error
+`Missing named-only parameter implementation` at `cc/extensions.bzl:190`.
 
 Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance,
-not a source of truth. Its `ARCHITECTURE.md` (`9db6aaaf…`),
-`src/analysis/providers.zig` (`7f0441f9…`),
-`src/analysis/starlark_action_registration.zig` (`9c5302a1…`), and
-`src/analysis/logical_actions.zig` (`cd01ea71…`) demonstrate two useful ideas:
-retain the authenticated FilesToRun occurrence until action lowering, and use
-one invocation-scoped depset importer across executable, inputs, and tools so
-shared roots remain shared. Slug applies only those ownership lessons through
-its existing dense Rust depset and publication comparator. Copy no Zig code,
-row layout, IDs, errors, action representation, scheduler, cache, digest, or
-compatibility claim.
+not a source of truth. Its
+`src/starlark_host/engine/module_extension_execution_capture.zig`
+(`8f03505b2302f79443d3ab95f12cbca2b65eec8a417ff94e739fb9fafcd06fc0`)
+keeps call binding at the declaration Host boundary and already proves the
+rules_cc positional `module_extension` spelling. Its `tag_class` binder rejects
+all positional arguments, contrary to pinned Bazel's API declaration, so that
+behavior is explicitly not adopted. Copy no Zig code, binding tables, errors,
+representation, scheduler, cache or compatibility claim.
 
 ## Compatibility classification
 
-**Exact:** direct/provider and root-associated executable selection; direct
-Artifact versus transitive FilesToRun tool classification; complete provider
-File membership including the runfiles tree; top-level versus sequence-nested
-depset association behavior; root/subrule scope separation; missing provider
-executable failure; and validation before action publication.
+**Exact:** first-parameter positional-or-named acceptance for
+`repository_rule`, `module_extension`, and `tag_class`; omission/default rules;
+named-only status for later parameters; duplicate, missing and excess argument
+rejection; and unchanged existing semantic validation after binding.
 
-**Slug-native:** collision-safe structural action identity; alias-aware dense
-depset publication equality; retention of the original top-level tools depset
-topology instead of reproducing Bazel's temporary flattened Java list; compact
-Rust layout; and configuration-relative Artifact paths rather than exact
-`bazel-out` bytes. These differences do not change File membership, Starlark
-typing, association, validation, or invalidation.
+**Slug-native:** Rust/starlark-rust diagnostic wording where the accepted tests
+do not claim exact Bazel text, Rust Unicode, compact frozen declaration layout
+and existing structural publication identity.
 
-**Unsupported/deferred:** directory expansion; action templates; named or
-automatic exec groups; resource callbacks; shadowed actions; manifest bytes;
-Windows runfiles; aquery formatting; physical execution/materialization;
-Bazel ActionKey; and REAPI/CAS projection. Deferred consumers may not flatten
-and rebuild FilesToRun, discard the tree, infer nested-depset associations, or
-introduce a second Spawn/provider representation.
+**Unsupported/deferred:** `repository_rule.remotable` behind Bazel's
+experimental flag; unadmitted repository/module-context operations; physical
+repository effects beyond accepted capabilities; later BCR loading/configured
+analysis failures; exact Java exception text; and all action/execution breadth.
+The packet may not silently widen any of these surfaces.
 
-## Frozen retained architecture
+## Frozen architecture
 
-`FilesToRunProvider` remains the sole provider owner. Completion reconstructs
-its stable `files` root from the effective `DefaultInfo.files`, the singleton
-runfiles-tree depset, and the executable. The temporary `complete` bool and
-private `_complete` occurrence field are deleted; `support: Option<Arc<_>>`
-continues to distinguish support-bearing and exact supportless categories.
-The post-evaluation finalizer remains the atomic boundary for registering all
-four support actions and replacing the effective `DefaultInfo` before
-publication.
+Keep `package_globals` as the sole declaration-builtin registration owner and
+starlark-rust's generated parameter schema as the sole binder. Correct only the
+two mismatched first-parameter annotations: remove the named-only requirement
+from `module_extension.implementation` and `tag_class.attrs`. Do not add a
+manual `*args/**kwargs` adapter, signature table, wrapper builtin, call-site
+rewrite, source inspection or rules_cc branch. The existing Rust function
+arguments continue to feed the same validation and frozen declaration owners.
 
-The existing action enums gain only reserved variants:
+Category proof must cover all three builtins together so later consumers do not
+reopen this signature decision. Assert positional, named and omitted-where-
+optional forms; reject positional-plus-named duplicates and a second
+positional argument; and prove positional/named results retain the same
+declaration content. No retained representation, hashing, compact collection,
+interning, clone, memory-accounting or DICE ownership changes.
 
-```text
-SpawnExecutable::FilesToRun(FilesToRunProvider)
-ArtifactInputSource::FilesToRun(FilesToRunProvider)
-```
-
-Rendering selects the provider executable. Input visitation follows the
-provider's existing `AnalysisDepset` through `RetainedArtifactInputs`; it does
-not flatten into an owned File vector. `SpawnExecutable`,
-`RetainedSpawnInvocation`, `ArtifactInputSource`, `ArtifactInputs`, command
-lines, inputs, and tools all compare with one `PublicationEqState`. This
-preserves alias partitions when the same retained depset appears in more than
-one Spawn domain.
-
-`ExecutableArtifactProvenance` remains one `SmallMap` for root associations
-and one `SmallMap` per subrule identity. The lowering split is:
-
-- root associated File: retain the direct File where Bazel does, then append
-  the associated provider's transitive root; an executable uses the provider
-  variant directly;
-- subrule associated File: reject and require the provider value;
-- direct provider: retain the provider variant;
-- top-level depset: retain its original dense topology, visit only in
-  registration scratch to discover root associations, and append only the
-  associated provider roots; and
-- sequence-nested depset: retain it unchanged and perform no association
-  lookup.
-
-No evaluator `Value` crosses publication. Provider/depset/action values are
-DICE-retained semantic memory with `Allocative`; association traversal and
-temporary source collection are action-registration scratch. Existing clones
-of `FilesToRunProvider` are bounded shallow clones of dense handles, Artifacts,
-and `Arc<RunfilesSupport>`; no leaf vector, interner, cache, lock, task, or new
-DICE key is added. A later measured packet may wrap the provider itself in an
-`Arc`, but this packet must not change occurrence identity merely for an
-unmeasured clone optimization.
-
-## Allowlist, caps, validation, and stops
+## Allowlist, caps, validation and stops
 
 Production allowlist:
 
-- `app/slug_build_api_v2/src/providers/mod.rs`;
-- `app/slug_build_api_v2/src/actions/spec.rs`;
-- `app/slug_analysis_v2/src/{analysis_value.rs,starlark_rule.rs,lib.rs}`; and
-- one cohesive `app/slug_analysis_v2/src/files_to_run_spawn.rs` split.
+- `app/slug_loading_v2/src/package.rs`.
 
 Proof allowlist:
 
-- `app/slug_build_api_v2/tests/{providers.rs,actions.rs}`; and
-- `app/slug_analysis_v2/tests/{starlark_rule.rs,subrule.rs}`.
+- the inline `module_extension_definition_tests` module in
+  `app/slug_loading_v2/src/package.rs`;
+- `app/slug_loading_v2/src/host_package_load_tests.rs`; or
+- one existing focused `app/slug_loading_v2` test module if it already owns
+  declaration-builtin call signatures.
 
 Scheduling/status edits may touch this manifest, canonical Live Status,
-Stage 6, Stage 9, and the routing log only if review changes the route.
-No loading, DICE, query, execution, REAPI, parser, or ruleset production file
-is allowed. `starlark_rule.rs` starts at 1,970 physical lines, so Spawn
-provenance/lowering moves into the cohesive new module and the original file
-must finish below 2,000 lines.
+Stage 6 and Stage 9. No routing-log row is needed unless review changes the
+route.
 
-Caps are 600 net / 750 gross production Rust lines, 650 net / 800 gross proof
-Rust lines, and 1,250 net / 1,550 gross total Rust lines; the new production
-module is capped at 360 physical lines. Validate serially with full
-`slug_build_api_v2`, `slug_analysis_v2`, and direct loading/query dependents;
-focused provider topology, all six Spawn branches, root/subrule diagnostics,
-alias-partition equality, action atomicity, and warm A/B/A tests;
-`cargo fmt --all -- --check`; Cargo metadata; core/REAPI compile checks;
-`scripts/v2_archive_status.sh`; `git diff --check`; cap accounting; and parked
-file SHA-256 verification.
+Caps are 10 net / 10 gross production Rust lines, 120 net / 150 gross proof
+Rust lines, and 130 net / 160 gross total Rust lines. Validate serially with
+the focused signature tests, full `slug_loading_v2`, direct `slug_query_v2` and
+`slug_analysis_v2` dependents, rebuilt `slug_cli_v2`, two daemon-clean real
+bootstrap replays, `cargo fmt --all -- --check`, Cargo metadata,
+`scripts/v2_archive_status.sh`, `git diff --check`, cap accounting and parked
+file SHA-256 verification. Clean stale `slugd` processes before and after the
+replays.
 
-`REPLAN` before changing the binder or DICE key, flattening retained topology,
-adding a second provider/Spawn/importer, weakening root/subrule separation,
-publishing an incomplete provider or partial action, adding execution
-projection, exceeding a cap, copying donor code, or introducing a parser,
-`cc_common`, C++ or ruleset-specific branch. Independent architecture review
-is required before Rust; independent terminal review is required before
-acceptance and commit.
+`REPLAN` before changing parser/evaluator language semantics, starlark-rust,
+manual argument binding, a retained declaration representation, DICE/loading
+ownership, repository effects, a rule/provider/action owner, exact diagnostic
+claims, an unsupported parameter, any ruleset/C++ branch, or a cap. Independent
+public-ABI review is required before Rust; independent terminal review is
+required before acceptance and commit.
+
+## Immediate predecessor
+
+Commit `21db5d7b8` implements the independently accepted complete FilesToRun
+Spawn expansion at `+378/-226` production and `+279/-25` proof Rust lines. It
+passes full owner/downstream, alias, root/subrule, warm A/B/A, format, metadata,
+archive and hygiene gates. Its later execution/REAPI importer remains deferred
+and must consume FilesToRun roots from both invocation and tool domains without
+flattening or losing alias topology.

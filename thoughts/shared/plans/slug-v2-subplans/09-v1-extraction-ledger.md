@@ -2150,10 +2150,9 @@ also returned `ACCEPT`; no V1, Buck2, or Zabel semantic owner was introduced.
 
 ### Stage 6 FilesToRun Spawn expansion utility decision (2026-08-31)
 
-Status: design `ACCEPT` in
-`WP-6-7A-files-to-run-spawn-expansion-design-r1` at base `f46a009a0`; the
-initial review's sole `REPLAN` was a mistyped pinned `SpawnAction.java` digest,
-which focused correction rereview accepted.
+Status: implementation terminally `ACCEPTED` in commit `21db5d7b8`; the
+initial design review's sole `REPLAN` was a mistyped pinned
+`SpawnAction.java` digest, which focused correction rereview accepted.
 
 Decision: reuse the existing Rust-native `FilesToRunProvider`,
 `AnalysisArtifact`, dense `AnalysisDepset`/`RetainedArtifactInputs`,
@@ -2172,3 +2171,11 @@ depset import context. Copy no Zig code, row layout, IDs, errors, action
 representation, scheduler, cache, digest, or compatibility claim. Bazel 9.2
 `FilesToRunProvider`, `RuleConfiguredTargetBuilder`, `SpawnAction`, and
 `StarlarkActionFactory` remain the sole exact behavior authority.
+
+Implementation preserves the frozen utility decision: one dense provider root,
+one shared `PublicationEqState`, shallow provider clones and no flattened File
+vector or second graph. Final growth is 152 net / 604 gross production and 254
+net / 304 gross proof Rust lines. Full serial owner/downstream and terminal
+review pass. The next Bzlmod declaration-signature packet changes only generated
+call binding and has no retained utility, hashing, collection, interning, clone,
+memory-accounting or V1 extraction decision.
