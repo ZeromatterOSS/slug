@@ -22063,6 +22063,32 @@ aspect/repository rejection. Focused corrections pass at unchanged 214/650
 production, corrected 448/606 proof, and 1,256 total gross Rust lines. Complete
 deterministic loading passes 552 tests plus one intentional ignore, complete
 analysis passes 117, CLI rebuild/replay and all hygiene gates pass, and
-independent terminal rereview returns `ACCEPT`. Commit the accepted category,
-then audit the complete generic coverage configuration-field category exposed
-by the authentic replay.
+independent terminal rereview returns `ACCEPT`. Commit `507ae2994` records the
+accepted category.
+
+#### Label file-admissibility accepted; coverage field architecture active (2026-08-31)
+
+The authentic rebuilt replay now stops at rules_rust
+`configuration_field(fragment = "coverage", name = "output_generator")`.
+Activate only
+`WP-6-7A-coverage-configuration-field-category-architecture-r1`. The audit
+finds exactly one Bazel 9.2 coverage configuration field, conditionally
+projected from the already-retained `collect_code_coverage` Boolean and
+`coverage_output_generator` label. Freeze one closed typed multi-fragment field
+enum, the ordinary/lifted resolver, exact command override, and matching root/
+subrule `ctx.fragments.coverage` facade before Rust. Do not add parser/`set`,
+aspect execution, instrumentation/actions, ruleset, `cc_common`, `cc_internal`,
+or C++ special-case work. Zabel remains peer typed-ownership guidance only;
+Bazel 9.2 remains semantic authority.
+
+Independent R1 review returns `REPLAN`: `coverage.output_generator` is a public
+struct field with no caller restriction, unlike Slug's allowlisted C++ fragment
+methods. Activate corrected R2 only. Its `CoverageFragmentValue` carries no
+caller manifest and performs no `BuiltinRestriction` check; ordinary and
+subrule true/false access from a non-allowlisted `.bzl` module must discriminate
+that boundary. All other category, representation, command, resolver, deferral,
+allowlist and cap decisions remain unchanged.
+
+Focused independent R2 rereview returns `ACCEPT`. Commit the corrected design,
+then implement only its closed typed coverage-field/command/resolver/facade
+category and unchanged explicit deferrals.

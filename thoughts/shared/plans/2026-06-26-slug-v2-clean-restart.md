@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[Label file-admissibility category parity](./slug-v2-subplans/current-packet.md).
+[Coverage configuration-field category architecture](./slug-v2-subplans/current-packet.md).
 
 Commit `1e65972a6` terminally accepts one compact retained property-bit owner
 and admits
@@ -52,26 +52,30 @@ Zabel supplies compact ownership guidance only. The rebuilt real BCR replay
 passes `flags` and stops at `attr.label_list(allow_files=[".rs"])` before any
 rule body, configured analysis, `cc_common`, or `cc_internal` is reached.
 
-The active `WP-6-7A-label-file-admissibility-category-parity-r1` design closes
-Boolean-or-ordered-suffix `allow_files` across all five exposing constructors,
-scalar-only `allow_single_file`, and their shared configured-prerequisite
-validation. One typed allowed-file/single-artifact policy replaces the current
-Boolean plus optional split, preserves suffix order/duplicates, and serves
-source, generated regular, directory, scalar/list, and dictionary dependencies
-without another schema or DICE owner. Suffix matching consumes the selected
-dependency configuration's existing structural Host flavor and fails closed
-when it is absent; Boolean any/no-file fast paths do not observe Host state,
-and no ambient build-host observation is admitted.
+Commit `507ae2994` terminally accepts the complete label file-admissibility
+category. One typed no/any/ordered-suffix plus single-artifact carrier now
+serves all five exposing constructors, ordinary and lifted dependencies,
+source/generated/directory outputs, dictionary orientations, selected Host
+flavors, fixed conversion controls and same-DICE restoration. Complete loading
+and analysis suites, authentic replay and independent terminal rereview pass.
 
-The first terminal implementation review confirms the production architecture
-and returns only a proof `REPLAN`: replace declaration-local identity evidence
-with a real same-DICE A/B/A source mutation and add missing scalar-invalid and
-suffix-specific macro/aspect/repository discriminators. That bounded
-correction is implemented; 552 loading tests plus one intentional ignore, 117
-analysis tests, rebuilt replay and all hygiene gates pass, and independent
-terminal rereview returns `ACCEPT`. The next authentic frontier is the generic
-`configuration_field(fragment = "coverage", name = "output_generator")`
-category.
+The active
+`WP-6-7A-coverage-configuration-field-category-architecture-r2` audits the
+complete one-field Bazel 9.2 coverage fragment rather than patching the one
+rules_rust declaration. It generalizes the retained field identity into a
+closed typed fragment enum, projects the existing structural
+`collect_code_coverage` and `coverage_output_generator` options through the one
+ordinary/lifted resolver, and includes the matching root/subrule fragment
+facade. Parser, `set`, rulesets, aspects, coverage actions and C++ special cases
+remain outside the packet. Independent design review is required before Rust.
+
+Independent R1 review returns `REPLAN` because it failed to distinguish the
+public coverage fragment field from Slug's allowlisted C++ facade. R2 requires
+`CoverageFragmentValue` to carry no caller manifest and perform no builtin-
+restriction check, with true/false ordinary and subrule access proofs from a
+non-allowlisted `.bzl` module. Every other boundary remains unchanged.
+Focused independent R2 rereview returns `ACCEPT`; commit the design, then
+implement only its frozen allowlists, caps, proof matrix and stops.
 
 Commit `683538254` terminally accepts generic configured fragment projection.
 The successor audit found that authentic rules_cc 0.2.17 forwards a nonempty
