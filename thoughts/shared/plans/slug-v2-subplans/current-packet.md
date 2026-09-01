@@ -1,14 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-repository-declaration-documentation-category-implementation-r2`
+Packet: `WP-6-7A-recursive-build-glob-category-design-r1`
 
-Milestone: M7A generic Starlark/ruleset closure; loading declaration metadata.
+Milestone: M7A generic Starlark/ruleset closure; BUILD glob loading semantics.
 
-Status: implementation R2 active after independent correction `ACCEPT`.
-The accepted design assumed starlark-rust `Option<&str>` made explicit `None`
-equivalent to omission. Focused compilation proves it rejects `NoneType`, so
-the same latent gap affects existing `tag_class` and `module_extension` doc
-bindings. Correct the full three-sibling category before resuming Rust.
+Status: docs-only source/owner audit active after terminal acceptance of
+`WP-6-7A-repository-declaration-documentation-category-implementation-r2`.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -16,190 +13,125 @@ at SHA-256
 `36c937d49369ac57e51defe2b17d4a53636a815ec0b2d407f7bd1a664c4d816a`;
 do not edit or stage it.
 
-## Observable result and compatibility classification
+## Objective and compatibility boundary
 
-Freeze the complete declaration-documentation boundary needed to admit Bazel
-9.2 `repository_rule(doc = ...)` during ordinary `.bzl` evaluation. The
-authentic rules_rust/platforms replay is only a consumer discriminator. No
-repository, platforms, ruleset, `cc_common`, `cc_internal`, parser or rule-body
-special case is allowed.
+Design the complete Bazel 9.2 recursive BUILD-glob category, not a literal
+`"**"` workaround. The authentic `@platforms//host:BUILD` call is one consumer
+discriminator. No platforms, rules_rust, ruleset, `cc_common`, `cc_internal`,
+parser or rule-family special case is allowed.
 
-Exact behavior within the admitted loading/build surface:
+The design audit must classify exact, Slug-native, and unsupported/deferred
+behavior for:
 
-- `repository_rule` binds named `doc` with default/explicit `None` equivalence,
-  accepts a Starlark string, and rejects every other value kind at call binding;
-- a valid doc string does not change repository-rule invocation, declared
-  attributes, local/configure/environ policy, repository effects, selected
-  module graph, package loading, configured analysis or action identity;
-- the complete already-exposed inventory is the thirteen `attr` constructors
-  (`label`, `label_list`, `string_keyed_label_dict`,
-  `label_keyed_string_dict`, `bool`, `int`, `label_list_dict`, `output`,
-  `output_list`, `string`, `string_list`, `string_dict`, and
-  `string_list_dict`), plus `rule`, `aspect`, `provider`, symbolic `macro`,
-  `module_extension`, `tag_class`, and `repository_rule`. Existing members
-  retain their accepted typed binding and ownership. Within this exact Slug
-  inventory, `repository_rule` rejects valid strings while `tag_class` and
-  `module_extension` reject explicit `None`; all three gaps close together; and
-- omitted, explicit `None`, empty, whitespace/multiline and ordinary strings
-  all reach the same repository build semantics. Source changes still
-  invalidate through existing module-source identity.
+- recursive wildcard segments at the start, middle and end, including multiple
+  `**` segments and the zero-directory match;
+- ordinary `*`, mixed recursive/ordinary segments, include union, exclude
+  subtraction, duplicate elimination and deterministic result order;
+- source files, directories under `exclude_directories`, symlinks, dangling or
+  cyclic paths, hidden names, non-UTF-8 Host names and Host-path flavor;
+- subpackage boundaries, ignored directories, deleted-package policy, package
+  marker changes, repository roots and external repository mappings;
+- empty includes, per-pattern empty failures, all-excluded behavior,
+  `allow_empty`, invalid absolute/dot/up-level/empty/embedded-`**` patterns and
+  exact phase/error precedence;
+- the retained flat listing path used by injected/package tests and the observed
+  Host traversal path used by production requests; and
+- same-DICE create/edit/delete, directory-boundary invalidation, A/B/A
+  restoration, Need/error ordering, cancellation and warm reuse.
 
-Slug-native behavior:
+Do not assume all of those rows are already admitted. Any behavior without a
+bounded Rust-native owner must be classified unsupported/deferred and fail
+closed rather than silently widened.
 
-- for the currently admitted loading/build graph, repository documentation is
-  validated and discarded after the call. It does not enter repository-rule
-  projection equality, DICE identity, marker inputs or effect identity. The
-  source module remains the structural invalidation owner; and
-- Rust valid-Unicode string handling retains the project-wide admitted string
-  divergence. No Java object, UTF-16 layout or doc-string storage identity is
-  reproduced.
-
-Unsupported/deferred behavior:
-
-- `native.starlark_doc_extract`, `ModuleInfo`/Stardoc protobuf output, retained
-  documentation text, doc-comment association, trimming/output formatting and
-  documentation query surfaces remain one later complete extraction category;
-- the experimental `repository_rule(remotable = ...)`, its semantics flag,
-  implicit `exec_properties`, remote repository execution and any associated
-  action/REAPI model remain fail-closed as a separate category; and
-- Bazel 9.2 `materializer_rule`, including its `doc` argument and complete
-  dynamic dependency semantics, is not exposed by Slug and remains one
-  explicitly deferred builtin category; and
-- no other declaration metadata, repository behavior, parser builtin, ruleset
-  API, configured analysis or action family is widened.
-
-This classification is intentionally narrower than claiming exact
-documentation extraction. It is exact for Bazel 9.2 call acceptance and build
-semantics on the admitted surface, Slug-native for nonsemantic metadata
-retention, and explicit about the unavailable extractor output.
-
-## Authority and evidence
+## Bazel 9.2 authority
 
 Bazel tag `9.2.0` commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole behavior authority.
-Pinned SHA-256 values are:
+Pinned starting sources are:
 
-- `RepositoryModuleApi.java`:
-  `1bb286ec5fe4667c4328081b3ca002e22fbcfb1af8f4ba5d06581a20151ddd8f`;
-- `StarlarkRuleFunctionsApi.java`:
-  `be73dbda0b5a3e8285a05bb732a0a01441f99e8d20dc29b83759ef972c0392ea`;
-- `StarlarkRepositoryModule.java`:
-  `c6adf0f521e56419ec22e7980def6b27778bab4d5c5294b3556c2286f5b6bcea`;
-- `ModuleInfoExtractor.java`:
-  `b17a46782eab739066ef593d90cefe8a0f7f15fa6aeaee8ccc828e573de0bebf`;
-- `StarlarkDocExtractTest.java`:
-  `f5779cf3f7a90350b8e422e3e67f0f5ef397465e981ce99c406befb2745c50bb`;
+- `StarlarkNativeModuleApi.java`:
+  `0451254c4e4f587a90d919c99a63bb469a49d80898deb1187dcf5ebd46866273`;
+- `StarlarkNativeModule.java`:
+  `600541da8362b71249e093552b84ee009da5e112d1c942a95eeb9c783fd16204`;
+- `UnixGlob.java`:
+  `f86ca1900a2d4668233771a85814bc8aaf5139808b7e27ef9d47714e125ea460`;
+- `GlobCache.java`:
+  `cf79d5a4a64924990936dfa1ae186aec94ea4ea9b0b7d7192c4ac30329558236`;
+- `GlobDescriptor.java`:
+  `8b06f007ca5ded81d72f342cb509bdad3c2ff0be70e73d876f152da45c48e310`;
+- `GlobFunction.java`:
+  `77a19c81fa09e9fc84bf0bd86aadfd906194faa379e12aed394976aa90ed63a6`;
+- `GlobValue.java`:
+  `b4ace32f5b31b2057a50d81bf0c47eec36c53aeb648acfb9cf068c9c14879c27`;
   and
-- `ModuleInfoExtractorTest.java`:
-  `0e165cbac7dfadfba0f24732e2f5da0d73a539b64951c027021710041e5fff82`.
+- `FragmentProducer.java`:
+  `410e8b8917247c774ddc4506859cc3efae5231c2d2f55507d8a5940d1b4f2dba`.
 
-The repository API fixes the exact public parameter list and string/None type.
-`StarlarkRuleFunctionsApi` proves that `materializer_rule(doc = ...)` belongs to
-a distinct Bazel builtin that Slug does not expose. The
-implementation trims and retains the string in Bazel's `RepoRule`, while
-`ModuleInfoExtractor` is the consumer that publishes it. These sources prove
-both that build evaluation accepts the metadata and that claiming extraction
-without retaining it would be false. The implementation successor therefore
-admits only the loading/build slice and leaves structured extraction deferred.
+The audit must locate and pin the smallest relevant Bazel regressions for
+recursive matching, subpackage pruning, excludes, files/directories and
+incremental invalidation. Add no Java helper or artifact to Slug.
 
-Existing Slug source proves that rule/aspect documentation is already typed and
-nonsemantic for current build evaluation, symbolic macros retain documentation,
-provider documentation remains owned by starlark-rust, and module-extension and
-tag-class docs are already typed. The successor must add a table-driven audit
-test so this remains a category decision rather than a one-call workaround.
+## Learned Slug facts to verify
 
-The authentic replay after default-exec configured dependencies reaches
-`@platforms//host:extension.bzl` and fails only because its repository rule
-passes `doc`; `local`, `configure`, and `environ` are already accepted and
-retained. Replay proves priority and boundedness, not semantics.
+Slug currently has two related owners:
 
-## Learned Slug facts and architecture decision
+- `glob.rs` owns public `GlobSpec` validation and expansion over an already
+  retained flat `WorkspaceDirectorySnapshot`; it currently rejects recursive
+  patterns before expansion; and
+- `host_glob/traversal.rs` already parses a standalone `**` segment and performs
+  observed recursive traversal with package-boundary checks. `package.rs`
+  nevertheless constructs `GlobSpec` before dispatch, so the public validator
+  blocks this owner from receiving the authentic pattern.
 
-`package_globals::repository_rule` currently binds `doc` as `Option<Value>` and
-explicitly rejects every non-`None` value. `tag_class` and `module_extension`
-bind `Option<&str>`; starlark-rust treats explicit `None` as a supplied value of
-the wrong type rather than as `Option::None`. Rule, aspect and all thirteen attr
-constructors already use `Option<Value>` plus explicit string/None validation;
-symbolic macro and provider documentation retain their separate accepted
-owners.
+The audit must determine whether one shared immutable parsed pattern can serve
+both flat-listing and Host traversal without replacing the existing observed
+keys, and whether the flat path can implement identical matching from its
+retained snapshot. Preserve DICE observation ownership: do not move Host I/O
+into the Starlark evaluator or hold a lock across a compute.
 
-Bind exactly `repository_rule`, `tag_class`, and `module_extension` as
-`Option<NoneOr<&str>>`. The outer option distinguishes omission; starlark-rust's
-existing typed union accepts explicit `None` or a string and keeps every other
-kind in generated call-binding validation. Discard the unpacked value. Add no
-manual converter and no documentation field to any live/frozen definition,
-projection, module selector, repository request, marker, effect or DICE key.
+Read `docs/developers/dice.md` before proposing key/ownership changes. Inspect
+the full current glob/host-glob caller and proof graph, not only the replay
+failure.
 
-The category audit records, rather than rewrites, the exact inventory above.
-Any additional valid sibling rejection, retained public metadata, extractor
-consumer, repository projection or cross-crate owner is `REPLAN` and requires
-an independently reviewed broader design.
+## Reuse and peer guidance
 
-Buck2/starlark-rust supplies the existing typed parameter conversion and frozen
-module lifetime; add no utility. Zabel commit
-`0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only: its
-`starlark_doc_extract` inputs are owned separately from repository execution
-facts, supporting the separation of documentation output from semantic
-repository identity. Copy no Zig code, layout, IDs, extraction behavior,
-scheduler, cache, limits or compatibility claim.
+Reuse existing Buck2-derived `Arc`, `CompactString`, compact maps/sets,
+`Allocative`, DICE keys and path-observation carriers. The design must account
+for parsed-pattern retained size, clone cost and memory accounting before adding
+another representation.
 
-## Bounded implementation successor
+Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only.
+Inspect `src/load/build_glob_pattern.zig`,
+`session_package_glob_computation.zig`, and the recursive package-source tests
+for route pruning, recursive-segment representation and proof ideas. Copy no
+Zig code, allocator/layout, IDs, limits, scheduler, cache, error, ordering or
+behavior. Bazel 9.2 alone fixes semantics.
 
-Implement only
-`WP-6-7A-repository-declaration-documentation-category-implementation-r2`.
+## Design deliverable and stops
 
-Allowed production file:
+This packet is documentation-only. It may edit only this manifest, the Stage 6
+owner plan, Stage 9 utility ledger if a retained representation decision is
+made, and canonical status. No Rust, fixture or generated file may change.
 
-- `app/slug_loading_v2/src/package.rs`, limited to the `NoneOr` import and the
-  `repository_rule`, `tag_class`, and `module_extension` doc signatures plus
-  removal of the repository-rule rejection.
+Produce an execution-ready successor with:
 
-`package.rs` is currently 9,580 lines. The existing `package_globals`
-`starlark_module` remains the cohesive owner because all three public callable
-signatures live in this existing globals-registration owner and consume an
-existing starlark-rust unpacker. Extracting a module would split generated
-bindings for a type-only correction. Forbid growth outside the one import and
-three named function hunks.
+- exact/Slug-native/deferred rows for the complete matrix above;
+- one representation and owner flow across `GlobSpec`, flat expansion and Host
+  traversal, or a justified `REPLAN` if unification is unsound;
+- closed production/proof/fixture allowlists, per-file complexity decisions and
+  gross-line caps;
+- pinned Bazel source/test hashes and one permanent oracle only if existing
+  evidence cannot discriminate the gap;
+- same-DICE, cancellation, error-order, package-boundary and replay gates; and
+- independent architecture review before Rust.
 
-Allowed proof files:
-
-- `app/slug_loading_v2/src/module_extension_repository_rule.rs` for the
-  repository-rule call/equality/error matrix;
-- Stage 6/current/canonical status documents at acceptance.
-
-Cap Rust production at 20 gross lines, proof at 110 gross lines and total at
-130.
-No new file, struct field, collection, clone, allocation, cache, interner, task,
-lock, DICE key, extractor model, fixture or command surface is allowed. A
-compiler-required production consumer outside `package.rs`, any fourth valid
-sibling rejection, or any remote-execution coupling is `REPLAN`.
-
-Required proof matrix:
-
-- omitted and explicit `None` load for each of `repository_rule`, `tag_class`
-  and `module_extension`, and compare equal in their existing projections;
-- empty, ordinary and multiline/whitespace strings load and invoke identically;
-- integer, bool, list, dict and callable docs fail at typed call binding for all
-  three siblings;
-- doc variants compare equal in final repository-rule projection and captured
-  invocation behavior. The unchanged complete-suite regression
-  `repository_context_attributes_restore_warm_effects_for_ordinary_and_innate_owners`
-  remains the downstream materialization/effect-identity guard; and
-- the audit explicitly records every already-exposed doc-bearing builtin above,
-  confirms no additional build-loading reject in that inventory, and records
-  `materializer_rule` as deferred rather than silently excluding it.
-
-Validation is the focused loading tests, complete `slug_loading_v2`, direct
-loading-query dependents if compilation requires them, `cargo fmt --all --
---check`, `git diff --check`, source hashes, archive/allowlist/cap/forbidden-
-surface gates, rebuilt `slug_cli_v2`, clean `slugd`, authentic replay, and
-independent terminal implementation review.
+Return `REPLAN` rather than designing an unbounded filesystem walk, duplicate
+graph, eager full-repository snapshot, second cache/interner, platform-specific
+special case, or semantics borrowed from Zabel.
 
 ## Immediate predecessor
 
-Commit `20bbe8661` terminally accepts
-`WP-6-7A-default-exec-configured-label-dependency-implementation-r2`. It covers
-all five label-bearing constructors and default
-execution configuration generically; it added no parser, ruleset, `cc_common`,
-`cc_internal` or C++/Rust rule special case. Its replay exposes this independent
-declaration-metadata frontier.
+The terminally accepted documentation-binding packet uses typed
+`Option<NoneOr<&str>>` for the complete three-sibling gap, retains no metadata,
+and passes complete loading validation. Its rebuilt replay clears
+`repository_rule(doc = ...)` and exposes this recursive glob frontier.

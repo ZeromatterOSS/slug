@@ -22415,3 +22415,22 @@ unchanged. Initial correction review returned `REVISE` because a manual
 `Option<Value>` converter weakened the public binding type; the corrected
 design uses starlark-rust's existing typed None-or-string unpacker instead.
 Focused correction rereview returns `ACCEPT`; activate only implementation R2.
+
+#### Repository declaration documentation category terminally accepted (2026-09-01)
+
+`WP-6-7A-repository-declaration-documentation-category-implementation-r2` is
+terminally `ACCEPTED`. `repository_rule`, `tag_class`, and `module_extension`
+now use starlark-rust's typed `Option<NoneOr<&str>>`, making omission, explicit
+`None`, and strings exact at binding while retaining no new metadata. The live
+proof audits all thirteen attr constructors plus rule/aspect/provider/macro and
+the corrected three siblings; repository projection and invocation records are
+identical across doc variants.
+
+Focused and complete loading suites pass, with 479 library tests plus the full
+integration set and one documented ignore. Production/proof/total diffstat is
+11/73/84 within 20/110/130 caps; formatting, source hashes, archive status,
+rebuilt CLI, clean lifecycle and terminal rereview pass. The authentic replay
+clears repository documentation and next stops on `glob(["**"])` in
+`@platforms//host:BUILD`. The next packet must audit the complete recursive-glob
+category across both retained listing and Host traversal owners; it must not be
+a platforms, rules_rust, `cc_common` or `cc_internal` special case.

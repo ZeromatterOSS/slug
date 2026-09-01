@@ -65,6 +65,7 @@ use starlark::values::list::AllocList;
 use starlark::values::list::ListRef;
 use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
+use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 use starlark::values::set::SetRef;
 use starlark::values::starlark_value;
@@ -7685,7 +7686,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] local: Option<bool>,
         #[starlark(require = named)] environ: Option<UnpackListOrTuple<&str>>,
         #[starlark(require = named)] configure: Option<bool>,
-        #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] doc: Option<NoneOr<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<RepositoryRuleDefinition<'v>> {
         let callable: Option<StarlarkCallable<'v>> =
@@ -7693,9 +7694,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         if callable.is_none() {
             anyhow::bail!("repository_rule implementation must be callable");
         }
-        if doc.is_some_and(|value| !value.is_none()) {
-            anyhow::bail!("unsupported repository_rule option in the admitted capture slice");
-        }
+        let _ = doc;
         let local = local.unwrap_or(false);
         let configure = configure.unwrap_or(false);
         let environment = Arc::new(
@@ -7787,7 +7786,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn tag_class<'v>(
         attrs: Option<SmallMap<String, Value<'v>>>,
-        #[starlark(require = named)] doc: Option<&str>,
+        #[starlark(require = named)] doc: Option<NoneOr<&str>>,
     ) -> anyhow::Result<TagClassDefinition> {
         let _ = doc;
         let mut attributes = Vec::new();
@@ -7843,7 +7842,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn module_extension<'v>(
         implementation: Value<'v>,
         #[starlark(require = named)] tag_classes: Option<SmallMap<String, Value<'v>>>,
-        #[starlark(require = named)] doc: Option<&str>,
+        #[starlark(require = named)] doc: Option<NoneOr<&str>>,
         #[starlark(require = named)] environ: Option<UnpackListOrTuple<&str>>,
         #[starlark(require = named)] os_dependent: Option<bool>,
         #[starlark(require = named)] arch_dependent: Option<bool>,

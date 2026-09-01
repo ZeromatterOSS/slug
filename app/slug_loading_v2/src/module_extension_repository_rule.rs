@@ -485,6 +485,7 @@ mod tests {
     use starlark::syntax::Dialect;
 
     use super::*;
+    use crate::package::FrozenModuleExtensionDefinition;
     use crate::package::build_file_loading_globals;
     use crate::package::loading_globals;
     use crate::provider::BzlEvaluationContext;
@@ -541,6 +542,16 @@ mod tests {
             .unwrap()
             .projection()
             .unwrap()
+    }
+
+    fn extension_projection(source: &str) -> crate::package::ModuleExtensionDefinitionProjection {
+        load(source)
+            .unwrap()
+            .get("ext")
+            .unwrap()
+            .downcast::<FrozenModuleExtensionDefinition>()
+            .unwrap()
+            .projection()
     }
 
     const BASE: &str = r#"
@@ -776,7 +787,7 @@ _repo = repository_rule(
         );
 
         let full = load(
-            "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['B','A','B'])\ndef run():\n  r(name='one')\n  r(name='two')\n",
+            "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['B','A','B'], doc='  repository docs\\n  second line')\ndef run():\n  r(name='one')\n  r(name='two')\n",
         )
         .unwrap();
         let full_projection = projection(&full, "r");
@@ -799,12 +810,32 @@ _repo = repository_rule(
             &calls[0].definition.environment,
             &calls[1].definition.environment
         ));
+        for doc in ["", ", doc=None"] {
+            let variant = load(&format!(
+                "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['B','A','B']{doc})\ndef run():\n  r(name='one')\n  r(name='two')\n"
+            ))
+            .unwrap();
+            let (result, variant_calls) = invoke(&variant, "run", |_| Vec::new());
+            assert_eq!(result.unwrap(), "None");
+            assert_eq!(variant_calls, calls);
+        }
 
         for source in [
             "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['B','A'])\n",
             "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['A','B'])\n",
+            "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['B','A'], doc=None)\n",
+            "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['B','A'], doc='different')\n",
         ] {
             assert_eq!(projection(&load(source).unwrap(), "r"), full_projection);
+        }
+        let extension_base = extension_projection(
+            "def impl(ctx): pass\ntag=tag_class()\next=module_extension(implementation=impl, tag_classes={'tag':tag})\n",
+        );
+        for source in [
+            "def impl(ctx): pass\ntag=tag_class(doc=None)\next=module_extension(implementation=impl, tag_classes={'tag':tag}, doc=None)\n",
+            "def impl(ctx): pass\ntag=tag_class(doc='tag docs')\next=module_extension(implementation=impl, tag_classes={'tag':tag}, doc='extension docs')\n",
+        ] {
+            assert_eq!(extension_projection(source), extension_base);
         }
         for source in [
             "def impl(ctx): pass\nr=repository_rule(impl, local=False, configure=True, environ=['A','B'])\n",
@@ -820,8 +851,34 @@ _repo = repository_rule(
         for source in [
             "def impl(ctx): pass\nr=repository_rule(impl)\n",
             "def impl(ctx): pass\nr=repository_rule(implementation=impl, attrs=None, local=False, configure=False, environ=[], doc=None)\n",
+            "def impl(ctx): pass\nr=repository_rule(impl, doc='')\n",
             "def impl(ctx): pass\nr=repository_rule(impl, local=True, configure=True, environ=['B','A','B'])\n",
             "def impl(ctx): pass\nr=repository_rule(impl, attrs={'b':attr.bool(default=True), 'i':attr.int(default=1), 's':attr.string(default='s'), 'l':attr.label(default=':l'), 'o':attr.output(), 'sl':attr.string_list(default=['s']), 'll':attr.label_list(default=[':l']), 'ol':attr.output_list(), 'sd':attr.string_dict(default={'k':'v'}), 'sld':attr.string_list_dict(default={'k':['v']}), 'skld':attr.string_keyed_label_dict(default={'k':':l'}), 'lksd':attr.label_keyed_string_dict(default={':l':'v'}), 'lld':attr.label_list_dict(default={'k':[':l']})})\n",
+        ] {
+            load(source).unwrap();
+        }
+        for constructor in [
+            "label",
+            "label_list",
+            "string_keyed_label_dict",
+            "label_keyed_string_dict",
+            "bool",
+            "int",
+            "label_list_dict",
+            "output",
+            "output_list",
+            "string",
+            "string_list",
+            "string_dict",
+            "string_list_dict",
+        ] {
+            load(&format!("x=attr.{constructor}(doc='docs')\n")).unwrap();
+        }
+        for source in [
+            "def impl(ctx): pass\nx=rule(implementation=impl, doc='docs')\n",
+            "def impl(target, ctx): return []\nx=aspect(implementation=impl, doc='docs')\n",
+            "x=provider(doc='docs')\n",
+            "def impl(name, visibility): pass\nx=macro(implementation=impl, doc='docs')\n",
         ] {
             load(source).unwrap();
         }
@@ -833,10 +890,6 @@ _repo = repository_rule(
             (
                 "def impl(ctx): pass\nr=repository_rule(impl, environ=['X', 1])\n",
                 "list[str]",
-            ),
-            (
-                "def impl(ctx): pass\nr=repository_rule(impl, doc='x')\n",
-                "unsupported repository_rule option",
             ),
             (
                 "def impl(ctx): pass\nr=repository_rule(impl, attrs={'name':attr.string()})\n",
@@ -877,6 +930,16 @@ _repo = repository_rule(
         ] {
             let error = load(source).unwrap_err();
             assert!(error.contains(expected), "{error}");
+        }
+        for invalid in ["1", "True", "[]", "{}", "lambda: None"] {
+            for call in [
+                format!("repository_rule(impl, doc={invalid})"),
+                format!("tag_class(doc={invalid})"),
+                format!("module_extension(implementation=impl, doc={invalid})"),
+            ] {
+                let error = load(&format!("def impl(ctx): pass\nx={call}\n")).unwrap_err();
+                assert!(error.contains("doc") && error.contains("str"), "{error}");
+            }
         }
     }
 
