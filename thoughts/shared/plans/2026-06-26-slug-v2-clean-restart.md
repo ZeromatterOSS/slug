@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[Coverage configuration-field category architecture](./slug-v2-subplans/current-packet.md).
+[C++ configuration-field catalog completion architecture](./slug-v2-subplans/current-packet.md).
 
 Commit `1e65972a6` terminally accepts one compact retained property-bit owner
 and admits
@@ -59,15 +59,15 @@ source/generated/directory outputs, dictionary orientations, selected Host
 flavors, fixed conversion controls and same-DICE restoration. Complete loading
 and analysis suites, authentic replay and independent terminal rereview pass.
 
-The completed implementation candidate for
-`WP-6-7A-coverage-configuration-field-category-implementation-r3` implements
+Commit `cb477b7ab` terminally accepts
+`WP-6-7A-coverage-configuration-field-category-implementation-r3`. It implements
 the complete one-field Bazel 9.2 coverage fragment rather than patching the one
 rules_rust declaration. It generalizes the retained field identity into a
 closed typed fragment enum, projects the existing structural
 `collect_code_coverage` and `coverage_output_generator` options through the one
 ordinary/lifted resolver, and includes the matching root/subrule fragment
 facade. Parser, `set`, rulesets, aspects, coverage actions and C++ special cases
-remain outside the packet. Independent design review is required before Rust.
+remain outside the packet.
 
 Independent R1 review returns `REPLAN` because it failed to distinguish the
 public coverage fragment field from Slug's allowlisted C++ facade. R2 requires
@@ -91,7 +91,20 @@ retains only its three documented thought-path failures. Fresh rebuilt
 `rules_rust` 0.73.0 cquery clears the coverage field and stops at
 `rust/private/rust.bzl:961` on
 `configuration_field(fragment = "cpp", name = "custom_malloc")`. Terminal
-implementation review returned `ACCEPT`; the candidate is ready to commit.
+implementation review returned `ACCEPT`; commit `cb477b7ab` records the result.
+
+The active `WP-6-7A-cpp-configuration-field-catalog-completion-r1` closes the
+finite C++ catalog rather than patching the rules_rust declaration. Pinned
+Bazel 9.2 proves `custom_malloc` is the sole member missing from Slug's ten
+typed fields, the nullable option and late-bound dependency are public, and
+`ctx.fragments.cpp.custom_malloc` is a public field even though existing C++
+fragment methods remain allowlisted. The packet adds no rule body or C++
+semantic branch and reuses the one-byte field identity, structural native
+option vector, command overlay, resolver, and shared root/subrule fragment
+value. It also corrects known non-Boolean native `--no...` forms generically
+instead of silently ignoring them. Bazel 9.2 remains authority; clean Zabel is
+peer representation guidance only. Independent design review returned
+`ACCEPT`; implement only the frozen packet.
 
 Commit `683538254` terminally accepts generic configured fragment projection.
 The successor audit found that authentic rules_cc 0.2.17 forwards a nonempty

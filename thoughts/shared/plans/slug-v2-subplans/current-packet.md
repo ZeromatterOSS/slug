@@ -1,22 +1,14 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-coverage-configuration-field-category-implementation-r3`
+Packet: `WP-6-7A-cpp-configuration-field-catalog-completion-r1`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 configured fragment,
 late-bound dependency, and command-configuration breadth.
 
-Status: terminally accepted implementation candidate. R1 independent review returned `REPLAN`
-for one public-access distinction. R1 incorrectly
-described the coverage facade as shared "just as" the C++ facade without
-forbidding C++'s private-caller manifest. R2 requires an unrestricted coverage
-value and non-allowlisted ordinary/subrule proofs. During R2 implementation, a
-discriminating loading proof found that the existing ordinary-rule seam did
-not enforce Bazel's shared private-name rule for late-bound defaults. Focused
-R3 review accepts adding the sole generic `rule()` attribute-publication seam
-and one pre-publication name check; every other boundary remains unchanged.
-Base commit `d767e77fe` contains the accepted R2 design, while `507ae2994`
-terminally accepts the complete label file-
-admissibility category. The unrelated dirty
+Status: independent design review returned `ACCEPT`; implement only the frozen
+boundary below.
+Base commit `cb477b7ab` terminally accepts the complete coverage configuration-
+field category. The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
 at SHA-256
 `36c937d49369ac57e51defe2b17d4a53636a815ec0b2d407f7bd1a664c4d816a`;
@@ -24,167 +16,140 @@ do not edit or stage it.
 
 ## Observable result and compatibility classification
 
-Close Bazel 9.2's complete one-field `coverage` configuration-fragment
-category rather than admitting only the authentic rules_rust declaration.
+Complete Bazel 9.2's finite `cpp` configuration-field catalog. Slug already
+admits ten of the eleven annotated fields; `custom_malloc` is the sole missing
+member. This packet adds that one member through the existing typed catalog and
+thereby closes the category rather than patching only the authentic
+rules_rust declaration.
 
 Exact admitted behavior:
 
-- `.bzl` `configuration_field(fragment = "coverage", name =
-  "output_generator")` produces the same typed late-bound identity family as
-  the accepted `cpp` fields. Unknown coverage fields and unknown fragments fail
-  at declaration; BUILD files still do not receive the global;
-- the field is valid only as a private `attr.label` default under the existing
-  rule/subrule restrictions. Symbolic macros, repository rules, tag classes,
-  non-label attributes, public attributes, direct invocation overrides, and
-  every already-rejected consumer continue failing before publication;
-- when `collect_code_coverage` is false the configured field resolves to
-  `None`, so no dependency edge is added. When true it resolves to the
-  structurally retained `coverage_output_generator` label, whose Bazel default
-  is `@bazel_tools//tools/test:lcov_merger` and whose command override observes
-  the caller's repository mapping;
-- `--coverage_output_generator=<label>` becomes a typed native command option
-  beside the already-admitted Boolean `--[no]collect_code_coverage`. Both
-  values remain independent structural configuration inputs even while the
-  late-bound result is suppressed;
-- ordinary and lifted/subrule late-bound dependencies continue through the one
-  accepted configured-dependency resolver, including target/exec configuration,
-  provider, executable, file-admissibility, FilesToRun, edge, and error order;
-- ordinary and subrule `ctx.fragments.coverage.output_generator` expose the
-  same optional configured label only when `coverage` was declared in
-  `fragments`; undeclared access, inactive evaluator access, and unknown
-  members fail under the existing fragment lifecycle. Unlike the restricted
-  C++ fragment methods, this public coverage field performs no caller-manifest
-  or `BuiltinRestriction` check and works from an ordinary non-allowlisted
-  `.bzl` module; and
-- configuration-field and fragment projections share one typed coverage-field
-  producer. No second label parser, late-bound resolver, option store, DICE
-  key, or fragment-specific dependency path is added.
+- `.bzl` `configuration_field(fragment = "cpp", name = "custom_malloc")`
+  produces the same typed late-bound identity family as the ten accepted C++
+  fields. The complete accepted C++ set is `zipper`, `custom_malloc`,
+  `fdo_optimize`, `fdo_prefetch_hints`, `fdo_profile`, `cs_fdo_profile`,
+  `propeller_optimize`, `xbinary_fdo`, `memprof_profile`, `libc_top`, and
+  `proto_profile_path`; every other name remains rejected at declaration;
+- the field is valid only as a private `attr.label` default under the already-
+  accepted ordinary/subrule restrictions. Default `None` adds no edge; an
+  explicit `--custom_malloc=<label>` supplies the configured dependency through
+  the existing target/Exec, provider, file, executable, edge, and error-order
+  machinery;
+- `--custom_malloc=<label>` becomes a typed native command option over the
+  already-retained CppOptions descriptor, with repository mapping, last-wins,
+  structural identity, and same-DICE A/B/A restoration. Joined value is
+  required. The generic command parser rejects `--nocustom_malloc` and every
+  other admitted non-Boolean native no-form with Bazel's illegal-prefix
+  diagnostic instead of silently treating it as an unrelated compatible flag;
+- ordinary and subrule `ctx.fragments.cpp.custom_malloc` return the configured
+  Label or `None` when `cpp` was declared. This field is public and performs no
+  caller-manifest or `BuiltinRestriction` check. Existing private C++ fragment
+  methods remain restricted, so one non-allowlisted module can read
+  `custom_malloc` while still being denied `compilation_mode()`; and
+- field default and fragment facade project the same structural `custom_malloc`
+  option. No second label parser, option store, resolver, fragment object,
+  command overlay, DICE key, cache, or lock is added.
 
-Slug-native behavior is limited to the already-approved structural
-configuration identity and Rust-native diagnostic decoration. Exact Bazel
-configuration checksum/output-path bytes remain M9.
+Slug-native behavior remains limited to the accepted structural configuration
+identity and Rust-native diagnostic decoration. Exact Bazel configuration
+checksum/output-path bytes remain M9.
 
 Unsupported/deferred behavior:
 
-- configured aspect application remains the existing typed deferred boundary;
-  this packet neither claims nor approximates Bazel aspect execution. Fixed
-  admitted aspect declarations must continue rejecting schemas outside their
-  frozen shapes;
-- `coverage_report_generator` is a native CoverageOptions label but is not a
-  Bazel `@StarlarkConfigurationField`; it remains retained registry input and
-  is not exposed as a configuration field;
-- coverage instrumentation, filters, report actions, test execution, and
-  `coverage_common` behavior are separate categories; and
-- other fragment classes/fields remain unsupported rather than being accepted
-  through a stringly generic escape hatch.
+- custom-malloc rule semantics, `CcInfo` production, link selection, malloc
+  precedence, action generation, and execution remain later BCR Starlark and
+  configured-action categories;
+- other fragment catalogs remain unsupported rather than accepted through a
+  stringly generic fallback; and
+- configured aspect application retains its existing typed deferred boundary.
 
-This is a generic fragment/late-bound/command category. It is not parser
-grammar, `set`, a Rust rule implementation, or a `cc_common`/`cc_internal`
-branch. Bazel 9 BCR Starlark remains the owner of every rule body, including
-`cc_internal`; `cc_common` is only a later consumer.
+This is finite generic configuration-field and fragment projection work. It is
+not parser grammar, `set`, a Rust rule implementation, or a `cc_common` /
+`cc_internal` special case. Bazel 9 BCR Starlark remains the owner of all rule
+bodies, including C++ rules; rules_rust is only the authentic consumer that
+selected the next catalog member.
 
 ## Bazel 9.2 authority and evidence
 
 Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole semantic
 authority. Pinned source SHA-256 values are:
 
-- `CoverageConfiguration.java`:
-  `9f1759880b3e5367d0ffe3fabbb196dc21d837abf0fe00f5e4537a154e1a27c8`;
-- `CoverageConfigurationApi.java`:
-  `17c68de9d055e4d3afe0b9c255a895fdc7d91621a9c6e6045ab6180e84e69516`;
-- `BazelBuildApiGlobals.java`:
-  `a54b4657f61846171d0dcaf42e3565e98ee1624316d06f4a47e8c66800fcf897`;
-- `StarlarkSubruleTest.java`:
-  `b4cad33b5eec81f34d53b17d8f7543d51dedbb41a9a8a5359908afd70e8060e9`;
-- `StarlarkRuleImplementationFunctionsTest.java`:
-  `89e6caf0c6d234be610ccb597a015610568c27f8071d572e55a7378a106597d8`;
-- `AspectTest.java`:
-  `d1bf5d2b0e2230a6d3d7b66ea442f09e7f710664706405ea2cd6c4df0d0f6465`;
+- `CppConfiguration.java`:
+  `d0c0fae644272fa8992e44461e8ec2f6655681e370b41594954f4f8f1adf9a71`;
+- `CppConfigurationApi.java`:
+  `57c88f6f17764f56974b083494cf3716aa9cbe2fd1aa9f9ee4ba24b6365cf841`;
+- `CppOptions.java`:
+  `ac9f2f4c4e1bcacc4066791b5d8f264b9ee5434477dfa90c1492ab8c8317c7a1`;
+- `StarlarkIntegrationTest.java`:
+  `ced8fc27cbe35bf30174678800d29b73012f800bff00bcdff6a5cf8c78fef836`;
   and
-- builtins `common/cc/semantics.bzl`:
-  `08e948c02184e5d3fcd2313ecb46dfa5631a21a2a836c4fe2d5faf148096db0f`;
-- `AttributeValueSource.java`:
-  `c0e66478a7d920e8291cd93e5860c2aec6c1eec1da624103185840073d9d1cb9`;
-  and
-- `StarlarkRuleClassFunctions.java`:
-  `a1f706cfbbc67aa3cd2521df2091dd5ed9af96eb4568049f8eee966d06c622f7`.
+- `OptionsParserImpl.java`:
+  `4bc80c745cad2b427b6f42b28c1fd75a0d121b94681ff20d11393d24413e8652`.
 
-`CoverageConfiguration` proves there is exactly one annotated field. Its
-constructor suppresses the fragment's option view unless CoreOptions
-`collectCodeCoverage` is true; `outputGenerator()` then returns the typed
-`coverageOutputGenerator` label. The API's public struct field has no
-`StarlarkThread` parameter or caller restriction, unlike the private C++
-fragment methods. The API and Bazel tests prove optional return, private label-
-default use, rule/subrule resolution, and the fragment/member spelling.
-`BazelBuildApiGlobals` proves fragment and field validation occurs at
-declaration through the registered fragment class and tools repository.
-`AttributeValueSource.LATE_BOUND` and the `rule()` descriptor conversion in
-`StarlarkRuleClassFunctions` prove that every late-bound attribute name must
-begin with `_` before the rule class is published.
+`CppConfiguration` contains exactly eleven `@StarlarkConfigurationField`
+annotations. Comparing that closed source inventory to Slug's typed enum proves
+`custom_malloc` is the only missing member. Its method directly returns the
+nullable CppOptions label. `CppOptions` declares `--custom_malloc` as a nullable
+`LabelConverter` option that changes inputs and outputs.
 
-The live Slug registry already owns both CoverageOptions descriptors and the
-CoreOptions Boolean in structural configuration identity. The live command
-surface already owns `collect_code_coverage`; it deliberately does not yet own
-`coverage_output_generator`. The accepted `ConfigurationFieldIdentity`,
-ordinary/lifted dependency resolver, and C++ fragment lifecycle are the owners
-to generalize, not duplicate.
+`CppConfigurationApi.customMalloc` is a public nullable struct field with no
+Starlark thread parameter or allowlist check. This differs from the accepted
+private C++ methods and requires a mixed-visibility facade, not a relaxation of
+the entire object. A fresh Bazel 9.2 oracle from an ordinary non-builtin `.bzl`
+module reports `None` by default and `@@//:malloc` under
+`--custom_malloc=//:malloc`, with no allowlist error. The pinned integration
+test separately proves the late-bound private attribute resolves to `None` or
+the configured dependency and enforces its `CcInfo` provider schema.
+
+`OptionsParserImpl` proves a `no` prefix on a known non-Boolean option is an
+error. A fresh Bazel 9.2 oracle reports exactly
+`Illegal use of 'no' prefix on non-boolean option: --nocustom_malloc`.
+
+The authenticated rules_rust 0.73.0 `rust/private/rust.bzl`, SHA-256
+`a645bd5db6344bd3c0997dcf73600475c0af53fb4dd025890be24b8e1e2dbfd8`,
+declares private `_custom_malloc` at lines 960-966 with this field and a
+`[[CcInfo]]` provider constraint. Rebuilt Slug cquery currently stops at that
+exact declaration before any rule implementation, `cc_common`, or
+`cc_internal` behavior runs.
 
 ## Representation and ownership decision
 
-Replace the `#[repr(transparent)] ConfigurationField(CppConfigurationField)`
-with a one-byte closed enum over typed fragment fields:
+Add `CustomMalloc` to `CppConfigurationField` and its flattened
+`ConfigurationField::CppCustomMalloc` discriminant. Preserve the one-byte
+`#[repr(u8)]` field, typed fragment accessors, and unchanged
+`ConfigurationFieldIdentity { field, tools_repository }`. The closed enum,
+not a string pair or dynamic registry, remains the authority after declaration.
 
-```text
-ConfigurationField
-  Cpp(CppConfigurationField)
-  Coverage(CoverageConfigurationField::OutputGenerator)
-```
+Map the new field in `SlugConfiguration::configuration_field_label` to the
+existing CppOptions `custom_malloc` label using the already-general
+`native_label` projection. Add `NativeCommandOption::CustomMalloc` through the
+existing mapping-aware command descriptor path. Extend the command parser's
+known `no`-prefix branch once, generically, so all admitted non-Boolean native
+options reject before configuration publication.
 
-Keep `ConfigurationFieldIdentity { field, tools_repository }` unchanged. Add
-typed `cpp_field() -> Option<_>` and `coverage_field() -> Option<_>` accessors;
-no caller may branch on raw fragment/name strings after declaration. Preserve
-the one-byte field layout and current compact identity clone/equality/hash.
-
-`SlugConfiguration::configuration_field_label` switches on the typed fragment
-field. Coverage reads the existing structural CoreOptions Boolean and
-CoverageOptions label record. Refactor any C++-named Boolean error helper into
-a generic typed native-Boolean projection rather than routing coverage errors
-through `InvalidCppConfiguration`. The label is resolved only through the
-existing `OptionLabelContext`; tools-repository identity remains part of the
-late-bound producer but is not substituted over an already canonical explicit
-option label.
-
-One evaluator-owned `CoverageFragmentValue` exposes `output_generator` and is
-shared by root and subrule fragment collections. It contains only the optional
-canonical output-generator label: it must not retain the C++ facade's caller
-manifest, call `check_default_allowlist`, or otherwise consult
-`BuiltinRestriction`. Allocate it only when a root or reachable subrule
-declares `coverage`; carry the same unrestricted frozen value through the
-existing invocation payload. Do not add a global callback, retained evaluator
-value, dynamic fragment map, cache, lock, or DICE key.
-
-The ordinary `rule()` attribute loop is the sole generic schema-publication
-owner for the private-name invariant. Reject a typed late-bound default whose
-Starlark name does not begin with `_` before mutating either the late-bound row
-list or user schema. This closes both coverage and the already-admitted C++
-fields; it is not a fragment-specific branch. Although `package.rs` exceeds
-the physical-size review trigger, this six-line check belongs in the cohesive
-attribute-conversion loop and extracting a second validation layer would add
-indirection without separating a responsibility.
+Keep `CppFragmentProjection` as a cheap phase-scratch view of the sole
+`SlugConfiguration`; do not duplicate the label into a second retained field.
+Expose a typed optional-label projection and allocate the evaluator-local
+Starlark Label only at facade access. Add `custom_malloc` to
+`CppFragmentValue` without calling its private-method `check`; all existing
+methods continue calling that check. Root and subrule collections already share
+the same frozen C++ value and token lifecycle, so neither transport nor analysis
+orchestration changes.
 
 ## Buck2 and Zabel guidance
 
 starlark-rust remains the parser/evaluator/generated-binder substrate and owns
-`set`; no language change is required. Existing compact enums, `Arc`, frozen
-evaluator values, and structural configuration vectors are the retained
-utility baseline required by the Buck2-reuse policy.
+`set`; no language change is required. Existing compact enums, frozen values,
+structural native option vectors, and label conversion are the retained
+Buck2-derived utility baseline. No new collection, interner, hash, or memory-
+accounting owner is justified.
 
 Clean Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance
-only. Its typed `ConfigurationFieldDefinition`/`LateBoundLabel` split supports
-keeping declaration identity distinct from configured materialization. Zabel
-does not implement Bazel's coverage option producer or establish semantics;
-copy none of its Zig code, arena lifetimes, diagnostics, or compatibility
-claims.
+only. Its captured typed configuration-field identity and mixed C++ fragment
+projection support keeping declaration identity, configured label ownership,
+and public `custom_malloc` access separate. Zabel supplies no semantic or
+source-order authority; copy none of its Zig code, arena lifetimes, diagnostics,
+or compatibility claims.
 
 ## Proposed implementation boundary, caps, and proofs
 
@@ -193,14 +158,10 @@ Production allowlist:
 - `app/slug_configuration_v2/src/command.rs`;
 - `app/slug_configuration_v2/src/native/configuration_field.rs`;
 - `app/slug_configuration_v2/src/native/configuration.rs`;
-- `app/slug_configuration_v2/src/native/mod.rs` and
-  `app/slug_configuration_v2/src/lib.rs` for typed reexports only;
-- `app/slug_loading_v2/src/subrule.rs`;
-- `app/slug_loading_v2/src/package.rs` for the generic pre-publication private
-  name check only;
-- `app/slug_loading_v2/src/analysis_fragments.rs`;
-- `app/slug_loading_v2/src/subrule_invocation.rs`; and
-- `app/slug_analysis_v2/src/starlark_rule.rs`.
+- `app/slug_configuration_v2/src/native/cpp_fragment.rs`;
+- `app/slug_commands_v2/src/common.rs` for generic known-native no-prefix
+  rejection; and
+- `app/slug_loading_v2/src/analysis_fragments.rs` for the public facade field.
 
 Proof allowlist:
 
@@ -209,79 +170,53 @@ Proof allowlist:
 - `app/slug_loading_v2/tests/subrule_loading.rs`;
 - `app/slug_analysis_v2/tests/starlark_rule.rs`;
 - `app/slug_analysis_v2/tests/subrule.rs`; and
-- `app/slug_commands_v2/src/common.rs` tests for exact command binding only.
+- `app/slug_commands_v2/src/common.rs` tests.
 
-Proposed cap is 520 net / 850 gross production Rust lines, 650 net / 900 gross
-proof Rust lines, and 1,750 total gross. No new file is expected. No new or
-expanded semantic helper may exceed 150 lines; existing generated method tables
-and analysis orchestrators retain their accepted cohesion decisions.
+Proposed cap is 180 net / 300 gross production Rust lines, 450 net / 650 gross
+proof Rust lines, and 950 total gross. No new file is expected. No new or
+expanded semantic helper may exceed 120 lines.
 
 Focused proofs must cover:
 
-1. exact coverage fragment/field acceptance, unknown names/fragments, BUILD
-   exclusion, equality/hash/layout, tools-repository A/B/A, and absence of a
-   raw-string fallback;
-2. false/true/false `collect_code_coverage` resolution to None/default/None,
-   explicit output-generator label mapping, invalid/non-visible labels, and
-   same-DICE result/error restoration;
-3. exact command forms for `--coverage_output_generator`, last-wins structural
-   identity, mapping sensitivity, and Boolean interaction;
-4. ordinary target and lifted/subrule late-bound dependency resolution,
-   including target/exec configuration, provider/file/executable validation,
-   omitted edge under false, and one shared resolver;
-5. root/subrule `ctx.fragments.coverage.output_generator` from an ordinary
-   non-allowlisted `.bzl` module, true-label and false-None projections,
-   declaration and invocation lifecycle, inactive-token rejection, absence of
-   a caller manifest/restriction, and C++ facade regression;
-6. macro/repository/tag/non-label/public/fixed-aspect controls remain closed,
-   including both coverage and C++ public-attribute rejection before schema
-   publication;
-   and
-7. authentic rebuilt cquery clears the coverage field and records the next
-   generic frontier before any C++-specific branch is considered.
+1. exact eleven-member C++ field inventory, unknown-field rejection, one-byte
+   layout, typed equality/hash, and tools-repository A/B/A;
+2. default-None / explicit-label / default-None restoration through the sole
+   field resolver, repository mapping, non-visible labels, provider validation,
+   omitted/default edge behavior, and configured target dependency identity;
+3. exact joined `--custom_malloc`, last-wins structural identity and mapping,
+   plus generic rejection of `--nocustom_malloc`,
+   `--nocoverage_output_generator`, and one previously admitted non-Boolean
+   option while Boolean no-forms remain valid;
+4. ordinary and subrule `ctx.fragments.cpp.custom_malloc` Label/None access from
+   a non-allowlisted `.bzl`, including declaration/invocation lifecycle and
+   same-DICE A/B/A;
+5. the same non-allowlisted caller remains denied an existing private C++
+   method, proving field-specific public access rather than facade widening;
+6. macro/repository/tag/non-label/public/fixed-aspect controls remain closed and
+   the existing ten configuration fields regress; and
+7. rebuilt authentic cquery clears `custom_malloc` and records the next generic
+   frontier before any rule-body or C++ builtin special case.
 
-Then run focused configuration/loading/analysis/command proofs, complete
+Then run focused configuration/loading/analysis/command proofs and complete
 `slug_configuration_v2`, `slug_loading_v2`, `slug_analysis_v2`, and affected
 `slug_commands_v2` suites serially; rebuild `slug_cli_v2`; clean `slugd` before
-and after authentic replay; run fmt, metadata, archive, diff, cap, and parked-
-SHA gates; obtain independent terminal implementation review before commit.
+and after authentic replay; run fmt, metadata, archive, diff, cap, pinned-source,
+clean-Zabel, and parked-SHA gates; obtain independent terminal implementation
+review before commit.
 
-`REPLAN` before adding a second option store, label parser, fragment map,
-late-bound resolver, DICE key/cache/lock, accepting another fragment/member,
-implementing aspects/coverage actions/instrumentation, touching a ruleset or
-starlark-rust, adding a C++ branch, or exceeding a cap. Independent design
-review is required before Rust.
+`REPLAN` before adding a raw field-name fallback, second option/label owner,
+resolver, fragment value, caller manifest, DICE key/cache/lock, accepting
+another fragment, implementing custom-malloc/C++ rule semantics, touching a
+ruleset or starlark-rust, or exceeding a cap.
 
-## Implementation candidate result
-
-The R3 candidate implements only the frozen typed field, option projection,
-shared ordinary/subrule dependency path, unrestricted coverage facade, and
-generic late-bound private-name check. The pre-publication check exposed and
-corrected one pre-existing analysis fixture whose C++ late-bound attribute was
-public; no compatibility surface was weakened.
-
-Serial validation passes all 63 configuration tests, all 28 command tests, all
-553 loading tests with one existing ignored test, and all 119 analysis tests.
-`cargo fmt --all -- --check`, workspace metadata, diff hygiene, the rebuilt V2
-CLI, every pinned Bazel 9.2 source hash, clean Zabel guidance commit, and the
-parked-file hash pass. The archive checker reports only its three documented
-non-V2 thought-path failures.
-
-A fresh one-shot cquery over `rules_rust` 0.73.0 clears
-`configuration_field(fragment = "coverage", name = "output_generator")` and
-now stops at `rust/private/rust.bzl:961` on the next typed catalog member,
-`configuration_field(fragment = "cpp", name = "custom_malloc")`. This is a
-generic configuration-field successor, not a rule-body, parser, `cc_common`,
-or `cc_internal` frontier.
-
-Independent terminal implementation review returned `ACCEPT`. It verified the
-closed one-byte representation, option and resolver reuse, public coverage
-facade, generic privacy invariant, proof matrix, cap audit, parked isolation,
-and honest successor classification.
+Independent design review returned `ACCEPT`. It verified the exact eleven-to-
+ten inventory comparison, mixed public/restricted facade, generic native no-
+prefix correction, one-byte and single-owner reuse, compatibility boundaries,
+allowlists, caps, proofs, and stops.
 
 ## Immediate predecessor
 
-Commit `507ae2994` terminally accepts
-`WP-6-7A-label-file-admissibility-category-parity-r1`. Its rebuilt authentic
-replay clears `allow_files` and stops at rules_rust
-`configuration_field(fragment = "coverage", name = "output_generator")`.
+Commit `cb477b7ab` terminally accepts
+`WP-6-7A-coverage-configuration-field-category-implementation-r3`. Its rebuilt
+authentic replay clears coverage and stops at the sole missing C++
+configuration-field catalog member, `cpp.custom_malloc`.
