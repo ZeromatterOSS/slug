@@ -146,6 +146,7 @@ use crate::cycle_detector::bzl_load_cycle_detector;
 use crate::package::BuildSettingDefinition;
 use crate::package::FrozenAspectDefinition;
 use crate::package::FrozenRuleDefinition;
+use crate::package::FrozenTransitionDefinition;
 use crate::package::PackageRecorder;
 use crate::provider::BuiltinProviderKey;
 use crate::provider::BzlEvaluationContext;
@@ -30801,11 +30802,98 @@ load("//rust/private:providers.bzl", "CaptureClippyOutputInfo", "ClippyInfo", "C
     assert!(targets.attached_aspect.unwrap().to_value().ptr_eq(aspect_value.value()));
     let transition = targets.transition.as_ref().unwrap();
     assert!(transition.implementation().to_value().ptr_eq(lint.get("TRANSITION_IMPL").unwrap().value()));
-    assert_eq!(transition.output(), "//command_line_option:platforms");
+    assert_eq!(
+        transition.outputs()[0].declared(),
+        "//command_line_option:platforms"
+    );
     for name in ["capture_clippy_output", "clippy_output_diagnostics"] {
         let setting = module.get(name).unwrap().downcast::<FrozenRuleDefinition>().unwrap();
         assert_eq!(setting.build_setting_definition, Some(BuildSettingDefinition::Boolean { flag: true }));
     }
+}
+
+#[test]
+fn imported_transition_settings_keep_definition_repository_identity() {
+    let producer_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@dep+//producer:defs.bzl").unwrap(),
+        workspace_path: PathBuf::from("/dep/producer/defs.bzl"),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("mapped").unwrap(),
+            CanonicalRepoName::new("mapped+").unwrap(),
+        )]),
+    };
+    let producer = eval_bzl_with_identity(
+        r#"def impl(settings, attr): return {}
+T = transition(
+    implementation = impl,
+    inputs = ["@mapped//cfg:remote", "//:local", "@//:main"],
+    outputs = ["@mapped//cfg:out", "//:out", "@//:main_out"],
+)
+"#,
+        producer_owner.clone(),
+    )
+    .unwrap();
+    let bridge_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@bridge+//bridge:defs.bzl").unwrap(),
+        workspace_path: PathBuf::from("/bridge/bridge/defs.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let bridge = eval_bzl_with_loaded_children(
+        "load('@dep//producer:defs.bzl', 'T')\nREEXPORTED = T\n",
+        bridge_owner.clone(),
+        &[(
+            "@dep//producer:defs.bzl",
+            producer_owner.clone(),
+            producer.dupe(),
+        )],
+    )
+    .unwrap();
+    let consumer = eval_bzl_with_loaded_children(
+        "load('@bridge//bridge:defs.bzl', 'REEXPORTED')\nIMPORTED = REEXPORTED\n",
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@consumer+//consumer:defs.bzl").unwrap(),
+            workspace_path: PathBuf::from("/consumer/consumer/defs.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+        &[("@bridge//bridge:defs.bzl", bridge_owner, bridge)],
+    )
+    .unwrap();
+    let transition = producer
+        .get("T")
+        .unwrap()
+        .downcast::<FrozenTransitionDefinition>()
+        .unwrap();
+    assert!(
+        consumer
+            .get("IMPORTED")
+            .unwrap()
+            .value()
+            .ptr_eq(producer.get("T").unwrap().value())
+    );
+    assert_eq!(
+        transition
+            .inputs()
+            .iter()
+            .map(|setting| (setting.canonical().to_string(), setting.declared()))
+            .collect::<Vec<_>>(),
+        [
+            ("@@//:main".to_owned(), "@//:main"),
+            ("@@dep+//:local".to_owned(), "//:local"),
+            ("@@mapped+//cfg:remote".to_owned(), "@mapped//cfg:remote",),
+        ]
+    );
+    assert_eq!(
+        transition
+            .outputs()
+            .iter()
+            .map(|setting| (setting.canonical().to_string(), setting.declared()))
+            .collect::<Vec<_>>(),
+        [
+            ("@@//:main_out".to_owned(), "@//:main_out"),
+            ("@@dep+//:out".to_owned(), "//:out"),
+            ("@@mapped+//cfg:out".to_owned(), "@mapped//cfg:out"),
+        ]
+    );
 }
 
 #[test]
@@ -30936,7 +31024,10 @@ LOCAL = rule(implementation = rule_impl, attrs = DESCRIPTORS)
             .to_value()
             .ptr_eq(producer.get("TRANSITION_IMPL").unwrap().value())
     );
-    assert_eq!(transition.output(), "//command_line_option:platforms");
+    assert_eq!(
+        transition.outputs()[0].declared(),
+        "//command_line_option:platforms"
+    );
     let tool = &imported.schema[schema_index(&imported, "tool")];
     assert!(tool.executable && tool.exec_configuration);
     assert!(tool.file_admissibility.single_artifact());
@@ -31479,7 +31570,7 @@ fn assert_frozen_rustfmt_test_rule(rule: &FrozenRuleDefinition) {
         "@@dep+//rust/private:providers.bzl%TestCrateInfo"
     );
     assert_eq!(
-        targets.transition.as_ref().unwrap().output(),
+        targets.transition.as_ref().unwrap().outputs()[0].declared(),
         "//command_line_option:platforms"
     );
     assert_frozen_rustfmt_test_aspect(

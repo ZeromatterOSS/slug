@@ -5,12 +5,15 @@ Packet: `WP-6-7A-transition-declaration-setting-identity-r1`
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 transition
 declaration breadth.
 
-Status: R1 independent pre-review returned `REVISE` for raw native-policy
-classification, disabled-option semantics, cross-parameter error order,
-Unicode ordering evidence, and the existing typed execution boundary. The R2
-contract and oracle below correct all five blockers. Focused R2 rereview
-returned `ACCEPT`; implement only this frozen contract, allowlist, caps, proofs,
-and stops.
+Status: terminally accepted. R1 independent pre-review returned `REVISE` for
+five design gaps; the R2 contract and oracle corrected them and focused R2
+rereview returned `ACCEPT`. Implementation review found one reversed canonical-
+duplicate diagnostic operand, the focused correction matched the pinned oracle,
+and correction rereview returned `ACCEPT`. Complete loading passed 559 tests
+with one ignored, complete analysis passed 121, the closed command-option proof
+passed, and authentic rebuilt rules_rust 0.73.0 replay cleared transition
+construction and stopped at generic `rule(cfg = transition)` binding in
+`rust/private/rust.bzl:1120-1124`.
 
 Base commit `072c721ad` terminally accepts complete cross-module attribute
 descriptor identity. The unrelated dirty

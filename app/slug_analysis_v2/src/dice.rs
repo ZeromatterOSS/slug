@@ -1597,10 +1597,20 @@ async fn configured_dependency_configuration(
     let Some(transition) = transition else {
         return analysis_semantic_complete(Ok((configuration.clone(), None)));
     };
-    let output_label = match CanonicalLabel::parse(&format!("@@{}", transition.output())) {
-        Ok(label) => label,
-        Err(error) => return analysis_semantic_complete(Err(AnalysisError::new(error))),
+    let [declared_output] = transition.outputs() else {
+        return analysis_semantic_complete(Err(AnalysisError::new(
+            "transition execution currently supports only input-free transitions with one root-repository build-setting output",
+        )));
     };
+    if !transition.inputs().is_empty()
+        || declared_output.is_native_option()
+        || !declared_output.canonical().package().repo().is_root()
+    {
+        return analysis_semantic_complete(Err(AnalysisError::new(
+            "transition execution currently supports only input-free transitions with one root-repository build-setting output",
+        )));
+    }
+    let output_label = declared_output.canonical().clone();
     let declaration = match build_setting_declaration(ctx, mode, workspace, &output_label).await {
         LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
         LoadingPreparationOutcome::Complete(Err(error)) => {
@@ -1624,15 +1634,15 @@ async fn configured_dependency_configuration(
             .ok_or_else(|| AnalysisError::new("transition must return a dictionary"))?
             .iter()
             .collect::<Vec<_>>();
-        let [(output, setting)] = entries.as_slice() else {
+        let [(returned_output, setting)] = entries.as_slice() else {
             return Err(AnalysisError::new(
                 "transition must return exactly one declared output",
             ));
         };
-        if output.unpack_str() != Some(transition.output()) {
+        if returned_output.unpack_str() != Some(declared_output.declared()) {
             return Err(AnalysisError::new(format!(
                 "transition output must be exactly {}",
-                transition.output()
+                declared_output.declared()
             )));
         }
         let candidate =

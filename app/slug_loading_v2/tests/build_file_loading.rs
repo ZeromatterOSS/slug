@@ -847,7 +847,8 @@ config_setting(name = "setting", values = {"cpu": "k8"})
             .unwrap()
             .transition()
             .unwrap()
-            .output(),
+            .outputs()[0]
+            .declared(),
         "//attr:base_string_setting"
     );
 }
@@ -2666,6 +2667,207 @@ fn attr_and_transition_parameters_are_named_only_and_transition_inputs_are_requi
 }
 
 #[test]
+fn transition_declarations_retain_complete_sorted_identity_and_spelling() {
+    let workspace = scratch("transition-declaration-identity");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"subject\")\n",
+    )
+    .unwrap();
+    let definitions = r#"def _impl(ctx): return []
+def _transition(settings, attr): return {}
+complete = transition(
+    implementation = _transition,
+    inputs = ("@//pkg:zeta", "//pkg:alpha", "//command_line_option:compilation_mode"),
+    outputs = [
+        "//pkg:𐀀",
+        "//pkg:",
+        "//pkg:alpha",
+        "@//command_line_option:experimental_alias",
+        "@@//command_line_option:incompatible_alias",
+        "//command_line_option:incompatible_enable_cc_toolchain_resolution",
+        "//command_line_option:incompatible_enable_apple_toolchain_resolution",
+    ],
+)
+empty = transition(implementation = _transition, inputs = [], outputs = [])
+probe = rule(implementation = _impl, attrs = {
+    "complete": attr.label(cfg = complete),
+    "empty": attr.label(cfg = empty),
+})
+"#;
+    fs::write(package.join("defs.bzl"), definitions).unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let PackageTargetKind::StarlarkRule(rule) = &loaded.targets[0].kind else {
+        panic!("expected Starlark rule")
+    };
+    let transition = |name: &str| {
+        rule.schema()
+            .iter()
+            .find(|schema| schema.declaration_name() == name)
+            .unwrap()
+            .transition()
+            .unwrap()
+    };
+    let complete = transition("complete");
+    assert_eq!(
+        complete
+            .inputs()
+            .iter()
+            .map(|setting| (setting.canonical().to_string(), setting.declared()))
+            .collect::<Vec<_>>(),
+        [
+            (
+                "@@//command_line_option:compilation_mode".to_owned(),
+                "//command_line_option:compilation_mode",
+            ),
+            ("@@//pkg:alpha".to_owned(), "//pkg:alpha"),
+            ("@@//pkg:zeta".to_owned(), "@//pkg:zeta"),
+        ]
+    );
+    assert_eq!(
+        complete
+            .outputs()
+            .iter()
+            .map(|setting| setting.declared())
+            .collect::<Vec<_>>(),
+        [
+            "@//command_line_option:experimental_alias",
+            "@@//command_line_option:incompatible_alias",
+            "//command_line_option:incompatible_enable_apple_toolchain_resolution",
+            "//command_line_option:incompatible_enable_cc_toolchain_resolution",
+            "//pkg:alpha",
+            "//pkg:",
+            "//pkg:𐀀",
+        ]
+    );
+    assert!(
+        complete.outputs()[..4]
+            .iter()
+            .all(|setting| setting.is_native_option())
+    );
+    assert_eq!(complete.inputs()[1], complete.outputs()[4]);
+    assert!(transition("empty").inputs().is_empty());
+    assert!(transition("empty").outputs().is_empty());
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(async {
+        let first = load_package_with_retained_dice(&dice, &workspace, &package)
+            .await
+            .unwrap();
+        fs::write(
+            package.join("defs.bzl"),
+            definitions.replace(
+                "inputs = (\"@//pkg:zeta\", \"//pkg:alpha\", \"//command_line_option:compilation_mode\")",
+                "inputs = (\"//command_line_option:compilation_mode\", \"//pkg:alpha\", \"@//pkg:zeta\")",
+            ),
+        )
+        .unwrap();
+        let reordered = load_package_with_retained_dice(&dice, &workspace, &package)
+            .await
+            .unwrap();
+        assert_eq!(first.targets, reordered.targets);
+        fs::write(
+            package.join("defs.bzl"),
+            definitions.replace("@//pkg:zeta", "@//pkg:beta"),
+        )
+        .unwrap();
+        let changed = load_package_with_retained_dice(&dice, &workspace, &package)
+            .await
+            .unwrap();
+        assert_ne!(first.targets, changed.targets);
+        fs::write(package.join("defs.bzl"), definitions).unwrap();
+        let restored = load_package_with_retained_dice(&dice, &workspace, &package)
+            .await
+            .unwrap();
+        assert_eq!(first, restored);
+    });
+}
+
+#[test]
+fn transition_declaration_validation_matches_bazel_phase_order() {
+    let workspace = scratch("transition-declaration-errors");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"T\")\n",
+    )
+    .unwrap();
+    let cases = [
+        (
+            "1, inputs = [1], outputs = [2]",
+            "Type of parameter `implementation` doesn't match",
+        ),
+        (
+            "_transition, inputs = [1], outputs = [2]",
+            "Type of parameter `inputs` doesn't match",
+        ),
+        (
+            "_transition, inputs = [\"//pkg:a\", \"//pkg:a\"], outputs = [\"//pkg:b\", \"//pkg:b\"]",
+            "duplicate transition input '//pkg:a'",
+        ),
+        (
+            "_transition, inputs = [], outputs = [\"//pkg:b\", \"//pkg:b\"]",
+            "duplicate transition output '//pkg:b'",
+        ),
+        (
+            "_transition, inputs = [\"@//pkg:a\", \"//pkg:a\"], outputs = [\"@//pkg:b\", \"//pkg:b\"]",
+            "duplicate build setting '//pkg:b' in OUTPUTS (specified as '//pkg:b' and '@//pkg:b')",
+        ),
+        (
+            "_transition, inputs = [\"@//pkg:a\", \"//pkg:a\"], outputs = []",
+            "duplicate build setting '//pkg:a' in INPUTS (specified as '//pkg:a' and '@//pkg:a')",
+        ),
+        (
+            "_transition, inputs = [], outputs = [\"not:a\"]",
+            "invalid transition output 'not:a'",
+        ),
+        (
+            "_transition, inputs = [], outputs = [\":relative\"]",
+            "invalid transition output ':relative'",
+        ),
+        (
+            "_transition, inputs = [], outputs = [\"@missing//:setting\"]",
+            "no repo visible as @missing",
+        ),
+        (
+            "_transition, inputs = [], outputs = [\"//pkg/...:setting\"]",
+            "package name cannot contain '...'",
+        ),
+        (
+            "_transition, inputs = [\"//command_line_option:experimental_bad\"], outputs = []",
+            "Cannot transition on --experimental_* or --incompatible_* options",
+        ),
+        (
+            "_transition, inputs = [], outputs = [\"//command_line_option:incompatible_bad\"]",
+            "Cannot transition on --experimental_* or --incompatible_* options",
+        ),
+    ];
+    for (arguments, expected) in cases {
+        fs::write(
+            package.join("defs.bzl"),
+            format!(
+                "def _transition(settings, attr): return {{}}\nT = transition(implementation = {arguments})\n"
+            ),
+        )
+        .unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains(expected),
+            "arguments: {arguments}\nerror: {error}"
+        );
+    }
+}
+
+#[test]
 fn exec_and_executable_attributes_retain_loading_identity_and_restore() {
     let workspace = scratch("executable-exec-attribute-policy");
     let package = workspace.join("pkg");
@@ -2722,7 +2924,7 @@ probe = rule(implementation = _impl, attrs = {
     else {
         panic!("custom transition identity was not retained")
     };
-    assert_eq!(transition.output(), "//pkg:setting");
+    assert_eq!(transition.outputs()[0].declared(), "//pkg:setting");
     assert!(schema("executable_dep").executable());
     assert_ne!(schema("target_dep"), schema("binary"));
     assert_ne!(schema("binary"), schema("executable_dep"));
@@ -2815,7 +3017,8 @@ fn transition_rejects_recursive_package_patterns_but_allows_ellipsis_in_target_n
             .unwrap()
             .transition()
             .unwrap()
-            .output(),
+            .outputs()[0]
+            .declared(),
         "//pkg:setting...variant"
     );
 
@@ -2824,7 +3027,7 @@ fn transition_rejects_recursive_package_patterns_but_allows_ellipsis_in_target_n
         .unwrap_err()
         .to_string();
     assert!(
-        error.contains("one main-repository target label"),
+        error.contains("package name cannot contain '...'"),
         "error: {error}"
     );
 }

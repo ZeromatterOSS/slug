@@ -58,6 +58,7 @@ pub use subrule::SubruleIdentity;
 mod testing_bootstrap;
 #[cfg(test)]
 mod testing_bootstrap_tests;
+mod transition;
 pub mod visibility;
 
 pub use attrs::AttributeKind;

@@ -332,28 +332,73 @@ impl AttributeSchema {
 }
 
 #[derive(Debug, Clone, Allocative)]
+pub struct TransitionSetting {
+    canonical: CanonicalLabel,
+    declared: CompactString,
+}
+
+impl TransitionSetting {
+    pub(crate) fn new(canonical: CanonicalLabel, declared: impl Into<CompactString>) -> Self {
+        Self {
+            canonical,
+            declared: declared.into(),
+        }
+    }
+
+    pub fn canonical(&self) -> &CanonicalLabel {
+        &self.canonical
+    }
+
+    pub fn declared(&self) -> &str {
+        &self.declared
+    }
+
+    pub fn is_native_option(&self) -> bool {
+        self.canonical.package().repo().is_root()
+            && self.canonical.package().package().as_str() == "command_line_option"
+    }
+}
+
+impl PartialEq for TransitionSetting {
+    fn eq(&self, other: &Self) -> bool {
+        self.canonical == other.canonical && self.declared == other.declared
+    }
+}
+
+impl Eq for TransitionSetting {}
+
+#[derive(Debug, Clone, Allocative)]
 pub struct TransitionDefinition {
     #[allocative(skip)]
     implementation: FrozenValue,
-    output: CompactString,
+    inputs: Arc<[TransitionSetting]>,
+    outputs: Arc<[TransitionSetting]>,
 }
 impl TransitionDefinition {
-    pub fn new(implementation: FrozenValue, output: impl Into<CompactString>) -> Self {
+    pub fn new(
+        implementation: FrozenValue,
+        inputs: Arc<[TransitionSetting]>,
+        outputs: Arc<[TransitionSetting]>,
+    ) -> Self {
         Self {
             implementation,
-            output: output.into(),
+            inputs,
+            outputs,
         }
     }
     pub fn implementation(&self) -> FrozenValue {
         self.implementation
     }
-    pub fn output(&self) -> &str {
-        &self.output
+    pub fn inputs(&self) -> &[TransitionSetting] {
+        &self.inputs
+    }
+    pub fn outputs(&self) -> &[TransitionSetting] {
+        &self.outputs
     }
 }
 impl PartialEq for TransitionDefinition {
     fn eq(&self, other: &Self) -> bool {
-        self.output == other.output
+        self.inputs == other.inputs && self.outputs == other.outputs
     }
 }
 impl Eq for TransitionDefinition {}

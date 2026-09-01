@@ -87,6 +87,7 @@ use crate::attrs::NativeAttributeValue;
 use crate::attrs::NativeRuleAttributes;
 use crate::attrs::NativeRuleClass;
 use crate::attrs::TransitionDefinition as LoadingTransitionDefinition;
+use crate::attrs::TransitionSetting;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::FrozenBzlLifetimeEntry;
 use crate::bzl_module::LoadingPrintCapture;
@@ -126,6 +127,9 @@ use crate::subrule::configuration_field_global;
 use crate::subrule::fail_closed_rule_implementation;
 use crate::subrule::subrule_global;
 use crate::testing_bootstrap::testing_bootstrap_globals;
+use crate::transition::TransitionSettingsKind;
+use crate::transition::canonicalize_transition_settings;
+use crate::transition::validate_transition_settings;
 use crate::visibility::PackageGroupContents;
 use crate::visibility::RuleVisibility;
 use crate::visibility::VisibilitySource;
@@ -4950,10 +4954,13 @@ pub(crate) struct TransitionDefinitionGen<V> {
     implementation: V,
     #[trace(unsafe_ignore)]
     #[freeze(identity)]
-    output: CompactString,
+    inputs: Arc<[TransitionSetting]>,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    outputs: Arc<[TransitionSetting]>,
 }
 type TransitionDefinition<'v> = TransitionDefinitionGen<Value<'v>>;
-type FrozenTransitionDefinition = TransitionDefinitionGen<FrozenValue>;
+pub(crate) type FrozenTransitionDefinition = TransitionDefinitionGen<FrozenValue>;
 starlark::starlark_complex_values!(TransitionDefinition);
 impl FrozenTransitionDefinition {
     #[cfg(test)]
@@ -4962,8 +4969,13 @@ impl FrozenTransitionDefinition {
     }
 
     #[cfg(test)]
-    pub(crate) fn output(&self) -> &str {
-        &self.output
+    pub(crate) fn inputs(&self) -> &[TransitionSetting] {
+        &self.inputs
+    }
+
+    #[cfg(test)]
+    pub(crate) fn outputs(&self) -> &[TransitionSetting] {
+        &self.outputs
     }
 }
 impl<V> fmt::Display for TransitionDefinitionGen<V> {
@@ -5037,7 +5049,8 @@ fn attribute_definition_from_value<'v>(value: Value<'v>) -> Option<AttributeDefi
                 .as_ref()
                 .map(|transition| TransitionDefinitionGen {
                     implementation: transition.implementation.to_value(),
-                    output: transition.output.clone(),
+                    inputs: transition.inputs.clone(),
+                    outputs: transition.outputs.clone(),
                 }),
         }),
     }
@@ -5681,7 +5694,8 @@ fn attribute_definition<'v>(
                     starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
                     starlark::__macro_refs::Either::Right(value) => Some(TransitionDefinitionGen {
                         implementation: value.implementation.to_value(),
-                        output: value.output.clone(),
+                        inputs: value.inputs.clone(),
+                        outputs: value.outputs.clone(),
                     }),
                 })
                 .map(Some)
@@ -6495,7 +6509,8 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                                 AttributeDependencyConfiguration::Starlark(
                                     LoadingTransitionDefinition::new(
                                         transition.implementation,
-                                        transition.output.clone(),
+                                        transition.inputs.clone(),
+                                        transition.outputs.clone(),
                                     ),
                                 )
                             }
@@ -7812,32 +7827,24 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         user_provider_from_arguments(doc, fields, init, eval)
     }
     fn transition<'v>(
-        #[starlark(require = named)] implementation: Value<'v>,
+        #[starlark(require = named)] implementation: StarlarkCallable<'v>,
         #[starlark(require = named)] inputs: UnpackListOrTuple<&str>,
         #[starlark(require = named)] outputs: UnpackListOrTuple<&str>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<TransitionDefinition<'v>> {
         let inputs = list(inputs);
         let outputs = list(outputs);
-        let [output] = outputs.as_slice() else {
-            anyhow::bail!(
-                "only transition(inputs = [], outputs = [one main-repository target label]) is supported"
-            )
-        };
-        if !inputs.is_empty()
-            || !output.starts_with("//")
-            || transition_output_has_recursive_package_segment(output)
-        {
-            anyhow::bail!(
-                "only transition(inputs = [], outputs = [one main-repository target label]) is supported"
-            )
-        }
-        let label = CanonicalLabel::parse(&format!("@@{output}")).map_err(anyhow::Error::msg)?;
-        if !label.package().repo().is_root() {
-            anyhow::bail!("transition output must be a direct main-repository target label")
-        }
+        let context = BzlEvaluationContext::from_evaluator(eval)?;
+        let source = context.source_identity_for_call(eval)?;
+        let inputs = validate_transition_settings(&inputs, TransitionSettingsKind::Inputs, source)?;
+        let outputs =
+            validate_transition_settings(&outputs, TransitionSettingsKind::Outputs, source)?;
+        let outputs = canonicalize_transition_settings(outputs, TransitionSettingsKind::Outputs)?;
+        let inputs = canonicalize_transition_settings(inputs, TransitionSettingsKind::Inputs)?;
         Ok(TransitionDefinitionGen {
-            implementation,
-            output: output.into(),
+            implementation: implementation.0,
+            inputs,
+            outputs,
         })
     }
 }
@@ -7907,14 +7914,6 @@ fn is_repository_rule_attribute_name(name: &str) -> bool {
         .enumerate()
         .all(|(index, byte)| byte.is_ascii_alphanumeric() || (index > 0 && byte == b'_'))
         && name.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
-}
-
-fn transition_output_has_recursive_package_segment(output: &str) -> bool {
-    let Some(label) = output.strip_prefix("//") else {
-        return false;
-    };
-    let package = label.split_once(':').map_or(label, |(package, _)| package);
-    package.split('/').any(|segment| segment == "...")
 }
 
 #[starlark_module]

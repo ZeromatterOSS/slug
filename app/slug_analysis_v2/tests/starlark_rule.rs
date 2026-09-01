@@ -5414,6 +5414,68 @@ parent(
 }
 
 #[tokio::test]
+async fn unsupported_transition_shapes_fail_before_setting_lookup_or_invocation() {
+    let cases = [
+        (
+            "nonempty-input",
+            "[\"//:missing_input\"]",
+            "[\"//:missing_output\"]",
+        ),
+        ("zero-output", "[]", "[]"),
+        (
+            "multiple-output",
+            "[]",
+            "[\"//:missing_a\", \"//:missing_b\"]",
+        ),
+        (
+            "native-output",
+            "[]",
+            "[\"//command_line_option:platforms\"]",
+        ),
+        ("external-output", "[]", "[\"@@dep+//:missing\"]"),
+    ];
+    for (name, inputs, outputs) in cases {
+        let workspace = scratch();
+        fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+        fs::write(
+            workspace.join("defs.bzl"),
+            format!(
+                r#"def _empty(ctx): return []
+empty = rule(implementation = _empty)
+def _transition(settings, attr): fail("TRANSITION_IMPLEMENTATION_WAS_INVOKED")
+t = transition(implementation = _transition, inputs = {inputs}, outputs = {outputs})
+parent = rule(implementation = _empty, attrs = {{"dep": attr.label(cfg = t)}})
+"#
+            ),
+        )
+        .unwrap();
+        fs::write(
+            workspace.join("BUILD.bazel"),
+            "load(':defs.bzl', 'empty', 'parent')\nempty(name = 'child')\nparent(name = 'parent', dep = ':child')\n",
+        )
+        .unwrap();
+        let key = ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:parent").unwrap(),
+            test_configuration(),
+        );
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let error = analyze_request(&dice, &workspace, &key, None, false)
+            .await
+            .unwrap_err();
+        assert!(
+            error.contains(
+                "transition execution currently supports only input-free transitions with one root-repository build-setting output"
+            ),
+            "{name}: {error}"
+        );
+        assert!(!error.contains("TRANSITION_IMPLEMENTATION_WAS_INVOKED"));
+        for missing in ["missing_input", "missing_output", "missing_a", "missing_b"] {
+            assert!(!error.contains(missing), "{name}: {error}");
+        }
+    }
+}
+
+#[tokio::test]
 async fn mixed_root_and_external_overlay_demands_root_package_before_mapping_need() {
     let workspace = scratch();
     fs::write(

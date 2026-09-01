@@ -2077,6 +2077,7 @@ fn cpp_fragment_projection_distinguishes_target_and_exec_compilation_modes() {
     assert!(CppFragmentProjection::new(absolute_fdo).is_err());
     for unowned in [
         "cs_fdo_absolute_path",
+        "incompatible_disable_transitions_on",
         "propeller_optimize_absolute_cc_profile",
         "propeller_optimize_absolute_ld_profile",
     ] {
