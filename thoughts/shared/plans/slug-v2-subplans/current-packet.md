@@ -5,8 +5,9 @@ Packet: `WP-6-7A-cpp-configuration-field-catalog-completion-r1`
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 configured fragment,
 late-bound dependency, and command-configuration breadth.
 
-Status: independent design review returned `ACCEPT`; implement only the frozen
-boundary below.
+Status: R1 implementation discovered a separate ordinary provider-constrained
+target-invocation boundary and returned `REPLAN`. Focused R2 correction review
+returned `ACCEPT`; resume only the corrected frozen boundary.
 Base commit `cb477b7ab` terminally accepts the complete coverage configuration-
 field category. The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -33,8 +34,8 @@ Exact admitted behavior:
 - the field is valid only as a private `attr.label` default under the already-
   accepted ordinary/subrule restrictions. Default `None` adds no edge; an
   explicit `--custom_malloc=<label>` supplies the configured dependency through
-  the existing target/Exec, provider, file, executable, edge, and error-order
-  machinery;
+  the existing target/Exec, file, executable, edge, and error-order machinery
+  for schemas already admitted by target invocation;
 - `--custom_malloc=<label>` becomes a typed native command option over the
   already-retained CppOptions descriptor, with repository mapping, last-wins,
   structural identity, and same-DICE A/B/A restoration. Joined value is
@@ -59,6 +60,11 @@ Unsupported/deferred behavior:
 - custom-malloc rule semantics, `CcInfo` production, link selection, malloc
   precedence, action generation, and execution remain later BCR Starlark and
   configured-action categories;
+- ordinary target invocation with a provider-constrained attribute is a
+  separate generic loading/analysis category. The authentic rules_rust
+  `_custom_malloc` schema uses `providers = [[CcInfo]]`; after this packet
+  clears the field declaration, replay may stop at that already-existing typed
+  boundary. This packet neither bypasses nor widens it;
 - other fragment catalogs remain unsupported rather than accepted through a
   stringly generic fallback; and
 - configured aspect application retains its existing typed deferred boundary.
@@ -98,8 +104,11 @@ private C++ methods and requires a mixed-visibility facade, not a relaxation of
 the entire object. A fresh Bazel 9.2 oracle from an ordinary non-builtin `.bzl`
 module reports `None` by default and `@@//:malloc` under
 `--custom_malloc=//:malloc`, with no allowlist error. The pinned integration
-test separately proves the late-bound private attribute resolves to `None` or
-the configured dependency and enforces its `CcInfo` provider schema.
+test separately proves Bazel's late-bound private attribute resolves to `None`
+or the configured dependency and enforces its `CcInfo` provider schema. Slug's
+ordinary provider-constrained target invocation remains explicitly deferred,
+so that part of the test selects the next generic category rather than evidence
+for this packet.
 
 `OptionsParserImpl` proves a `no` prefix on a known non-Boolean option is an
 error. A fresh Bazel 9.2 oracle reports exactly
@@ -181,8 +190,9 @@ Focused proofs must cover:
 1. exact eleven-member C++ field inventory, unknown-field rejection, one-byte
    layout, typed equality/hash, and tools-repository A/B/A;
 2. default-None / explicit-label / default-None restoration through the sole
-   field resolver, repository mapping, non-visible labels, provider validation,
-   omitted/default edge behavior, and configured target dependency identity;
+   field resolver, repository mapping, non-visible labels, omitted/default edge
+   behavior, and configured target dependency identity on an otherwise admitted
+   ordinary/subrule schema;
 3. exact joined `--custom_malloc`, last-wins structural identity and mapping,
    plus generic rejection of `--nocustom_malloc`,
    `--nocoverage_output_generator`, and one previously admitted non-Boolean
@@ -195,7 +205,8 @@ Focused proofs must cover:
 6. macro/repository/tag/non-label/public/fixed-aspect controls remain closed and
    the existing ten configuration fields regress; and
 7. rebuilt authentic cquery clears `custom_malloc` and records the next generic
-   frontier before any rule-body or C++ builtin special case.
+   frontier—expected to be ordinary provider-constrained target invocation—
+   before any rule-body or C++ builtin special case.
 
 Then run focused configuration/loading/analysis/command proofs and complete
 `slug_configuration_v2`, `slug_loading_v2`, `slug_analysis_v2`, and affected
@@ -213,6 +224,27 @@ Independent design review returned `ACCEPT`. It verified the exact eleven-to-
 ten inventory comparison, mixed public/restricted facade, generic native no-
 prefix correction, one-byte and single-owner reuse, compatibility boundaries,
 allowlists, caps, proofs, and stops.
+
+## R2 correction after discriminating implementation proof
+
+The R1 root proof copied rules_rust's `providers = [[CcInfo]]` onto the new
+late-bound attribute. Loading failed before analysis with Slug's existing
+`target invocation for provider-constrained or aspect-bearing attribute ... is
+not supported` boundary. That is not configuration-field behavior and cannot
+be absorbed through this packet's frozen production allowlist.
+
+R2 removes only the ordinary provider-validation claim and proof. The root and
+subrule facade/edge proof uses an otherwise admitted label schema; existing
+shared provider-validation regressions remain green. Authentic replay must
+clear `custom_malloc` and record the provider-constrained invocation stop if it
+appears. Every representation, visibility, command, owner, allowlist, cap, and
+other proof decision remains unchanged. Independent correction review is
+required before further implementation.
+
+Focused independent R2 correction review returned `ACCEPT`. It confirms that
+provider-constrained ordinary invocation is an independent category and that
+unconstrained root/subrule proofs still discriminate every field, edge, facade,
+mapping, lifecycle, and restoration behavior owned here.
 
 ## Immediate predecessor
 

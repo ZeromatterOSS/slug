@@ -106,6 +106,17 @@ instead of silently ignoring them. Bazel 9.2 remains authority; clean Zabel is
 peer representation guidance only. Independent design review returned
 `ACCEPT`; implement only the frozen packet.
 
+R1 implementation then exposed a separate generic boundary: adding the
+authentic `providers = [[CcInfo]]` constraint to an ordinary late-bound
+attribute fails at Slug's existing provider-constrained target-invocation stop
+before configured analysis. `REPLAN` to R2 removes only that provider claim
+and proof from the field-catalog packet. The root/subrule field, edge, facade,
+command and lifecycle proofs use otherwise admitted schemas; rebuilt replay
+must record the provider-constrained invocation frontier rather than bypassing
+it. No representation, resolver, DICE, parser, ruleset, `cc_common`, or C++ rule
+scope changes. Focused independent correction review returned `ACCEPT`; resume
+only the corrected frozen packet.
+
 Commit `683538254` terminally accepts generic configured fragment projection.
 The successor audit found that authentic rules_cc 0.2.17 forwards a nonempty
 transitive `all_files` depset through action tools, activating the retained
