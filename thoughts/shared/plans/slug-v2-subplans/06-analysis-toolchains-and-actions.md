@@ -21980,3 +21980,44 @@ invalid types and positional docs. Full owner/direct-dependent validation and
 the CLI rebuild pass. The real replay advances to the separate
 `attr.label_list(flags=["DIRECT_COMPILE_TIME_INPUT"])` label-dependency-control
 family. No parser, schema, DICE, ruleset, `cc_common`, or C++ owner changed.
+
+#### Attribute documentation accepted; direct-compile-input flags active (2026-08-31)
+
+Commit `1e583e9d0` terminally accepts the complete documentation-parameter
+category across Slug's thirteen existing attribute representations. The next
+authentic rules_rust failure is the named-only
+`attr.label_list(flags=["DIRECT_COMPILE_TIME_INPUT"])` declaration, still
+before configured analysis, a rule implementation, or `cc_common`.
+
+Activate
+`WP-6-7A-attribute-flags-direct-compile-input-category-parity-r1` at
+`1e583e9d0`. Bazel 9.2 exposes `flags` on exactly five label dependency
+constructors and normalizes exact string names into an `EnumSet`. Install one
+V2-owned `u32` property-bit newtype in the existing loading schema, admit
+`DIRECT_COMPILE_TIME_INPUT` across the complete five-constructor family, and
+preserve it through ordinary rule descriptor freeze and package publication.
+Duplicates and input order collapse; invalid types, unknown names, unexposed
+constructors, and conversions that would discard a nonempty set fail before
+publication. Fixed-schema aspect, macro, subrule, repository-rule and tag-class
+conversions reject a nonempty set instead of silently discarding it.
+
+Bazel's deprecated parameter accepts 25 internal property names whose effects
+span collection normalization, configurability, validation, transitions,
+tools, constraints, licenses and dependency resolution. Keep the complete name
+registry centralized but reject the other 24 as unsupported until their
+natural consumers move with them. Slug does not implement
+`--compile_one_dependency`, the sole consumer of the admitted bit, so this
+packet changes no configured dependency or action behavior. It adds no parser,
+set, DICE key, query, command, ruleset, `cc_common`, `cc_internal`, or C++
+branch. Bazel 9.2 remains sole semantic authority; Buck2/starlark-rust supplies
+the binder and compact-value patterns, while Zabel is peer ownership guidance
+only.
+
+The implementation is terminally `ACCEPT` at 114 production net / 136 gross,
+183 proof, and 319 total gross Rust lines. A real package-level proof observes
+the admitted bit on the final published rule schema and would fail if final
+lowering dropped it. Full loading and analysis suites, CLI rebuild, and hygiene
+gates pass. The authentic replay now accepts `flags` and stops at
+`attr.label_list(allow_files=[".rs"])`, selecting the complete label-file-
+admissibility category. It still reaches no rule body, configured analysis,
+`compile_one_dependency`, `cc_common`, or `cc_internal`.

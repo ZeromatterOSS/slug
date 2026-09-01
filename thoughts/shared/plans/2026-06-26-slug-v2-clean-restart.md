@@ -30,29 +30,31 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration, selected-toolchain context, configured hidden dependencies, direct subrule calls, the first generic fragment category, dense retained depsets, configured action environments, scalar/vector Args, param-file/write, common non-callback Spawn, typed FilesToRun/runfiles/complete DefaultInfo, symlink declaration, complete runfiles-package ownership, four runfiles-support actions, FilesToRun Spawn expansion, and Bzlmod declaration selection accepted** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; configured hidden dependencies in `2bf86bfa8`; direct invocation/value materialization in `da6865a3b`; real starlark-rust `set` in `cb71a302d`; generic fragment projection in `683538254`; dense depset/action-input owner in `7b0db03e1`; configured-action-environment owner in `71d34affa`; scalar generic actions in `78b94789c`; vector Args and parameter files in `a01a23fe7`; complete default-context non-callback Spawn envelope in `bfe6f2690`; terminally accepted typed FilesToRun provider core in `8e7234b82`; typed runfiles and complete DefaultInfo in `f346c209a`; complete loading/package metadata in `80a6bfd3a`; configured transitive-package closure in `2483dd7e2`; four support actions in `f46a009a0`; complete FilesToRun Spawn expansion in `21db5d7b8`; exact Bzlmod declaration-call signatures in `817d017b6`; exact assigned-global selector/producer identity in `18b2549bd` | public attribute-constructor categories, other standard-provider breadth, named exec groups/callbacks, and execution projection remain | close documentation binding/validation across every already-owned attribute representation, then replay the bootstrap frontier |
+| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration, selected-toolchain context, configured hidden dependencies, direct subrule calls, the first generic fragment category, dense retained depsets, configured action environments, scalar/vector Args, param-file/write, common non-callback Spawn, typed FilesToRun/runfiles/complete DefaultInfo, symlink declaration, complete runfiles-package ownership, four runfiles-support actions, FilesToRun Spawn expansion, Bzlmod declaration selection, attribute documentation signatures, and direct-compile-input attribute flags accepted** | accepted M7A loading/repository closure through `c83e70f0f`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; configured hidden dependencies in `2bf86bfa8`; direct invocation/value materialization in `da6865a3b`; real starlark-rust `set` in `cb71a302d`; generic fragment projection in `683538254`; dense depset/action-input owner in `7b0db03e1`; configured-action-environment owner in `71d34affa`; scalar generic actions in `78b94789c`; vector Args and parameter files in `a01a23fe7`; complete default-context non-callback Spawn envelope in `bfe6f2690`; terminally accepted typed FilesToRun provider core in `8e7234b82`; typed runfiles and complete DefaultInfo in `f346c209a`; complete loading/package metadata in `80a6bfd3a`; configured transitive-package closure in `2483dd7e2`; four support actions in `f46a009a0`; complete FilesToRun Spawn expansion in `21db5d7b8`; exact Bzlmod declaration-call signatures in `817d017b6`; exact assigned-global selector/producer identity in `18b2549bd`; exact documentation binding/validation in `1e583e9d0`; terminally accepted compact flag ownership and exact direct-compile-input binding | retained public attribute-policy categories, other standard-provider breadth, named exec groups/callbacks, and execution projection remain | close label file-admissibility across its complete constructor and consumer category, then replay the bootstrap frontier |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[Attribute documentation-parameter category parity](./slug-v2-subplans/current-packet.md).
+[Attribute flags / direct-compile-input category parity](./slug-v2-subplans/current-packet.md).
 
-Commit `18b2549bd` terminally accepts exact assigned-global Bzlmod declaration
-selection, private/public alias and reexport behavior, and repository-rule
-first-producer identity. Two rebuilt real BCR replays pass rules_cc's private
-repository-rule boundary and stop identically at rules_rust
-`attr.label_keyed_string_dict(doc=...)` declaration binding.
-
-The active `WP-6-7A-attribute-doc-parameter-category-parity-r1` packet closes
-`doc` binding and validation across every attribute value representation Slug
-already owns, rather than special-casing that caller. It retains no
-documentation and changes no parser, set, attribute value/schema, DICE key,
-rule body, action, `cc_common`, `cc_internal`, ruleset, or C++ owner. The full
-constructor surface is partitioned next into collection/`int_list`, label-
-dependency, and experimental/disabled families so each semantic parameter
-moves with its natural owner. Bazel 9.2 is semantic authority; Zabel supplies
-category and ownership guidance only.
+Commit `1e583e9d0` terminally accepts named-only `doc` binding and validation
+across all thirteen attribute representations Slug already owns. The terminally
+accepted
+`WP-6-7A-attribute-flags-direct-compile-input-category-parity-r1` packet
+installs one compact retained property-bit owner and admits
+`DIRECT_COMPILE_TIME_INPUT` across all five Bazel constructors exposing
+`flags`. Bazel accepts 25 property names through this deprecated parameter,
+but their effects span collection normalization, configurability, file and
+provider validation, transitions, tools, constraints, licenses and dependency
+resolution. Unowned names therefore fail closed and move later with their
+complete consumer category; the one-word schema avoids future representation
+churn. No parser, `set`, command, action, rule body, `cc_common`, `cc_internal`,
+ruleset, or C++ special case is admitted. Bazel 9.2 is semantic authority;
+Zabel supplies compact ownership guidance only. The rebuilt real BCR replay
+now passes `flags` and stops at `attr.label_list(allow_files=[".rs"])`, selecting
+the next complete label-file-admissibility category before any rule body,
+configured analysis, `cc_common`, or `cc_internal` is reached.
 
 Commit `683538254` terminally accepts generic configured fragment projection.
 The successor audit found that authentic rules_cc 0.2.17 forwards a nonempty

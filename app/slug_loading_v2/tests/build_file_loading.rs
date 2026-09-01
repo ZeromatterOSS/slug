@@ -2540,6 +2540,38 @@ probe(
 }
 
 #[test]
+fn direct_compile_input_flags_reach_instantiated_rule_schema() {
+    let workspace = scratch("direct-compile-input-schema");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def _impl(ctx): return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {'srcs': attr.label_list(flags = ['DIRECT_COMPILE_TIME_INPUT']), 'deps': attr.label_list()})\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(':defs.bzl', 'probe')\nprobe(name = 'subject')\n",
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let PackageTargetKind::StarlarkRule(rule) = &loaded.targets[0].kind else {
+        panic!("expected Starlark rule")
+    };
+    let flag = |name: &str| {
+        rule.schema()
+            .iter()
+            .find(|schema| schema.declaration_name() == name)
+            .unwrap()
+            .direct_compile_time_input()
+    };
+    assert!(flag("srcs"));
+    assert!(!flag("deps"));
+}
+
+#[test]
 fn rule_rejects_explicit_configurable_descriptor_arguments() {
     let workspace = scratch("explicit-configurable");
     let package = workspace.join("pkg");

@@ -54,6 +54,25 @@ pub(crate) enum AllowedAttributeValues {
     String(Arc<[CompactString]>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Allocative)]
+pub(crate) struct AttributeFlags(u32);
+
+impl AttributeFlags {
+    const DIRECT_COMPILE_TIME_INPUT: u32 = 1 << 6;
+
+    pub(crate) fn insert_direct_compile_time_input(&mut self) {
+        self.0 |= Self::DIRECT_COMPILE_TIME_INPUT;
+    }
+
+    pub(crate) fn direct_compile_time_input(self) -> bool {
+        self.0 & Self::DIRECT_COMPILE_TIME_INPUT != 0
+    }
+
+    pub(crate) fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum AttributeDependencyConfiguration {
     Target,
@@ -99,6 +118,7 @@ pub struct AttributeSchema {
     builtin: bool,
     allow_files: bool,
     allow_single_file: Option<AllowSingleFile>,
+    flags: AttributeFlags,
     allowed_values: AllowedAttributeValues,
     default: Option<Arc<CoercedAttributeValue>>,
     dependency_configuration: AttributeDependencyConfiguration,
@@ -130,6 +150,7 @@ impl AttributeSchema {
             builtin: false,
             allow_files: false,
             allow_single_file: None,
+            flags: AttributeFlags::default(),
             allowed_values: AllowedAttributeValues::None,
             default: default.map(Arc::new),
             dependency_configuration: AttributeDependencyConfiguration::Target,
@@ -189,6 +210,9 @@ impl AttributeSchema {
     pub fn allow_single_file(&self) -> Option<&AllowSingleFile> {
         self.allow_single_file.as_ref()
     }
+    pub fn direct_compile_time_input(&self) -> bool {
+        self.flags.direct_compile_time_input()
+    }
     pub(crate) fn allowed_values(&self) -> &AllowedAttributeValues {
         &self.allowed_values
     }
@@ -201,6 +225,10 @@ impl AttributeSchema {
     }
     pub(crate) fn with_allow_files(mut self, allow_files: bool) -> Self {
         self.allow_files = allow_files;
+        self
+    }
+    pub(crate) fn with_flags(mut self, flags: AttributeFlags) -> Self {
+        self.flags = flags;
         self
     }
     pub(crate) fn with_allowed_values(mut self, values: AllowedAttributeValues) -> Self {
@@ -1267,6 +1295,7 @@ mod tests {
     use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
 
+    use super::AttributeFlags;
     use super::AttributeKind;
     use super::AttributeProvenance;
     use super::AttributeQueryValue;
@@ -1275,6 +1304,21 @@ mod tests {
     use super::CoercedAttributeValue;
     use super::NativeAttributePolicy;
     use super::NativeRuleClass;
+
+    #[test]
+    fn attribute_flags_are_one_word_and_project_through_schema() {
+        assert_eq!(std::mem::size_of::<AttributeFlags>(), 4);
+        let mut flags = AttributeFlags::default();
+        assert!(flags.is_empty());
+        flags.insert_direct_compile_time_input();
+        flags.insert_direct_compile_time_input();
+        assert!(flags.direct_compile_time_input());
+        assert!(
+            AttributeSchema::new("deps", AttributeKind::LabelList, false, true, None)
+                .with_flags(flags)
+                .direct_compile_time_input()
+        );
+    }
 
     #[test]
     fn native_rule_schemas_have_exact_unique_bazel_slots() {
