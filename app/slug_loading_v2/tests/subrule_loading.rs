@@ -11,7 +11,6 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
-use slug_loading_v2::AllowSingleFile;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::ConfiguredDependencyDefault;
@@ -559,16 +558,15 @@ ordinary_only = rule(
         .find(|attribute| attribute.user_name() == Some("_proto_profile"))
         .unwrap();
     assert_eq!(proto.kind(), AttributeKind::Label);
-    assert!(matches!(
-        proto.allow_single_file(),
-        Some(AllowSingleFile::True)
-    ));
+    assert!(proto.file_admissibility().single_artifact());
+    assert!(proto.file_admissibility().is_any_file());
     let fdo = configured
         .iter()
         .copied()
         .find(|attribute| attribute.user_name() == Some("_fdo_optimize"))
         .unwrap();
-    assert!(fdo.allow_files());
+    assert!(fdo.file_admissibility().is_any_file());
+    assert!(!fdo.file_admissibility().single_artifact());
     assert_eq!(
         fdo.required_providers()
             .iter()

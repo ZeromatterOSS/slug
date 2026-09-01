@@ -22021,3 +22021,48 @@ gates pass. The authentic replay now accepts `flags` and stops at
 `attr.label_list(allow_files=[".rs"])`, selecting the complete label-file-
 admissibility category. It still reaches no rule body, configured analysis,
 `compile_one_dependency`, `cc_common`, or `cc_internal`.
+
+#### Direct-compile-input flags accepted; label file-admissibility active (2026-08-31)
+
+Commit `1e65972a6` terminally accepts compact property-bit retention and exact
+`DIRECT_COMPILE_TIME_INPUT` binding across all five Bazel constructors exposing
+`flags`. The authentic one-shot replay passes that declaration and stops at
+rules_rust `attr.label_list(allow_files=[".rs"])`, still before a rule body,
+configured analysis, `cc_common`, or `cc_internal`.
+
+Activate `WP-6-7A-label-file-admissibility-category-parity-r1` at
+`1e65972a6`. Bazel 9.2 exposes Boolean-or-ordered-suffix `allow_files` on all
+five dependency constructors and scalar-only `allow_single_file`; a non-None
+single-file value independently sets the single-artifact property. Replace
+Slug's current Boolean plus optional split with one typed retained policy and
+flow it through ordinary/fixed loading schemas and configured-prerequisite
+validation. Preserve suffix order, duplicates, empty lists, any/no-file fast
+paths, rule eligibility, generated-output one-of-many matching, directory
+admission, and the label-bearing side of all three dictionary shapes. Add no
+parser, query, command, action identity, ruleset, `cc_common`, or
+`cc_internal` branch. Bazel 9.2 is sole semantic authority; Buck2/starlark-rust
+and Zabel supply representation and ownership guidance only.
+
+Suffix matching consumes only the selected dependency configuration's existing
+structural `SlugConfiguration::configured_action_path_flavor()`, including
+source preparation and post-compute rule-output validation, and fails closed
+without Host facts. Boolean any/no-file fast paths do not observe Host state;
+ambient/build-host OS selection is forbidden. The unified carrier replaces the
+public `AllowSingleFile` reexport without a compatibility alias or second
+retained representation.
+
+The first terminal implementation review found no production defect and
+confirmed the public-carrier replacement, shared ordinary/lifted validator,
+lazy selected-Host ownership, caps, complexity and isolation. It returned a
+proof-only `REPLAN`: the retained-schema A/B/A used separate declarations, and
+scalar invalid inputs plus suffix-specific macro/aspect/repository controls
+were under-discriminated. The bounded correction adds one same-DICE ordinary
+policy A/B/A restoring configured results and errors, invalid scalar
+`allow_single_file` rows, ordered-suffix macro retention, and suffix-specific
+aspect/repository rejection. Focused corrections pass at unchanged 214/650
+production, corrected 448/606 proof, and 1,256 total gross Rust lines. Complete
+deterministic loading passes 552 tests plus one intentional ignore, complete
+analysis passes 117, CLI rebuild/replay and all hygiene gates pass, and
+independent terminal rereview returns `ACCEPT`. Commit the accepted category,
+then audit the complete generic coverage configuration-field category exposed
+by the authentic replay.

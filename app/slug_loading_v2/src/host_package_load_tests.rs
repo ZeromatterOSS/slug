@@ -131,9 +131,9 @@ use super::merge_root_package_observations;
 use super::resolve_external_load_label;
 use super::resolve_host_load_label;
 use super::resolve_root_package_direct_load;
-use crate::AllowSingleFile;
 use crate::AttributeKind;
 use crate::CoercedAttributeValue;
+use crate::FileAdmissibility;
 use crate::HostCanonicalRepositoryLoadRouteObservationKey;
 use crate::LoadingPreparationOutcome;
 use crate::PackageListing;
@@ -3387,10 +3387,8 @@ fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
     let config = &aspect.attributes[0];
     assert_eq!(config.name, "_config");
     assert_eq!(config.kind, AttributeKind::Label);
-    assert!(matches!(
-        config.allow_single_file,
-        Some(AllowSingleFile::True)
-    ));
+    assert!(config.file_admissibility.is_any_file());
+    assert!(config.file_admissibility.single_artifact());
     assert!(
         matches!(config.default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@dep+//rust/settings:rustfmt.toml")
     );
@@ -3398,7 +3396,8 @@ fn assert_frozen_rustfmt_aspect(aspect: &FrozenAspectDefinition) {
     let process_wrapper = &aspect.attributes[1];
     assert_eq!(process_wrapper.name, "_process_wrapper");
     assert_eq!(process_wrapper.kind, AttributeKind::Label);
-    assert!(process_wrapper.allow_single_file.is_none());
+    assert!(process_wrapper.file_admissibility.is_no_files());
+    assert!(!process_wrapper.file_admissibility.single_artifact());
     assert!(
         matches!(process_wrapper.default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == "@@dep+//util/process_wrapper:process_wrapper")
     );
@@ -30935,7 +30934,7 @@ fn clippy_aspect_freezes_complete_source_declaration() {
     for (attribute, (name, target)) in aspect.attributes.iter().zip(expected) {
         assert_eq!(attribute.name, name);
         assert_eq!(attribute.kind, AttributeKind::Label);
-        assert!(!attribute.mandatory && attribute.configurable && !attribute.allow_files);
+        assert!(!attribute.mandatory && attribute.configurable);
         assert!(matches!(
             attribute.allowed_values,
             AllowedAttributeValues::None
@@ -30946,8 +30945,12 @@ fn clippy_aspect_freezes_complete_source_declaration() {
             matches!(attribute.default.as_ref(), Some(CoercedAttributeValue::Label(label)) if label.to_string() == format!("@@rules_rust+//{target}"))
         );
         assert_eq!(
-            attribute.allow_single_file,
-            (name == "_config").then_some(AllowSingleFile::True)
+            attribute.file_admissibility,
+            if name == "_config" {
+                FileAdmissibility::any_file().with_single_artifact()
+            } else {
+                FileAdmissibility::default()
+            }
         );
         assert_eq!(attribute.executable, name == "_process_wrapper");
         assert_eq!(attribute.exec_configuration, name == "_process_wrapper");
@@ -30982,8 +30985,8 @@ fn clippy_aspect_freezes_complete_source_declaration() {
     let deps = rule.schema.last().unwrap();
     assert_eq!(deps.name, "deps");
     assert_eq!(deps.kind, AttributeKind::LabelList);
-    assert!(!deps.mandatory && deps.configurable && !deps.allow_files);
-    assert!(deps.default.is_none() && deps.allow_single_file.is_none());
+    assert!(!deps.mandatory && deps.configurable && deps.file_admissibility.is_no_files());
+    assert!(deps.default.is_none() && !deps.file_admissibility.single_artifact());
     assert!(!deps.executable && !deps.exec_configuration && deps.transition.is_none());
     assert_eq!(deps.required_providers.len(), 2);
     assert_eq!(
@@ -31179,7 +31182,7 @@ fn assert_frozen_rustfmt_test_rule(rule: &FrozenRuleDefinition) {
     let targets = &declared[5];
     assert_eq!(targets.kind, AttributeKind::LabelList);
     assert!(!targets.mandatory && !targets.executable && !targets.exec_configuration);
-    assert!(targets.default.is_none() && targets.allow_single_file.is_none());
+    assert!(targets.default.is_none() && targets.file_admissibility.is_no_files());
     assert_eq!(targets.required_providers.len(), 2);
     assert_eq!(
         provider_identity_text(&targets.required_providers[0][0]),
@@ -31519,10 +31522,8 @@ CUSTOM_TRUE = rule(implementation = _impl, attrs = {"x": attr.label(cfg = transi
     for name in ["proc_macro_srv", "rust_analyzer", "rustc"] {
         let schema = &rule.schema[attr_index(&rule, name)];
         assert!(schema.executable && schema.exec_configuration);
-        assert!(matches!(
-            schema.allow_single_file,
-            Some(AllowSingleFile::True)
-        ));
+        assert!(schema.file_admissibility.is_any_file());
+        assert!(schema.file_admissibility.single_artifact());
     }
     assert!(rule.schema[attr_index(&rule, "rustc")].mandatory);
     assert!(rule.schema[attr_index(&rule, "rustc_srcs")].mandatory);
@@ -31548,7 +31549,7 @@ CUSTOM_TRUE = rule(implementation = _impl, attrs = {"x": attr.label(cfg = transi
 }
 
 #[test]
-fn bazel_label_list_boolean_allow_files_freezes_rust_stdlib_filegroup() {
+fn label_file_admissibility_binds_all_five_constructors_and_retains_identity() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_rust+//rust/private:toolchain.bzl").unwrap(),
         workspace_path: PathBuf::from("/rules_rust/rust/private/toolchain.bzl"),
@@ -31556,38 +31557,132 @@ fn bazel_label_list_boolean_allow_files_freezes_rust_stdlib_filegroup() {
     };
     let source = r#"
 def _impl(ctx): fail("implementation must stay lazy")
-OMITTED = rule(implementation = _impl, attrs = {"srcs": attr.label_list()})
-EXPLICIT_NONE = rule(implementation = _impl, attrs = {"srcs": attr.label_list(allow_files = None)})
-EXPLICIT_FALSE = rule(implementation = _impl, attrs = {"srcs": attr.label_list(allow_files = False)})
-rust_stdlib_filegroup = rule(doc = "stdlib", implementation = _impl, attrs = {
-    "srcs": attr.label_list(allow_files = True, doc = "stdlib files", mandatory = True),
+R = rule(implementation = _impl, attrs = {
+    "scalar": attr.label(allow_files = (".a", ".a", "")),
+    "list": attr.label_list(allow_files = [".b", ".a"]),
+    "string_keyed": attr.string_keyed_label_dict(allow_files = True),
+    "label_keyed": attr.label_keyed_string_dict(allow_files = False),
+    "list_dict": attr.label_list_dict(allow_files = None),
+    "single_false": attr.label(allow_single_file = False),
+    "single_empty": attr.label(allow_single_file = []),
 })
+RESTORED = rule(implementation = _impl, attrs = {"scalar": attr.label(allow_files = (".a", ".a", ""))})
+DISTINCT = rule(implementation = _impl, attrs = {"scalar": attr.label(allow_files = (".a", ""))})
+ORDERED = rule(implementation = _impl, attrs = {"scalar": attr.label(allow_files = (".a", ".b"))})
+REORDERED = rule(implementation = _impl, attrs = {"scalar": attr.label(allow_files = (".b", ".a"))})
+EMPTY = rule(implementation = _impl, attrs = {"scalar": attr.label(allow_files = [])})
+FALSE = rule(implementation = _impl, attrs = {"scalar": attr.label(allow_files = False)})
+SINGLE_SUFFIX = rule(implementation = _impl, attrs = {"scalar": attr.label(allow_single_file = (".a", ".b"))})
 "#;
     let module = eval_bzl_with_identity(source, owner.clone()).unwrap();
-    for (name, allow_files) in [
-        ("OMITTED", false),
-        ("EXPLICIT_NONE", false),
-        ("EXPLICIT_FALSE", false),
-        ("rust_stdlib_filegroup", true),
-    ] {
-        let rule = module
-            .get(name)
+    let policy = |rule_name: &str, attribute_name: &str| {
+        module
+            .get(rule_name)
             .unwrap()
             .downcast::<FrozenRuleDefinition>()
-            .unwrap();
-        let srcs = rule
+            .unwrap()
             .schema
             .iter()
-            .find(|schema| schema.name == "srcs")
-            .unwrap();
-        assert_eq!(srcs.allow_files, allow_files, "{name}");
-        if allow_files {
-            assert!(srcs.mandatory, "{name}");
+            .find(|schema| schema.name == attribute_name)
+            .unwrap()
+            .file_admissibility
+            .clone()
+    };
+    assert_eq!(
+        policy("R", "scalar").suffixes(),
+        Some([".a".into(), ".a".into(), "".into()].as_slice())
+    );
+    assert_eq!(
+        policy("R", "list").suffixes(),
+        Some([".b".into(), ".a".into()].as_slice())
+    );
+    assert!(policy("R", "string_keyed").is_any_file());
+    assert!(policy("R", "label_keyed").is_no_files());
+    assert!(policy("R", "list_dict").is_no_files());
+    assert!(policy("R", "single_false").is_no_files());
+    assert!(policy("R", "single_false").single_artifact());
+    assert_eq!(policy("R", "single_empty").suffixes(), Some([].as_slice()));
+    assert!(policy("R", "single_empty").single_artifact());
+    assert_eq!(policy("R", "scalar"), policy("RESTORED", "scalar"));
+    assert_ne!(policy("R", "scalar"), policy("DISTINCT", "scalar"));
+    assert_ne!(policy("ORDERED", "scalar"), policy("REORDERED", "scalar"));
+    assert_ne!(policy("EMPTY", "scalar"), policy("FALSE", "scalar"));
+    assert_eq!(
+        policy("ORDERED", "scalar").suffixes(),
+        policy("SINGLE_SUFFIX", "scalar").suffixes()
+    );
+    assert_ne!(
+        policy("ORDERED", "scalar"),
+        policy("SINGLE_SUFFIX", "scalar")
+    );
+    let rejects = |source: String| eval_bzl_with_identity(&source, owner.clone()).is_err();
+    let file_constructors = [
+        "label",
+        "label_list",
+        "string_keyed_label_dict",
+        "label_keyed_string_dict",
+        "label_list_dict",
+    ];
+    for constructor in file_constructors {
+        for argument in [
+            "",
+            "allow_files = None",
+            "allow_files = True",
+            "allow_files = False",
+            "allow_files = ['.a']",
+            "allow_files = ('.a',)",
+            "allow_files = []",
+            "allow_files = ['.a', '.a']",
+            "allow_files = ['.b', '.a']",
+        ] {
+            let source = format!("X = attr.{constructor}({argument})");
+            eval_bzl_with_identity(&source, owner.clone())
+                .unwrap_or_else(|error| panic!("{constructor}/{argument}: {error}"));
         }
+        for invalid in ["1", "'.a'", "[1]", "{}"] {
+            assert!(rejects(format!(
+                "X = attr.{constructor}(allow_files = {invalid})"
+            )));
+        }
+        assert!(rejects(format!("X = attr.{constructor}(True)")));
     }
-    let rejects = |source| eval_bzl_with_identity(source, owner.clone()).is_err();
-    assert!(rejects("X = attr.label_list(allow_files = ['.rlib'])"));
-    assert!(rejects("X = attr.label_list(allow_files = 1)"));
+    for constructor in file_constructors.into_iter().skip(1) {
+        assert!(rejects(format!(
+            "X = attr.{constructor}(allow_single_file = True)"
+        )));
+    }
+    for invalid in ["1", "'.a'", "[1]", "{}"] {
+        assert!(rejects(format!(
+            "X = attr.label(allow_single_file = {invalid})"
+        )));
+    }
+    for constructor in [
+        "bool",
+        "int",
+        "output",
+        "output_list",
+        "string",
+        "string_list",
+        "string_dict",
+        "string_list_dict",
+    ] {
+        assert!(rejects(format!(
+            "X = attr.{constructor}(allow_files = True)"
+        )));
+        assert!(rejects(format!(
+            "X = attr.{constructor}(allow_single_file = True)"
+        )));
+    }
+    assert!(rejects(
+        "X = attr.label(allow_files = True, allow_single_file = [])".into()
+    ));
+    for valid in [
+        "allow_files = None, allow_single_file = True",
+        "allow_files = True, allow_single_file = None",
+        "allow_single_file = None",
+    ] {
+        eval_bzl_with_identity(&format!("X = attr.label({valid})"), owner.clone()).unwrap();
+    }
 }
 
 #[tokio::test]
@@ -31627,8 +31722,8 @@ async fn rust_stdlib_filegroup_projects_file_allowance_into_target_schema() {
         .iter()
         .find(|schema| schema.declaration_name() == "srcs")
         .unwrap();
-    assert!(srcs.mandatory() && srcs.allow_files());
-    assert!(srcs.allow_single_file().is_none());
+    assert!(srcs.mandatory() && srcs.file_admissibility().is_any_file());
+    assert!(!srcs.file_admissibility().single_artifact());
 }
 
 #[tokio::test]
@@ -31653,8 +31748,8 @@ async fn scalar_label_file_allowance_projects_without_single_artifact_identity()
         .iter()
         .find(|schema| schema.declaration_name() == "tool")
         .unwrap();
-    assert!(tool.allow_files());
-    assert!(tool.allow_single_file().is_none());
+    assert!(tool.file_admissibility().is_any_file());
+    assert!(!tool.file_admissibility().single_artifact());
 }
 
 #[test]
@@ -31834,22 +31929,32 @@ rust_toolchain = rule(implementation = _impl, attrs = {
             .iter()
             .find(|schema| schema.name == attribute_name)
             .unwrap();
-        (schema.allow_files, schema.allow_single_file.clone())
+        schema.file_admissibility.clone()
     };
     for name in ["LABEL_OMITTED", "LABEL_NONE", "LABEL_FALSE"] {
-        assert_eq!(label_snapshot(name, "x"), (false, None), "{name}");
+        assert_eq!(
+            label_snapshot(name, "x"),
+            FileAdmissibility::default(),
+            "{name}"
+        );
     }
-    assert_eq!(label_snapshot("LABEL_TRUE", "x"), (true, None));
+    assert_eq!(
+        label_snapshot("LABEL_TRUE", "x"),
+        FileAdmissibility::any_file()
+    );
     assert_eq!(
         label_snapshot("LABEL_SINGLE", "x"),
-        (false, Some(AllowSingleFile::True))
+        FileAdmissibility::any_file().with_single_artifact()
     );
     for name in ["llvm_lib", "llvm_tools"] {
-        assert_eq!(label_snapshot("rust_toolchain", name), (true, None));
+        assert_eq!(
+            label_snapshot("rust_toolchain", name),
+            FileAdmissibility::any_file()
+        );
     }
     assert_eq!(
         label_snapshot("rust_toolchain", "llvm_profdata"),
-        (false, Some(AllowSingleFile::True))
+        FileAdmissibility::any_file().with_single_artifact()
     );
     let provider_snapshot = |rule_name: &str, attribute_name: &str| {
         let rule = module
@@ -31907,7 +32012,7 @@ rust_toolchain = rule(implementation = _impl, attrs = {
             "{invalid}"
         );
     }
-    for invalid in ["1", "'file'", "['.so']", "{}"] {
+    for invalid in ["1", "'file'", "[1]", "{}"] {
         let source = format!("X = attr.label(allow_files = {invalid})");
         assert!(
             eval_bzl_with_identity(&source, owner.clone()).is_err(),
@@ -31956,6 +32061,8 @@ rust_toolchain = rule(implementation = _impl, attrs = {
         .is_err()
     );
     assert!(eval_bzl_with_identity("def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.label(allow_files = True)})", owner.clone()).is_err());
+    assert!(eval_bzl_with_identity("def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.label(allow_files = ['.rs'])})", owner.clone()).is_err());
+    assert!(eval_bzl_with_identity("def impl(target, ctx): return []\nX = aspect(implementation = impl, attrs = {'_x': attr.label(allow_files = ['.rs'])})", owner.clone()).is_err());
     assert!(
         eval_bzl_with_identity(
             "X = tag_class(attrs = {'x': attr.label(allow_files = True)})",

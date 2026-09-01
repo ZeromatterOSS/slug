@@ -24,7 +24,6 @@ use slug_events_v2::EventBatch;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
-use slug_loading_v2::AllowSingleFile;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::BzlModuleEvaluator;
@@ -2455,21 +2454,31 @@ probe(
     assert_eq!(schema("properties").kind(), AttributeKind::StringDict);
     assert_eq!(schema("word_map").kind(), AttributeKind::StringListDict);
     assert_eq!(schema("label_map").kind(), AttributeKind::LabelListDict);
-    assert!(matches!(
-        schema("optional").allow_single_file(),
-        Some(AllowSingleFile::True)
-    ));
-    assert!(matches!(
-        schema("no_files").allow_single_file(),
-        Some(AllowSingleFile::False)
-    ));
-    assert!(matches!(
-        schema("extensions").allow_single_file(),
-        Some(AllowSingleFile::Extensions(extensions))
-            if extensions.as_ref() == [".txt", ".md"]
-    ));
-    assert_eq!(schema("omitted_files").allow_single_file(), None);
-    assert_eq!(schema("explicit_none_files").allow_single_file(), None);
+    assert!(schema("optional").file_admissibility().is_any_file());
+    assert!(schema("optional").file_admissibility().single_artifact());
+    assert!(schema("no_files").file_admissibility().is_no_files());
+    assert!(schema("no_files").file_admissibility().single_artifact());
+    assert_eq!(
+        schema("extensions").file_admissibility().suffixes(),
+        Some([".txt".into(), ".md".into()].as_slice())
+    );
+    assert!(schema("extensions").file_admissibility().single_artifact());
+    assert!(schema("omitted_files").file_admissibility().is_no_files());
+    assert!(
+        !schema("omitted_files")
+            .file_admissibility()
+            .single_artifact()
+    );
+    assert!(
+        schema("explicit_none_files")
+            .file_admissibility()
+            .is_no_files()
+    );
+    assert!(
+        !schema("explicit_none_files")
+            .file_admissibility()
+            .single_artifact()
+    );
     assert!(schema("flag").configurable());
     assert!(matches!(
         schema("optional").default(),
@@ -2704,10 +2713,8 @@ probe = rule(implementation = _impl, attrs = {
         schema("binary").dependency_configuration(),
         AttributeDependencyConfiguration::Exec
     ));
-    assert_eq!(
-        schema("binary").allow_single_file(),
-        Some(&AllowSingleFile::True)
-    );
+    assert!(schema("binary").file_admissibility().is_any_file());
+    assert!(schema("binary").file_admissibility().single_artifact());
     assert!(schema("binary").mandatory());
     assert!(!schema("binary").executable());
     let AttributeDependencyConfiguration::Starlark(transition) =

@@ -13,11 +13,14 @@
 use std::sync::Arc;
 
 use compact_str::CompactString;
+use slug_build_api_v2::ActionOutputKind;
+use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::ProviderIdentity;
+use slug_configuration_v2::HostPathFlavor;
 use slug_identity_v2::CanonicalLabel;
-use slug_loading_v2::AllowSingleFile;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::ConfiguredDependencyDefault;
+use slug_loading_v2::FileAdmissibility;
 use slug_loading_v2::SubruleIdentity;
 use slug_loading_v2::package::StarlarkRuleImplementation;
 
@@ -29,8 +32,7 @@ use crate::result::ConfiguredNodeResult;
 
 #[derive(Debug, Clone)]
 pub(crate) struct ConfiguredDependencyValidation {
-    allow_files: bool,
-    allow_single_file: Option<AllowSingleFile>,
+    file_admissibility: FileAdmissibility,
     executable: bool,
     required_providers: Arc<[Arc<[ProviderIdentity]>]>,
 }
@@ -44,6 +46,7 @@ pub(crate) struct DeclaredDependencyKey {
     pub(crate) hidden: bool,
     pub(crate) exec_configuration: bool,
     pub(crate) source_admitted: bool,
+    pub(crate) path_flavor: Option<HostPathFlavor>,
     pub(crate) validation: Option<ConfiguredDependencyValidation>,
     pub(crate) configured_row: Option<u32>,
 }
@@ -62,11 +65,16 @@ pub(crate) struct ConfiguredDependencyRow {
 }
 
 impl ConfiguredDependencyRow {
+    pub(crate) fn attribute_name(&self) -> &str {
+        &self.attribute
+    }
+
+    pub(crate) fn requires_path_flavor(&self) -> bool {
+        self.validation.file_admissibility.suffixes().is_some()
+    }
+
     pub(crate) fn allow_single_file(&self) -> bool {
-        matches!(
-            self.validation.allow_single_file,
-            Some(AllowSingleFile::True | AllowSingleFile::Extensions(_))
-        )
+        self.validation.file_admissibility.single_artifact()
     }
 
     pub(crate) fn executable(&self) -> bool {
@@ -75,6 +83,7 @@ impl ConfiguredDependencyRow {
 
     pub(crate) fn into_keys(
         &self,
+        path_flavor: Option<HostPathFlavor>,
         make_node: impl Fn(CanonicalLabel, bool) -> ConfiguredNodeKey,
     ) -> Vec<DeclaredDependencyKey> {
         let validation = self.validation.clone();
@@ -90,6 +99,7 @@ impl ConfiguredDependencyRow {
                 hidden: self.hidden,
                 exec_configuration: self.exec_configuration,
                 source_admitted: validation.admits_file(),
+                path_flavor,
                 validation: Some(validation.clone()),
                 configured_row: Some(self.index),
             })
@@ -99,11 +109,19 @@ impl ConfiguredDependencyRow {
 
 impl ConfiguredDependencyValidation {
     fn admits_file(&self) -> bool {
-        self.allow_files
-            || matches!(
-                self.allow_single_file,
-                Some(AllowSingleFile::True | AllowSingleFile::Extensions(_))
-            )
+        self.file_admissibility.admits_direct_file()
+    }
+
+    pub(crate) fn new(
+        file_admissibility: FileAdmissibility,
+        executable: bool,
+        required_providers: Arc<[Arc<[ProviderIdentity]>]>,
+    ) -> Self {
+        Self {
+            file_admissibility,
+            executable,
+            required_providers,
+        }
     }
 }
 
@@ -157,12 +175,11 @@ pub(crate) fn configured_dependency_rows(
                 labels,
                 hidden: attribute.is_hidden(),
                 exec_configuration: attribute.exec_configuration(),
-                validation: ConfiguredDependencyValidation {
-                    allow_files: attribute.allow_files(),
-                    allow_single_file: attribute.allow_single_file().cloned(),
-                    executable: attribute.executable(),
-                    required_providers: Arc::from(attribute.required_providers()),
-                },
+                validation: ConfiguredDependencyValidation::new(
+                    attribute.file_admissibility().clone(),
+                    attribute.executable(),
+                    Arc::from(attribute.required_providers()),
+                ),
             })
         })
         .collect()
@@ -203,20 +220,7 @@ pub(crate) fn validate_configured_dependency(
             dependency.attribute
         )));
     }
-    let single_file = match &validation.allow_single_file {
-        Some(AllowSingleFile::True) | Some(AllowSingleFile::Extensions(_)) => true,
-        Some(AllowSingleFile::False) | None => false,
-    };
-    if file && !validation.allow_files && !single_file {
-        return Err(AnalysisError::message(format!(
-            "configured dependency `{}` does not admit file target {}",
-            dependency.attribute,
-            result.key().label()
-        )));
-    }
-    if single_file {
-        validate_single_file(dependency, result, validation)?;
-    }
+    validate_file_admissibility(dependency, result, validation, file)?;
     if validation.executable
         && !file
         && result
@@ -233,44 +237,121 @@ pub(crate) fn validate_configured_dependency(
     Ok(())
 }
 
-fn validate_single_file(
+fn validate_file_admissibility(
     dependency: &DeclaredDependencyKey,
     result: &ConfiguredNodeResult,
     validation: &ConfiguredDependencyValidation,
+    direct_file: bool,
 ) -> Result<(), AnalysisError> {
-    let files = if matches!(
-        result.kind(),
-        ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
-    ) {
-        vec![result.key().label().target().as_str().to_owned()]
-    } else {
-        result
-            .providers()
-            .default_info()
-            .map(|info| {
-                info.file_artifacts()
-                    .into_iter()
-                    .map(|artifact| artifact.path().into_owned())
-                    .collect()
-            })
-            .unwrap_or_default()
-    };
-    let [file] = files.as_slice() else {
+    let policy = &validation.file_admissibility;
+    if direct_file {
+        let filename = result
+            .key()
+            .label()
+            .target()
+            .as_str()
+            .rsplit('/')
+            .next()
+            .expect("target name is nonempty");
+        if policy_matches_filename(dependency, policy, filename)? {
+            return Ok(());
+        }
+        return Err(AnalysisError::message(format!(
+            "configured dependency `{}` source file {} does not match its admitted file types",
+            dependency.attribute,
+            result.key().label()
+        )));
+    }
+    if policy.is_no_files() || (policy.is_any_file() && !policy.single_artifact()) {
+        return Ok(());
+    }
+    let artifacts = result
+        .providers()
+        .default_info()
+        .map(|info| info.file_artifacts())
+        .unwrap_or_default();
+    if policy.single_artifact() && artifacts.len() != 1 {
         return Err(AnalysisError::message(format!(
             "configured dependency `{}` must provide exactly one file, got {}",
             dependency.attribute,
-            files.len()
-        )));
-    };
-    if let Some(AllowSingleFile::Extensions(extensions)) = &validation.allow_single_file
-        && !extensions
-            .iter()
-            .any(|extension| file.ends_with(extension.as_str()))
-    {
-        return Err(AnalysisError::message(format!(
-            "configured dependency `{}` file `{file}` does not match an admitted extension",
-            dependency.attribute
+            artifacts.len()
         )));
     }
-    Ok(())
+    if policy.is_any_file() {
+        return Ok(());
+    }
+    if generated_artifacts_match(&artifacts, |filename| {
+        policy_matches_filename(dependency, policy, filename)
+    })? {
+        return Ok(());
+    }
+    Err(AnalysisError::message(format!(
+        "configured dependency `{}` does not produce any file matching its admitted file types",
+        dependency.attribute
+    )))
+}
+
+fn generated_artifacts_match(
+    artifacts: &[AnalysisArtifact],
+    mut matches_filename: impl FnMut(&str) -> Result<bool, AnalysisError>,
+) -> Result<bool, AnalysisError> {
+    for artifact in artifacts {
+        if matches!(
+            artifact,
+            AnalysisArtifact::Derived { output, .. }
+                if output.kind() == ActionOutputKind::Directory
+        ) || matches_filename(artifact.path().rsplit('/').next().unwrap_or_default())?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn policy_matches_filename(
+    dependency: &DeclaredDependencyKey,
+    policy: &FileAdmissibility,
+    filename: &str,
+) -> Result<bool, AnalysisError> {
+    if policy.is_no_files() {
+        return Ok(false);
+    }
+    if policy.is_any_file() {
+        return Ok(true);
+    }
+    let path_flavor = dependency.path_flavor.ok_or_else(|| {
+        AnalysisError::message(format!(
+            "configured dependency `{}` suffix policy is missing structural Host path flavor",
+            dependency.attribute
+        ))
+    })?;
+    Ok(policy.matches_filename(path_flavor, filename))
+}
+
+#[cfg(test)]
+mod tests {
+    use slug_build_api_v2::ActionOutput;
+    use slug_build_api_v2::AnalysisConfiguredTargetKey;
+
+    use super::*;
+
+    #[test]
+    fn generated_directory_is_admitted_before_suffix_matching() {
+        let directory = AnalysisArtifact::Derived {
+            owner: AnalysisConfiguredTargetKey::new(
+                CanonicalLabel::parse("@@//pkg:producer").unwrap(),
+                Arc::<[u8]>::from([]),
+            ),
+            output: ActionOutput::new("pkg/tree", ActionOutputKind::Directory),
+        };
+        let mut suffix_checks = 0;
+        assert!(
+            generated_artifacts_match(&[directory], |_| {
+                suffix_checks += 1;
+                Ok(false)
+            })
+            .unwrap()
+        );
+        assert_eq!(suffix_checks, 0);
+    }
 }

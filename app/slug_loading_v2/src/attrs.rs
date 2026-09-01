@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use slug_configuration_v2::HostPathFlavor;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use starlark::values::FrozenValue;
@@ -41,10 +42,89 @@ pub enum AttributeKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub enum AllowSingleFile {
-    False,
-    True,
-    Extensions(Arc<[CompactString]>),
+enum FileTypes {
+    NoFiles,
+    AnyFile,
+    Suffixes(Arc<[CompactString]>),
+}
+
+/// Immutable direct-file and single-artifact policy for label-bearing attributes.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct FileAdmissibility {
+    file_types: FileTypes,
+    single_artifact: bool,
+}
+
+impl FileAdmissibility {
+    pub(crate) fn no_files() -> Self {
+        Self {
+            file_types: FileTypes::NoFiles,
+            single_artifact: false,
+        }
+    }
+
+    pub(crate) fn any_file() -> Self {
+        Self {
+            file_types: FileTypes::AnyFile,
+            single_artifact: false,
+        }
+    }
+
+    pub(crate) fn ordered_suffixes(suffixes: Arc<[CompactString]>) -> Self {
+        Self {
+            file_types: FileTypes::Suffixes(suffixes),
+            single_artifact: false,
+        }
+    }
+
+    pub(crate) fn with_single_artifact(mut self) -> Self {
+        self.single_artifact = true;
+        self
+    }
+
+    /// Whether direct-file validation is applicable.  Suffix matching remains
+    /// the authority for a particular file, including an empty suffix list.
+    pub fn admits_direct_file(&self) -> bool {
+        !self.is_no_files()
+    }
+
+    pub fn single_artifact(&self) -> bool {
+        self.single_artifact
+    }
+
+    pub fn is_no_files(&self) -> bool {
+        matches!(self.file_types, FileTypes::NoFiles)
+    }
+
+    pub fn is_any_file(&self) -> bool {
+        matches!(self.file_types, FileTypes::AnyFile)
+    }
+
+    pub fn suffixes(&self) -> Option<&[CompactString]> {
+        match &self.file_types {
+            FileTypes::Suffixes(suffixes) => Some(suffixes),
+            FileTypes::NoFiles | FileTypes::AnyFile => None,
+        }
+    }
+
+    pub fn matches_filename(&self, flavor: HostPathFlavor, filename: &str) -> bool {
+        match &self.file_types {
+            FileTypes::NoFiles => false,
+            FileTypes::AnyFile => true,
+            FileTypes::Suffixes(suffixes) => suffixes.iter().any(|suffix| match flavor {
+                HostPathFlavor::Unix => filename.ends_with(suffix.as_str()),
+                HostPathFlavor::Windows => filename
+                    .get(filename.len().saturating_sub(suffix.len())..)
+                    .is_some_and(|tail| tail.eq_ignore_ascii_case(suffix.as_str())),
+            }),
+        }
+    }
+}
+
+impl Default for FileAdmissibility {
+    fn default() -> Self {
+        Self::no_files()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -116,8 +196,7 @@ pub struct AttributeSchema {
     order_independent: bool,
     ordinary_dependency: bool,
     builtin: bool,
-    allow_files: bool,
-    allow_single_file: Option<AllowSingleFile>,
+    file_admissibility: FileAdmissibility,
     flags: AttributeFlags,
     allowed_values: AllowedAttributeValues,
     default: Option<Arc<CoercedAttributeValue>>,
@@ -148,8 +227,7 @@ impl AttributeSchema {
             order_independent: false,
             ordinary_dependency: kind.contributes_ordinary_dependencies(),
             builtin: false,
-            allow_files: false,
-            allow_single_file: None,
+            file_admissibility: FileAdmissibility::default(),
             flags: AttributeFlags::default(),
             allowed_values: AllowedAttributeValues::None,
             default: default.map(Arc::new),
@@ -201,14 +279,11 @@ impl AttributeSchema {
     pub fn is_builtin(&self) -> bool {
         self.builtin
     }
-    pub fn allow_files(&self) -> bool {
-        self.allow_files
+    pub fn file_admissibility(&self) -> &FileAdmissibility {
+        &self.file_admissibility
     }
     pub(crate) fn order_independent(&self) -> bool {
         self.order_independent
-    }
-    pub fn allow_single_file(&self) -> Option<&AllowSingleFile> {
-        self.allow_single_file.as_ref()
     }
     pub fn direct_compile_time_input(&self) -> bool {
         self.flags.direct_compile_time_input()
@@ -216,15 +291,8 @@ impl AttributeSchema {
     pub(crate) fn allowed_values(&self) -> &AllowedAttributeValues {
         &self.allowed_values
     }
-    pub(crate) fn with_allow_single_file(
-        mut self,
-        allow_single_file: Option<AllowSingleFile>,
-    ) -> Self {
-        self.allow_single_file = allow_single_file;
-        self
-    }
-    pub(crate) fn with_allow_files(mut self, allow_files: bool) -> Self {
-        self.allow_files = allow_files;
+    pub(crate) fn with_file_admissibility(mut self, file_admissibility: FileAdmissibility) -> Self {
+        self.file_admissibility = file_admissibility;
         self
     }
     pub(crate) fn with_flags(mut self, flags: AttributeFlags) -> Self {
@@ -1292,6 +1360,7 @@ mod tests {
     use std::sync::Arc;
 
     use compact_str::CompactString;
+    use slug_configuration_v2::HostPathFlavor;
     use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
 
@@ -1302,6 +1371,7 @@ mod tests {
     use super::AttributeSchema;
     use super::AttributeValue;
     use super::CoercedAttributeValue;
+    use super::FileAdmissibility;
     use super::NativeAttributePolicy;
     use super::NativeRuleClass;
 
@@ -1318,6 +1388,38 @@ mod tests {
                 .with_flags(flags)
                 .direct_compile_time_input()
         );
+    }
+
+    #[test]
+    fn file_admissibility_is_compact_shared_and_host_explicit() {
+        let suffixes: Arc<[CompactString]> = Arc::from([CompactString::new(".rs")]);
+        let policy = FileAdmissibility::ordered_suffixes(suffixes);
+        let clone = policy.clone();
+        assert!(std::mem::size_of::<FileAdmissibility>() <= 32);
+        assert_eq!(policy.suffixes(), clone.suffixes());
+        assert!(std::ptr::eq(
+            policy.suffixes().unwrap().as_ptr(),
+            clone.suffixes().unwrap().as_ptr()
+        ));
+        assert!(policy.admits_direct_file());
+        assert!(!policy.is_no_files() && !policy.is_any_file());
+        assert!(policy.matches_filename(HostPathFlavor::Unix, "src/lib.rs"));
+        assert!(!policy.matches_filename(HostPathFlavor::Unix, "src/lib.RS"));
+        assert!(policy.matches_filename(HostPathFlavor::Windows, "src/lib.RS"));
+        assert!(!policy.matches_filename(HostPathFlavor::Unix, "README"));
+        let ordered = FileAdmissibility::ordered_suffixes(Arc::from([
+            CompactString::new(".rs"),
+            CompactString::new(".rs"),
+            CompactString::new(""),
+        ]));
+        assert_eq!(
+            ordered.suffixes(),
+            Some([".rs".into(), ".rs".into(), "".into()].as_slice())
+        );
+        assert!(ordered.matches_filename(HostPathFlavor::Unix, "README"));
+        let no_files = FileAdmissibility::no_files().with_single_artifact();
+        assert!(no_files.is_no_files() && no_files.single_artifact());
+        assert!(!no_files.matches_filename(HostPathFlavor::Unix, "src/lib.rs"));
     }
 
     #[test]

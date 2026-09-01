@@ -40,12 +40,12 @@ use starlark_map::StarlarkHasher;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
-use crate::attrs::AllowSingleFile;
 use crate::attrs::AllowedAttributeValues;
 use crate::attrs::AttributeDependencyConfiguration;
 use crate::attrs::AttributeKind;
 use crate::attrs::AttributeSchema;
 use crate::attrs::CoercedAttributeValue;
+use crate::attrs::FileAdmissibility;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::package::ToolchainTypeRequirement;
 use crate::package::subrule_attribute_from_value;
@@ -127,8 +127,7 @@ pub(crate) struct SubruleAttribute {
     pub(crate) kind: AttributeKind,
     pub(crate) configurable: bool,
     pub(crate) default: SubruleAttributeDefault,
-    pub(crate) allow_files: bool,
-    pub(crate) allow_single_file: Option<AllowSingleFile>,
+    pub(crate) file_admissibility: FileAdmissibility,
     pub(crate) allowed_values: AllowedAttributeValues,
     pub(crate) executable: bool,
     pub(crate) exec_configuration: bool,
@@ -171,8 +170,7 @@ pub(crate) struct LiftedSubruleAttribute {
     pub(crate) kind: AttributeKind,
     pub(crate) configurable: bool,
     pub(crate) default: SubruleAttributeDefault,
-    pub(crate) allow_files: bool,
-    pub(crate) allow_single_file: Option<AllowSingleFile>,
+    pub(crate) file_admissibility: FileAdmissibility,
     pub(crate) allowed_values: AllowedAttributeValues,
     pub(crate) executable: bool,
     pub(crate) exec_configuration: bool,
@@ -197,8 +195,7 @@ impl LiftedSubruleAttribute {
             kind: attribute.kind,
             configurable: attribute.configurable,
             default: attribute.default.clone(),
-            allow_files: attribute.allow_files,
-            allow_single_file: attribute.allow_single_file.clone(),
+            file_admissibility: attribute.file_admissibility.clone(),
             allowed_values: attribute.allowed_values.clone(),
             executable: attribute.executable,
             exec_configuration: attribute.exec_configuration,
@@ -257,8 +254,7 @@ pub struct ConfiguredDependencyAttribute<'a> {
     user_name: Option<&'a str>,
     kind: AttributeKind,
     default: ConfiguredDependencyDefault<'a>,
-    allow_files: bool,
-    allow_single_file: Option<&'a AllowSingleFile>,
+    file_admissibility: &'a FileAdmissibility,
     executable: bool,
     exec_configuration: bool,
     required_providers: &'a [Arc<[ProviderIdentity]>],
@@ -275,8 +271,7 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
             user_name: None,
             kind: schema.kind(),
             default: ConfiguredDependencyDefault::ConfigurationField(&attribute.identity),
-            allow_files: schema.allow_files(),
-            allow_single_file: schema.allow_single_file(),
+            file_admissibility: schema.file_admissibility(),
             executable: schema.executable(),
             exec_configuration: matches!(
                 schema.dependency_configuration(),
@@ -299,8 +294,7 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
             user_name: Some(attribute.user_name.as_str()),
             kind: attribute.kind,
             default,
-            allow_files: attribute.allow_files,
-            allow_single_file: attribute.allow_single_file.as_ref(),
+            file_admissibility: &attribute.file_admissibility,
             executable: attribute.executable,
             exec_configuration: attribute.exec_configuration,
             required_providers: &attribute.required_providers,
@@ -323,12 +317,8 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
         self.default
     }
 
-    pub fn allow_files(self) -> bool {
-        self.allow_files
-    }
-
-    pub fn allow_single_file(self) -> Option<&'a AllowSingleFile> {
-        self.allow_single_file
+    pub fn file_admissibility(self) -> &'a FileAdmissibility {
+        self.file_admissibility
     }
 
     pub fn executable(self) -> bool {

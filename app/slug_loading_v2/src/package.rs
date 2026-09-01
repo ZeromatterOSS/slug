@@ -71,7 +71,6 @@ use starlark::values::typing::StarlarkCallable;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
-use crate::attrs::AllowSingleFile;
 use crate::attrs::AllowedAttributeValues;
 use crate::attrs::AttributeDependencyConfiguration;
 use crate::attrs::AttributeFlags;
@@ -80,6 +79,7 @@ use crate::attrs::AttributeProvenance;
 use crate::attrs::AttributeSchema;
 use crate::attrs::AttributeValue;
 use crate::attrs::CoercedAttributeValue;
+use crate::attrs::FileAdmissibility;
 use crate::attrs::NativeAttributeOrder;
 use crate::attrs::NativeAttributePolicy;
 use crate::attrs::NativeAttributeSchema;
@@ -3648,8 +3648,7 @@ struct MacroAttributeSchema {
     configurable: bool,
     default: Option<CoercedAttributeValue>,
     default_to_none: bool,
-    allow_files: bool,
-    allow_single_file: Option<AllowSingleFile>,
+    file_admissibility: FileAdmissibility,
     allowed_values: AllowedAttributeValues,
 }
 
@@ -3671,8 +3670,7 @@ impl MacroAttributeSchema {
             configurable: definition.configurable,
             default: definition.default.clone(),
             default_to_none: false,
-            allow_files: definition.allow_files,
-            allow_single_file: definition.allow_single_file.clone(),
+            file_admissibility: definition.file_admissibility.clone(),
             allowed_values: definition.allowed_values.clone(),
         })
     }
@@ -3697,8 +3695,7 @@ impl MacroAttributeSchema {
             configurable: schema.configurable,
             default: schema.default.clone(),
             default_to_none: !schema.mandatory,
-            allow_files: schema.allow_files,
-            allow_single_file: schema.allow_single_file.clone(),
+            file_admissibility: schema.file_admissibility.clone(),
             allowed_values: schema.allowed_values.clone(),
         })
     }
@@ -3723,8 +3720,7 @@ impl MacroAttributeSchema {
             configurable: schema.configurable,
             default: schema.default.clone(),
             default_to_none: !schema.mandatory,
-            allow_files: schema.allow_files,
-            allow_single_file: schema.allow_single_file.clone(),
+            file_admissibility: schema.file_admissibility.clone(),
             allowed_values: schema.allowed_values.clone(),
         })
     }
@@ -4324,34 +4320,34 @@ fn aspect_attributes<'v>(
                 starlark::__macro_refs::Either::Right(_) => None,
             })
             .ok_or_else(|| anyhow::anyhow!("aspect attribute `{name}` must use attr.label()"))?;
-        let (label, allow_single_file, executable, exec_configuration) = match name.as_str() {
+        let (label, file_admissibility, executable, exec_configuration) = match name.as_str() {
             "_capture_output" => (
                 format!("@@{repo}//rust/settings:capture_clippy_output"),
-                None,
+                FileAdmissibility::default(),
                 false,
                 false,
             ),
             "_clippy_error_format" => (
                 format!("@@{repo}//rust/settings:clippy_error_format"),
-                None,
+                FileAdmissibility::default(),
                 false,
                 false,
             ),
             "_clippy_flag" => (
                 format!("@@{repo}//rust/settings:clippy_flag"),
-                None,
+                FileAdmissibility::default(),
                 false,
                 false,
             ),
             "_clippy_flags" => (
                 format!("@@{repo}//rust/settings:clippy_flags"),
-                None,
+                FileAdmissibility::default(),
                 false,
                 false,
             ),
             "_clippy_output_diagnostics" => (
                 format!("@@{repo}//rust/settings:clippy_output_diagnostics"),
-                None,
+                FileAdmissibility::default(),
                 false,
                 false,
             ),
@@ -4364,37 +4360,37 @@ fn aspect_attributes<'v>(
                         "clippy.toml"
                     }
                 ),
-                Some(AllowSingleFile::True),
+                FileAdmissibility::any_file().with_single_artifact(),
                 false,
                 false,
             ),
             "_error_format" => (
                 format!("@@{repo}//rust/settings:error_format"),
-                None,
+                FileAdmissibility::default(),
                 false,
                 false,
             ),
             "_extra_rustc_flag" => (
                 format!("@@{repo}//rust/settings:extra_rustc_flag"),
-                None,
+                FileAdmissibility::default(),
                 false,
                 false,
             ),
             "_incompatible_change_clippy_error_format" => (
                 format!("@@{repo}//rust/settings:incompatible_change_clippy_error_format"),
-                None,
+                FileAdmissibility::default(),
                 false,
                 false,
             ),
             "_per_crate_rustc_flag" => (
                 format!("@@{repo}//rust/settings:per_crate_rustc_flag"),
-                None,
+                FileAdmissibility::default(),
                 false,
                 false,
             ),
             "_process_wrapper" => (
                 format!("@@{repo}//util/process_wrapper:process_wrapper"),
-                None,
+                FileAdmissibility::default(),
                 true,
                 true,
             ),
@@ -4407,8 +4403,7 @@ fn aspect_attributes<'v>(
             || definition.mandatory
             || !definition.configurable
             || definition.configurable_set
-            || definition.allow_files
-            || definition.allow_single_file != allow_single_file
+            || definition.file_admissibility != file_admissibility
             || !matches!(definition.allowed_values, AllowedAttributeValues::None)
             || definition.default.as_ref() != Some(&expected_default)
             || definition.executable != executable
@@ -4474,9 +4469,7 @@ pub(crate) struct RuleAttributeSchemaGen<V> {
     #[trace(unsafe_ignore)]
     configurable_set: bool,
     #[trace(unsafe_ignore)]
-    pub(crate) allow_files: bool,
-    #[trace(unsafe_ignore)]
-    pub(crate) allow_single_file: Option<AllowSingleFile>,
+    pub(crate) file_admissibility: FileAdmissibility,
     #[trace(unsafe_ignore)]
     pub(crate) flags: AttributeFlags,
     #[trace(unsafe_ignore)]
@@ -4505,8 +4498,7 @@ fn declared_attribute_schema<'v>(
         transition: definition.transition.clone(),
         builtin: false,
         configurable_set: false,
-        allow_files: definition.allow_files,
-        allow_single_file: definition.allow_single_file.clone(),
+        file_admissibility: definition.file_admissibility.clone(),
         flags: definition.flags,
         allowed_values: definition.allowed_values.clone(),
         executable: definition.executable,
@@ -4537,8 +4529,7 @@ fn starlark_builtin_schema<V>(
             transition: None,
             builtin: true,
             configurable_set: false,
-            allow_files: false,
-            allow_single_file: None,
+            file_admissibility: FileAdmissibility::default(),
             flags: AttributeFlags::default(),
             allowed_values: AllowedAttributeValues::None,
             executable: false,
@@ -5003,9 +4994,7 @@ struct AttributeDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     configurable_set: bool,
     #[trace(unsafe_ignore)]
-    allow_files: bool,
-    #[trace(unsafe_ignore)]
-    allow_single_file: Option<AllowSingleFile>,
+    file_admissibility: FileAdmissibility,
     #[trace(unsafe_ignore)]
     flags: AttributeFlags,
     #[trace(unsafe_ignore)]
@@ -5042,8 +5031,7 @@ fn rule_attribute_definition_from_value<'v>(value: Value<'v>) -> Option<Attribut
                 mandatory: value.mandatory,
                 configurable: value.configurable,
                 configurable_set: value.configurable_set,
-                allow_files: value.allow_files,
-                allow_single_file: value.allow_single_file.clone(),
+                file_admissibility: value.file_admissibility.clone(),
                 flags: value.flags,
                 allowed_values: value.allowed_values.clone(),
                 default: value.default.clone(),
@@ -5122,8 +5110,7 @@ pub(crate) fn subrule_attribute_from_value<'v>(
             kind: definition.kind,
             configurable: definition.configurable,
             default,
-            allow_files: definition.allow_files,
-            allow_single_file: definition.allow_single_file.clone(),
+            file_admissibility: definition.file_admissibility.clone(),
             allowed_values: definition.allowed_values.clone(),
             executable: definition.executable,
             exec_configuration: definition.exec_configuration,
@@ -5160,8 +5147,7 @@ impl<'v> Freeze for AttributeDefinition<'v> {
             mandatory: self.mandatory,
             configurable: self.configurable,
             configurable_set: self.configurable_set,
-            allow_files: self.allow_files,
-            allow_single_file: self.allow_single_file,
+            file_admissibility: self.file_admissibility,
             flags: self.flags,
             allowed_values: self.allowed_values,
             default: self.default,
@@ -5190,8 +5176,7 @@ impl<'v> Freeze for RuleAttributeSchema<'v> {
             mandatory: self.mandatory,
             configurable: self.configurable,
             configurable_set: self.configurable_set,
-            allow_files: self.allow_files,
-            allow_single_file: self.allow_single_file,
+            file_admissibility: self.file_admissibility,
             flags: self.flags,
             allowed_values: self.allowed_values,
             default: self.default,
@@ -5218,7 +5203,7 @@ pub(crate) struct ModuleExtensionTagAttribute {
     pub(crate) mandatory: bool,
     pub(crate) configurable: bool,
     pub(crate) default: Option<CoercedAttributeValue>,
-    pub(crate) allow_single_file: Option<AllowSingleFile>,
+    pub(crate) file_admissibility: FileAdmissibility,
 }
 
 pub(crate) type ModuleExtensionTagCoercionError = CompactString;
@@ -5648,7 +5633,7 @@ fn attribute_definition<'v>(
     kind: AttributeKind,
     mandatory: bool,
     configurable: Option<bool>,
-    allow_single_file: Option<AllowSingleFile>,
+    file_admissibility: FileAdmissibility,
     executable: bool,
     default: Option<Value<'v>>,
     cfg: Option<Value<'v>>,
@@ -5720,8 +5705,7 @@ fn attribute_definition<'v>(
             AttributeKind::Output | AttributeKind::OutputList
         )),
         configurable_set: configurable.is_some(),
-        allow_files: false,
-        allow_single_file,
+        file_admissibility,
         flags: AttributeFlags::default(),
         allowed_values: AllowedAttributeValues::None,
         default,
@@ -5804,26 +5788,38 @@ fn unpack_attribute_flags(
     Ok(result)
 }
 
-fn unpack_allow_single_file(value: Option<Value>) -> anyhow::Result<Option<AllowSingleFile>> {
-    let Some(value) = value else {
-        return Ok(None);
-    };
-    if value.is_none() {
-        return Ok(None);
+fn unpack_file_admissibility<'v>(
+    allow_files: Option<Value<'v>>,
+    allow_single_file: Option<Value<'v>>,
+) -> anyhow::Result<FileAdmissibility> {
+    if allow_files.is_some_and(|value| !value.is_none())
+        && allow_single_file.is_some_and(|value| !value.is_none())
+    {
+        anyhow::bail!("allow_files and allow_single_file cannot both be set");
     }
+    let (value, name, single_artifact) = match (allow_files, allow_single_file) {
+        (Some(value), _) if !value.is_none() => (value, "allow_files", false),
+        (_, Some(value)) if !value.is_none() => (value, "allow_single_file", true),
+        _ => return Ok(FileAdmissibility::default()),
+    };
     if let Some(value) = value.unpack_bool() {
-        return Ok(Some(if value {
-            AllowSingleFile::True
+        let result = if value {
+            FileAdmissibility::any_file()
         } else {
-            AllowSingleFile::False
-        }));
+            FileAdmissibility::no_files()
+        };
+        return Ok(if single_artifact {
+            result.with_single_artifact()
+        } else {
+            result
+        });
     }
     let values = if let Some(values) = ListRef::from_value(value) {
         values.iter().collect::<Vec<_>>()
     } else if let Some(values) = TupleRef::from_value(value) {
         values.iter().collect::<Vec<_>>()
     } else {
-        anyhow::bail!("allow_single_file must be a bool or a sequence of file extensions")
+        anyhow::bail!("{name} must be a bool or a sequence of file extensions")
     };
     let extensions = values
         .into_iter()
@@ -5831,22 +5827,15 @@ fn unpack_allow_single_file(value: Option<Value>) -> anyhow::Result<Option<Allow
             value
                 .unpack_str()
                 .map(CompactString::new)
-                .ok_or_else(|| anyhow::anyhow!("allow_single_file extensions must be strings"))
+                .ok_or_else(|| anyhow::anyhow!("{name} extensions must be strings"))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
-    Ok(Some(AllowSingleFile::Extensions(extensions.into())))
-}
-
-fn unpack_boolean_allow_files(value: Option<Value>) -> anyhow::Result<bool> {
-    let Some(value) = value else {
-        return Ok(false);
-    };
-    if value.is_none() {
-        return Ok(false);
-    }
-    value
-        .unpack_bool()
-        .ok_or_else(|| anyhow::anyhow!("allow_files must be a bool or None"))
+    let result = FileAdmissibility::ordered_suffixes(extensions.into());
+    Ok(if single_artifact {
+        result.with_single_artifact()
+    } else {
+        result
+    })
 }
 
 fn normalize_allowed_integer_values(values: Option<UnpackListOrTuple<i32>>) -> Arc<[i32]> {
@@ -5890,22 +5879,17 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        if allow_files.is_some_and(|value| !value.is_none())
-            && allow_single_file.is_some_and(|value| !value.is_none())
-        {
-            anyhow::bail!("allow_files and allow_single_file cannot both be set");
-        }
+        let file_admissibility = unpack_file_admissibility(allow_files, allow_single_file)?;
         let mut definition = attribute_definition(
             AttributeKind::Label,
             mandatory.unwrap_or(false),
             configurable,
-            unpack_allow_single_file(allow_single_file)?,
+            file_admissibility,
             executable.unwrap_or(false),
             default,
             cfg,
             eval,
         )?;
-        definition.allow_files = unpack_boolean_allow_files(allow_files)?;
         definition.required_providers = label_required_provider(providers)?;
         definition.flags = unpack_attribute_flags(flags)?;
         Ok(definition)
@@ -5929,13 +5913,12 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::LabelList,
             mandatory.unwrap_or(false),
             configurable,
-            None,
+            unpack_file_admissibility(allow_files, None)?,
             false,
             default,
             cfg,
             eval,
         )?;
-        definition.allow_files = unpack_boolean_allow_files(allow_files)?;
         definition.required_providers = required_providers;
         definition.attached_aspect = label_list_attached_aspect(aspects)?;
         definition.flags = unpack_attribute_flags(flags)?;
@@ -5947,6 +5930,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
@@ -5955,7 +5939,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::StringKeyedLabelDict,
             mandatory.unwrap_or(false),
             configurable,
-            None,
+            unpack_file_admissibility(allow_files, None)?,
             false,
             default,
             None,
@@ -5970,6 +5954,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
@@ -5978,7 +5963,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::LabelKeyedStringDict,
             mandatory.unwrap_or(false),
             configurable,
-            None,
+            unpack_file_admissibility(allow_files, None)?,
             false,
             default,
             None,
@@ -6000,7 +5985,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::Boolean,
             mandatory.unwrap_or(false),
             configurable,
-            None,
+            FileAdmissibility::default(),
             false,
             default,
             None,
@@ -6021,7 +6006,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::Integer,
             mandatory.unwrap_or(false),
             configurable,
-            None,
+            FileAdmissibility::default(),
             false,
             default,
             None,
@@ -6041,6 +6026,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
+        #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
@@ -6049,7 +6035,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::LabelListDict,
             mandatory.unwrap_or(false),
             configurable,
-            None,
+            unpack_file_admissibility(allow_files, None)?,
             false,
             default,
             None,
@@ -6069,7 +6055,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::Output,
             mandatory.unwrap_or(false),
             None,
-            None,
+            FileAdmissibility::default(),
             false,
             None,
             None,
@@ -6087,7 +6073,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::OutputList,
             mandatory.unwrap_or(false),
             None,
-            None,
+            FileAdmissibility::default(),
             false,
             None,
             None,
@@ -6108,7 +6094,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::String,
             mandatory.unwrap_or(false),
             configurable,
-            None,
+            FileAdmissibility::default(),
             false,
             default,
             None,
@@ -6130,7 +6116,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::StringList,
             mandatory.unwrap_or(false),
             configurable,
-            None,
+            FileAdmissibility::default(),
             false,
             default,
             None,
@@ -6150,7 +6136,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::StringDict,
             mandatory.unwrap_or(false),
             configurable,
-            None,
+            FileAdmissibility::default(),
             false,
             default,
             None,
@@ -6170,7 +6156,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             AttributeKind::StringListDict,
             mandatory.unwrap_or(false),
             configurable,
-            None,
+            FileAdmissibility::default(),
             false,
             default,
             None,
@@ -6542,8 +6528,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                             dependency_configuration,
                             declaration.executable,
                         )
-                        .with_allow_files(declaration.allow_files)
-                        .with_allow_single_file(declaration.allow_single_file.clone())
+                        .with_file_admissibility(declaration.file_admissibility.clone())
                         .with_flags(declaration.flags)
                         .with_allowed_values(declaration.allowed_values.clone())
                     };
@@ -7350,8 +7335,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 || definition.transition.is_some()
                 || definition.executable
                 || definition.exec_configuration
-                || definition.allow_files
-                || definition.allow_single_file.is_some()
+                || !definition.file_admissibility.is_no_files()
+                || definition.file_admissibility.single_artifact()
                 || !definition.flags.is_empty()
                 || !definition.required_providers.is_empty()
                 || !matches!(definition.allowed_values, AllowedAttributeValues::None)
@@ -7406,7 +7391,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             if definition.late_bound_default.is_some() || definition.computed_default {
                 anyhow::bail!("tag attribute `{name}` does not support deferred defaults");
             }
-            if definition.allow_files {
+            if !definition.file_admissibility.is_no_files()
+                && !definition.file_admissibility.single_artifact()
+            {
                 anyhow::bail!("tag attribute `{name}` does not support allow_files");
             }
             if !definition.flags.is_empty() {
@@ -7428,7 +7415,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 mandatory: definition.mandatory,
                 configurable: definition.configurable,
                 default: definition.default.clone(),
-                allow_single_file: definition.allow_single_file.clone(),
+                file_admissibility: definition.file_admissibility.clone(),
             });
         }
         Ok(TagClassDefinition {
@@ -8472,6 +8459,30 @@ mod module_extension_definition_tests {
     }
 
     #[test]
+    fn symbolic_macro_preserves_ordered_suffix_file_policy() {
+        let module = evaluate(
+            "def _impl(name, visibility, dep): pass\n\
+             M = macro(implementation = _impl, attrs = {'dep': attr.label(allow_files = ['.rs', '.src', '.rs'])})\n",
+        )
+        .unwrap();
+        let definition = module
+            .get("M")
+            .unwrap()
+            .downcast::<FrozenSymbolicMacroDefinition>()
+            .unwrap();
+        assert_eq!(definition.attributes.len(), 1);
+        assert_eq!(
+            definition.attributes[0].file_admissibility.suffixes(),
+            Some([".rs".into(), ".src".into(), ".rs".into()].as_slice())
+        );
+        assert!(
+            !definition.attributes[0]
+                .file_admissibility
+                .single_artifact()
+        );
+    }
+
+    #[test]
     fn attribute_documentation_category_is_named_typed_and_nonsemantic() {
         #[derive(Debug, PartialEq, Eq)]
         struct DefinitionSnapshot {
@@ -8479,8 +8490,7 @@ mod module_extension_definition_tests {
             mandatory: bool,
             configurable: bool,
             configurable_set: bool,
-            allow_files: bool,
-            allow_single_file: Option<AllowSingleFile>,
+            file_admissibility: FileAdmissibility,
             flags: AttributeFlags,
             allowed_values: AllowedAttributeValues,
             default: Option<CoercedAttributeValue>,
@@ -8504,8 +8514,7 @@ mod module_extension_definition_tests {
                 mandatory: definition.mandatory,
                 configurable: definition.configurable,
                 configurable_set: definition.configurable_set,
-                allow_files: definition.allow_files,
-                allow_single_file: definition.allow_single_file.clone(),
+                file_admissibility: definition.file_admissibility.clone(),
                 flags: definition.flags,
                 allowed_values: definition.allowed_values.clone(),
                 default: definition.default.clone(),
@@ -8730,7 +8739,7 @@ mod module_extension_definition_tests {
             mandatory,
             configurable: true,
             default,
-            allow_single_file: None,
+            file_admissibility: FileAdmissibility::default(),
         }
     }
 
@@ -9003,8 +9012,8 @@ ext = module_extension(
         assert!(value.arch_dependent);
         assert_eq!(value.facts_version, 3);
         assert!(matches!(
-            value.tag_classes[0].1[1].allow_single_file,
-            Some(AllowSingleFile::Extensions(_))
+            value.tag_classes[0].1[1].file_admissibility.suffixes(),
+            Some(extensions) if extensions == [".txt"]
         ));
     }
 

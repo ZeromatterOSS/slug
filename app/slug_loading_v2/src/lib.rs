@@ -60,13 +60,13 @@ mod testing_bootstrap;
 mod testing_bootstrap_tests;
 pub mod visibility;
 
-pub use attrs::AllowSingleFile;
 pub use attrs::AttributeKind;
 pub use attrs::AttributeProvenance;
 pub use attrs::AttributeQueryValue;
 pub use attrs::AttributeSchema;
 pub use attrs::AttributeValue;
 pub use attrs::CoercedAttributeValue;
+pub use attrs::FileAdmissibility;
 pub use attrs::NativeAttributeOrder;
 pub use attrs::NativeAttributePolicy;
 pub use attrs::NativeAttributeSchema;

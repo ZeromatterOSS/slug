@@ -8858,6 +8858,318 @@ cross_owner(name = 'cross_owner', dep = ':producer')
     }
 }
 
+const FILE_ADMISSIBILITY_DEFS: &str = r#"
+def _producer(ctx):
+    files = []
+    for name in ctx.attr.names:
+        out = ctx.actions.declare_file(name)
+        ctx.actions.write(out, name)
+        files.append(out)
+    return [DefaultInfo(files = depset(files))]
+
+producer = rule(implementation = _producer, attrs = {"names": attr.string_list()})
+
+def _generated_file(ctx):
+    ctx.actions.write(ctx.outputs.out, "generated")
+    return [DefaultInfo(files = depset([ctx.outputs.out]))]
+
+generated_file = rule(
+    implementation = _generated_file,
+    attrs = {"out": attr.output(mandatory = True)},
+)
+
+def _pass(ctx):
+    return [DefaultInfo()]
+
+suffix = rule(
+    implementation = _pass,
+    attrs = {"dep": attr.label(allow_files = [".rs"], mandatory = True)},
+)
+default_files = rule(
+    implementation = _pass,
+    attrs = {"dep": attr.label(mandatory = True)},
+)
+no_files = rule(
+    implementation = _pass,
+    attrs = {"dep": attr.label(allow_files = False, mandatory = True)},
+)
+any_files = rule(
+    implementation = _pass,
+    attrs = {"dep": attr.label(allow_files = True, mandatory = True)},
+)
+single = rule(
+    implementation = _pass,
+    attrs = {"dep": attr.label(allow_single_file = True, mandatory = True)},
+)
+single_suffix = rule(
+    implementation = _pass,
+    attrs = {"dep": attr.label(allow_single_file = [".rs"], mandatory = True)},
+)
+single_false = rule(
+    implementation = _pass,
+    attrs = {"dep": attr.label(allow_single_file = False, mandatory = True)},
+)
+string_map = rule(
+    implementation = _pass,
+    attrs = {"dep": attr.string_keyed_label_dict(allow_files = [".rs"], mandatory = True)},
+)
+label_map = rule(
+    implementation = _pass,
+    attrs = {"dep": attr.label_keyed_string_dict(allow_files = [".rs"], mandatory = True)},
+)
+list_map = rule(
+    implementation = _pass,
+    attrs = {"dep": attr.label_list_dict(allow_files = [".rs"], mandatory = True)},
+)
+
+def _shape(ctx):
+    if ctx.attr.source.label.name != "source.rs": fail("scalar source shape changed")
+    if ctx.attr.generated_file.label.name != "generated.rs": fail("generated-file shape changed")
+    if ctx.attr.generated_rule.label.name != "good": fail("generated-rule shape changed")
+    if ctx.attr.mapped["m"].label.name != "source.rs": fail("string-keyed value changed")
+    reverse = ctx.attr.reverse.items()
+    if len(reverse) != 1 or reverse[0][0].label.name != "source.rs" or reverse[0][1] != "r":
+        fail("label-keyed entry changed")
+    if len(ctx.attr.grouped["g"]) != 1 or ctx.attr.grouped["g"][0].label.name != "source.rs":
+        fail("label-list dictionary value changed")
+    return [DefaultInfo()]
+
+shape = rule(
+    implementation = _shape,
+    attrs = {
+        "source": attr.label(allow_files = [".rs"], mandatory = True),
+        "generated_file": attr.label(allow_files = [".rs"], mandatory = True),
+        "generated_rule": attr.label(allow_files = [".rs"], mandatory = True),
+        "mixed_rule": attr.label(allow_files = [".rs"], mandatory = True),
+        "mapped": attr.string_keyed_label_dict(allow_files = [".rs"], mandatory = True),
+        "reverse": attr.label_keyed_string_dict(allow_files = [".rs"], mandatory = True),
+        "grouped": attr.label_list_dict(allow_files = [".rs"], mandatory = True),
+        "no_files_rule": attr.label(allow_files = False, mandatory = True),
+        "any_upper": attr.label(allow_files = True, mandatory = True),
+        "single": attr.label(allow_single_file = [".rs"], mandatory = True),
+        "single_false": attr.label(allow_single_file = False, mandatory = True),
+    },
+)
+"#;
+
+const FILE_ADMISSIBILITY_BUILD: &str = r#"
+load(
+    ":defs.bzl",
+    "any_files",
+    "default_files",
+    "generated_file",
+    "label_map",
+    "list_map",
+    "no_files",
+    "producer",
+    "shape",
+    "single",
+    "single_false",
+    "single_suffix",
+    "string_map",
+    "suffix",
+)
+
+producer(name = "zero")
+producer(name = "good", names = ["one.rs"])
+producer(name = "bad", names = ["one.bin"])
+producer(name = "mixed", names = ["one.bin", "two.rs"])
+producer(name = "multi", names = ["one.rs", "two.rs"])
+generated_file(name = "file_owner", out = "generated.rs")
+generated_file(name = "bad_file_owner", out = "generated.bin")
+
+shape(
+    name = "shape",
+    source = "source.rs",
+    generated_file = ":generated.rs",
+    generated_rule = ":good",
+    mixed_rule = ":mixed",
+    mapped = {"m": "source.rs"},
+    reverse = {"source.rs": "r"},
+    grouped = {"g": ["source.rs"]},
+    no_files_rule = ":multi",
+    any_upper = "upper.RS",
+    single = ":good",
+    single_false = ":multi",
+)
+
+suffix(name = "source_ok", dep = "source.rs")
+suffix(name = "source_bad", dep = "source.bin")
+suffix(name = "generated_file_ok", dep = ":generated.rs")
+suffix(name = "generated_file_bad", dep = ":generated.bin")
+suffix(name = "generated_rule_ok", dep = ":good")
+suffix(name = "generated_rule_bad", dep = ":bad")
+suffix(name = "generated_rule_mixed", dep = ":mixed")
+suffix(name = "upper", dep = "upper.RS")
+default_files(name = "default_source", dep = "source.rs")
+no_files(name = "false_source", dep = "source.rs")
+no_files(name = "no_files_rule", dep = ":zero")
+any_files(name = "any_upper", dep = "upper.RS")
+single(name = "zero_single", dep = ":zero")
+single(name = "one_single", dep = ":good")
+single(name = "multi_single", dep = ":multi")
+single_suffix(name = "bad_single_suffix", dep = ":bad")
+single_false(name = "single_false_multi", dep = ":multi")
+string_map(name = "mapped_bad", dep = {"m": "source.bin"})
+label_map(name = "reverse_bad", dep = {"source.bin": "r"})
+list_map(name = "grouped_bad", dep = {"g": ["source.bin"]})
+"#;
+
+#[tokio::test]
+async fn ordinary_file_admissibility_covers_sources_outputs_platforms_and_dictionaries() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(workspace.join("defs.bzl"), FILE_ADMISSIBILITY_DEFS).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), FILE_ADMISSIBILITY_BUILD).unwrap();
+    for file in ["source.rs", "source.bin", "upper.RS"] {
+        fs::write(workspace.join(file), file).unwrap();
+    }
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = |target: &str, configuration: ConfigurationKey| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+            configuration,
+        )
+    };
+    for target in [
+        "shape",
+        "source_ok",
+        "generated_file_ok",
+        "generated_rule_ok",
+        "generated_rule_mixed",
+        "no_files_rule",
+        "any_upper",
+        "one_single",
+        "single_false_multi",
+    ] {
+        let result = analyze_request(
+            &dice,
+            &workspace,
+            &key(target, typed_action_test_configuration()),
+            None,
+            false,
+        )
+        .await;
+        assert!(result.is_ok(), "{target}: {result:?}");
+    }
+
+    for (target, expected) in [
+        ("source_bad", "does not match its admitted file types"),
+        (
+            "generated_file_bad",
+            "does not match its admitted file types",
+        ),
+        ("generated_rule_bad", "does not produce any file matching"),
+        ("default_source", "does not match its admitted file types"),
+        ("false_source", "does not match its admitted file types"),
+        ("zero_single", "must provide exactly one file, got 0"),
+        ("multi_single", "must provide exactly one file, got 2"),
+        ("bad_single_suffix", "does not produce any file matching"),
+        ("upper", "does not match its admitted file types"),
+        ("mapped_bad", "does not match its admitted file types"),
+        ("reverse_bad", "does not match its admitted file types"),
+        ("grouped_bad", "does not match its admitted file types"),
+    ] {
+        let error = analyze_request(
+            &dice,
+            &workspace,
+            &key(target, typed_action_test_configuration()),
+            None,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains(expected), "{target}: {error}");
+    }
+
+    let windows = typed_action_test_configuration_for(
+        HostPathFlavor::Windows,
+        ActionEnvironmentHostOs::Windows,
+    );
+    assert!(
+        analyze_request(&dice, &workspace, &key("upper", windows), None, false)
+            .await
+            .is_ok()
+    );
+
+    let no_host = test_configuration();
+    for target in ["any_upper", "no_files_rule"] {
+        let result = analyze_request(
+            &dice,
+            &workspace,
+            &key(target, no_host.clone()),
+            None,
+            false,
+        )
+        .await;
+        assert!(result.is_ok(), "{target}: {result:?}");
+    }
+    let missing_host = analyze_request(&dice, &workspace, &key("source_ok", no_host), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        missing_host.contains("is missing structural Host path flavor"),
+        "{missing_host}"
+    );
+}
+
+#[tokio::test]
+async fn ordinary_file_policy_invalidates_and_restores_configured_results_and_errors_a_b_a() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(':defs.bzl', 'probe')\nprobe(name = 'rs', dep = 'source.rs')\nprobe(name = 'bin', dep = 'source.bin')\n",
+    )
+    .unwrap();
+    for file in ["source.rs", "source.bin"] {
+        fs::write(workspace.join(file), file).unwrap();
+    }
+    let definition = |suffix: &str| {
+        format!(
+            "def _impl(ctx): return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {{'dep': attr.label(allow_files = ['{suffix}'], mandatory = True)}})\n"
+        )
+    };
+    let definitions = workspace.join("defs.bzl");
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = |target: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+            typed_action_test_configuration(),
+        )
+    };
+
+    fs::write(&definitions, definition(".rs")).unwrap();
+    let initial_result = analyze_request(&dice, &workspace, &key("rs"), None, false)
+        .await
+        .unwrap();
+    let initial_error = analyze_request(&dice, &workspace, &key("bin"), None, false)
+        .await
+        .unwrap_err();
+
+    fs::write(&definitions, definition(".bin")).unwrap();
+    let changed_error = analyze_request(&dice, &workspace, &key("rs"), None, false)
+        .await
+        .unwrap_err();
+    let changed_result = analyze_request(&dice, &workspace, &key("bin"), None, false)
+        .await
+        .unwrap();
+
+    fs::write(&definitions, definition(".rs")).unwrap();
+    let restored_result = analyze_request(&dice, &workspace, &key("rs"), None, false)
+        .await
+        .unwrap();
+    let restored_error = analyze_request(&dice, &workspace, &key("bin"), None, false)
+        .await
+        .unwrap_err();
+
+    assert_eq!(initial_result, restored_result);
+    assert_eq!(initial_error, restored_error);
+    assert_ne!(initial_result, changed_result);
+    assert_ne!(initial_error, changed_error);
+}
+
 #[tokio::test]
 async fn configured_attributes_select_specialize_allocate_dicts_and_predeclare_outputs() {
     let workspace = scratch();

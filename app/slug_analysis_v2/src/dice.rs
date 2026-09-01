@@ -32,6 +32,7 @@ use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::FilesToRunProvider;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderValue;
+use slug_configuration_v2::HostPathFlavor;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
@@ -112,6 +113,7 @@ use crate::starlark_rule::PreparedConfiguredAttribute;
 use crate::starlark_rule::PreparedDependency;
 use crate::starlark_rule::PreparedToolchain;
 use crate::starlark_rule::evaluate_loaded_rule;
+use crate::subrule::ConfiguredDependencyValidation;
 use crate::subrule::DeclaredDependencyKey;
 use crate::subrule::configured_dependency_rows;
 use crate::subrule::validate_configured_dependency;
@@ -1519,6 +1521,16 @@ async fn root_declared_dependency_keys(
             }
             LoadingPreparationOutcome::Complete(Ok(Ok(configuration))) => configuration,
         };
+        let path_flavor = match schema.file_admissibility().suffixes() {
+            Some(_) => match configured_dependency_path_flavor(
+                &configuration,
+                value.declaration_name.as_str(),
+            ) {
+                Ok(path_flavor) => Some(path_flavor),
+                Err(error) => return analysis_semantic_complete(Err(error)),
+            },
+            None => None,
+        };
         for (attribute_index, label) in labels.into_iter().enumerate() {
             let node = if label.package() == configured_target.label().package()
                 && package
@@ -1542,20 +1554,37 @@ async fn root_declared_dependency_keys(
                 transition_output: transition_output.clone(),
                 hidden: false,
                 exec_configuration: false,
-                source_admitted: schema.allow_files()
-                    || matches!(
-                        schema.allow_single_file(),
-                        Some(
-                            slug_loading_v2::AllowSingleFile::True
-                                | slug_loading_v2::AllowSingleFile::Extensions(_)
-                        )
-                    ),
-                validation: None,
+                source_admitted: schema.file_admissibility().admits_direct_file(),
+                path_flavor,
+                validation: Some(ConfiguredDependencyValidation::new(
+                    schema.file_admissibility().clone(),
+                    schema.executable(),
+                    Arc::from([]),
+                )),
                 configured_row: None,
             });
         }
     }
     analysis_semantic_complete(Ok(dependencies))
+}
+
+fn configured_dependency_path_flavor(
+    configuration: &ConfigurationKey,
+    attribute: &str,
+) -> Result<HostPathFlavor, AnalysisError> {
+    configuration
+        .slug_configuration()
+        .ok_or_else(|| {
+            AnalysisError::message(format!(
+                "configured dependency `{attribute}` is missing structural configuration"
+            ))
+        })?
+        .configured_action_path_flavor()
+        .map_err(|error| {
+            AnalysisError::message(format!(
+                "configured dependency `{attribute}` is missing structural Host path flavor: {error}"
+            ))
+        })
 }
 
 async fn configured_dependency_configuration(
@@ -5406,7 +5435,18 @@ impl ConfiguredNodeAnalysisKey {
             None
         } else {
             for row in &configured_rows {
-                declared_dependency_keys.extend(row.into_keys(|label, _| {
+                let path_flavor = if row.requires_path_flavor() {
+                    match configured_dependency_path_flavor(
+                        configured_target.configuration(),
+                        row.attribute_name(),
+                    ) {
+                        Ok(path_flavor) => Some(path_flavor),
+                        Err(error) => return root_analysis_driver_complete(Err(error)),
+                    }
+                } else {
+                    None
+                };
+                declared_dependency_keys.extend(row.into_keys(path_flavor, |label, _| {
                     ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
                         label,
                         configured_target.configuration().clone(),
@@ -5516,7 +5556,23 @@ impl ConfiguredNodeAnalysisKey {
                 }
             };
             for row in &configured_rows {
-                declared_dependency_keys.extend(row.into_keys(|label, exec| {
+                let dependency_configuration = if row.exec_configuration {
+                    &exec_configuration
+                } else {
+                    configured_target.configuration()
+                };
+                let path_flavor = if row.requires_path_flavor() {
+                    match configured_dependency_path_flavor(
+                        dependency_configuration,
+                        row.attribute_name(),
+                    ) {
+                        Ok(path_flavor) => Some(path_flavor),
+                        Err(error) => return root_analysis_driver_complete(Err(error)),
+                    }
+                } else {
+                    None
+                };
+                declared_dependency_keys.extend(row.into_keys(path_flavor, |label, exec| {
                     ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
                         label,
                         if exec {

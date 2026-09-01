@@ -1114,9 +1114,9 @@ async fn configured_subrule_validation_rejects_each_child_before_invocation() {
         ),
         ("zero_single", "must provide exactly one file, got 0"),
         ("multi_single", "must provide exactly one file, got 2"),
-        ("bad_extension", "does not match an admitted extension"),
+        ("bad_extension", "does not match its admitted file types"),
         ("bad_executable", "is not executable"),
-        ("bad_file", "does not admit file target"),
+        ("bad_file", "does not match its admitted file types"),
         (
             "bad_file_provider",
             "does not provide any admitted provider alternative",
