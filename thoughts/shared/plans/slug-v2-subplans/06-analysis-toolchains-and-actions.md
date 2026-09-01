@@ -22289,3 +22289,47 @@ type error: Bazel accepts a scalar string or a sequence containing strings and
 packet boundary. Focused R2 rereview returns `ACCEPT` with no remaining
 findings. Commit this architecture before Rust, then activate its bounded
 implementation successor.
+
+#### Rule-level transition execution accepted; default-exec dependency architecture active (2026-09-01)
+
+Commit `96ffe8ef3` terminally accepts generic rule-level Starlark transition
+execution. Complete loading/analysis and permanent Bazel-oracle evidence pass;
+the rebuilt authentic rules_rust 0.73 replay clears the self-transition and
+stops at `proc_macro_deps` declared with `cfg = "exec"`.
+
+Activate only
+`WP-6-7A-default-exec-configured-label-dependency-architecture-r2`. Freeze the
+complete default execution-group category across all five Bazel 9.2
+label-bearing constructors, including target/None conversion, select-before-
+transition ordering, selected-platform configuration, executable/provider/file
+validation and direct-source tool-edge identity. Replace the split public
+ordinary/transitioned/implicit/source edge representation with one typed
+attribute edge carrying visibility plus target/exec/Starlark role, and share
+one general default/named exec-group identity with existing action contexts.
+Only default exec executes now; named/automatic/composed groups, configured
+aspects and cquery tool traversal stay fail-closed behind the same future-ready
+owner.
+
+Bazel 9.2 remains sole behavior authority. Buck2 supplies only retained compact
+Rust utilities and concept-level exec-dependency separation. Zabel is a peer
+implementation whose typed group/relation ownership informs the design, not a
+source of truth; no Zig representation, selection behavior, cache or scheduler
+is copied. Bazel 9 BCR Starlark owns all rules, while rules_rust and
+`cc_common` remain downstream consumers rather than special cases. Independent
+architecture review and an accepted design commit are required before Rust.
+
+R1 independent review returned `REVISE`: the proposed singular Starlark output
+lost the already-admitted zero/multi-output transition identity, and the
+production allowlist had an open-ended compiler escape. Corrected R2 retains
+the complete immutable canonical output slice, including empty, and names the
+full production allowlist after compile-consumer preflight. Obtain focused R2
+rereview before Rust.
+
+#### Default-exec configured dependency architecture accepted; implementation active (2026-09-01)
+
+Focused R2 rereview returns `ACCEPT`: complete zero/single/multi-output
+Starlark edge identity and the closed production/proof allowlists resolve both
+R1 blockers. Activate only
+`WP-6-7A-default-exec-configured-label-dependency-implementation-r1` with the
+accepted exact/Slug-native/deferred boundary, typed edge/group owners, DICE
+ordering, oracle matrix, caps and stop conditions unchanged.
