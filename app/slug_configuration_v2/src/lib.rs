@@ -11,6 +11,7 @@ pub use native::CanonicalStringMap;
 pub use native::CanonicalStringSet;
 pub use native::ConfigurationField;
 pub use native::ConfigurationFieldIdentity;
+pub use native::CoverageConfigurationField;
 pub use native::CppConfigurationField;
 pub use native::CppFragmentProjection;
 pub use native::NativeStringListOption;

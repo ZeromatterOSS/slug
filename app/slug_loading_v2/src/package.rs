@@ -7768,6 +7768,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                         "rule attribute `{name}` uses a default form deferred outside this packet"
                     );
                 }
+                if definition.late_bound_default.is_some() && !name.starts_with('_') {
+                    anyhow::bail!(
+                        "When an attribute value is a function, the attribute must be private (i.e. start with '_'). Found '{name}'"
+                    );
+                }
                 if let Some(identity) = &definition.late_bound_default {
                     late_bound_attributes.push((
                         u32::try_from(user_schema.len()).expect("rule attribute count fits in u32"),

@@ -43,6 +43,7 @@ mod command_configuration_tests {
     use crate::CommandConfigurationOverlay;
     use crate::ConfigurationField;
     use crate::ConfigurationFieldIdentity;
+    use crate::CoverageConfigurationField;
     use crate::CppConfigurationField;
     use crate::NativeCommandOption;
     use crate::StarlarkOptions;
@@ -75,6 +76,13 @@ mod command_configuration_tests {
     fn cpp_field(field: CppConfigurationField) -> ConfigurationFieldIdentity {
         ConfigurationFieldIdentity::new(
             ConfigurationField::cpp(field),
+            CanonicalRepoName::new("tools+9.2").unwrap(),
+        )
+    }
+
+    fn coverage_field() -> ConfigurationFieldIdentity {
+        ConfigurationFieldIdentity::new(
+            ConfigurationField::coverage(CoverageConfigurationField::OutputGenerator),
             CanonicalRepoName::new("tools+9.2").unwrap(),
         )
     }
@@ -612,6 +620,169 @@ mod command_configuration_tests {
                     .contains("invalid C++ configuration")
             );
         }
+    }
+
+    #[test]
+    fn coverage_field_is_typed_compact_and_projects_false_true_false() {
+        let field = ConfigurationField::from_starlark_names("coverage", "output_generator")
+            .expect("the sole Bazel 9.2 coverage field is admitted");
+        assert_eq!(field.fragment_name(), "coverage");
+        assert_eq!(field.field_name(), "output_generator");
+        assert_eq!(field.cpp_field(), None);
+        assert_eq!(
+            field.coverage_field(),
+            Some(CoverageConfigurationField::OutputGenerator)
+        );
+        assert_eq!(size_of::<CoverageConfigurationField>(), 1);
+        assert_eq!(size_of::<ConfigurationField>(), 1);
+        assert!(ConfigurationField::is_fragment_name("coverage"));
+        assert_eq!(
+            ConfigurationField::from_starlark_names("coverage", "coverage_report_generator"),
+            None
+        );
+        assert_eq!(
+            ConfigurationField::from_starlark_names("unknown", "output_generator"),
+            None
+        );
+
+        let base = configuration();
+        assert_eq!(base.coverage_output_generator_label().unwrap(), None);
+        assert_eq!(
+            base.configuration_field_label(&coverage_field()).unwrap(),
+            None
+        );
+
+        let enabled = base
+            .with_command_configuration(
+                StarlarkOptions::default(),
+                &vec![CommandConfigurationOccurrence::native(
+                    NativeCommandOption::CollectCodeCoverage,
+                    None::<&str>,
+                    false,
+                )]
+                .into(),
+            )
+            .unwrap();
+        assert_eq!(
+            enabled
+                .configuration_field_label(&coverage_field())
+                .unwrap()
+                .unwrap()
+                .to_string(),
+            "@@bazel_tools//tools/test:lcov_merger"
+        );
+
+        let disabled = base
+            .with_command_configuration(
+                StarlarkOptions::default(),
+                &vec![CommandConfigurationOccurrence::native(
+                    NativeCommandOption::CollectCodeCoverage,
+                    None::<&str>,
+                    true,
+                )]
+                .into(),
+            )
+            .unwrap();
+        assert_eq!(disabled.coverage_output_generator_label().unwrap(), None);
+        assert_eq!(disabled, base);
+        assert_ne!(enabled, base);
+    }
+
+    #[test]
+    fn coverage_command_override_observes_mapping_last_wins_and_boolean_independence() {
+        let base = configuration();
+        let mapping = mapping();
+        let overlay: CommandConfigurationOverlay = vec![
+            native(
+                NativeCommandOption::CoverageOutputGenerator,
+                "//tools:first",
+            ),
+            native(
+                NativeCommandOption::CoverageOutputGenerator,
+                "@alias//tools:mapped",
+            ),
+            CommandConfigurationOccurrence::native(
+                NativeCommandOption::CollectCodeCoverage,
+                None::<&str>,
+                false,
+            ),
+        ]
+        .into();
+        assert!(overlay.requires_repository_mapping());
+        let configured = base
+            .with_command_configuration_context(
+                StarlarkOptions::default(),
+                &overlay,
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap();
+        assert_eq!(
+            configured
+                .coverage_output_generator_label()
+                .unwrap()
+                .unwrap()
+                .to_string(),
+            "@@mapped+1.0//tools:mapped"
+        );
+
+        let suppressed = base
+            .with_command_configuration_context(
+                StarlarkOptions::default(),
+                &vec![
+                    native(
+                        NativeCommandOption::CoverageOutputGenerator,
+                        "@alias//tools:mapped",
+                    ),
+                    CommandConfigurationOccurrence::native(
+                        NativeCommandOption::CollectCodeCoverage,
+                        None::<&str>,
+                        true,
+                    ),
+                ]
+                .into(),
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap();
+        assert_eq!(suppressed.coverage_output_generator_label().unwrap(), None);
+        assert_ne!(suppressed, base, "the suppressed label remains structural");
+        assert_ne!(suppressed, configured);
+
+        let unresolved = base
+            .with_command_configuration_context(
+                StarlarkOptions::default(),
+                &vec![
+                    native(
+                        NativeCommandOption::CoverageOutputGenerator,
+                        "@missing//tools:unresolved",
+                    ),
+                    CommandConfigurationOccurrence::native(
+                        NativeCommandOption::CollectCodeCoverage,
+                        None::<&str>,
+                        false,
+                    ),
+                ]
+                .into(),
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap();
+        assert!(
+            unresolved
+                .coverage_output_generator_label()
+                .unwrap_err()
+                .to_string()
+                .contains("non-visible repository")
+        );
+        assert!(
+            base.with_command_configuration(
+                StarlarkOptions::default(),
+                &vec![native(
+                    NativeCommandOption::CoverageOutputGenerator,
+                    "/not-a-label"
+                )]
+                .into(),
+            )
+            .is_err()
+        );
     }
 }
 
@@ -2858,6 +3029,7 @@ mod retry7_private_kernel_contract {
                 "pub use configuration::StarlarkOptions;",
                 "pub use configuration_field::ConfigurationField;",
                 "pub use configuration_field::ConfigurationFieldIdentity;",
+                "pub use configuration_field::CoverageConfigurationField;",
                 "pub use configuration_field::CppConfigurationField;",
                 "pub use cpp_fragment::CppFragmentProjection;",
                 "pub use matching::NativeConfigSettingMatchError;",

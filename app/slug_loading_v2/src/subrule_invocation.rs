@@ -679,6 +679,7 @@ struct AnalysisEvaluationPayload {
     target_label: CanonicalLabel,
     action_sink: Arc<dyn AnalysisActionSink>,
     cpp_fragment: FrozenValue,
+    coverage_fragment: FrozenValue,
     source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
 }
 
@@ -689,6 +690,26 @@ impl AnalysisEvaluationContext {
         target_label: CanonicalLabel,
         action_sink: Arc<dyn AnalysisActionSink>,
         cpp_fragment: FrozenValue,
+        source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    ) -> Self {
+        Self::new_with_coverage(
+            direct,
+            prepared,
+            target_label,
+            action_sink,
+            cpp_fragment,
+            FrozenValue::new_none(),
+            source_identities_by_filename,
+        )
+    }
+
+    pub fn new_with_coverage(
+        direct: Arc<[Arc<SubruleIdentity>]>,
+        prepared: impl IntoIterator<Item = PreparedSubruleInvocation>,
+        target_label: CanonicalLabel,
+        action_sink: Arc<dyn AnalysisActionSink>,
+        cpp_fragment: FrozenValue,
+        coverage_fragment: FrozenValue,
         source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
     ) -> Self {
         let stack = Arc::new(Mutex::new(AnalysisCallStack {
@@ -709,6 +730,7 @@ impl AnalysisEvaluationContext {
                 target_label,
                 action_sink,
                 cpp_fragment,
+                coverage_fragment,
                 source_identities_by_filename,
             }),
         }
@@ -813,6 +835,7 @@ impl AnalysisEvaluationContext {
             token.clone(),
             prepared.fragments.clone(),
             self.payload.cpp_fragment,
+            self.payload.coverage_fragment,
         ));
         let context = eval.heap().alloc(SubruleContext {
             token: token.clone(),

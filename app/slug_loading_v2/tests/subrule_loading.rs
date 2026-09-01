@@ -291,6 +291,102 @@ my_rule = rule(implementation = _rule_impl, subrules = [my_subrule])
 }
 
 #[test]
+fn coverage_configuration_field_freezes_for_ordinary_and_subrule_private_labels() {
+    let workspace = scratch("coverage-field");
+    let package = workspace.join("pkg");
+    write(
+        &package.join("defs.bzl"),
+        r#"
+COVERAGE = configuration_field(fragment = "coverage", name = "output_generator")
+def _check():
+    if COVERAGE != configuration_field(fragment = "coverage", name = "output_generator"):
+        fail("coverage producer identity changed")
+    if COVERAGE == configuration_field(fragment = "cpp", name = "fdo_profile"):
+        fail("fragment identity collapsed")
+_check()
+
+def _sub_impl(ctx, _coverage): return None
+coverage_sub = subrule(
+    implementation = _sub_impl,
+    attrs = {"_coverage": attr.label(default = COVERAGE, cfg = "exec", executable = True)},
+)
+def _impl(ctx): return []
+coverage_rule = rule(
+    implementation = _impl,
+    attrs = {"_coverage": attr.label(default = COVERAGE)},
+    subrules = [coverage_sub],
+)
+"#,
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "load(':defs.bzl', 'coverage_rule')\ncoverage_rule(name = 'subject')\n",
+    );
+
+    let loaded = load_package(&workspace, &package);
+    let rule = starlark_rule(&loaded, "subject");
+    let configured = rule.configured_dependency_attributes().collect::<Vec<_>>();
+    assert_eq!(configured.len(), 2);
+    for attribute in configured {
+        let ConfiguredDependencyDefault::ConfigurationField(identity) = attribute.default() else {
+            panic!("coverage dependency lost typed field identity")
+        };
+        assert_eq!(identity.field().fragment_name(), "coverage");
+        assert_eq!(identity.field().field_name(), "output_generator");
+    }
+    let lifted = rule
+        .configured_dependency_attributes()
+        .find(|attribute| attribute.user_name() == Some("_coverage"))
+        .unwrap();
+    assert!(lifted.exec_configuration());
+    assert!(lifted.executable());
+
+    for (name, source, expected) in [
+        (
+            "unknown-coverage-field",
+            "X = configuration_field(fragment = 'coverage', name = 'coverage_report_generator')\n",
+            "invalid configuration field name 'coverage_report_generator' on fragment 'coverage'",
+        ),
+        (
+            "public-attribute",
+            "X = configuration_field(fragment = 'coverage', name = 'output_generator')\ndef impl(ctx): return []\nbad = rule(implementation = impl, attrs = {'coverage': attr.label(default = X)})\n",
+            "the attribute must be private (i.e. start with '_'). Found 'coverage'",
+        ),
+        (
+            "public-cpp-attribute",
+            "X = configuration_field(fragment = 'cpp', name = 'fdo_profile')\ndef impl(ctx): return []\nbad = rule(implementation = impl, attrs = {'profile': attr.label(default = X)})\n",
+            "the attribute must be private (i.e. start with '_'). Found 'profile'",
+        ),
+        (
+            "non-label",
+            "X = configuration_field(fragment = 'coverage', name = 'output_generator')\ndef impl(ctx): return []\nbad = rule(implementation = impl, attrs = {'_coverage': attr.string(default = X)})\n",
+            "configuration_field may only be the default of attr.label",
+        ),
+    ] {
+        let package = workspace.join(name);
+        write(&package.join("defs.bzl"), source);
+        write(&package.join("BUILD.bazel"), "load(':defs.bzl', 'bad')\n");
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "{name}: {error}");
+    }
+
+    let build_only = workspace.join("build-field");
+    write(
+        &build_only.join("BUILD.bazel"),
+        "X = configuration_field(fragment = 'coverage', name = 'output_generator')\n",
+    );
+    let error = try_load_package(&workspace, &build_only)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("configuration_field") && error.contains("not found"),
+        "{error}"
+    );
+}
+
+#[test]
 fn subrule_declaration_validation_matches_the_admitted_bazel_matrix() {
     let cases = [
         (
@@ -349,6 +445,11 @@ fn subrule_declaration_validation_matches_the_admitted_bazel_matrix() {
             "unsupported repository_rule attribute schema 'x'",
         ),
         (
+            "repository-coverage-late-bound",
+            "def impl(ctx): pass\nbad = repository_rule(impl, attrs = {'x': attr.label(default = configuration_field(fragment = 'coverage', name = 'output_generator'))})\n",
+            "unsupported repository_rule attribute schema 'x'",
+        ),
+        (
             "repository-computed",
             "def impl(ctx): pass\nbad = repository_rule(impl, attrs = {'x': attr.label(default = lambda: '')})\n",
             "unsupported repository_rule attribute schema 'x'",
@@ -357,6 +458,21 @@ fn subrule_declaration_validation_matches_the_admitted_bazel_matrix() {
             "tag-late-bound",
             "bad = tag_class(attrs = {'x': attr.label(default = configuration_field(fragment = 'cpp', name = 'zipper'))})\n",
             "tag attribute `x` does not support deferred defaults",
+        ),
+        (
+            "tag-coverage-late-bound",
+            "bad = tag_class(attrs = {'x': attr.label(default = configuration_field(fragment = 'coverage', name = 'output_generator'))})\n",
+            "tag attribute `x` does not support deferred defaults",
+        ),
+        (
+            "macro-coverage-late-bound",
+            "def impl(name, visibility, x): pass\nbad = macro(implementation = impl, attrs = {'x': attr.label(default = configuration_field(fragment = 'coverage', name = 'output_generator'))})\n",
+            "macro attribute 'x' uses an unsupported dependency constraint",
+        ),
+        (
+            "subrule-coverage-aspect",
+            "def aspect_impl(target, ctx): return []\na = aspect(implementation = aspect_impl)\ndef impl(ctx, **kwargs): return None\nbad = subrule(implementation = impl, attrs = {'_x': attr.label(default = configuration_field(fragment = 'coverage', name = 'output_generator'), aspects = [a])})\n",
+            "Found `aspects` extra named parameter(s) for call to label",
         ),
         (
             "tag-computed",

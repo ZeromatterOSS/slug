@@ -62,6 +62,7 @@ use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::SubruleIdentity;
+use slug_loading_v2::analysis_fragments::CoverageFragmentValue;
 use slug_loading_v2::analysis_fragments::CppFragmentValue;
 use slug_loading_v2::analysis_fragments::RuleFragmentCollection;
 use slug_loading_v2::package::resolve_rule_definition_label;
@@ -1538,6 +1539,13 @@ pub(crate) fn evaluate_loaded_rule(
         || implementation
             .subrule_invocations()
             .any(|(_, _, _, fragments)| fragments.contains("cpp"));
+    let needs_coverage_fragment = implementation
+        .required_fragments()
+        .iter()
+        .any(|fragment| fragment == "coverage")
+        || implementation
+            .subrule_invocations()
+            .any(|(_, _, _, fragments)| fragments.contains("coverage"));
     let cpp_fragment = if needs_cpp_fragment {
         let structural_configuration =
             key.configuration().slug_configuration().ok_or_else(|| {
@@ -1548,6 +1556,20 @@ pub(crate) fn evaluate_loaded_rule(
                 .map_err(|error| error.to_string())?,
             implementation.source_identities_by_filename().clone(),
         ))
+    } else {
+        FrozenValue::new_none()
+    };
+    let coverage_fragment = if needs_coverage_fragment {
+        let structural_configuration =
+            key.configuration().slug_configuration().ok_or_else(|| {
+                "configured fragment projection requires structural configuration".to_owned()
+            })?;
+        let output_generator = structural_configuration
+            .coverage_output_generator_label()
+            .map_err(|error| error.to_string())?;
+        module
+            .frozen_heap()
+            .alloc(CoverageFragmentValue::new(output_generator))
     } else {
         FrozenValue::new_none()
     };
@@ -1643,12 +1665,13 @@ pub(crate) fn evaluate_loaded_rule(
             .collect::<Result<Vec<_>, String>>()?
     };
     let returned = {
-        let analysis_context = AnalysisEvaluationContext::new(
+        let analysis_context = AnalysisEvaluationContext::new_with_coverage(
             implementation.direct_subrule_identities(),
             prepared_subrules,
             key.label().clone(),
             action_sink.clone(),
             cpp_fragment,
+            coverage_fragment,
             implementation.source_identities_by_filename().clone(),
         );
         let mut evaluator = Evaluator::new(&module);
@@ -1672,6 +1695,7 @@ pub(crate) fn evaluate_loaded_rule(
             analysis_context.root_token(),
             root_fragment_declarations,
             cpp_fragment,
+            coverage_fragment,
         ));
         let context = module.heap().alloc(AnalysisContextGen {
             action_sink,

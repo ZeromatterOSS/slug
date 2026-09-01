@@ -22,6 +22,7 @@ use slug_identity_v2::serialization::StableSerialize;
 use strong_hash::StrongHash;
 
 use super::configuration_field::ConfigurationFieldIdentity;
+use super::configuration_field::CoverageConfigurationField;
 use super::configuration_field::CppConfigurationField;
 use super::convert::ConvertError;
 use super::defaults::materialize_default;
@@ -47,6 +48,8 @@ const PROJECTION_VERSION: u16 = 2;
 const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
 const CPP_OPTIONS: &str = "com.google.devtools.build.lib.rules.cpp.CppOptions";
 const CORE_OPTIONS: &str = "com.google.devtools.build.lib.analysis.config.CoreOptions";
+const COVERAGE_OPTIONS: &str =
+    "com.google.devtools.build.lib.analysis.test.CoverageConfiguration.CoverageOptions";
 const STRICT_ACTION_ENV_OPTIONS: &str =
     "com.google.devtools.build.lib.bazel.rules.BazelRuleClassProvider.StrictActionEnvOptions";
 const HOST_PLATFORM: &str = "host_platform";
@@ -317,6 +320,7 @@ pub enum SlugConfigurationError {
     UnknownNativeOption,
     InvalidCommandNativeOption { option: &'static str },
     UnexpectedNativeStringList { option: &'static str },
+    UnexpectedNativeBoolean { option: &'static str },
     UnexpectedNativeLabel { option: &'static str },
     NonVisibleNativeLabel { option: &'static str },
     InvalidCppConfiguration { reason: &'static str },
@@ -378,6 +382,9 @@ impl fmt::Display for SlugConfigurationError {
             }
             Self::UnexpectedNativeStringList { option } => {
                 write!(formatter, "native option {option} is not a string list")
+            }
+            Self::UnexpectedNativeBoolean { option } => {
+                write!(formatter, "native option {option} is not a Boolean")
             }
             Self::UnexpectedNativeLabel { option } => {
                 write!(formatter, "native option {option} is not a label value")
@@ -900,7 +907,14 @@ impl SlugConfiguration {
         &self,
         identity: &ConfigurationFieldIdentity,
     ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
-        let field = identity.field().cpp_field();
+        let Some(field) = identity.field().cpp_field() else {
+            return match identity.field().coverage_field() {
+                Some(CoverageConfigurationField::OutputGenerator) => {
+                    self.coverage_output_generator_label()
+                }
+                None => Err(SlugConfigurationError::UnknownNativeOption),
+            };
+        };
         self.validate_cpp_field_state()?;
         match field {
             CppConfigurationField::FdoOptimize => self.cpp_fdo_optimize_label(),
@@ -937,6 +951,17 @@ impl SlugConfiguration {
                 }
             }
         }
+    }
+
+    /// Project Bazel's public coverage fragment field from the same native
+    /// option vector used by `configuration_field` late-bound defaults.
+    pub fn coverage_output_generator_label(
+        &self,
+    ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
+        if !self.native_bool(CORE_OPTIONS, "collect_code_coverage")? {
+            return Ok(None);
+        }
+        self.native_label(COVERAGE_OPTIONS, "coverage_output_generator")
     }
 
     pub fn projection(&self) -> SlugConfigurationProjection {
@@ -1034,7 +1059,15 @@ impl SlugConfiguration {
         &self,
         name: &'static str,
     ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
-        match self.option_value(CPP_OPTIONS, name)? {
+        self.native_label(CPP_OPTIONS, name)
+    }
+
+    fn native_label(
+        &self,
+        class_name: &'static str,
+        name: &'static str,
+    ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
+        match self.option_value(class_name, name)? {
             OptionValue::Label(None) => Ok(None),
             OptionValue::Label(Some(LabelValue::Label(value))) => value
                 .canonical()
@@ -1045,11 +1078,17 @@ impl SlugConfiguration {
     }
 
     fn core_bool(&self, name: &'static str) -> Result<bool, SlugConfigurationError> {
-        match self.option_value(CORE_OPTIONS, name)? {
+        self.native_bool(CORE_OPTIONS, name)
+    }
+
+    fn native_bool(
+        &self,
+        class_name: &'static str,
+        name: &'static str,
+    ) -> Result<bool, SlugConfigurationError> {
+        match self.option_value(class_name, name)? {
             OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Bool(value))) => Ok(*value),
-            _ => Err(SlugConfigurationError::InvalidCppConfiguration {
-                reason: "a C++ suppressor has an invalid retained value",
-            }),
+            _ => Err(SlugConfigurationError::UnexpectedNativeBoolean { option: name }),
         }
     }
 
@@ -1091,6 +1130,7 @@ fn typed_native_command_descriptor(
         | NativeCommandOption::HostCompilationMode
         | NativeCommandOption::ActionEnv
         | NativeCommandOption::HostActionEnv => CORE_OPTIONS,
+        NativeCommandOption::CoverageOutputGenerator => COVERAGE_OPTIONS,
         NativeCommandOption::IncompatibleStrictActionEnv => STRICT_ACTION_ENV_OPTIONS,
         _ => CPP_OPTIONS,
     };

@@ -32,6 +32,7 @@ pub use configuration::StarlarkOptionValue;
 pub use configuration::StarlarkOptions;
 pub use configuration_field::ConfigurationField;
 pub use configuration_field::ConfigurationFieldIdentity;
+pub use configuration_field::CoverageConfigurationField;
 pub use configuration_field::CppConfigurationField;
 pub use cpp_fragment::CppFragmentProjection;
 pub use matching::NativeConfigSettingMatchError;

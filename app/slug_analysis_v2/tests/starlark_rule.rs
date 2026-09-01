@@ -8194,7 +8194,7 @@ provider_subject = rule(implementation = _provider_subject, subrules = [provider
 provider_exec_subject = rule(implementation = _provider_exec_subject, subrules = [provider_exec])
 
 def _root_subject(ctx):
-    provider = ctx.attr.exec[DefaultInfo].files_to_run
+    provider = ctx.attr._exec[DefaultInfo].files_to_run
     executable = provider.executable
     outputs = [ctx.actions.declare_file("root-%d.out" % i) for i in range(6)]
     ctx.actions.run(outputs = [outputs[0]], executable = executable)
@@ -8207,7 +8207,7 @@ def _root_subject(ctx):
 
 root_subject = rule(
     implementation = _root_subject,
-    attrs = {"exec": attr.label(default = configuration_field(fragment = "cpp", name = "fdo_profile"), cfg = "exec", executable = True)},
+    attrs = {"_exec": attr.label(default = configuration_field(fragment = "cpp", name = "fdo_profile"), cfg = "exec", executable = True)},
 )
 
 def _missing_provider_exec(ctx):

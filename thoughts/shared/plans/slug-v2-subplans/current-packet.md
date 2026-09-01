@@ -1,17 +1,20 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-coverage-configuration-field-category-architecture-r2`
+Packet: `WP-6-7A-coverage-configuration-field-category-implementation-r3`
 
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 configured fragment,
 late-bound dependency, and command-configuration breadth.
 
-Status: R2 architecture independently accepted; commit the design, then
-implement only its frozen boundary. R1 independent review returned `REPLAN`
+Status: terminally accepted implementation candidate. R1 independent review returned `REPLAN`
 for one public-access distinction. R1 incorrectly
 described the coverage facade as shared "just as" the C++ facade without
 forbidding C++'s private-caller manifest. R2 requires an unrestricted coverage
-value and non-allowlisted ordinary/subrule proofs; every other boundary is
-unchanged. Focused R2 rereview returns `ACCEPT`. Base commit `507ae2994`
+value and non-allowlisted ordinary/subrule proofs. During R2 implementation, a
+discriminating loading proof found that the existing ordinary-rule seam did
+not enforce Bazel's shared private-name rule for late-bound defaults. Focused
+R3 review accepts adding the sole generic `rule()` attribute-publication seam
+and one pre-publication name check; every other boundary remains unchanged.
+Base commit `d767e77fe` contains the accepted R2 design, while `507ae2994`
 terminally accepts the complete label file-
 admissibility category. The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -99,7 +102,12 @@ authority. Pinned source SHA-256 values are:
   `d1bf5d2b0e2230a6d3d7b66ea442f09e7f710664706405ea2cd6c4df0d0f6465`;
   and
 - builtins `common/cc/semantics.bzl`:
-  `08e948c02184e5d3fcd2313ecb46dfa5631a21a2a836c4fe2d5faf148096db0f`.
+  `08e948c02184e5d3fcd2313ecb46dfa5631a21a2a836c4fe2d5faf148096db0f`;
+- `AttributeValueSource.java`:
+  `c0e66478a7d920e8291cd93e5860c2aec6c1eec1da624103185840073d9d1cb9`;
+  and
+- `StarlarkRuleClassFunctions.java`:
+  `a1f706cfbbc67aa3cd2521df2091dd5ed9af96eb4568049f8eee966d06c622f7`.
 
 `CoverageConfiguration` proves there is exactly one annotated field. Its
 constructor suppresses the fragment's option view unless CoreOptions
@@ -110,6 +118,9 @@ fragment methods. The API and Bazel tests prove optional return, private label-
 default use, rule/subrule resolution, and the fragment/member spelling.
 `BazelBuildApiGlobals` proves fragment and field validation occurs at
 declaration through the registered fragment class and tools repository.
+`AttributeValueSource.LATE_BOUND` and the `rule()` descriptor conversion in
+`StarlarkRuleClassFunctions` prove that every late-bound attribute name must
+begin with `_` before the rule class is published.
 
 The live Slug registry already owns both CoverageOptions descriptors and the
 CoreOptions Boolean in structural configuration identity. The live command
@@ -152,6 +163,15 @@ declares `coverage`; carry the same unrestricted frozen value through the
 existing invocation payload. Do not add a global callback, retained evaluator
 value, dynamic fragment map, cache, lock, or DICE key.
 
+The ordinary `rule()` attribute loop is the sole generic schema-publication
+owner for the private-name invariant. Reject a typed late-bound default whose
+Starlark name does not begin with `_` before mutating either the late-bound row
+list or user schema. This closes both coverage and the already-admitted C++
+fields; it is not a fragment-specific branch. Although `package.rs` exceeds
+the physical-size review trigger, this six-line check belongs in the cohesive
+attribute-conversion loop and extracting a second validation layer would add
+indirection without separating a responsibility.
+
 ## Buck2 and Zabel guidance
 
 starlark-rust remains the parser/evaluator/generated-binder substrate and owns
@@ -176,6 +196,8 @@ Production allowlist:
 - `app/slug_configuration_v2/src/native/mod.rs` and
   `app/slug_configuration_v2/src/lib.rs` for typed reexports only;
 - `app/slug_loading_v2/src/subrule.rs`;
+- `app/slug_loading_v2/src/package.rs` for the generic pre-publication private
+  name check only;
 - `app/slug_loading_v2/src/analysis_fragments.rs`;
 - `app/slug_loading_v2/src/subrule_invocation.rs`; and
 - `app/slug_analysis_v2/src/starlark_rule.rs`.
@@ -211,7 +233,9 @@ Focused proofs must cover:
    non-allowlisted `.bzl` module, true-label and false-None projections,
    declaration and invocation lifecycle, inactive-token rejection, absence of
    a caller manifest/restriction, and C++ facade regression;
-6. macro/repository/tag/non-label/public/fixed-aspect controls remain closed;
+6. macro/repository/tag/non-label/public/fixed-aspect controls remain closed,
+   including both coverage and C++ public-attribute rejection before schema
+   publication;
    and
 7. authentic rebuilt cquery clears the coverage field and records the next
    generic frontier before any C++-specific branch is considered.
@@ -227,6 +251,33 @@ late-bound resolver, DICE key/cache/lock, accepting another fragment/member,
 implementing aspects/coverage actions/instrumentation, touching a ruleset or
 starlark-rust, adding a C++ branch, or exceeding a cap. Independent design
 review is required before Rust.
+
+## Implementation candidate result
+
+The R3 candidate implements only the frozen typed field, option projection,
+shared ordinary/subrule dependency path, unrestricted coverage facade, and
+generic late-bound private-name check. The pre-publication check exposed and
+corrected one pre-existing analysis fixture whose C++ late-bound attribute was
+public; no compatibility surface was weakened.
+
+Serial validation passes all 63 configuration tests, all 28 command tests, all
+553 loading tests with one existing ignored test, and all 119 analysis tests.
+`cargo fmt --all -- --check`, workspace metadata, diff hygiene, the rebuilt V2
+CLI, every pinned Bazel 9.2 source hash, clean Zabel guidance commit, and the
+parked-file hash pass. The archive checker reports only its three documented
+non-V2 thought-path failures.
+
+A fresh one-shot cquery over `rules_rust` 0.73.0 clears
+`configuration_field(fragment = "coverage", name = "output_generator")` and
+now stops at `rust/private/rust.bzl:961` on the next typed catalog member,
+`configuration_field(fragment = "cpp", name = "custom_malloc")`. This is a
+generic configuration-field successor, not a rule-body, parser, `cc_common`,
+or `cc_internal` frontier.
+
+Independent terminal implementation review returned `ACCEPT`. It verified the
+closed one-byte representation, option and resolver reuse, public coverage
+facade, generic privacy invariant, proof matrix, cap audit, parked isolation,
+and honest successor classification.
 
 ## Immediate predecessor
 

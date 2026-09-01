@@ -99,7 +99,7 @@ pub(crate) fn configuration_field_global<'v>(
     name: &str,
     eval: &Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<ConfigurationFieldValue> {
-    if fragment != "cpp" {
+    if !ConfigurationField::is_fragment_name(fragment) {
         anyhow::bail!("invalid configuration fragment name '{fragment}'");
     }
     let Some(field) = ConfigurationField::from_starlark_names(fragment, name) else {
@@ -799,28 +799,50 @@ mod tests {
         }
     }
 
-    fn field(source: &BzlModuleIdentity, name: &str) -> ConfigurationFieldIdentity {
+    fn field(source: &BzlModuleIdentity, fragment: &str, name: &str) -> ConfigurationFieldIdentity {
         ConfigurationFieldIdentity::new(
-            ConfigurationField::from_starlark_names("cpp", name).unwrap(),
+            ConfigurationField::from_starlark_names(fragment, name).unwrap(),
             tools_repository(source),
         )
     }
 
     #[test]
     fn typed_field_identity_ignores_module_and_discriminates_field_and_tools_repository() {
+        fn hash(value: &ConfigurationFieldIdentity) -> u64 {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            value.hash(&mut hasher);
+            std::hash::Hasher::finish(&hasher)
+        }
         let first = owner("@@one+//pkg:first.bzl", "tools+1.0");
         let second = owner("@@two+//other:second.bzl", "tools+1.0");
         let remapped = owner("@@one+//pkg:first.bzl", "tools+2.0");
 
         assert_eq!(
-            field(&first, "fdo_optimize"),
-            field(&second, "fdo_optimize")
+            field(&first, "cpp", "fdo_optimize"),
+            field(&second, "cpp", "fdo_optimize")
         );
-        assert_ne!(field(&first, "fdo_optimize"), field(&first, "fdo_profile"));
         assert_ne!(
-            field(&first, "fdo_optimize"),
-            field(&remapped, "fdo_optimize")
+            field(&first, "cpp", "fdo_optimize"),
+            field(&first, "cpp", "fdo_profile")
         );
+        assert_ne!(
+            field(&first, "cpp", "fdo_optimize"),
+            field(&remapped, "cpp", "fdo_optimize")
+        );
+        assert_eq!(
+            field(&first, "coverage", "output_generator"),
+            field(&second, "coverage", "output_generator")
+        );
+        assert_ne!(
+            field(&first, "coverage", "output_generator"),
+            field(&remapped, "coverage", "output_generator")
+        );
+        let coverage_a = field(&first, "coverage", "output_generator");
+        let coverage_b = field(&remapped, "coverage", "output_generator");
+        let coverage_a_again = field(&first, "coverage", "output_generator");
+        assert_eq!(coverage_a, coverage_a_again);
+        assert_eq!(hash(&coverage_a), hash(&coverage_a_again));
+        assert_ne!(coverage_a, coverage_b);
     }
 
     #[test]

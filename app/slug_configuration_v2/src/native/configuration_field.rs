@@ -50,36 +50,119 @@ impl CppConfigurationField {
     }
 }
 
-/// Typed producer identity for one admitted Starlark `configuration_field`.
-#[repr(transparent)]
+/// The finite Bazel 9.2 `coverage` configuration-field surface admitted by
+/// Slug.
+#[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
-pub struct ConfigurationField(CppConfigurationField);
+pub enum CoverageConfigurationField {
+    OutputGenerator,
+}
 
-impl ConfigurationField {
-    pub const fn cpp(field: CppConfigurationField) -> Self {
-        Self(field)
-    }
-
-    pub fn from_starlark_names(fragment: &str, name: &str) -> Option<Self> {
-        match fragment {
-            "cpp" => match CppConfigurationField::from_starlark_name(name) {
-                Some(field) => Some(Self::cpp(field)),
-                None => None,
-            },
+impl CoverageConfigurationField {
+    pub fn from_starlark_name(name: &str) -> Option<Self> {
+        match name {
+            "output_generator" => Some(Self::OutputGenerator),
             _ => None,
         }
     }
 
+    pub const fn starlark_name(self) -> &'static str {
+        match self {
+            Self::OutputGenerator => "output_generator",
+        }
+    }
+}
+
+/// Typed producer identity for one admitted Starlark `configuration_field`.
+///
+/// The payload is flattened into the discriminant so the retained field stays
+/// one byte while callers still cross typed fragment-specific accessors.
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub enum ConfigurationField {
+    CppFdoOptimize,
+    CppXbinaryFdo,
+    CppFdoProfile,
+    CppCsFdoProfile,
+    CppFdoPrefetchHints,
+    CppPropellerOptimize,
+    CppMemprofProfile,
+    CppProtoProfilePath,
+    CppLibcTop,
+    CppZipper,
+    CoverageOutputGenerator,
+}
+
+impl ConfigurationField {
+    pub const fn cpp(field: CppConfigurationField) -> Self {
+        match field {
+            CppConfigurationField::FdoOptimize => Self::CppFdoOptimize,
+            CppConfigurationField::XbinaryFdo => Self::CppXbinaryFdo,
+            CppConfigurationField::FdoProfile => Self::CppFdoProfile,
+            CppConfigurationField::CsFdoProfile => Self::CppCsFdoProfile,
+            CppConfigurationField::FdoPrefetchHints => Self::CppFdoPrefetchHints,
+            CppConfigurationField::PropellerOptimize => Self::CppPropellerOptimize,
+            CppConfigurationField::MemprofProfile => Self::CppMemprofProfile,
+            CppConfigurationField::ProtoProfilePath => Self::CppProtoProfilePath,
+            CppConfigurationField::LibcTop => Self::CppLibcTop,
+            CppConfigurationField::Zipper => Self::CppZipper,
+        }
+    }
+
+    pub const fn coverage(field: CoverageConfigurationField) -> Self {
+        match field {
+            CoverageConfigurationField::OutputGenerator => Self::CoverageOutputGenerator,
+        }
+    }
+
+    pub fn from_starlark_names(fragment: &str, name: &str) -> Option<Self> {
+        match fragment {
+            "cpp" => CppConfigurationField::from_starlark_name(name).map(Self::cpp),
+            "coverage" => CoverageConfigurationField::from_starlark_name(name).map(Self::coverage),
+            _ => None,
+        }
+    }
+
+    pub fn is_fragment_name(fragment: &str) -> bool {
+        matches!(fragment, "cpp" | "coverage")
+    }
+
     pub const fn fragment_name(self) -> &'static str {
-        "cpp"
+        match self {
+            Self::CoverageOutputGenerator => "coverage",
+            _ => "cpp",
+        }
     }
 
     pub const fn field_name(self) -> &'static str {
-        self.0.starlark_name()
+        match (self.cpp_field(), self.coverage_field()) {
+            (Some(field), None) => field.starlark_name(),
+            (None, Some(field)) => field.starlark_name(),
+            _ => unreachable!(),
+        }
     }
 
-    pub const fn cpp_field(self) -> CppConfigurationField {
-        self.0
+    pub const fn cpp_field(self) -> Option<CppConfigurationField> {
+        Some(match self {
+            Self::CppFdoOptimize => CppConfigurationField::FdoOptimize,
+            Self::CppXbinaryFdo => CppConfigurationField::XbinaryFdo,
+            Self::CppFdoProfile => CppConfigurationField::FdoProfile,
+            Self::CppCsFdoProfile => CppConfigurationField::CsFdoProfile,
+            Self::CppFdoPrefetchHints => CppConfigurationField::FdoPrefetchHints,
+            Self::CppPropellerOptimize => CppConfigurationField::PropellerOptimize,
+            Self::CppMemprofProfile => CppConfigurationField::MemprofProfile,
+            Self::CppProtoProfilePath => CppConfigurationField::ProtoProfilePath,
+            Self::CppLibcTop => CppConfigurationField::LibcTop,
+            Self::CppZipper => CppConfigurationField::Zipper,
+            Self::CoverageOutputGenerator => return None,
+        })
+    }
+
+    pub const fn coverage_field(self) -> Option<CoverageConfigurationField> {
+        match self {
+            Self::CoverageOutputGenerator => Some(CoverageConfigurationField::OutputGenerator),
+            _ => None,
+        }
     }
 }
 

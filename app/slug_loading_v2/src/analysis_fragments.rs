@@ -6,6 +6,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use compact_str::CompactString;
 use slug_configuration_v2::CppFragmentProjection;
+use slug_identity_v2::CanonicalLabel;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -22,14 +23,14 @@ use starlark_map::small_set::SmallSet;
 
 use crate::BzlModuleIdentity;
 use crate::builtin_restriction::check_default_allowlist;
+use crate::provider::alloc_starlark_label;
 use crate::subrule_invocation::AnalysisCallToken;
 
-const ACTIVE_FRAGMENT_NAMES_EXCEPT_CPP: &[&str] = &[
+const ACTIVE_FRAGMENT_NAMES_EXCEPT_CPP_AND_COVERAGE: &[&str] = &[
     "android",
     "apple",
     "bazel_android",
     "bazel_py",
-    "coverage",
     "j2objc",
     "java",
     "objc",
@@ -143,6 +144,51 @@ impl<'v> StarlarkValue<'v> for CppFragmentValue {
     }
 }
 
+/// Bazel's public coverage fragment contains no caller restriction. The
+/// optional canonical label is the complete configured projection.
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CoverageFragmentValue {
+    output_generator: Option<CanonicalLabel>,
+}
+
+impl CoverageFragmentValue {
+    pub fn new(output_generator: Option<CanonicalLabel>) -> Self {
+        Self { output_generator }
+    }
+}
+
+impl fmt::Display for CoverageFragmentValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<coverage configuration fragment>")
+    }
+}
+
+starlark::starlark_simple_value!(CoverageFragmentValue);
+
+#[starlark_module]
+fn coverage_fragment_methods(builder: &mut MethodsBuilder) {
+    #[starlark(attribute)]
+    fn output_generator<'v>(
+        this: &CoverageFragmentValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(this
+            .output_generator
+            .as_ref()
+            .map_or_else(Value::new_none, |label| {
+                alloc_starlark_label(heap, label.clone())
+            }))
+    }
+}
+
+#[starlark_value(type = "coverage")]
+impl<'v> StarlarkValue<'v> for CoverageFragmentValue {
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(coverage_fragment_methods)
+    }
+}
+
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct RuleFragmentCollection {
     #[allocative(skip)]
@@ -150,6 +196,8 @@ pub struct RuleFragmentCollection {
     declarations: Arc<SmallSet<CompactString>>,
     #[allocative(skip)]
     cpp: FrozenValue,
+    #[allocative(skip)]
+    coverage: FrozenValue,
 }
 
 impl RuleFragmentCollection {
@@ -157,11 +205,13 @@ impl RuleFragmentCollection {
         token: AnalysisCallToken,
         declarations: Arc<SmallSet<CompactString>>,
         cpp: FrozenValue,
+        coverage: FrozenValue,
     ) -> Self {
         Self {
             token,
             declarations,
             cpp,
+            coverage,
         }
     }
 }
@@ -185,6 +235,18 @@ fn rule_fragment_methods(builder: &mut MethodsBuilder) {
         }
         Ok(this.cpp.to_value())
     }
+
+    #[starlark(attribute)]
+    fn coverage<'v>(this: &RuleFragmentCollection) -> anyhow::Result<Value<'v>> {
+        this.token
+            .require_active("coverage", "rule fragment collection")?;
+        if !this.declarations.contains("coverage") {
+            anyhow::bail!(
+                "rule has to declare 'coverage' as a required fragment in order to access it"
+            );
+        }
+        Ok(this.coverage.to_value())
+    }
 }
 
 #[starlark_value(type = "fragments")]
@@ -195,7 +257,7 @@ impl<'v> StarlarkValue<'v> for RuleFragmentCollection {
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        ACTIVE_FRAGMENT_NAMES_EXCEPT_CPP
+        ACTIVE_FRAGMENT_NAMES_EXCEPT_CPP_AND_COVERAGE
             .iter()
             .map(|name| (*name).to_owned())
             .collect()
@@ -209,6 +271,8 @@ pub struct SubruleFragmentCollection {
     declarations: Arc<SmallSet<CompactString>>,
     #[allocative(skip)]
     cpp: FrozenValue,
+    #[allocative(skip)]
+    coverage: FrozenValue,
 }
 
 impl SubruleFragmentCollection {
@@ -216,11 +280,13 @@ impl SubruleFragmentCollection {
         token: AnalysisCallToken,
         declarations: Arc<SmallSet<CompactString>>,
         cpp: FrozenValue,
+        coverage: FrozenValue,
     ) -> Self {
         Self {
             token,
             declarations,
             cpp,
+            coverage,
         }
     }
 }
@@ -239,7 +305,11 @@ impl<'v> StarlarkValue<'v> for SubruleFragmentCollection {
         self.token
             .require_active(attribute, "subrule fragment collection")
             .ok()?;
-        (attribute == "cpp" && self.declarations.contains("cpp")).then(|| self.cpp.to_value())
+        match attribute {
+            "cpp" if self.declarations.contains("cpp") => Some(self.cpp.to_value()),
+            "coverage" if self.declarations.contains("coverage") => Some(self.coverage.to_value()),
+            _ => None,
+        }
     }
 
     fn dir_attr(&self) -> Vec<String> {

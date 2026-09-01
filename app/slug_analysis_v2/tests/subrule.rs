@@ -242,6 +242,28 @@ fn grte_configuration(value: &str) -> ConfigurationKey {
     )
 }
 
+fn coverage_configuration(enabled: bool, generator: Option<&str>) -> ConfigurationKey {
+    let base = configuration(None).slug_configuration().unwrap().clone();
+    let mut occurrences = Vec::new();
+    if let Some(generator) = generator {
+        occurrences.push(CommandConfigurationOccurrence::native(
+            NativeCommandOption::CoverageOutputGenerator,
+            Some(generator),
+            false,
+        ));
+    }
+    occurrences.push(CommandConfigurationOccurrence::native(
+        NativeCommandOption::CollectCodeCoverage,
+        None::<&str>,
+        !enabled,
+    ));
+    let overlay: CommandConfigurationOverlay = occurrences.into();
+    ConfigurationKey::from_slug(
+        base.with_command_configuration(base.starlark_options().clone(), &overlay)
+            .unwrap(),
+    )
+}
+
 fn compilation_configuration(mode: &str, host_mode: &str) -> ConfigurationKey {
     let base = configuration(None).slug_configuration().unwrap().clone();
     let overlay: CommandConfigurationOverlay = vec![
@@ -631,12 +653,94 @@ generate = rule(implementation = _generate, attrs = {"out": attr.output()})
     epoch.package("rules", "");
     epoch.file("/workspace/rules/defs.bzl", defs);
     epoch.file(
+        "/workspace/rules/coverage.bzl",
+        r#"load("//rules:defs.bzl", "ProfileInfo")
+OUTPUT_GENERATOR = configuration_field(fragment = "coverage", name = "output_generator")
+
+def _coverage_sub(ctx, **kwargs):
+    projected = ctx.fragments.coverage.output_generator
+    dependency = kwargs["_generator"]
+    if (dependency == None) != (projected == None): fail("subrule coverage option/dependency presence diverged")
+    if dependency != None and not dependency.executable.path.endswith(projected.name): fail("subrule coverage executable diverged")
+    return projected
+
+coverage_sub = subrule(
+    implementation = _coverage_sub,
+    attrs = {"_generator": attr.label(
+        default = OUTPUT_GENERATOR,
+        allow_files = True,
+        cfg = "exec",
+        executable = True,
+        providers = [[DefaultInfo], [ProfileInfo]],
+    )},
+    fragments = ["coverage"],
+)
+
+def _coverage(ctx):
+    projected = ctx.fragments.coverage.output_generator
+    dependency = ctx.attr._generator
+    if (dependency == None) != (projected == None): fail("root coverage option/dependency presence diverged")
+    if dependency != None and dependency.label != projected: fail("root coverage label diverged")
+    if coverage_sub() != projected: fail("root and subrule coverage fragments diverged")
+    return [DefaultInfo()]
+
+coverage_rule = rule(
+    implementation = _coverage,
+    attrs = {"_generator": attr.label(
+        default = OUTPUT_GENERATOR,
+        allow_files = True,
+    )},
+    fragments = ["coverage"],
+    subrules = [coverage_sub],
+)
+
+def _bad_file(ctx): return [DefaultInfo()]
+bad_file = rule(implementation = _bad_file, attrs = {
+    "_generator": attr.label(default = OUTPUT_GENERATOR, allow_files = [".prof"]),
+})
+
+def _bad_provider_sub(ctx, **kwargs): return None
+bad_provider_sub = subrule(implementation = _bad_provider_sub, attrs = {
+    "_generator": attr.label(default = OUTPUT_GENERATOR, allow_files = True, providers = [ProfileInfo]),
+})
+def _bad_provider(ctx):
+    bad_provider_sub()
+    return [DefaultInfo()]
+bad_provider = rule(implementation = _bad_provider, subrules = [bad_provider_sub])
+
+def _undeclared(ctx):
+    value = ctx.fragments.coverage.output_generator
+    return [DefaultInfo()]
+undeclared = rule(implementation = _undeclared)
+
+def _sub_undeclared(ctx): return ctx.fragments.coverage.output_generator
+sub_undeclared = subrule(implementation = _sub_undeclared)
+def _sub_undeclared_rule(ctx):
+    sub_undeclared()
+    return [DefaultInfo()]
+sub_undeclared_rule = rule(implementation = _sub_undeclared_rule, subrules = [sub_undeclared])
+
+def _escape(ctx): return ctx.fragments
+escape = subrule(implementation = _escape, fragments = ["coverage"])
+def _escaped(ctx):
+    stale = escape()
+    value = stale.coverage
+    return [DefaultInfo()]
+escaped = rule(implementation = _escaped, subrules = [escape])
+
+def _unknown(ctx):
+    value = ctx.fragments.coverage.unknown
+    return [DefaultInfo()]
+unknown = rule(implementation = _unknown, fragments = ["coverage"])
+"#,
+    );
+    epoch.file(
         "/workspace/rules/denied_helper.bzl",
         "def denied_mode(cpp): return cpp.compilation_mode()\n",
     );
     epoch.package(
         "deps",
-        "load('//rules:defs.bzl', 'generate', 'multi', 'plain', 'profile', 'tool')\nprofile(name='literal')\nprofile(name='other')\nprofile(name='profile')\nprofile(name='everything')\nplain(name='plain')\nmulti(name='multi')\ntool(name='tool')\ngenerate(name='generator', out='generated.bin')\nalias(name='alias_profile', actual=':literal')\n",
+        "load('//rules:defs.bzl', 'generate', 'multi', 'plain', 'profile', 'tool')\nprofile(name='literal')\nprofile(name='other')\nprofile(name='profile')\nprofile(name='everything')\nplain(name='plain')\nmulti(name='multi')\ntool(name='tool')\ntool(name='lcov_merger')\ngenerate(name='generator', out='generated.bin')\nalias(name='alias_profile', actual=':literal')\n",
     );
     epoch.package(
         "files",
@@ -716,7 +820,7 @@ fragment_exec_parent = rule(implementation = _exec_parent, subrules = [exec_prob
     );
     epoch.package(
         "subject",
-        "load('//rules:defs.bzl', 'allowed_helper_subject', 'bad_executable_subject', 'bad_extension_subject', 'bad_file_provider_subject', 'bad_file_subject', 'bad_nested_subject', 'bad_provider_subject', 'escaped_actions_subject', 'escaped_ctx_subject', 'exec_first_subject', 'fragment_subject', 'missing_action_subject', 'multi_single_subject', 'nested_subject', 'ordinary', 'outer_lock_subject', 'override_subject', 'parent_lock_subject', 'repeat_context_subject', 'subject', 'target_first_subject', 'toolchain_subject', 'undeclared_subject', 'zero_single_subject')\nload('//tools/build_defs/cc:fragments.bzl', 'denied_helper', 'fragment_arity', 'fragment_exec_parent', 'fragment_methods', 'fragment_opt_terminal', 'undeclared_fragment', 'undeclared_sub_fragment')\nsubject(name='subject')\nbad_provider_subject(name='bad_provider')\nzero_single_subject(name='zero_single')\nmulti_single_subject(name='multi_single')\nbad_extension_subject(name='bad_extension')\nbad_executable_subject(name='bad_executable')\nbad_file_subject(name='bad_file')\nbad_file_provider_subject(name='bad_file_provider')\nexec_first_subject(name='exec_first')\ntarget_first_subject(name='target_first')\nnested_subject(name='nested')\nundeclared_subject(name='undeclared')\nbad_nested_subject(name='bad_nested')\noverride_subject(name='override')\nouter_lock_subject(name='outer_lock')\nescaped_ctx_subject(name='escaped_ctx')\nescaped_actions_subject(name='escaped_actions')\nparent_lock_subject(name='parent_lock')\nrepeat_context_subject(name='repeat_context')\nfragment_subject(name='fragment')\nallowed_helper_subject(name='allowed_helper')\nfragment_methods(name='fragment_methods')\ndenied_helper(name='denied_helper')\nundeclared_fragment(name='undeclared_fragment')\nundeclared_sub_fragment(name='undeclared_sub_fragment')\nfragment_arity(name='fragment_arity')\nfragment_opt_terminal(name='fragment_opt_terminal')\nfragment_exec_parent(name='fragment_exec_parent')\ntoolchain_subject(name='toolchain_deferred')\nmissing_action_subject(name='missing_action')\nordinary(name='ordinary')\n",
+        "load('//rules:defs.bzl', 'allowed_helper_subject', 'bad_executable_subject', 'bad_extension_subject', 'bad_file_provider_subject', 'bad_file_subject', 'bad_nested_subject', 'bad_provider_subject', 'escaped_actions_subject', 'escaped_ctx_subject', 'exec_first_subject', 'fragment_subject', 'missing_action_subject', 'multi_single_subject', 'nested_subject', 'ordinary', 'outer_lock_subject', 'override_subject', 'parent_lock_subject', 'repeat_context_subject', 'subject', 'target_first_subject', 'toolchain_subject', 'undeclared_subject', 'zero_single_subject')\nload('//rules:coverage.bzl', 'bad_file', 'bad_provider', 'coverage_rule', 'escaped', 'sub_undeclared_rule', 'undeclared', 'unknown')\nload('//tools/build_defs/cc:fragments.bzl', 'denied_helper', 'fragment_arity', 'fragment_exec_parent', 'fragment_methods', 'fragment_opt_terminal', 'undeclared_fragment', 'undeclared_sub_fragment')\nsubject(name='subject')\nbad_provider_subject(name='bad_provider')\nzero_single_subject(name='zero_single')\nmulti_single_subject(name='multi_single')\nbad_extension_subject(name='bad_extension')\nbad_executable_subject(name='bad_executable')\nbad_file_subject(name='bad_file')\nbad_file_provider_subject(name='bad_file_provider')\nexec_first_subject(name='exec_first')\ntarget_first_subject(name='target_first')\nnested_subject(name='nested')\nundeclared_subject(name='undeclared')\nbad_nested_subject(name='bad_nested')\noverride_subject(name='override')\nouter_lock_subject(name='outer_lock')\nescaped_ctx_subject(name='escaped_ctx')\nescaped_actions_subject(name='escaped_actions')\nparent_lock_subject(name='parent_lock')\nrepeat_context_subject(name='repeat_context')\nfragment_subject(name='fragment')\nallowed_helper_subject(name='allowed_helper')\nfragment_methods(name='fragment_methods')\ndenied_helper(name='denied_helper')\nundeclared_fragment(name='undeclared_fragment')\nundeclared_sub_fragment(name='undeclared_sub_fragment')\nfragment_arity(name='fragment_arity')\nfragment_opt_terminal(name='fragment_opt_terminal')\nfragment_exec_parent(name='fragment_exec_parent')\ntoolchain_subject(name='toolchain_deferred')\nmissing_action_subject(name='missing_action')\nordinary(name='ordinary')\ncoverage_rule(name='coverage')\nbad_file(name='coverage_bad_file')\nbad_provider(name='coverage_bad_provider')\nundeclared(name='coverage_undeclared')\nsub_undeclared_rule(name='coverage_sub_undeclared')\nescaped(name='coverage_escaped')\nunknown(name='coverage_unknown')\n",
     );
     epoch
 }
@@ -1087,6 +1191,180 @@ async fn configured_fragment_facades_project_methods_and_fail_closed() {
     )
     .await;
     assert!(exec_fastbuild.is_ok(), "{exec_fastbuild:?}");
+}
+
+#[tokio::test]
+async fn coverage_field_and_public_facades_restore_false_true_false_in_one_dice() {
+    for route in [AnalysisRoute::Legacy, AnalysisRoute::Observed] {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(Tracker::default());
+        let disabled = analyze_result(
+            &dice,
+            semantic_epoch().build(),
+            "@@//subject:coverage",
+            coverage_configuration(false, None),
+            tracker.clone(),
+            route,
+        )
+        .await
+        .unwrap();
+        assert!(
+            disabled
+                .edges()
+                .iter()
+                .all(|edge| edge.target().label().target().as_str() != "lcov_merger"),
+            "{route:?}: disabled coverage edge"
+        );
+
+        let enabled = analyze_result(
+            &dice,
+            semantic_epoch().build(),
+            "@@//subject:coverage",
+            coverage_configuration(true, Some("//deps:lcov_merger")),
+            tracker.clone(),
+            route,
+        )
+        .await
+        .unwrap();
+        let coverage_edges = enabled
+            .edges()
+            .iter()
+            .filter(|edge| edge.target().label().target().as_str() == "lcov_merger")
+            .collect::<Vec<_>>();
+        assert_eq!(coverage_edges.len(), 2, "{route:?}");
+        assert_eq!(coverage_edges.iter().filter(|edge| edge.tool()).count(), 1);
+
+        let restored = analyze_result(
+            &dice,
+            semantic_epoch().build(),
+            "@@//subject:coverage",
+            coverage_configuration(false, None),
+            tracker.clone(),
+            route,
+        )
+        .await
+        .unwrap();
+        assert!(Arc::ptr_eq(&disabled, &restored), "{route:?}");
+
+        let explicit = analyze_result(
+            &dice,
+            semantic_epoch().build(),
+            "@@//subject:coverage",
+            coverage_configuration(true, Some("//deps:tool")),
+            tracker,
+            route,
+        )
+        .await
+        .unwrap();
+        let explicit_edges = explicit
+            .edges()
+            .iter()
+            .filter(|edge| edge.target().label().to_string() == "@@//deps:tool")
+            .collect::<Vec<_>>();
+        assert_eq!(explicit_edges.len(), 2, "{route:?}");
+        assert_eq!(explicit_edges.iter().filter(|edge| edge.tool()).count(), 1);
+    }
+}
+
+#[tokio::test]
+async fn coverage_field_omission_and_shared_dependency_validation_fail_closed() {
+    let restoration_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let first = analyze_result(
+        &restoration_dice,
+        semantic_epoch().build(),
+        "@@//subject:coverage_bad_file",
+        coverage_configuration(false, None),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await
+    .unwrap();
+    let error = analyze(
+        &restoration_dice,
+        semantic_epoch().build(),
+        "@@//subject:coverage_bad_file",
+        coverage_configuration(true, Some("//deps:lcov_merger")),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await;
+    assert!(
+        error.contains("does not produce any file matching its admitted file types"),
+        "{error}"
+    );
+    let restored = analyze_result(
+        &restoration_dice,
+        semantic_epoch().build(),
+        "@@//subject:coverage_bad_file",
+        coverage_configuration(false, None),
+        Arc::new(Tracker::default()),
+        AnalysisRoute::Legacy,
+    )
+    .await
+    .unwrap();
+    assert!(Arc::ptr_eq(&first, &restored));
+
+    for target in ["coverage_bad_provider"] {
+        let disabled = analyze_result(
+            &Dice::builder().build(DetectCycles::Enabled),
+            semantic_epoch().build(),
+            &format!("@@//subject:{target}"),
+            coverage_configuration(false, None),
+            Arc::new(Tracker::default()),
+            AnalysisRoute::Legacy,
+        )
+        .await;
+        assert!(disabled.is_ok(), "{target}: {disabled:?}");
+    }
+
+    for (target, configuration, expected) in [
+        (
+            "coverage_bad_file",
+            coverage_configuration(true, Some("//deps:lcov_merger")),
+            "does not produce any file matching its admitted file types",
+        ),
+        (
+            "coverage_bad_provider",
+            coverage_configuration(true, Some("//deps:plain")),
+            "does not provide any admitted provider alternative",
+        ),
+        (
+            "coverage",
+            coverage_configuration(true, Some("//deps:plain")),
+            "is not executable",
+        ),
+        (
+            "coverage_undeclared",
+            coverage_configuration(false, None),
+            "has to declare 'coverage' as a required fragment",
+        ),
+        (
+            "coverage_sub_undeclared",
+            coverage_configuration(false, None),
+            "has no attribute `coverage`",
+        ),
+        (
+            "coverage_escaped",
+            coverage_configuration(false, None),
+            "has no attribute `coverage`",
+        ),
+        (
+            "coverage_unknown",
+            coverage_configuration(false, None),
+            "has no attribute `unknown`",
+        ),
+    ] {
+        let error = analyze(
+            &Dice::builder().build(DetectCycles::Enabled),
+            semantic_epoch().build(),
+            &format!("@@//subject:{target}"),
+            configuration,
+            Arc::new(Tracker::default()),
+            AnalysisRoute::Legacy,
+        )
+        .await;
+        assert!(error.contains(expected), "{target}: {error}");
+    }
 }
 
 #[tokio::test]

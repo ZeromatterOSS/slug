@@ -39,6 +39,7 @@ pub enum NativeCommandOption {
     FdoInstrument,
     CsFdoInstrument,
     CollectCodeCoverage,
+    CoverageOutputGenerator,
     Copt,
     ActionEnv,
     HostActionEnv,
@@ -62,6 +63,7 @@ impl NativeCommandOption {
             "fdo_instrument" => Self::FdoInstrument,
             "cs_fdo_instrument" => Self::CsFdoInstrument,
             "collect_code_coverage" => Self::CollectCodeCoverage,
+            "coverage_output_generator" => Self::CoverageOutputGenerator,
             "copt" => Self::Copt,
             "action_env" => Self::ActionEnv,
             "host_action_env" => Self::HostActionEnv,
@@ -88,6 +90,7 @@ impl NativeCommandOption {
             Self::FdoInstrument => "fdo_instrument",
             Self::CsFdoInstrument => "cs_fdo_instrument",
             Self::CollectCodeCoverage => "collect_code_coverage",
+            Self::CoverageOutputGenerator => "coverage_output_generator",
             Self::Copt => "copt",
             Self::ActionEnv => "action_env",
             Self::HostActionEnv => "host_action_env",
@@ -113,6 +116,7 @@ impl NativeCommandOption {
                 | Self::MemprofProfile
                 | Self::ProtoProfilePath
                 | Self::GrteTop
+                | Self::CoverageOutputGenerator
         )
     }
 }

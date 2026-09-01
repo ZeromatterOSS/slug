@@ -734,6 +734,36 @@ mod tests {
     }
 
     #[test]
+    fn coverage_output_generator_requires_joined_value_and_is_typed() {
+        assert_eq!(
+            occurrence("--coverage_output_generator=@tools//coverage:merger").unwrap(),
+            Some(CommandConfigurationOccurrence::native(
+                NativeCommandOption::CoverageOutputGenerator,
+                Some("@tools//coverage:merger"),
+                false,
+            ))
+        );
+        assert!(occurrence("--coverage_output_generator").is_err());
+        assert_eq!(occurrence("--nocoverage_output_generator").unwrap(), None);
+        assert_eq!(
+            occurrence("--collect_code_coverage=true").unwrap(),
+            Some(CommandConfigurationOccurrence::native(
+                NativeCommandOption::CollectCodeCoverage,
+                Some("true"),
+                false,
+            ))
+        );
+        assert_eq!(
+            occurrence("--nocollect_code_coverage").unwrap(),
+            Some(CommandConfigurationOccurrence::native(
+                NativeCommandOption::CollectCodeCoverage,
+                None::<&str>,
+                true,
+            ))
+        );
+    }
+
+    #[test]
     fn environment_flags_reject_missing_values_and_joined_boolean_no_forms() {
         assert!(occurrence("--action_env").is_err());
         assert!(occurrence("--host_action_env").is_err());
