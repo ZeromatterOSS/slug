@@ -22783,14 +22783,15 @@ case.
 ### WP-6-7A module-extension tag attribute-schema category (2026-09-01)
 
 The authentic replay-selected successor is
-`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r1`.
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r2`.
 This is the complete default-enabled ordinary tag-schema kind category, not a
 literal `auth: StringDict` repair. Pinned Bazel 9.2 source plus a disposable
 fourteen-kind oracle establish `bool`, `int`, `int_list`, every ordinary
 string/label list and dictionary family, `output`, and `output_list`, including
-intrinsic defaults, two-phase supplied/schema ordering, label mapping and
-visibility, same-package outputs, allowed/empty constraints, and immutable
-runtime collections.
+intrinsic defaults, two-phase supplied/schema ordering, visible-label mapping,
+same-package outputs, allowed values, Bazel's tag-specific acceptance of empty
+collections regardless of `allow_empty`, public private-field spelling, and
+immutable runtime collections.
 
 Use the existing shared attribute kind/value model. Add the missing compact
 `IntegerList(Arc<[i32]>)` once and carry it through rule, macro,
@@ -22798,5 +22799,15 @@ repository-rule and query projections; materialize prepared tag values only in
 the existing invocation module's `FrozenHeap`. Add no tag-only value graph,
 custom collection, DICE key, cache, interner, lock or parser change. Zabel's
 schema-slot and invocation-freeze shape is peer guidance only; Bazel 9.2 owns
-semantics. Rust remains gated on independent review of the current-packet
-allowlist, caps and stop conditions.
+semantics.
+
+R1 architecture review returned `REPLAN` before Rust. Its precise
+non-visible-label failure-order claim required retaining an otherwise-invalid
+label outside the shared canonical representation; R2 instead keeps every
+valid/visible label shape exact, fails invisible labels closed, and explicitly
+defers only their precise diagnostic precedence. R1 also incorrectly applied
+the rule-attribute `allow_empty` policy to tag conversion and exposed Bazel's
+internal `$private` name. R2 accepts empty tag collections and preserves the
+public `_private` spelling across supplied/default/runtime/`dir` behavior.
+The kind inventory, shared `IntegerList`, frozen invocation representation,
+allowlist and caps are unchanged. Independent R2 review remains the Rust gate.

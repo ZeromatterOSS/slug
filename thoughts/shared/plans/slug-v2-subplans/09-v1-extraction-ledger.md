@@ -2306,8 +2306,9 @@ scratch. No service-retained cache or asynchronous transfer memory is added.
 
 ### Stage 6 module-extension tag schema utility decision (2026-09-01)
 
-Status: docs-first R1 design awaiting independent review in
-`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r1`.
+Status: R1 architecture review returned `REPLAN` before Rust; corrected R2
+awaits independent review in
+`WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r2`.
 
 Decision: no V1 extraction and no second tag-only value family. Extend the
 existing V2 `AttributeKind`/`CoercedAttributeValue` once with compact
@@ -2315,6 +2316,14 @@ existing V2 `AttributeKind`/`CoercedAttributeValue` once with compact
 and reuse those values through rule, macro, repository-rule and tag paths.
 Invocation-only immutable Starlark collections belong to the already-live
 starlark-rust `FrozenHeap`; DICE values remain heap-independent.
+
+R1's exact non-visible-label failure-order claim could not fit the shared
+canonical-label value without a prohibited second representation, so R2 keeps
+complete exact valid/visible conversion and fail-closed invisible labels while
+deferring only their precise diagnostic precedence. R2 also corrects tag
+semantics to ignore rule-policy `allow_empty` and keeps `_private` as the
+public supplied/default/runtime/`dir` field name. These corrections do not
+change the no-extraction decision, value owner, lifetime, allowlist or caps.
 
 Zabel `0795445f...` schema-ordered tag slots, compact typed tag values and
 invocation freezing are peer optimization guidance only. Copy no Zig type,

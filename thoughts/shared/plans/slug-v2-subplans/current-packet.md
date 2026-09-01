@@ -1,12 +1,12 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r1`
+Packet: `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r2`
 
 Milestone: M7A generic Starlark/ruleset closure; module-extension tag schema
 conversion and invocation values.
 
-Status: docs-first architecture audit complete; independent review required
-before Rust.
+Status: R1 architecture review returned `REPLAN`; corrected R2 design awaits
+independent review before Rust.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -26,7 +26,8 @@ kind matrix is `bool`, `int`, `int_list`, `string`, `string_list`,
 rule, macro and repository-rule attribute model so the public constructor does
 not create a tag-only special case.
 
-Admit as **exact** for Bazel 9.2's default-enabled ordinary descriptor surface:
+Admit as **exact** for Bazel 9.2's default-enabled ordinary descriptor surface
+when every supplied/default label is visible:
 
 - supplied non-`None` values are converted in MODULE call order; explicit
   `None` is skipped; then mandatory/default/visibility checks run in schema
@@ -34,12 +35,17 @@ Admit as **exact** for Bazel 9.2's default-enabled ordinary descriptor surface:
 - signed i32 scalar and integer-list members, list or tuple input for list
   kinds, ordered Starlark dictionary conversion, all scalar/list/dictionary
   type failures, intrinsic defaults, declared defaults, `mandatory`, scalar
-  `values`, collection `allow_empty`, unknown attributes, and failure order;
+  `values`, unknown attributes, and failure order outside the deferred
+  non-visible-label case;
+- empty tag collections even when their descriptor carries
+  `allow_empty = False`, because Bazel's tag conversion does not consult that
+  rule-attribute policy;
 - apparent label conversion in the consuming module's repository mapping,
-  definition-owned canonical label defaults, recursive visibility checks,
-  same-package output conversion, and duplicate canonical
+  definition-owned visible canonical label defaults, recursive visibility
+  acceptance, same-package output conversion, and duplicate canonical
   `label_keyed_string_dict` key rejection;
-- schema-order field lookup and `dir`, Starlark insertion order within
+- public Starlark tag field spelling, including leading-underscore private
+  names, schema-order field lookup and `dir`, Starlark insertion order within
   collections, immutable invocation-local list/dictionary values, Label ABI,
   and no retained evaluator borrow; and
 - the same `IntegerList` kind/value in rules, symbolic macros, repository-rule
@@ -54,8 +60,10 @@ HotSpot identity and Java UTF-16-only invalid strings are not claimed.
 Keep **unsupported/deferred** experimental dormant-label descriptors,
 the disabled legacy `attr.license`, computed/late-bound defaults, selectors in
 MODULE values, dormant dependencies, descriptor policies not consumed by
-`AttributeUtils.typeCheckAttrValues`, and exact documentation-only descriptor
-metadata. This packet changes no MODULE parser, BCR rule body, rules_rust,
+`AttributeUtils.typeCheckAttrValues`, exact diagnostic/failure precedence for
+non-visible supplied or definition-default labels, and exact documentation-only
+descriptor metadata. Non-visible labels still fail closed and are never
+accepted. This packet changes no MODULE parser, BCR rule body, rules_rust,
 toolchain, C++, `cc_common`, `cc_internal`, provider, configured-analysis or
 action semantics. Those names remain downstream discriminators only.
 
@@ -102,13 +110,22 @@ module-extension-only type graph. The existing heap-independent
 `NonrootAttributeValue` already owns raw list/tuple/dictionary and arbitrary
 integer syntax; conversion validates i32 only at the typed schema boundary.
 
-Retain `allow_empty` and existing allowed scalar values in the shared
-definition/schema projection. `prepare_module_extension_tag_attributes` owns
-the Bazel `AttributeUtils` two-phase order: initialize schema slots, convert
-every supplied non-`None` value in source order, then fill/check slots in
-schema order. It recursively converts labels and checks visibility. Collection
-conversion returns existing immutable `Arc` slices; dictionary equality stays
-structural while source order remains available for Starlark iteration.
+Retain existing allowed scalar values in the shared definition/schema
+projection. `allow_empty` remains available to the shared rule-attribute
+consumers that actually enforce it, but module-extension tag conversion must
+ignore it. `prepare_module_extension_tag_attributes` owns the Bazel
+`AttributeUtils` two-phase order: initialize schema slots, convert every
+supplied non-`None` value in source order, then fill/check slots in schema
+order. It recursively converts visible labels and checks visibility; an
+invisible label fails closed without claiming Bazel's precise diagnostic
+precedence. Collection conversion returns existing immutable `Arc` slices;
+dictionary equality stays structural while source order remains available for
+Starlark iteration.
+
+Store each tag schema entry under its public Starlark name. In particular,
+`_private` remains `_private` for supplied lookup, defaults, runtime
+`get_attr`, and `dir`; Slug does not expose Bazel's internal `$private`
+spelling because it has no separate native/public tag-field representation.
 
 At extension invocation, materialize the already-prepared values into the
 invocation module's existing starlark-rust `FrozenHeap`. Lists and dictionaries
@@ -158,10 +175,13 @@ Add one table-driven fourteen-kind conversion/default/runtime projection proof
 covering list and tuple inputs, ordered nested dictionaries, local and mapped
 labels, outputs and immutable collection mutation failures. Add discriminating
 rows for every wrong shape, i32 scalar/member overflow, unknown attributes,
-explicit `None`, mandatory/default order, scalar `values`, collection
-`allow_empty`, invisible nested/default labels, same-package outputs and
-canonicalized duplicate label keys. Prove the shared `IntegerList` value through
-ordinary rule, macro, repository-rule and query/output-template boundaries.
+explicit `None`, mandatory/default order, scalar `values`, acceptance of empty
+tag collections with `allow_empty = False`, fail-closed invisible
+nested/default labels without an exact-order claim, same-package outputs,
+canonicalized duplicate label keys, and supplied/default/runtime/`dir`
+behavior for a leading-underscore field. Prove the shared `IntegerList` value
+through ordinary rule, macro, repository-rule and query/output-template
+boundaries.
 
 Run formatting and diff checks, focused package/module-extension/repository
 tests, the full `slug_loading_v2` suite, direct analysis/query/core/server
@@ -172,6 +192,22 @@ and after, then replay the authentic rules_rust fixture. It must clear
 genuine generic failure selects the following packet. Independent architecture
 review is required before Rust and independent terminal review before
 acceptance.
+
+## R1 review and R2 correction
+
+Independent R1 architecture review returned `REPLAN` before Rust. First,
+Slug's shared `CanonicalLabel` value cannot retain a non-visible label long
+enough to reproduce Bazel's later schema-ordered visibility failure, so R1's
+exact nested/default visibility-order claim required a forbidden second value
+graph. R2 keeps complete exact visible-label conversion and explicitly defers
+only the precise non-visible diagnostic precedence while preserving fail-closed
+behavior. Second, R1 incorrectly treated `allow_empty` as tag conversion
+policy; pinned `AttributeUtils.typeCheckAttrValues` never consults it, so R2
+requires empty tag collections to succeed. Third, Bazel indexes tag fields by
+`Attribute.getPublicName()`; R2 therefore preserves `_private` rather than the
+internal `$private` spelling. The fourteen-kind inventory, shared
+`IntegerList`, invocation `FrozenHeap`, allowlist and caps are otherwise
+unchanged.
 
 ## Immediate predecessor
 
