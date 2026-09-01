@@ -22711,3 +22711,8 @@ authorized. The measured result becomes 987 production/626 proof/1,613 total
 gross under unchanged 1,000/1,000/1,720 caps. Every semantic, production,
 DICE, cache, lock, traversal, compatibility and remaining proof boundary is
 unchanged. Resume editing only after independent `ACCEPT`.
+
+Independent R3 review confirms the assertion is exactly the stale
+include/include/exclude dependency list and that retaining only the two include
+keys strengthens the accepted no-exclude-traversal invariant. It returns
+`ACCEPT`; resume only the bounded R3 implementation.

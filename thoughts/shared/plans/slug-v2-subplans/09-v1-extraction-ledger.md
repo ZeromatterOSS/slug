@@ -2261,7 +2261,7 @@ the mandatory full suite then exposed one protected assertion that still
 requires the forbidden exclude traversal. R3 permits only that proof
 expectation to retain the two include keys instead of three include/exclude
 keys, producing 987/626/1,613 gross under unchanged caps. Independent R3 review
-and terminal implementation acceptance remain pending.
+returned `ACCEPT`; terminal implementation acceptance remains pending.
 
 Decision: replace the split raw flat-pattern validator and separately retained
 Host pattern with one V2-owned immutable `GlobPattern`: one `Arc<str>` raw

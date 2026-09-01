@@ -4,8 +4,8 @@ Packet: `WP-6-7A-recursive-build-glob-category-implementation-r3`
 
 Milestone: M7A generic Starlark/ruleset closure; BUILD glob loading semantics.
 
-Status: proof-allowlist correction review active after R2 ended `REPLAN` at a
-stale protected assertion. The accepted architecture, compatibility classes,
+Status: implementation active after independent `ACCEPT` of the R3
+proof-allowlist correction. The accepted architecture, compatibility classes,
 production allowlist, caps and proof obligations are unchanged.
 
 The unrelated dirty
@@ -176,6 +176,8 @@ after the include union and forbids that dependency. R3 adds only the exact
 proof assertion above; changing its three expected traversal keys to the two
 include keys adds two gross proof lines, for 987 production/626 proof/1,613
 total. It does not authorize another change in the 37,117-line file.
+Independent review confirmed this is the exact stale assertion, strengthens
+the no-exclude-traversal invariant and returned `ACCEPT`.
 
 Stop with `REPLAN` if another production file is required, segment-key equality
 cannot remain byte/discriminator based, or the implementation needs a new DICE
