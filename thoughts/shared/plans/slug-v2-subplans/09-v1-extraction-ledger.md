@@ -2308,7 +2308,7 @@ scratch. No service-retained cache or asynchronous transfer memory is added.
 
 Status: R1 architecture review returned `REPLAN` before Rust; independent R2
 architecture review accepted the semantic architecture; proof-only R3 is
-pending independent review for
+independently accepted for
 `WP-6-7A-module-extension-tag-attribute-schema-category-implementation-r3`.
 
 Decision: no V1 extraction and no second tag-only value family. Extend the
@@ -2333,8 +2333,10 @@ Implementation validation selected R3 only because an existing prepared-input
 test outside R2's proof allowlist asserted that an unused `attr.string_list()`
 tag schema was unsupported. Permit changing that one assertion to successful
 preparation. No production ownership, extraction decision, compatibility
-surface, representation, lifetime or cap changes; independent review is
-required before terminal validation resumes.
+surface, representation, lifetime or cap changes; independent review was
+required before terminal validation resumed. Independent R3 review returns
+`ACCEPT`; the named expectation is necessarily stale and the update does not
+mask an implementation error.
 
 Zabel `0795445f...` schema-ordered tag slots, compact typed tag values and
 invocation freezing are peer optimization guidance only. Copy no Zig type,

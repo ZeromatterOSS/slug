@@ -22818,5 +22818,7 @@ The first full implementation suite exposed one stale prepared-input proof in
 `bzl_module.rs` that expected `attr.string_list()` tag schemas to remain
 unsupported. R3 permits changing only that named test to successful
 preparation. This is a proof-only allowlist correction; production ownership,
-compatibility, architecture and caps are unchanged, and independent review is
-required before terminal validation continues.
+compatibility, architecture and caps are unchanged, and independent review was
+required before terminal validation continued. Independent R3 review returns
+`ACCEPT`: the named assertion is necessarily stale and the bounded update
+exposes the newly admitted behavior without masking an implementation error.

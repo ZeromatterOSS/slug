@@ -103,7 +103,7 @@ R3 changes only the proof allowlist for one stale prepared-input assertion
 that expected `attr.string_list()` tag schemas to remain unsupported. It
 permits that named assertion to require successful preparation; production,
 semantics, caps and every other boundary are unchanged. Independent R3 review
-is required before terminal validation resumes.
+returns `ACCEPT`; terminal validation may resume.
 Structured `starlark_doc_extract` output and experimental remote repository
 execution remain separate deferred categories. Bazel 9.2 is sole behavior
 authority; Zabel remains peer architecture and optimization guidance only.
@@ -7185,4 +7185,5 @@ Implementation validation found one stale string-list-schema rejection in the
 existing prepared-input test module outside R2's proof allowlist. R3 changes
 only that proof boundary: the named test may assert successful preparation.
 Production ownership, semantics, caps and every other boundary remain
-unchanged; independent review is required before terminal validation resumes.
+unchanged; independent R3 review returns `ACCEPT` and terminal validation may
+resume.

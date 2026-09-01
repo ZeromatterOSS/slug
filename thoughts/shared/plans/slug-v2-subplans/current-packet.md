@@ -7,7 +7,7 @@ conversion and invocation values.
 
 Status: R1 architecture review returned `REPLAN`; independent R2 architecture
 review returned `ACCEPT`; implementation validation selected a proof-only R3
-allowlist correction for independent review.
+allowlist correction; independent R3 review returned `ACCEPT`.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -237,8 +237,11 @@ the admitted category.
 R3 changes only the proof allowlist to permit that one assertion to require a
 successful prepared input. It changes no production file, compatibility
 claim, value representation, lifetime, cap, test fixture or downstream
-consumer. Independent review must accept this bounded correction before
-terminal validation resumes.
+consumer. Independent R3 review returns `ACCEPT`: the assertion is necessarily
+stale once `string_list` joins the exact ordinary tag category, the named hunk
+exposes rather than masks that behavior, and all four routing documents keep
+production ownership, semantics, representation and caps unchanged. Terminal
+validation may resume.
 
 ## Immediate predecessor
 
