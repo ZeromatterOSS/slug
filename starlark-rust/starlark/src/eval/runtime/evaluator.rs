@@ -782,6 +782,11 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
     }
 
     pub(crate) fn set_slot_module(&mut self, slot: ModuleSlotId, value: Value<'v>) {
+        self.module_env.mutable_names().mark_assigned(slot);
+        self.module_env.slots().set_slot(slot, value);
+    }
+
+    pub(crate) fn set_slot_module_from_load(&mut self, slot: ModuleSlotId, value: Value<'v>) {
         self.module_env.slots().set_slot(slot, value);
     }
 

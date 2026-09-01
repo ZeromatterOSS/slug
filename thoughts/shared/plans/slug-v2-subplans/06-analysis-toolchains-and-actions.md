@@ -21944,3 +21944,12 @@ Initial retained-representation/public-ABI review returned `REVISE`: public
 visibility alone does not exclude public-named raw `load` bindings in
 starlark-rust. The focused correction makes assigned origin and public
 visibility conjunctive for `use_repo_rule`; rereview returned `ACCEPT`.
+
+Implementation terminal review returned `ACCEPT`. One packed scratch origin
+bit per existing module slot folds into the unchanged-size frozen-name tuple;
+all four module-extension selectors and the public-and-assigned
+`use_repo_rule` path consume it, while private repository-effect reacquisition
+remains protected by complete producer-projection equality. Full owner and
+downstream validation passes, the complete starlark result adds one passing
+test over an identical 30-failure detached baseline, and two real replays
+advance to rules_rust `attr.label_keyed_string_dict(doc=...)` breadth.

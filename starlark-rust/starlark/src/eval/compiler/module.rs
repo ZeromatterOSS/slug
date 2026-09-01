@@ -111,7 +111,7 @@ impl<'v> Compiler<'v, '_, '_, '_> {
                 FrameSpan::new(FrozenFileSpan::new(self.codemap, load_arg.span())),
                 self.eval,
             )?;
-            self.eval.set_slot_module(slot, value)
+            self.eval.set_slot_module_from_load(slot, value)
         }
 
         Ok(())

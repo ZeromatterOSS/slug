@@ -2182,9 +2182,9 @@ memory-accounting or V1 extraction decision.
 
 ### Stage 6 assigned-global Starlark module utility decision (2026-08-31)
 
-Status: design independently `ACCEPTED` after a focused correction requiring
-assigned origin and public visibility together for `use_repo_rule`, in
-`WP-6-7A-bzlmod-declaration-selection-identity-parity-r1`.
+Status: implementation terminally `ACCEPTED` after a focused design correction
+requiring assigned origin and public visibility together for `use_repo_rule`,
+in `WP-6-7A-bzlmod-declaration-selection-identity-parity-r1`; commit pending.
 
 Source inspected: Buck2 `088c75c7e36805df99c3de29062baa95db700b8b`
 starlark-rust `environment/{names,modules}.rs`, evaluator module stores, and

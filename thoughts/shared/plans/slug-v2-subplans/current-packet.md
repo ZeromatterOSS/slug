@@ -5,7 +5,8 @@ Packet: `WP-6-7A-bzlmod-declaration-selection-identity-parity-r1`
 Milestone: M7A generic Starlark/ruleset closure; Stage 6 Bzlmod declaration
 selection and repository-rule producer identity.
 
-Status: design is frozen and independently `ACCEPTED`. The first retained-
+Status: implementation terminally `ACCEPTED`; commit pending. The design is
+frozen and independently `ACCEPTED`. The first retained-
 representation/public-ABI review returned `REVISE` because public visibility
 alone does not exclude a public-named raw `load` binding in starlark-rust. The
 focused correction requires assigned origin and public visibility together for
@@ -224,6 +225,43 @@ identity fields, repository effects, an unsupported declaration parameter, an
 action/rule/provider owner, any ruleset/C++ branch, or a cap. Independent
 retained-representation/public-ABI review is required before Rust and
 independent terminal review before acceptance and commit.
+
+## Implementation candidate evidence
+
+The candidate keeps the frozen architecture. `MutableNames` owns one packed
+assignment-origin bit per existing slot; ordinary assignment stores and
+`Module::set` mark it, while the dedicated load store and
+`import_public_symbols` do not. Freeze folds the bit into the existing name
+entry, and a compile-time assertion proves the retained tuple remains the same
+size. One hidden origin-aware lookup serves all four module-extension sites and
+the public-and-assigned `use_repo_rule` gate. Internal repository-rule
+reacquisition alone uses any-visibility lookup with full projection equality.
+No parser, set, DICE, ruleset, action, `cc_common`, `cc_internal`, C++, Cargo,
+fixture, or public-export lookup changed.
+
+Focused assigned/load/import/modify/visibility, module-extension
+private/alias/reexport/load-only, innate first-producer alias, and private
+repository-effect tests pass. The complete `slug_loading_v2` owner passes
+462/462 with one pre-existing ignored fixture test; complete `slug_query_v2`
+and `slug_analysis_v2` plus integration and doc tests pass. The complete
+starlark library command is 808/838 with exactly the same 30 pre-existing
+profile/function-name, bytecode source-span/name, and struct-JSON-order
+failures as detached clean design base `2cbd2042b` at 807/837; the sole added
+test passes.
+The V2 CLI rebuild passes. Two daemon-clean authentic
+`cquery //app/slug_cli_v2:slug` replays both pass the prior private rules_cc
+repository-rule boundary and stop at the same next unsupported category:
+rules_rust `attr.label_keyed_string_dict(doc=...)` declaration breadth.
+
+Accounting is 78 net / 118 gross starlark-rust production, -1 net / 27 gross
+Slug production, 202 net / 226 gross proof, and 371 gross Rust total. The
+parked registration proof remains unchanged at SHA-256
+`36c937d49369ac57e51defe2b17d4a53636a815ec0b2d407f7bd1a664c4d816a`.
+Independent terminal review returned `ACCEPT`: assignment origin remains
+scratch-only until the unchanged-size frozen fold, every selector uses the
+correct origin/visibility conjunction, and repository producer identity stays
+projection-authenticated. The only residual risk is the separate rules_rust
+attribute-constructor breadth frontier exposed by both replays.
 
 ## Immediate predecessor
 

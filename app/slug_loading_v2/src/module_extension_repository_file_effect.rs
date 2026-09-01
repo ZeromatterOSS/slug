@@ -366,7 +366,8 @@ fn authenticate_rule(
     let call = repository.call();
     let value = module
         .module
-        .get(&call.definition.exported_name)
+        .get_any_visibility(&call.definition.exported_name)
+        .map(|(value, _visibility)| value)
         .map_err(|error| HostSelectedRepositoryFileEffectError::Projection {
             certificate: certificate.clone(),
             ordinal,
@@ -1022,10 +1023,11 @@ def write(ctx):
     print('repository-file-effect')
     ctx.file('BUILD.bazel', content='exports_files([\"generated.txt\"])\\n')
     ctx.file('generated.txt', 'from-rule', executable=False)
-repo=repository_rule(implementation=write)
+_repo=repository_rule(implementation=write)
 def impl(ctx):
-    repo(name='first')
-ext=module_extension(implementation=impl)
+    _repo(name='first')
+_ext=module_extension(implementation=impl)
+ext=_ext
 "#;
     const MSVC_ENVVARS_FIXTURE: &str = r#"MSVC_ENVVARS = [
     "BAZEL_VC",
@@ -1722,8 +1724,8 @@ ext = module_extension(implementation = impl)
         }
 
         let mismatch_source = EXTENSION.replace(
-            "repo=repository_rule(implementation=write)",
-            "repo=repository_rule(implementation=write, environ=['MISMATCH'])",
+            "_repo=repository_rule(implementation=write)",
+            "_repo=repository_rule(implementation=write, environ=['MISMATCH'])",
         );
         let mut mismatch = transaction_untracked(&dice, MODULE, &mismatch_source, true).await;
         let RepositoryDefinitionLabel::Root(label) =
@@ -2357,7 +2359,7 @@ ext=module_extension(implementation=impl)
         let source = include_str!("module_extension_repository_file_effect.rs");
         let production = &source[..source.find("\n#[cfg(test)]").unwrap()];
         for shape in [
-            "get(&call.definition.exported_name)",
+            "get_any_visibility(&call.definition.exported_name)",
             "downcast::<FrozenRepositoryRuleDefinition>()",
             "if projection != call.definition",
             "Ok(rule.implementation())",

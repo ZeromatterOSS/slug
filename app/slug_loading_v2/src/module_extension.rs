@@ -413,8 +413,8 @@ async fn preflight_pure_invocations(ctx: &mut DiceComputations<'_>, workspace: &
         if &module.manifest != loaded_manifest {
             return Err(pure_complete(Err(after(Some(input.input.parts().0), &[], Arc::from([]), HostPureModuleExtensionInvocationError::Drift("reacquired manifest differs".into()))), observations));
         }
-        let export = match module.module.get(input.input.parts().0.parts().1) {
-            Ok(value) => value,
+        let export = match module.module.get_assigned(input.input.parts().0.parts().1) {
+            Ok((value, _visibility)) => value,
             Err(error) => return Err(pure_complete(Err(after(Some(input.input.parts().0), &[], Arc::from([]), HostPureModuleExtensionInvocationError::Drift(error.to_string().into()))), observations)),
         };
         let definition = match export.downcast::<FrozenModuleExtensionDefinition>() {
@@ -636,7 +636,7 @@ fn owner_after(inputs: &Arc<HostSelectedExtensionOwnerInputs>, calls: Arc<[Repos
 
 #[rustfmt::skip]
 fn owner_projection(module: &FrozenBzlModule, request: &HostSelectedExtensionDefinitionLoadRequest) -> Result<OwnerProjection, CompactString> {
-    let export = module.module.get(request.parts().1).map_err(|error| CompactString::from(error.to_string()))?;
+    let (export, _visibility) = module.module.get_assigned(request.parts().1).map_err(|error| CompactString::from(error.to_string()))?;
     let definition = export.downcast::<FrozenModuleExtensionDefinition>().map_err(|_| CompactString::from("selected export is not module_extension"))?;
     let projection = definition.projection();
     if !projection.environment.is_empty() || projection.os_dependent || projection.arch_dependent || projection.facts_version != 0 {
@@ -740,7 +740,7 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
     if second != *first {
         return owner_complete(Err(owner_after(&inputs, Arc::from([]), "reacquired selected module extension differs")), observations);
     }
-    let definition = module.module.get(inputs.request().parts().1).expect("projection authenticated export").downcast::<FrozenModuleExtensionDefinition>().expect("projection authenticated kind");
+    let definition = module.module.get_assigned(inputs.request().parts().1).expect("projection authenticated export").0.downcast::<FrozenModuleExtensionDefinition>().expect("projection authenticated kind");
     let invocation_module = Module::new();
     let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner));
     let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);

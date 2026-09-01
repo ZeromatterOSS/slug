@@ -43,24 +43,35 @@ use crate::values::FrozenStringValue;
 /// On an unscope, we do the reverse, putting things back to how they were
 /// before (apart from the total) number of slots required.
 #[derive(Debug)]
-pub(crate) struct MutableNames(RefCell<SmallMap<FrozenStringValue, (ModuleSlotId, Visibility)>>);
+pub(crate) struct MutableNames {
+    names: RefCell<SmallMap<FrozenStringValue, (ModuleSlotId, Visibility)>>,
+    assigned: RefCell<Vec<bool>>,
+}
 
 #[derive(Debug, Allocative)]
-pub(crate) struct FrozenNames(SmallMap<FrozenStringValue, (ModuleSlotId, Visibility)>);
+pub(crate) struct FrozenNames(SmallMap<FrozenStringValue, (ModuleSlotId, Visibility, bool)>);
+
+const _: () = assert!(
+    std::mem::size_of::<(ModuleSlotId, Visibility, bool)>()
+        == std::mem::size_of::<(ModuleSlotId, Visibility)>()
+);
 
 impl MutableNames {
     pub(crate) fn new() -> Self {
-        Self(RefCell::new(SmallMap::new()))
+        Self {
+            names: RefCell::new(SmallMap::new()),
+            assigned: RefCell::new(Vec::new()),
+        }
     }
 
     pub(crate) fn slot_count(&self) -> u32 {
-        self.0.borrow().len().try_into().unwrap()
+        self.names.borrow().len().try_into().unwrap()
     }
 
     /// Try and go back from a slot to a name.
     /// Inefficient - only use in error paths.
     pub(crate) fn get_slot(&self, slot: ModuleSlotId) -> Option<FrozenStringValue> {
-        for (s, (i, _vis)) in &*self.0.borrow() {
+        for (s, (i, _vis)) in &*self.names.borrow() {
             if *i == slot {
                 return Some(*s);
             }
@@ -69,7 +80,7 @@ impl MutableNames {
     }
 
     pub(crate) fn get_name(&self, name: Hashed<&str>) -> Option<(ModuleSlotId, Visibility)> {
-        self.0.borrow().get_hashed(name).copied()
+        self.names.borrow().get_hashed(name).copied()
     }
 
     /// Add a name with explicit visibility to the module.
@@ -78,7 +89,7 @@ impl MutableNames {
         name: FrozenStringValue,
         vis: Visibility,
     ) -> ModuleSlotId {
-        let mut x = self.0.borrow_mut();
+        let mut x = self.names.borrow_mut();
         match x.get_mut_hashed(name.get_hashed().as_ref()) {
             Some((slot, stored_vis)) => {
                 // Public visibility wins.
@@ -90,6 +101,13 @@ impl MutableNames {
             None => {
                 let slot = ModuleSlotId::new(x.len().try_into().unwrap());
                 x.insert_hashed(name.get_hashed(), (slot, vis));
+                let mut assigned = self.assigned.borrow_mut();
+                let index = slot.0 as usize;
+                if index == assigned.len() {
+                    assigned.push(false);
+                } else {
+                    assigned[index] = false;
+                }
                 slot
             }
         }
@@ -101,11 +119,15 @@ impl MutableNames {
     }
 
     pub(crate) fn hide_name(&self, name: &str) {
-        self.0.borrow_mut().shift_remove(name);
+        self.names.borrow_mut().shift_remove(name);
+    }
+
+    pub(crate) fn mark_assigned(&self, slot: ModuleSlotId) {
+        self.assigned.borrow_mut()[slot.0 as usize] = true;
     }
 
     pub(crate) fn all_names_and_slots(&self) -> Vec<(FrozenStringValue, ModuleSlotId)> {
-        self.0
+        self.names
             .borrow()
             .iter()
             .map(|(name, (slot, _vis))| (*name, *slot))
@@ -113,7 +135,7 @@ impl MutableNames {
     }
 
     pub(crate) fn all_names_and_visibilities(&self) -> Vec<(FrozenStringValue, Visibility)> {
-        self.0
+        self.names
             .borrow()
             .iter()
             .map(|(name, (_slot, vis))| (*name, *vis))
@@ -123,7 +145,7 @@ impl MutableNames {
     pub(crate) fn all_names_slots_and_visibilities(
         &self,
     ) -> Vec<(FrozenStringValue, ModuleSlotId, Visibility)> {
-        self.0
+        self.names
             .borrow()
             .iter()
             .map(|(name, (slot, vis))| (*name, *slot, *vis))
@@ -131,12 +153,19 @@ impl MutableNames {
     }
 
     pub(crate) fn freeze(self) -> FrozenNames {
-        FrozenNames(self.0.into_inner())
+        let assigned = self.assigned.into_inner();
+        FrozenNames(
+            self.names
+                .into_inner()
+                .into_iter()
+                .map(|(name, (slot, vis))| (name, (slot, vis, assigned[slot.0 as usize])))
+                .collect(),
+        )
     }
 }
 
 impl FrozenNames {
-    pub(crate) fn get_name(&self, name: &str) -> Option<(ModuleSlotId, Visibility)> {
+    pub(crate) fn get_name(&self, name: &str) -> Option<(ModuleSlotId, Visibility, bool)> {
         self.0.get(name).copied()
     }
 
@@ -144,14 +173,18 @@ impl FrozenNames {
     pub(crate) fn all_symbols(
         &self,
     ) -> impl Iterator<Item = (FrozenStringValue, ModuleSlotId)> + '_ {
-        self.0.iter().map(|(name, (slot, _vis))| (*name, *slot))
+        self.0
+            .iter()
+            .map(|(name, (slot, _vis, _assigned))| (*name, *slot))
     }
 
     /// Exported symbols.
     pub(crate) fn symbols(&self) -> impl Iterator<Item = (FrozenStringValue, ModuleSlotId)> + '_ {
-        self.0.iter().filter_map(|(name, (slot, vis))| match vis {
-            Visibility::Private => None,
-            Visibility::Public => Some((*name, *slot)),
-        })
+        self.0
+            .iter()
+            .filter_map(|(name, (slot, vis, _assigned))| match vis {
+                Visibility::Private => None,
+                Visibility::Public => Some((*name, *slot)),
+            })
     }
 }

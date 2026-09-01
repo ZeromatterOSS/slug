@@ -3445,8 +3445,8 @@ async fn drive_loaded_extension_definitions(
                 }
             },
         };
-        let exported = match module.module.get(export) {
-            Ok(value) => value,
+        let exported = match module.module.get_assigned(export) {
+            Ok((value, _visibility)) => value,
             Err(error) => {
                 return loaded_extension_definitions_driver_complete(
                     Err(HostLoadedModuleExtensionDefinitionsError::Request {
@@ -8351,6 +8351,89 @@ mod module_extension_definition_loading_tests {
                     })
                 )
         ));
+    }
+
+    #[tokio::test]
+    async fn module_extension_selection_uses_assigned_globals_at_either_visibility() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let implementation = "def implementation(ctx):\n    pass\n";
+        for (requested, extension) in [
+            (
+                "_private",
+                format!(
+                    "{implementation}_private=module_extension(implementation=implementation)\n"
+                ),
+            ),
+            (
+                "public_alias",
+                format!(
+                    "{implementation}_private=module_extension(implementation=implementation)\npublic_alias=_private\n"
+                ),
+            ),
+        ] {
+            let outcome = compute_case(
+                &dice,
+                &format!(
+                    "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','{requested}')\n"
+                ),
+                &extension,
+                "",
+                true,
+                None,
+            )
+            .await;
+            assert!(
+                matches!(&outcome, SourcePreparationOutcome::Complete(value) if value.as_ref().is_ok()),
+                "assigned extension `{requested}` must load: {outcome:?}"
+            );
+        }
+
+        let reexported = compute_case(
+            &dice,
+            "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','reexported')\n",
+            "load('//:child.bzl','child')\nreexported=child\n",
+            &format!("{implementation}child=module_extension(implementation=implementation)\n"),
+            true,
+            None,
+        )
+        .await;
+        assert!(
+            matches!(&reexported, SourcePreparationOutcome::Complete(value) if value.as_ref().is_ok()),
+            "assigned reexport must load: {reexported:?}"
+        );
+
+        for requested in ["child", "_loaded"] {
+            let load = if requested == "child" {
+                "load('//:child.bzl','child')\n"
+            } else {
+                "load('//:child.bzl',_loaded='child')\n"
+            };
+            let outcome = compute_case(
+                &dice,
+                &format!(
+                    "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','{requested}')\n"
+                ),
+                load,
+                &format!("{implementation}child=module_extension(implementation=implementation)\n"),
+                true,
+                None,
+            )
+            .await;
+            assert!(
+                matches!(
+                    &outcome,
+                    SourcePreparationOutcome::Complete(value)
+                        if matches!(
+                            value.as_ref(),
+                            Err(HostLoadedModuleExtensionDefinitionsError::Request {
+                                error: HostLoadedModuleExtensionDefinitionError::Export { .. },
+                                ..
+                            })
+                        )
+                ),
+                "raw load `{requested}` must not be a selectable module global: {outcome:?}"
+            );
+        }
     }
 
     #[tokio::test]

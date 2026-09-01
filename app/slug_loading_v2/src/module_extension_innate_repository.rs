@@ -351,8 +351,12 @@ fn projection(
     module: &FrozenBzlModule,
     inputs: &HostSelectedInnateRepositoryOwnerInputs,
 ) -> Result<RepositoryRuleDefinitionProjection, HostPureInnateRepositoryOwnerError> {
-    let (label, name, _, _) = inputs.definition_parts();
-    let value = module
+    let (_, name, _, _) = inputs.definition_parts();
+    let (value, _visibility) = module
+        .module
+        .get_assigned(name)
+        .map_err(|error| HostPureInnateRepositoryOwnerError::Export(error.to_string().into()))?;
+    module
         .module
         .get(name)
         .map_err(|error| HostPureInnateRepositoryOwnerError::Export(error.to_string().into()))?;
@@ -368,11 +372,6 @@ fn projection(
             "selected innate repository_rule is not exported".into(),
         )
     })?;
-    if &projection.defining_label != label || projection.exported_name != name {
-        return Err(HostPureInnateRepositoryOwnerError::Export(
-            "selected innate repository_rule projection differs from request".into(),
-        ));
-    }
     Ok(projection)
 }
 
@@ -951,6 +950,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn innate_alias_keeps_the_first_repository_rule_producer_name() {
+        for (definition, expected_name) in [
+            (
+                "_private=repository_rule(lambda ctx: None)\nrepo=_private\n",
+                "_private",
+            ),
+            (
+                "original=repository_rule(lambda ctx: None)\nrepo=original\n",
+                "original",
+            ),
+        ] {
+            let dice = builtin_graph_dice();
+            let mut module = builtin_graph_module();
+            module.push_str("\nrepo=use_repo_rule('//:ext.bzl','repo')\nrepo(name='out')\n");
+            let mut tx = transaction(&dice, &module, definition, true, None).await;
+            let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+            let owner = selected_owner(&mut tx, &workspace, "+repo+out").await;
+            let certificate = tx
+                .compute(&HostSelectedExtensionOwnerCertificateObservationKey::new(
+                    workspace, owner,
+                ))
+                .await
+                .unwrap();
+            let SourcePreparationOutcome::Complete(Ok(certificate)) = certificate else {
+                panic!("aliased innate certificate must complete: {certificate:?}");
+            };
+            let certificate = certificate.result().as_ref().as_ref().unwrap();
+            let rows = certificate.iter().collect::<Vec<_>>();
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].1.rule_id.rule_name, expected_name);
+            assert_eq!(
+                rows[0].1.rule_id.bzl_file,
+                CanonicalLabel::parse("@@//:ext.bzl").unwrap()
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn root_innate_calls_keep_order_and_the_admitted_value_matrix() {
         let dice = builtin_graph_dice();
         let mut module = builtin_graph_module();
@@ -1015,12 +1052,6 @@ mod tests {
             ),
             (
                 "repo=module_extension(implementation=lambda ctx: None)\n",
-                "repo",
-                "repo(name='out')",
-                "export",
-            ),
-            (
-                "other=repository_rule(lambda ctx: None)\nrepo=other\n",
                 "repo",
                 "repo(name='out')",
                 "export",

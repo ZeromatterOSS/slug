@@ -156,12 +156,33 @@ impl FrozenModule {
     }
 
     fn get_any_visibility_option(&self, name: &str) -> Option<(OwnedFrozenValue, Visibility)> {
-        self.module.names.get_name(name).and_then(|(slot, vis)|
+        self.module
+            .names
+            .get_name(name)
+            .and_then(|(slot, vis, _assigned)|
         // This code is safe because we know the frozen module ref keeps the values alive
         self.module
             .slots
             .get_slot(slot)
             .map(|x| (unsafe { OwnedFrozenValue::new(self.heap.dupe(), x) }, vis)))
+    }
+
+    fn get_assigned_option(&self, name: &str) -> Option<(OwnedFrozenValue, Visibility)> {
+        self.module
+            .names
+            .get_name(name)
+            .and_then(|(slot, vis, assigned)| {
+                assigned
+                    .then(|| self.module.slots.get_slot(slot))
+                    .flatten()
+                    .map(|value| {
+                        // SAFETY: this module's frozen heap owns `value`.
+                        (
+                            unsafe { OwnedFrozenValue::new(self.heap.dupe(), value) },
+                            vis,
+                        )
+                    })
+            })
     }
 
     /// Get value, exported or private by name.
@@ -170,6 +191,24 @@ impl FrozenModule {
     #[doc(hidden)]
     pub fn get_any_visibility(&self, name: &str) -> anyhow::Result<(OwnedFrozenValue, Visibility)> {
         self.get_any_visibility_option(name).ok_or_else(|| {
+            match did_you_mean(name, self.names().map(|s| s.as_str())) {
+                Some(better) => EnvironmentError::ModuleHasNoSymbolDidYouMean(
+                    name.to_owned(),
+                    better.to_owned(),
+                )
+                .into(),
+                None => EnvironmentError::ModuleHasNoSymbol(name.to_owned()).into(),
+            }
+        })
+    }
+
+    /// Get a value assigned by this module, at either visibility.
+    ///
+    /// Unlike [`FrozenModule::get_any_visibility`], this excludes bindings
+    /// introduced only by `load()` or [`Module::import_public_symbols`].
+    #[doc(hidden)]
+    pub fn get_assigned(&self, name: &str) -> anyhow::Result<(OwnedFrozenValue, Visibility)> {
+        self.get_assigned_option(name).ok_or_else(|| {
             match did_you_mean(name, self.names().map(|s| s.as_str())) {
                 Some(better) => EnvironmentError::ModuleHasNoSymbolDidYouMean(
                     name.to_owned(),
@@ -468,6 +507,7 @@ impl Module {
     /// surprising effects.
     pub fn set<'v>(&'v self, name: &str, value: Value<'v>) {
         let slot = self.names.add_name(self.frozen_heap.alloc_str_intern(name));
+        self.names.mark_assigned(slot);
         let slots = self.slots();
         slots.ensure_slot(slot);
         slots.set_slot(slot, value);
@@ -573,7 +613,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use starlark_derive::starlark_module;
+    use starlark_syntax::syntax::ast::Visibility;
 
     use crate as starlark;
     use crate::environment::FrozenModule;
@@ -581,6 +624,7 @@ mod tests {
     use crate::environment::GlobalsBuilder;
     use crate::environment::Module;
     use crate::eval::Evaluator;
+    use crate::eval::ReturnFileLoader;
     use crate::eval::runtime::profile::mode::ProfileMode;
     use crate::syntax::AstModule;
     use crate::syntax::Dialect;
@@ -633,11 +677,92 @@ x = f(1)
 
         let module = FrozenModule::from_globals(&globals).unwrap();
         assert_eq!("function", module.get("foo").unwrap().value().get_type());
+        assert_eq!(Visibility::Public, module.get_assigned("foo").unwrap().1);
         assert_eq!(
             0,
             ListRef::from_value(module.get("BAR").unwrap().value())
                 .unwrap()
                 .len()
         );
+    }
+
+    #[test]
+    fn assigned_bindings_exclude_raw_loads_without_changing_visibility() {
+        let dependency = Module::new();
+        {
+            let mut eval = Evaluator::new(&dependency);
+            eval.eval_module(
+                AstModule::parse(
+                    "dependency.bzl",
+                    "exported = 17\n".to_owned(),
+                    &Dialect::AllOptionsInternal,
+                )
+                .unwrap(),
+                &Globals::standard(),
+            )
+            .unwrap();
+        }
+        let dependency = dependency.freeze().unwrap();
+        let imported = Module::new();
+        imported.import_public_symbols(&dependency);
+        let imported = imported.freeze().unwrap();
+        assert!(imported.get_any_visibility("exported").is_ok());
+        assert!(imported.get_assigned("exported").is_err());
+
+        let modules = HashMap::from([("dependency.bzl", &dependency)]);
+        let loader = ReturnFileLoader { modules: &modules };
+        let module = Module::new();
+        {
+            let mut eval = Evaluator::new(&module);
+            eval.set_loader(&loader);
+            eval.eval_module(
+                AstModule::parse(
+                    "module.bzl",
+                    r#"
+load("dependency.bzl", "exported", raw_private = "exported", modified = "exported")
+reexported = exported
+_private_reexport = exported
+modified += 1
+"#
+                    .to_owned(),
+                    &Dialect::AllOptionsInternal,
+                )
+                .unwrap(),
+                &Globals::standard(),
+            )
+            .unwrap();
+        }
+        let module = module.freeze().unwrap();
+
+        assert_eq!(
+            17,
+            module
+                .get("exported")
+                .unwrap()
+                .value()
+                .unpack_i32()
+                .unwrap()
+        );
+        assert!(module.get_assigned("exported").is_err());
+        assert!(module.get_assigned("raw_private").is_err());
+        assert_eq!(
+            18,
+            module
+                .get_assigned("modified")
+                .unwrap()
+                .0
+                .value()
+                .unpack_i32()
+                .unwrap()
+        );
+        assert_eq!(
+            Visibility::Public,
+            module.get_assigned("reexported").unwrap().1
+        );
+        assert_eq!(
+            Visibility::Private,
+            module.get_assigned("_private_reexport").unwrap().1
+        );
+        assert!(module.get("_private_reexport").is_err());
     }
 }
