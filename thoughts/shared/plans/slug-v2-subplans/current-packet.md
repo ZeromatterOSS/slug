@@ -1,21 +1,17 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-provider-constrained-dependency-implementation-r1`
+Packet: `WP-6-7A-rule-level-starlark-transition-execution-architecture-r1`
 
-Milestone: M7A generic Starlark/ruleset closure; Stage 4 retained attribute
-schema and Stage 6 configured dependency validation.
+Milestone: M7A generic Starlark/ruleset closure; Stage 6 configured-target
+identity, transition application and delegation.
 
-Status: terminal implementation rereview returns `ACCEPT`. R1 architecture
-review returned `REVISE`: alias-to-file lacked a lawful actual-kind owner and
-the permanent oracle had no path/provenance allowlist. Corrected R2 explicitly
-defers Slug's broader alias-to-file configured-identity gap and freezes a
-bounded five-constructor fixture; focused rereview returned `ACCEPT`. The
-implementation's first terminal review required complete dependency-label/DNF
-diagnostics, a multi-provider conjunction discriminator and a generating-rule
-failure distinct from the generated-file exemption. The corrected proofs and
-production path satisfy all three findings. The rebuilt authentic rules_rust
-0.73 replay clears `rust/private/rust.bzl`'s provider-constrained `link_deps`
-and stops at the independent rule-level Starlark transition-execution frontier.
+Status: corrected R2 architecture accepted; implementation active. R1 review
+returned `REVISE` only because it incorrectly admitted a scalar `Label` as a
+`platforms` output; Bazel accepts scalar string or a sequence of strings/Labels
+and rejects scalar `Label`. Focused R2 rereview returned `ACCEPT` with no
+remaining findings. Commit `493be79b6` terminally accepted provider-constrained
+dependencies and the rebuilt authentic rules_rust 0.73 replay now stops at the
+independent rule-level Starlark transition-execution gate for `@@//pkg:probe`.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -25,73 +21,112 @@ do not edit or stage it.
 
 ## Observable result and compatibility classification
 
-Implement one generic architecture that admits provider-constrained target
-invocation and validates the configured provider collection for every label
-edge. The category covers exactly the five Bazel 9.2 constructors exposing
-`providers`: `attr.label`, `attr.label_list`,
-`attr.string_keyed_label_dict`, `attr.label_keyed_string_dict`, and
-`attr.label_list_dict`.
+Implement one generic rule self-transition lifecycle before configured
+attribute, dependency, toolchain, fragment or rule-implementation analysis.
+The transition engine covers every already-admitted Starlark build-setting
+value and Bazel's target-platform native-option category. The BCR rules_rust
+transition is one discriminator, never an implementation branch.
 
-Exact behavior:
+Exact behavior within the admitted surface:
 
-- all five constructors bind the named-only `providers` parameter with Bazel's
-  empty default. A flat sequence is one conjunction; a nested sequence is a
-  disjunction of conjunctions. Provider order and duplicates are semantic
-  sets. An empty outer sequence or any empty conjunction means no restriction;
-- builtin and exported user providers share the existing `ProviderIdentity`.
-  Unexported providers, nonproviders and mixed flat/nested shapes fail during
-  declaration evaluation. The same canonical DNF survives descriptor freeze,
-  rule freeze, target invocation and package publication;
-- target invocation accepts a rule carrying a nonempty provider predicate.
-  Every configured rule dependency reached through the constrained attribute
-  is checked after dependency analysis and before the owner implementation
-  runs. It succeeds when every provider in any one conjunction is present in
-  its configured provider collection; otherwise analysis fails on that
-  attribute and dependency. Source files and generated output-file targets
-  that pass the independent file-admissibility policy are not rejected for
-  missing providers;
-- scalar, sequence and all three dictionary label orientations validate every
-  contained dependency. Empty values have no dependency to validate. Select
-  resolution and every already-admitted target/Exec/Starlark transition
-  continue through the existing configured-dependency producer. Aliases to
-  configured rules use the already-forwarded provider collection and are
-  checked against it; and
-- provider-policy changes participate in package equality and DICE
-  invalidation. Same-DICE A/B/A must recompute on a changed predicate and cut
-  off on exact restoration.
+- a Starlark rule carrying `rule(cfg = transition(...))` applies that patch
+  transition to its own incoming target configuration. The transition receives
+  a `settings` dictionary keyed by each declared spelling and an `attr` struct
+  containing raw configured rule attributes, with label-bearing values exposed
+  as `Label` values rather than configured dependency/provider objects;
+- direct Starlark build settings in any visible repository may be inputs or
+  outputs. Integer, Boolean, string, repeatable/nonrepeatable string-list and
+  string-set declarations use their existing typed default/effective-value,
+  unpacking, normalization and default-elision owners. Multiple inputs and
+  outputs are admitted in one transition, and every declaration is loaded
+  through DICE before synchronous evaluation;
+- `//command_line_option:platforms` may be an input or output. Its input is the
+  effective target-platform label list, including the Host fallback when the
+  retained option list is empty. Output accepts Bazel's scalar string or a
+  sequence of strings/Labels; scalar `Label` is rejected as an invalid native
+  option value. Accepted spellings resolve in the transition definition's Bzl/
+  repository context, normalize Bazel's list option to its first member, and
+  treat empty or the effective Host platform as the existing Host-fallback
+  semantic configuration. A changed effective selection is DICE-validated as
+  an actual platform before delegation. Selected platform declarations in this
+  packet have default empty `flags`, `parents`, `required_settings` and other
+  already-unsupported platform policy fields;
+- the implementation may return a patch dictionary, a string-keyed dictionary
+  of patch dictionaries, a sequence of patch dictionaries, `None`, an empty
+  dictionary or an empty sequence. The latter three forms are identity. Every
+  nonempty patch must return every declared output and no undeclared output. A
+  one-entry split-shaped return is accepted; rule transitions reject more than
+  one returned configuration with Bazel's single-configuration
+  rule-transition boundary;
+- values are validated against their declared setting before publication.
+  Invalid/missing/non-build-setting targets, bad native option/value forms,
+  missing or extra outputs, evaluation failures and split rule results fail
+  before any configured dependency, toolchain or implementation work;
+- transition `attr` preparation uses the pre-transition configuration. A
+  selector that is invalid or whose condition reads a setting the transition
+  may output is omitted from the struct, preserving Bazel's informative
+  missing-attribute behavior. Other selectors resolve under the incoming
+  configuration. The final rule analysis resolves all attributes again under
+  the transitioned configuration;
+- the first application is classified as identity when structural
+  configuration is unchanged. A changed result is applied a second time with
+  the same transition and captured `attr` object but a fresh `settings`
+  dictionary projected from the first result. Equal first and second results
+  are idempotent; unequal results are non-idempotent. Identity analyzes the
+  requested key. Idempotent results delegate to the transitioned key with rule
+  application still enabled. Non-idempotent results delegate to the
+  transitioned key with rule application disabled, so the transition executes
+  exactly once and cannot create an unbounded key chain;
+- the apply/skip state participates in configured-target/DICE equality and
+  hashing but not user-facing label/configuration formatting. The delegated
+  configured result owns its final structural configuration, dependencies,
+  toolchain selection, fragments, actions and providers. Two incoming
+  configurations that converge share the same lawful final key; and
+- rule transition output is the parent for all ordinary attribute transitions:
+  the rule transition is applied first, final rule attributes/selects are
+  resolved under it, and each dependency transition starts from that final
+  rule configuration. The attribute transition receives fresh settings plus
+  that final raw configured attr struct and may use the same complete admitted
+  setting/platform category; its currently admitted dependency edge still
+  requires zero or one result. Same-DICE A/B/A changes to transition
+  implementation, transition attributes, setting defaults or declarations,
+  and configuration inputs recompute and exact restoration cuts off.
 
 Slug-native behavior:
 
-- the retained policy is the existing canonical
-  `Arc<[Arc<[ProviderIdentity]>]>`, shared from the frozen descriptor into the
-  package-owned `AttributeSchema` and cloned by `Arc` into phase-scratch edge
-  validation. Slug does not reproduce Java collection/object identity or
-  serialization bytes; and
-- diagnostics retain the attribute, dependency label and missing predicate
-  structure, but Rust formatting is not claimed byte-for-byte identical to
-  Bazel's Java `StringUtil.joinEnglishList` decoration.
+- semantic configuration equality remains Slug's complete Rust structural
+  identity. The apply/skip bit is semantic configured-analysis control, while
+  display/path tokens remain separate projections. Slug does not reproduce
+  Bazel's Java object identity, SkyKey interning, checksum, `-ST-` fragment or
+  `bazel-out` bytes; and
+- Host-fallback and explicit-Host target-platform forms may canonicalize to one
+  Slug semantic configuration. Diagnostics preserve target, transition source,
+  declared setting and value shape without claiming byte-identical Java event
+  decoration.
 
 Unsupported/deferred behavior:
 
-- `aspects` attachment remains fail-closed on all label-bearing constructors.
-  Required-aspect expansion, direct duplicate/reverse-required validation,
-  aspect parameters, applied-aspect DICE identity and configured aspect
-  execution remain one later complete category. Removing the provider gate
-  must not remove the independent aspect gate;
-- `allow_rules`, `skip_validations`, materializers, dormant dependencies,
-  `for_dependency_resolution` and their option gates remain separate complete
-  attribute-policy categories. No implicit bypass is inferred from them;
-- aliases to source or generated output files remain unsupported/deferred with
-  Slug's broader alias-to-file configured-identity gap. The current alias
-  result retains `ConfiguredNodeKind::Alias` and only a configured-target
-  actual identity, so this packet neither guesses file status from an empty
-  provider set nor adds a partial actual-node carrier. The Bazel oracle records
-  the required future exemption;
-- configured provider publication stays within the already accepted rule and
-  standard-provider surfaces. This packet does not add `CcInfo`,
-  `rust_common`, `cc_common`, `cc_internal`, rules_rust behavior, a native/C++
-  rule, parser grammar, `set`, action, query projection or execution fallback.
-  Bazel 9 BCR Starlark remains the rule-body producer.
+- native options other than `//command_line_option:platforms`, native flag
+  aliases, `--define`, platform mappings and nonempty platform `flags` or
+  inheritance/policy remain fail-closed. Each later native option family must
+  project and update the existing sole typed `OptionRecord` vector; no opaque
+  native dictionary or parallel configuration store is permitted;
+- aliased build settings, aliases whose actual uses `select()`, project-boundary
+  enforcement and exact Bazel output-directory affected-option bytes remain
+  later complete categories. Direct canonical build settings in root and
+  external repositories are admitted here;
+- multi-configuration attribute transitions remain unsupported. The shared
+  evaluator may represent zero/one/many returned patches, but the existing
+  configured dependency producer continues to admit only one final child
+  configuration until split-edge identity, ordering, query topology and
+  provider materialization move together;
+- transition `print`/event replay, analysis-test transitions, exec transitions,
+  native trimming/composed rule transitions, configuration fragment trimming,
+  flag-setting aliases and platform flag expansion remain separate categories;
+- configured aspect execution remains fail-closed. No `CcInfo`, `rust_common`,
+  `cc_common`, `cc_internal`, C++/Rust rule body, parser grammar, `set`, action,
+  query formatter or execution fallback is added. Bazel 9 BCR Starlark owns all
+  rule and transition bodies.
 
 ## Bazel 9.2 authority and evidence
 
@@ -99,186 +134,206 @@ Bazel tag `9.2.0` commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` is the sole semantic authority.
 Pinned source SHA-256 values are:
 
-- `StarlarkAttrModuleApi.java`:
-  `af70c851882fa049034184dbb6f6580731cfa738d79dfb8abcf61af176257670`;
-- `StarlarkAttrModule.java`:
-  `388421c44c623c1c6625fd9f2b059d2a7d1e13b8d45e7c96173f24866a917967`;
-- `RequiredProviders.java`:
-  `b6032c80271686c9ba1ac1f8d05c8b187c524e11e7b0831e433f408c7c40e5d3`;
-- `RuleContext.java`:
-  `0f6dcffac7286a9056d050624bd29e73cefc4138dd9dc24708dec63e147b41e2`;
-- `StarlarkRuleClassFunctionsTest.java`:
-  `e09c93616e096d639ec69b6b0c6a397a8a36bc8a95fa21b986cb5fc7f8f010aa`;
+- `RuleTransitionApplier.java`:
+  `077a37ebf2f339f530ae97bfd405ede4852a7a922dd1d54c260bb316c017eebd`;
+- `TargetAndConfigurationProducer.java`:
+  `0321b8858ed23282237947183040d6ec7a9dc83f776aaa1619cc4d3b71fe0722`;
+- `StarlarkRuleTransitionProvider.java`:
+  `98f6904646e5f789dd79d81dfce09687fa09a5161fe5bfd2772b08b78e45f7ae`;
+- `StarlarkAttributeTransitionProvider.java`:
+  `669bc7600309ac0553375ae1ff4104efc801f8d19a4b4b673c6d243eeffdc54f`;
+- `StarlarkDefinedConfigTransition.java`:
+  `427a16020eb158943b4073981b1f0701b75ebd85d28816f3a3b6415afcb9a22b`;
+- `FunctionTransitionUtil.java`:
+  `f07a15da5366085a9ba9d8054628f0e244d7022611180c63299e79c2a5cb7447`;
+- `ConfiguredTargetKey.java`:
+  `a679d99c0195fe16c247b9702e349a32c72f5710757b78f75f82ab54e035ae28`;
+- `PlatformOptions.java`:
+  `631330a01e28bff914f79d4ad63898f333853756c012407376313474fde3f26e`;
+- `StarlarkRuleTransitionProviderTest.java`:
+  `9b7e78408513f0d989d76fb84bed45093333dbb0d066f737b01e49035e4ae3bb`;
+- `StarlarkAttrTransitionProviderTest.java`:
+  `607f6f12b6fbc343a3a423f7ab99f25eef40dfb05e1b1abaf948245b6baca7d7`;
   and
-- `StarlarkRuleContextTest.java`:
-  `d195e5d49aae52a92bd3abebfc8de7942aacb252b522cea315985d41277f082d`.
+- `ConfigStringSetTest.java`:
+  `0aeba90ac56ea1687268d2f9eefa1b4264e58aeafb8bf653634522ff60539ad0`.
 
-The public API proves the exact five-constructor surface. `StarlarkAttrModule`
-proves flat/nested conversion and empty-conjunction collapse.
-`RequiredProviders` proves any-of/all-of satisfaction and missing-provider
-projection. `RuleContext.checkRuleDependencyMandatoryProviders` proves that
-validation uses the configured target's actual provider collection during
-analysis. Reuse `StarlarkRuleContextTest`'s flat/nested label-list and
-label-keyed/list-dict success/failure cases. A focused Bazel 9.2 workspace now
-proves that custom-provider constraints reject a plain rule but accept source
-and generated output files, while `DefaultInfo` accepts those same files and a
-custom-provider alias forwards its rule provider collection. Preserve that
-theme in the permanent `provider-constrained-dependencies` fixture described
-below; alias-to-file remains oracle-only unsupported evidence. Do not copy an
-unrelated rules_rust workspace into the fixture.
+`StarlarkRuleTransitionProvider` proves raw/configured attribute projection,
+selector-output omission and patch-only rule transitions.
+`StarlarkAttributeTransitionProvider` proves that dependency transitions use
+the owning rule's final configured raw attrs and are intrinsically split.
+`StarlarkDefinedConfigTransition` proves all accepted return shapes, declared-
+spelling output validation and canonicalization. `FunctionTransitionUtil`
+proves declared settings, typed application and native list conversion.
+`RuleTransitionApplier` and
+`TargetAndConfigurationProducer` prove ordering, double application,
+identity/idempotent/non-idempotent classification and delegation.
+`ConfiguredTargetKey` proves the apply bit belongs in equality/hash while its
+false form is a rare subtype optimization. `PlatformOptions` proves first-label
+normalization and Host fallback. Reuse the named Bazel tests for bad return,
+input/output settings, configurable attrs, Label-shaped attrs, build-setting
+types/default elision, platform list conversion, no-op forms, attribute-only
+invalidation and set-normalized configuration convergence.
 
 Authentic consumer evidence is rules_rust 0.73 `rust/private/rust.bzl`, SHA-256
 `a645bd5db6344bd3c0997dcf73600475c0af53fb4dd025890be24b8e1e2dbfd8`.
-It is replay evidence only, never compatibility authority.
+Its static/shared/binary/test rules share an input/output `platforms` self-
+transition and `_resolve_platform(settings, attr)`. It is replay evidence only,
+never compatibility authority.
 
 ## Learned Slug facts and architecture decision
 
-Slug already owns the complete canonical provider DNF on live/frozen
-`RuleAttributeSchema`, actual configured provider publication, and
-`ConfiguredDependencyValidation.required_providers`. The validator already
-implements any-alternative/all-members matching for late-bound and subrule
-dependencies, but its `DefaultInfo`-only file special case is narrower than
-Bazel: provider policy is not consulted for any file prerequisite that passes
-file admissibility. The other artificial gaps are that three dictionary
-constructors do not bind `providers`, target invocation rejects every nonempty
-predicate, the final package `AttributeSchema` drops the DNF, and ordinary
-dependency rows therefore pass an empty predicate to the existing validator.
+Loading already retains one frozen regular `TransitionDefinition` on the final
+`StarlarkRuleImplementation`; setting canonicalization and rule attachment are
+terminally accepted. Extend that sole definition with the transition call's
+immutable `BzlModuleIdentity` and shared source-identity table. This context is
+required for `Label()` calls and returned relative/apparent platform strings,
+and participates in equality. Do not retain source text or add a callable
+registry.
 
-Add the shared DNF to `AttributeSchema`, including its derived structural
-equality, borrowed accessor and builder. During target invocation, clone the
-already-canonical `Arc` from `RuleAttributeSchema` into that final schema.
-Bind all three missing constructor parameters through the existing
-`declaration_required_providers` parser. In `root_declared_dependency_keys`,
-clone the final schema predicate into the existing
-`ConfiguredDependencyValidation`. Correct that shared validator to bypass the
-provider predicate for source/generated file nodes and otherwise evaluate the
-actual configured provider collection; make no second validator or side
-table. Narrow `reject_deferred_attribute_invocation` to attached aspects only.
+Analysis currently rejects every incoming transition before configured work.
+Its narrow attribute-transition function independently executes only an
+input-free, one-root-build-setting patch. Extract one synchronous
+`starlark_transition` evaluator used by both rule and attribute callers. It
+accepts DICE-prepared typed setting rows and raw resolved attributes, allocates
+the declared-key settings dictionary and transition attr struct, evaluates the
+frozen function in its Bzl source context, validates generic return/output
+shape and produces typed phase-scratch patches. It does not load packages,
+mutate DICE, retain evaluator values or publish configuration.
 
-The final package and configured-analysis DICE owners already observe
-`StarlarkRuleImplementation` structural equality, which includes its schema.
-No key, lock, filesystem read, request overlay, repository mapping, command
-option, cache or global registry changes. Overlapping requests continue to use
-ordinary DICE dependency recording and immutable package results.
+DICE remains the sole asynchronous owner. A preparation helper loads direct
+build-setting declarations and prepares selector facts plus the immutable
+transition `attr` object. Each application projects fresh effective setting
+inputs from its own source configuration, invokes the synchronous evaluator,
+converts every typed output, atomically constructs a candidate
+`ConfigurationKey`, and validates any changed effective target platform through
+the existing configured-platform DICE owner before publication. Thus the
+idempotency check reuses declarations and attrs but observes the first result's
+settings. No lock is held across a DICE computation. The existing attribute-
+transition producer uses the same helper but retains its one-result boundary.
 
-Retained memory is one extra shallow `Arc` field per published attribute
-schema; empty predicates share an empty slice and dependency-edge copies are
-phase scratch. Keep `CompactString`, immutable `Arc` slices, canonical
-`ProviderIdentity`, `Allocative`, and existing small deterministic parsing
-scratch. Add no `HashMap`/`HashSet`, interner, flattened provider bitmap or
-source-text identity. This is reuse of already-adopted Buck2 utility patterns,
-not a new Buck2/V1 import, so Stage 9 needs no new adoption row.
+Add one `should_apply_rule_transition` bit to `ConfiguredTargetKey`; `new`
+defaults true and a crate-private final constructor sets false. Include the bit
+in Eq/Ord/Hash/Allocative and DICE keys, omit it from `stable_serialize`, and
+prove that its only production false construction follows a detected
+non-idempotent rule transition. In the configured Starlark-rule driver, prepare
+and apply before final configured attributes. Identity continues locally;
+changed results run the same prepared patch a second time, then recurse through
+the ordinary observed configured-result function using the idempotency-selected
+key. The delegated value, not the pre-transition shell, is returned.
+
+Extend `SlugConfiguration` only with borrowed/functional target-platform
+transition projections over its existing private `OptionRecord` vector.
+Canonical labels are converted before publication; clone the vector only on a
+semantic change and retain its existing `Arc` otherwise. Future native-setting
+families extend this projection seam and the same evaluator row rather than
+adding maps, strings or per-transition configuration overlays.
+
+Retained cost is the definition-source/source-table `Arc`s already shared by
+the owning module and one compact key bit (expected to fit existing padding).
+Every settings/attrs/output dictionary, declaration vector and second-apply
+result is phase scratch. Keep `CompactString`, `Arc` slices, `SmallMap`/
+`SmallSet`, canonical labels, normalized `StarlarkOptions`, `Dupe` and
+`Allocative`. Add no `HashMap`/`HashSet`, interner, global cache, source-text
+identity or flattened option dictionary. Stage 9 needs no new utility-adoption
+row.
 
 Clean Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` remains peer
-guidance only. Its typed provider-class and immutable declaration/application
-separation support keeping provider policy on the attribute schema and actual
-provider membership on configured results. Slug adopts no Zig IDs, allocator,
-scheduler, graph, limits, tests or behavior.
+guidance only. Its typed `RuleConfigurationTransition`, explicit
+`should_apply_rule_transition` owner bit, separate pre/final configuration
+services and retained failure provenance support the same ownership split.
+Slug adopts no Zig code, IDs, allocator, DICE engine, scheduler, cache, limits,
+tests or behavior.
 
 ## Implementation boundary, proofs and stops
 
 Production allowlist:
 
-- `app/slug_loading_v2/src/attrs.rs` for final typed schema ownership;
-- `app/slug_loading_v2/src/package.rs` for complete constructor binding,
-  transfer at target invocation and the independent aspect-only fail-closed
-  gate; and
-- `app/slug_analysis_v2/src/dice.rs` for the ordinary configured-dependency
-  handoff to the existing validator; and
-- `app/slug_analysis_v2/src/subrule.rs` for the shared exact rule-versus-file
-  provider-validation branch.
+- `app/slug_loading_v2/src/attrs.rs`, `package.rs`, `provider.rs` and
+  `starlark_label.rs` for the sole source-aware transition definition and a
+  lightweight transition evaluation context;
+- `app/slug_configuration_v2/src/native/configuration.rs` and the smallest
+  existing export module for borrowed/functional target-platform projection;
+- `app/slug_analysis_v2/src/key.rs`, `configured_attribute.rs`, `dice.rs`,
+  `lib.rs` and one new `starlark_transition.rs` for the key bit, selector-output
+  predicate, DICE preparation/delegation and shared synchronous evaluator.
 
 Proof allowlist:
 
-- `app/slug_loading_v2/src/host_package_load_tests.rs` and existing loading
-  integration/invalidation tests; and
-- `app/slug_analysis_v2/tests/starlark_rule.rs` or the smallest existing
-  configured-target test owner for configured provider validation;
-- `app/slug_analysis_v2/tests/subrule.rs` only to update the existing shared
-  validator regression from the prior DefaultInfo-only file rule to Bazel's
-  direct-file exemption;
-- `tests/v2_oracle/fixtures/provider-constrained-dependencies/fixture.toml`,
-  `workspace/{MODULE.bazel,BUILD.bazel,defs.bzl}` and
+- focused existing loading and configuration unit/integration owners for
+  transition-source retention and platform projection;
+- `app/slug_analysis_v2/tests/starlark_rule.rs` plus the smallest internal
+  transition/key unit owner;
+- existing attribute-transition tests only where sharing the evaluator changes
+  their proof surface;
+- `tests/v2_oracle/fixtures/rule-level-starlark-transition-execution/` with
+  fixed `fixture.toml`, `workspace/{MODULE.bazel,BUILD.bazel,defs.bzl}` and
   `expected/oracle.json`; and
 - the existing `tools.v2_oracle` harness without harness-code changes.
 
 The fixture uses `comparison = "message_shape"`, Bazel 9.2 commit provenance,
-the pinned sources above and the generation command
-`python3 -B -m tools.v2_oracle run --fixture provider-constrained-dependencies
---tool bazel --bazel /usr/bin/bazel --update-expected`. Its bounded rows are:
-all-five-constructor success; flat/nested and builtin/user success; missing
-rule provider failure; source and generated-output file exemption; rule-alias
-success/failure; empty-conjunction success; and per-entry dictionary failure.
-Invalid mixed/nonprovider/unexported declaration shapes remain pinned-source
-Rust regressions: one immutable three-file workspace cannot selectively
-evaluate multiple invalid top-level declarations, and mutating the fixture
-would contradict this packet's fixed-workspace proof boundary. Alias-to-file
-remains unsupported/deferred and therefore is not a Slug replay row. No
-mutation, repository download, action execution or copied ruleset is needed.
+the pinned sources above and generation command
+`python3 -B -m tools.v2_oracle run --fixture
+rule-level-starlark-transition-execution --tool bazel --bazel /usr/bin/bazel
+--update-expected`. Fixed rows prove settings plus raw attrs; identity,
+idempotent and non-idempotent outcomes; selector re-resolution after the rule
+transition; direct typed Starlark inputs/multiple outputs; effective/default
+elision; empty and explicit target-platform results; composition with one
+attribute transition; missing/extra/bad outputs; selector-output omission; and
+split-rule rejection. Platform targets have empty flags/policy.
 
-The touched `package.rs` and `dice.rs` files exceed the size trigger, but each
-change remains a small extension of its existing declaration/invocation and
-configured-edge producer. Extracting only these lines would split ownership
-and widen private interfaces. Add no helper over 140 lines and no more than 20
-lines to an already oversized function. Caps are 180 net / 300 gross
-production Rust lines, 360 net / 520 gross proof Rust lines and 820 total gross
-Rust lines.
+The touched `package.rs` and `dice.rs` exceed the size trigger. Their edits are
+limited to transfer and orchestration; evaluation belongs in the new module and
+platform mutation stays with configuration. Add no helper over 140 lines and
+no more than 20 lines to an already oversized function. Caps are 760 net /
+1,050 gross production Rust lines, 900 net / 1,300 gross proof Rust lines and
+2,350 total gross Rust lines.
 
 Focused proofs cover:
 
-1. the exact five-constructor named-only ABI, flat/nested/builtin/user/empty,
-   canonical reorder/duplicate identity and all invalid shapes;
-2. live/frozen/imported/final schema retention and package equality, including
-   same-DICE A/B/A on a policy-only change;
-3. successful and failing configured dependencies for one conjunction and
-   alternatives, actual returned versus merely advertised providers, rule
-   aliases, direct source files, generated output files and generating rules;
-4. scalar/list and all three dictionary orientations, proving every contained
-   label receives the same predicate and empty values are neutral;
-5. explicit separation from aspect attachment: provider-only invocation
-   succeeds while every still-unadmitted aspect-bearing form remains
-   fail-closed; and
-6. rebuilt fresh rules_rust replay clears `link_deps` provider policy and
-   records the next independent generic frontier.
+1. transition definition source/mapping retention through live, frozen,
+   imported, final rule and attribute ownership, including equality and A/B/A;
+2. `ConfiguredTargetKey` apply-bit equality/hash/size, unchanged display,
+   default-true construction and non-idempotent-only false construction;
+3. settings dictionaries for every admitted Starlark value plus effective
+   `platforms`, declared spelling, multiple input/output ordering and default
+   elision;
+4. raw attr values for all admitted kinds, Label rather than Target shape,
+   ordinary selector resolution, output-reading selector omission and final
+   post-transition re-resolution;
+5. patch-dict, one-entry dict-of-dicts and one-entry sequence returns, all
+   identity forms, complete output validation, wrong type,
+   missing/non-setting declaration, evaluation failure and multi-result split
+   rejection before configured work;
+6. identity local completion, fresh second-application settings, idempotent
+   true-bit convergence and non-idempotent false-bit single application,
+   including two incoming configs converging on one final key;
+7. rule-before-attribute-transition composition, attribute-transition access
+   to final settings/raw attrs, and final configuration use by dependencies,
+   toolchains, fragments, implementation, providers and action owner identity;
+8. target-platform Host fallback, explicit Host equivalence, alternate/empty,
+   scalar string, string/Label sequences, scalar-Label rejection, first-member
+   normalization, invalid label, missing/non-platform target and nondefault-
+   platform-policy failure;
+9. same-DICE implementation, attribute, setting-default and input A/B/A with
+   exact restoration cutoff and no warm replay; and
+10. unchanged unsupported gates for other native options, platform flags,
+    build-setting aliases, split attribute edges and configured aspects.
 
-Validation is serial: focused oracle and Rust tests, complete loading and
-analysis suites, one loading-query dependent, `cargo fmt --check`, Cargo
-metadata, `git diff --check`, archive status, pinned hashes, clean Bazel/Buck2/
-Zabel, parked-file hash, `cargo build -p slug_cli_v2`, stale-`slugd` cleanup
-and fresh authentic replay. Corrected R2 architecture pre-review is accepted;
-independent terminal cross-crate retained-representation review is required.
+Run focused tests first, then serial complete
+`cargo test -p slug_configuration_v2`, `cargo test -p slug_loading_v2`,
+`cargo test -p slug_analysis_v2`, `cargo test -p slug_query_v2`, the generated
+and verified Bazel fixture, `cargo fmt --all -- --check`, metadata, diff,
+archive-status and source/hash gates. Rebuild `slug_cli_v2`, clean stale `slugd`,
+and replay a fresh authenticated rules_rust 0.73 workspace. The replay must
+clear the rule-transition gate without parser, ruleset or C++ special cases and
+stop at the next honest independent boundary. Clean `slugd` again.
 
-There is no fallback. `REPLAN` before Rust if exact satisfaction requires a
-second provider identity, provider policy cannot live in package schema
-equality, ordinary and hidden dependencies need divergent validators, actual
-provider publication is unavailable at the existing validation point, or the
-complete five-constructor family requires an admitted aspect/materializer/
-dependency-resolution bypass, or the authentic frontier requires the deferred
-alias-to-file category. `REPLAN` during implementation if any
-constructor drops policy, a policy-only change fails to invalidate, validation
-runs before the dependency's configured providers exist, caps are exceeded,
-or authentic replay contradicts the pinned category.
-
-## Immediate predecessor
-
-Commit `096653548` terminally accepts
-`WP-6-7A-generic-aspect-declaration-implementation-r1`: complete generic
-aspect declarations retain every admitted input, pass terminal review and
-full validation, and advance the authentic replay to provider-constrained
-ordinary dependency invocation.
-
-## Terminal result
-
-One canonical provider DNF now survives descriptor, frozen rule, final package
-schema and ordinary configured-edge ownership across exactly the five Bazel
-9.2 constructors. Direct files bypass provider policy after independent file
-admissibility; configured rules and rule aliases validate actual providers
-through the shared ordinary/hidden validator. The permanent Bazel 9.2 oracle,
-focused Rust proofs, complete loading/analysis/query suites, metadata, format,
-diff, archive, pinned-source, clean-reference and parked-file gates pass. The
-production delta is 42 net / 66 gross Rust lines, the proof delta is 211 net /
-239 gross, and total gross is 305, all below the frozen caps. Independent
-terminal rereview returns `ACCEPT`. A fresh rebuilt one-shot rules_rust replay
-reaches `rule-level Starlark transition execution is not supported for
-@@//pkg:probe`, proving `link_deps` is cleared without widening this packet into
-transition execution.
+Stop and `REPLAN` before Rust if independent review rejects the key/control
+identity, source-context owner, selector-output rule, target-platform boundary,
+shared evaluator, proof discriminators, allowlist or caps. During
+implementation stop on any need for a second configuration store, opaque
+native option map, unbounded delegation, held lock across DICE, platform flag
+guess, alias bypass, split-edge flattening, rules_rust/`cc_common` branch,
+parser change, source-text identity, harness mutation or out-of-allowlist
+production edit.

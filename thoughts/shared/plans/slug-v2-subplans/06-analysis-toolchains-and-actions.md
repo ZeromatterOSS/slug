@@ -22259,3 +22259,33 @@ and query suites plus every static/provenance gate pass within 66 production,
 `ACCEPT`. The rebuilt one-shot rules_rust 0.73 replay clears the
 provider-constrained `link_deps` invocation and stops at the independent
 rule-level Starlark transition-execution boundary for `@@//pkg:probe`.
+
+#### Generic rule-level Starlark transition-execution architecture active (2026-09-01)
+
+Commit `493be79b6` accepts complete provider-constrained dependencies. Activate
+`WP-6-7A-rule-level-starlark-transition-execution-architecture-r1` as the next
+generic configured-analysis category. Bazel applies the rule transition before
+final configured attributes/dependencies/toolchains, applies a changed result a
+second time to classify idempotence, and carries an apply/skip bit in configured
+target identity so non-idempotent transitions run exactly once.
+
+The candidate covers every already-admitted typed Starlark build setting and
+the complete bounded target-platform option with default-policy platforms. It
+retains transition definition source/mapping, replaces the narrow attribute-
+only executor with one shared synchronous evaluator, and keeps asynchronous
+declaration/selector preparation plus final publication in DICE. Other native
+options, nonempty platform flags/mappings, setting aliases, split attribute
+topology and configured aspects remain explicit later categories. The
+authentic rules_rust platform self-transition is a discriminator only. Bazel
+9.2 remains authority; Zabel's explicit apply bit and pre/final configuration
+split are peer architecture/optimization guidance, never behavior authority;
+BCR Starlark continues to own every rule including `cc_internal`, and
+`cc_common` remains a generic downstream host-ABI consumer.
+
+R1 independent architecture review returned `REVISE` for one native-option
+type error: Bazel accepts a scalar string or a sequence containing strings and
+`Label` values for `//command_line_option:platforms`, but rejects a scalar
+`Label`. Corrected R2 states and tests that distinction without changing the
+packet boundary. Focused R2 rereview returns `ACCEPT` with no remaining
+findings. Commit this architecture before Rust, then activate its bounded
+implementation successor.
