@@ -2255,8 +2255,9 @@ Status: architecture independently `ACCEPTED` after the bounded
 `REPLAN` only because removing both superseded Host parsers produced 987 gross
 production lines against an underestimated 720-line production cap. R2 changes
 that cap to 1,000 while preserving the 1,720 total cap and every architecture,
-allowlist and proof boundary; its independent cap-correction review and
-terminal acceptance remain pending.
+allowlist and proof boundary. Independent cap-correction review recomputed the
+987 production/624 proof/1,611 total gross candidate and returned `ACCEPT`;
+terminal implementation acceptance remains pending.
 
 Decision: replace the split raw flat-pattern validator and separately retained
 Host pattern with one V2-owned immutable `GlobPattern`: one `Arc<str>` raw

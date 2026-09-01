@@ -4,10 +4,9 @@ Packet: `WP-6-7A-recursive-build-glob-category-implementation-r2`
 
 Milestone: M7A generic Starlark/ruleset closure; BUILD glob loading semantics.
 
-Status: cap-correction review active after R1 ended `REPLAN`. The accepted
-architecture, compatibility classes, allowlists and proof obligations are
-unchanged; implementation acceptance remains paused pending independent review
-of the truthful R2 gross bounds.
+Status: implementation active after independent `ACCEPT` of the R2 cap
+correction. The accepted architecture, compatibility classes, allowlists and
+proof obligations are unchanged.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -164,7 +163,8 @@ but undercounted more than 300 gross deleted lines from removing two
 superseded Host pattern implementations and their adapter plumbing. R2 changes only the
 production cap to 1,000; it adds no file, semantic row, proof exception, DICE
 owner, cache, lock or eager walk. The unchanged 1,720 total cap still bounds
-the complete packet.
+the complete packet. Independent review recomputed exactly 987 production, 624
+proof and 1,611 total gross lines and returned `ACCEPT`.
 
 Stop with `REPLAN` if another production file is required, segment-key equality
 cannot remain byte/discriminator based, or the implementation needs a new DICE

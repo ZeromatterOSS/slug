@@ -22689,3 +22689,7 @@ compatibility classification, architecture decision, proof obligation,
 validation gate and stop condition above remains byte-for-byte authoritative;
 R2 adds no production file, semantic row, DICE owner, cache, lock or eager
 walk. Resume Rust acceptance only after that cap correction returns `ACCEPT`.
+
+Independent cap-correction review recomputes exactly 987 production, 624 proof
+and 1,611 total gross lines and returns `ACCEPT`. R2 implementation acceptance
+may resume under the corrected caps and otherwise unchanged contract.

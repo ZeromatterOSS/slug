@@ -58,7 +58,8 @@ for arbitrary-size `exclude_directories` integers and matched symlink-cycle
 semantics. R1 ended `REPLAN` because its 987 production gross lines include
 the required deletion of both duplicate Host pattern implementations, beyond
 the estimated 720 production cap while remaining inside the total cap.
-Independently review only the truthful cap correction, then activate
+Independent cap-correction review recomputed 987 production/624 proof/1,611
+total gross lines and returned `ACCEPT`. Activate only
 `WP-6-7A-recursive-build-glob-category-implementation-r2` under unchanged
 semantics, allowlists, proof obligations and 1,720 total cap: one shared
 immutable pattern representation serves the flat-listing and observed Host
