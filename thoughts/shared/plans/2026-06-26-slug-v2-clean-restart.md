@@ -36,7 +36,24 @@ and must name the same packet.
 
 ### Current packet
 
-[Cross-module attribute-descriptor identity architecture](./slug-v2-subplans/current-packet.md).
+[Complete transition declaration-setting identity architecture](./slug-v2-subplans/current-packet.md).
+
+Materialize and review
+`WP-6-7A-transition-declaration-setting-identity-r1`. It replaces the scalar
+root-only transition output with complete immutable input/output setting
+identity: definition-repository canonical labels, original spellings, exact
+two-phase duplicate/error order, raw-only native-option restrictions, and
+canonical internal-byte ordering. The architecture is sized for later
+patch/split and native-option
+execution, but this packet keeps all nonempty-input, nonsingle-output,
+rule-level, split and native execution explicitly deferred and fail closed.
+No rules_rust, parser, `set`, rule-body, `cc_common`, `cc_internal`, or C++
+special case is admitted. Bazel 9.2 is sole semantic authority; Buck2 and
+Zabel are representation guidance only. R1 pre-review returned `REVISE`; the
+R2 contract also pins the default-empty disabled-option semantics, preserves
+all admitted typed build-setting execution, and rejects native/external/new
+shapes before DICE lookup or invocation. Focused R2 rereview returned
+`ACCEPT`; implement only the frozen packet.
 
 Commit `1e65972a6` terminally accepts one compact retained property-bit owner
 and admits
