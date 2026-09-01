@@ -171,6 +171,7 @@ struct AnalysisContextGen<V> {
     package_path: String,
     #[trace(unsafe_ignore)]
     dependencies: Arc<[AnalysisDependency]>,
+    executables: Arc<[AnalysisExecutable]>,
     resolved_attributes: Arc<[ResolvedRuleAttribute]>,
     #[trace(unsafe_ignore)]
     predeclared_outputs: Arc<[PredeclaredOutput]>,
@@ -195,6 +196,7 @@ impl<'v> Freeze for AnalysisContext<'v> {
             target_label: self.target_label,
             package_path: self.package_path,
             dependencies: self.dependencies,
+            executables: self.executables,
             resolved_attributes: self.resolved_attributes,
             predeclared_outputs: self.predeclared_outputs,
             build_setting_value: self
@@ -235,6 +237,10 @@ where
                 token: self.token.clone(),
                 dependencies: self.dependencies.clone(),
                 attributes: self.resolved_attributes.clone(),
+            })),
+            "executable" => Some(heap.alloc_simple(AnalysisExecutables {
+                token: self.token.clone(),
+                executables: self.executables.clone(),
             })),
             "outputs" => Some(heap.alloc_simple(AnalysisOutputs {
                 token: self.token.clone(),
@@ -420,6 +426,45 @@ struct AnalysisAttributes {
     token: AnalysisCallToken,
     dependencies: Arc<[AnalysisDependency]>,
     attributes: Arc<[ResolvedRuleAttribute]>,
+}
+
+#[derive(Debug, Clone, Allocative)]
+struct AnalysisExecutable {
+    attribute: CompactString,
+    executable: Option<FrozenValue>,
+}
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct AnalysisExecutables {
+    #[allocative(skip)]
+    token: AnalysisCallToken,
+    executables: Arc<[AnalysisExecutable]>,
+}
+
+impl fmt::Display for AnalysisExecutables {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<ctx.executable>")
+    }
+}
+
+starlark::starlark_simple_value!(AnalysisExecutables);
+
+#[starlark_value(type = "analysis_executables")]
+impl<'v> StarlarkValue<'v> for AnalysisExecutables {
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        self.token
+            .require_active(attribute, "rule context executables")
+            .ok()?;
+        let executable = self
+            .executables
+            .iter()
+            .find(|candidate| candidate.attribute == attribute)?;
+        Some(
+            executable
+                .executable
+                .map_or_else(Value::new_none, FrozenValue::to_value),
+        )
+    }
 }
 
 impl fmt::Display for AnalysisAttributes {
@@ -1652,8 +1697,29 @@ pub(crate) fn evaluate_loaded_rule(
         executable_provenance,
         execution_tags,
     });
-    let (dependencies, toolchain) = {
+    let (dependencies, executables, toolchain) = {
         let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
+        let executables = implementation
+            .schema()
+            .iter()
+            .filter(|schema| schema.executable())
+            .map(|schema| {
+                let executable = dependencies
+                    .iter()
+                    .find(|dependency| dependency.attribute == schema.declaration_name())
+                    .and_then(|dependency| dependency.executable.as_ref())
+                    .and_then(|provider| provider.executable.clone())
+                    .map(|artifact| {
+                        module
+                            .frozen_heap()
+                            .alloc(AnalysisArtifactValue::new(artifact))
+                    });
+                AnalysisExecutable {
+                    attribute: CompactString::new(schema.declaration_name()),
+                    executable,
+                }
+            })
+            .collect::<Arc<[_]>>();
         let dependencies = dependencies
             .into_iter()
             .map(|dependency| {
@@ -1678,7 +1744,7 @@ pub(crate) fn evaluate_loaded_rule(
                 )
             })
             .transpose()?;
-        (dependencies, toolchain)
+        (dependencies, executables, toolchain)
     };
     let prepared_subrules = {
         let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
@@ -1742,6 +1808,7 @@ pub(crate) fn evaluate_loaded_rule(
             target_label: key.label().clone(),
             package_path: package_path.to_owned(),
             dependencies,
+            executables,
             resolved_attributes: resolved_attributes.clone(),
             predeclared_outputs: predeclared_outputs.clone(),
             build_setting_value,

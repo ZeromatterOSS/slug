@@ -2224,3 +2224,26 @@ the folded bit is DICE-retained frozen-module semantic metadata with no new
 allocation and no evaluator borrow. Existing source/manifests own invalidation,
 existing frozen heaps own values, and existing DICE publication/cutoff,
 cancellation, eviction and shutdown lifetimes remain unchanged.
+
+### Stage 6 configured exec dependency utility decision (2026-09-01)
+
+Status: implementation terminally `ACCEPTED` in
+`WP-6-7A-default-exec-configured-label-dependency-implementation-r2`; commit
+pending.
+
+Decision: reuse existing Buck2-derived `CompactString`, `Arc` slices,
+`Allocative`, structural configuration values and provider owners. Add one
+small shared `ConfiguredExecGroup::{Default, Named}` value and one typed
+attribute-edge relation carrying target, exec or complete canonical Starlark
+transition outputs. The evaluator-only `ctx.executable` slice shallowly
+projects the already-prepared FilesToRun provider and does not enter a DICE
+result. Add no V1 extraction, second graph, interner, cache, task, lock, DICE
+key, provider owner or reconstructed configuration token.
+
+Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a`
+`exec_group_resolution.zig`, `session_configured_exec_group_relation.zig` and
+`session_configured_owner_value.zig` are peer guidance for typed group/relation
+ownership only. No Zig representation, IDs, selection semantics, scheduler,
+cache, limits or behavior is imported. Bazel 9.2 remains sole authority, and
+BCR Starlark continues to own rule bodies including `cc_internal`; rules_rust
+and `cc_common` are downstream consumers.

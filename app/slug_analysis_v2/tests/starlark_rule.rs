@@ -46,9 +46,11 @@ use slug_analysis_v2::CommandConfigurationPreparationObservationKey;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredActionExecutionState as ActionExecutionState;
 use slug_analysis_v2::ConfiguredActionToolchainContext;
+use slug_analysis_v2::ConfiguredAttributeDependency;
 use slug_analysis_v2::ConfiguredConditionKey;
 use slug_analysis_v2::ConfiguredConditionMatch;
 use slug_analysis_v2::ConfiguredEdgeKind;
+use slug_analysis_v2::ConfiguredExecGroup;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredNodeAnalysisObservationKey;
 use slug_analysis_v2::ConfiguredNodeKey;
@@ -1583,7 +1585,7 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
     assert_eq!(context.owner(), first.configured_target_key().unwrap());
     assert_eq!(
         context.exec_group(),
-        &slug_analysis_v2::ConfiguredActionExecGroup::Default
+        &slug_analysis_v2::ConfiguredExecGroup::Default
     );
     assert_eq!(
         retained_toolchain_marker(context.toolchain().unwrap()),
@@ -2670,8 +2672,12 @@ async fn selected_toolchain_accepts_declared_actions_and_default_outputs() {
         edge.target().label().to_string() == "@@//:dep"
             && matches!(
                 edge.kind(),
-                ConfiguredEdgeKind::OrdinaryAttribute { attribute, index }
-                    if attribute == "dep" && *index == 0
+                ConfiguredEdgeKind::Attribute {
+                    attribute,
+                    index,
+                    hidden: false,
+                    dependency: ConfiguredAttributeDependency::Target,
+                } if attribute == "dep" && *index == 0
             )
     }));
     let direct = root_target_request(&dice, &workspace, "@@//:first_impl", tracker())
@@ -6481,13 +6487,21 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = first)
     assert_ne!(result.edges()[0].kind(), result.edges()[1].kind());
     assert!(matches!(
         result.edges()[0].kind(),
-        slug_analysis_v2::ConfiguredEdgeKind::TransitionedAttribute { attribute, index: 0, .. }
-        if attribute == "left"
+        slug_analysis_v2::ConfiguredEdgeKind::Attribute {
+            attribute,
+            index: 0,
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Starlark { .. },
+        } if attribute == "left"
     ));
     assert!(matches!(
         result.edges()[1].kind(),
-        slug_analysis_v2::ConfiguredEdgeKind::TransitionedAttribute { attribute, index: 0, .. }
-        if attribute == "right"
+        slug_analysis_v2::ConfiguredEdgeKind::Attribute {
+            attribute,
+            index: 0,
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Starlark { .. },
+        } if attribute == "right"
     ));
     assert!(matches!(
         result.edges()[2].kind(),
@@ -6558,8 +6572,12 @@ ordinary_rule(
     assert_eq!(root.edges().len(), 6);
     assert!(matches!(
         root.edges()[0].kind(),
-        ConfiguredEdgeKind::OrdinaryAttribute { attribute, index: 0 }
-        if attribute == "normal"
+        ConfiguredEdgeKind::Attribute {
+            attribute,
+            index: 0,
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Target,
+        } if attribute == "normal"
     ));
     assert_eq!(
         root.edges()[0].target(),
@@ -6567,22 +6585,38 @@ ordinary_rule(
     );
     assert!(matches!(
         root.edges()[1].kind(),
-        ConfiguredEdgeKind::OrdinaryAttribute { attribute, index: 0 }
-        if attribute == "aliased"
+        ConfiguredEdgeKind::Attribute {
+            attribute,
+            index: 0,
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Target,
+        } if attribute == "aliased"
     ));
     assert_eq!(
         root.edges()[1].target(),
         &configured("@@//:alias_outer").into()
     );
-    assert_eq!(root.edges()[2].kind(), &ConfiguredEdgeKind::Source);
+    assert!(matches!(
+        root.edges()[2].kind(),
+        ConfiguredEdgeKind::Attribute {
+            attribute,
+            index: 0,
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Target,
+        } if attribute == "src"
+    ));
     assert_eq!(
         root.edges()[2].target(),
         &ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:source.txt").unwrap())
     );
     assert!(matches!(
         root.edges()[3].kind(),
-        ConfiguredEdgeKind::OrdinaryAttribute { attribute, index: 0 }
-        if attribute == "generated"
+        ConfiguredEdgeKind::Attribute {
+            attribute,
+            index: 0,
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Target,
+        } if attribute == "generated"
     ));
     assert_eq!(
         root.edges()[3].target(),
@@ -8433,16 +8467,20 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     );
     assert!(matches!(
         result.edges()[0].kind(),
-        slug_analysis_v2::ConfiguredEdgeKind::OrdinaryAttribute {
+        slug_analysis_v2::ConfiguredEdgeKind::Attribute {
             attribute,
-            index: 0
+            index: 0,
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Target,
         } if attribute == "deps"
     ));
     assert!(matches!(
         result.edges()[1].kind(),
-        slug_analysis_v2::ConfiguredEdgeKind::OrdinaryAttribute {
+        slug_analysis_v2::ConfiguredEdgeKind::Attribute {
             attribute,
-            index: 1
+            index: 1,
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Target,
         } if attribute == "deps"
     ));
     let parent_id = ProviderId::new("//rules:defs.bzl", "ParentInfo").unwrap();
@@ -10100,8 +10138,12 @@ async fn selected_configurable_transition_ignores_unselected_branch_and_authenti
 setting = rule(implementation = _empty, build_setting = config.string(flag = True))
 leaf = rule(implementation = _empty)
 def _transition(settings, attr): return {"//:setting": "changed"}
+def _empty_transition(settings, attr): return {}
+def _multi(settings, attr): return {"//:setting": "first", "//:other": "second"}
 configured = transition(implementation = _transition, inputs = [], outputs = ["//:setting"])
-parent = rule(implementation = _empty, attrs = {"dep": attr.label(cfg = configured)})
+empty = transition(implementation = _empty_transition, inputs = [], outputs = [])
+multi = transition(implementation = _multi, inputs = [], outputs = ["//:setting", "//:other"])
+parent = rule(implementation = _empty, attrs = {"dep": attr.label(cfg = configured), "empty": attr.label(cfg = empty), "multi": attr.label(cfg = multi)})
 "#,
     )
     .unwrap();
@@ -10109,9 +10151,10 @@ parent = rule(implementation = _empty, attrs = {"dep": attr.label(cfg = configur
         workspace.join("BUILD.bazel"),
         r#"load(":defs.bzl", "leaf", "parent", "setting")
 setting(name = "setting", build_setting_default = "default")
+setting(name = "other", build_setting_default = "default")
 leaf(name = "selected")
 config_setting(name = "choose", values = {"compilation_mode": "fastbuild"})
-parent(name = "parent", dep = select({":choose": ":selected", "//conditions:default": ":unselected_missing"}))
+parent(name = "parent", dep = select({":choose": ":selected", "//conditions:default": ":unselected_missing"}), empty = ":selected", multi = ":selected")
 "#,
     )
     .unwrap();
@@ -10133,36 +10176,59 @@ parent(name = "parent", dep = select({":choose": ":selected", "//conditions:defa
             .and_then(|option| option.value().as_str()),
         Some("changed")
     );
-    assert_eq!(result.configured_dependencies().count(), 2);
+    assert_eq!(result.configured_dependencies().count(), 4);
+    let transition_edges = result
+        .edges()
+        .iter()
+        .filter_map(|edge| match edge.kind() {
+            ConfiguredEdgeKind::Attribute {
+                attribute,
+                index,
+                dependency:
+                    ConfiguredAttributeDependency::Starlark {
+                        outputs,
+                        exec_group: None,
+                    },
+                ..
+            } => Some((
+                attribute.to_string(),
+                *index,
+                outputs.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            )),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        transition_edges,
+        [
+            ("dep".to_owned(), 0, vec!["@@//:setting".to_owned()]),
+            ("empty".to_owned(), 0, vec![]),
+            (
+                "multi".to_owned(),
+                0,
+                vec!["@@//:other".to_owned(), "@@//:setting".to_owned()],
+            ),
+        ]
+    );
     assert!(matches!(
-        result.edges()[0].kind(),
-        slug_analysis_v2::ConfiguredEdgeKind::TransitionedAttribute {
-            attribute,
-            index: 0,
-            output,
-        } if attribute == "dep" && output == &CanonicalLabel::parse("@@//:setting").unwrap()
-    ));
-    assert!(matches!(
-        result.edges()[1].kind(),
+        result.edges()[3].kind(),
         slug_analysis_v2::ConfiguredEdgeKind::CandidateExecutionPlatform { index: 0 }
     ));
 }
 
 #[tokio::test]
-async fn exec_and_executable_attributes_fail_closed_before_configured_consumption() {
+async fn exec_and_executable_attributes_reach_dependency_validation_before_rule_evaluation() {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(workspace.join("plain.txt"), "plain\n").unwrap();
     fs::write(
         workspace.join("defs.bzl"),
         r#"def _unsupported(ctx):
     fail("RULE_EVALUATED")
 def _ok(ctx):
     return [DefaultInfo()]
-def _transition(settings, attr):
-    return {"//:setting": "changed"}
-configured = transition(implementation = _transition, inputs = [], outputs = ["//:setting"])
 exec_rule = rule(implementation = _unsupported, attrs = {"dep": attr.label(cfg = "exec")})
-executable_rule = rule(implementation = _unsupported, attrs = {"dep": attr.label(cfg = configured, executable = True)})
+executable_rule = rule(implementation = _unsupported, attrs = {"dep": attr.label(cfg = "target", executable = True)})
 ok_rule = rule(implementation = _ok)
 "#,
     )
@@ -10170,21 +10236,19 @@ ok_rule = rule(implementation = _ok)
     fs::write(
         workspace.join("BUILD.bazel"),
         r#"load(":defs.bzl", "exec_rule", "executable_rule", "ok_rule")
-exec_rule(name = "exec", dep = ":missing_exec_child")
-executable_rule(name = "executable", dep = ":missing_executable_child")
+exec_rule(name = "exec", dep = ":plain.txt")
+executable_rule(name = "executable", dep = ":ok")
 ok_rule(name = "ok")
 "#,
     )
     .unwrap();
 
     let dice = Dice::builder().build(DetectCycles::Enabled);
-    for (target, expected_exec, expected_executable) in
-        [("exec", true, false), ("executable", false, true)]
-    {
+    for target in ["exec", "executable"] {
         let tracker = Arc::new(RootActivationTracker::default());
         let key = ConfiguredTargetKey::new(
             CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
-            test_configuration(),
+            typed_action_test_configuration(),
         );
         let error = analyze_request_typed(&dice, &workspace, &key, Some(tracker.clone()), false)
             .await
@@ -10193,25 +10257,11 @@ ok_rule(name = "ok")
             !error.to_string().contains("RULE_EVALUATED"),
             "{target}: {error}"
         );
-        assert!(matches!(
-            error.kind(),
-            AnalysisErrorKind::UnsupportedConfiguredAttribute {
-                target: error_target,
-                attribute,
-                exec_configuration,
-                executable,
-            } if error_target == key.label()
-                && attribute == "dep"
-                && *exec_configuration == expected_exec
-                && *executable == expected_executable
-        ));
-        let (activations, _, _) = tracker.take();
         assert!(
-            activations
-                .iter()
-                .all(|(identity, _)| !identity.contains("missing_")),
-            "unsupported child was configured: {activations:#?}"
+            !error.to_string().contains("does not yet support attribute"),
+            "{target}: {error}"
         );
+        let _ = tracker.take();
     }
 
     let tracker = Arc::new(RootActivationTracker::default());
@@ -10240,6 +10290,194 @@ ok_rule(name = "ok")
             .any(|code| code == "resolved/@@//:ok=<default>:R"),
         "missing warm reuse activation: {codes:#?}"
     );
+}
+
+#[tokio::test]
+async fn default_exec_configuration_covers_all_label_shapes_selects_first_and_keeps_tool_edges() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(package.join("data.txt"), "source\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+r#"ProbeInfo = provider(fields = {"value": "configured attribute shape proof"})
+
+def _setting(ctx):
+    return []
+
+string_setting = rule(
+    implementation = _setting,
+    attrs = {"scope": attr.string()},
+    build_setting = config.string(flag = True),
+)
+
+def _tool(ctx):
+    out = ctx.actions.declare_file(ctx.label.name)
+    ctx.actions.write(out, "tool", is_executable = True)
+    return [DefaultInfo(executable = out)]
+
+tool = rule(implementation = _tool, executable = True)
+
+def _probe(ctx):
+    if type(ctx.executable.scalar) != "File" or type(ctx.executable.target_tool) != "File":
+        fail("ctx.executable did not project executable Files")
+    if ctx.executable.optional_tool != None or ctx.attr.optional_tool != None:
+        fail("omitted optional executable did not remain None")
+    if hasattr(ctx.executable, "ordinary"):
+        fail("nonexecutable attribute leaked into ctx.executable")
+    if ctx.attr.scalar.label.name != "chosen":
+        fail("scalar select was not resolved in the target configuration")
+    if [dep.label.name for dep in ctx.attr.vector] != ["chosen", "other"]:
+        fail("label_list order changed")
+    if [ctx.attr.string_keyed["first"].label.name, ctx.attr.string_keyed["second"].label.name] != ["chosen", "other"]:
+        fail("string_keyed_label_dict orientation changed")
+    label_keyed = []
+    for dep, value in ctx.attr.label_keyed.items():
+        label_keyed.append(dep.label.name + ":" + value)
+    if label_keyed != ["chosen:first", "other:second"]:
+        fail("label_keyed_string_dict orientation changed: %s" % label_keyed)
+    if [dep.label.name for dep in ctx.attr.list_dict["group"]] != ["other", "chosen"]:
+        fail("label_list_dict orientation changed")
+    if ctx.attr.source.basename != "data.txt":
+        fail("exec source file did not materialize")
+    return [ProbeInfo(value = ctx.executable.scalar.basename + ":" + ctx.executable.target_tool.basename)]
+
+probe = rule(
+    implementation = _probe,
+    attrs = {
+        "scalar": attr.label(cfg = "exec", executable = True),
+        "target_tool": attr.label(cfg = "target", executable = True),
+        "optional_tool": attr.label(cfg = "exec", executable = True),
+        "ordinary": attr.label(),
+        "vector": attr.label_list(cfg = "exec"),
+        "string_keyed": attr.string_keyed_label_dict(cfg = "exec"),
+        "label_keyed": attr.label_keyed_string_dict(cfg = "exec"),
+        "list_dict": attr.label_list_dict(cfg = "exec"),
+        "source": attr.label(cfg = "exec", allow_files = True),
+    },
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "probe", "string_setting", "tool")
+string_setting(name = "switch", build_setting_default = "default", scope = "target")
+config_setting(name = "selected", flag_values = {":switch": "selected"})
+tool(name = "chosen")
+tool(name = "other")
+probe(
+    name = "probe",
+    scalar = select({":selected": ":chosen", "//conditions:default": ":other"}),
+    target_tool = ":other",
+    vector = [":chosen", ":other"],
+    string_keyed = {"first": ":chosen", "second": ":other"},
+    label_keyed = {":chosen": "first", ":other": "second"},
+    list_dict = {"group": [":other", ":chosen"]},
+    source = ":data.txt",
+)
+"#,
+    )
+    .unwrap();
+
+    let switch = CanonicalLabel::parse("@@//pkg:switch").unwrap();
+    let request_configuration = typed_action_test_configuration().with_starlark_option(
+        StarlarkOption::string(switch.clone(), "selected", StarlarkOptionScope::Target),
+    );
+    let result = root_target_request_with_configuration(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//pkg:probe",
+        request_configuration.clone(),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        provider_value(
+            &result,
+            &ProviderId::new("//pkg:defs.bzl", "ProbeInfo").unwrap()
+        ),
+        "chosen:other"
+    );
+    assert_eq!(
+        result
+            .configured_target_key()
+            .unwrap()
+            .configuration()
+            .starlark_option(&switch)
+            .and_then(|option| option.value().as_str()),
+        Some("selected")
+    );
+
+    let mut exec_attribute_edges = 0;
+    let mut saw_selected_scalar = false;
+    let mut saw_source = false;
+    let mut saw_target_tool = false;
+    for edge in result.edges() {
+        let ConfiguredEdgeKind::Attribute {
+            attribute,
+            hidden: false,
+            dependency,
+            ..
+        } = edge.kind()
+        else {
+            continue;
+        };
+        match dependency {
+            ConfiguredAttributeDependency::Exec(ConfiguredExecGroup::Default) => {
+                exec_attribute_edges += 1;
+                assert!(edge.tool(), "{attribute}");
+                if attribute == "scalar" {
+                    saw_selected_scalar = edge.target().label().to_string() == "@@//pkg:chosen";
+                }
+                if attribute == "source" {
+                    saw_source = edge.target().configured_target().is_none()
+                        && edge.target().label().to_string() == "@@//pkg:data.txt";
+                    continue;
+                }
+                let child = edge
+                    .configured_target()
+                    .expect("rule dependency is configured");
+                assert_eq!(
+                    child.configuration().kind(),
+                    slug_analysis_v2::ConfigurationKind::Exec
+                );
+                assert!(
+                    child.configuration().starlark_option(&switch).is_none(),
+                    "target-scoped option leaked to exec dependency {attribute}"
+                );
+                assert_eq!(
+                    child
+                        .configuration()
+                        .slug_configuration()
+                        .unwrap()
+                        .target_platform_label()
+                        .unwrap()
+                        .to_string(),
+                    "@@//.slug_test_host:host"
+                );
+            }
+            ConfiguredAttributeDependency::Target => {
+                assert_eq!(attribute, "target_tool");
+                assert!(!edge.tool());
+                saw_target_tool = edge
+                    .configured_target()
+                    .is_some_and(|child| child.configuration() == &request_configuration);
+            }
+            ConfiguredAttributeDependency::Starlark { .. } => {
+                panic!("unexpected Starlark transition edge for {attribute}")
+            }
+            ConfiguredAttributeDependency::Exec(ConfiguredExecGroup::Named(name)) => {
+                panic!("unexpected named exec group {name}")
+            }
+        }
+    }
+    assert_eq!(exec_attribute_edges, 10);
+    assert!(saw_selected_scalar);
+    assert!(saw_source);
+    assert!(saw_target_tool);
 }
 
 #[tokio::test]

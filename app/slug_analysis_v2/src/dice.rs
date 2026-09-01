@@ -80,6 +80,8 @@ use crate::configured_analysis_cycle_detector::ConfiguredAnalysisCycleGuard;
 use crate::configured_attribute::ConfiguredAttributeCondition;
 use crate::configured_attribute::ResolvedRuleAttribute;
 use crate::configured_attribute::resolve_configured_attribute;
+use crate::configured_target::ConfiguredAttributeDependency;
+use crate::exec_group::ConfiguredExecGroup;
 use crate::key::ConfigurationKey;
 use crate::key::ConfigurationKind;
 use crate::key::ConfiguredNodeKey;
@@ -87,7 +89,6 @@ use crate::key::ConfiguredTargetKey;
 #[cfg(test)]
 use crate::key::StarlarkOption;
 use crate::result::ConfiguredActionAspectProvenance;
-use crate::result::ConfiguredActionExecGroup;
 use crate::result::ConfiguredActionOwnerContext;
 use crate::result::ConfiguredActionPlatformConstraint;
 use crate::result::ConfiguredActionToolchainContext;
@@ -124,12 +125,6 @@ pub enum AnalysisErrorKind {
     ExecutableRuleMissingExecutable {
         rule_class: CompactString,
     },
-    UnsupportedConfiguredAttribute {
-        target: CanonicalLabel,
-        attribute: CompactString,
-        exec_configuration: bool,
-        executable: bool,
-    },
     Message(String),
 }
 
@@ -165,22 +160,6 @@ impl AnalysisError {
         Self { kind }
     }
 
-    fn unsupported_configured_attribute(
-        target: CanonicalLabel,
-        attribute: impl Into<CompactString>,
-        exec_configuration: bool,
-        executable: bool,
-    ) -> Self {
-        Self {
-            kind: AnalysisErrorKind::UnsupportedConfiguredAttribute {
-                target,
-                attribute: attribute.into(),
-                exec_configuration,
-                executable,
-            },
-        }
-    }
-
     pub fn kind(&self) -> &AnalysisErrorKind {
         &self.kind
     }
@@ -200,23 +179,6 @@ impl fmt::Display for AnalysisError {
                 f,
                 "The rule '{rule_class}' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns."
             ),
-            AnalysisErrorKind::UnsupportedConfiguredAttribute {
-                target,
-                attribute,
-                exec_configuration,
-                executable,
-            } => {
-                let declaration = match (*exec_configuration, *executable) {
-                    (true, true) => "cfg=\"exec\" and executable=True",
-                    (true, false) => "cfg=\"exec\"",
-                    (false, true) => "executable=True",
-                    (false, false) => unreachable!("unsupported attribute retains a reason"),
-                };
-                write!(
-                    f,
-                    "configured analysis of target `{target}` does not yet support attribute `{attribute}` declared with {declaration}"
-                )
-            }
             AnalysisErrorKind::Message(message) => f.write_str(message),
         }
     }
@@ -1485,6 +1447,7 @@ async fn root_declared_dependency_keys(
     package: &LoadedPackage,
     configured_target: &ConfiguredTargetKey,
     resolved_attributes: &[ResolvedRuleAttribute],
+    exec_configuration: Option<&ConfigurationKey>,
 ) -> AnalysisSemanticOutcome<Vec<DeclaredDependencyKey>> {
     let implementation = match starlark_rule_implementation(package, configured_target) {
         Ok(implementation) => implementation,
@@ -1513,26 +1476,58 @@ async fn root_declared_dependency_keys(
         }
         let mut labels = Vec::new();
         value.value.labels(&mut labels);
-        let (configuration, transition_output) = match configured_dependency_configuration(
-            ctx,
-            mode,
-            workspace,
-            configured_target.configuration(),
-            schema.transition(),
-            resolved_attributes,
-        )
-        .await
-        {
-            LoadingPreparationOutcome::Need(need) => {
-                return LoadingPreparationOutcome::Need(need);
+        let (configuration, dependency) = match schema.dependency_configuration() {
+            AttributeDependencyConfiguration::Target => (
+                configured_target.configuration().clone(),
+                ConfiguredAttributeDependency::Target,
+            ),
+            AttributeDependencyConfiguration::Exec => {
+                let Some(configuration) = exec_configuration else {
+                    return analysis_semantic_complete(Err(AnalysisError::new(format!(
+                        "internal error: exec dependency `{}` was prepared before execution-platform selection",
+                        value.declaration_name
+                    ))));
+                };
+                (
+                    configuration.clone(),
+                    ConfiguredAttributeDependency::Exec(ConfiguredExecGroup::Default),
+                )
             }
-            LoadingPreparationOutcome::Complete(Err(error)) => {
-                return LoadingPreparationOutcome::Complete(Err(error));
+            AttributeDependencyConfiguration::Starlark(transition) => {
+                let configuration = match configured_dependency_configuration(
+                    ctx,
+                    mode,
+                    workspace,
+                    configured_target.configuration(),
+                    transition,
+                    resolved_attributes,
+                )
+                .await
+                {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return LoadingPreparationOutcome::Need(need);
+                    }
+                    LoadingPreparationOutcome::Complete(Err(error)) => {
+                        return LoadingPreparationOutcome::Complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                        return analysis_semantic_complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Ok(configuration))) => configuration,
+                };
+                (
+                    configuration,
+                    ConfiguredAttributeDependency::Starlark {
+                        outputs: transition
+                            .outputs()
+                            .iter()
+                            .map(|setting| setting.canonical().clone())
+                            .collect::<Vec<_>>()
+                            .into(),
+                        exec_group: None,
+                    },
+                )
             }
-            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-                return analysis_semantic_complete(Err(error));
-            }
-            LoadingPreparationOutcome::Complete(Ok(Ok(configuration))) => configuration,
         };
         let path_flavor = match schema.file_admissibility().suffixes() {
             Some(_) => match configured_dependency_path_flavor(
@@ -1564,9 +1559,8 @@ async fn root_declared_dependency_keys(
                 attribute_index: u32::try_from(attribute_index)
                     .expect("attribute dependency index fits u32"),
                 node,
-                transition_output: transition_output.clone(),
+                dependency: dependency.clone(),
                 hidden: false,
-                exec_configuration: false,
                 source_admitted: schema.file_admissibility().admits_direct_file(),
                 path_flavor,
                 validation: Some(ConfiguredDependencyValidation::new(
@@ -1605,12 +1599,9 @@ async fn configured_dependency_configuration(
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
     configuration: &ConfigurationKey,
-    transition: Option<&TransitionDefinition>,
+    transition: &TransitionDefinition,
     attributes: &[ResolvedRuleAttribute],
-) -> AnalysisSemanticOutcome<(ConfigurationKey, Option<CanonicalLabel>)> {
-    let Some(transition) = transition else {
-        return analysis_semantic_complete(Ok((configuration.clone(), None)));
-    };
+) -> AnalysisSemanticOutcome<ConfigurationKey> {
     let rows = semantic_value!(
         prepare_starlark_transition_settings(ctx, mode, workspace, transition).await
     );
@@ -1625,13 +1616,7 @@ async fn configured_dependency_configuration(
         )));
     };
     semantic_value!(validate_transition_platform(ctx, workspace, configuration, candidate).await);
-    analysis_semantic_complete(Ok((
-        candidate.clone(),
-        transition
-            .outputs()
-            .first()
-            .map(|setting| setting.canonical().clone()),
-    )))
+    analysis_semantic_complete(Ok(candidate.clone()))
 }
 
 async fn prepare_starlark_transition_settings(
@@ -2255,31 +2240,11 @@ where
                 dependency.node
             ))
         })?;
-        let kind = if dependency.hidden {
-            crate::configured_target::ConfiguredEdgeKind::ImplicitAttribute {
-                attribute: dependency.attribute.clone(),
-                index: dependency.attribute_index,
-                tool: dependency.exec_configuration,
-            }
-        } else {
-            match (&dependency.node, &dependency.transition_output) {
-                (ConfiguredNodeKey::Null(_), _) => {
-                    crate::configured_target::ConfiguredEdgeKind::Source
-                }
-                (ConfiguredNodeKey::Configured(_), Some(output)) => {
-                    crate::configured_target::ConfiguredEdgeKind::TransitionedAttribute {
-                        attribute: dependency.attribute.clone(),
-                        index: dependency.attribute_index,
-                        output: output.clone(),
-                    }
-                }
-                (ConfiguredNodeKey::Configured(_), None) => {
-                    crate::configured_target::ConfiguredEdgeKind::OrdinaryAttribute {
-                        attribute: dependency.attribute.clone(),
-                        index: dependency.attribute_index,
-                    }
-                }
-            }
+        let kind = crate::configured_target::ConfiguredEdgeKind::Attribute {
+            attribute: dependency.attribute.clone(),
+            index: dependency.attribute_index,
+            hidden: dependency.hidden,
+            dependency: dependency.dependency.clone(),
         };
         if !dependency.hidden {
             let executable = implementation
@@ -3669,7 +3634,7 @@ async fn prepare_selected_toolchain_context(
     };
     let action_context = ConfiguredActionOwnerContext::new(
         owner.clone(),
-        ConfiguredActionExecGroup::Default,
+        ConfiguredExecGroup::Default,
         execution_platform,
         resolution.execution_platform().fact().clone(),
         &BTreeMap::new(),
@@ -4547,16 +4512,20 @@ mod tests {
         let edges = vec![
             crate::ConfiguredEdge::new(
                 key_z.clone(),
-                crate::ConfiguredEdgeKind::OrdinaryAttribute {
+                crate::ConfiguredEdgeKind::Attribute {
                     attribute: CompactString::new("deps"),
                     index: 1,
+                    hidden: false,
+                    dependency: ConfiguredAttributeDependency::Target,
                 },
             ),
             crate::ConfiguredEdge::new(
                 key_a.clone(),
-                crate::ConfiguredEdgeKind::OrdinaryAttribute {
+                crate::ConfiguredEdgeKind::Attribute {
                     attribute: CompactString::new("deps"),
                     index: 0,
+                    hidden: false,
+                    dependency: ConfiguredAttributeDependency::Target,
                 },
             ),
         ];
@@ -5121,10 +5090,12 @@ impl ConfiguredNodeAnalysisKey {
                     let child = root_value!(outcome);
                     edges.push(crate::configured_target::ConfiguredEdge::new(
                         child.key().clone(),
-                        crate::configured_target::ConfiguredEdgeKind::OrdinaryAttribute {
+                        crate::configured_target::ConfiguredEdgeKind::Attribute {
                             attribute,
                             index: u32::try_from(index)
                                 .expect("config_setting dependency index fits u32"),
+                            hidden: false,
+                            dependency: ConfiguredAttributeDependency::Target,
                         },
                     ));
                     children.push(child);
@@ -5421,10 +5392,12 @@ impl ConfiguredNodeAnalysisKey {
                     if let Some((attribute, index)) = edge {
                         edges.push(crate::configured_target::ConfiguredEdge::new(
                             child.key().clone(),
-                            crate::configured_target::ConfiguredEdgeKind::OrdinaryAttribute {
+                            crate::configured_target::ConfiguredEdgeKind::Attribute {
                                 attribute,
                                 index: u32::try_from(index)
                                     .expect("native toolchain attribute index fits u32"),
+                                hidden: false,
+                                dependency: ConfiguredAttributeDependency::Target,
                             },
                         ));
                         children.push(child);
@@ -5580,31 +5553,6 @@ impl ConfiguredNodeAnalysisKey {
         {
             return delegated;
         }
-        let configured_dependency_names = implementation
-            .configured_dependency_attributes()
-            .filter(|attribute| !attribute.is_hidden())
-            .map(|attribute| attribute.name())
-            .collect::<SmallSet<_>>();
-        if let Some(schema) = implementation.schema().iter().find(|schema| {
-            (schema.executable()
-                || matches!(
-                    schema.dependency_configuration(),
-                    AttributeDependencyConfiguration::Exec
-                ))
-                && !configured_dependency_names.contains(schema.declaration_name())
-        }) {
-            return root_analysis_driver_complete(Err(
-                AnalysisError::unsupported_configured_attribute(
-                    configured_target.label().clone(),
-                    schema.declaration_name(),
-                    matches!(
-                        schema.dependency_configuration(),
-                        AttributeDependencyConfiguration::Exec
-                    ),
-                    schema.executable(),
-                ),
-            ));
-        }
         let (resolved_attributes, selector_packages) = match prepare_configured_rule_attributes(
             ctx,
             mode,
@@ -5627,28 +5575,6 @@ impl ConfiguredNodeAnalysisKey {
             }
             LoadingPreparationOutcome::Complete(Ok(Ok(values))) => values,
         };
-        let mut declared_dependency_keys = match root_declared_dependency_keys(
-            ctx,
-            mode,
-            &self.workspace,
-            package,
-            configured_target,
-            &resolved_attributes,
-        )
-        .await
-        {
-            LoadingPreparationOutcome::Need(need) => {
-                return LoadingPreparationOutcome::Need(need);
-            }
-            LoadingPreparationOutcome::Complete(Err(error)) => {
-                return LoadingPreparationOutcome::Complete(Err(error));
-            }
-            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-                return root_analysis_driver_complete(Err(error));
-            }
-            LoadingPreparationOutcome::Complete(Ok(Ok(keys))) => keys,
-        };
-
         let structural_configuration = configured_target
             .configuration()
             .slug_configuration()
@@ -5658,10 +5584,39 @@ impl ConfiguredNodeAnalysisKey {
                 Ok(rows) => rows,
                 Err(error) => return root_analysis_driver_complete(Err(error)),
             };
-        let has_exec_dependency = configured_rows.iter().any(|row| row.exec_configuration);
+        let has_exec_dependency = implementation.schema().iter().any(|schema| {
+            schema.ordinary_dependency()
+                && matches!(
+                    schema.dependency_configuration(),
+                    AttributeDependencyConfiguration::Exec
+                )
+        }) || configured_rows.iter().any(|row| row.dependency.tool());
+        let mut declared_dependency_keys = Vec::new();
         let target_only_prepared = if has_exec_dependency {
             None
         } else {
+            declared_dependency_keys = match root_declared_dependency_keys(
+                ctx,
+                mode,
+                &self.workspace,
+                package,
+                configured_target,
+                &resolved_attributes,
+                None,
+            )
+            .await
+            {
+                LoadingPreparationOutcome::Need(need) => {
+                    return LoadingPreparationOutcome::Need(need);
+                }
+                LoadingPreparationOutcome::Complete(Err(error)) => {
+                    return LoadingPreparationOutcome::Complete(Err(error));
+                }
+                LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                    return root_analysis_driver_complete(Err(error));
+                }
+                LoadingPreparationOutcome::Complete(Ok(Ok(keys))) => keys,
+            };
             for row in &configured_rows {
                 let path_flavor = if row.requires_path_flavor() {
                     match configured_dependency_path_flavor(
@@ -5783,8 +5738,30 @@ impl ConfiguredNodeAnalysisKey {
                     ))));
                 }
             };
+            declared_dependency_keys = match root_declared_dependency_keys(
+                ctx,
+                mode,
+                &self.workspace,
+                package,
+                configured_target,
+                &resolved_attributes,
+                Some(&exec_configuration),
+            )
+            .await
+            {
+                LoadingPreparationOutcome::Need(need) => {
+                    return LoadingPreparationOutcome::Need(need);
+                }
+                LoadingPreparationOutcome::Complete(Err(error)) => {
+                    return LoadingPreparationOutcome::Complete(Err(error));
+                }
+                LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                    return root_analysis_driver_complete(Err(error));
+                }
+                LoadingPreparationOutcome::Complete(Ok(Ok(keys))) => keys,
+            };
             for row in &configured_rows {
-                let dependency_configuration = if row.exec_configuration {
+                let dependency_configuration = if row.dependency.tool() {
                     &exec_configuration
                 } else {
                     configured_target.configuration()
@@ -5800,10 +5777,10 @@ impl ConfiguredNodeAnalysisKey {
                 } else {
                     None
                 };
-                declared_dependency_keys.extend(row.into_keys(path_flavor, |label, exec| {
+                declared_dependency_keys.extend(row.into_keys(path_flavor, |label, dependency| {
                     ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
                         label,
-                        if exec {
+                        if dependency.tool() {
                             exec_configuration.clone()
                         } else {
                             configured_target.configuration().clone()
@@ -5952,7 +5929,7 @@ impl ConfiguredNodeAnalysisKey {
         } else {
             match ConfiguredActionOwnerContext::new(
                 configured_target.clone(),
-                ConfiguredActionExecGroup::Default,
+                ConfiguredExecGroup::Default,
                 selected_platform.actual().clone(),
                 selected_platform.fact().clone(),
                 &BTreeMap::new(),

@@ -356,14 +356,21 @@ async fn cquery_deps_frontier_need_precedes_an_earlier_child_analysis_error() {
             .with_edges(vec![
                 slug_analysis_v2::ConfiguredEdge::new(
                     configured("@@//:missing").into(),
-                    slug_analysis_v2::ConfiguredEdgeKind::OrdinaryAttribute {
+                    slug_analysis_v2::ConfiguredEdgeKind::Attribute {
                         attribute: "error".into(),
                         index: 0,
+                        hidden: false,
+                        dependency: slug_analysis_v2::ConfiguredAttributeDependency::Target,
                     },
                 ),
                 slug_analysis_v2::ConfiguredEdge::new(
                     ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:source.txt").unwrap()),
-                    slug_analysis_v2::ConfiguredEdgeKind::Source,
+                    slug_analysis_v2::ConfiguredEdgeKind::Attribute {
+                        attribute: "src".into(),
+                        index: 0,
+                        hidden: false,
+                        dependency: slug_analysis_v2::ConfiguredAttributeDependency::Target,
+                    },
                 ),
             ]),
     );

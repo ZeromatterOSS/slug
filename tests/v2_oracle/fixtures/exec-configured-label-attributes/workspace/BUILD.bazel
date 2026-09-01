@@ -1,0 +1,36 @@
+load(":defs.bzl", "probe", "string_setting", "tool")
+
+string_setting(name = "switch", build_setting_default = "default", scope = "target")
+config_setting(name = "selected", flag_values = {":switch": "selected"})
+
+constraint_setting(name = "configuration_role")
+constraint_value(name = "target_role", constraint_setting = ":configuration_role")
+constraint_value(name = "exec_role", constraint_setting = ":configuration_role")
+
+platform(name = "target_platform", constraint_values = [":target_role"])
+platform(name = "exec_platform", constraint_values = [":exec_role"])
+
+config_setting(name = "target_configuration", constraint_values = [":target_role"])
+config_setting(name = "exec_configuration", constraint_values = [":exec_role"])
+
+PLATFORM = select({
+    ":target_configuration": "target",
+    ":exec_configuration": "exec",
+    "//conditions:default": "wrong",
+})
+
+tool(name = "chosen", platform = PLATFORM)
+tool(name = "other", platform = PLATFORM)
+
+exports_files(["data.txt"])
+
+probe(
+    name = "probe",
+    scalar = select({":selected": ":chosen", "//conditions:default": ":other"}),
+    target_tool = ":other",
+    vector = [":chosen", ":other"],
+    string_keyed = {"first": ":chosen", "second": ":other"},
+    label_keyed = {":chosen": "first", ":other": "second"},
+    list_dict = {"group": [":other", ":chosen"]},
+    source = ":data.txt",
+)

@@ -3340,7 +3340,6 @@ probe = rule(implementation = _impl, attrs = {
         "attr.label(doc = 1)",
         "attr.string(doc = 1)",
         "attr.label(executable = True)",
-        "attr.label(cfg = \"target\")",
         "attr.label(cfg = 1)",
     ] {
         fs::write(

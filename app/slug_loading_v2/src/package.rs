@@ -5993,19 +5993,17 @@ fn attribute_definition<'v>(
         })
         .transpose()?
         .flatten();
-    let mut exec_configuration = false;
-    let transition = cfg
-        .map(|value| {
-            if value.unpack_str() == Some("exec") {
-                exec_configuration = true;
-                return Ok(None);
-            }
-            transition_definition_from_value(value)
-                .map(Some)
-                .ok_or_else(|| anyhow::anyhow!("attr.label cfg must be 'exec' or a transition"))
-        })
-        .transpose()?
-        .flatten();
+    let (exec_configuration, transition) = match cfg {
+        None => (false, None),
+        Some(value) if value.is_none() || value.unpack_str() == Some("target") => (false, None),
+        Some(value) if value.unpack_str() == Some("exec") => (true, None),
+        Some(value) => (
+            false,
+            Some(transition_definition_from_value(value).ok_or_else(|| {
+                anyhow::anyhow!("attribute cfg must be 'target', 'exec', or a transition")
+            })?),
+        ),
+    };
     Ok(AttributeDefinition {
         kind,
         mandatory,
@@ -6241,6 +6239,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
+        #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
@@ -6252,7 +6251,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             unpack_file_admissibility(allow_files, None)?,
             false,
             default,
-            None,
+            cfg,
             eval,
         )?;
         definition.required_providers =
@@ -6268,6 +6267,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
+        #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
@@ -6279,7 +6279,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             unpack_file_admissibility(allow_files, None)?,
             false,
             default,
-            None,
+            cfg,
             eval,
         )?;
         definition.required_providers =
@@ -6343,6 +6343,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
+        #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
@@ -6354,7 +6355,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
             unpack_file_admissibility(allow_files, None)?,
             false,
             default,
-            None,
+            cfg,
             eval,
         )?;
         definition.required_providers =
@@ -9017,6 +9018,62 @@ mod module_extension_definition_tests {
             assert!(
                 evaluate(&format!("X = attr.{constructor}('documentation')\n")).is_err(),
                 "{constructor} accepted positional documentation"
+            );
+        }
+    }
+
+    #[test]
+    fn label_dependency_cfg_conversion_is_shared_across_all_five_constructors() {
+        let snapshot = |constructor: &str, cfg: &str| {
+            let module = evaluate(&format!("X = attr.{constructor}({cfg})\n")).unwrap();
+            let definition = module
+                .get("X")
+                .unwrap()
+                .downcast::<FrozenAttributeDefinition>()
+                .unwrap();
+            (
+                definition.exec_configuration,
+                definition.transition.is_some(),
+            )
+        };
+        for constructor in [
+            "label",
+            "label_list",
+            "string_keyed_label_dict",
+            "label_keyed_string_dict",
+            "label_list_dict",
+        ] {
+            let target = snapshot(constructor, "");
+            assert_eq!(target, (false, false), "{constructor}");
+            assert_eq!(target, snapshot(constructor, "cfg = None"), "{constructor}");
+            assert_eq!(
+                target,
+                snapshot(constructor, "cfg = 'target'"),
+                "{constructor}"
+            );
+            assert_eq!(
+                snapshot(constructor, "cfg = 'exec'"),
+                (true, false),
+                "{constructor}"
+            );
+            for invalid in ["'host'", "'other'", "1", "[]"] {
+                assert!(
+                    evaluate(&format!("X = attr.{constructor}(cfg = {invalid})\n")).is_err(),
+                    "{constructor} accepted cfg={invalid}"
+                );
+            }
+        }
+
+        for cfg in ["", "cfg = None"] {
+            assert!(
+                evaluate(&format!("X = attr.label(executable = True, {cfg})\n")).is_err(),
+                "executable label accepted cfg={cfg}"
+            );
+        }
+        for cfg in ["'target'", "'exec'"] {
+            assert!(
+                evaluate(&format!("X = attr.label(executable = True, cfg = {cfg})\n")).is_ok(),
+                "executable label rejected cfg={cfg}"
             );
         }
     }

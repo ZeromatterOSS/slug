@@ -29,6 +29,7 @@ use slug_loading_v2::RuleCapability;
 
 use crate::configured_target::ConfiguredEdge;
 use crate::configured_target::ConfiguredEdgeKind;
+use crate::exec_group::ConfiguredExecGroup;
 use crate::key::ConfigurationKind;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
@@ -167,12 +168,6 @@ pub struct ToolchainTopology {
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct PlatformSemanticFact {
     pub exec_properties: Arc<[(CompactString, CompactString)]>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
-pub enum ConfiguredActionExecGroup {
-    Default,
-    Named(CompactString),
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -438,7 +433,7 @@ pub enum ConfiguredActionExecutionState {
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct ConfiguredActionOwnerContext {
     owner: ConfiguredTargetKey,
-    exec_group: ConfiguredActionExecGroup,
+    exec_group: ConfiguredExecGroup,
     execution_platform: Option<ConfiguredTargetKey>,
     platform_fact: Option<PlatformSemanticFact>,
     platform_constraints: Arc<[ConfiguredActionPlatformConstraint]>,
@@ -454,7 +449,7 @@ impl ConfiguredActionOwnerContext {
         )?;
         Ok(Self {
             owner,
-            exec_group: ConfiguredActionExecGroup::Default,
+            exec_group: ConfiguredExecGroup::Default,
             execution_platform: None,
             platform_fact: None,
             platform_constraints: Arc::new([]),
@@ -466,7 +461,7 @@ impl ConfiguredActionOwnerContext {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         owner: ConfiguredTargetKey,
-        exec_group: ConfiguredActionExecGroup,
+        exec_group: ConfiguredExecGroup,
         execution_platform: ConfiguredTargetKey,
         platform_fact: PlatformSemanticFact,
         target_exec_properties: &BTreeMap<String, String>,
@@ -545,7 +540,7 @@ impl ConfiguredActionOwnerContext {
         &self.owner
     }
 
-    pub fn exec_group(&self) -> &ConfiguredActionExecGroup {
+    pub fn exec_group(&self) -> &ConfiguredExecGroup {
         &self.exec_group
     }
 
@@ -655,7 +650,7 @@ impl<'a> ConfiguredActionView<'a> {
             .expect("configured action view validates a selected platform")
     }
 
-    pub fn exec_group(&self) -> &'a ConfiguredActionExecGroup {
+    pub fn exec_group(&self) -> &'a ConfiguredExecGroup {
         self.0.context.exec_group()
     }
 
@@ -995,8 +990,8 @@ impl ConfiguredNodeResult {
             .map(|spec| {
                 let group = spec
                     .exec_group()
-                    .map_or(ConfiguredActionExecGroup::Default, |name| {
-                        ConfiguredActionExecGroup::Named(CompactString::from(name))
+                    .map_or(ConfiguredExecGroup::Default, |name| {
+                        ConfiguredExecGroup::Named(CompactString::from(name))
                     });
                 let context = by_group.get(&group).cloned().ok_or_else(|| {
                     "configured action has no matching exec-group context".to_owned()

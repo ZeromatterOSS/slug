@@ -22365,3 +22365,25 @@ the existing prepared provider's artifact. It adds no second provider owner,
 DICE state or configured-result identity. Resume only
 `WP-6-7A-default-exec-configured-label-dependency-implementation-r2` under the
 corrected `starlark_rule.rs` allowlist and 600/760/1,360 gross caps.
+
+#### Default-exec configured dependencies terminally accepted (2026-09-01)
+
+`WP-6-7A-default-exec-configured-label-dependency-implementation-r2` is
+terminally `ACCEPTED`. One typed attribute edge now retains target, default-exec
+or complete Starlark-transition identity across all five label-bearing
+constructors; one shared `ConfiguredExecGroup` owns default/named group identity
+for dependencies and actions. Default-exec children are configured only after
+the selected execution platform is known, and `ctx.executable` projects the
+existing prepared FilesToRun executable as `File`, present `None`, or an absent
+field according to the schema.
+
+Complete loading, analysis, query and REAPI suites, focused core identity tests,
+the permanent Bazel 9.2 oracle, formatting/static gates, rebuilt CLI and the
+authentic rules_rust replay pass. Ten full-core failures are pre-existing; the
+only plausibly adjacent cquery activation-count failure reproduces unchanged at
+base `4efcf2e80`. Terminal review's sole correction added a real analysis proof
+for zero, singleton and two-output transition edge slices; focused rereview
+returned `ACCEPT`. The replay clears `proc_macro_deps(cfg = "exec")` and next
+stops at `repository_rule(doc = ...)` declaration metadata. That frontier is a
+generic declaration-documentation category, not a platforms, rules_rust,
+`cc_common` or `cc_internal` branch.

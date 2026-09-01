@@ -8,10 +8,13 @@
  * above-listed licenses.
  */
 
+use std::sync::Arc;
+
 use allocative::Allocative;
 use compact_str::CompactString;
 use slug_identity_v2::CanonicalLabel;
 
+use crate::exec_group::ConfiguredExecGroup;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 
@@ -43,20 +46,35 @@ impl ConfiguredEdge {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub enum ConfiguredAttributeDependency {
+    Target,
+    Exec(ConfiguredExecGroup),
+    Starlark {
+        outputs: Arc<[CanonicalLabel]>,
+        exec_group: Option<ConfiguredExecGroup>,
+    },
+}
+
+impl ConfiguredAttributeDependency {
+    pub fn tool(&self) -> bool {
+        matches!(
+            self,
+            Self::Exec(_)
+                | Self::Starlark {
+                    exec_group: Some(_),
+                    ..
+                }
+        )
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum ConfiguredEdgeKind {
-    OrdinaryAttribute {
+    Attribute {
         attribute: CompactString,
         index: u32,
-    },
-    TransitionedAttribute {
-        attribute: CompactString,
-        index: u32,
-        output: CanonicalLabel,
-    },
-    ImplicitAttribute {
-        attribute: CompactString,
-        index: u32,
-        tool: bool,
+        hidden: bool,
+        dependency: ConfiguredAttributeDependency,
     },
     AliasActual,
     GeneratedBy,
@@ -82,7 +100,7 @@ impl ConfiguredEdgeKind {
     pub fn implicit(&self) -> bool {
         matches!(
             self,
-            Self::ImplicitAttribute { .. }
+            Self::Attribute { hidden: true, .. }
                 | Self::PackageGroupInclude { .. }
                 | Self::ToolchainRequirement
                 | Self::SelectedToolchainImplementation
@@ -93,7 +111,13 @@ impl ConfiguredEdgeKind {
                 | Self::FunctionTransitionAllowlist
         )
     }
-    pub const fn tool(&self) -> bool {
-        matches!(self, Self::ImplicitAttribute { tool: true, .. })
+    pub fn tool(&self) -> bool {
+        matches!(
+            self,
+            Self::Attribute {
+                dependency,
+                ..
+            } if dependency.tool()
+        )
     }
 }

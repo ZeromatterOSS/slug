@@ -14,9 +14,9 @@ use std::sync::Arc;
 use prost::Message;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredActionAspectProvenance;
-use slug_analysis_v2::ConfiguredActionExecGroup;
 use slug_analysis_v2::ConfiguredActionOwnerContext;
 use slug_analysis_v2::ConfiguredActionToolchainContext;
+use slug_analysis_v2::ConfiguredExecGroup;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::ConfiguredToolchainContextRow;
@@ -38,6 +38,7 @@ use slug_build_api_v2::RetainedArgsRecipe;
 use slug_build_api_v2::RetainedCommandLine;
 use slug_build_api_v2::RetainedParamFileFormat;
 use slug_build_api_v2::RetainedSpawnInvocation;
+use slug_build_api_v2::RunfilesPackageDepset;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SpawnSpec;
 use slug_configuration_v2::CanonicalStringMap;
@@ -267,7 +268,7 @@ fn configured_file_write_reapi_plan_reads_retained_platform_properties() {
     let context = Arc::new(
         ConfiguredActionOwnerContext::new(
             owner.clone(),
-            ConfiguredActionExecGroup::Default,
+            ConfiguredExecGroup::Default,
             platform,
             PlatformSemanticFact {
                 exec_properties: Arc::from([
@@ -285,19 +286,20 @@ fn configured_file_write_reapi_plan_reads_retained_platform_properties() {
     );
     let providers =
         ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
-    let result = ConfiguredNodeResult::new_rule(owner, providers, None)
-        .with_action_specs(
-            vec![ActionSpec::new(
-                ActionKind::Write {
-                    content: "content".to_owned(),
-                    is_executable: false,
-                },
-                "FileWrite",
-                vec![ActionOutput::new("out.txt", ActionOutputKind::File)],
-            )],
-            vec![context.clone()],
-        )
-        .unwrap();
+    let result =
+        ConfiguredNodeResult::new_rule(owner, providers, None, RunfilesPackageDepset::empty())
+            .with_action_specs(
+                vec![ActionSpec::new(
+                    ActionKind::Write {
+                        content: "content".to_owned(),
+                        is_executable: false,
+                    },
+                    "FileWrite",
+                    vec![ActionOutput::new("out.txt", ActionOutputKind::File)],
+                )],
+                vec![context.clone()],
+            )
+            .unwrap();
     let action = result
         .configured_file_write_actions()
         .unwrap()

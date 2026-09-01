@@ -12,12 +12,14 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::mem::size_of;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use compact_str::CompactString;
 use dice::CancellationContext;
 use dice::DetectCycles;
 use dice::Dice;
@@ -26,13 +28,14 @@ use dice::Key;
 use slug_analysis_v2::AnalysisDiagnostic;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredActionAspectProvenance;
-use slug_analysis_v2::ConfiguredActionExecGroup;
 use slug_analysis_v2::ConfiguredActionExecutionState as State;
 use slug_analysis_v2::ConfiguredActionOwnerContext;
 use slug_analysis_v2::ConfiguredActionPlatformConstraint;
 use slug_analysis_v2::ConfiguredActionToolchainContext;
+use slug_analysis_v2::ConfiguredAttributeDependency;
 use slug_analysis_v2::ConfiguredEdge;
 use slug_analysis_v2::ConfiguredEdgeKind;
+use slug_analysis_v2::ConfiguredExecGroup;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeResult;
@@ -91,6 +94,29 @@ use slug_workspace_v2::NormalizedAbsolutePath;
 
 fn no_runfiles_packages() -> RunfilesPackageDepset {
     RunfilesPackageDepset::empty()
+}
+
+#[allow(dead_code)]
+enum PreviousConfiguredEdgeKind {
+    TransitionedAttribute {
+        attribute: CompactString,
+        index: u32,
+        output: CanonicalLabel,
+    },
+    Source,
+}
+
+#[test]
+fn configured_edge_layout_growth_is_measured() {
+    assert_eq!(
+        (
+            size_of::<PreviousConfiguredEdgeKind>(),
+            size_of::<ConfiguredEdgeKind>(),
+            size_of::<ConfiguredAttributeDependency>(),
+        ),
+        (128, 72, 40),
+    );
+    assert!(size_of::<ConfiguredEdgeKind>() < size_of::<PreviousConfiguredEdgeKind>());
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
@@ -426,7 +452,7 @@ fn default_action_context(
     let toolchain = toolchain_context(owner, &platform, "marker");
     let context = ConfiguredActionOwnerContext::new(
         owner.clone(),
-        ConfiguredActionExecGroup::Default,
+        ConfiguredExecGroup::Default,
         platform.clone(),
         PlatformSemanticFact {
             exec_properties: Arc::from([]),
@@ -541,7 +567,7 @@ async fn action_and_default_files_publication_equality_cut_off_parent_dice() {
 
 fn action_context(
     owner: &ConfiguredTargetKey,
-    group: ConfiguredActionExecGroup,
+    group: ConfiguredExecGroup,
     platform: ConfiguredTargetKey,
     platform_properties: &[(&str, &str)],
     target_properties: &[(&str, &str)],
@@ -672,43 +698,30 @@ fn configured_analysis_key_rejects_legacy_configuration_identity() {
 }
 
 #[test]
-fn configured_edge_records_transition_output_and_fixed_bits() {
-    let edge = ConfiguredEdge::new(
-        ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
-            canonical("@@//dep:lib"),
-            ConfigurationKey::exec("execplatform1").unwrap(),
-        )),
-        ConfiguredEdgeKind::TransitionedAttribute {
-            attribute: "deps".into(),
-            index: 0,
-            output: canonical("@@//settings:exec"),
-        },
-    );
-
-    let key = edge.configured_target().unwrap();
-    assert_eq!(key.label().to_string(), "@@//dep:lib");
-    assert_eq!(key.configuration().stable_serialize(), "exec:execplatform1");
-    assert_eq!(edge.implicit(), false);
-    assert_eq!(edge.tool(), false);
-}
-
-#[test]
 fn configured_edges_preserve_transition_convergence_order_and_fixed_bits() {
     let target = ConfiguredTargetKey::new(canonical("@@//dep:lib"), target_config());
     let first = ConfiguredEdge::new(
         target.clone().into(),
-        ConfiguredEdgeKind::TransitionedAttribute {
+        ConfiguredEdgeKind::Attribute {
             attribute: "left".into(),
             index: 0,
-            output: canonical("@@//settings:out"),
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Starlark {
+                outputs: Arc::from([canonical("@@//settings:out")]),
+                exec_group: None,
+            },
         },
     );
     let second = ConfiguredEdge::new(
         target.clone().into(),
-        ConfiguredEdgeKind::TransitionedAttribute {
+        ConfiguredEdgeKind::Attribute {
             attribute: "right".into(),
             index: 1,
-            output: canonical("@@//settings:out"),
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Starlark {
+                outputs: Arc::from([canonical("@@//settings:out")]),
+                exec_group: None,
+            },
         },
     );
     assert_ne!(first, second);
@@ -716,23 +729,28 @@ fn configured_edges_preserve_transition_convergence_order_and_fixed_bits() {
 
     let kinds = vec![
         (
-            ConfiguredEdgeKind::OrdinaryAttribute {
+            ConfiguredEdgeKind::Attribute {
                 attribute: "deps".into(),
                 index: 0,
+                hidden: false,
+                dependency: ConfiguredAttributeDependency::Target,
             },
             false,
         ),
         (
-            ConfiguredEdgeKind::TransitionedAttribute {
+            ConfiguredEdgeKind::Attribute {
                 attribute: "deps".into(),
                 index: 1,
-                output: canonical("@@//settings:out"),
+                hidden: false,
+                dependency: ConfiguredAttributeDependency::Starlark {
+                    outputs: Arc::from([]),
+                    exec_group: None,
+                },
             },
             false,
         ),
         (ConfiguredEdgeKind::AliasActual, false),
         (ConfiguredEdgeKind::GeneratedBy, false),
-        (ConfiguredEdgeKind::Source, false),
         (ConfiguredEdgeKind::DeclaringVisibility, false),
         (ConfiguredEdgeKind::PackageGroupInclude { index: 0 }, true),
         (ConfiguredEdgeKind::ToolchainRequirement, true),
@@ -766,12 +784,75 @@ fn configured_edges_preserve_transition_convergence_order_and_fixed_bits() {
     assert_ne!(ordered, reordered);
     assert_eq!(
         ordered.edges()[0].kind(),
-        &ConfiguredEdgeKind::TransitionedAttribute {
+        &ConfiguredEdgeKind::Attribute {
             attribute: "left".into(),
             index: 0,
-            output: canonical("@@//settings:out")
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Starlark {
+                outputs: Arc::from([canonical("@@//settings:out")]),
+                exec_group: None,
+            },
         }
     );
+
+    let empty = ConfiguredAttributeDependency::Starlark {
+        outputs: Arc::from([]),
+        exec_group: None,
+    };
+    let one = ConfiguredAttributeDependency::Starlark {
+        outputs: Arc::from([canonical("@@//settings:a")]),
+        exec_group: None,
+    };
+    let multiple = ConfiguredAttributeDependency::Starlark {
+        outputs: Arc::from([canonical("@@//settings:a"), canonical("@@//settings:b")]),
+        exec_group: None,
+    };
+    let reordered = ConfiguredAttributeDependency::Starlark {
+        outputs: Arc::from([canonical("@@//settings:b"), canonical("@@//settings:a")]),
+        exec_group: None,
+    };
+    assert_ne!(empty, one);
+    assert_ne!(one, multiple);
+    assert_ne!(multiple, reordered);
+
+    let hidden_target = ConfiguredEdge::new(
+        ConfiguredNodeKey::null(canonical("@@//pkg:source.txt")),
+        ConfiguredEdgeKind::Attribute {
+            attribute: "$hidden".into(),
+            index: 0,
+            hidden: true,
+            dependency: ConfiguredAttributeDependency::Target,
+        },
+    );
+    assert!(hidden_target.implicit());
+    assert!(!hidden_target.tool());
+    let visible_exec_source = ConfiguredEdge::new(
+        ConfiguredNodeKey::null(canonical("@@//pkg:source.txt")),
+        ConfiguredEdgeKind::Attribute {
+            attribute: "tool".into(),
+            index: 0,
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Exec(ConfiguredExecGroup::Default),
+        },
+    );
+    assert!(!visible_exec_source.implicit());
+    assert!(visible_exec_source.tool());
+    let composed = ConfiguredEdge::new(
+        ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
+            canonical("@@//dep:composed"),
+            target_config(),
+        )),
+        ConfiguredEdgeKind::Attribute {
+            attribute: "tool".into(),
+            index: 1,
+            hidden: false,
+            dependency: ConfiguredAttributeDependency::Starlark {
+                outputs: Arc::from([canonical("@@//settings:out")]),
+                exec_group: Some(ConfiguredExecGroup::Named("named".into())),
+            },
+        },
+    );
+    assert!(composed.tool());
 }
 
 #[test]
@@ -950,7 +1031,7 @@ fn configured_file_write_view_tracks_and_restores_structural_identity() {
     let restored = file_write_result(c0, "@@//:p0", "content-A", "path-A.txt");
 
     let baseline = only_file_write(&baseline);
-    assert_eq!(baseline.exec_group(), &ConfiguredActionExecGroup::Default);
+    assert_eq!(baseline.exec_group(), &ConfiguredExecGroup::Default);
     assert_eq!(baseline.owner().label(), &canonical("@@//:probe"));
     assert_eq!(baseline.execution_platform().label(), &canonical("@@//:p0"));
     assert_eq!(baseline.output().path(), "path-A.txt");
@@ -979,7 +1060,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
     );
     let default = action_context(
         &owner,
-        ConfiguredActionExecGroup::Default,
+        ConfiguredExecGroup::Default,
         platform("@@//:p0"),
         &[("a", "platform"), ("z", "platform")],
         &[("a", "target"), ("b", "target")],
@@ -990,7 +1071,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
     .unwrap();
     let named = action_context(
         &owner,
-        ConfiguredActionExecGroup::Named("named".into()),
+        ConfiguredExecGroup::Named("named".into()),
         platform("@@//:p1"),
         &[("a", "platform")],
         &[("a", "target")],
@@ -1053,7 +1134,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
     let platform_only = Arc::new(
         ConfiguredActionOwnerContext::new(
             owner.clone(),
-            ConfiguredActionExecGroup::Default,
+            ConfiguredExecGroup::Default,
             platform("@@//:p0"),
             PlatformSemanticFact {
                 exec_properties: Arc::from([]),
@@ -1082,7 +1163,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
     );
     let all_optional = ConfiguredActionOwnerContext::new(
         owner.clone(),
-        ConfiguredActionExecGroup::Default,
+        ConfiguredExecGroup::Default,
         platform("@@//:p0"),
         PlatformSemanticFact {
             exec_properties: Arc::from([]),
@@ -1099,7 +1180,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
 
     let restored = action_context(
         &owner,
-        ConfiguredActionExecGroup::Default,
+        ConfiguredExecGroup::Default,
         platform("@@//:p0"),
         &[("a", "platform"), ("z", "platform")],
         &[("a", "target"), ("b", "target")],
@@ -1116,7 +1197,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
         default,
         action_context(
             &owner,
-            ConfiguredActionExecGroup::Default,
+            ConfiguredExecGroup::Default,
             platform("@@//:p0"),
             &[("a", "platform"), ("z", "platform")],
             &[],
@@ -1131,7 +1212,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
         ConfiguredTargetKey::new(canonical("@@//:other"), owner.configuration().clone());
     let wrong_context = action_context(
         &wrong_owner,
-        ConfiguredActionExecGroup::Default,
+        ConfiguredExecGroup::Default,
         platform("@@//:p0"),
         &[],
         &[],
@@ -1165,7 +1246,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
     assert!(
         action_context(
             &owner,
-            ConfiguredActionExecGroup::Default,
+            ConfiguredExecGroup::Default,
             ConfiguredTargetKey::new(canonical("@@//:bad"), target_config()),
             &[],
             &[],
@@ -1178,7 +1259,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
     assert!(
         action_context(
             &owner,
-            ConfiguredActionExecGroup::Default,
+            ConfiguredExecGroup::Default,
             platform("@@//:p0"),
             &[("z", "last"), ("a", "first")],
             &[],
@@ -1195,7 +1276,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
     assert!(
         action_context(
             &owner,
-            ConfiguredActionExecGroup::Default,
+            ConfiguredExecGroup::Default,
             platform("@@//:p0"),
             &[],
             &[],

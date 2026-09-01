@@ -11,7 +11,7 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
-use slug_analysis_v2::ConfiguredActionExecGroup;
+use slug_analysis_v2::ConfiguredExecGroup;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutputKind;
@@ -54,8 +54,8 @@ impl FileWriteSemanticIdentity {
             *is_executable,
         );
         encoder.field(0x0004, |field| match view.action().exec_group() {
-            ConfiguredActionExecGroup::Default => field.field(0x0401, |_| {}),
-            ConfiguredActionExecGroup::Named(name) => field.field(0x0402, |value| value.text(name)),
+            ConfiguredExecGroup::Default => field.field(0x0401, |_| {}),
+            ConfiguredExecGroup::Named(name) => field.field(0x0402, |value| value.text(name)),
         });
         let selected = view.action().execution_platform();
         encoder.field(0x0005, |field| configured_key(field, selected))?;

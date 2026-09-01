@@ -1,0 +1,35 @@
+[fixture]
+name = "exec-configured-label-attributes"
+description = "Bazel 9.2 default exec configuration across every label-bearing attribute shape."
+comparison = "message_shape"
+oracle_notes = "The build row discriminates target-select-before-exec ordering, target-scoped setting removal, the selected default execution platform, scalar executable projection, direct source-file materialization, and all five label container orientations. Cquery proves configured exec-rule dependencies are filtered as tools while the direct source remains visibly null-configured; Bazel's retained source edge role is pinned by Attribute.isToolDependency, and its cquery null-source exception remains outside Slug's deferred tool traversal. Named/automatic/composed exec groups and configured aspects also remain deferred."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkAttrModule.java#convertCfg",
+  "src/main/java/com/google/devtools/build/lib/analysis/config/ExecutionTransitionFactory.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/DependencyResolutionHelpers.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkAttributesCollection.java#addAttribute",
+  "src/main/java/com/google/devtools/build/lib/packages/Attribute.java#isToolDependency",
+  "src/main/java/com/google/devtools/build/lib/packages/DependencyFilter.java#ONLY_TARGET_DEPS",
+]
+translation_notes = "Slug resolves selectors in the final owner target configuration, derives one structural exec configuration from the selected default execution platform, retains typed target/exec/Starlark edge roles, and projects ctx.executable from the already-prepared FilesToRun provider. Bazel remains behavior authority; configuration checksum/output bytes are not claimed."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture exec-configured-label-attributes --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture exec-configured-label-attributes --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "all_shapes_select_scope_platform_executable_and_source"
+argv = ["build", "//:probe", "--//:switch=selected", "--platforms=//:target_platform"]
+expected_exit = 0
+
+[[commands]]
+name = "configured_dependencies_include_exec_tools_and_null_source"
+argv = ["cquery", "deps(//:probe, 1)", "--//:switch=selected", "--platforms=//:target_platform", "--output=label"]
+expected_exit = 0
+
+[[commands]]
+name = "target_dependency_filter_excludes_exec_rules_but_retains_null_source"
+argv = ["cquery", "deps(//:probe, 1)", "--//:switch=selected", "--platforms=//:target_platform", "--output=label", "--notool_deps"]
+expected_exit = 0

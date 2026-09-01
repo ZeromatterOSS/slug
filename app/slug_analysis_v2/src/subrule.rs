@@ -24,7 +24,9 @@ use slug_loading_v2::FileAdmissibility;
 use slug_loading_v2::SubruleIdentity;
 use slug_loading_v2::package::StarlarkRuleImplementation;
 
+use crate::configured_target::ConfiguredAttributeDependency;
 use crate::dice::AnalysisError;
+use crate::exec_group::ConfiguredExecGroup;
 use crate::key::ConfigurationKind;
 use crate::key::ConfiguredNodeKey;
 use crate::result::ConfiguredNodeKind;
@@ -42,9 +44,8 @@ pub(crate) struct DeclaredDependencyKey {
     pub(crate) attribute: CompactString,
     pub(crate) attribute_index: u32,
     pub(crate) node: ConfiguredNodeKey,
-    pub(crate) transition_output: Option<CanonicalLabel>,
+    pub(crate) dependency: ConfiguredAttributeDependency,
     pub(crate) hidden: bool,
-    pub(crate) exec_configuration: bool,
     pub(crate) source_admitted: bool,
     pub(crate) path_flavor: Option<HostPathFlavor>,
     pub(crate) validation: Option<ConfiguredDependencyValidation>,
@@ -60,7 +61,7 @@ pub(crate) struct ConfiguredDependencyRow {
     pub(crate) kind: AttributeKind,
     pub(crate) labels: Vec<CanonicalLabel>,
     pub(crate) hidden: bool,
-    pub(crate) exec_configuration: bool,
+    pub(crate) dependency: ConfiguredAttributeDependency,
     validation: ConfiguredDependencyValidation,
 }
 
@@ -84,7 +85,7 @@ impl ConfiguredDependencyRow {
     pub(crate) fn into_keys(
         &self,
         path_flavor: Option<HostPathFlavor>,
-        make_node: impl Fn(CanonicalLabel, bool) -> ConfiguredNodeKey,
+        make_node: impl Fn(CanonicalLabel, &ConfiguredAttributeDependency) -> ConfiguredNodeKey,
     ) -> Vec<DeclaredDependencyKey> {
         let validation = self.validation.clone();
         self.labels
@@ -94,10 +95,9 @@ impl ConfiguredDependencyRow {
             .map(|(index, label)| DeclaredDependencyKey {
                 attribute: self.attribute.clone(),
                 attribute_index: u32::try_from(index).expect("dependency index fits u32"),
-                node: make_node(label, self.exec_configuration),
-                transition_output: None,
+                node: make_node(label, &self.dependency),
+                dependency: self.dependency.clone(),
                 hidden: self.hidden,
-                exec_configuration: self.exec_configuration,
                 source_admitted: validation.admits_file(),
                 path_flavor,
                 validation: Some(validation.clone()),
@@ -174,7 +174,11 @@ pub(crate) fn configured_dependency_rows(
                 kind: attribute.kind(),
                 labels,
                 hidden: attribute.is_hidden(),
-                exec_configuration: attribute.exec_configuration(),
+                dependency: if attribute.exec_configuration() {
+                    ConfiguredAttributeDependency::Exec(ConfiguredExecGroup::Default)
+                } else {
+                    ConfiguredAttributeDependency::Target
+                },
                 validation: ConfiguredDependencyValidation::new(
                     attribute.file_admissibility().clone(),
                     attribute.executable(),
@@ -192,7 +196,7 @@ pub(crate) fn validate_configured_dependency(
     let Some(validation) = &dependency.validation else {
         return Ok(());
     };
-    if dependency.exec_configuration
+    if dependency.dependency.tool()
         && dependency
             .node
             .configured_target()

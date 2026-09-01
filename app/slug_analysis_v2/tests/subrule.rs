@@ -1033,7 +1033,7 @@ async fn configured_subrule_dependencies_materialize_and_invoke() {
         .filter(|edge| {
             matches!(
                 edge.kind(),
-                slug_analysis_v2::ConfiguredEdgeKind::ImplicitAttribute { .. }
+                slug_analysis_v2::ConfiguredEdgeKind::Attribute { hidden: true, .. }
             )
         })
         .collect::<Vec<_>>();

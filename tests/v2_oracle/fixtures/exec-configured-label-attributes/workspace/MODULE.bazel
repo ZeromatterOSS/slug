@@ -1,0 +1,2 @@
+module(name = "exec_configured_label_attributes", version = "0.1.0")
+register_execution_platforms("//:exec_platform")

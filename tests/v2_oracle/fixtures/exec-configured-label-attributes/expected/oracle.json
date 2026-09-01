@@ -1,0 +1,108 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--//:switch=selected",
+        "--platforms=//:target_platform"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--//:switch=selected",
+        "--platforms=//:target_platform"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "all_shapes_select_scope_platform_executable_and_source",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 1 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 3 targets configured)\nAnalyzing: target //:probe (1 packages loaded, 3 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 25 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date:\n  bazel-bin/probe.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/exec-configured-label-attributes/20260901-112449-1329411-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/exec-configured-label-attributes/20260901-112539-1330260-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 1 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 3 targets configured)\nAnalyzing: target //:probe (1 packages loaded, 3 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 25 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date:\n  bazel-bin/probe.txt\nINFO: Elapsed time: 5.768s, Critical Path: 0.01s\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(//:probe, 1)",
+        "--//:switch=selected",
+        "--platforms=//:target_platform",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:probe, 1)",
+        "--//:switch=selected",
+        "--platforms=//:target_platform",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "configured_dependencies_include_exec_tools_and_null_source",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 3 targets configured)\nINFO: Analyzed target //:probe (4 packages loaded, 25 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "//:probe (e3ed516)\n//:selected (e3ed516)\n//:chosen (b7355c5)\n@bazel_tools//tools:host_platform (3030ed4)\n//:other (e3ed516)\n//:other (b7355c5)\n//:exec_platform (3030ed4)\n//:data.txt (null)\n//:target_platform (3030ed4)",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 3 targets configured)\nINFO: Analyzed target //:probe (4 packages loaded, 25 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.135s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "//:probe (e3ed516)\n//:selected (e3ed516)\n//:chosen (b7355c5)\n@bazel_tools//tools:host_platform (3030ed4)\n//:other (e3ed516)\n//:other (b7355c5)\n//:exec_platform (3030ed4)\n//:data.txt (null)\n//:target_platform (3030ed4)\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(//:probe, 1)",
+        "--//:switch=selected",
+        "--platforms=//:target_platform",
+        "--output=label",
+        "--notool_deps"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:probe, 1)",
+        "--//:switch=selected",
+        "--platforms=//:target_platform",
+        "--output=label",
+        "--notool_deps"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "target_dependency_filter_excludes_exec_rules_but_retains_null_source",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "//:probe (e3ed516)\n//:selected (e3ed516)\n@bazel_tools//tools:host_platform (3030ed4)\n//:other (e3ed516)\n//:exec_platform (3030ed4)\n//:data.txt (null)\n//:target_platform (3030ed4)",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.039s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "//:probe (e3ed516)\n//:selected (e3ed516)\n@bazel_tools//tools:host_platform (3030ed4)\n//:other (e3ed516)\n//:exec_platform (3030ed4)\n//:data.txt (null)\n//:target_platform (3030ed4)\n"
+    }
+  ],
+  "fixture": "exec-configured-label-attributes",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
