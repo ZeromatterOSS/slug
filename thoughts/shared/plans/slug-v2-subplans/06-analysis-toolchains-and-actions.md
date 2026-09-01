@@ -22219,3 +22219,22 @@ The next packet must cover Bazel 9.2's complete provider-policy family across
 all five label-bearing constructors; it must not become a rules_rust,
 `cc_common`, `cc_internal`, parser or configured-aspect special case. Zabel
 remains peer ownership/optimization guidance only.
+
+#### Complete provider-constrained dependency architecture active (2026-09-01)
+
+Commit `096653548` accepts generic aspect declarations. Activate only
+`WP-6-7A-provider-constrained-dependency-architecture-r1`: bind `providers`
+across Bazel 9.2's exact five label-bearing constructors, retain the existing
+canonical DNF on final package schema equality, and hand ordinary configured
+edges to the existing actual-provider validator. Aspect attachment stays
+independently fail-closed. The clean rules_rust replay is consumer evidence;
+Bazel 9.2 remains authority, Buck2-derived immutable compact utilities are
+reused, and Zabel remains peer guidance only.
+
+R1 review returned `REVISE`: Slug's configured alias result cannot classify an
+alias-to-file actual without a broader actual-node identity, and the proposed
+oracle lacked a fixture allowlist. Corrected R2 defers alias-to-file honestly,
+keeps direct files and rule aliases exact, and freezes one bounded fixture with
+provenance, rows and comparison semantics. Focused rereview returns `ACCEPT`.
+Activate only
+`WP-6-7A-provider-constrained-dependency-implementation-r1`.
