@@ -719,6 +719,7 @@ async fn compute_effect(
         .then(InvocationPrintCapture::default);
     let invocation_result = invoke_repository_rule(
         implementation,
+        &module.manifest,
         input,
         platform.clone(),
         transaction.snapshot().dupe(),

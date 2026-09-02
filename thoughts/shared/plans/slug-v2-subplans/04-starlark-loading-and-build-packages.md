@@ -8007,3 +8007,17 @@ cutoff are Slug-native. Wider Label/repository_ctx/repository-rule surfaces,
 native rules, mapping-recorder identity, materialization, lockfiles and
 configured semantics remain unsupported/deferred. The active manifest owns
 proof, caps and terminal stops; audit and architecture return `ACCEPT`.
+
+### Repository-rule Label runtime context accepted (2026-09-02)
+
+Terminal rereview returns `ACCEPT`. The repository invocation state now nests
+the existing manifest-derived BZL context, and the shared projector preserves
+the innermost direct/imported function's package and mapping. No retained
+definition, call, certificate, manifest, key or effect shape changes.
+
+The implementation closes at 13/150/163 production/proof/total gross Rust
+additions. Seven focused repository-context tests and all loading, Bzlmod and
+query gates pass. The rebuilt authentic replay clears the Label constructor and
+next rejects the independent `repository_ctx.path(Label(label))` method. Stage
+5 owns the docs-only path audit; no Label grammar or rules_cc branch follows
+from this acceptance.

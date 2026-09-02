@@ -6,9 +6,9 @@ Milestone: M7A bootstrap-critical loading/repository execution closure. Make
 the existing `.bzl` `Label()` constructor see the exact defining-function
 module context while an admitted repository-rule implementation executes.
 
-Status: docs-only audit and architecture `ACCEPTED`; bounded Rust is selected.
-The packet composes two existing evaluation-time owners and adds no retained
-repository-rule, BZL-manifest or DICE state.
+Status: implementation terminally `ACCEPTED`. The packet composes two existing
+evaluation-time owners and adds no retained repository-rule, BZL-manifest or
+DICE state.
 
 Immediate predecessor
 `WP-4-7A-applicable-licenses-loading-alias-design-r1` is terminally accepted in
@@ -241,3 +241,28 @@ Audit and architecture result: `ACCEPT`. The natural owner has the complete
 manifest at invocation time, the existing caller-aware resolver matches the
 Bazel stack rule, and runtime-only context composition is bounded. Rust may
 begin under this contract.
+
+## Accepted implementation outcome
+
+Terminal rereview returns `ACCEPT`. The authenticated frozen definition
+module's manifest is borrowed into repository execution, and the single
+invocation-only state now exposes its nested `BzlEvaluationContext` to the
+shared caller-aware projector. Direct implementation calls, builtin aliases,
+Label idempotence and imported helpers select their own package and mapping.
+Missing or ambiguous source provenance fails before effect publication.
+
+The candidate closes at 13 gross added production Rust lines, 150 proof lines
+and 163 total, with the focused discriminator at the 80-line cap. All seven
+repository-context tests pass. Loading passes 513 active library units plus one
+ignored and every integration target (51/29/8/6/2/1/5/1). Bzlmod passes
+596/596 and query-library passes 55/55. CLI rebuild, formatting, diff, process
+hygiene and archive-baseline checks pass.
+
+The rebuilt authenticated rules_rust 0.73.0 replay clears the repository-rule
+`Label()` stop. It advances on the same
+`@@rules_cc+//cc/private/toolchain:lib_cc_configure.bzl:38` expression to the
+independent missing `repository_ctx.path(Label(label))` method and reports that
+`repository_ctx` has no attribute `path`. Select docs-only
+`WP-5-7A-repository-context-path-audit` next. Audit Bazel 9.2 Label/path value,
+generated-repository root, existence and host-observation semantics before
+Rust; add no rules_cc, toolchain or label-spelling special case.

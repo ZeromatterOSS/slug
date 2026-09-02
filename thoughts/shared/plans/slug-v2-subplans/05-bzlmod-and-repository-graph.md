@@ -4429,3 +4429,15 @@ definition/call/certificate projection, DICE key, dependency, retained mapping,
 cache, lock or repository materialization behavior. Source, recursive-load or
 mapping changes continue to invalidate through the frozen-module dependency;
 missing or ambiguous caller provenance fails before effect publication.
+
+Terminal implementation rereview returns `ACCEPT` with the selected DICE
+owner and all retained repository/BZL shapes unchanged. The rebuilt rules_rust
+replay clears Label construction and stops at
+`repository_ctx.path(Label(label))` in
+`@@rules_cc+//cc/private/toolchain:lib_cc_configure.bzl:38`.
+
+Run only docs-first `WP-5-7A-repository-context-path-audit`. Determine Bazel
+9.2's repository_ctx path-value type, Label routing, generated-repository root,
+existence/error behavior, host observations and revision identity before
+selecting Rust. Do not infer filesystem semantics from the Label context bridge
+or add a rules_cc/toolchain special case.

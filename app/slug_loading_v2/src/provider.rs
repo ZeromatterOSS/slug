@@ -262,6 +262,11 @@ impl BzlEvaluationContext {
                                 .downcast_ref::<crate::package::MacroEvaluationContext<'_>>()
                                 .map(crate::package::MacroEvaluationContext::bzl)
                         })
+                        .or_else(|| {
+                            extra
+                                .downcast_ref::<crate::repository_rule_context::RepositoryRuleInvocationState>()
+                                .map(crate::repository_rule_context::RepositoryRuleInvocationState::bzl)
+                        })
                 })
             })
             .ok_or_else(|| anyhow::anyhow!("operation may only be called in a .bzl module"))

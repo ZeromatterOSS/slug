@@ -41,7 +41,9 @@ use starlark_map::small_map::SmallMap;
 
 use crate::attrs::AttributeKind;
 use crate::attrs::CoercedAttributeValue;
+use crate::bzl_module::BzlLoadManifest;
 use crate::module_extension_repository_rule::RepositoryRuleAttribute;
+use crate::provider::BzlEvaluationContext;
 use crate::starlark_label::StarlarkLabel;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -436,12 +438,13 @@ struct RepositoryOs { platform: RepositoryPlatform, snapshot: RepositoryEnvironm
 
 #[rustfmt::skip]
 #[derive(Debug, ProvidesStaticType)]
-struct RepositoryRuleInvocationState { effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, error: RefCell<Option<RepositoryRuleInvocationError>> }
+pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, error: RefCell<Option<RepositoryRuleInvocationError>> }
 
 #[rustfmt::skip]
 impl RepositoryRuleInvocationState {
-    fn new() -> Self { Self { effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), error: RefCell::new(None) } }
+    fn new(manifest: &BzlLoadManifest) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), error: RefCell::new(None) } }
     fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> { eval.extra.and_then(|extra| extra.downcast_ref::<Self>()).ok_or_else(|| anyhow::anyhow!("repository_ctx is outside repository-rule execution")) }
+    pub(crate) fn bzl(&self) -> &BzlEvaluationContext { &self.bzl }
     fn fail(&self, error: RepositoryRuleInvocationError) -> anyhow::Error {
         *self.error.borrow_mut() = Some(error);
         anyhow::anyhow!("unsupported repository_ctx.file argument")
@@ -578,6 +581,7 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
 #[rustfmt::skip]
 pub(crate) fn invoke_repository_rule(
     implementation: starlark::values::FrozenValue,
+    manifest: &BzlLoadManifest,
     input: RepositoryRuleInvocationInput,
     platform: RepositoryPlatform,
     snapshot: RepositoryEnvironmentSnapshot,
@@ -585,7 +589,7 @@ pub(crate) fn invoke_repository_rule(
 ) -> Result<RepositoryRuleInvocation, RepositoryRuleInvocationError> {
     let invocation_module = Module::new();
     let context = invocation_module.heap().alloc_simple(RepositoryRuleContext { platform, snapshot, input });
-    let state = RepositoryRuleInvocationState::new();
+    let state = RepositoryRuleInvocationState::new(manifest);
     let returned = {
         let mut evaluator = Evaluator::new(&invocation_module);
         if let Some(print_handler) = print_handler {
@@ -604,6 +608,8 @@ pub(crate) fn invoke_repository_rule(
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use slug_bzlmod_v2::RepositoryEnvironmentEntry;
     use slug_identity_v2::CanonicalLabel;
     use starlark::environment::Globals;
@@ -611,6 +617,69 @@ mod tests {
     use starlark::syntax::Dialect;
 
     use super::*;
+    use crate::bzl_module::BzlModuleIdentity;
+    use crate::package::loading_globals;
+
+    struct ModuleLoader(Vec<(String, starlark::environment::FrozenModule)>);
+
+    impl starlark::eval::FileLoader for ModuleLoader {
+        fn load(&self, path: &str) -> starlark::Result<starlark::environment::FrozenModule> {
+            self.0
+                .iter()
+                .find_map(|(candidate, module)| (candidate == path).then(|| module.dupe()))
+                .ok_or_else(|| {
+                    starlark::Error::new_other(anyhow::anyhow!("unexpected load {path}"))
+                })
+        }
+    }
+
+    fn freeze_bzl(
+        manifest: &BzlLoadManifest,
+        source: &str,
+        loader: Option<&dyn starlark::eval::FileLoader>,
+    ) -> starlark::environment::FrozenModule {
+        let ast = AstModule::parse(
+            manifest.root.workspace_path.to_str().unwrap(),
+            source.to_owned(),
+            &Dialect::Bazel,
+        )
+        .unwrap();
+        let module = Module::new();
+        let context = BzlEvaluationContext::from_manifest(manifest);
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&context);
+        if let Some(loader) = loader {
+            evaluator.set_loader(loader);
+        }
+        evaluator.eval_module(ast, &loading_globals()).unwrap();
+        drop(evaluator);
+        module.freeze().unwrap()
+    }
+
+    fn invocation_manifest() -> BzlLoadManifest {
+        let root = BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@//:repository_rule.bzl").unwrap(),
+            workspace_path: PathBuf::from("repository_rule.bzl"),
+            repository_mapping: Arc::from([]),
+        };
+        BzlLoadManifest {
+            root: root.clone(),
+            direct_children: Arc::from([]),
+            reachable: Arc::from([root]),
+            fingerprint: [0; 32],
+        }
+    }
+
+    fn mapped_identity(label: &str, path: &str, mapped: &str) -> BzlModuleIdentity {
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse(label).unwrap(),
+            workspace_path: PathBuf::from(path),
+            repository_mapping: Arc::from([(
+                slug_identity_v2::ApparentRepoName::new("alias").unwrap(),
+                slug_identity_v2::CanonicalRepoName::new(mapped).unwrap(),
+            )]),
+        }
+    }
 
     fn implementation(
         source: &str,
@@ -652,8 +721,10 @@ mod tests {
         input: RepositoryRuleInvocationInput,
     ) -> Result<RepositoryRuleInvocation, RepositoryRuleInvocationError> {
         let (_owner, implementation) = implementation(source);
+        let manifest = invocation_manifest();
         invoke_repository_rule(
             implementation,
+            &manifest,
             input,
             RepositoryPlatform::new("linux", "x86_64"),
             RepositoryEnvironmentSnapshot::empty(),
@@ -1096,6 +1167,7 @@ def implementation(ctx):
         .unwrap();
         let invocation = invoke_repository_rule(
             implementation,
+            &invocation_manifest(),
             RepositoryRuleInvocationInput::new(
                 "repo".into(),
                 None,
@@ -1119,6 +1191,88 @@ def implementation(ctx):
             effect.content(),
             br#"["linux", "x86_64", {"EMPTY": "", "PRESENT": "value", "UNOBSERVED": "ambient"}, "value", None, "fallback", ""]"#
         );
+    }
+
+    #[test]
+    fn label_uses_repository_implementation_and_imported_helper_modules() {
+        let helper_identity = mapped_identity(
+            "@@helper+//helpers:support.bzl",
+            "/workspace/helper/helpers/support.bzl",
+            "helper_dep+",
+        );
+        let helper_manifest = BzlLoadManifest {
+            root: helper_identity.clone(),
+            direct_children: Arc::from([]),
+            reachable: Arc::from([helper_identity.clone()]),
+            fingerprint: [1; 32],
+        };
+        let helper = freeze_bzl(
+            &helper_manifest,
+            "def helper_label(): return Label('@alias//pkg:helper')\n",
+            None,
+        );
+        let root_identity = mapped_identity(
+            "@@root+//defs:ext.bzl",
+            "/workspace/root/defs/ext.bzl",
+            "direct_dep+",
+        );
+        let manifest = BzlLoadManifest {
+            root: root_identity.clone(),
+            direct_children: Arc::from([helper_identity.clone()]),
+            reachable: Arc::from([root_identity.clone(), helper_identity]),
+            fingerprint: [2; 32],
+        };
+        let loader = ModuleLoader(vec![("//helpers:support.bzl".to_owned(), helper)]);
+        let root = freeze_bzl(
+            &manifest,
+            r#"
+load("//helpers:support.bzl", "helper_label")
+LABEL_ALIAS = Label
+def implementation(ctx):
+    direct = LABEL_ALIAS("@alias//pkg:direct")
+    ctx.file("labels", "%s\n%s\n%s" % (direct, Label(direct), helper_label()))
+"#,
+            Some(&loader),
+        );
+        let implementation =
+            unsafe { root.get("implementation").unwrap().unchecked_frozen_value() };
+        let invoke = |manifest: &BzlLoadManifest| {
+            invoke_repository_rule(
+                implementation,
+                manifest,
+                RepositoryRuleInvocationInput::new(
+                    "repo".into(),
+                    None,
+                    Arc::new(SmallMap::new()),
+                    Arc::from([]),
+                )
+                .unwrap(),
+                RepositoryPlatform::new("linux", "x86_64"),
+                RepositoryEnvironmentSnapshot::empty(),
+                None,
+            )
+        };
+        let invocation = invoke(&manifest).unwrap();
+        assert_eq!(
+            invocation.plan.effects()[0].content(),
+            b"@@direct_dep+//pkg:direct\n@@direct_dep+//pkg:direct\n@@helper_dep+//pkg:helper"
+        );
+        let missing = BzlLoadManifest {
+            reachable: Arc::from([root_identity.clone()]),
+            ..manifest.clone()
+        };
+        assert!(matches!(
+            invoke(&missing),
+            Err(RepositoryRuleInvocationError::Evaluation(_))
+        ));
+        let ambiguous = BzlLoadManifest {
+            reachable: Arc::from([root_identity.clone(), root_identity]),
+            ..manifest
+        };
+        assert!(matches!(
+            invoke(&ambiguous),
+            Err(RepositoryRuleInvocationError::Evaluation(_))
+        ));
     }
 
     #[test]
