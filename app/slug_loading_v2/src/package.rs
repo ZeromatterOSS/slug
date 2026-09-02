@@ -54,6 +54,7 @@ use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
+use starlark::values::StringValue;
 use starlark::values::Trace;
 use starlark::values::Tracer;
 use starlark::values::UnpackValue;
@@ -1324,14 +1325,10 @@ impl PackageRecorder {
         visibility: Option<Vec<VisibilityArgument>>,
         deprecation: Option<String>,
         testonly: Option<bool>,
-        package_metadata: Option<Arc<[CanonicalLabel]>>,
+        package_metadata: Option<(&str, Arc<[CanonicalLabel]>)>,
     ) -> anyhow::Result<()> {
-        if let Some(package_metadata) = &package_metadata {
-            reject_duplicate_canonical_labels(
-                package_metadata,
-                "default_package_metadata",
-                "package",
-            )?;
+        if let Some((attribute, package_metadata)) = &package_metadata {
+            reject_duplicate_canonical_labels(package_metadata, attribute, "package")?;
         }
         let mut state = self.state.borrow_mut();
         if let Some(visibility) = visibility {
@@ -1343,7 +1340,7 @@ impl PackageRecorder {
         if let Some(testonly) = testonly {
             state.default_testonly = testonly;
         }
-        if let Some(package_metadata) = package_metadata {
+        if let Some((_, package_metadata)) = package_metadata {
             state.default_package_metadata = package_metadata;
         }
         Ok(())
@@ -2904,21 +2901,59 @@ fn aspect_exec_compatible_with(
         .map(Arc::from)
 }
 
+const PACKAGE_METADATA_ATTRIBUTE: &str = "package_metadata";
+const APPLICABLE_LICENSES_ATTRIBUTE: &str = "applicable_licenses";
+
+fn canonical_rule_attribute_name(name: &str) -> &str {
+    match name {
+        APPLICABLE_LICENSES_ATTRIBUTE => PACKAGE_METADATA_ATTRIBUTE,
+        _ => name,
+    }
+}
+
+fn explicit_rule_attribute_value<'v>(
+    names: &SmallMap<StringValue<'v>, Value<'v>>,
+    declaration: &str,
+) -> Option<Value<'v>> {
+    match declaration {
+        APPLICABLE_LICENSES_ATTRIBUTE => None,
+        PACKAGE_METADATA_ATTRIBUTE => names.iter().fold(None, |selected, (name, value)| {
+            if canonical_rule_attribute_name(name.as_str()) == declaration && !value.is_none() {
+                Some(*value)
+            } else {
+                selected
+            }
+        }),
+        _ => names.get(declaration).copied(),
+    }
+}
+
 fn package_global<'v>(
     default_visibility: Option<UnpackVisibility>,
     default_deprecation: Option<&str>,
     default_testonly: Option<bool>,
     default_package_metadata: Option<Value<'v>>,
+    default_applicable_licenses: Option<Value<'v>>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<NoneType> {
     let recorder = PackageRecorder::from_evaluator(eval)?;
     recorder.reject_macro_operation("package()")?;
+    let package_metadata = match (default_package_metadata, default_applicable_licenses) {
+        (Some(_), Some(_)) => anyhow::bail!(
+            "Can not set both default_package_metadata and default_applicable_licenses. Move all declarations to default_package_metadata."
+        ),
+        (Some(value), None) => Some(("default_package_metadata", value)),
+        (None, Some(value)) => Some(("default_applicable_licenses", value)),
+        (None, None) => None,
+    };
     recorder.set_package_defaults(
         default_visibility.map(|value| value.items),
         default_deprecation.map(ToOwned::to_owned),
         default_testonly,
-        default_package_metadata
-            .map(|value| coerce_native_direct_labels(recorder, "default_package_metadata", value))
+        package_metadata
+            .map(|(name, value)| {
+                coerce_native_direct_labels(recorder, name, value).map(|value| (name, value))
+            })
             .transpose()?,
     )?;
     Ok(NoneType)
@@ -3112,10 +3147,11 @@ fn coerce_native_overrides<'v>(
     kwargs: SmallMap<String, Value<'v>>,
     rule_class: &str,
 ) -> anyhow::Result<Vec<NativeAttributeOverride>> {
-    kwargs
+    let overrides = kwargs
         .into_iter()
         .map(|(name, value)| {
-            let (slot, schema) = class.slot(&name).ok_or_else(|| {
+            let name = canonical_rule_attribute_name(&name);
+            let (slot, schema) = class.slot(name).ok_or_else(|| {
                 anyhow::anyhow!(
                     "native attribute `{name}` is not declared by rule '{rule_class}'"
                 )
@@ -3130,6 +3166,9 @@ fn coerce_native_overrides<'v>(
                         "native attribute `{name}` is fixed by rule '{rule_class}' and cannot be set"
                     )
                 }
+            }
+            if name == PACKAGE_METADATA_ATTRIBUTE && value.is_none() {
+                return Ok(None);
             }
             let mut value = match schema.kind() {
                 AttributeKind::Boolean => value
@@ -3194,15 +3233,16 @@ fn coerce_native_overrides<'v>(
                     _ => {}
                 }
             }
-            Ok(NativeAttributeOverride {
+            Ok(Some(NativeAttributeOverride {
                 slot,
                 value: NativeAttributeValue {
                     provenance: AttributeProvenance::Explicit,
                     value,
                 },
-            })
+            }))
         })
-        .collect()
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(overrides.into_iter().flatten().collect())
 }
 fn selector_key_labels(value: &CoercedAttributeValue) -> Vec<CanonicalLabel> {
     fn collect(value: &CoercedAttributeValue, labels: &mut Vec<CanonicalLabel>) {
@@ -7236,16 +7276,14 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         self.reject_deferred_attribute_invocation()
             .map_err(starlark::Error::new_other)?;
         for attribute in names.keys() {
-            if attribute.as_str() != "name"
-                && attribute.as_str() != "visibility"
-                && !self
-                    .schema
-                    .iter()
-                    .any(|schema| schema.name == attribute.as_str())
+            let attribute = canonical_rule_attribute_name(attribute);
+            if attribute != "name"
+                && attribute != "visibility"
+                && !self.schema.iter().any(|schema| schema.name == attribute)
             {
                 return Err(starlark::Error::new_other(anyhow::anyhow!(
                     "target `{name}` received unknown attribute `{}`",
-                    attribute.as_str()
+                    attribute
                 )));
             }
         }
@@ -7360,7 +7398,8 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     // optional value. Stage 8 must distinguish absent-looking
                     // values from a missing declaration.
                     schema.push(attribute_schema.clone());
-                    let explicit = names.get(declaration.name.as_str()).copied();
+                    let explicit =
+                        explicit_rule_attribute_value(&names, declaration.name.as_str());
                     if builtin
                         && explicit.is_some()
                         && !starlark_builtin_callable(declaration.name.as_str())
@@ -8395,6 +8434,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         default_deprecation: Option<&str>,
         default_testonly: Option<bool>,
         default_package_metadata: Option<Value<'v>>,
+        default_applicable_licenses: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         package_global(
@@ -8402,6 +8442,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             default_deprecation,
             default_testonly,
             default_package_metadata,
+            default_applicable_licenses,
             eval,
         )
     }
@@ -8960,6 +9001,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         default_deprecation: Option<&str>,
         default_testonly: Option<bool>,
         default_package_metadata: Option<Value<'v>>,
+        default_applicable_licenses: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         package_global(
@@ -8967,6 +9009,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
             default_deprecation,
             default_testonly,
             default_package_metadata,
+            default_applicable_licenses,
             eval,
         )
     }

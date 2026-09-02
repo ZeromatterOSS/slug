@@ -7953,3 +7953,30 @@ packet owns the exact/Slug-native/deferred classifications, last-non-`None`
 and macro-rejection proof, 90/230/320 line caps, one-file production allowlist
 and terminal stops. Audit and architecture return `ACCEPT`; bounded Rust is
 authorized without a Skylib or toolchain special case.
+
+### Applicable-license loading aliases accepted (2026-09-02)
+
+Terminal implementation rereview returns `ACCEPT`. Both BUILD package facades
+canonicalize `default_applicable_licenses` before the existing package state;
+admitted native and Starlark rules canonicalize `applicable_licenses` before
+schema lookup. Only the existing immutable default slice and canonical
+`package_metadata` attribute survive. Explicit empty, omitted/`None`, last-
+non-`None`, duplicate, absent-schema and macro-rejection proofs pass. The typed
+package binding does not retain raw keyword order, so malformed dual-spelling
+diagnostic precedence is Slug-native rather than an exact claim.
+
+The packet closes at 66 gross added and 23 removed production Rust lines, 214
+proof lines and 280 gross additions total. Focused proof passes 2/2; loading
+passes 512 active library units plus one ignored and all integration targets
+(51/29/8/6/2/1/5/1). Bzlmod passes 596/596 and query-library passes 55/55.
+Rebuilt CLI, formatting, diff, process hygiene and the unchanged archive
+baseline pass.
+
+The authenticated rules_rust replay clears the Skylib package alias and
+reaches rules_cc toolchain registration row 8. The next generic stop is
+`Label()` inside a `.bzl`-defined repository-rule implementation: the
+repository evaluator lacks the defining BZL label/mapping context and rejects
+the constructor as outside a `.bzl` module. Run docs-only
+`WP-4-7A-repository-rule-label-constructor-context-audit` next. Audit the
+complete Bazel 9.2 context and lifetime category; add no rules_cc, toolchain or
+repository-name special case.

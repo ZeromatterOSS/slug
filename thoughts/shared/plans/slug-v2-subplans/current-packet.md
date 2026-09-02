@@ -8,10 +8,10 @@ the bounded Bazel 9.2 compatibility aliases
 immediately into Slug's accepted `default_package_metadata` package field and
 `package_metadata` rule-attribute slot.
 
-Status: category audit and architecture `ACCEPTED`; bounded Rust is authorized.
-The exact claim is limited to single BUILD-package declarations and admitted
-rule instances. It does not widen the existing package-call, REPO.bazel,
-symbolic-macro, rules_license or configured-analysis surfaces.
+Status: implementation terminally `ACCEPTED`. The exact claim is limited to
+single BUILD-package declarations and admitted rule instances. It does not
+widen the existing package-call, REPO.bazel, symbolic-macro, rules_license or
+configured-analysis surfaces.
 
 Immediate predecessor
 `WP-4-7A-analysis-test-transition-loading-declaration-design-r1` is terminally
@@ -81,8 +81,9 @@ Implement as **exact** within the named Bazel 9.2 loading slice:
    `default_package_metadata` in both `package()` and `native.package()`.
    String and `Label` members, package-relative and mapped labels, order,
    duplicate rejection, explicit empty lists and type errors use the existing
-   canonical conversion path. Supplying both spellings fails with Bazel's
-   pinned migration diagnostic before package-state mutation.
+   canonical conversion path. Supplying both spellings with convertible values
+   fails with Bazel's pinned migration diagnostic before package-state
+   mutation.
 2. On admitted native and Starlark rule instances,
    `applicable_licenses` resolves to `package_metadata` before schema lookup.
    It is accepted only where that canonical slot exists, is coerced and
@@ -99,7 +100,10 @@ Implement as **exact** within the named Bazel 9.2 loading slice:
 Keep **Slug-native** only the already-admitted Rust/starlark-rust diagnostic
 framing, source spans, evaluator layout, collision-safe canonical repository
 identity, and incidental query presentation outside the canonical attribute
-name and value.
+name and value. If both package spellings are present and either value is
+malformed, the relative type-error-versus-migration-error precedence is also
+Slug-native because the existing typed Rust binding does not retain keyword
+order.
 
 Keep **unsupported/deferred**:
 
@@ -238,3 +242,30 @@ Return `REPLAN` before or during Rust if:
 - a new oracle fixture is necessary without a docs-first provenance decision;
   or
 - the file allowlist, growth caps or bounded large-file decision is exceeded.
+
+## Accepted implementation outcome
+
+Terminal rereview returns `ACCEPT`. Both BUILD package facades canonicalize the
+default alias before `PackageState`; native and Starlark rule calls canonicalize
+the rule alias before schema lookup and retain only the existing
+`package_metadata` slot. Explicit empty, omitted/`None`, last-non-`None`, absent
+native schema and symbolic-macro rejection behavior match the bounded contract.
+No alias spelling reaches package, target, DICE or query identity.
+
+The candidate closes at 66 gross added and 23 removed production Rust lines,
+214 proof lines and 280 gross additions total. No new function exceeds 100
+lines and no existing function grows beyond the packet cap. Focused proof
+passes 2/2; loading passes 512 active library units plus one ignored and every
+integration target (51/29/8/6/2/1/5/1). Bzlmod passes 596/596 and query-library
+passes 55/55. CLI rebuild, formatting, diff, process hygiene and archive checks
+pass with only the three unchanged accepted thoughts-path archive exceptions.
+
+The authenticated rules_rust 0.73.0 replay clears the Skylib package alias and
+advances through repository discovery to rules_cc toolchain registration row
+8. It stops while executing
+`@@rules_cc+//cc/private/toolchain:lib_cc_configure.bzl`, where a repository-rule
+implementation calls `Label(label)` and Slug reports that `Label()` may only be
+called in a `.bzl` module. Select docs-only
+`WP-4-7A-repository-rule-label-constructor-context-audit` next. Audit the
+complete Bazel 9.2 defining-module label/repository-mapping context for `Label()`
+during repository-rule execution; add no rules_cc or toolchain special case.

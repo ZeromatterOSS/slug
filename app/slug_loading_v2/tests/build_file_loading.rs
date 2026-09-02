@@ -1451,6 +1451,220 @@ fn native_direct_label_parameters_fail_before_publication() {
 }
 
 #[test]
+fn applicable_license_aliases_publish_only_canonical_metadata() {
+    let workspace = scratch("applicable-license-aliases");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+TYPED = Label(":typed")
+def _impl(ctx):
+    return [DefaultInfo()]
+probe = rule(implementation = _impl)
+"#,
+    )
+    .unwrap();
+    let source = r#"
+load(":defs.bzl", "TYPED", "probe")
+package(default_applicable_licenses = [TYPED, ":default"])
+filegroup(name = "native_default")
+filegroup(name = "native_alias", applicable_licenses = [":native_alias_value"])
+filegroup(name = "native_empty", applicable_licenses = [])
+filegroup(name = "native_none", applicable_licenses = None)
+filegroup(name = "native_both", package_metadata = [":first"], applicable_licenses = [":second"])
+filegroup(name = "native_none_last", applicable_licenses = [":first"], package_metadata = None)
+probe(name = "starlark_alias", applicable_licenses = [":starlark_alias_value"])
+probe(name = "starlark_both", applicable_licenses = [":first"], package_metadata = [":second"])
+probe(name = "starlark_none", applicable_licenses = None)
+"#;
+    fs::write(package.join(BUILD_FILE_PRIMARY), source).unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let label = |name: &str| CanonicalLabel::parse(&format!("@@//pkg:{name}")).unwrap();
+    let native_metadata = |name: &str| {
+        let attributes = loaded.native_attributes(name).unwrap();
+        assert!(attributes.get("applicable_licenses").is_none());
+        let value = &attributes.get("package_metadata").unwrap().1;
+        let CoercedAttributeValue::LabelList(labels) = &value.value else {
+            panic!("package_metadata must remain a label list")
+        };
+        (value.provenance, labels.to_vec())
+    };
+    assert_eq!(
+        native_metadata("native_default"),
+        (
+            AttributeProvenance::Default,
+            vec![label("typed"), label("default")]
+        )
+    );
+    assert_eq!(
+        native_metadata("native_alias"),
+        (
+            AttributeProvenance::Explicit,
+            vec![label("native_alias_value")]
+        )
+    );
+    assert_eq!(
+        native_metadata("native_empty"),
+        (AttributeProvenance::Explicit, Vec::new())
+    );
+    assert_eq!(
+        native_metadata("native_none"),
+        (
+            AttributeProvenance::Default,
+            vec![label("typed"), label("default")]
+        )
+    );
+    assert_eq!(
+        native_metadata("native_both"),
+        (AttributeProvenance::Explicit, vec![label("second")])
+    );
+    assert_eq!(
+        native_metadata("native_none_last"),
+        (AttributeProvenance::Explicit, vec![label("first")])
+    );
+
+    let starlark_metadata = |name: &str| {
+        let PackageTargetKind::StarlarkRule(rule) = &loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap()
+            .kind
+        else {
+            panic!("expected Starlark rule")
+        };
+        assert!(
+            rule.schema()
+                .iter()
+                .all(|schema| schema.declaration_name() != "applicable_licenses")
+        );
+        let value = rule
+            .values()
+            .iter()
+            .find(|value| value.declaration_name == "package_metadata")
+            .unwrap();
+        let CoercedAttributeValue::LabelList(labels) = value.value.as_ref() else {
+            panic!("package_metadata must remain a label list")
+        };
+        (value.provenance, labels.to_vec())
+    };
+    assert_eq!(
+        starlark_metadata("starlark_alias"),
+        (
+            AttributeProvenance::Explicit,
+            vec![label("starlark_alias_value")]
+        )
+    );
+    assert_eq!(
+        starlark_metadata("starlark_both"),
+        (AttributeProvenance::Explicit, vec![label("second")])
+    );
+    assert_eq!(
+        starlark_metadata("starlark_none"),
+        (
+            AttributeProvenance::Default,
+            vec![label("typed"), label("default")]
+        )
+    );
+
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        source.replace(
+            "package(default_applicable_licenses",
+            "package(default_package_metadata",
+        ),
+    )
+    .unwrap();
+    assert_eq!(loaded, load_package(&workspace, &package));
+
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        source.replace(
+            "package(default_applicable_licenses",
+            "native.package(default_applicable_licenses",
+        ),
+    )
+    .unwrap();
+    assert_eq!(loaded, load_package(&workspace, &package));
+
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "package(default_applicable_licenses = [])\nfilegroup(name = 'empty_default')\n",
+    )
+    .unwrap();
+    let empty = load_package(&workspace, &package);
+    let value = &empty
+        .native_attributes("empty_default")
+        .unwrap()
+        .get("package_metadata")
+        .unwrap()
+        .1;
+    assert_eq!(value.provenance, AttributeProvenance::Default);
+    assert!(matches!(
+        &value.value,
+        CoercedAttributeValue::LabelList(labels) if labels.is_empty()
+    ));
+}
+
+#[test]
+fn applicable_license_aliases_preserve_bazel_rejections() {
+    let workspace = scratch("applicable-license-alias-errors");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+TYPED = Label(":typed")
+def _macro(name, visibility, package_metadata):
+    pass
+M = macro(implementation = _macro, attrs = {"package_metadata": attr.label_list()})
+"#,
+    )
+    .unwrap();
+    let cases = [
+        (
+            "package(default_package_metadata = [], default_applicable_licenses = [])",
+            "Can not set both default_package_metadata and default_applicable_licenses. Move all declarations to default_package_metadata.",
+        ),
+        (
+            "native.package(default_applicable_licenses = [], default_package_metadata = [])",
+            "Can not set both default_package_metadata and default_applicable_licenses. Move all declarations to default_package_metadata.",
+        ),
+        (
+            "load(':defs.bzl', 'TYPED')\npackage(default_applicable_licenses = [TYPED, ':typed'])",
+            "default_applicable_licenses",
+        ),
+        (
+            "platform(name = 'bad', applicable_licenses = [])",
+            "native attribute `package_metadata` is not declared",
+        ),
+        (
+            "constraint_setting(name = 'bad', applicable_licenses = [])",
+            "native attribute `package_metadata` is not declared",
+        ),
+        (
+            "constraint_value(name = 'bad', constraint_setting = ':setting', applicable_licenses = [])",
+            "native attribute `package_metadata` is not declared",
+        ),
+        (
+            "load(':defs.bzl', 'M')\nM(name = 'bad', applicable_licenses = [])",
+            "no such attribute 'applicable_licenses' in 'M' macro",
+        ),
+    ];
+    for (index, (source, expected)) in cases.into_iter().enumerate() {
+        fs::write(package.join(BUILD_FILE_PRIMARY), source).unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "failure {index}: {error}");
+    }
+}
+
+#[test]
 fn native_label_facades_retain_the_same_direct_values() {
     let workspace = scratch("native-direct-label-facades");
     let package = workspace.join("pkg");
