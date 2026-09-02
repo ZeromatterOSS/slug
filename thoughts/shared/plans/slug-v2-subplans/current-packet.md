@@ -1,307 +1,263 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-7A-native-builtin-label-like-parameter-category-design-r1
+Packet: WP-4-7A-analysis-test-transition-loading-declaration-design-r1
 
-Milestone: M7A bootstrap-critical generic Starlark/loading closure. Audit and
-freeze the complete admitted native-builtin direct-parameter category in which
-Bazel 9.2 accepts either a string spelling or an already-constructed `Label`.
+Milestone: M7A bootstrap-critical generic Starlark/loading closure. Implement
+the complete bounded Bazel 9.2 loading declaration for the BZL-only
+`analysis_test_transition(settings = ...)` global without claiming configured
+analysis-test execution.
 
-Status: terminally `ACCEPTED`. Initial architecture review returned `REVISE`
-on three bounded contract details; R1 corrected the source owners, package-
-metadata duplicate contract and ordinary-label grammar. Terminal implementation
-review returned one bounded proof-only `REVISE` for nested `None` and exact
-wildcard-like target-name assertions. The focused correction rereview returns
-`ACCEPT` with production/proof/total additions of 186/315/501 lines.
+Status: design `ACCEPTED`. The complete source/owner audit is accepted. Initial
+review identified and the packet corrected two bounded source-contract defects:
+native option existence belongs to configured analysis, and identical raw
+dictionary keys cannot reach transition duplicate validation. A focused source
+check also preserves the first-phase absolute-label requirement while varying
+only analysis-test native-option policy. Focused rereview returns `ACCEPT`;
+Rust is authorized only within this packet's deliberately narrow publication
+boundary, retained-value lifetime, proof, allowlist, caps and stops.
 
-Immediate predecessor `WP-4-5-7A-repository-source-glob-routing-category-
-implementation-r2` is terminally accepted in `bf509cd8b`. Its source-routed
-catalog traversal passes complete loading/Bzlmod/query/cross-target/replay
-gates. The authentic rules_rust replay clears `GlobUnsupported` and reaches
-this independent generic boundary when verbatim `@@bazel_tools//tools/res`
-passes a `Label` to native `toolchain(toolchain_type = ...)` while Slug's
-hand-written direct adapter requires `str`.
+Immediate predecessor
+`WP-4-7A-native-builtin-label-like-parameter-category-design-r1` is terminally
+accepted in `36ee4f124`. Its authentic rules_rust replay clears native
+String-or-Label conversion and stops while loading
+`@@bazel_skylib+//lib:unittest.bzl`, whose function body refers to the missing
+predeclared `analysis_test_transition` name. The reference is resolved when the
+module is compiled even though the function is not invoked.
 
-The predecessor recorded an unrelated dirty edit to
-`app/slug_loading_v2/src/registration_expansion_tests.rs`; it is absent from
-this clean checkout. If that parked edit reappears, verify that its SHA-256 is
-`36c937d49369ac57e51defe2b17d4a53636a815ec0b2d407f7bd1a664c4d816a`;
-do not edit or stage it.
-
-## Trigger and learned facts
+## Audit result and upstream ownership
 
 Pinned Bazel 9.2.0 commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` owns this category:
 
-- `BuildType.java` `LabelType.convert` returns an existing `Label` unchanged
-  and resolves only strings through the caller's `LabelConverter`;
-- the same file's `LABEL_LIST`, `NODEP_LABEL_LIST` and
-  `LABEL_KEYED_STRING_DICT` recursively use that scalar conversion and reject
-  distinct keys that canonicalize to the same label;
-- `PackageArgs.java` `processParam` converts `default_package_metadata` with
-  `LABEL_LIST` and rejects duplicate canonical labels before setting defaults;
-- `Attribute.java`, `RuleClass.java` and the generic native rule invocation
-  path apply those declared types before native target publication;
-- `StarlarkNativeModule.java` applies `BuildType.LABEL_LIST` independently to
-  `package_group.includes`, while `PackageGroup.java` retains the converted
-  labels; and
-- `BaseRuleClasses.java`, `Alias.java` (nested `AliasRule`),
-  `ConfigRuleClasses.java`,
-  `TestSuiteRule.java`, `ConstraintSettingRule.java`,
-  `ConstraintValueRule.java`, `PlatformRule.java`, `ToolchainType.java`
-  (nested `ToolchainTypeRule`) and `ToolchainRule.java` own the admitted native
-  attribute types.
+- `ConfigGlobalLibraryApi.java` declares one top-level BZL global with exactly
+  one required named-only `settings` argument;
+- `ConfigGlobalLibrary.java` requires a BZL module context, casts dictionary
+  keys to strings while retaining arbitrary Starlark values, validates each
+  key as a transition output, permits experimental and incompatible native
+  options, and records the defining module's repository mapping and location;
+- `StarlarkDefinedConfigTransition.java` gives the result a fixed patch shape,
+  no callback, no inputs or splits, canonical/sorted outputs, literal changed-
+  settings identity and repr `<analysis_test_transition object>`;
+- `StarlarkAttrModule.java` admits the object at dependency-attribute `cfg`
+  positions and marks the descriptor `HAS_ANALYSIS_TEST_TRANSITION` rather
+  than `HAS_STARLARK_DEFINED_TRANSITION`;
+- `StarlarkRuleClassFunctions.java` rejects an analysis-test transition on a
+  rule not declared with `analysis_test = True` using
+  `Only rule definitions with analysis_test=True may have attributes with analysis_test_transition transitions`;
+- `StarlarkRuleFunctionsApi.java`, `FunctionTransitionUtil.java`,
+  `RuleConfiguredTargetBuilder.java` and `CoreOptions.java` separately own
+  configured analysis-test rules: implied test status, action prohibition,
+  required `AnalysisTestResultInfo`, the always-distinct analysis-test
+  configuration marker, nested-analysis-test rejection and the default 2000
+  transitive-label cap; and
+- `TestingModuleApi.java` plus `StarlarkTestingModule.java` own the separate
+  BUILD-only `testing.analysis_test` target factory. It is not the global
+  audited here.
 
-Pinned `BuildTypeTest` covers an already-typed label in a label-keyed string
-dictionary, mixed strings/typed labels in nested label lists, package-relative
-string conversion and canonicalized-key collision rejection. The accepted
-package-context label work in `5f9f9a98a` already owns borrowed string syntax,
-mapping, `@//`/`@@//` separation and the single `CanonicalLabel` result. The
-accepted repository-source packet supplies a live discriminator for one typed
-scalar without making `tools/res` or rules_rust semantic authority.
+Pinned `StarlarkIntegrationTest` covers successful option application,
+same-value transitions remaining configuration-distinct, ordinary-rule
+rejection, nested analysis tests and the dependency cap. The integration shell
+test covers `allow_analysis_failures`. The audit found no analysis-test-specific
+allowlist: Bazel's function-transition allowlist tracks the separate regular
+transition property.
 
-Slug's generic raw attribute route already matches the upstream architecture.
-`RawAttributeValue::Label`, `RawLabelContext::Package::label` and
-`coerce_raw_value` preserve an existing `StarlarkLabel`, resolve strings through
-`PackageRecorder::dependency_label`, recurse through lists and dictionaries,
-and reject canonical label-key collisions. `UnpackVisibility`,
-`filegroup.srcs`, `target_settings`, and all label-typed native kwargs already
-use that behavior.
+## Slug inventory and bounded decision
 
-The gap is the hand-written direct parameter layer in `package.rs`. The BUILD
-global and `native.*` facades duplicate string-only signatures before values
-reach the complete generic coercer. The complete changed inventory is:
+Slug already has a complete callback-backed regular transition declaration,
+attribute attachment and configured execution route. It is the wrong semantic
+type for this fixed literal patch. Its callable, closure-source identity,
+input/output protocol, split behavior and idempotent configured re-entry must
+remain unchanged.
 
-- `package.default_package_metadata` (`LABEL_LIST`);
-- `package_group.includes` (`LABEL_LIST`);
-- `alias.actual` (`LABEL`);
-- `test_suite.tests` (`LABEL_LIST`);
-- `config_setting.flag_values` keys (`LABEL_KEYED_STRING_DICT`) and
-  `config_setting.constraint_values` (`LABEL_LIST`);
-- `constraint_value.constraint_setting` (`LABEL`);
-- `platform.constraint_values` (`LABEL_LIST`); and
-- `toolchain.toolchain` (`NODEP_LABEL`), `toolchain.toolchain_type` (`LABEL`),
-  `toolchain.exec_compatible_with` (`LABEL_LIST`) and
-  `toolchain.target_compatible_with` (`LABEL_LIST`).
+`AttributePropertyFlag::HasAnalysisTestTransition` exists only as catalog text
+today. `rule()` has no `analysis_test` parameter. `AnalysisTestResultInfo` and
+`testing.analysis_test` deliberately reject construction/invocation until
+configured semantics are admitted. Although the configuration registry
+contains pinned descriptors for `analysis_testing_deps_limit` and
+`evaluating for analysis test`, Slug does not yet own the configured graph
+rules that consume them.
 
-`constraint_setting.default_constraint_value` is the positive scalar control:
-it already accepts `Label`, string or `None`. `filegroup.srcs`, visibility,
-`platform.parents`, `platform.required_settings`,
-`platform.allowed_toolchain_types`, `constraint_setting.refines_constraint_value`
-and common native label/list attributes are generic-coercer controls rather
-than new work. `exports_files.srcs`, `package_group.packages`, licenses, tags,
-glob patterns, names and output attributes have distinct path/string/output
-grammars and are not in this category.
+Implement one distinct evaluator/frozen declaration value for
+`analysis_test_transition`. Register it only in BZL globals. It retains:
 
-## Decision and natural ownership
+1. the original settings dictionary value on its evaluator or frozen module
+   heap, including arbitrary Starlark values and original key spellings;
+2. canonical, Bazel-ordered `Arc<[TransitionSetting]>` outputs produced by the
+   existing transition-setting validator/canonicalizer under an explicit
+   analysis-test policy; and
+3. the defining `BzlModuleIdentity` needed for label and repository-mapping
+   interpretation.
 
-Replace only the inventoried string-only direct adapters with one shared
-evaluator-local String-or-Label conversion route. Reuse the existing
-`RawAttributeValue`/`RawLabelContext::Package`/`coerce_raw_value` semantics or a
-thin private projection over them; do not create another label parser or
-mapping policy.
+The object has no implementation callable, inputs, source-closure inventory or
+final configured transition projection. It must not be converted into
+`attrs::TransitionDefinition`.
 
-For each direct value:
+Extend the transient `AttributeDefinitionGen<Value/FrozenValue>` descriptor to
+retain this distinct object through local construction, freeze, import and
+dictionary reuse. `set_attribute_cfg` accepts either the existing regular
+transition or this analysis-test transition, never both. Macro and subrule
+consumers preserve their existing fail-closed transition restrictions.
 
-1. an already-constructed `StarlarkLabel` contributes its existing
-   `CanonicalLabel` without display-string conversion or caller-context
-   reinterpretation;
-2. a string is parsed by `PackageRecorder::dependency_label` in the current
-   BUILD package and repository mapping;
-3. lists preserve input order unless the already-declared native schema owns
-   order-independent canonicalization;
-4. label-keyed dictionaries preserve value association and reject different
-   raw keys that canonicalize to the same label; and
-5. package metadata rejects repeated canonical labels even when distinct raw
-   String/Label values produce the collision; and
-6. invalid scalar, container, nested element or dictionary-value kinds fail
-   before the target or package defaults are published.
+When `rule()` consumes an attribute descriptor containing the new object, it
+must stop before `RuleAttributeSchema`, `FrozenRuleDefinition`, target or
+package publication with Bazel's ordinary-rule diagnostic above. This packet
+does not add `rule(analysis_test = True)`. Consequently the arbitrary literal
+map never becomes package/DICE/configuration semantic state, where pointer
+identity or omission would be unsound. A later configured packet must design a
+V2-owned structural literal value before lifting this stop.
 
-All inventoried values use ordinary Bazel attribute-label grammar. Target
-names `all`, `all-targets`, `*`, `...` and `sub/...` are valid labels when the
-declared type is `LABEL`/`NODEP_LABEL`; remove the current
-`native_toolchain_label` lexical target-pattern rejection on these attribute
-paths. Preserve recursive and wildcard rejection only in APIs whose input is
-actually a target pattern, such as registration or command target-pattern
-parsing.
-
-The BUILD package's `PackageRecorder` remains the sole caller-context owner.
-The existing `CanonicalLabel` remains the sole semantic value. Existing
-`PackageState`, `PackageTargetKind`, `NativeToolchainTarget`,
-`ConfigSettingTarget`, native override slots and package defaults retain the
-converted values and therefore own package equality and downstream semantic
-references. The root/repository package-load DICE keys continue to own source,
-mapping, evaluation, equality cutoff and invalidation. Add no DICE key,
-projection, side registry, cache, interner, lock, filesystem read or fallback.
-
-Do not stringify a typed label and feed it back through the current BUILD
-package. A typed `Label(":typed")` created in a defining `.bzl` package and a
-raw `":raw"` string passed by the same macro intentionally retain different
-owners: the former stays in the defining package; the latter resolves in the
-calling BUILD package.
+This generic boundary is sufficient for the motivating bazel_skylib module:
+the missing name is resolved while compiling `_make_analysis_test`, but the
+constructor and `rule(analysis_test = True)` are reached only if that function
+is invoked. Add no bazel_skylib, rules_rust, unittest, toolchain, C++,
+`cc_common` or `cc_internal` consumer branch.
 
 ## Compatibility classification
 
-Admit as **exact** for the named Bazel 9.2 loading surface:
+Admit as **exact** for the named Bazel 9.2 loading declaration surface:
 
-- String and `Label` acceptance for every inventoried scalar, list element and
-  label-keyed dictionary key;
-- current-package/repository-mapping resolution of strings and identity
-  preservation of already-canonical labels;
-- ordinary attribute labels whose target names are `all`, `all-targets`, `*`,
-  `...` or `sub/...`, without importing command/registration target-pattern
-  semantics;
-- mixed String/Label collections, input ordering, declared
-  order-independent normalization, default/explicit provenance and duplicate
-  canonical-key/default-package-metadata rejection; and
-- final loading-time native target/package-default values and semantic
-  references for the already-admitted native rule classes.
+- presence only in `.bzl` evaluation, including ordinary and Bzlmod-routed BZL
+  modules, and absence from BUILD globals;
+- exactly one required named-only `settings` dictionary argument;
+- string-only keys, arbitrary frozen Starlark values, empty and nonempty maps,
+  absolute build-setting labels, repository mapping, and
+  syntactically well-formed native `//command_line_option:` names including
+  unknown, experimental and incompatible names;
+- invalid label syntax, invisible repositories and distinct dictionary keys
+  that canonicalize to the same build-setting label rejected through the
+  existing transition-output policy and diagnostic order; raw duplicate keys
+  remain the Starlark dictionary constructor's boundary;
+- canonical Bazel ordering, defining-module identity, value/object freeze and
+  repr `<analysis_test_transition object>`;
+- use as `cfg` on supported dependency attribute constructors through local,
+  frozen and imported attribute descriptors; and
+- pre-publication rejection when such a descriptor is consumed by an ordinary
+  Slug rule, with the pinned Bazel diagnostic.
 
 Keep **Slug-native**:
 
-- Rust/starlark-rust type-error wording and source spans, DICE key/value
-  layout, compact collection choices and package equality cutoff; and
-- the already-accepted collision-safe canonical repository/mapping identity.
+- Rust/starlark-rust source spans and incidental type-rendering details outside
+  the named exact diagnostics;
+- evaluator/frozen heap layout, compact collection choices and BZL module DICE
+  ownership; and
+- Slug's already-accepted collision-safe canonical repository identity.
 
 Keep **unsupported/deferred**:
 
-- selectors or configurable-expression breadth not already accepted on a
-  named native attribute, and all configured matching/toolchain selection;
-- unrepresented native rule classes, rule implementation semantics, legacy
-  toolchain resolution, registration, execution platforms, actions and
-  execution;
-- output/path/file grammars, exact impossible-state Java diagnostics and Java
-  object identity; and
-- rules_rust, rules_cc, `@@bazel_tools//tools/res`, C++, `cc_common` and
-  `cc_internal` behavior beyond ordinary consumption of the generic loading
-  result.
+- `rule(analysis_test = True)`, analysis-test rule invocation and target
+  publication;
+- literal patch application, typed option/build-setting conversion, the
+  always-distinct analysis-test configuration marker and action-conflict
+  behavior;
+- `AnalysisTestResultInfo` construction/validation, action prohibition,
+  nested-analysis-test prevention and transitive dependency counting/caps;
+- BUILD-only `testing.analysis_test`, its dynamic rule definition and
+  invocation behavior;
+- analysis-test attributes in macros/subrules, configured transition
+  preparation/execution, query/cquery/aquery projection and execution; and
+- Java object identity, exact impossible-state diagnostics, legacy toolchain
+  resolution and all unadmitted ruleset/action breadth.
 
-This packet does not claim that every future native parameter accepts a
-`Label`; only the inventoried Bazel `LABEL`, `NODEP_LABEL`, `LABEL_LIST`,
-`NODEP_LABEL_LIST` and label-keyed dictionary positions are admitted.
+The exact claim ends before rule-schema or package publication. Do not describe
+this packet as complete analysis-test support or configured transition support.
 
-## Revision, equality and memory
+## Identity, revision and memory
 
-No request option or mutable Host observation is added. A package evaluation
-converts invocation values completely before publication. Its existing source
-and repository-mapping dependencies determine the immutable DICE request;
-overlapping requests share only complete package results through existing
-keys. Need, cancellation or conversion failure publishes no partial target.
+The BZL evaluation key and imported-module graph already own source bytes,
+repository mapping, imports, evaluation success and frozen heap lifetime.
+Constructor success publishes only a frozen module value. Changing settings
+source or imported inputs invalidates and recomputes that module through the
+existing graph; cancellation or failure publishes no partial descriptor.
 
-Equivalent string and typed-label inputs that resolve to the same
-`CanonicalLabel` may equality-cut off to the same complete `LoadedPackage`.
-Changing a raw mapping or typed canonical label must change the retained
-package value and downstream semantic references; restoring it must restore
-the prior value without stale representation state. No lock is held across a
-DICE computation.
+Within the accepted boundary, the original dictionary and arbitrary values are
+owned by the live/frozen Starlark heap and traced/frozen exactly once. Canonical
+outputs use the existing compact `TransitionSetting` plus immutable `Arc`
+slice. No copied value tree, repr-derived identity, ordinal, pointer-derived
+package identity, map, interner, cache, registry, DICE key, lock, I/O or
+fallback is added. The object and descriptors release with module invalidation,
+eviction or service shutdown.
 
-Starlark `Value`, temporary raw lists/dictionaries and conversion vectors are
-evaluator/phase scratch and drop after invocation. Existing compact strings,
-`CanonicalLabel`s and `Arc` slices/maps remain DICE-retained package semantic
-memory and release on invalidation/eviction or service shutdown. No command,
-service-cache, transfer-owned async or task memory is added. There is no hot-
-path or retained-representation change requiring a benchmark or Stage 9/Buck2
-extraction update.
+The Buck2 utility review selects the already-adopted row 112 frozen-transition
+lifetime pattern only: evaluator values freeze with their owning module and
+compact canonical settings use shared immutable slices. It explicitly rejects
+reuse of the regular callable transition as semantic identity. Because this
+packet stops before a retained package/configured representation, Stage 9 gains
+no new adopted extraction row; a future lifting packet must record its
+structural literal representation before Rust.
 
 ## Evidence and proof
 
-Use a pinned-source regression rather than a new persistent oracle fixture.
-`BuildType.java` supplies one generic conversion contract, and the accepted
-verbatim catalog replay already discriminates the motivating scalar. This
-avoids copying a matrix whose rows differ only by RuleClass declaration while
-still testing every Slug adapter that bypasses the shared conversion owner. No
-fixture-growth checkpoint is triggered.
+Use a pinned-source regression rather than a new oracle fixture. The source
+contract is closed and the motivating authentic replay discriminates BZL name
+availability. Add focused tests that prove:
 
-Add focused proof that:
+- the name exists in ordinary/Bzlmod BZL globals and is absent from BUILD;
+- missing, positional, extra, non-dictionary and non-string-key arguments fail;
+- empty and mixed arbitrary-value dictionaries construct, freeze, import and
+  preserve exact repr, raw value structure, canonical output order and defining
+  package/repository mapping;
+- build-setting, mapped-repository, native, experimental and incompatible keys
+  succeed, including a syntactically valid unknown native name; malformed and
+  invisible labels plus canonical-label aliases fail in pinned order, while
+  native option existence and value typing remain deferred to configured
+  analysis;
+- all supported dependency attribute constructors accept the object as `cfg`,
+  and a frozen descriptor survives a two-hop imported dictionary union;
+- ordinary rule consumption fails with the exact pinned diagnostic before a
+  rule definition, target or package can be published;
+- regular `transition()` descriptors retain their existing live/frozen/final
+  identity and tests;
+- macro/subrule consumers and `testing.analysis_test` retain their existing
+  unsupported boundaries; and
+- the authentic rules_rust replay clears the missing-global stop and selects
+  only the next independent generic boundary.
 
-- direct BUILD globals and `.bzl` `native.*` calls both accept the complete
-  inventoried category;
-- scalar/list/dictionary rows mix strings and typed Labels and publish the
-  exact canonical values, semantic references, order and provenance;
-- one cross-package macro keeps a typed defining-package label while resolving
-  a raw string in the calling BUILD package;
-- typed and equivalent raw spellings compare as the same semantic package
-  value, while a different typed owner changes and restores the result;
-- canonicalized collisions in `config_setting.flag_values`, invalid scalar,
-  list element, dictionary key/value and `None` positions fail before target
-  or package-default publication;
-- global `package()` and `native.package()` reject equivalent String/Label
-  duplicates in `default_package_metadata` without retaining either default;
-- String and typed-Label values with target names `all`, `all-targets`, `*`,
-  `...` and `sub/...` succeed at the inventoried attribute positions, while
-  actual target-pattern APIs retain their existing wildcard/recursive
-  rejection;
-- generic kwargs, visibility, `constraint_setting.default_constraint_value`,
-  output/path/string grammars and ordinary valid string behavior remain
-  unchanged; and
-- the built-in `tools/res` package clears the typed-parameter stop, then either
-  publishes through ordinary loading or reaches a later independently
-  classified boundary without a catalog/toolchain/ruleset branch.
-
-The rebuilt authentic rules_rust replay must clear the current
-`toolchain_type` Label-versus-string diagnostic and select only the next
-generic unsupported category, if any. It is downstream evidence, not
-authority for ruleset behavior.
-
-## Terminal implementation outcome
-
-The implementation replaces every inventoried direct String-only adapter with
-a thin projection through the existing raw package-context coercer. Typed
-labels retain their defining identity, raw strings use the calling BUILD
-package, canonical collisions and invalid nested values fail before
-publication, and ordinary label target names remain distinct from target-
-pattern APIs. No parser, DICE owner, retained representation, I/O, fallback or
-consumer special case was added.
-
-Serial validation passes 508 loading library tests with one ignored, every
-loading integration binary, 596 Bzlmod tests, 55 query tests, the V2 CLI build,
-formatting and diff checks. The archive checker passes its refs and structural
-gates and reports only the three longstanding thoughts-path allowlist failures;
-the parked registration edit is absent. The isolated authenticated rules_rust
-configured-query replay clears the former `toolchain_type` Label-versus-string
-diagnostic and next stops at missing predeclared `analysis_test_transition` in
-`@@bazel_skylib+//lib:unittest.bzl`. No stale `slugd` remains.
-
-Next, audit the complete Bazel 9.2 predeclared `analysis_test_transition`
-category docs-first. Do not add a bazel_skylib/rules_rust consumer branch or
-silently widen configured-analysis test semantics.
+No A/B/A package-semantic claim is allowed for the literal settings map in this
+packet because it is intentionally never published into a package. A focused
+module-source change/restore test may prove existing BZL invalidation without
+claiming configured semantics.
 
 ## Allowlist, caps and complexity
 
 Production Rust may change only:
 
-- `app/slug_loading_v2/src/package.rs`.
+- `app/slug_loading_v2/src/package.rs`; and
+- `app/slug_loading_v2/src/transition.rs`.
 
 Proof Rust may change only:
 
 - `app/slug_loading_v2/src/host_package_load_tests.rs`;
-- `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs`;
-- `app/slug_loading_v2/tests/build_file_loading.rs`; and
+- `app/slug_loading_v2/src/testing_bootstrap_tests.rs`; and
 - `app/slug_loading_v2/tests/bzl_invalidation.rs`.
 
-Scheduling records may change only the canonical plan, Stage 4 owner and this
-manifest. Caps are 240 gross added production Rust lines, 520 proof lines and
-760 total. No new function may exceed 120 lines.
+Scheduling records may change only the canonical plan, Stage 4 owner, Stage 9
+ledger and this manifest. Stage 9 may change only if review determines that an
+extraction row is mandatory before implementation; otherwise leave it
+untouched.
 
-`package.rs` is 10,784 lines and exceeds the 2,000-line trigger. It remains the
-cohesive owner because it contains `PackageRecorder`, evaluator-local raw
-attribute coercion and both mirrored native invocation facades. The patch may
-add one private converter beside the existing raw conversion and alter only
-the inventoried adapters; moving the converter away would split evaluator
-values from package/mapping ownership. Do not move unrelated declarations,
-schema storage, presentation, persistence or transport into this file.
+Caps are 210 gross added production Rust lines, 330 proof lines and 540 total.
+No new function may exceed 100 lines.
 
-The proof files are large existing owner suites. Add only focused rows using
-their current scaffolding; do not create copied package trees or broad
-snapshot assertions. This category adds no retained collection and is not a
-demonstrated hot path, so no benchmark is required.
+`package.rs` is over the 2,000-line trigger but remains the cohesive owner of
+BZL globals, transition validation, evaluator/frozen attribute descriptors and
+rule declaration. Extracting this loading-only object elsewhere would split
+the one evaluator lifetime and force new public plumbing. Do not move unrelated
+definitions. `transition.rs` remains the sole setting parser and canonicalizer;
+generalize it with a closed regular-versus-analysis-test policy so absolute-
+label behavior does not change while analysis-test outputs permit all
+syntactically valid native names and regular option rejection remains exact.
+Proof must use existing evaluator and host-load scaffolding; do not copy
+bazel_skylib or create a fixture tree. No benchmark is required: this adds one
+construction-time compact slice and no configured hot path.
 
 ## Validation and stops
 
 Run serially:
 
-- focused package/raw-coercion, direct BUILD, `native.*`, mapping and A/B/A
-  tests;
-- focused built-in catalog repository-load proof;
+- focused constructor/global-placement/signature/validation/repr/freeze/import,
+  attribute-consumer and ordinary-rule rejection tests;
+- existing regular-transition declaration/attachment/loading tests;
+- focused BZL invalidation only if that proof is added;
 - `cargo test -p slug_loading_v2 --lib -q` and every loading integration test;
 - `cargo test -p slug_bzlmod_v2 --lib -q`;
 - `cargo test -p slug_query_v2 --lib -q`;
@@ -309,24 +265,24 @@ Run serially:
 - authentic rules_rust configured-query replay with stale `slugd` cleanup
   before and after;
 - `cargo fmt --check`, `git diff --check`, archive checker and parked-proof
-  SHA-256 verification.
+  verification.
 
 Return `REPLAN` before or during Rust if:
 
-- any inventoried value requires a second parser, stringification/reparse of a
-  typed label, direct mapping lookup outside `PackageRecorder`, new DICE owner,
-  registry, cache, interner, lock, I/O or fallback;
-- exact behavior requires selectors/configured evaluation, output/path/file
-  widening or a native rule class outside the declared category;
-- one facade cannot share the same semantic conversion without changing its
-  BUILD-versus-defining-package ownership;
-- a failure can publish a partial target/package default or canonicalized
-  dictionary collisions are accepted;
-- a `tools/res`, rules_rust, rules_cc, toolchain-selection, C++, `cc_common` or
-  `cc_internal` consumer special case appears;
-- a new oracle fixture becomes necessary without first resolving the current
-  fixture-growth checkpoint count; or
+- the literal map reaches `RuleAttributeSchema`, `LoadedPackage`,
+  `attrs::TransitionDefinition`, a configured dependency or any DICE value;
+- arbitrary literal values are stringified, recursively copied, assigned an
+  ordinal, compared by pointer, omitted from a semantic equality domain or
+  routed through the regular transition callback;
+- `rule(analysis_test = True)`, `testing.analysis_test`,
+  `AnalysisTestResultInfo`, action restrictions, nested tests, dependency caps
+  or configured patch application become necessary to pass an admitted proof;
+- BUILD receives the global, ordinary regular-transition behavior changes, or
+  macro/subrule restrictions are widened;
+- a second transition parser/validator, native-option existence lookup,
+  repository mapping, DICE key, cache,
+  interner, registry, lock, I/O, fallback or consumer special case appears;
+- a new oracle fixture is necessary without first resolving the fixture-growth
+  checkpoint; or
 - production/proof caps, file allowlists or the bounded `package.rs` cohesion
   decision are exceeded.
-
-Independent architecture review must return `ACCEPT` before Rust begins.

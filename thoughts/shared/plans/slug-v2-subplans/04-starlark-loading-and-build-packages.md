@@ -7863,3 +7863,39 @@ missing predeclared `analysis_test_transition` symbol in
 `@@bazel_skylib+//lib:unittest.bzl`. Audit that complete Bazel 9.2 category
 docs-first. Do not add a bazel_skylib, rules_rust, toolchain or consumer branch,
 and do not imply analysis-test execution semantics before they are owned.
+
+### Analysis-test transition category audited (2026-09-02)
+
+The complete pinned Bazel 9.2 audit separates the globally predeclared
+`analysis_test_transition(settings = ...)` constructor from the BUILD-only
+`testing.analysis_test` factory and from ordinary callback-backed transitions.
+The constructor owns a fixed literal patch with no inputs, callback or split;
+its arbitrary values and canonical outputs are semantic identity. Bazel permits
+it only on attributes of `rule(analysis_test = True)` rules, whose configured
+semantics additionally require a distinct configuration marker, no registered
+actions, `AnalysisTestResultInfo`, nested-test rejection and the transitive
+dependency cap.
+
+Select docs-first
+`WP-4-7A-analysis-test-transition-loading-declaration-design-r1`. The bounded
+exact surface is BZL-only predeclaration, signature/key validation, canonical
+output ordering, defining-module package/mapping context, repr/freeze,
+transient attribute
+descriptor retention and exact rejection when an ordinary Slug rule consumes
+the descriptor. Stop before `RuleAttributeSchema`, package publication or DICE
+semantic state so arbitrary literal settings are never compared by pointer or
+omitted from equality. Do not reuse the regular callable transition type.
+
+The accepted frozen-transition lifetime pattern supplies evaluator/frozen heap
+ownership and immutable compact output slices. No new Stage 9 extraction row is
+needed unless review changes that decision. Full analysis-test rule/configured
+execution, BUILD-only `testing.analysis_test`, provider/action enforcement,
+nested-test prevention and the dependency cap remain unsupported/deferred.
+Independent architecture review must accept the lifetime, fail-closed boundary,
+proof, allowlist, caps and stops before Rust.
+
+Initial review corrected raw-dictionary duplicate ownership and deferred native
+option existence checks. A focused source rereview confirms that the first
+validation phase still requires absolute build-setting labels and only the
+analysis-test native-option policy differs from ordinary transitions. It
+returns `ACCEPT`; Rust may proceed only inside the frozen loading-only packet.
