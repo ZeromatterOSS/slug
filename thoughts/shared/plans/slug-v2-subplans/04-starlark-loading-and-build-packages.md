@@ -7918,7 +7918,38 @@ the missing global and stops at
 `@@bazel_skylib+//toolchains/unittest:BUILD` on the generic
 `package(default_applicable_licenses = ["//:license"])` parameter.
 
-Run docs-only `WP-4-7A-applicable-licenses-loading-category-audit` next. Audit
-the complete Bazel 9.2 package/rule applicable-license category and its
-identity/publication owner before selecting Rust. Do not add a Bazel Skylib,
-toolchain or other consumer special case.
+### Applicable-license loading category audited (2026-09-02)
+
+Pinned Bazel 9.2 `PackageArgs`, `PackageCallable`, `RepoFileGlobals`,
+`RuleClass`, `AttributeProvider`, `BaseRuleClasses`, `MacroClass` and
+`StarlarkRuleClassFunctions` close the category. Package input
+`default_applicable_licenses` and rule input `applicable_licenses` are aliases
+for the sole canonical `default_package_metadata` field and `package_metadata`
+slot. Package aliases reject simultaneous use; rule aliases rewrite before
+schema lookup, ignore `None`, and keep the last non-`None` value when both
+spellings occur. Only the canonical name is stored and queried.
+
+The complete trace also bounds the claim. `MacroClass` rejects unknown
+keywords before shared attribute population, so symbolic macros do not admit
+the alternate rule spelling. Platform, constraint-setting/value and
+materializer/dependency-resolution classes lack the canonical slot. Bazel's
+`rules_license` repository-name special case suppresses package metadata
+defaults to avoid self-edges. Slug's dormant REPO.bazel evaluator discards all
+`repo()` keyword values, and Slug currently admits repeated BUILD package
+calls. Those independent categories remain unsupported/deferred rather than
+being hidden inside an alias patch.
+
+Select
+`WP-4-7A-applicable-licenses-loading-alias-design-r1`. Implement only immediate
+canonicalization at existing BUILD package, admitted Starlark-rule and native-
+rule ingress. Reuse the existing package recorder, repository-mapped label
+coercer, immutable label slice, canonical native/Starlark schema slots and
+package-load DICE owner. Add no retained spelling, metadata slot, registry,
+cache, key, parser, fixture, ruleset or configured consumer branch.
+
+`RuleClassTest.testPackageMetadataAlternateName` and the accepted Stage 4
+package-metadata matrix are sufficient pinned-source evidence. The active
+packet owns the exact/Slug-native/deferred classifications, last-non-`None`
+and macro-rejection proof, 90/230/320 line caps, one-file production allowlist
+and terminal stops. Audit and architecture return `ACCEPT`; bounded Rust is
+authorized without a Skylib or toolchain special case.

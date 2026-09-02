@@ -1,314 +1,240 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-7A-analysis-test-transition-loading-declaration-design-r1
+Packet: WP-4-7A-applicable-licenses-loading-alias-design-r1
 
 Milestone: M7A bootstrap-critical generic Starlark/loading closure. Implement
-the complete bounded Bazel 9.2 loading declaration for the BZL-only
-`analysis_test_transition(settings = ...)` global without claiming configured
-analysis-test execution.
+the bounded Bazel 9.2 compatibility aliases
+`default_applicable_licenses` and `applicable_licenses` by canonicalizing them
+immediately into Slug's accepted `default_package_metadata` package field and
+`package_metadata` rule-attribute slot.
 
-Status: implementation terminally `ACCEPTED`. The complete source/owner audit
-and implementation rereview are accepted. Review corrections made
-repository-rule and tag-class rejection explicit and proved all five supported
-dependency constructors across live, frozen and two-hop imported descriptors.
-The implementation stays inside the loading-only publication boundary; no
-literal settings map reaches rule schema, package, DICE or configured state.
+Status: category audit and architecture `ACCEPTED`; bounded Rust is authorized.
+The exact claim is limited to single BUILD-package declarations and admitted
+rule instances. It does not widen the existing package-call, REPO.bazel,
+symbolic-macro, rules_license or configured-analysis surfaces.
 
 Immediate predecessor
-`WP-4-7A-native-builtin-label-like-parameter-category-design-r1` is terminally
-accepted in `36ee4f124`. Its authentic rules_rust replay clears native
-String-or-Label conversion and stops while loading
-`@@bazel_skylib+//lib:unittest.bzl`, whose function body refers to the missing
-predeclared `analysis_test_transition` name. The reference is resolved when the
-module is compiled even though the function is not invoked.
+`WP-4-7A-analysis-test-transition-loading-declaration-design-r1` is terminally
+accepted in `3f90b41b5`. Its rebuilt authenticated rules_rust replay clears the
+missing BZL global and stops while loading
+`@@bazel_skylib+//toolchains/unittest:BUILD` at
+`package(default_applicable_licenses = ["//:license"])`.
 
-## Audit result and upstream ownership
+## Learned facts and research basis
 
 Pinned Bazel 9.2.0 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` owns this category:
+`8220c6198837d5c13d53fea211cf3282aa12408a` owns the category:
 
-- `ConfigGlobalLibraryApi.java` declares one top-level BZL global with exactly
-  one required named-only `settings` argument;
-- `ConfigGlobalLibrary.java` requires a BZL module context, casts dictionary
-  keys to strings while retaining arbitrary Starlark values, validates each
-  key as a transition output, permits experimental and incompatible native
-  options, and records the defining module's repository mapping and location;
-- `StarlarkDefinedConfigTransition.java` gives the result a fixed patch shape,
-  no callback, no inputs or splits, canonical/sorted outputs, literal changed-
-  settings identity and repr `<analysis_test_transition object>`;
-- `StarlarkAttrModule.java` admits the object at dependency-attribute `cfg`
-  positions and marks the descriptor `HAS_ANALYSIS_TEST_TRANSITION` rather
-  than `HAS_STARLARK_DEFINED_TRANSITION`;
-- `StarlarkRuleClassFunctions.java` rejects an analysis-test transition on a
-  rule not declared with `analysis_test = True` using
-  `Only rule definitions with analysis_test=True may have attributes with analysis_test_transition transitions`;
-- `StarlarkRuleFunctionsApi.java`, `FunctionTransitionUtil.java`,
-  `RuleConfiguredTargetBuilder.java` and `CoreOptions.java` separately own
-  configured analysis-test rules: implied test status, action prohibition,
-  required `AnalysisTestResultInfo`, the always-distinct analysis-test
-  configuration marker, nested-analysis-test rejection and the default 2000
-  transitive-label cap; and
-- `TestingModuleApi.java` plus `StarlarkTestingModule.java` own the separate
-  BUILD-only `testing.analysis_test` target factory. It is not the global
-  audited here.
+- `PackageArgs.java` sends both `default_applicable_licenses` and
+  `default_package_metadata` through the same `LABEL_LIST` conversion and
+  `defaultPackageMetadata` builder field. It rejects canonical-label
+  duplicates using the supplied spelling and rejects both spellings together
+  with the fixed migration diagnostic.
+- `PackageCallable.java` exposes those package arguments only while evaluating
+  a BUILD file. `RepoFileGlobals.java` exposes the same `PackageArgs` through
+  REPO.bazel's distinct `repo()` call.
+- `RuleClass.java` names the stored common attribute `package_metadata` and its
+  alternate input spelling `applicable_licenses`.
+- `AttributeProvider.java` rewrites the alternate spelling before schema
+  lookup for rule instances, ignores `None` after checking that the canonical
+  schema exists, converts through the canonical attribute, and stores only the
+  canonical slot. If both spellings are supplied, ordered keyword traversal
+  makes the last non-`None` value win.
+- `BaseRuleClasses.java` gives ordinary native and Starlark rules the
+  nonconfigurable, no-configuration `package_metadata` label-list attribute,
+  whose computed default reads the package's `defaultPackageMetadata`.
+- `StarlarkRuleClassFunctions.java` removes `package_metadata` from dependency-
+  resolution and materializer base rules. Platform, constraint-setting and
+  constraint-value rule classes likewise remove it.
+- `MacroClass.java` checks user keywords against the macro schema before its
+  shared `AttributeProvider` population step. A macro that declares
+  `package_metadata` therefore still rejects `applicable_licenses`; the alias
+  is not a symbolic-macro input surface.
+- `RuleClass.isPackageMetadataRule` and `AttributeProvider` suppress the
+  package default for Starlark rules defined in the canonical repository named
+  `rules_license`, avoiding metadata self-edges.
+- `RuleClassTest.testPackageMetadataAlternateName` is the focused pinned-source
+  regression: alternate input is converted to a label and observed only under
+  the canonical slot. `StarlarkRuleClassFunctionsTest` proves the canonical
+  common attribute. The accepted Stage 4 package-license matrix already proves
+  package-default propagation for native, Starlark and config-setting rules.
 
-Pinned `StarlarkIntegrationTest` covers successful option application,
-same-value transitions remaining configuration-distinct, ordinary-rule
-rejection, nested analysis tests and the dependency cap. The integration shell
-test covers `allow_analysis_failures`. The audit found no analysis-test-specific
-allowlist: Bazel's function-transition allowlist tracks the separate regular
-transition property.
+Slug already owns one `PackageState.default_package_metadata` field as
+`Arc<[CanonicalLabel]>`, one canonical Starlark builtin schema declaration and
+one canonical native schema slot. Filegroup, alias, config_setting, test_suite,
+toolchain_type and toolchain own that native slot; constraint_setting,
+constraint_value and platform intentionally do not. Both BUILD `package()` and
+`native.package()` route through `package_global`, and rule labels already use
+the package recorder's canonical repository mapping.
 
-## Slug inventory and bounded decision
+Slug's REPO.bazel evaluator currently validates `repo()` call placement but
+deliberately discards all keyword values; its file is marked dormant until a
+root package-policy activation packet. This is not a lawful place to add one
+metadata exception.
 
-Slug already has a complete callback-backed regular transition declaration,
-attribute attachment and configured execution route. It is the wrong semantic
-type for this fixed literal patch. Its callable, closure-source identity,
-input/output protocol, split behavior and idempotent configured re-entry must
-remain unchanged.
+## Decision and compatibility classification
 
-`AttributePropertyFlag::HasAnalysisTestTransition` exists only as catalog text
-today. `rule()` has no `analysis_test` parameter. `AnalysisTestResultInfo` and
-`testing.analysis_test` deliberately reject construction/invocation until
-configured semantics are admitted. Although the configuration registry
-contains pinned descriptors for `analysis_testing_deps_limit` and
-`evaluating for analysis test`, Slug does not yet own the configured graph
-rules that consume them.
+Implement as **exact** within the named Bazel 9.2 loading slice:
 
-Implement one distinct evaluator/frozen declaration value for
-`analysis_test_transition`. Register it only in BZL globals. It retains:
+1. On one otherwise-admitted BUILD package declaration,
+   `default_applicable_licenses` is a true input alias for
+   `default_package_metadata` in both `package()` and `native.package()`.
+   String and `Label` members, package-relative and mapped labels, order,
+   duplicate rejection, explicit empty lists and type errors use the existing
+   canonical conversion path. Supplying both spellings fails with Bazel's
+   pinned migration diagnostic before package-state mutation.
+2. On admitted native and Starlark rule instances,
+   `applicable_licenses` resolves to `package_metadata` before schema lookup.
+   It is accepted only where that canonical slot exists, is coerced and
+   defaulted exactly as that slot, and is stored/query-visible only as
+   `package_metadata`.
+3. Explicit non-`None` canonical or alternate values override the package
+   default; an explicit empty list suppresses it. `None` is omission after the
+   canonical schema-existence check. If both spellings occur, the last
+   non-`None` value in BUILD keyword order wins.
+4. A rule class without `package_metadata` rejects the alternate spelling as a
+   missing canonical attribute. Symbolic macros continue to reject the
+   alternate spelling even when they declare canonical `package_metadata`.
 
-1. the original settings dictionary value on its evaluator or frozen module
-   heap, including arbitrary Starlark values and original key spellings;
-2. canonical, Bazel-ordered `Arc<[TransitionSetting]>` outputs produced by the
-   existing transition-setting validator/canonicalizer under an explicit
-   analysis-test policy; and
-3. the defining `BzlModuleIdentity` needed for label and repository-mapping
-   interpretation.
-
-The object has no implementation callable, inputs, source-closure inventory or
-final configured transition projection. It must not be converted into
-`attrs::TransitionDefinition`.
-
-Extend the transient `AttributeDefinitionGen<Value/FrozenValue>` descriptor to
-retain this distinct object through local construction, freeze, import and
-dictionary reuse. `set_attribute_cfg` accepts either the existing regular
-transition or this analysis-test transition, never both. Macro and subrule
-consumers preserve their existing fail-closed transition restrictions.
-
-When `rule()` consumes an attribute descriptor containing the new object, it
-must stop before `RuleAttributeSchema`, `FrozenRuleDefinition`, target or
-package publication with Bazel's ordinary-rule diagnostic above. This packet
-does not add `rule(analysis_test = True)`. Consequently the arbitrary literal
-map never becomes package/DICE/configuration semantic state, where pointer
-identity or omission would be unsound. A later configured packet must design a
-V2-owned structural literal value before lifting this stop.
-
-This generic boundary is sufficient for the motivating bazel_skylib module:
-the missing name is resolved while compiling `_make_analysis_test`, but the
-constructor and `rule(analysis_test = True)` are reached only if that function
-is invoked. Add no bazel_skylib, rules_rust, unittest, toolchain, C++,
-`cc_common` or `cc_internal` consumer branch.
-
-## Compatibility classification
-
-Admit as **exact** for the named Bazel 9.2 loading declaration surface:
-
-- presence only in `.bzl` evaluation, including ordinary and Bzlmod-routed BZL
-  modules, and absence from BUILD globals;
-- exactly one required named-only `settings` dictionary argument;
-- string-only keys, arbitrary frozen Starlark values, empty and nonempty maps,
-  absolute build-setting labels, repository mapping, and
-  syntactically well-formed native `//command_line_option:` names including
-  unknown, experimental and incompatible names;
-- invalid label syntax, invisible repositories and distinct dictionary keys
-  that canonicalize to the same build-setting label rejected through the
-  existing transition-output policy and diagnostic order; raw duplicate keys
-  remain the Starlark dictionary constructor's boundary;
-- canonical Bazel ordering, defining-module identity, value/object freeze and
-  repr `<analysis_test_transition object>`;
-- use as `cfg` on supported dependency attribute constructors through local,
-  frozen and imported attribute descriptors; and
-- pre-publication rejection when such a descriptor is consumed by an ordinary
-  Slug rule, with the pinned Bazel diagnostic.
-
-Keep **Slug-native**:
-
-- Rust/starlark-rust source spans and incidental type-rendering details outside
-  the named exact diagnostics;
-- evaluator/frozen heap layout, compact collection choices and BZL module DICE
-  ownership; and
-- Slug's already-accepted collision-safe canonical repository identity.
+Keep **Slug-native** only the already-admitted Rust/starlark-rust diagnostic
+framing, source spans, evaluator layout, collision-safe canonical repository
+identity, and incidental query presentation outside the canonical attribute
+name and value.
 
 Keep **unsupported/deferred**:
 
-- `rule(analysis_test = True)`, analysis-test rule invocation and target
-  publication;
-- literal patch application, typed option/build-setting conversion, the
-  always-distinct analysis-test configuration marker and action-conflict
-  behavior;
-- `AnalysisTestResultInfo` construction/validation, action prohibition,
-  nested-analysis-test prevention and transitive dependency counting/caps;
-- BUILD-only `testing.analysis_test`, its dynamic rule definition and
-  invocation behavior;
-- analysis-test attributes in macros/subrules, configured transition
-  preparation/execution, query/cquery/aquery projection and execution; and
-- Java object identity, exact impossible-state diagnostics, legacy toolchain
-  resolution and all unadmitted ruleset/action breadth.
+- more than one `package()`/`native.package()` call in a BUILD file and every
+  interaction that relies on Slug's currently broader call multiplicity;
+- REPO.bazel `repo()` package-argument retention, merge precedence and
+  propagation to repository packages;
+- the Bazel `rules_license` repository-name special case and metadata-rule
+  default self-edge suppression;
+- `applicable_licenses` on symbolic macros, repository rules, tag classes,
+  aspects or subrules; rule initializers and initializer-returned aliases;
+- dependency-resolution/materializer rules and native rule classes outside
+  Slug's admitted catalog;
+- configured metadata providers, license policy interpretation, action or
+  output identity, query/cquery/aquery semantics beyond the already-loaded
+  canonical attribute, and any Skylib/toolchain/ruleset special case; and
+- Java/HotSpot object identity, legacy toolchain resolution and exact
+  incidental diagnostics not named above.
 
-The exact claim ends before rule-schema or package publication. Do not describe
-this packet as complete analysis-test support or configured transition support.
+The package and rule aliases are distinct inputs. Do not infer a second
+attribute named `applicable_licenses`, a license provider, or full applicable-
+license policy from this packet.
 
-## Identity, revision and memory
+## Natural owner, identity and revision behavior
 
-The BZL evaluation key and imported-module graph already own source bytes,
-repository mapping, imports, evaluation success and frozen heap lifetime.
-Constructor success publishes only a frozen module value. Changing settings
-source or imported inputs invalidates and recomputes that module through the
-existing graph; cancellation or failure publishes no partial descriptor.
+`PackageRecorder::set_package_defaults` and its `PackageState` remain the sole
+producer and retained owner of package metadata defaults.
+`FrozenRuleDefinition::invoke` and `coerce_native_overrides` remain the sole
+Starlark/native rule-input owners and publish only the existing canonical
+attribute values. Add one small name-canonicalization helper shared where
+useful; do not retain the original alias spelling.
 
-Within the accepted boundary, the original dictionary and arbitrary values are
-owned by the live/frozen Starlark heap and traced/frozen exactly once. Canonical
-outputs use the existing compact `TransitionSetting` plus immutable `Arc`
-slice. No copied value tree, repr-derived identity, ordinal, pointer-derived
-package identity, map, interner, cache, registry, DICE key, lock, I/O or
-fallback is added. The object and descriptors release with module invalidation,
-eviction or service shutdown.
+The BUILD source observation and package-load DICE key already own source
+bytes, BZL imports, repository mapping, evaluation success and the final
+`LoadedPackage`. An alias/canonical source edit invalidates through that same
+graph. Equivalent spellings may equality-cut off at the existing canonical
+loaded value; failures publish no partial package. Overlapping requests keep
+their existing immutable observations and transaction boundaries. No command
+overlay, host fallback or historical filesystem inference is added.
 
-The Buck2 utility review selects the already-adopted row 112 frozen-transition
-lifetime pattern only: evaluator values freeze with their owning module and
-compact canonical settings use shared immutable slices. It explicitly rejects
-reuse of the regular callable transition as semantic identity. Because this
-packet stops before a retained package/configured representation, Stage 9 gains
-no new adopted extraction row; a future lifting packet must record its
-structural literal representation before Rust.
+All retained memory is the existing DICE-retained `Arc<[CanonicalLabel]>` or
+canonical `AttributeValue`. Keyword maps and the supplied spelling are
+evaluation scratch and release when invocation returns. No new enum, string,
+map, interner, registry, cache, DICE key, lock, task, I/O or async-transfer
+memory is permitted. Cancellation, invalidation, eviction and shutdown remain
+those of the existing package-load graph.
+
+This immediate canonicalization changes no retained data structure, hashing,
+compact collection, clone path or memory accounting, so the Buck2 hot-path
+utility skill is not triggered and Stage 9 gains no extraction row.
 
 ## Evidence and proof
 
-Use a pinned-source regression rather than a new oracle fixture. The source
-contract is closed and the motivating authentic replay discriminates BZL name
-availability. Add focused tests that prove:
+Reuse the pinned-source regression and accepted Stage 4 package-metadata
+evidence rather than adding an oracle fixture. Add focused loading tests that
+prove:
 
-- the name exists in ordinary/Bzlmod BZL globals and is absent from BUILD;
-- missing, positional, extra, non-dictionary and non-string-key arguments fail;
-- empty and mixed arbitrary-value dictionaries construct, freeze, import and
-  preserve exact repr, raw value structure, canonical output order and defining
-  package/repository mapping;
-- build-setting, mapped-repository, native, experimental and incompatible keys
-  succeed, including a syntactically valid unknown native name; malformed and
-  invisible labels plus canonical-label aliases fail in pinned order, while
-  native option existence and value typing remain deferred to configured
-  analysis;
-- all supported dependency attribute constructors accept the object as `cfg`,
-  and a frozen descriptor survives a two-hop imported dictionary union;
-- ordinary rule consumption fails with the exact pinned diagnostic before a
-  rule definition, target or package can be published;
-- regular `transition()` descriptors retain their existing live/frozen/final
-  identity and tests;
-- macro/subrule consumers and `testing.analysis_test` retain their existing
-  unsupported boundaries; and
-- the authentic rules_rust replay clears the missing-global stop and selects
-  only the next independent generic boundary.
+- `package()` and `native.package()` accept the alternate default spelling,
+  including String/`Label`, relative-label, explicit-empty and canonical-
+  duplicate cases;
+- both package spellings together produce the pinned diagnostic before any
+  target/package publication;
+- canonical and alternate package spellings produce equal canonical loaded
+  defaults and equivalent rule projection;
+- admitted native and Starlark rules accept `applicable_licenses`, publish only
+  `package_metadata`, override defaults, distinguish explicit empty, treat
+  `None` as omission, and preserve last-non-`None` behavior when both spellings
+  are present;
+- constraint_setting, constraint_value and platform reject through the absent
+  canonical slot, while symbolic macros keep their pre-provider rejection;
+- ordinary canonical `default_package_metadata` and `package_metadata`
+  behavior remains unchanged; and
+- the rebuilt authentic rules_rust replay clears the Skylib package argument
+  and selects only the next independent generic boundary.
 
-No A/B/A package-semantic claim is allowed for the literal settings map in this
-packet because it is intentionally never published into a package. A focused
-module-source change/restore test may prove existing BZL invalidation without
-claiming configured semantics.
+`RuleClassTest.testPackageMetadataAlternateName` is adapted as a Rust loading
+regression. The configured proto-output and materializer tests are skipped
+because those phases/rule families remain unsupported. The accepted package-
+license oracle is stronger than adding another fixture for default propagation.
 
 ## Allowlist, caps and complexity
 
 Production Rust may change only:
 
-- `app/slug_loading_v2/src/package.rs`; and
-- `app/slug_loading_v2/src/transition.rs`.
+- `app/slug_loading_v2/src/package.rs`.
 
 Proof Rust may change only:
 
-- `app/slug_loading_v2/src/host_package_load_tests.rs`;
-- `app/slug_loading_v2/src/testing_bootstrap_tests.rs`; and
-- `app/slug_loading_v2/tests/bzl_invalidation.rs`.
+- `app/slug_loading_v2/tests/build_file_loading.rs`.
 
-Scheduling records may change only the canonical plan, Stage 4 owner, Stage 9
-ledger and this manifest. Stage 9 may change only if review determines that an
-extraction row is mandatory before implementation; otherwise leave it
-untouched.
+Scheduling records may change only the canonical plan, Stage 4 owner and this
+manifest. Do not change Stage 9, oracle fixtures, Bazel/Skylib sources, query
+production, Bzlmod production or Cargo metadata.
 
-Caps are 210 gross added production Rust lines, 330 proof lines and 540 total.
-No new function may exceed 100 lines.
+Caps are 90 gross added production Rust lines, 230 proof lines and 320 total.
+No new function may exceed 100 lines, and no existing function may grow by
+more than 20 lines.
 
-`package.rs` is over the 2,000-line trigger but remains the cohesive owner of
-BZL globals, transition validation, evaluator/frozen attribute descriptors and
-rule declaration. Extracting this loading-only object elsewhere would split
-the one evaluator lifetime and force new public plumbing. Do not move unrelated
-definitions. `transition.rs` remains the sole setting parser and canonicalizer;
-generalize it with a closed regular-versus-analysis-test policy so absolute-
-label behavior does not change while analysis-test outputs permit all
-syntactically valid native names and regular option rejection remains exact.
-Proof must use existing evaluator and host-load scaffolding; do not copy
-bazel_skylib or create a fixture tree. No benchmark is required: this adds one
-construction-time compact slice and no configured hot path.
+`package.rs` is above the 2,000-line trigger and contains large rule/native
+invocation functions. It nevertheless remains the cohesive owner because the
+alias must disappear at the existing package, Starlark-rule and native-rule
+ingress sites before any semantic value is built. Use small helpers and do not
+move unrelated declarations or create a second attribute-normalization module.
+The test file is also large; extend the existing package-metadata/direct-label
+test neighborhood rather than creating new harness or fixture machinery. No
+benchmark is required because retained representation and configured hot paths
+do not change.
 
 ## Validation and stops
 
 Run serially:
 
-- focused constructor/global-placement/signature/validation/repr/freeze/import,
-  attribute-consumer and ordinary-rule rejection tests;
-- existing regular-transition declaration/attachment/loading tests;
-- focused BZL invalidation only if that proof is added;
+- focused package-default, native-rule, Starlark-rule, absent-schema and macro-
+  rejection tests;
+- `cargo test -p slug_loading_v2 --test build_file_loading -q`;
 - `cargo test -p slug_loading_v2 --lib -q` and every loading integration test;
 - `cargo test -p slug_bzlmod_v2 --lib -q`;
 - `cargo test -p slug_query_v2 --lib -q`;
 - `cargo build -p slug_cli_v2 -q` before authentic replay;
 - authentic rules_rust configured-query replay with stale `slugd` cleanup
-  before and after;
+  before and after; and
 - `cargo fmt --check`, `git diff --check`, archive checker and parked-proof
   verification.
 
 Return `REPLAN` before or during Rust if:
 
-- the literal map reaches `RuleAttributeSchema`, `LoadedPackage`,
-  `attrs::TransitionDefinition`, a configured dependency or any DICE value;
-- arbitrary literal values are stringified, recursively copied, assigned an
-  ordinal, compared by pointer, omitted from a semantic equality domain or
-  routed through the regular transition callback;
-- `rule(analysis_test = True)`, `testing.analysis_test`,
-  `AnalysisTestResultInfo`, action restrictions, nested tests, dependency caps
-  or configured patch application become necessary to pass an admitted proof;
-- BUILD receives the global, ordinary regular-transition behavior changes, or
-  macro/subrule restrictions are widened;
-- a second transition parser/validator, native-option existence lookup,
-  repository mapping, DICE key, cache,
-  interner, registry, lock, I/O, fallback or consumer special case appears;
-- a new oracle fixture is necessary without first resolving the fixture-growth
-  checkpoint; or
-- production/proof caps, file allowlists or the bounded `package.rs` cohesion
-  decision are exceeded.
-
-## Accepted implementation outcome
-
-The terminal implementation rereview returns `ACCEPT`. The BZL-only global
-retains its arbitrary settings dictionary on the module heap, owns one compact
-canonical output slice and defining-module identity, and remains a distinct
-fixed-patch value rather than Slug's callback transition. All five dependency
-attribute constructors retain it through live creation, freeze and two-hop
-import. Ordinary rules reject with Bazel's pinned diagnostic, while macro,
-subrule, aspect, repository-rule and tag-class consumers fail closed before
-schema or package publication. BUILD placement and the existing regular
-transition policy remain unchanged.
-
-The candidate closes at 152 gross added production Rust lines, 265 proof lines
-and 417 total, with no new function over 100 lines. Focused proof passes 4/4;
-the final loading gate passes 512 active units plus one ignored and every
-integration target (49/29/8/6/2/1/5/1); Bzlmod passes 596/596 and the required
-query library passes 55/55. The CLI rebuild, formatting, diff, process hygiene
-and archive checks pass, with only the archive checker's three unchanged
-thoughts-path baseline failures.
-
-The rebuilt authenticated rules_rust 0.73.0 replay clears the missing
-`analysis_test_transition` stop. It next stops in
-`@@bazel_skylib+//toolchains/unittest:BUILD` at the generic
-`package(default_applicable_licenses = ["//:license"])` declaration boundary.
-Select docs-only `WP-4-7A-applicable-licenses-loading-category-audit` next;
-audit the complete Bazel 9.2 package/rule applicable-license category before
-authorizing Rust, without a Bazel Skylib or toolchain consumer special case.
+- either alias survives in `PackageState`, `RuleAttributeSchema`,
+  `NativeRuleAttributes`, `LoadedPackage`, DICE identity or query output;
+- a second metadata field/slot, source-spelling bit, registry, cache, DICE key,
+  lock, fallback, parser, label converter or consumer special case appears;
+- REPO.bazel keyword retention, repeated-package-call enforcement,
+  rules_license self-edge suppression, macro alias acceptance, rule
+  initializers, materializers or configured license semantics become necessary;
+- alias handling changes canonical attribute ordering, dependency edges,
+  repository mapping, existing package defaults or unrelated `None` policy;
+- a new oracle fixture is necessary without a docs-first provenance decision;
+  or
+- the file allowlist, growth caps or bounded large-file decision is exceeded.
