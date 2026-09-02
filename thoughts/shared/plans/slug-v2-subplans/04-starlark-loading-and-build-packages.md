@@ -8039,3 +8039,19 @@ borrows before awaiting those owners, and return a real immutable path value
 backed by their lexical materialized root. String/generated-root paths, path
 filesystem methods, built-in catalog paths, symlink/template effects and all
 other repository APIs remain deferred. No Rust is authorized by this audit.
+
+### Repository Label-path evaluator bridge design accepted (2026-09-02)
+
+Independent architecture review accepts a bounded 256-address retry bridge.
+`repository_ctx.path` admits only an existing Label in this slice. A prepared
+hit allocates one immutable `path` value whose equality/hash/stringification
+use normalized physical path bytes; a miss returns one typed demand. The outer
+repository-effect owner drops all evaluator and invocation state before DICE,
+resolves the lexical path, and retries. Only terminal-attempt prints,
+environment observations and file effects publish.
+
+The address retains package/target and deliberately drops optional repository-
+mapping provenance after canonical resolution. String/generated-root paths,
+built-in catalog paths, path fields/methods and symlink/template effects remain
+unsupported/deferred. The active packet freezes proof, caps and terminal stops;
+bounded Rust may begin with no ruleset or toolchain branch.

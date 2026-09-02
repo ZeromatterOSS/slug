@@ -1,220 +1,293 @@
 # Current Slug V2 Packet
 
-Packet: WP-5-7A-repository-context-path-audit
+Packet: WP-2-4-5-7A-repository-label-path-owner-design-r1
 
-Milestone: M7A bootstrap-critical loading/repository execution closure. Audit
-the complete Bazel 9.2 `repository_ctx.path` and path-value category exposed by
-the accepted repository-rule `Label()` context, without treating a filesystem
-path as a label-formatting detail.
+Milestone: M7A bootstrap-critical loading/repository execution closure. Admit
+the bounded Bazel 9.2 `repository_ctx.path(Label)` slice with a lexical routed
+path owner and a lock-safe bridge between synchronous Starlark evaluation and
+asynchronous DICE prerequisites.
 
-Status: docs-only audit terminally `REPLAN`. A dedicated cross-stage label-path
-owner design is required before Rust. No production, proof, fixture or oracle
-file changed in this packet.
+Status: docs-only design and independent architecture review `ACCEPTED`;
+bounded Rust is selected under this frozen contract.
 
-Immediate predecessor
-`WP-4-5-7A-repository-rule-label-constructor-context-implementation-r1` is
-terminally accepted in `77cfe94ce`. Its authenticated rules_rust 0.73.0 replay
-clears `Label()` and stops at
-`repository_ctx.path(Label(label))` in
-`@@rules_cc+//cc/private/toolchain:lib_cc_configure.bzl:38`.
+Immediate predecessor `WP-5-7A-repository-context-path-audit` is terminally
+`REPLAN` in `08af092a8`. It proves that Slug's existing
+`HostRepositoryPathKey` is not reusable because it observes target existence
+and resolves symlinks, while Bazel's Label-path operation only package-looks-up
+the Label and returns a lexical rooted path.
 
-## Learned facts and research basis
+## Frozen compatibility boundary
 
-Pinned Bazel 9.2.0 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` owns the category:
+Implement as **exact** within the admitted repository-file-effect slice of at
+most 256 distinct Label-path addresses per invocation:
 
-- `StarlarkBaseExternalContext.getPath` accepts a string, Label or existing
-  `StarlarkPath`. A string is resolved against the repository working
-  directory, a Label goes through `getPathFromLabel`, and a path is returned
-  unchanged.
-- `RepositoryUtils.getRootedPathFromLabel` first requests the Label package's
-  `PackageLookupValue`. A missing package or package without BUILD metadata is
-  an evaluation error. A successful lookup returns the package root joined
-  with the Label path fragment; it does **not** inspect whether the named
-  target path exists and does not resolve its symlinks.
-- `getPathFromLabel` materializes a remote external repository when necessary.
-  Bazel 9.2 defaults `--incompatible_no_implicit_watch_label=true`, so merely
-  constructing the path does not watch the target. Package lookup and source
-  materialization still remain semantic prerequisites.
-- `StarlarkPath` is immutable and hashable. Equality and hashing use the
-  underlying physical `Path`; `str` emits that path and `repr` quotes it.
-  `basename`, `dirname` and `get_child` are lexical. `exists` and `is_dir`
-  perform unwatched filesystem reads. `realpath` resolves symlinks, while
-  `readdir` can add a watched directory-entry input according to its `watch`
-  argument.
-- `StarlarkRepositoryContext.symlink` converts both operands through the same
-  path constructor, checks that the link is under the generated repository
-  directory, creates it immediately, and on filesystems without native
-  symlinks may watch the target. `template` similarly converts its output and
-  source, reads source bytes, applies substitutions and writes immediately.
-  These are effects, not path-constructor behavior.
+1. `repository_ctx.path` accepts an existing Slug `Label` value. Its canonical
+   repository/package/target address selects the root workspace or an
+   authenticated canonical repository source route.
+2. The Label package must exist according to the same BUILD/BUILD.bazel,
+   deleted-package and repository-ignore policy used by ordinary loading. A
+   missing target underneath an existing package is accepted and produces the
+   same path as a present target.
+3. The path is the selected package root joined lexically with the Label's
+   package and target fragment. Construction does not inspect the target,
+   resolve its symlinks or add a target observation. This matches Bazel 9.2's
+   default `--incompatible_no_implicit_watch_label=true` behavior.
+4. The returned `path` value is immutable and hashable. `str` emits its
+   normalized physical path, `repr` quotes the same string, and equality/hash
+   compare only those physical path bytes. Observation namespace and source
+   routing provenance do not affect Starlark equality.
+5. Direct-local, immutable registry/archive and generated external routes use
+   the same projection when their existing source owners complete. Root labels
+   use the package root chosen by the existing root package lookup, not an
+   assumed workspace directory.
+6. Route, package and materialization needs restart through existing DICE need
+   algebra. Package/source/materialization errors fail before an effect is
+   published. A self-generated-repository cycle remains a typed DICE failure;
+   it is not bypassed.
 
-The authenticated rules_cc 0.2.18 source confirms the first consumer shape.
-`resolve_labels` constructs a dictionary of Label-backed paths specifically to
-front-load Skyframe restarts. On Unix the caller requests nine `@rules_cc`
-files, then immediately supplies two of those path values to
-`repository_ctx.symlink`; later code stringifies host-tool paths and compares
-`dirname` values. Windows additionally exercises `exists`, `get_child`,
-`dirname`, `basename` and `readdir`. This is generic repository API use; no
-rules_cc or toolchain branch is admissible.
+Keep **Slug-native** physical temporary/materialization directory bytes,
+native-Unicode path representation, diagnostics, retry count and error text,
+evaluator sentinel transport, observation carrier representation and DICE
+cutoff mechanics. No exact Bazel output-base, Java VFS or HotSpot identity is
+claimed.
 
-Slug already owns most prerequisites, but not their required projection:
+Keep **unsupported/deferred**:
 
-- `HostCanonicalRepositoryLoadRoute{,Observation}Key` and
-  `HostRootRepositoryLoadRoute{,Observation}Key` select authenticated source
-  routes. `RepositoryMaterializationResultKey` owns local or immutable source
-  roots and immutable observation-instance identity.
-- `ExternalRepositoryPackageLookup{,Observation}Key` and the root package
-  lookup owners already implement BUILD/BUILD.bazel package existence,
-  deleted-package and repository-ignore policy.
-- `HostRepositoryPathKey` is **not** the Bazel Label-path operation. It asks the
-  exact path resolver to inspect existence, expand symlinks and retain the
-  resolved route. Reusing it would add target observations that Bazel 9.2 does
-  not make and would return the real path rather than the lexical rooted path.
-- Built-in `@bazel_tools` content is an immutable in-memory catalog with no
-  physical materialization root. Root-workspace paths use a different package
-  lookup owner. Neither case can be inferred from a loaded `.bzl` filename.
-- Generated repository effects are currently planned before the materializer
-  chooses a temporary root. Therefore string-relative path values cannot be
-  assigned honest physical bytes during invocation, and the current file-only
-  effect plan cannot encode symlinks or templates.
-
-## Decision and compatibility classification
-
-The audit returns `REPLAN`; it does not authorize Rust.
-
-A later bounded slice may classify as **exact**:
-
-1. `repository_ctx.path(Label)` routes the canonical Label to its selected
-   source repository, requires the Label's package to exist, and returns the
-   lexical package-root-plus-label-fragment path without testing or resolving
-   the target.
-2. With Bazel 9.2 default semantics, construction adds no observation of the
-   target path. Source-route, materialization and package-lookup dependencies
-   remain owned and invalidating.
-3. The resulting repository path is immutable and hashable. Equality compares
-   concrete path identity, not Label spelling, mapping provenance or the
-   target's contents.
-4. An unresolved route, package or materialization restarts through the normal
-   DICE/need path; malformed or absent packages fail before an effect is
-   published.
-
-Keep **Slug-native** physical generated/materialization directory bytes,
-native-Unicode path representation, diagnostics, retry count, evaluator error
-transport, observation carrier representation and DICE cutoff mechanics.
-Exact Bazel output-base or Java VFS path bytes are not claimed.
-
-Keep **unsupported/deferred** until separately designed and admitted:
-
-- `repository_ctx.path` string and existing-path inputs, generated-repository
-  working-directory identity, absolute/relative normalization and cross-origin
-  path equality;
-- built-in `@bazel_tools` Label paths before an immutable physical catalog
-  materialization owner exists;
+- string and existing-path arguments to `repository_ctx.path`, including the
+  generated repository's working-directory identity and absolute-path rules;
+- built-in `@bazel_tools` Label paths while its verbatim in-memory catalog has
+  no immutable physical materialization owner;
 - `basename`, `dirname`, `get_child`, `exists`, `is_dir`, `realpath`, `readdir`
-  and their host-observation/watch/error semantics;
+  and every filesystem observation/watch they can initiate;
 - `symlink`, `template`, `read`, `watch`, `watch_tree`, `execute`, `which`,
-  download/extract/patch/delete/rename and every other repository effect;
-- non-Starlark/native repository rules, module-extension path values, remote
-  repository execution, exact generated-repository layout, lockfile changes
-  and configured analysis/actions.
+  delete/rename/download/extract/patch and every other repository effect;
+- module-extension path values, native repository rules, remote repository
+  execution, lockfile mutation, configured analysis/actions and exact
+  generated-repository layout;
+- alternate Label grammar/mapping behavior and any rules_cc, rules_rust,
+  toolchain, repository-name or platform special case; and
+- invocations demanding more than 256 distinct Label paths.
 
-This boundary is intentionally narrower than the complete Bazel path type. It
-does not imply that returning an opaque Label wrapper or a formatted Label
-would be compatible: an admitted value must be backed by the selected package
-root and materialization identity.
+The path value is useful for dictionary storage, equality, hashing,
+stringification and later generic repository APIs. This packet does not claim
+that the current rules_cc replay completes: its next independent call is
+expected to be `repository_ctx.symlink`.
 
-## Required successor architecture
+## Natural owner and retained identity
 
-Select docs-only
-`WP-2-4-5-7A-repository-label-path-owner-design-r1`. It must converge all of
-the following before implementation:
+Add one private-module/public-ABI family in
+`app/slug_bzlmod_v2/src/repository_label_path.rs`:
 
-1. Add one public, narrow Bzlmod projection for a source route plus canonical
-   package/target to a lexical materialized path. It must reuse the existing
-   materialization and package-lookup owners and must not call
-   `HostRepositoryPathKey`, inspect the target, resolve a symlink or perform
-   direct filesystem I/O.
-2. Give root-workspace labels an equivalent package-lookup projection without
-   loading/evaluating the BUILD file. Decide built-in catalog disposition
-   explicitly; fail closed rather than inventing a root.
-3. Let `HostSelectedRepositoryFileEffectKey` drive synchronous Starlark
-   evaluation in bounded retries. An unresolved Label path may be captured as
-   an invocation demand; the evaluator and all invocation `RefCell` borrows
-   must be dropped before the outer key awaits route/package/materialization
-   DICE computations. Prepared paths are invocation-local scratch only.
-4. Retain the path's normalized physical bytes and observation namespace in a
-   Starlark path value, but compare path equality by physical path only. Do not
-   retain caller mapping provenance, source bytes or a second Label identity.
-5. Prove A/B/A route, package-marker and materialization-root restoration,
-   need/retry/cancellation behavior, missing-package versus missing-target
-   discrimination, no target observation, and exact DICE equality/cutoff.
+- `HostRepositoryLabelPathSource` is either a root package-lookup workspace or
+  an existing `HostRepositorySourceRoute`.
+- `RepositoryLabelPathAddress` contains only `PackageIdentifier` and
+  `TargetName`, projected from `CanonicalLabel`. It deliberately discards
+  `RepositoryMappingId`: mapping provenance selected the canonical address but
+  is not part of Bazel path identity. This is a filesystem address, not a
+  second Label representation.
+- `HostRepositoryLabelPath{,Observation}Key` owns source plus address.
+  Constructors reject root/external repository mismatches before compute.
+- `HostRepositoryLabelPathValue` owns `NormalizedAbsolutePath` and
+  `PathObservationNamespace`. Its DICE equality includes both because the
+  namespace distinguishes host from immutable materialization observations;
+  the Starlark wrapper's equality/hash intentionally uses only the path.
+- `HostRepositoryLabelPathError` projects package disposition, package lookup,
+  materialization, root mismatch, invalid materialized path and unsupported
+  built-in catalog disposition without exposing unrelated private key types.
+- `ObservedHostRepositoryLabelPath` owns the ordinary result and merged
+  package-marker observation epoch. Observed outer frontier errors remain
+  separate exactly like existing Bzlmod observed keys.
 
-The successor must decide whether a single-demand retry is sufficient or a
-compact prepared-path map is justified. The Buck2 utility-reuse audit prefers
-the existing `SmallMap`/`SmallSet`, `Arc`, `CompactString`, `Dupe`,
-`Allocative`, `NormalizedAbsolutePath`, `PathObservationNamespace`,
-`HostRepositorySourceRoute` and canonical Label/package types. No new
-interner, global cache, registry, path parser or retained unbounded collection
-is justified. Any new retained key/value shape requires an explicit Stage 9
-decision, even when the answer is reuse with no extraction row.
+The key must reuse `HostRootPackageLookup{,Observation}Key` for root labels and
+`ExternalRepositoryPackageLookup{,Observation}Key` for routed external labels.
+For root success, use `HostPackage.package_root()`. For external success,
+compute the existing `RepositoryMaterializationResultKey` and select local
+`source_root`/Host namespace or immutable `generation_root`/materialization
+namespace. Widen that result key to `pub(crate)` only if the sibling module
+needs it; do not publish it outside `slug_bzlmod_v2`.
 
-The DICE ownership audit rejects a lock, evaluator borrow or invocation-state
-borrow across any compute. It also rejects direct host reads from a Starlark
-method and reconstruction of a materialization root from
-`BzlModuleIdentity.workspace_path`.
+After package success, join `package.package()` and `target` directly from the
+already-validated identity types. Do not parse their display form. Do not call
+`HostRepositoryPathKey`, `ResolvedPathKey`, file-byte keys, directory listing,
+BUILD evaluation or direct filesystem APIs for the target. Package lookup may
+continue using its already-accepted marker-resolution dependencies.
 
-## Evidence and proof contract for the successor
+Built-in source disposition returns a stable typed unsupported error after
+package lookup and before fabricating any path. Root package search must retain
+the exact selected package root when multiple package roots exist.
 
-Reuse the pinned Bazel sources and tests:
+No repository-rule definition, call, selected-owner certificate, BZL manifest,
+source route, materialization result, generated file-effect plan or published
+effect shape changes. The new key/value is retained DICE state and therefore
+must derive/implement structural `Eq`, `Hash`, `Allocative`, cutoff and validity
+in the existing style.
 
-- `StarlarkBaseExternalContext.getPath` and `getPathFromLabel`;
-- `RepositoryUtils.getRootedPathFromLabel`;
-- `StarlarkPath` and `StarlarkPathTest`;
-- `StarlarkRepositoryContextTest`'s implicit-watch flag cases; and
-- the rules_cc `resolve_labels` call sites above.
+## Synchronous invocation bridge
 
-The design must require focused Rust proof for external immutable, direct
-local and root-workspace routes; package present/absent; target present/absent
-with identical construction; lexical symlink non-resolution; path
-hash/equality/stringification; route/materialization revisions; and observed
-versus legacy parity. An authentic replay is a discriminator only after all
-focused and owning-crate suites pass.
+Add an invocation-only `PreparedRepositoryLabelPaths` using the existing
+`SmallMap<RepositoryLabelPathAddress, HostRepositoryLabelPathValue>`. It is
+created inside `HostSelectedRepositoryFileEffectKey::compute`, never published,
+and capped at 256 distinct addresses. Exceeding the cap is a Slug-native
+terminal invocation error. The first rules_cc consumer requests nine.
 
-No new checked-in Bazel fixture is selected by this audit. If source evidence
-cannot discriminate a proposed edge, the successor must first add an isolated
-pinned Bazel 9.2 oracle decision and then freeze its own allowlist/caps.
+`RepositoryRuleInvocationState` borrows or clones that prepared map for one
+synchronous attempt and owns one `RefCell<Option<RepositoryLabelPathAddress>>`
+unresolved demand. The `path` method:
 
-## Audit allowlist, validation and stops
+1. validates the receiver and accepts only `StarlarkLabel`;
+2. projects its address without reparsing or retaining mapping provenance;
+3. returns a heap-allocated `RepositoryStarlarkPath` on a prepared hit; or
+4. records the first unresolved address and returns an evaluator sentinel.
 
-This docs-only packet may change only:
+`invoke_repository_rule` examines invocation state after the evaluator is
+dropped. When the sentinel corresponds to the recorded unresolved address it
+returns a typed `RepositoryRuleInvocationError::LabelPathNeed`; otherwise it
+preserves the existing evaluation/result/path/plan errors. It must not turn an
+arbitrary evaluation error into a need.
 
-- the canonical plan;
-- Stage 4;
-- Stage 5; and
-- this current-packet manifest.
+The outer effect driver loops over attempts. On `LabelPathNeed`, it proves that
+the address is new, resolves it asynchronously through the root or canonical
+load route and the new label-path key, inserts the complete value, then invokes
+again. Every evaluator, heap allocation, effect builder, dynamic-environment
+vector, invocation state and `RefCell` borrow from the failed attempt is
+dropped before any `ctx.compute(...).await`.
 
-Validate `git diff --check`, current-link consistency, archive-baseline
-integrity and a clean status after commit. Cargo, CLI rebuild and authentic
-replay are unnecessary because no Rust, fixture or executable input changes.
+Each attempt gets its own print capture; captures, partial file effects and
+dynamic environment observations from demand attempts are discarded. Only the
+terminal successful attempt publishes them. The prepared map and retry count
+are local scratch and never participate in effect identity. The DICE
+dependencies computed while filling it do participate normally in the outer
+effect key.
 
-Return `REPLAN` from the successor if it:
+Legacy mode computes ordinary route/path keys. Observed mode computes their
+observation variants and unions route and package-marker epochs with the
+effect's current observations before the next attempt. A need returns through
+the existing `SourcePreparationOutcome`; on recompute, child DICE results may
+be reused even though the local prepared map starts empty. Cancellation drops
+all scratch. No lock or borrow crosses a DICE compute.
 
-- reuses `HostRepositoryPathKey` or otherwise observes/resolves the target;
-- infers a repository root from a `.bzl` filename, output-base convention or
-  generated repository name;
-- loads a BUILD file merely to prove package existence;
-- holds a lock, evaluator, heap or `RefCell` borrow across DICE computation;
-- stores retry demands in a process global, injected frontier or published
-  repository effect;
-- admits string/generated-root paths, built-in paths, filesystem path methods
-  or repository effects without their full owner and observation semantics;
-- changes the existing Label grammar/mapping owner, repository-rule
-  definition/call/certificate identity or file-effect plan; or
-- adds a rules_cc, rules_rust, toolchain, repository-name or platform special
-  case.
+## Buck2 utility and memory decision
 
-Audit result: `REPLAN`. The Bazel category is implementable only after a new
-narrow lexical label-path projection and a lock-safe evaluator/DICE retry
-contract are independently frozen. The current file-only effect model and
-existing resolved-path key are not compatible substitutes.
+Reuse the retained Buck2-derived `SmallMap`, `Dupe` and `Allocative` patterns,
+plus existing `Arc`, `CompactString`, `NormalizedAbsolutePath`,
+`PathObservationNamespace`, `HostRepositorySourceRoute`, `PackageIdentifier`
+and `TargetName` values. The prepared map is bounded invocation scratch; the
+retained key contains one source and one compact address, while the retained
+value contains one normalized path and namespace.
+
+No new interner, arena, global cache, registry, process singleton, string-path
+parser or large clone is selected. This is new Slug-owned semantic composition,
+not an extraction from V1 or Buck2, so Stage 9 records the reuse decision but
+adds no extraction-ledger row. Add size assertions for the address, key and
+value; return `REPLAN` if the key exceeds 384 bytes or the value exceeds 128
+bytes on the reference target.
+
+## Evidence and proof
+
+Pinned authority remains Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`, specifically
+`StarlarkBaseExternalContext.getPath/getPathFromLabel`,
+`RepositoryUtils.getRootedPathFromLabel`, `StarlarkPath`,
+`StarlarkPathTest`, and both implicit-watch cases in
+`StarlarkRepositoryContextTest`. The authenticated rules_cc 0.2.18
+`resolve_labels` source is a consumer discriminator only.
+
+Add focused Bzlmod proof for:
+
+- root lookup selecting the actual package root, including a non-first root;
+- direct-local and immutable external roots and namespaces;
+- package absent/deleted/ignored/invalid/error dispositions;
+- target present, missing and symlink spellings producing the same lexical
+  address and no target observation;
+- built-in catalog fail-closed behavior;
+- route/repository mismatch and invalid join rejection;
+- observed/legacy value parity, exact marker observations, need propagation,
+  cancellation and A/B/A materialization-root restoration;
+- equality/cutoff/hash and size ceilings.
+
+Add focused loading proof for:
+
+- one and multiple Label path demands resolving through retries;
+- repeated demand hits without another resolution and the 256-address cap;
+- immutable/hashable path equality, inequality, `str` and `repr`;
+- Label mapping provenance not affecting a resolved physical path address;
+- root and canonical route selection plus missing package/error projection;
+- failed-attempt print/effect/environment discard and successful-attempt
+  publication;
+- observed route/package epochs, needs, cancellation and A/B/A restoration;
+- no target-observation dependency and no lock/borrow across compute.
+
+The rebuilt authentic replay must clear only the missing `path` method and stop
+at the next independent generic boundary. Do not add a symlink or rules_cc
+special case to make the replay advance farther.
+
+## Allowlist, caps and complexity
+
+Production Rust may change only:
+
+- new `app/slug_bzlmod_v2/src/repository_label_path.rs`;
+- `app/slug_bzlmod_v2/src/lib.rs`;
+- `app/slug_bzlmod_v2/src/source_preparation.rs` only for a private visibility
+  handoff when required;
+- `app/slug_loading_v2/src/repository_rule_context.rs`;
+- `app/slug_loading_v2/src/module_extension_repository_file_effect.rs`; and
+- `app/slug_loading_v2/src/lib.rs` only if a new internal module is required.
+
+Proof Rust may change only the `#[cfg(test)]` sections/modules adjacent to
+those owners and one new focused loading test module if keeping proof out of the
+2,428-line effect owner materially improves reviewability.
+
+Scheduling records may change only the canonical plan, Stages 2, 4, 5 and 9,
+and this manifest. Do not change Cargo metadata, fixtures, Bazel/rules_cc
+sources, repository-rule definition/call/certificate shapes, Label parsing,
+source-route/materialization shapes or generated file-effect shapes.
+
+Caps are 520 gross added production Rust lines, 650 proof lines and 1,170 total.
+No new function may exceed 90 lines; no existing function may grow by more
+than 25 lines. Prefer a new focused Bzlmod owner over adding the category to
+the 17,245-line `source_preparation.rs` or 5,616-line `host_package.rs`.
+`module_extension_repository_file_effect.rs` may receive only orchestration
+helpers and the bounded retry loop. No benchmark is required; retained size
+ceilings, map cap and warm-DICE nonreplay proof are mandatory.
+
+## Validation and terminal stops
+
+Run serially:
+
+- focused label-path Bzlmod and repository-context/effect tests;
+- `cargo test -p slug_bzlmod_v2 --lib -q`;
+- `cargo test -p slug_loading_v2 --lib -q` and every loading integration test;
+- `cargo test -p slug_query_v2 --lib -q`;
+- `cargo build -p slug_cli_v2 -q` before authentic replay;
+- stale `slugd` cleanup before and after the authentic rules_rust replay;
+- `cargo fmt --check`, `git diff --check`, archive checker and parked-proof
+  verification.
+
+Return `REPLAN` before or during Rust if:
+
+- package lookup cannot provide the actual root without BUILD evaluation;
+- the target is read, listed, resolved, watched or otherwise observed;
+- `HostRepositoryPathKey`/`ResolvedPathKey` is used for the target;
+- a root is inferred from a `.bzl` path, output-base convention, generated
+  repository name or display string;
+- built-in catalog, string/generated-root path or filesystem method support is
+  needed to make the bounded value honest;
+- an evaluator, heap, lock, state or `RefCell` borrow crosses a DICE compute;
+- arbitrary evaluation errors can be mistaken for path needs, partial attempt
+  events/effects/environment escape, or the retry cap is absent;
+- a demand/prepared map enters retained effect identity, an injected frontier,
+  process global, cache or registry;
+- Label mapping provenance is copied into path identity or canonical address
+  is reconstructed by parsing text;
+- the retained size, file allowlist, growth caps or large-file boundaries are
+  exceeded; or
+- symlink/template/effect, ruleset/toolchain/repository/platform special cases
+  or broader path semantics become necessary.
+
+Architecture result: `ACCEPT`. Independent review confirms the natural owner,
+no-target-observation boundary, mapping-provenance exclusion, 256-address
+compatibility cap, speculative-attempt event discard and lock-safe retry
+lifetime. The packet creates one lexical package-root path owner over existing
+DICE dependencies and one bounded invocation-local retry bridge; it neither
+weakens observation identity nor pretends the resolved source-read path is
+Bazel's path constructor. Rust may begin only under this contract.

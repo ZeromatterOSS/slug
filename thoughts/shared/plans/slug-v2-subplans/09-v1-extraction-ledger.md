@@ -2573,3 +2573,19 @@ listing and external-boundary owners. Complete serial validation and authentic
 replay pass to the next generic declaration-schema boundary. No V1, Buck2 or
 Zabel code extraction is required for the next audit; Zabel remains peer
 architecture guidance only.
+
+### Repository Label-path owner utility decision (2026-09-02)
+
+`WP-2-4-5-7A-repository-label-path-owner-design-r1` requires no V1 or Buck2
+extraction. Reuse the retained Buck2-derived `SmallMap`, `Dupe` and `Allocative`
+patterns and existing `Arc`, `CompactString`, `NormalizedAbsolutePath`,
+`PathObservationNamespace`, source-route and canonical package/target types.
+The retained key holds one source and address; the retained value holds one
+path and namespace. The prepared map is invocation scratch capped at 256 and
+is never published or cached separately.
+
+Add no interner, arena, global cache, registry, path parser or large clone.
+This is Slug-owned composition of existing semantic owners, so no extraction-
+ledger row is added. Address/key/value size assertions and the active packet's
+384/128-byte key/value ceilings are mandatory. Independent retained-
+representation review returns `ACCEPT`.

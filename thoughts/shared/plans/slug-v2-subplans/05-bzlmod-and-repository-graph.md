@@ -4466,3 +4466,20 @@ loaded `.bzl` paths, load BUILD files, or widen into string paths, built-in
 catalog materialization, path filesystem methods, symlink/template effects or
 ruleset special cases. The audit changes documentation only and authorizes no
 Rust.
+
+### Lexical repository Label-path owner design accepted (2026-09-02)
+
+Independent architecture review accepts one new Bzlmod key/value family over a
+root package workspace or existing `HostRepositorySourceRoute` plus canonical
+package/target address. It composes the existing root/external package lookups
+with the existing materialization result, returns normalized lexical path plus
+Host/materialization observation namespace, and never invokes
+`HostRepositoryPathKey` or observes the target.
+
+Root success uses the package lookup's selected package root. Direct-local,
+immutable and completed generated external sources use their existing local or
+generation roots; the in-memory built-in catalog fails closed. Observed mode
+retains package-marker epochs, while target-present/missing/symlink spellings
+produce the same unobserved lexical path. A/B/A, needs, cancellation, equality
+and retained-size proof are mandatory. The active packet authorizes bounded
+Rust only inside its frozen allowlist and caps.

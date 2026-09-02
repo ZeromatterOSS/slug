@@ -6652,3 +6652,21 @@ writable docs are canonical/current/Stage 6/routing; Stage 7/8/10 and live Rust
 are read-only. It must decide one immutable action-owner-context design, one
 uniquely smaller just-in-time Bazel 9.2 evidence prerequisite, or REPLAN before
 any M7A implementation. M8 follows accepted M7A; M7B and M9 remain later.
+
+### Repository Label-path DICE retry design accepted (2026-09-02)
+
+`WP-2-4-5-7A-repository-label-path-owner-design-r1` adds one complete-only
+lexical path key over an existing root workspace or authenticated repository
+source route plus canonical package/target address. It reuses package lookup
+and materialization dependencies, retains normalized physical path and
+observation namespace, and never asks the target resolver to inspect or expand
+the target.
+
+The synchronous repository evaluator may return one typed unresolved-path
+demand. The outer effect key drops the evaluator, heap, invocation state and
+all `RefCell` borrows before asynchronously computing that DICE dependency,
+then retries with a bounded invocation-local prepared map. Speculative effects,
+environment names and print batches are discarded; only the terminal attempt
+publishes. No lock crosses compute, and needs/cancellation/A-B-A restoration
+remain normal DICE behavior. Independent architecture review returns
+`ACCEPT`; bounded Rust is authorized only by the active packet.
