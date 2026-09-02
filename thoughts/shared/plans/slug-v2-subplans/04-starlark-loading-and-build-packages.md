@@ -7899,3 +7899,26 @@ option existence checks. A focused source rereview confirms that the first
 validation phase still requires absolute build-setting labels and only the
 analysis-test native-option policy differs from ordinary transitions. It
 returns `ACCEPT`; Rust may proceed only inside the frozen loading-only packet.
+
+### Analysis-test transition loading declaration accepted (2026-09-02)
+
+Terminal implementation rereview returns `ACCEPT`. The exact BZL-only
+constructor retains arbitrary settings on its live/frozen module heap, a
+canonical immutable output slice and defining-module identity. It is distinct
+from callback transitions and never reaches rule schema, package, DICE or
+configured state. All five dependency constructors retain it through two-hop
+import; ordinary rules use Bazel's pinned rejection, and macro, subrule,
+aspect, repository-rule and tag-class consumers fail closed.
+
+The packet closes at 152/265/417 gross production/proof/total Rust additions,
+with no function over 100 lines. Focused proof, all loading integrations,
+596 Bzlmod units, 55 query-library units, rebuilt CLI, formatting, hygiene and
+the unchanged archive baseline pass. The authentic rules_rust replay clears
+the missing global and stops at
+`@@bazel_skylib+//toolchains/unittest:BUILD` on the generic
+`package(default_applicable_licenses = ["//:license"])` parameter.
+
+Run docs-only `WP-4-7A-applicable-licenses-loading-category-audit` next. Audit
+the complete Bazel 9.2 package/rule applicable-license category and its
+identity/publication owner before selecting Rust. Do not add a Bazel Skylib,
+toolchain or other consumer special case.

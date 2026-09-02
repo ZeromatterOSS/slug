@@ -19,24 +19,25 @@ use crate::bzl_module::BzlModuleIdentity;
 
 const NATIVE_OPTION_PREFIX: &str = "//command_line_option:";
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TransitionSettingsKind {
     Inputs,
     Outputs,
+    AnalysisTestOutputs,
 }
 
 impl TransitionSettingsKind {
     fn singular(self) -> &'static str {
         match self {
             Self::Inputs => "input",
-            Self::Outputs => "output",
+            Self::Outputs | Self::AnalysisTestOutputs => "output",
         }
     }
 
     fn plural(self) -> &'static str {
         match self {
             Self::Inputs => "INPUTS",
-            Self::Outputs => "OUTPUTS",
+            Self::Outputs | Self::AnalysisTestOutputs => "OUTPUTS",
         }
     }
 }
@@ -89,7 +90,9 @@ fn resolve_transition_setting(
     source: &BzlModuleIdentity,
 ) -> anyhow::Result<CanonicalLabel> {
     if let Some(option) = raw.strip_prefix(NATIVE_OPTION_PREFIX) {
-        if !valid_regular_transition_option(option) {
+        if kind != TransitionSettingsKind::AnalysisTestOutputs
+            && !valid_regular_transition_option(option)
+        {
             anyhow::bail!(
                 "Invalid transition {} '{}'. Cannot transition on --experimental_* or --incompatible_* options",
                 kind.singular(),

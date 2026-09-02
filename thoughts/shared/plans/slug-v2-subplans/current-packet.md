@@ -7,14 +7,12 @@ the complete bounded Bazel 9.2 loading declaration for the BZL-only
 `analysis_test_transition(settings = ...)` global without claiming configured
 analysis-test execution.
 
-Status: design `ACCEPTED`. The complete source/owner audit is accepted. Initial
-review identified and the packet corrected two bounded source-contract defects:
-native option existence belongs to configured analysis, and identical raw
-dictionary keys cannot reach transition duplicate validation. A focused source
-check also preserves the first-phase absolute-label requirement while varying
-only analysis-test native-option policy. Focused rereview returns `ACCEPT`;
-Rust is authorized only within this packet's deliberately narrow publication
-boundary, retained-value lifetime, proof, allowlist, caps and stops.
+Status: implementation terminally `ACCEPTED`. The complete source/owner audit
+and implementation rereview are accepted. Review corrections made
+repository-rule and tag-class rejection explicit and proved all five supported
+dependency constructors across live, frozen and two-hop imported descriptors.
+The implementation stays inside the loading-only publication boundary; no
+literal settings map reaches rule schema, package, DICE or configured state.
 
 Immediate predecessor
 `WP-4-7A-native-builtin-label-like-parameter-category-design-r1` is terminally
@@ -286,3 +284,31 @@ Return `REPLAN` before or during Rust if:
   checkpoint; or
 - production/proof caps, file allowlists or the bounded `package.rs` cohesion
   decision are exceeded.
+
+## Accepted implementation outcome
+
+The terminal implementation rereview returns `ACCEPT`. The BZL-only global
+retains its arbitrary settings dictionary on the module heap, owns one compact
+canonical output slice and defining-module identity, and remains a distinct
+fixed-patch value rather than Slug's callback transition. All five dependency
+attribute constructors retain it through live creation, freeze and two-hop
+import. Ordinary rules reject with Bazel's pinned diagnostic, while macro,
+subrule, aspect, repository-rule and tag-class consumers fail closed before
+schema or package publication. BUILD placement and the existing regular
+transition policy remain unchanged.
+
+The candidate closes at 152 gross added production Rust lines, 265 proof lines
+and 417 total, with no new function over 100 lines. Focused proof passes 4/4;
+the final loading gate passes 512 active units plus one ignored and every
+integration target (49/29/8/6/2/1/5/1); Bzlmod passes 596/596 and the required
+query library passes 55/55. The CLI rebuild, formatting, diff, process hygiene
+and archive checks pass, with only the archive checker's three unchanged
+thoughts-path baseline failures.
+
+The rebuilt authenticated rules_rust 0.73.0 replay clears the missing
+`analysis_test_transition` stop. It next stops in
+`@@bazel_skylib+//toolchains/unittest:BUILD` at the generic
+`package(default_applicable_licenses = ["//:license"])` declaration boundary.
+Select docs-only `WP-4-7A-applicable-licenses-loading-category-audit` next;
+audit the complete Bazel 9.2 package/rule applicable-license category before
+authorizing Rust, without a Bazel Skylib or toolchain consumer special case.

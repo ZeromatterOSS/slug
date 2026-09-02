@@ -148,6 +148,7 @@ use crate::package::AspectAttributePropagationEdge;
 use crate::package::AspectPropagationEdgesGen;
 use crate::package::AspectToolchainPropagationEdge;
 use crate::package::BuildSettingDefinition;
+use crate::package::FrozenAnalysisTestTransition;
 use crate::package::FrozenAspectDefinition;
 use crate::package::FrozenRuleDefinition;
 use crate::package::FrozenTransitionDefinition;
@@ -30854,6 +30855,225 @@ load("//rust/private:providers.bzl", "CaptureClippyOutputInfo", "ClippyInfo", "C
         let setting = module.get(name).unwrap().downcast::<FrozenRuleDefinition>().unwrap();
         assert_eq!(setting.build_setting_definition, Some(BuildSettingDefinition::Boolean { flag: true }));
     }
+}
+
+#[test]
+fn analysis_test_transition_global_contract_and_setting_policy_are_exact() {
+    let owner = analysis_test_transition_owner();
+    let source = r#"T = analysis_test_transition(settings = {
+    "@mapped//cfg:z": struct(arbitrary = [1]),
+    "//local:a": None,
+    "@//cfg:main": "main",
+    "@@other+//cfg:m": Label("@mapped//value:typed"),
+    "//command_line_option:unknown_future_option": 7,
+    "//command_line_option:experimental_x": True,
+    "//command_line_option:incompatible_x": False,
+})
+KIND = type(T)
+TEXT = repr(T)
+"#;
+    for globals in [loading_globals(), bzlmod_loading_globals()] {
+        let module = eval_bzl_with_identity_and_globals(source, owner.clone(), &globals).unwrap();
+        let transition = module
+            .get("T")
+            .unwrap()
+            .downcast::<FrozenAnalysisTestTransition>()
+            .unwrap();
+        assert_eq!(
+            module.get("KIND").unwrap().value().unpack_str(),
+            Some("transition")
+        );
+        assert_eq!(
+            module.get("TEXT").unwrap().value().unpack_str(),
+            Some("<analysis_test_transition object>")
+        );
+        assert_eq!(transition.definition_source().as_ref(), &owner);
+        assert_eq!(
+            transition
+                .outputs()
+                .iter()
+                .map(|setting| (setting.canonical().to_string(), setting.declared()))
+                .collect::<Vec<_>>(),
+            [
+                ("@@//cfg:main".to_owned(), "@//cfg:main"),
+                (
+                    "@@//command_line_option:experimental_x".to_owned(),
+                    "//command_line_option:experimental_x"
+                ),
+                (
+                    "@@//command_line_option:incompatible_x".to_owned(),
+                    "//command_line_option:incompatible_x"
+                ),
+                (
+                    "@@//command_line_option:unknown_future_option".to_owned(),
+                    "//command_line_option:unknown_future_option"
+                ),
+                ("@@dep+//local:a".to_owned(), "//local:a"),
+                ("@@mapped+//cfg:z".to_owned(), "@mapped//cfg:z"),
+                ("@@other+//cfg:m".to_owned(), "@@other+//cfg:m"),
+            ]
+        );
+        let settings = DictRef::from_value(transition.settings().to_value()).unwrap();
+        assert_eq!(settings.len(), 7);
+        assert_eq!(settings.get_str("//local:a").unwrap().to_repr(), "None");
+        assert_eq!(
+            settings.get_str("@mapped//cfg:z").unwrap().to_repr(),
+            "struct(arbitrary=[1])"
+        );
+        assert_eq!(
+            settings
+                .get_str("//command_line_option:unknown_future_option")
+                .unwrap()
+                .to_repr(),
+            "7"
+        );
+    }
+    assert!(
+        eval_global(
+            "T=analysis_test_transition(settings={})",
+            &build_file_loading_globals()
+        )
+        .is_err()
+    );
+}
+
+fn analysis_test_transition_owner() -> BzlModuleIdentity {
+    BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@dep+//defs:producer.bzl").unwrap(),
+        workspace_path: PathBuf::from("/dep/defs/producer.bzl"),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("mapped").unwrap(),
+            CanonicalRepoName::new("mapped+").unwrap(),
+        )]),
+    }
+}
+
+#[test]
+fn analysis_test_transition_rejects_invalid_calls_without_narrowing_native_names() {
+    let owner = analysis_test_transition_owner();
+    for source in [
+        "T=analysis_test_transition()",
+        "T=analysis_test_transition({})",
+        "T=analysis_test_transition(settings={}, extra=1)",
+        "T=analysis_test_transition(settings=[])",
+        "T=analysis_test_transition(settings={1: 'bad'})",
+    ] {
+        assert!(
+            eval_bzl_with_identity(source, owner.clone()).is_err(),
+            "{source}"
+        );
+    }
+    for (source, expected) in [
+        (
+            "T=analysis_test_transition(settings={':relative': 1})",
+            "invalid transition output",
+        ),
+        (
+            "T=analysis_test_transition(settings={'bad': 1})",
+            "invalid transition output",
+        ),
+        (
+            "T=analysis_test_transition(settings={'@missing//cfg:x': 1})",
+            "no repo visible as @missing",
+        ),
+        (
+            "T=analysis_test_transition(settings={'@mapped//cfg:x': 1, '@@mapped+//cfg:x': 2})",
+            "Transition declares duplicate build setting",
+        ),
+    ] {
+        let error = eval_bzl_with_identity(source, owner.clone())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "{source}: {error}");
+    }
+    let regular = "def impl(settings, attr): return {}\nT=transition(implementation=impl, inputs=[], outputs=['//command_line_option:experimental_x'])";
+    assert!(eval_bzl_with_identity(regular, owner).is_err());
+}
+
+#[test]
+fn analysis_test_transition_descriptors_freeze_import_and_fail_closed() {
+    let owner = |package: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(&format!("@@dep+//{package}:defs.bzl")).unwrap(),
+        workspace_path: PathBuf::from(format!("/dep/{package}/defs.bzl")),
+        repository_mapping: Arc::from([]),
+    };
+    let producer_owner = owner("producer");
+    let producer = eval_bzl_with_identity(
+        r#"T=analysis_test_transition(settings={})
+ATTRS={
+    'one':attr.label(cfg=T),
+    'many':attr.label_list(cfg=T),
+    'string_keyed':attr.string_keyed_label_dict(cfg=T),
+    'label_keyed':attr.label_keyed_string_dict(cfg=T),
+    'many_by_key':attr.label_list_dict(cfg=T),
+}
+"#,
+        producer_owner.clone(),
+    )
+    .unwrap();
+    let bridge_owner = owner("bridge");
+    let bridge = eval_bzl_with_loaded_children(
+        "load('//producer:defs.bzl','ATTRS')\nREEXPORTED={} | ATTRS\n",
+        bridge_owner.clone(),
+        &[("//producer:defs.bzl", producer_owner, producer.dupe())],
+    )
+    .unwrap();
+    let original_value = producer.get("ATTRS").unwrap();
+    let reexported_value = bridge.get("REEXPORTED").unwrap();
+    let original = DictRef::from_value(original_value.value()).unwrap();
+    let reexported = DictRef::from_value(reexported_value.value()).unwrap();
+    for name in ["one", "many", "string_keyed", "label_keyed", "many_by_key"] {
+        assert!(
+            original
+                .get_str(name)
+                .unwrap()
+                .ptr_eq(reexported.get_str(name).unwrap())
+        );
+        assert_eq!(reexported.get_str(name).unwrap().get_type(), "attribute");
+    }
+    let evaluate = |body: &str| {
+        eval_bzl_with_loaded_children(
+            &format!("load('//bridge:defs.bzl','REEXPORTED')\n{body}\n"),
+            owner("consumer"),
+            &[("//bridge:defs.bzl", bridge_owner.clone(), bridge.dupe())],
+        )
+    };
+    let error = evaluate("def impl(ctx): return []\nR=rule(implementation=impl, attrs=REEXPORTED)")
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("Only rule definitions with analysis_test=True may have attributes with analysis_test_transition transitions"));
+    let error = evaluate("def impl(name, visibility, **kwargs): pass\nM=macro(implementation=impl, attrs={'dep':REEXPORTED['one']})")
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("macro attribute 'dep' uses an unsupported dependency constraint"));
+    let error = evaluate(
+        "def impl(ctx): pass\nS=subrule(implementation=impl, attrs={'_dep':REEXPORTED['one']})",
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("bad cfg for attribute '_dep'"));
+    let error = evaluate(
+        "def impl(target, ctx): return []\nA=aspect(implementation=impl, attrs={'_dep':REEXPORTED['one']})",
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("analysis-test transitions are unsupported in aspect attributes"));
+    let error = evaluate(
+        "def impl(ctx): pass\nR=repository_rule(implementation=impl, attrs={'dep':REEXPORTED['one']})",
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("unsupported repository_rule attribute schema 'dep'"));
+    let error = evaluate("T=tag_class(attrs={'dep':REEXPORTED['one']})")
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("does not support cfg transitions"));
+    assert!(
+        eval_bzl_with_identity("X=testing.analysis_test()", owner("testing"))
+            .unwrap_err()
+            .to_string()
+            .contains("testing.analysis_test is unsupported")
+    );
 }
 
 #[test]

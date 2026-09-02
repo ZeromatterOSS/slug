@@ -3724,6 +3724,7 @@ impl MacroAttributeSchema {
             || definition.computed_default
             || definition.attached_aspect.is_some()
             || definition.transition.is_some()
+            || definition.analysis_test_transition.is_some()
             || !definition.required_providers.is_empty()
         {
             anyhow::bail!("macro attribute '{name}' uses an unsupported dependency constraint");
@@ -4622,6 +4623,9 @@ fn aspect_attributes<'v>(
         }
         let definition = attribute_definition_from_value(value)?
             .ok_or_else(|| anyhow::anyhow!("aspect attribute `{name}` must use attr.*()"))?;
+        if definition.analysis_test_transition.is_some() {
+            anyhow::bail!("analysis-test transitions are unsupported in aspect attributes");
+        }
         if definition.configurable_set {
             anyhow::bail!(
                 "attribute '{name}' has the 'configurable' argument set, which is not allowed in aspect definitions"
@@ -5299,6 +5303,70 @@ where
     type Canonical = FrozenTransitionDefinition;
 }
 
+#[derive(
+    Debug,
+    Clone,
+    Trace,
+    Freeze,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative
+)]
+pub(crate) struct AnalysisTestTransitionGen<V> {
+    settings: V,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    outputs: Arc<[TransitionSetting]>,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    definition_source: Arc<BzlModuleIdentity>,
+}
+type AnalysisTestTransition<'v> = AnalysisTestTransitionGen<Value<'v>>;
+pub(crate) type FrozenAnalysisTestTransition = AnalysisTestTransitionGen<FrozenValue>;
+starlark::starlark_complex_values!(AnalysisTestTransition);
+
+fn analysis_test_transition_from_value<'v>(value: Value<'v>) -> Option<AnalysisTestTransition<'v>> {
+    match AnalysisTestTransition::from_value(value)? {
+        starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
+        starlark::__macro_refs::Either::Right(value) => Some(AnalysisTestTransitionGen {
+            settings: value.settings.to_value(),
+            outputs: value.outputs.clone(),
+            definition_source: value.definition_source.clone(),
+        }),
+    }
+}
+
+impl FrozenAnalysisTestTransition {
+    #[cfg(test)]
+    pub(crate) fn settings(&self) -> FrozenValue {
+        self.settings
+    }
+
+    #[cfg(test)]
+    pub(crate) fn outputs(&self) -> &[TransitionSetting] {
+        &self.outputs
+    }
+
+    #[cfg(test)]
+    pub(crate) fn definition_source(&self) -> &Arc<BzlModuleIdentity> {
+        &self.definition_source
+    }
+}
+
+impl<V> fmt::Display for AnalysisTestTransitionGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<analysis_test_transition object>")
+    }
+}
+
+#[starlark_value(type = "transition")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for AnalysisTestTransitionGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    type Canonical = FrozenAnalysisTestTransition;
+}
+
 #[derive(Debug, Clone, Trace, ProvidesStaticType, NoSerialize, Allocative)]
 struct AttributeDefinitionGen<V> {
     #[trace(unsafe_ignore)]
@@ -5333,6 +5401,7 @@ struct AttributeDefinitionGen<V> {
     required_providers: Arc<[Arc<[ProviderIdentity]>]>,
     attached_aspect: Option<V>,
     transition: Option<TransitionDefinitionGen<V>>,
+    analysis_test_transition: Option<AnalysisTestTransitionGen<V>>,
 }
 type AttributeDefinition<'v> = AttributeDefinitionGen<Value<'v>>;
 type FrozenAttributeDefinition = AttributeDefinitionGen<FrozenValue>;
@@ -5373,6 +5442,13 @@ fn attribute_definition_from_value<'v>(
                     definition_source: transition.definition_source.clone(),
                     source_identities_by_filename: transition.source_identities_by_filename.clone(),
                 }),
+            analysis_test_transition: value.analysis_test_transition.as_ref().map(|transition| {
+                AnalysisTestTransitionGen {
+                    settings: transition.settings.to_value(),
+                    outputs: transition.outputs.clone(),
+                    definition_source: transition.definition_source.clone(),
+                }
+            }),
         },
     };
     if definition
@@ -5409,7 +5485,7 @@ pub(crate) fn subrule_attribute_from_value<'v>(
         if name.len() > 128 {
             anyhow::bail!("attribute {name}: name is too long ({} > 128)", name.len());
         }
-        if definition.transition.is_some() {
+        if definition.transition.is_some() || definition.analysis_test_transition.is_some() {
             anyhow::bail!(
                 "bad cfg for attribute '{name}': subrules may only have target/exec attributes."
             );
@@ -5499,6 +5575,10 @@ impl<'v> Freeze for AttributeDefinition<'v> {
                 .transpose()?,
             transition: self
                 .transition
+                .map(|value| value.freeze(freezer))
+                .transpose()?,
+            analysis_test_transition: self
+                .analysis_test_transition
                 .map(|value| value.freeze(freezer))
                 .transpose()?,
         })
@@ -6236,6 +6316,7 @@ fn attribute_definition_before_later_properties<'v>(
         required_providers: Arc::from([]),
         attached_aspect: None,
         transition: None,
+        analysis_test_transition: None,
     })
 }
 
@@ -6253,19 +6334,23 @@ fn set_attribute_cfg<'v>(
     definition: &mut AttributeDefinition<'v>,
     cfg: Option<Value<'v>>,
 ) -> anyhow::Result<()> {
-    let (exec_configuration, transition) = match cfg {
-        None => (false, None),
-        Some(value) if value.is_none() || value.unpack_str() == Some("target") => (false, None),
-        Some(value) if value.unpack_str() == Some("exec") => (true, None),
-        Some(value) => (
-            false,
-            Some(transition_definition_from_value(value).ok_or_else(|| {
-                anyhow::anyhow!("attribute cfg must be 'target', 'exec', or a transition")
-            })?),
-        ),
+    let (exec_configuration, transition, analysis_test_transition) = match cfg {
+        None => (false, None, None),
+        Some(value) if value.is_none() || value.unpack_str() == Some("target") => {
+            (false, None, None)
+        }
+        Some(value) if value.unpack_str() == Some("exec") => (true, None, None),
+        Some(value) => match transition_definition_from_value(value) {
+            Some(transition) => (false, Some(transition), None),
+            None => match analysis_test_transition_from_value(value) {
+                Some(transition) => (false, None, Some(transition)),
+                None => anyhow::bail!("attribute cfg must be 'target', 'exec', or a transition"),
+            },
+        },
     };
     definition.exec_configuration = exec_configuration;
     definition.transition = transition;
+    definition.analysis_test_transition = analysis_test_transition;
     Ok(())
 }
 
@@ -6391,6 +6476,9 @@ fn finalize_dependency_attribute_properties<V>(
     }
     if definition.transition.is_some() {
         flags.insert(AttributePropertyFlag::HasStarlarkDefinedTransition);
+    }
+    if definition.analysis_test_transition.is_some() {
+        flags.insert(AttributePropertyFlag::HasAnalysisTestTransition);
     }
 
     definition.mandatory |= flags.contains(AttributePropertyFlag::Mandatory);
@@ -8163,6 +8251,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 || definition.late_bound_default.is_some()
                 || definition.computed_default
                 || definition.transition.is_some()
+                || definition.analysis_test_transition.is_some()
                 || definition.executable
                 || definition.exec_configuration
                 || definition.flags.has_any_except(&[
@@ -8209,6 +8298,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             let definition = attribute_definition_from_value(value)?
                 .ok_or_else(|| anyhow::anyhow!("tag attribute `{name}` must use attr.*()"))?;
             if definition.transition.is_some()
+                || definition.analysis_test_transition.is_some()
                 || definition.executable
                 || definition.exec_configuration
             {
@@ -8600,6 +8690,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 }
                 let definition = attribute_definition_from_value(value)?
                     .ok_or_else(|| anyhow::anyhow!("rule attribute `{name}` must use attr.*()"))?;
+                if definition.analysis_test_transition.is_some() {
+                    anyhow::bail!(
+                        "Only rule definitions with analysis_test=True may have attributes with analysis_test_transition transitions"
+                    );
+                }
                 if definition.configurable_set {
                     anyhow::bail!(
                         "attribute '{name}' has the 'configurable' argument set, which is not allowed in rule definitions"
@@ -9179,6 +9274,37 @@ impl AllocFrozenValue for BzlmodNativeModule {
 
 #[starlark_module]
 fn bzl_only_globals(builder: &mut GlobalsBuilder) {
+    fn analysis_test_transition<'v>(
+        #[starlark(require = named)] settings: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AnalysisTestTransition<'v>> {
+        let settings_dict = DictRef::from_value(settings)
+            .ok_or_else(|| anyhow::anyhow!("settings must be a dictionary"))?;
+        let outputs = settings_dict
+            .iter()
+            .map(|(key, _)| {
+                key.unpack_str()
+                    .map(ToOwned::to_owned)
+                    .ok_or_else(|| anyhow::anyhow!("settings dictionary keys must be strings"))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let context = BzlEvaluationContext::from_evaluator(eval)?;
+        let source = context.source_identity_for_call(eval)?;
+        let outputs = validate_transition_settings(
+            &outputs,
+            TransitionSettingsKind::AnalysisTestOutputs,
+            source,
+        )?;
+        Ok(AnalysisTestTransitionGen {
+            settings,
+            outputs: canonicalize_transition_settings(
+                outputs,
+                TransitionSettingsKind::AnalysisTestOutputs,
+            )?,
+            definition_source: Arc::new(source.clone()),
+        })
+    }
+
     fn r#macro<'v>(
         #[starlark(require = named)] implementation: Value<'v>,
         #[starlark(require = named)] attrs: Option<Value<'v>>,
@@ -9287,6 +9413,51 @@ mod module_extension_definition_tests {
 
     fn evaluate(source: &str) -> anyhow::Result<starlark::environment::FrozenModule> {
         evaluate_with_globals(source, loading_globals())
+    }
+
+    #[test]
+    fn analysis_test_transition_is_bzl_only_and_retains_canonical_outputs() {
+        let module = evaluate(
+            "T = analysis_test_transition(settings = {'//z:setting': {'arbitrary': [1]}, '//a:setting': None, '//command_line_option:experimental_x': True})\nD = attr.label(cfg = T)\nL = attr.label_list(cfg = T)\nS = attr.string_keyed_label_dict(cfg = T)\nK = attr.label_keyed_string_dict(cfg = T)\nM = attr.label_list_dict(cfg = T)\n",
+        )
+        .unwrap();
+        let transition = module
+            .get("T")
+            .unwrap()
+            .downcast::<FrozenAnalysisTestTransition>()
+            .unwrap();
+        assert_eq!(transition.to_string(), "<analysis_test_transition object>");
+        assert_eq!(transition.outputs.len(), 3);
+        assert!(transition.settings.to_value().get_type() == "dict");
+        for name in ["D", "L", "S", "K", "M"] {
+            let descriptor = module
+                .get(name)
+                .unwrap()
+                .downcast::<FrozenAttributeDefinition>()
+                .unwrap();
+            assert!(descriptor.transition.is_none());
+            assert!(descriptor.analysis_test_transition.is_some());
+            assert!(
+                descriptor
+                    .flags
+                    .contains(AttributePropertyFlag::HasAnalysisTestTransition)
+            );
+        }
+        assert!(
+            evaluate_with_globals(
+                "T = analysis_test_transition(settings = {})\n",
+                build_file_loading_globals(),
+            )
+            .is_err()
+        );
+        let error = evaluate(
+            "T = analysis_test_transition(settings = {})\ndef impl(ctx): pass\nR = rule(implementation = impl, attrs = {'dep': attr.label(cfg = T)})\n",
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains(
+            "Only rule definitions with analysis_test=True may have attributes with analysis_test_transition transitions"
+        ));
     }
 
     fn projection(source: &str) -> ModuleExtensionDefinitionProjection {
