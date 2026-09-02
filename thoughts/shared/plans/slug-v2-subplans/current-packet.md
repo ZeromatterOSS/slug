@@ -1,17 +1,24 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-5-7A-package-context-label-string-category-design-r2
+Packet: WP-4-5-7A-package-context-label-string-category-design-r3
 
 Milestone: M7A bootstrap-critical generic Starlark/loading and repository
 closure. Converge every currently admitted package-context dependency-label
 string consumer on one Bazel 9.2 grammar and typed canonical projection.
 
-Status: corrected docs-only design accepted by focused independent architecture
-rereview; Rust implementation is authorized within this packet. R1 returned
+Status: focused terminal review of the R2 implementation returned `REPLAN`;
+the docs-only R3 correction is accepted by focused independent architecture
+rereview and Rust may resume only within its bounded corrections. R1 returned
 `REPLAN` for innate repository-call context ownership,
 empty apparent versus canonical repository spellings, converted dictionary-key
 collisions and an incomplete inventory of existing `PackageRecorder` consumers;
-R2 corrects those four boundaries without changing the central owner. The
+R2 corrected those four boundaries without changing the central owner. Its
+terminal implementation review found three bounded misses: ordinary extension
+calls still selected the repository rule's defining package instead of the
+extension evaluation package, dependency-label convergence widened three
+deferred output routes, and the exact ordinary BUILD proof owner was absent
+from the proof allowlist. R3 corrects only those context, non-widening and
+allowlist boundaries. The
 predecessor repository-rule file-admissibility category is terminally accepted
 and committed in `95b4f0da6`; its current-packet and canonical scheduling
 records were one integration step stale before this packet was materialized.
@@ -96,7 +103,9 @@ Loading retains every context decision:
 3. explicit module-extension tag values use the calling module's root package
    and mapping, never the tag-class definition mapping;
 4. explicit ordinary extension repository-rule values use the selected
-   extension evaluation base package and full generated-repository namespace;
+   extension evaluation `.bzl` package from the selected request plus the full
+   generated-repository namespace, even when the repository rule was imported
+   from another `.bzl` package;
 5. explicit innate `use_repo_rule` values use the repository-rule `.bzl`
    package and the calling module's mapping, not the generated namespace;
 6. every pretyped Label remains unchanged rather than being parsed or mapped
@@ -248,6 +257,10 @@ Add focused proof for:
 - the defining `.bzl` mapping for defaults, calling module mapping for explicit
   tags, ordinary extension namespace for ordinary repository calls, and
   repository-rule `.bzl` package plus calling-module mapping for innate calls;
+- an ordinary extension importing a repository rule from another `.bzl`
+  package, proving explicit relative strings use the extension evaluation
+  package while descriptor defaults retain the repository-rule definition
+  package;
 - ordinary/symbolic-macro BUILD package conversion, selector keys, and
   representative direct consumers covering visibility/package metadata,
   alias/filegroup/test-suite/config-setting and platform/toolchain families;
@@ -281,6 +294,9 @@ Proof may change only those files' existing test modules plus:
 - `app/slug_identity_v2/tests/label_roundtrip.rs`;
 - `app/slug_loading_v2/src/host_package_inventory_tests.rs`;
 - `app/slug_loading_v2/src/host_package_load_tests.rs`; and
+- `app/slug_loading_v2/tests/build_file_loading.rs`, solely for ordinary BUILD
+  package-context success/collision coverage and stale expectations directly
+  contradicted by the admitted canonical-label surface; and
 - only if required for the existing repository-declaration DICE harness,
   `app/slug_loading_v2/src/module_extension.rs`.
 
@@ -335,3 +351,20 @@ During implementation collision checks must compare canonical
 repository/package/target identity rather than optional Slug mapping provenance,
 and innate conversion must borrow `definition_parts().3`, never the generated
 namespace returned by `namespace_parts()`.
+
+Focused terminal R2 implementation review returns `REPLAN`. R3 requires
+ordinary instantiation to pass `receipt.request.parts().0` as conversion base
+while retaining the full namespace mapping; the repository rule's defining
+label remains the `RepoRuleId` and default-conversion owner. Restore the
+pre-packet parser/policy for BUILD, module-tag and repository-call
+`Output`/`OutputList` positions; only the five dependency-label constructors
+use the shared package-context owner. Add the existing BUILD integration test
+file to the proof allowlist because the exact ordinary BUILD surface cannot be
+proved while preserving its now-stale canonical-external rejection. No other
+architecture, compatibility class, production allowlist, cap, retained owner,
+DICE boundary or authentic replay requirement changes. Rust may resume only
+after focused R3 rereview returns `ACCEPT`.
+
+Focused independent R3 architecture rereview returns `ACCEPT`. The ordinary
+evaluation-base owner, deferred output non-widening boundary, narrow BUILD proof
+allowlist, unchanged caps and unchanged retained-state architecture are accepted.

@@ -4297,6 +4297,19 @@ Focused R2 rereview returns `ACCEPT`; innate implementation must borrow the
 calling-module mapping exposed by `definition_parts`, never the generated
 namespace returned by `namespace_parts`.
 
+Terminal R2 implementation review returns `REPLAN` because ordinary explicit
+repository-call strings still used an imported repository rule's defining
+package, three deferred output routes were widened, and the ordinary BUILD
+integration proof owner was omitted from the allowlist. R3 passes the selected
+request's extension evaluation `.bzl` label as ordinary conversion base while
+retaining the generated namespace mapping, preserves the repository-rule
+definition context for defaults and `RepoRuleId`, restores all pre-packet
+output policy, and adds only the existing BUILD proof file. Innate conversion
+continues to borrow `definition_parts().3`. No Bzlmod key, mapping owner,
+namespace, retained state, production allowlist or cap changes; focused R3
+rereview is required before Rust resumes.
+Focused R3 architecture rereview returns `ACCEPT`; no Bzlmod owner moves.
+
 ### Compilation-helper acceptance and Stage 4 continuation (2026-08-26)
 
 Commit `3060e4d4d` accepts the complete rules_cc compilation-helper freeze with

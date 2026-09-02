@@ -7747,3 +7747,17 @@ config-setting and constraint/platform/toolchain declarations. It also splits
 ordinary extension repository calls from innate calls. Focused R2 rereview is
 required before Rust and returns `ACCEPT`; implementation may proceed only
 through the shared parser and inventoried conversion paths.
+
+Terminal R2 implementation review returns `REPLAN`. Corrected R3 keeps the
+shared parser but requires ordinary extension explicit strings to use the
+selected extension evaluation `.bzl` package even when their repository rule
+is imported, restores pre-packet output parsing/policy at BUILD, tag and
+repository-call positions, and adds the existing ordinary BUILD integration
+test to the proof allowlist. Descriptor defaults still use the repository-rule
+definition context, ordinary explicit strings still use the full generated
+namespace, and innate explicit strings still use the repository-rule `.bzl`
+package plus calling-module mapping. No compatibility class, retained owner,
+DICE boundary, production allowlist or cap changes. Rust resumes only after
+focused R3 rereview returns `ACCEPT`.
+Focused R3 architecture rereview returns `ACCEPT`; Rust may resume only within
+the corrected ordinary-base, deferred-output and BUILD-proof boundaries.

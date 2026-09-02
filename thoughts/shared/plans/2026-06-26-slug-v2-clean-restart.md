@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[Design the complete package-context label-string category](./slug-v2-subplans/current-packet.md).
+[Correct the complete package-context label-string category](./slug-v2-subplans/current-packet.md).
 
 Commit `95b4f0da6` terminally accepts the complete repository-rule
 file-admissibility category. The existing compact policy now survives frozen
@@ -62,6 +62,19 @@ existing `PackageRecorder` consumer family. R2 makes those corrections without
 changing the shared parser/typed-result architecture; focused rereview is
 required before Rust. Focused R2 rereview returns `ACCEPT`; implementation is
 authorized only within the corrected packet.
+
+Terminal R2 implementation review returns `REPLAN` for three bounded misses.
+Ordinary extension repository calls must use the selected extension evaluation
+`.bzl` package, not an imported repository rule's definition package, while
+retaining the full generated namespace. BUILD, module-tag and repository-call
+output positions must keep their pre-packet deferred policy instead of using
+the dependency-label parser. The exact ordinary BUILD proof also requires its
+existing integration test file in the proof allowlist. Activate only docs-first
+`WP-4-5-7A-package-context-label-string-category-design-r3`; all other owners,
+compatibility classes, caps and stops remain unchanged, and Rust resumes only
+after focused R3 architecture `ACCEPT`.
+Focused R3 architecture rereview returns `ACCEPT`; implement only those three
+bounded corrections.
 
 Commit `20bbe8661` terminally accepts
 `WP-6-7A-default-exec-configured-label-dependency-implementation-r2`. The

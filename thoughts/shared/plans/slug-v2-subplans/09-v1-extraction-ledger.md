@@ -2515,3 +2515,12 @@ sufficient. Focused R2 rereview must accept the corrected category before Rust.
 Focused R2 rereview returns `ACCEPT`; duplicate checks compare canonical
 repository/package/target projection rather than optional Slug mapping
 provenance and retain no collision index.
+
+Terminal R2 implementation review's ordinary-base, deferred-output and proof-
+allowlist corrections do not change the utility decision. R3 still reuses the
+same borrowed parser and existing `CanonicalLabel`; it adds no extraction,
+retained context, mapping copy, collection, cache, interner, registry, DICE key
+or I/O. Focused R3 rereview must accept the corrected call-site ownership and
+non-widening boundary before Rust resumes.
+Focused R3 architecture rereview returns `ACCEPT`; the no-extraction decision
+remains final for this packet.
