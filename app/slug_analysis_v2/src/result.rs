@@ -951,6 +951,25 @@ impl ConfiguredNodeResult {
         self.rule_capability.as_ref()
     }
 
+    /// Rule class used by Bazel's prerequisite validation. Alias wrappers use
+    /// their already-retained configured actual edge rather than the wrapper's
+    /// own `alias` capability.
+    pub fn prerequisite_rule_class(&self) -> Option<&str> {
+        if matches!(self.kind, ConfiguredNodeKind::Alias) {
+            return self
+                .edges
+                .iter()
+                .find_map(|edge| match edge.kind() {
+                    ConfiguredEdgeKind::AliasActual { rule_class } => Some(rule_class.as_deref()),
+                    _ => None,
+                })
+                .flatten();
+        }
+        self.rule_capability
+            .as_ref()
+            .map(|capability| capability.rule_class.as_str())
+    }
+
     pub fn toolchain_topology(&self) -> Option<&ToolchainTopology> {
         self.toolchain_topology.as_ref()
     }

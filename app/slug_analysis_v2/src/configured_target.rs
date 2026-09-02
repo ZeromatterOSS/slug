@@ -76,7 +76,9 @@ pub enum ConfiguredEdgeKind {
         hidden: bool,
         dependency: ConfiguredAttributeDependency,
     },
-    AliasActual,
+    AliasActual {
+        rule_class: Option<CompactString>,
+    },
     GeneratedBy,
     Source,
     DeclaringVisibility,

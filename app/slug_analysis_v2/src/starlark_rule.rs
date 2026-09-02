@@ -390,6 +390,7 @@ pub(crate) struct PreparedDependency {
     pub(crate) providers: ProviderCollection,
     pub(crate) attribute: CompactString,
     pub(crate) target_shape: bool,
+    pub(crate) filtered: bool,
     pub(crate) executable: Option<slug_build_api_v2::FilesToRunProvider>,
 }
 
@@ -585,7 +586,7 @@ fn allocate_analysis_attribute<'v>(
     let mut dependency = || {
         dependencies
             .next()
-            .map(|dependency| dependency.target.to_value())
+            .map(|dependency| dependency.target.map(FrozenValue::to_value))
             .ok_or_else(|| {
                 format!(
                     "resolved attribute `{}` is missing a prepared dependency",
@@ -595,13 +596,18 @@ fn allocate_analysis_attribute<'v>(
     };
     Ok(match &attribute.value {
         CoercedAttributeValue::None => Value::new_none(),
-        CoercedAttributeValue::Label(_) if attribute.sequence => heap.alloc(vec![dependency()?]),
-        CoercedAttributeValue::Label(_) => dependency()?,
+        CoercedAttributeValue::Label(_) if attribute.sequence => {
+            heap.alloc(dependency()?.into_iter().collect::<Vec<_>>())
+        }
+        CoercedAttributeValue::Label(_) => dependency()?.unwrap_or_else(Value::new_none),
         CoercedAttributeValue::LabelList(labels) => heap.alloc(
             labels
                 .iter()
                 .map(|_| dependency())
-                .collect::<Result<Vec<_>, _>>()?,
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>(),
         ),
         CoercedAttributeValue::String(value) => heap.alloc_str(value).to_value(),
         CoercedAttributeValue::StringList(values) => heap.alloc(
@@ -645,14 +651,24 @@ fn allocate_analysis_attribute<'v>(
         CoercedAttributeValue::StringKeyedLabelDict(values) => heap.alloc(AllocDict(
             values
                 .iter()
-                .map(|(key, _)| Ok((heap.alloc_str(key).to_value(), dependency()?)))
-                .collect::<Result<Vec<_>, String>>()?,
+                .map(|(key, _)| {
+                    Ok(dependency()?.map(|target| (heap.alloc_str(key).to_value(), target)))
+                })
+                .collect::<Result<Vec<_>, String>>()?
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>(),
         )),
         CoercedAttributeValue::LabelKeyedStringDict(values) => heap.alloc(AllocDict(
             values
                 .iter()
-                .map(|(_, value)| Ok((dependency()?, heap.alloc_str(value).to_value())))
-                .collect::<Result<Vec<_>, String>>()?,
+                .map(|(_, value)| {
+                    Ok(dependency()?.map(|target| (target, heap.alloc_str(value).to_value())))
+                })
+                .collect::<Result<Vec<_>, String>>()?
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>(),
         )),
         CoercedAttributeValue::LabelListDict(values) => heap.alloc(AllocDict(
             values
@@ -664,7 +680,10 @@ fn allocate_analysis_attribute<'v>(
                             labels
                                 .iter()
                                 .map(|_| dependency())
-                                .collect::<Result<Vec<_>, String>>()?,
+                                .collect::<Result<Vec<_>, String>>()?
+                                .into_iter()
+                                .flatten()
+                                .collect::<Vec<_>>(),
                         ),
                     ))
                 })
@@ -744,7 +763,7 @@ impl<'v> StarlarkValue<'v> for AnalysisToolchains {
 #[derive(Debug, Clone, Allocative)]
 struct AnalysisDependency {
     attribute: CompactString,
-    target: FrozenValue,
+    target: Option<FrozenValue>,
 }
 
 /// Synchronously evaluate one loaded rule after DICE has prepared all direct
@@ -1726,11 +1745,18 @@ pub(crate) fn evaluate_loaded_rule(
         let dependencies = dependencies
             .into_iter()
             .map(|dependency| {
-                let target = if dependency.target_shape {
-                    materializer
-                        .configured_dependency_target(&dependency.key, dependency.providers)?
+                let target = if dependency.filtered {
+                    None
+                } else if dependency.target_shape {
+                    Some(
+                        materializer
+                            .configured_dependency_target(&dependency.key, dependency.providers)?,
+                    )
                 } else {
-                    materializer.configured_dependency(&dependency.key, dependency.providers)?
+                    Some(
+                        materializer
+                            .configured_dependency(&dependency.key, dependency.providers)?,
+                    )
                 };
                 Ok(AnalysisDependency {
                     attribute: dependency.attribute,

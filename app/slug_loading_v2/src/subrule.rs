@@ -48,6 +48,7 @@ use crate::attrs::AttributePropertyFlags;
 use crate::attrs::AttributeSchema;
 use crate::attrs::CoercedAttributeValue;
 use crate::attrs::FileAdmissibility;
+use crate::attrs::RuleClassAdmissibility;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::package::ToolchainTypeRequirement;
 use crate::package::subrule_attribute_from_value;
@@ -131,6 +132,7 @@ pub(crate) struct SubruleAttribute {
     pub(crate) default: SubruleAttributeDefault,
     pub(crate) file_admissibility: FileAdmissibility,
     pub(crate) flags: AttributePropertyFlags,
+    pub(crate) rule_class_admissibility: RuleClassAdmissibility,
     pub(crate) allowed_values: AllowedAttributeValues,
     pub(crate) executable: bool,
     pub(crate) exec_configuration: bool,
@@ -175,6 +177,7 @@ pub(crate) struct LiftedSubruleAttribute {
     pub(crate) default: SubruleAttributeDefault,
     pub(crate) file_admissibility: FileAdmissibility,
     pub(crate) flags: AttributePropertyFlags,
+    pub(crate) rule_class_admissibility: RuleClassAdmissibility,
     pub(crate) allowed_values: AllowedAttributeValues,
     pub(crate) executable: bool,
     pub(crate) exec_configuration: bool,
@@ -201,6 +204,7 @@ impl LiftedSubruleAttribute {
             default: attribute.default.clone(),
             file_admissibility: attribute.file_admissibility.clone(),
             flags: attribute.flags,
+            rule_class_admissibility: attribute.rule_class_admissibility.clone(),
             allowed_values: attribute.allowed_values.clone(),
             executable: attribute.executable,
             exec_configuration: attribute.exec_configuration,
@@ -261,6 +265,8 @@ pub struct ConfiguredDependencyAttribute<'a> {
     default: ConfiguredDependencyDefault<'a>,
     file_admissibility: &'a FileAdmissibility,
     skip_analysis_time_filetype_check: bool,
+    silent_ruleclass_filter: bool,
+    allowed_rule_classes: Option<&'a Arc<[CompactString]>>,
     executable: bool,
     exec_configuration: bool,
     required_providers: &'a [Arc<[ProviderIdentity]>],
@@ -279,6 +285,8 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
             default: ConfiguredDependencyDefault::ConfigurationField(&attribute.identity),
             file_admissibility: schema.file_admissibility(),
             skip_analysis_time_filetype_check: schema.skip_analysis_time_filetype_check(),
+            silent_ruleclass_filter: schema.silent_ruleclass_filter(),
+            allowed_rule_classes: schema.allowed_rule_classes(),
             executable: schema.executable(),
             exec_configuration: matches!(
                 schema.dependency_configuration(),
@@ -305,6 +313,10 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
             skip_analysis_time_filetype_check: attribute
                 .flags
                 .contains(AttributePropertyFlag::SkipAnalysisTimeFiletypeCheck),
+            silent_ruleclass_filter: attribute
+                .flags
+                .contains(AttributePropertyFlag::SilentRuleclassFilter),
+            allowed_rule_classes: attribute.rule_class_admissibility.classes(),
             executable: attribute.executable,
             exec_configuration: attribute.exec_configuration,
             required_providers: &attribute.required_providers,
@@ -333,6 +345,14 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
 
     pub fn skip_analysis_time_filetype_check(self) -> bool {
         self.skip_analysis_time_filetype_check
+    }
+
+    pub fn silent_ruleclass_filter(self) -> bool {
+        self.silent_ruleclass_filter
+    }
+
+    pub fn allowed_rule_classes(self) -> Option<&'a Arc<[CompactString]>> {
+        self.allowed_rule_classes
     }
 
     pub fn executable(self) -> bool {
@@ -900,6 +920,7 @@ mod tests {
             ))),
             file_admissibility: FileAdmissibility::default(),
             flags,
+            rule_class_admissibility: RuleClassAdmissibility::only(vec!["library".into()]),
             allowed_values: AllowedAttributeValues::None,
             executable: false,
             exec_configuration: false,
@@ -913,6 +934,10 @@ mod tests {
         let lifted = LiftedSubruleAttribute::new(&identity, &attribute);
         assert_eq!(lifted.flags, flags);
         let configured = ConfiguredDependencyAttribute::from_hidden(&lifted);
+        assert_eq!(
+            configured.allowed_rule_classes().unwrap().as_ref(),
+            &[CompactString::new("library")]
+        );
         assert!(configured.skip_analysis_time_filetype_check());
     }
 }

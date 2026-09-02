@@ -131,6 +131,36 @@ impl Default for FileAdmissibility {
     }
 }
 
+/// Bazel's rule-class predicate distinguishes an unspecified predicate from
+/// an explicitly empty set. The retained slice is sorted and deduplicated so
+/// declaration order and duplicate spellings do not affect semantic identity.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum RuleClassAdmissibility {
+    Any,
+    Only(Arc<[CompactString]>),
+}
+
+impl RuleClassAdmissibility {
+    pub(crate) fn only(mut classes: Vec<CompactString>) -> Self {
+        classes.sort_unstable();
+        classes.dedup();
+        Self::Only(classes.into())
+    }
+
+    pub(crate) fn classes(&self) -> Option<&Arc<[CompactString]>> {
+        match self {
+            Self::Any => None,
+            Self::Only(classes) => Some(classes),
+        }
+    }
+}
+
+impl Default for RuleClassAdmissibility {
+    fn default() -> Self {
+        Self::Any
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) enum AllowedAttributeValues {
     None,
@@ -285,6 +315,7 @@ pub struct AttributeSchema {
     builtin: bool,
     file_admissibility: FileAdmissibility,
     flags: AttributePropertyFlags,
+    rule_class_admissibility: RuleClassAdmissibility,
     allowed_values: AllowedAttributeValues,
     allow_empty: bool,
     required_providers: Arc<[Arc<[ProviderIdentity]>]>,
@@ -318,6 +349,7 @@ impl AttributeSchema {
             builtin: false,
             file_admissibility: FileAdmissibility::default(),
             flags: AttributePropertyFlags::default(),
+            rule_class_admissibility: RuleClassAdmissibility::Any,
             allowed_values: AllowedAttributeValues::None,
             allow_empty: true,
             required_providers: Arc::from([]),
@@ -384,6 +416,13 @@ impl AttributeSchema {
         self.flags
             .contains(AttributePropertyFlag::SkipAnalysisTimeFiletypeCheck)
     }
+    pub fn silent_ruleclass_filter(&self) -> bool {
+        self.flags
+            .contains(AttributePropertyFlag::SilentRuleclassFilter)
+    }
+    pub fn allowed_rule_classes(&self) -> Option<&Arc<[CompactString]>> {
+        self.rule_class_admissibility.classes()
+    }
     pub(crate) fn allowed_values(&self) -> &AllowedAttributeValues {
         &self.allowed_values
     }
@@ -412,6 +451,14 @@ impl AttributeSchema {
     }
     pub(crate) fn with_allowed_values(mut self, values: AllowedAttributeValues) -> Self {
         self.allowed_values = values;
+        self
+    }
+
+    pub(crate) fn with_rule_class_admissibility(
+        mut self,
+        admissibility: RuleClassAdmissibility,
+    ) -> Self {
+        self.rule_class_admissibility = admissibility;
         self
     }
 

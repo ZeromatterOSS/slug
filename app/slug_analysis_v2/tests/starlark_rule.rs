@@ -6652,7 +6652,12 @@ ordinary_rule(
     assert!(outer.providers().default_info().is_some());
     assert_eq!(provider_value(&outer, &seen), "ordinary");
     assert_eq!(outer.edges().len(), 1);
-    assert_eq!(outer.edges()[0].kind(), &ConfiguredEdgeKind::AliasActual);
+    assert_eq!(
+        outer.edges()[0].kind(),
+        &ConfiguredEdgeKind::AliasActual {
+            rule_class: Some("ordinary_rule".into()),
+        }
+    );
     assert_eq!(
         outer.edges()[0].target(),
         &configured("@@//:alias_inner").into()
@@ -10038,6 +10043,368 @@ consumer(name = "generated_owner_bad", scalar = ":owner")
             "{target}: {error}"
         );
     }
+}
+
+fn write_rule_class_restriction_definitions(workspace: &PathBuf) -> &'static str {
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    let definitions = r#"P = provider()
+SeenInfo = provider(fields = {"value": "configured observation"})
+
+def _plain(ctx):
+    return []
+
+def _provided(ctx):
+    return [P()]
+
+allowed_rule = rule(implementation = _plain)
+other_rule = rule(implementation = _plain)
+provided_rule = rule(implementation = _provided)
+
+def _producer(ctx):
+    return [DefaultInfo(files = depset([ctx.outputs.out]))]
+
+producer_rule = rule(
+    implementation = _producer,
+    attrs = {"out": attr.output(mandatory = True)},
+)
+
+def _shape(ctx):
+    return [SeenInfo(value = "%s|%s|%s|%s|%s" % (
+        ctx.attr.scalar.label.name,
+        len(ctx.attr.sequence),
+        len(ctx.attr.string_keyed),
+        len(ctx.attr.label_keyed),
+        len(ctx.attr.grouped["group"]),
+    ))]
+
+shape_consumer = rule(
+    implementation = _shape,
+    attrs = {
+        "scalar": attr.label(default = Label("//:allowed"), allow_rules = ["allowed_rule"]),
+        "sequence": attr.label_list(default = [Label("//:allowed")], allow_rules = ["allowed_rule"]),
+        "string_keyed": attr.string_keyed_label_dict(default = {"key": Label("//:allowed")}, allow_rules = ["allowed_rule"]),
+        "label_keyed": attr.label_keyed_string_dict(default = {Label("//:allowed"): "value"}, allow_rules = ["allowed_rule"]),
+        "grouped": attr.label_list_dict(default = {"group": [Label("//:allowed")]}, allow_rules = ["allowed_rule"]),
+    },
+)
+
+def _provider_consumer(ctx):
+    return [SeenInfo(value = ctx.attr.dep.label.name)]
+
+provider_consumer = rule(
+    implementation = _provider_consumer,
+    attrs = {
+        "dep": attr.label(allow_rules = ["allowed_rule"], providers = [[P]]),
+    },
+)
+
+empty_consumer = rule(
+    implementation = _provider_consumer,
+    attrs = {"dep": attr.label(allow_rules = [])},
+)
+
+file_consumer = rule(
+    implementation = _provider_consumer,
+    attrs = {"dep": attr.label(allow_rules = [], allow_files = True)},
+)
+
+nonrule_consumer = rule(
+    implementation = _provider_consumer,
+    attrs = {"dep": attr.label(allow_rules = [], providers = [[P]])},
+)
+
+suffix_consumer = rule(
+    implementation = _provider_consumer,
+    attrs = {"dep": attr.label(allow_files = [".wanted"])},
+)
+
+precedence_consumer = rule(
+    implementation = _provider_consumer,
+    attrs = {"dep": attr.label(allow_rules = ["allowed_rule"], providers = [[P]], allow_files = [".wanted"])},
+)
+
+def _silent(ctx):
+    return [SeenInfo(value = "%s|%s|%s|%s|%s" % (
+        ctx.attr.scalar == None,
+        len(ctx.attr.deps),
+        len(ctx.attr.reverse),
+        len(ctx.attr.provider_or),
+        ctx.executable.tool == None,
+    ))]
+
+silent_consumer = rule(
+    implementation = _silent,
+    attrs = {
+        "scalar": attr.label(allow_rules = ["allowed_rule"], flags = ["SILENT_RULECLASS_FILTER"]),
+        "deps": attr.label_list(allow_rules = ["allowed_rule"], allow_files = True, flags = ["SILENT_RULECLASS_FILTER"]),
+        "reverse": attr.label_keyed_string_dict(allow_rules = ["allowed_rule"], allow_files = True, flags = ["SILENT_RULECLASS_FILTER"]),
+        "provider_or": attr.label_list(allow_rules = ["allowed_rule"], providers = [[P]], flags = ["SILENT_RULECLASS_FILTER"]),
+        "tool": attr.label(allow_rules = ["allowed_rule"], executable = True, cfg = "exec", flags = ["SILENT_RULECLASS_FILTER"]),
+    },
+)
+
+silent_string_keyed = rule(
+    implementation = _plain,
+    attrs = {"deps": attr.string_keyed_label_dict(allow_rules = ["allowed_rule"], flags = ["SILENT_RULECLASS_FILTER"])},
+)
+
+silent_grouped = rule(
+    implementation = _plain,
+    attrs = {"deps": attr.label_list_dict(allow_rules = ["allowed_rule"], flags = ["SILENT_RULECLASS_FILTER"])},
+)
+
+def _filtered_subrule_impl(ctx, **kwargs):
+    return str(kwargs["_dep"] == None)
+
+filtered_subrule = subrule(
+    implementation = _filtered_subrule_impl,
+    attrs = {"_dep": attr.label(default = "//:other", allow_rules = ["allowed_rule"], flags = ["SILENT_RULECLASS_FILTER"])},
+)
+
+strict_subrule = subrule(
+    implementation = _filtered_subrule_impl,
+    attrs = {"_dep": attr.label(default = "//:other", allow_rules = ["allowed_rule"])},
+)
+
+def _filtered_subrule_subject(ctx):
+    return [SeenInfo(value = filtered_subrule())]
+
+def _strict_subrule_subject(ctx):
+    strict_subrule()
+    return []
+
+filtered_subrule_subject = rule(implementation = _filtered_subrule_subject, subrules = [filtered_subrule])
+strict_subrule_subject = rule(implementation = _strict_subrule_subject, subrules = [strict_subrule])
+
+aba_consumer = rule(
+    implementation = _provider_consumer,
+    attrs = {"dep": attr.label(allow_rules = ["allowed_rule"])},
+)
+"#;
+    fs::write(workspace.join("defs.bzl"), definitions).unwrap();
+    definitions
+}
+
+fn write_rule_class_restriction_build(workspace: &PathBuf) {
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "aba_consumer", "allowed_rule", "empty_consumer", "file_consumer", "filtered_subrule_subject", "nonrule_consumer", "other_rule", "precedence_consumer", "provided_rule", "producer_rule", "provider_consumer", "shape_consumer", "silent_consumer", "silent_grouped", "silent_string_keyed", "strict_subrule_subject", "suffix_consumer")
+
+allowed_rule(name = "allowed")
+allowed_rule(name = "allowed_two")
+other_rule(name = "other")
+provided_rule(name = "provided")
+producer_rule(name = "producer", out = "generated.txt")
+alias(name = "allowed_alias_inner", actual = ":allowed")
+alias(name = "allowed_alias_outer", actual = ":allowed_alias_inner")
+alias(name = "generated_alias", actual = ":generated.txt")
+package_group(name = "visibility_group", packages = ["//..."])
+
+shape_consumer(name = "good")
+shape_consumer(name = "alias_good", scalar = ":allowed_alias_outer")
+shape_consumer(name = "bad_scalar", scalar = ":other")
+shape_consumer(name = "bad_sequence", sequence = [":other"])
+shape_consumer(name = "bad_string_keyed", string_keyed = {"bad": ":other"})
+shape_consumer(name = "bad_label_keyed", label_keyed = {":other": "bad"})
+shape_consumer(name = "bad_grouped", grouped = {"group": [":other"]})
+
+provider_consumer(name = "class_or", dep = ":allowed")
+provider_consumer(name = "provider_or", dep = ":provided")
+provider_consumer(name = "combined_bad", dep = ":other")
+empty_consumer(name = "empty_bad", dep = ":allowed")
+file_consumer(name = "source_ok", dep = ":source.txt")
+file_consumer(name = "generated_ok", dep = ":generated.txt")
+nonrule_consumer(name = "package_group_ok", dep = ":visibility_group")
+nonrule_consumer(name = "generated_alias_ok", dep = ":generated_alias")
+suffix_consumer(name = "suffix_bad", dep = ":producer")
+precedence_consumer(name = "precedence_bad", dep = ":producer")
+
+silent_consumer(
+    name = "silent",
+    scalar = ":other",
+    deps = [":allowed", ":other", ":source.txt", ":generated.txt", ":allowed_alias_outer"],
+    reverse = {":allowed": "allowed", ":allowed_two": "allowed_two", ":other": "other", ":source.txt": "source"},
+    provider_or = [":allowed", ":provided"],
+    tool = ":other",
+)
+silent_string_keyed(name = "silent_string_bad", deps = {"bad": ":other"})
+silent_grouped(name = "silent_grouped_bad", deps = {"bad": [":other"]})
+filtered_subrule_subject(name = "subrule_filtered")
+strict_subrule_subject(name = "subrule_bad")
+aba_consumer(name = "aba", dep = ":allowed")
+"#,
+    )
+    .unwrap();
+    fs::write(workspace.join("source.txt"), "source\n").unwrap();
+}
+
+fn assert_configured_nonrule_alias(result: &ConfiguredNodeResult, actual: ConfiguredNodeKey) {
+    assert_eq!(result.kind(), &ConfiguredNodeKind::Alias);
+    assert_eq!(
+        result.edges()[0].kind(),
+        &ConfiguredEdgeKind::AliasActual { rule_class: None }
+    );
+    assert_eq!(result.edges()[0].target(), &actual);
+}
+
+fn assert_silent_rule_class_topology(result: &ConfiguredNodeResult) {
+    let attribute_edges = result
+        .edges()
+        .iter()
+        .filter(|edge| matches!(edge.kind(), ConfiguredEdgeKind::Attribute { .. }))
+        .collect::<Vec<_>>();
+    assert_eq!(attribute_edges.len(), 13);
+    for retained in ["@@//:other", "@@//:source.txt", "@@//:provided"] {
+        assert!(
+            attribute_edges
+                .iter()
+                .any(|edge| edge.target().label().to_string() == retained),
+            "missing filtered topology edge {retained}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn rule_class_restrictions_cover_shapes_aliases_providers_silent_views_and_a_b_a() {
+    let workspace = scratch();
+    let definitions = write_rule_class_restriction_definitions(&workspace);
+    write_rule_class_restriction_build(&workspace);
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let configuration = typed_action_test_configuration();
+    let key = |target: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+            configuration.clone(),
+        )
+    };
+    let seen = ProviderId::new("//:defs.bzl", "SeenInfo").unwrap();
+
+    let good = analyze_request(&dice, &workspace, &key("good"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(provider_value(&good, &seen), "allowed|1|1|1|1");
+    let alias = analyze_request(&dice, &workspace, &key("alias_good"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(provider_value(&alias, &seen), "allowed|1|1|1|1");
+    for (target, attribute) in [
+        ("bad_scalar", "scalar"),
+        ("bad_sequence", "sequence"),
+        ("bad_string_keyed", "string_keyed"),
+        ("bad_label_keyed", "label_keyed"),
+        ("bad_grouped", "grouped"),
+    ] {
+        let error = analyze_request(&dice, &workspace, &key(target), None, false)
+            .await
+            .unwrap_err();
+        assert!(
+            error.contains(attribute) && error.contains("allowed_rule"),
+            "{target}: {error}"
+        );
+    }
+
+    for target in [
+        "class_or",
+        "provider_or",
+        "source_ok",
+        "generated_ok",
+        "generated_alias_ok",
+    ] {
+        analyze_request(&dice, &workspace, &key(target), None, false)
+            .await
+            .unwrap_or_else(|error| panic!("{target}: {error}"));
+    }
+    let package_group = analyze_request(&dice, &workspace, &key("package_group_ok"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        package_group.contains("target `@@//:visibility_group` is not a Starlark rule")
+            && !package_group.contains("rule class expected")
+            && !package_group.contains("providers expected"),
+        "{package_group}"
+    );
+    let generated_alias = analyze_request(&dice, &workspace, &key("generated_alias"), None, false)
+        .await
+        .unwrap();
+    assert_configured_nonrule_alias(
+        &generated_alias,
+        ConfiguredNodeKey::Configured(key("generated.txt")),
+    );
+    let combined = analyze_request(&dice, &workspace, &key("combined_bad"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        combined.contains("rule class expected allowed_rule")
+            && combined.contains("providers expected //:defs.bzl%P"),
+        "{combined}"
+    );
+    let empty = analyze_request(&dice, &workspace, &key("empty_bad"), None, false)
+        .await
+        .unwrap_err();
+    assert!(empty.contains("rule class expected nothing"), "{empty}");
+    let suffix = analyze_request(&dice, &workspace, &key("suffix_bad"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        suffix.contains("does not produce any file matching its admitted file types"),
+        "{suffix}"
+    );
+    let precedence = analyze_request(&dice, &workspace, &key("precedence_bad"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        precedence.contains("rule class expected allowed_rule")
+            && precedence.contains("providers expected //:defs.bzl%P")
+            && !precedence.contains("admitted file types"),
+        "{precedence}"
+    );
+
+    let silent = analyze_request(&dice, &workspace, &key("silent"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(provider_value(&silent, &seen), "True|2|2|1|True");
+    assert_silent_rule_class_topology(&silent);
+    for target in ["silent_string_bad", "silent_grouped_bad"] {
+        let error = analyze_request(&dice, &workspace, &key(target), None, false)
+            .await
+            .unwrap_err();
+        assert!(
+            error.contains("unsupported silent-filter projection"),
+            "{target}: {error}"
+        );
+    }
+    let subrule_filtered =
+        analyze_request(&dice, &workspace, &key("subrule_filtered"), None, false)
+            .await
+            .unwrap();
+    assert_eq!(provider_value(&subrule_filtered, &seen), "True");
+    let subrule_bad = analyze_request(&dice, &workspace, &key("subrule_bad"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        subrule_bad.contains("allowed_rule") && subrule_bad.contains("_dep"),
+        "{subrule_bad}"
+    );
+
+    let initial = analyze_request(&dice, &workspace, &key("aba"), None, false)
+        .await
+        .unwrap();
+    let changed_definitions = definitions.replacen(
+        "attrs = {\"dep\": attr.label(allow_rules = [\"allowed_rule\"])}",
+        "attrs = {\"dep\": attr.label(allow_rules = [\"other_rule\"])}",
+        1,
+    );
+    fs::write(workspace.join("defs.bzl"), changed_definitions).unwrap();
+    let changed = analyze_request(&dice, &workspace, &key("aba"), None, false)
+        .await
+        .unwrap_err();
+    assert!(changed.contains("other_rule"), "{changed}");
+    fs::write(workspace.join("defs.bzl"), definitions).unwrap();
+    let restored = analyze_request(&dice, &workspace, &key("aba"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(initial, restored);
 }
 
 #[tokio::test]

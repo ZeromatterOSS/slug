@@ -4190,6 +4190,26 @@ compilation-helper freeze. No additional Stage 5 implementation is selected.
 Zabel's immutable-universe separation remained peer architectural guidance;
 Bazel 9.2 alone owned names and behavior, and no Zig content was adopted.
 
+### Root apparent-to-canonical load-route adapter selected (2026-09-01)
+
+The canonical route, generated definition/effect plan and
+`HostCanonicalRepositorySourceInput` owners are accepted and remain unchanged.
+The next M7A route publication is a loading adapter, not a new Bzlmod resolver:
+it first preserves the existing admission-aware `RootRepositoryRouteKey`, then
+uses root-context canonical apparent mapping plus the canonical load route only
+for its exact Unknown/Unsupported polarity. It accepts only Generated canonical
+kind; mapping Missing and mapped non-generated results restore the original
+root-route error.
+
+Observed publication must recursively preserve existing selected
+Path/Infrastructure frontier polarity, merge exact child epochs left-first and
+retain no failed carrier. Bzlmod adds only read-only frontier projections on
+existing opaque observation errors; no mapping, definition, registry,
+extension, materializer, lockfile or environment semantic owner moves. Bazel
+9.2 remains authority and Zabel remains concept/test guidance only.
+Independent Sol architecture review returns `ACCEPT`; implementation is active
+only within the frozen shared-route packet.
+
 ### Compilation-helper acceptance and Stage 4 continuation (2026-08-26)
 
 Commit `3060e4d4d` accepts the complete rules_cc compilation-helper freeze with

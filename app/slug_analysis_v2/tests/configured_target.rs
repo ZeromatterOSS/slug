@@ -749,7 +749,7 @@ fn configured_edges_preserve_transition_convergence_order_and_fixed_bits() {
             },
             false,
         ),
-        (ConfiguredEdgeKind::AliasActual, false),
+        (ConfiguredEdgeKind::AliasActual { rule_class: None }, false),
         (ConfiguredEdgeKind::GeneratedBy, false),
         (ConfiguredEdgeKind::DeclaringVisibility, false),
         (ConfiguredEdgeKind::PackageGroupInclude { index: 0 }, true),

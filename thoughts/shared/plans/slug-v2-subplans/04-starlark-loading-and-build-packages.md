@@ -7658,3 +7658,30 @@ canonical policy uses the shared observation owner without an apparent alias.
 Stage B external subtree/`.bzl`/package loading remains read-only until this
 packet is accepted. Bazel 9 BCR Starlark still owns `cc_internal`; `cc_common`
 remains a generic host-ABI consumer and Zabel remains peer guidance only.
+
+### Root-context repository load-route publication selected (2026-09-01)
+
+The authentic rules_rust replay now proves one missing adapter above the
+accepted Root/Canonical source carrier: a root BUILD direct `.bzl` load still
+uses Bzlmod's selected/direct-local root route, so an imported extension-
+generated apparent name stops before the canonical load route. Loading is the
+natural shared owner because it already owns canonical apparent mapping,
+generated definition/effect composition and external-Bzl/package consumers.
+
+Design one admission-aware `HostRootRepositoryLoadRoute` key family over
+workspace plus nonroot apparent name. It preserves ordinary versus root-BUILD
+admission, returns the existing root source route when available, and only on
+the exact Unknown/Unsupported polarity resolves the producer-recorded
+canonical target and requires the existing canonical load route to be
+Generated. Missing or mapped non-generated fallback restores the original
+route error. Root direct `.bzl`, external query and exported-source build must
+consume the same value; core's temporary generated-package bridge is deleted.
+No apparent alias, mapping copy, generated-effect duplicate, parser/ruleset or
+C++ special case is permitted.
+
+Pinned Bazel 9.2 `ModuleExtensionResolutionTest.simpleExtension` and
+`generatedReposHaveCorrectMappings` own direct-load/mapping behavior. Zabel
+`0795445f...` composed repository sources and selected package-source consumer
+are ownership guidance only. Independent public-DICE architecture review
+returns `ACCEPT`; implementation is active only within the frozen shared-route
+packet.

@@ -22963,3 +22963,26 @@ allowlist, caps and remaining behavior are unchanged; focused rereview is
 required.
 
 Focused R2 architecture rereview returns `ACCEPT`; implement only R2.
+
+### Shared root repository load route supersedes the private core bridge (2026-09-01)
+
+The accepted private `GeneratedPackageRoute` bridge reached its explicit
+deletion condition: loading now owns canonical apparent mapping, canonical
+generated definition/effect composition and one Root/Canonical repository-
+source carrier. The next reviewed packet adds one admission-aware loading key
+and cuts over root direct `.bzl`, query and exported-source build together.
+
+Core must delete `runtime/generated_package_route.rs`, retain the shared route
+beside its root apparent spelling, and choose existing root/canonical package
+load and source-observation children. It preserves direct-local, built-in,
+unknown and mapped-non-generated diagnostics; a lower generated-route observed
+outer remains a typed command terminal with only the already-complete public
+prefix. Query similarly retains the shared route in its private external graph
+key and performs no mapping discovery inside graph projection.
+
+This is exact Bazel 9.2 generated-repository loading for the named consumers,
+with Slug-native DICE/epoch/error representation. BCR Starlark remains the
+rules layer, including `cc_internal`; `cc_common` is only a generic host-ABI
+consumer. Zabel `0795445f...` supplies composed-source ownership guidance, not
+behavior or code. Independent Sol review returns `ACCEPT`; implementation is
+active only within the frozen shared-route packet.

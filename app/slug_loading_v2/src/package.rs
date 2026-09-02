@@ -91,6 +91,7 @@ use crate::attrs::NativeAttributeSchema;
 use crate::attrs::NativeAttributeValue;
 use crate::attrs::NativeRuleAttributes;
 use crate::attrs::NativeRuleClass;
+use crate::attrs::RuleClassAdmissibility;
 use crate::attrs::TransitionDefinition as LoadingTransitionDefinition;
 use crate::attrs::TransitionSetting;
 use crate::bzl_module::BzlModuleIdentity;
@@ -3750,6 +3751,7 @@ struct MacroAttributeSchema {
     default_to_none: bool,
     file_admissibility: FileAdmissibility,
     flags: AttributePropertyFlags,
+    rule_class_admissibility: RuleClassAdmissibility,
     allowed_values: AllowedAttributeValues,
     allow_empty: bool,
 }
@@ -3773,6 +3775,7 @@ impl MacroAttributeSchema {
             default_to_none: false,
             file_admissibility: definition.file_admissibility.clone(),
             flags: definition.flags,
+            rule_class_admissibility: definition.rule_class_admissibility.clone(),
             allowed_values: definition.allowed_values.clone(),
             allow_empty: definition.allow_empty,
         })
@@ -3800,6 +3803,7 @@ impl MacroAttributeSchema {
             default_to_none: !schema.mandatory,
             file_admissibility: schema.file_admissibility.clone(),
             flags: schema.flags,
+            rule_class_admissibility: schema.rule_class_admissibility.clone(),
             allowed_values: schema.allowed_values.clone(),
             allow_empty: schema.allow_empty,
         })
@@ -3827,6 +3831,7 @@ impl MacroAttributeSchema {
             default_to_none: !schema.mandatory,
             file_admissibility: schema.file_admissibility.clone(),
             flags: schema.flags,
+            rule_class_admissibility: schema.rule_class_admissibility.clone(),
             allowed_values: schema.allowed_values.clone(),
             allow_empty: schema.allow_empty,
         })
@@ -4774,6 +4779,8 @@ pub(crate) struct RuleAttributeSchemaGen<V> {
     #[trace(unsafe_ignore)]
     pub(crate) flags: AttributePropertyFlags,
     #[trace(unsafe_ignore)]
+    pub(crate) rule_class_admissibility: RuleClassAdmissibility,
+    #[trace(unsafe_ignore)]
     pub(crate) allowed_values: AllowedAttributeValues,
     #[trace(unsafe_ignore)]
     pub(crate) allow_empty: bool,
@@ -4803,6 +4810,7 @@ fn declared_attribute_schema<'v>(
         configurable_set: false,
         file_admissibility: definition.file_admissibility.clone(),
         flags: definition.flags,
+        rule_class_admissibility: definition.rule_class_admissibility.clone(),
         allowed_values: definition.allowed_values.clone(),
         allow_empty: definition.allow_empty,
         executable: definition.executable,
@@ -4835,6 +4843,7 @@ fn starlark_builtin_schema<V>(
             configurable_set: false,
             file_admissibility: FileAdmissibility::default(),
             flags: AttributePropertyFlags::default(),
+            rule_class_admissibility: RuleClassAdmissibility::Any,
             allowed_values: AllowedAttributeValues::None,
             allow_empty: true,
             executable: false,
@@ -5343,6 +5352,8 @@ struct AttributeDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     flags: AttributePropertyFlags,
     #[trace(unsafe_ignore)]
+    rule_class_admissibility: RuleClassAdmissibility,
+    #[trace(unsafe_ignore)]
     allowed_values: AllowedAttributeValues,
     #[trace(unsafe_ignore)]
     allow_empty: bool,
@@ -5380,6 +5391,7 @@ fn attribute_definition_from_value<'v>(
             configurable_set: value.configurable_set,
             file_admissibility: value.file_admissibility.clone(),
             flags: value.flags,
+            rule_class_admissibility: value.rule_class_admissibility.clone(),
             allowed_values: value.allowed_values.clone(),
             allow_empty: value.allow_empty,
             default: value.default.clone(),
@@ -5474,6 +5486,7 @@ pub(crate) fn subrule_attribute_from_value<'v>(
             default,
             file_admissibility: definition.file_admissibility.clone(),
             flags: definition.flags,
+            rule_class_admissibility: definition.rule_class_admissibility.clone(),
             allowed_values: definition.allowed_values.clone(),
             executable: definition.executable,
             exec_configuration: definition.exec_configuration,
@@ -5509,6 +5522,7 @@ impl<'v> Freeze for AttributeDefinition<'v> {
             configurable_set: self.configurable_set,
             file_admissibility: self.file_admissibility,
             flags: self.flags,
+            rule_class_admissibility: self.rule_class_admissibility,
             allowed_values: self.allowed_values,
             allow_empty: self.allow_empty,
             default: self.default,
@@ -5539,6 +5553,7 @@ impl<'v> Freeze for RuleAttributeSchema<'v> {
             configurable_set: self.configurable_set,
             file_admissibility: self.file_admissibility,
             flags: self.flags,
+            rule_class_admissibility: self.rule_class_admissibility,
             allowed_values: self.allowed_values,
             allow_empty: self.allow_empty,
             default: self.default,
@@ -6254,6 +6269,7 @@ fn attribute_definition_before_later_properties<'v>(
             flags.insert(AttributePropertyFlag::StarlarkDefined);
             flags
         },
+        rule_class_admissibility: RuleClassAdmissibility::Any,
         allowed_values: AllowedAttributeValues::None,
         allow_empty: true,
         default,
@@ -6354,6 +6370,34 @@ fn unpack_attribute_flags(flags: Option<Value<'_>>) -> anyhow::Result<AttributeP
         result.insert(property);
     }
     Ok(result)
+}
+
+fn unpack_rule_class_admissibility(
+    allow_rules: Option<Value<'_>>,
+) -> anyhow::Result<RuleClassAdmissibility> {
+    let Some(allow_rules) = allow_rules else {
+        return Ok(RuleClassAdmissibility::Any);
+    };
+    if allow_rules.is_none() {
+        return Ok(RuleClassAdmissibility::Any);
+    }
+    let values = if let Some(values) = ListRef::from_value(allow_rules) {
+        values.iter().collect::<Vec<_>>()
+    } else if let Some(values) = TupleRef::from_value(allow_rules) {
+        values.iter().collect::<Vec<_>>()
+    } else {
+        anyhow::bail!("allow_rules must be a list or tuple of strings")
+    };
+    let classes = values
+        .into_iter()
+        .map(|value| {
+            value
+                .unpack_str()
+                .map(CompactString::new)
+                .ok_or_else(|| anyhow::anyhow!("allow_rules must contain only strings"))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(RuleClassAdmissibility::only(classes))
 }
 
 fn finalize_dependency_attribute_properties<V>(
@@ -6498,6 +6542,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] allow_single_file: Option<Value<'v>>,
+        #[starlark(require = named)] allow_rules: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] executable: Option<bool>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
@@ -6516,6 +6561,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         let flags = unpack_attribute_flags(flags)?;
         validate_executable_cfg_presence(definition.executable, cfg)?;
         definition.file_admissibility = unpack_file_admissibility(allow_files, allow_single_file)?;
+        definition.rule_class_admissibility = unpack_rule_class_admissibility(allow_rules)?;
         definition.required_providers = label_required_provider(providers)?;
         set_attribute_cfg(&mut definition, cfg)?;
         finalize_dependency_attribute_properties(
@@ -6536,6 +6582,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] allow_empty: Option<bool>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
+        #[starlark(require = named)] allow_rules: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] aspects: Option<Value<'v>>,
@@ -6554,6 +6601,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         definition.allow_empty = allow_empty.unwrap_or(true);
         let flags = unpack_attribute_flags(flags)?;
         definition.file_admissibility = unpack_file_admissibility(allow_files, None)?;
+        definition.rule_class_admissibility = unpack_rule_class_admissibility(allow_rules)?;
         definition.required_providers = label_list_required_providers(providers)?;
         set_attribute_cfg(&mut definition, cfg)?;
         definition.attached_aspect = label_list_attached_aspect(aspects)?;
@@ -6574,6 +6622,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] allow_empty: Option<bool>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
+        #[starlark(require = named)] allow_rules: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<Value<'v>>,
@@ -6591,6 +6640,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         definition.allow_empty = allow_empty.unwrap_or(true);
         let flags = unpack_attribute_flags(flags)?;
         definition.file_admissibility = unpack_file_admissibility(allow_files, None)?;
+        definition.rule_class_admissibility = unpack_rule_class_admissibility(allow_rules)?;
         definition.required_providers =
             declaration_required_providers(providers, "attribute providers")?;
         set_attribute_cfg(&mut definition, cfg)?;
@@ -6612,6 +6662,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] allow_empty: Option<bool>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
+        #[starlark(require = named)] allow_rules: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<Value<'v>>,
@@ -6629,6 +6680,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         definition.allow_empty = allow_empty.unwrap_or(true);
         let flags = unpack_attribute_flags(flags)?;
         definition.file_admissibility = unpack_file_admissibility(allow_files, None)?;
+        definition.rule_class_admissibility = unpack_rule_class_admissibility(allow_rules)?;
         definition.required_providers =
             declaration_required_providers(providers, "attribute providers")?;
         set_attribute_cfg(&mut definition, cfg)?;
@@ -6721,6 +6773,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] allow_empty: Option<bool>,
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
+        #[starlark(require = named)] allow_rules: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<Value<'v>>,
@@ -6738,6 +6791,7 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         definition.allow_empty = allow_empty.unwrap_or(true);
         let flags = unpack_attribute_flags(flags)?;
         definition.file_admissibility = unpack_file_admissibility(allow_files, None)?;
+        definition.rule_class_admissibility = unpack_rule_class_admissibility(allow_rules)?;
         definition.required_providers =
             declaration_required_providers(providers, "attribute providers")?;
         set_attribute_cfg(&mut definition, cfg)?;
@@ -7259,6 +7313,9 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         )
                         .with_file_admissibility(declaration.file_admissibility.clone())
                         .with_flags(declaration.flags)
+                        .with_rule_class_admissibility(
+                            declaration.rule_class_admissibility.clone(),
+                        )
                         .with_allowed_values(declaration.allowed_values.clone())
                         .with_allow_empty(declaration.allow_empty)
                         .with_required_providers(declaration.required_providers.clone())
@@ -8167,6 +8224,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                     AttributePropertyFlag::StrictLabelChecking,
                     AttributePropertyFlag::Mandatory,
                 ])
+                || definition.rule_class_admissibility.classes().is_some()
                 || !definition.required_providers.is_empty()
                 || !matches!(definition.allowed_values, AllowedAttributeValues::None)
                 || definition
@@ -8233,6 +8291,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             }
             if !definition.required_providers.is_empty() {
                 anyhow::bail!("tag attribute `{name}` does not support providers");
+            }
+            if definition.rule_class_admissibility.classes().is_some() {
+                anyhow::bail!("tag attribute `{name}` does not support allow_rules");
             }
             attributes.push(ModuleExtensionTagAttribute {
                 name: name.into(),
@@ -9849,6 +9910,193 @@ mod module_extension_definition_tests {
             evaluate(supported).unwrap();
             assert!(evaluate(unsupported).is_err(), "discarded {unsupported}");
         }
+    }
+
+    fn rule_class_descriptor(constructor: &str, arguments: &str) -> RuleClassAdmissibility {
+        let module = evaluate(&format!("X = attr.{constructor}({arguments})\n")).unwrap();
+        module
+            .get("X")
+            .unwrap()
+            .downcast::<FrozenAttributeDefinition>()
+            .unwrap()
+            .rule_class_admissibility
+            .clone()
+    }
+
+    fn assert_rule_class_constructor_contract() {
+        for constructor in [
+            "label",
+            "label_list",
+            "string_keyed_label_dict",
+            "label_keyed_string_dict",
+            "label_list_dict",
+        ] {
+            assert_eq!(
+                rule_class_descriptor(constructor, ""),
+                RuleClassAdmissibility::Any
+            );
+            assert_eq!(
+                rule_class_descriptor(constructor, "allow_rules = None"),
+                RuleClassAdmissibility::Any
+            );
+            assert_eq!(
+                rule_class_descriptor(constructor, "allow_rules = []"),
+                RuleClassAdmissibility::only(Vec::new())
+            );
+            let canonical =
+                rule_class_descriptor(constructor, "allow_rules = ['z_rule', 'a_rule', 'z_rule']");
+            assert_eq!(
+                canonical,
+                rule_class_descriptor(constructor, "allow_rules = ('a_rule', 'z_rule')")
+            );
+            assert_eq!(
+                canonical.classes().unwrap().as_ref(),
+                &[CompactString::new("a_rule"), CompactString::new("z_rule")]
+            );
+            assert!(
+                evaluate(&format!("X = attr.{constructor}(['a_rule'])\n")).is_err(),
+                "{constructor} accepted positional allow_rules"
+            );
+        }
+        for constructor in [
+            "bool",
+            "int",
+            "string",
+            "string_list",
+            "output",
+            "output_list",
+            "string_dict",
+            "string_list_dict",
+        ] {
+            assert!(
+                evaluate(&format!("X = attr.{constructor}(allow_rules = None)\n")).is_err(),
+                "{constructor} exposed allow_rules"
+            );
+        }
+        for invalid in ["1", "'rule'", "[1]", "['rule', 1]"] {
+            let error = evaluate(&format!("X = attr.label(allow_rules = {invalid})\n"))
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("allow_rules"), "{error}");
+        }
+    }
+
+    fn assert_rule_class_failure_order() {
+        let default_first =
+            evaluate("X = attr.label(default = 1, allow_rules = [1], providers = 1)\n")
+                .unwrap_err()
+                .to_string();
+        assert!(
+            default_first.contains("attribute `label` must be a string")
+                && !default_first.contains("allow_rules must contain only strings"),
+            "{default_first}"
+        );
+        let flags_first = evaluate(
+            "X = attr.label(flags = ['UNKNOWN'], allow_files = 1, allow_rules = [1], providers = 1)\n",
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            flags_first.contains("unknown attribute flag"),
+            "{flags_first}"
+        );
+        let file_first =
+            evaluate("X = attr.label(allow_files = 1, allow_rules = [1], providers = 1)\n")
+                .unwrap_err()
+                .to_string();
+        assert!(file_first.contains("allow_files"), "{file_first}");
+        for later in ["providers = 1", "cfg = 'host'"] {
+            let error = evaluate(&format!("X = attr.label(allow_rules = [1], {later})\n"))
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("allow_rules"), "{error}");
+        }
+        let aspect_later = evaluate("X = attr.label_list(allow_rules = [1], aspects = [1])\n")
+            .unwrap_err()
+            .to_string();
+        assert!(aspect_later.contains("allow_rules"), "{aspect_later}");
+    }
+
+    fn assert_rule_class_projections() {
+        let rule_restriction = |arguments: &str| {
+            let module = evaluate(&format!(
+                "def impl(ctx): pass\nR = rule(implementation = impl, attrs = {{'deps': attr.label_list({arguments})}})\n"
+            ))
+            .unwrap();
+            let rule = module
+                .get("R")
+                .unwrap()
+                .downcast::<FrozenRuleDefinition>()
+                .unwrap();
+            rule.schema
+                .iter()
+                .find(|attribute| attribute.name == "deps")
+                .unwrap()
+                .rule_class_admissibility
+                .clone()
+        };
+        let first = rule_restriction("");
+        let changed = rule_restriction("allow_rules = ['library']");
+        let restored = rule_restriction("");
+        assert_eq!(first, RuleClassAdmissibility::Any);
+        assert_eq!(
+            changed,
+            RuleClassAdmissibility::only(vec!["library".into()])
+        );
+        assert_eq!(first, restored);
+
+        let aspect = evaluate(
+            "def impl(target, ctx): return []\nA = aspect(implementation = impl, attrs = {'_dep': attr.label(default = Label('//:dep'), allow_rules = ['library'])})\n",
+        )
+        .unwrap();
+        let aspect = aspect
+            .get("A")
+            .unwrap()
+            .downcast::<FrozenAspectDefinition>()
+            .unwrap();
+        assert_eq!(
+            aspect.attributes[0].rule_class_admissibility,
+            RuleClassAdmissibility::only(vec!["library".into()])
+        );
+
+        for source in [
+            "def impl(name, visibility, deps): pass\nM = macro(implementation = impl, attrs = {'deps': attr.label_list(allow_rules = ['library'])})\n",
+            "def rule_impl(ctx): pass\nR = rule(implementation = rule_impl, attrs = {'deps': attr.label_list(allow_rules = ['library'])})\ndef macro_impl(name, visibility, **kwargs): pass\nM = macro(implementation = macro_impl, inherit_attrs = R)\n",
+        ] {
+            let module = evaluate(source).unwrap();
+            let definition = module
+                .get("M")
+                .unwrap()
+                .downcast::<FrozenSymbolicMacroDefinition>()
+                .unwrap();
+            assert_eq!(
+                definition
+                    .attributes
+                    .iter()
+                    .find(|attribute| attribute.name == "deps")
+                    .unwrap()
+                    .rule_class_admissibility,
+                RuleClassAdmissibility::only(vec!["library".into()])
+            );
+        }
+        evaluate(
+            "def impl(ctx): pass\nS = subrule(implementation = impl, attrs = {'_deps': attr.label_list(default = [], allow_rules = ['library'])})\n",
+        )
+        .unwrap();
+
+        for source in [
+            "def impl(ctx): pass\nR = repository_rule(impl, attrs = {'deps': attr.label_list(allow_rules = ['library'])})\n",
+            "T = tag_class(attrs = {'deps': attr.label_list(allow_rules = ['library'])})\n",
+        ] {
+            assert!(evaluate(source).is_err(), "discarded restriction: {source}");
+        }
+    }
+
+    #[test]
+    fn dependency_rule_class_restrictions_bind_canonicalize_and_propagate() {
+        assert_rule_class_constructor_contract();
+        assert_rule_class_failure_order();
+        assert_rule_class_projections();
     }
 
     #[test]

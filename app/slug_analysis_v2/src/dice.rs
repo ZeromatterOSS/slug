@@ -111,6 +111,7 @@ use crate::starlark_rule::evaluate_loaded_rule;
 use crate::starlark_transition::PreparedTransitionSetting;
 use crate::starlark_transition::evaluate as evaluate_starlark_transition;
 use crate::starlark_transition::is_platforms;
+use crate::subrule::ConfiguredDependencyDisposition;
 use crate::subrule::ConfiguredDependencyValidation;
 use crate::subrule::DeclaredDependencyKey;
 use crate::subrule::configured_dependency_rows;
@@ -1564,8 +1565,11 @@ async fn root_declared_dependency_keys(
                 source_admitted: schema.file_admissibility().admits_direct_file(),
                 path_flavor,
                 validation: Some(ConfiguredDependencyValidation::new(
+                    schema.kind(),
                     schema.file_admissibility().clone(),
                     schema.skip_analysis_time_filetype_check(),
+                    schema.silent_ruleclass_filter(),
+                    schema.allowed_rule_classes().cloned(),
                     schema.executable(),
                     schema.required_providers().clone(),
                 )),
@@ -2131,14 +2135,19 @@ fn configured_attribute_item(
 fn prepare_configured_attributes<T: ComputedAnalysis>(
     rows: &[crate::subrule::ConfiguredDependencyRow],
     keys: &[DeclaredDependencyKey],
+    dispositions: &[ConfiguredDependencyDisposition],
     computed: &SmallMap<ConfiguredNodeKey, T>,
 ) -> Result<Vec<PreparedConfiguredAttribute>, AnalysisError> {
     rows.iter()
         .map(|row| {
             let values = keys
                 .iter()
-                .filter(|dependency| dependency.configured_row == Some(row.index))
-                .map(|dependency| {
+                .zip(dispositions)
+                .filter(|(dependency, disposition)| {
+                    dependency.configured_row == Some(row.index)
+                        && **disposition == ConfiguredDependencyDisposition::Visible
+                })
+                .map(|(dependency, _)| {
                     let result = computed.get(&dependency.node).ok_or_else(|| {
                         AnalysisError::new(format!(
                             "internal error: configured attribute result missing for `{}`",
@@ -2223,15 +2232,18 @@ where
     }
     let mut dependencies = Vec::new();
     let mut edges = Vec::with_capacity(declared_dependency_keys.len() + visibility_labels.len());
-    for dependency in declared_dependency_keys {
-        let result = computed.get(&dependency.node).ok_or_else(|| {
-            AnalysisError::new(format!(
-                "internal error: dependency result missing for `{}`",
-                dependency.node
-            ))
-        })?;
-        validate_configured_dependency(dependency, result.result())?;
-    }
+    let dependency_dispositions = declared_dependency_keys
+        .iter()
+        .map(|dependency| {
+            let result = computed.get(&dependency.node).ok_or_else(|| {
+                AnalysisError::new(format!(
+                    "internal error: dependency result missing for `{}`",
+                    dependency.node
+                ))
+            })?;
+            validate_configured_dependency(dependency, result.result())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     for attribute in &resolved_attributes {
         let schema = implementation
             .schema()
@@ -2250,9 +2262,16 @@ where
             )));
         }
     }
-    let configured_attributes =
-        prepare_configured_attributes(configured_rows, declared_dependency_keys, computed)?;
-    for dependency in declared_dependency_keys {
+    let configured_attributes = prepare_configured_attributes(
+        configured_rows,
+        declared_dependency_keys,
+        &dependency_dispositions,
+        computed,
+    )?;
+    for (dependency, disposition) in declared_dependency_keys
+        .iter()
+        .zip(&dependency_dispositions)
+    {
         let result = computed.get(&dependency.node).ok_or_else(|| {
             AnalysisError::new(format!(
                 "internal error: dependency result missing for `{}`",
@@ -2266,13 +2285,18 @@ where
             dependency: dependency.dependency.clone(),
         };
         if !dependency.hidden {
-            let executable = implementation
-                .schema()
-                .iter()
-                .find(|schema| schema.declaration_name() == dependency.attribute)
-                .filter(|schema| schema.executable())
-                .map(|_| configured_executable_provider(result.result()))
-                .transpose()?;
+            let filtered = *disposition == ConfiguredDependencyDisposition::Filtered;
+            let executable = if filtered {
+                None
+            } else {
+                implementation
+                    .schema()
+                    .iter()
+                    .find(|schema| schema.declaration_name() == dependency.attribute)
+                    .filter(|schema| schema.executable())
+                    .map(|_| configured_executable_provider(result.result()))
+                    .transpose()?
+            };
             dependencies.push(PreparedDependency {
                 key: result
                     .result()
@@ -2283,6 +2307,7 @@ where
                 providers: result.result().providers().clone(),
                 attribute: dependency.attribute.clone(),
                 target_shape: dependency.configured_row.is_some(),
+                filtered,
                 executable,
             });
         }
@@ -4636,8 +4661,10 @@ mod tests {
     #[test]
     fn runfiles_collector_requires_contributing_edges_but_excludes_candidates() {
         let target = configured_key("@@//dep:target");
-        let contributing =
-            crate::ConfiguredEdge::new(target.clone(), crate::ConfiguredEdgeKind::AliasActual);
+        let contributing = crate::ConfiguredEdge::new(
+            target.clone(),
+            crate::ConfiguredEdgeKind::AliasActual { rule_class: None },
+        );
         let mut collector = RunfilesPackageCollector::default();
         collector.add_direct(runfiles_metadata("//owner"));
         assert!(
@@ -5475,7 +5502,9 @@ impl ConfiguredNodeAnalysisKey {
                 };
                 let edges = vec![crate::configured_target::ConfiguredEdge::new(
                     child.key().clone(),
-                    crate::configured_target::ConfiguredEdgeKind::AliasActual,
+                    crate::configured_target::ConfiguredEdgeKind::AliasActual {
+                        rule_class: child.prerequisite_rule_class().map(CompactString::new),
+                    },
                 )];
                 return root_analysis_driver_complete(
                     native_configured_result(

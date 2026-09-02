@@ -34,10 +34,19 @@ use crate::result::ConfiguredNodeResult;
 
 #[derive(Debug, Clone)]
 pub(crate) struct ConfiguredDependencyValidation {
+    attribute_kind: AttributeKind,
     file_admissibility: FileAdmissibility,
     skip_analysis_time_filetype_check: bool,
+    silent_ruleclass_filter: bool,
+    allowed_rule_classes: Option<Arc<[CompactString]>>,
     executable: bool,
     required_providers: Arc<[Arc<[ProviderIdentity]>]>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ConfiguredDependencyDisposition {
+    Visible,
+    Filtered,
 }
 
 #[derive(Debug, Clone)]
@@ -114,14 +123,20 @@ impl ConfiguredDependencyValidation {
     }
 
     pub(crate) fn new(
+        attribute_kind: AttributeKind,
         file_admissibility: FileAdmissibility,
         skip_analysis_time_filetype_check: bool,
+        silent_ruleclass_filter: bool,
+        allowed_rule_classes: Option<Arc<[CompactString]>>,
         executable: bool,
         required_providers: Arc<[Arc<[ProviderIdentity]>]>,
     ) -> Self {
         Self {
+            attribute_kind,
             file_admissibility,
             skip_analysis_time_filetype_check,
+            silent_ruleclass_filter,
+            allowed_rule_classes,
             executable,
             required_providers,
         }
@@ -183,8 +198,11 @@ pub(crate) fn configured_dependency_rows(
                     ConfiguredAttributeDependency::Target
                 },
                 validation: ConfiguredDependencyValidation::new(
+                    attribute.kind(),
                     attribute.file_admissibility().clone(),
                     attribute.skip_analysis_time_filetype_check(),
+                    attribute.silent_ruleclass_filter(),
+                    attribute.allowed_rule_classes().cloned(),
                     attribute.executable(),
                     Arc::from(attribute.required_providers()),
                 ),
@@ -196,9 +214,9 @@ pub(crate) fn configured_dependency_rows(
 pub(crate) fn validate_configured_dependency(
     dependency: &DeclaredDependencyKey,
     result: &ConfiguredNodeResult,
-) -> Result<(), AnalysisError> {
+) -> Result<ConfiguredDependencyDisposition, AnalysisError> {
     let Some(validation) = &dependency.validation else {
-        return Ok(());
+        return Ok(ConfiguredDependencyDisposition::Visible);
     };
     if dependency.dependency.tool()
         && dependency
@@ -211,39 +229,43 @@ pub(crate) fn validate_configured_dependency(
             dependency.attribute
         )));
     }
+    let prerequisite_rule_class = result.prerequisite_rule_class();
+    let silently_filtered = validation.silent_ruleclass_filter
+        && validation
+            .allowed_rule_classes
+            .as_ref()
+            .is_some_and(|classes| !rule_class_matches(classes, prerequisite_rule_class));
+    if silently_filtered {
+        if matches!(
+            validation.attribute_kind,
+            AttributeKind::StringKeyedLabelDict | AttributeKind::LabelListDict
+        ) {
+            return Err(AnalysisError::message(format!(
+                "configured dependency `{}` would enter Bazel 9.2's unsupported silent-filter projection for {:?}",
+                dependency.attribute, validation.attribute_kind
+            )));
+        }
+        return Ok(ConfiguredDependencyDisposition::Filtered);
+    }
+
     let file = matches!(
         result.kind(),
         ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
     );
-    if !file
-        && !validation.required_providers.is_empty()
-        && !validation.required_providers.iter().any(|alternative| {
-            alternative
-                .iter()
-                .all(|provider| result.providers().contains(provider))
-        })
-    {
-        let required = validation
-            .required_providers
-            .iter()
-            .map(|alternative| {
+    if prerequisite_rule_class.is_some() {
+        let providers_match = !validation.required_providers.is_empty()
+            && validation.required_providers.iter().any(|alternative| {
                 alternative
                     .iter()
-                    .map(|provider| match provider {
-                        ProviderIdentity::Builtin(name) => name.to_string(),
-                        ProviderIdentity::User(id) => id.to_string(),
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" and ")
-            })
-            .collect::<Vec<_>>()
-            .join(" or ");
-        return Err(AnalysisError::message(format!(
-            "configured dependency `{}` target `{}` does not provide any admitted provider alternative: {}",
-            dependency.attribute,
-            dependency.node.label(),
-            required,
-        )));
+                    .all(|provider| result.providers().contains(provider))
+            });
+        let class_matches = match &validation.allowed_rule_classes {
+            Some(classes) => rule_class_matches(classes, prerequisite_rule_class),
+            None => validation.required_providers.is_empty(),
+        };
+        if !class_matches && !providers_match {
+            return Err(rule_or_provider_error(dependency, validation));
+        }
     }
     validate_file_admissibility(dependency, result, validation, file)?;
     if validation.executable
@@ -259,7 +281,69 @@ pub(crate) fn validate_configured_dependency(
             dependency.attribute
         )));
     }
-    Ok(())
+    Ok(ConfiguredDependencyDisposition::Visible)
+}
+
+fn rule_class_matches(classes: &[CompactString], rule_class: Option<&str>) -> bool {
+    let rule_class = rule_class.unwrap_or("");
+    classes
+        .binary_search_by(|candidate| candidate.as_str().cmp(rule_class))
+        .is_ok()
+}
+
+fn rule_or_provider_error(
+    dependency: &DeclaredDependencyKey,
+    validation: &ConfiguredDependencyValidation,
+) -> AnalysisError {
+    let required_providers = (!validation.required_providers.is_empty()).then(|| {
+        validation
+            .required_providers
+            .iter()
+            .map(|alternative| {
+                alternative
+                    .iter()
+                    .map(|provider| match provider {
+                        ProviderIdentity::Builtin(name) => name.to_string(),
+                        ProviderIdentity::User(id) => id.to_string(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" and ")
+            })
+            .collect::<Vec<_>>()
+            .join(" or ")
+    });
+    if validation.allowed_rule_classes.is_none() {
+        return AnalysisError::message(format!(
+            "configured dependency `{}` target `{}` does not provide any admitted provider alternative: {}",
+            dependency.attribute,
+            dependency.node.label(),
+            required_providers.expect("provider-only failure has requirements"),
+        ));
+    }
+    let mut requirements = Vec::new();
+    if let Some(classes) = &validation.allowed_rule_classes {
+        requirements.push(if classes.is_empty() {
+            "rule class expected nothing".to_owned()
+        } else {
+            format!(
+                "rule class expected {}",
+                classes
+                    .iter()
+                    .map(CompactString::as_str)
+                    .collect::<Vec<_>>()
+                    .join(" or ")
+            )
+        });
+    }
+    if let Some(required) = required_providers {
+        requirements.push(format!("providers expected {required}"));
+    }
+    AnalysisError::message(format!(
+        "configured dependency `{}` target `{}` is misplaced ({})",
+        dependency.attribute,
+        dependency.node.label(),
+        requirements.join("; "),
+    ))
 }
 
 fn validate_file_admissibility(
@@ -362,6 +446,8 @@ fn policy_matches_filename(
 mod tests {
     use slug_build_api_v2::ActionOutput;
     use slug_build_api_v2::AnalysisConfiguredTargetKey;
+    use slug_build_api_v2::ProviderCollection;
+    use slug_build_api_v2::RunfilesPackageDepset;
 
     use super::*;
 
@@ -383,5 +469,42 @@ mod tests {
             .unwrap()
         );
         assert_eq!(suffix_checks, 0);
+    }
+
+    #[test]
+    fn package_group_bypasses_rule_class_and_provider_predicates() {
+        let label = CanonicalLabel::parse("@@//pkg:visibility").unwrap();
+        let node = ConfiguredNodeKey::null(label);
+        let result = ConfiguredNodeResult::new_native(
+            node.clone(),
+            ConfiguredNodeKind::PackageGroup,
+            ProviderCollection::from_values(Vec::new(), false).unwrap(),
+            None,
+            RunfilesPackageDepset::empty(),
+        );
+        let dependency = DeclaredDependencyKey {
+            attribute: "dep".into(),
+            attribute_index: 0,
+            node,
+            dependency: ConfiguredAttributeDependency::Target,
+            hidden: false,
+            source_admitted: false,
+            path_flavor: None,
+            validation: Some(ConfiguredDependencyValidation::new(
+                AttributeKind::Label,
+                FileAdmissibility::default(),
+                false,
+                false,
+                Some(Arc::from([CompactString::new("missing_rule")])),
+                false,
+                Arc::from([Arc::from([ProviderIdentity::builtin("MissingInfo")])]),
+            )),
+            configured_row: None,
+        };
+
+        assert_eq!(
+            validate_configured_dependency(&dependency, &result).unwrap(),
+            ConfiguredDependencyDisposition::Visible
+        );
     }
 }

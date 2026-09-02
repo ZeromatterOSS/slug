@@ -2435,3 +2435,20 @@ configured actual targets.
 
 Focused R2 architecture rereview returns `ACCEPT`; the no-extraction decision
 is final for this packet.
+
+### Stage 4/5/6 root repository load-route utility decision (2026-09-01)
+
+`WP-4-5-6-7A-root-repository-load-route-publication-implementation-r1` requires no V1
+or Buck2 extraction. Reuse existing V2 `Arc<Result<...>>`, `Dupe`,
+`Allocative`, typed workspace/apparent/canonical identities,
+`HostRepositorySourceRoute` and `PathObservationEpoch`. The new retained key
+adds only workspace, apparent name and one admission word; its success retains
+one existing immutable source route and copies no mapping, RepoSpec, generated
+effect plan, source tree or evaluator heap.
+
+Add no `String`, `Vec`, map/set, hasher, interner, cache, lock or global owner.
+Zabel's composed repository-source family and selected materialized package
+source are concept/test guidance only; copy no Zig representation, allocator,
+store, scheduler or behavior. The existing compact utility set is sufficient,
+Independent public-DICE architecture review returns `ACCEPT`; the
+no-extraction decision is final for this packet.

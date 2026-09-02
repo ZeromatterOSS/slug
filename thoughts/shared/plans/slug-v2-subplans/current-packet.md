@@ -1,383 +1,387 @@
 # Current Slug V2 Packet
 
-Packet: WP-6-7D-rule-class-restriction-category-implementation-r2
+Packet: WP-4-5-6-7A-root-repository-load-route-publication-implementation-r1
 
-Milestone: M7A generic Starlark/ruleset closure; complete dependency-attribute
-rule-class restriction architecture.
+Milestone: M7A bootstrap-critical repository/ruleset closure. Publish one
+root-context apparent-repository load route for every active loading, query and
+exported-source consumer, including extension-generated repositories.
 
-Status: R2 architecture `ACCEPTED`; Rust implementation is authorized only
-within this packet. R1 independent architecture review returned REPLAN on the
-existing alias-to-file actual-identity gap, configured-aspect execution being
-deferred, and one inverted evidence phrase. R2 narrows only those runtime
-claims; focused independent rereview returns `ACCEPT`.
+Status: implementation active. Independent Sol architecture review returned
+`ACCEPT` on 2026-09-01 with no correction. Implement only the frozen boundary,
+allowlist, caps, proof contract and stops below.
 
 The unrelated dirty
-app/slug_loading_v2/src/registration_expansion_tests.rs proof remains parked
+`app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
 at SHA-256
-36c937d49369ac57e51defe2b17d4a53636a815ec0b2d407f7bd1a664c4d816a.
+`36c937d49369ac57e51defe2b17d4a53636a815ec0b2d407f7bd1a664c4d816a`.
 Do not edit or stage it.
 
-## Immediate predecessor and observable result
+## Immediate predecessor and observable stop
 
-Commit b9411cd61 terminally accepted
-WP-6-7C-attribute-property-flag-category-implementation-r4 at 537 production,
-371 proof and 908 total gross Rust lines. It owns the complete Bazel 9.2
-25-property set and retains every property through rule, aspect, macro and
-subrule projections. The authentic rules_rust 0.73 configured-query replay
-clears that category and now stops while loading rules_shell at the generic
-surface:
+`WP-6-7D-rule-class-restriction-category-implementation-r2` is terminally
+accepted at 955 added Rust lines within its 1,950-line cap. It implements the
+complete admitted Bazel 9.2 `allow_rules` category through all five ordinary
+dependency constructors, rules, aspect declarations, macros, subrules,
+aliases, provider alternatives, stable silent projections and DICE A/B/A.
+Focused loading/analysis validation, dependent compilation, formatting, diff
+hygiene and independent terminal review pass. The parked proof hash is
+unchanged.
 
-    attr.label_list(allow_rules = ["sh_library"])
+The rebuilt authentic rules_rust 0.73 configured-query replay clears
+`allow_rules` and now stops while the root package loads a generated-repository
+module:
 
-This packet must make that declaration and the complete Bazel 9.2 rule-class
-restriction category work without a rules_shell, rules_rust, C++,
-cc_common, cc_internal or parser special case. Bazel 9 BCR Starlark rules are
-consumers of the general loading and analysis architecture.
+    unknown repo 'slug_crates' requested from @@
 
-The observable result is:
+Root `MODULE.bazel` already retains the isolated `use_extension`,
+`crate.from_cargo(name = "slug_crates", ...)` and `use_repo(crate,
+"slug_crates", ...)` mapping. The failure is downstream: root BUILD direct
+`.bzl` loading still asks Bzlmod's selected/direct-local
+`RootRepositoryRouteKey`, which cannot publish an extension-generated source.
+This is not a parser, `set`, rules_rust, rules_cc, C++, `cc_common` or
+`cc_internal` special case. Bazel 9 BCR Starlark rules remain generic consumers
+of the repository/loading and host-ABI architecture.
 
-- all five ordinary dependency constructors bind and retain allow_rules;
-- rules, aspect declarations, symbolic macros and lifted subrules preserve the same
-  restriction identity;
-- configured dependency validation uses the prerequisite's effective rule
-  class with Bazel's allow-rules/provider OR semantics;
-- aliases to configured rule/non-rule targets are checked against their
-  resolved actual rule class or non-rule status;
-- source files, generated files and non-rule targets bypass rule-class and
-  provider validation;
-- the stable SILENT_RULECLASS_FILTER projections filter ctx.attr and subrule
-  views without deleting declared/configured dependency topology; and
-- unrestricted/restricted/unrestricted A/B/A requests restore the original
-  result through ordinary DICE equality and dependencies.
+The packet's observable result is that all three active root-context apparent
+repository consumers use one loading-owned route family:
 
-## Learned Bazel 9.2 facts
+- a root BUILD file can directly load a `.bzl` file from an imported
+  extension-generated repository;
+- external exported-source `build` can load and observe the same repository
+  without core's private generated-package bridge; and
+- external `query` can load the same generated repository without a separate
+  query-side route composition.
+
+The authentic replay must advance past `@slug_crates//:defs.bzl`; the next
+honest terminal selects the successor packet.
+
+## Learned Bazel 9.2 facts and evidence
 
 Semantic authority is Bazel tag 9.2.0, commit
-8220c6198837d5c13d53fea211cf3282aa12408a.
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
 
-Public declaration:
+Pinned discriminators:
 
-- allow_rules exists on exactly attr.label, attr.label_list,
-  attr.string_keyed_label_dict, attr.label_keyed_string_dict and
-  attr.label_list_dict among admitted ordinary constructors;
-- the experimental dormant-label constructors also expose it, but Slug has
-  not admitted that experimental family;
-- it is named-only, defaults to None, and accepts None or a Sequence[str];
-- lists and tuples work; arbitrary strings are accepted; matching is
-  case-sensitive;
-- omitted and explicit None are the same unrestricted predicate;
-- an explicit empty sequence is a distinct predicate that allows no rule
-  class; and
-- duplicates collapse and semantic equality is set-like and order-insensitive.
+- `ModuleExtensionResolutionTest.simpleExtension` evaluates root
+  `//:data.bzl`, whose direct loads resolve `@foo` and `@bar` generated by a
+  root extension usage;
+- `generatedReposHaveCorrectMappings` evaluates root `data.bzl` -> generated
+  `@ext//:data.bzl`, then resolves both a selected module and a sibling
+  generated repository under the generated repository's own mapping;
+- the adjacent own-repo-name, internal-name and strict-deps tests distinguish
+  mapping context from physical source selection; and
+- `BzlLoadFunction#getRepositoryMapping` plus `PackageFunction` establish that
+  BUILD-owned loads resolve through the requesting repository context before
+  recursive Bzl loading.
 
-StarlarkAttrModule.createAttribute processes the default and materializer
-before raw flags, mandatory/sibling properties, executable/cfg presence and
-file policy. It then processes allow_rules, followed by values, providers, cfg
-conversion and aspects. The packet preserves that failure order. The complete
-allow_rules sequence is cast to strings before RuleClassNamePredicate.only
-canonicalizes it.
+The pinned test file SHA-256 is
+`d8602fd385d34ab5387cb0ef3891ef9acc0ca62cd8f67324e09fd33ea7a3e769`;
+`BzlLoadFunction.java` is
+`bc3efe6f47de9c0a4f8a5a865972575ace4594564c4851d64edea37184fdf2cc` and
+`PackageFunction.java` is
+`799ab77e36ca0d47bbd3773931ef7534d3840d4c6e5172f719921400d769f01f`.
 
-Configured validation:
+Reuse the already accepted `module-extension-use-repo` generated build fixture
+and authentic rules_rust replay. The pinned Java tests are not copied: their
+public Starlark load behavior is covered by focused Rust tests plus the existing
+fixture, while Skyframe key-shape assertions would be implementation detail.
+Add no new fixture unless implementation demonstrates a public mapping or
+load-order gap not covered by those discriminators.
 
-- RuleContext validates a rule dependency only when the prerequisite exposes
-  a nonempty rule class. Source/generated files and package-group-like
-  non-rules bypass both rule-class and provider predicates.
-- A rule passes when its class matches the explicit allowed-class predicate OR
-  it satisfies one required-provider alternative.
-- With no explicit class predicate and no required providers, every rule
-  passes. With providers but no class predicate, providers are required.
-- An explicit empty predicate with no provider alternative rejects every rule.
-- A mismatch with a provider mismatch reports both requirements.
-- Aliases use the resolved actual target's rule class, not the alias wrapper
-  class.
-- Rule/provider validation precedes generated-file admissibility checks.
+## Live ownership facts
 
-SILENT_RULECLASS_FILTER is part of the same rule-class predicate family, but
-has a distinct projection:
+Loading already owns the complete apparent-free source path:
 
-- an unspecified predicate is a no-op;
-- an explicit predicate removes mismatching rule prerequisites from analysis
-  attribute views before ordinary prerequisite validation;
-- file and other non-rule prerequisites have the empty rule-class string and
-  are therefore removed unless the predicate explicitly contains the empty
-  string;
-- provider alternatives do not rescue a silent mismatch because filtering
-  precedes provider validation;
-- scalar mismatches project as None, list mismatches are omitted, and
-  label-keyed-string dictionary entries are omitted;
-- dependency/query topology still contains every declared prerequisite; and
-- Bazel 9.2 crashes internally when a mismatch is silently filtered from
-  string_keyed_label_dict or label_list_dict. The failures are respectively a
-  null ImmutableMap value and a null Starlark-list element in
-  StarlarkAttributesCollection.
+1. `HostCanonicalRepositoryApparentMapping(Key/ObservationKey)` resolves a
+   root-context apparent name to its producer-recorded canonical target.
+2. `HostCanonicalRepositoryRoute(Key/ObservationKey)` selects built-in,
+   selected or generated canonical definition without a physical-path repair.
+3. `HostCanonicalRepositoryLoadRoute(Key/ObservationKey)` adds the generated
+   file-effect plan when and only when required and produces one
+   `HostCanonicalRepositorySourceInput` containing canonical mapping and
+   materialization identity.
+4. `HostRepositorySourceRoute::{Root, Canonical}` already feeds shared source,
+   directory, package, glob and external-Bzl owners.
 
-Fresh disposable Bazel 9.2 oracle evidence at
-/tmp/slug-allow-rules-oracle.YMQpXx proves None versus empty behavior,
-rule/provider OR, combined diagnostics, alias-to-rule resolution, source and
-generated-file bypass, silent scalar/list/label-keyed projections, alias-to-
-file removal, filter-before-provider ordering and topology retention. It also
-isolates both dictionary crash shapes. This is design evidence only; it creates
-no committed fixture or oracle asset.
+The missing abstraction is only a root-context apparent-name adapter over
+those accepted owners. Reimplementing generated definition/effect/materializer
+semantics in root package loading, query or core would create three semantic
+owners and repeat the private bridge that this packet must delete.
 
-Relevant pinned sources and hashes:
+The private core `GeneratedPackageRoute(Key/ObservationKey)` was explicitly a
+temporary bridge. Its deletion condition was a later public generated-route
+publication owner able to consume the accepted mapping/definition/package
+chain without dependency inversion. Loading now owns that entire canonical
+chain, so this packet satisfies the deletion condition.
 
-- packages/Attribute.java:
-  fbe208c37ad4ed88030f874fa6cd8bd5cf2f4aac63f9a01a4ff24ca499c9a6a4
-- packages/RuleClass.java:
-  33be32dc5c884d7fba2338f13f3bc4bcd0c175e3479c70fcd810474a5749b5e6
-- analysis/RuleContext.java:
-  0f6dcffac7286a9056d050624bd29e73cefc4138dd9dc24708dec63e147b41e2
-- analysis/starlark/StarlarkAttributesCollection.java:
-  9b3b300d7e9c25dceafc8a9450dd2511f9b0b83088e11421b6dc3b5086cc7442
-- analysis/starlark/StarlarkAttrModule.java:
-  388421c44c623c1c6625fd9f2b059d2a7d1e13b8d45e7c96173f24866a917967
-- starlarkbuildapi/StarlarkAttrModuleApi.java:
-  af70c851882fa049034184dbb6f6580731cfa738d79dfb8abcf61af176257670
-- the focused Starlark rule-class, Attribute and BuildView tests named in the
-  source audit.
+## Decision and public boundary
 
-## Compatibility decision
+Add one doc-hidden loading-owned family:
 
-Admit as exact:
+    HostRootRepositoryLoadRouteKey {
+        workspace,
+        apparent_repo,
+        admission,
+    }
+    HostRootRepositoryLoadRouteObservationKey(...)
 
-- declaration, type/failure order and retained identity on all five ordinary
-  constructors;
-- unrestricted versus explicit empty/only predicates, duplicate collapse and
-  set-like equality/invalidation;
-- propagation through rule, aspect declarations, macro inheritance and lifted
-  subrules;
-- ordinary rule and subrule-owned dependency validation;
-- effective-class semantics for aliases whose actual remains a configured
-  target, direct non-rule bypass and rule/provider OR;
-- stable silent-filter projections for label, label_list and
-  label_keyed_string_dict;
-- validation/filtering order and preservation of configured/query topology;
+`admission` has exactly the existing `Ordinary` and `RootBuild` polarities.
+Public constructors are `new` and `for_root_build`; both reject the root
+apparent name. Identity includes workspace, apparent name and admission so a
+root BUILD's already-admitted selected-registry behavior cannot silently widen
+ordinary query/build behavior.
+
+The retained success value is:
+
+    HostRootRepositoryLoadRoute {
+        apparent_repo,
+        source: HostRepositorySourceRoute,
+    }
+
+It exposes borrowed apparent/canonical names and the immutable source route.
+For a direct-local, built-in or admitted selected route, `source` is
+`Root(existing RootRepositoryRoute)`. For an extension-generated route,
+`source` is `Canonical(existing HostCanonicalRepositorySourceInput)`. Do not
+fabricate a `RootRepositoryRoute`, apparent alias, physical root, mapping copy
+or second generated effect plan.
+
+The driver is ordered:
+
+1. compute the existing root route with the key's admission;
+2. return that exact success or any non-fallback error;
+3. only for the existing exact Unknown/Unsupported fallback predicate, compute
+   the root-context canonical apparent mapping;
+4. Mapping Missing is fallback-neutral and restores the original root-route
+   error; context mismatch or other mapping failure is typed;
+5. on mapping success compute the canonical load route for the resolved target;
+6. require canonical route kind `Generated`; a successfully mapped non-
+   generated route is fallback-neutral and restores the original root-route
+   error; and
+7. return the canonical source input without reconstructing its definition,
+   effect, mapping or materialization request.
+
+The error retains the original `RootRepositoryRouteError` or one typed
+mapping/load/kind failure. No diagnostic string matching, private-kind export
+or command-specific error taxonomy is permitted.
+
+Legacy and Observed use one staged driver. Need is immediate and carrierless.
+Complete retains one `Arc<Result<...>>`. Observed success or semantic error
+retains the exact left-first union of root-route, mapping and canonical-load
+epochs. Contradictory epoch union is an observed path frontier.
+
+## Observation-frontier correction
+
+The shared observed key must preserve path retry versus infrastructure failure
+without exposing private nested error kinds. Add doc-hidden
+`selected_frontier()` projections to the existing observation-error wrappers
+on the route's dependency chain:
+
+- selected extension demand and owner-input errors in Bzlmod;
+- canonical apparent mapping and canonical route errors;
+- generated-definition, owner-certificate and repository-file-effect errors;
   and
-- repository-rule/tag-class conversion of unrestricted descriptors, while an
-  explicit class restriction fails closed at the boundary that lacks a
-  configured rule prerequisite owner.
+- canonical load-route errors.
 
-Keep Slug-native:
+Each projection recursively preserves an existing
+`HostSelectedObservationFrontier::{Path, Infrastructure}`. Direct Host-Bzl and
+epoch-merge failures are Path; existing selected-graph compute failures remain
+Infrastructure. Do not stringify a path frontier, convert infrastructure into
+a retry, invent an epoch, or retain a failed child carrier.
 
-- Rust valid-Unicode rule-class strings and starlark-rust diagnostic
-  decoration;
-- canonical sorted diagnostic class order rather than Java insertion-order
-  details;
-- compact structural semantic identity and normal DICE scheduling/accounting;
-  and
-- an explicit unsupported error instead of reproducing a Bazel JVM crash.
+`HostRootRepositoryLoadRouteObservationError::selected_frontier()` is the only
+classification consumers need. Root package loading and query restart only a
+Path frontier and retain Infrastructure as typed terminal state. Core preserves
+its accepted exported-build behavior: a lower generated-route outer becomes a
+typed generated-route terminal retaining only the already completed public
+prefix; it does not leak the lower carrier or epoch into the build request.
 
-Classify unsupported/deferred:
+## Complete consumer-category cutover
 
-- experimental dormant_label and dormant_label_list;
-- Bazel's native allowed-rule-class warning predicate, which has no public
-  Starlark declaration surface;
-- legacy command-specific rule-class consumers outside configured dependency
-  validation;
-- explicit allow_rules in repository/tag schemas, whose configured
-  prerequisite owner does not exist there; and
-- configured aspect execution/validation, while aspect declarations retain
-  exact restriction identity for that later category;
-- alias-to-file effective-class/filter behavior. Slug's existing alias result
-  requires an actual configured-target identity and cannot yet represent a
-  source/null actual; repairing that broader identity gap is not part of this
-  attribute packet; and
-- a SILENT_RULECLASS_FILTER mismatch in string_keyed_label_dict or
-  label_list_dict. Slug accepts the declaration and matching values, but fails
-  closed during configured validation if a mismatch would enter Bazel's
-  crashing projection.
+Cut over the three active consumers in the same implementation packet:
 
-The last boundary is deliberately narrower than rejecting either constructor:
-ordinary non-silent validation remains exact, silent unrestricted predicates
-remain no-ops, and silent restricted dictionaries with only matching rules
-remain usable.
+1. **Root direct `.bzl` loading.** Replace direct root-route computation with
+   the shared key. Generalize the local external-Bzl handoff from
+   `RootRepositoryRoute` to the already accepted `HostRepositorySourceRoute`;
+   choose the existing root or canonical external-Bzl constructors without a
+   new evaluator.
+2. **Core exported-source build.** Replace public-route-plus-private-bridge
+   glue with the shared key and delete
+   `runtime/generated_package_route.rs`. Choose the existing root/canonical
+   repository package-load and source-observation children from the retained
+   source route. Preserve existing direct-local/built-in/unknown diagnostics
+   and source-certificate behavior.
+3. **External loading query.** Return the shared route from repository
+   verification. Generalize the private external package-graph key to retain
+   the shared route, select the existing root/canonical package-load child, and
+   use its retained apparent/canonical identity for `QueryLabel`. Add no route
+   discovery inside graph projection.
 
-## Representation and natural semantic owners
+Every other `RootRepositoryRouteKey` consumer remains unchanged. In
+particular, direct-local MODULE inspection keeps its direct-local-only owner;
+the packet does not turn generated repositories into local overrides.
 
-Loading owns one new immutable value in slug_loading_v2::attrs:
+## Compatibility classification
 
-    RuleClassAdmissibility::Any
-    RuleClassAdmissibility::Only(Arc<[CompactString]>)
+Admit as **exact** for the named Bazel 9.2 surface:
 
-Only contains a sorted, deduplicated slice. Any is distinct from Only([]).
-This makes equality, hashing, cloning, allocation accounting and diagnostics
-canonical without retaining source order or duplicate count. Do not use five
-booleans, a second provider predicate, a global registry, cache, interner or
-DICE key.
+- root BUILD direct `.bzl` loads through imported extension-generated repos;
+- root-apparent mapping to canonical generated definition and its repository
+  mapping during recursive Bzl loads;
+- generated external package loading for the existing query and exported-
+  source build consumers;
+- root/direct-local/built-in/selected success and existing non-fallback error
+  behavior; and
+- Missing/non-generated fallback neutrality preserving the original root-route
+  diagnostic.
 
-AttributeDefinitionGen is the declaration producer. Existing
-RuleAttributeSchemaGen, AttributeSchema, MacroAttributeSchema,
-SubruleAttribute and LiftedSubruleAttribute projections retain the same value.
-Repository/tag conversion accepts Any and fails closed on Only. No command-side
-repair or consumer-specific copy is permitted.
+Keep **Slug-native**:
 
-ConfiguredDependencyValidation is the sole configured validation owner. It
-borrows the schema restriction and property set to decide:
+- key/type names, compact structural identity, complete-only DICE equality,
+  epoch carrier layout and typed infrastructure diagnostic decoration;
+- Rust valid-Unicode repository names already admitted by identity types; and
+- the core command's deliberate lower-outer-to-terminal projection.
 
-1. whether the prerequisite is silently filtered;
-2. whether a crashing dictionary projection must fail closed;
-3. whether a remaining rule satisfies class OR provider requirements; and
-4. the existing file/executable checks in Bazel order.
+Keep **unsupported/deferred**:
 
-ConfiguredNodeResult continues to own direct rule capability. An alias does
-not rewrite that capability. Instead ConfiguredEdgeKind::AliasActual gains the
-resolved actual prerequisite rule class as Option<CompactString>, and
-ConfiguredNodeResult::prerequisite_rule_class returns:
-
-- the AliasActual payload for aliases, including chained aliases;
-- the direct RuleCapability class for ordinary rules; or
-- None for direct files, configured non-rules and aliases to configured
-  non-rules.
-
-This retains the minimum semantic fact on the already-required alias child
-edge. Alias construction already depends on the child configured result, so no
-new DICE key, dependency, lock or alternate registry is introduced. It does
-not repair or claim alias-to-file actual identity.
-
-Every declared dependency remains a ConfiguredEdge. PreparedDependency gains a
-phase-local filtered marker so ctx.attr and configured subrule projection can
-consume a placeholder without dropping graph topology. Filtered dependencies
-do not contribute executable provenance or analysis values.
+- exact Bazel configuration/output identity bytes;
+- unadmitted repository rules, repository environments and materialization
+  forms already rejected by canonical load-route owners;
+- widening ordinary consumers to selected nonregistry routes merely because a
+  canonical route exists; and
+- any rules_rust, rules_cc, C++, `cc_common`, `cc_internal`, parser or builtin
+  specialization.
 
 ## Request, revision and DICE behavior
 
-The immutable attribute schema, resolved label/configuration and prerequisite
-configured result completely determine validation. No command option,
-environment read, filesystem read, repository mutation, lockfile fact or host
-session input is added.
+Workspace, apparent name and admission are the complete key identity. All
+mapping, extension demand/certificate, repository rule execution, generated
+file effects, registry inputs, environment inputs and materialization identity
+remain dependencies of existing canonical owners. The adapter adds no direct
+filesystem read, environment read, command option, lockfile parser or fresh-
+graph bypass.
 
-Schema equality includes RuleClassAdmissibility. Changing Any to Only or one
-Only set to another invalidates the existing rule/schema consumers. Alias
-effective-class changes arrive through the existing AliasActual child DICE
-dependency. Equality cutoff restores the original result on A/B/A without a
-fresh-graph bypass. Overlapping requests use DICE's existing key deduplication;
-the packet adds no lock and holds no guard across a compute.
+Complete-only equality suppresses downstream invalidation when those existing
+owners restore the same route. A/B/A mapping/definition/effect changes restore
+the original shared result. Overlapping requests share DICE computation by
+key; no manual lock, cache, interner, event replay or post-compute injection is
+added. No lock is held across a DICE compute.
 
-The design follows docs/developers/dice.md: semantic inputs remain in retained
-schema/results and explicit child dependencies, with no mutable global state or
-post-compute injection.
+## Memory, reuse and peer guidance
 
-## Memory, asynchronous ownership and reuse
+The key and complete result are DICE-retained semantic memory. They retain one
+typed workspace path, apparent name, admission word and one existing immutable
+source route/result Arc. The canonical input already owns its route Arc and
+materialization disposition; this adapter copies no mapping, RepoSpec, effect
+plan, source tree or evaluator heap. Epoch merge vectors are phase scratch and
+release at compute completion/cancellation. Need and outer failure publish no
+complete carrier. No async transfer, task, shutdown hook or service cache is
+added.
 
-- The canonical Arc slice is DICE-retained semantic memory. It is published
-  with the immutable schema/result, participates in equality and is released
-  when those retained values are evicted.
-- The optional alias class is DICE-retained semantic memory on the existing
-  alias edge and follows that edge's publication/invalidation lifetime.
-- Silent-filter booleans/placeholders are phase scratch owned by one configured
-  analysis and are released at phase completion or cancellation.
-- No evaluator heap is retained. No service cache, command cache, async
-  transfer buffer, background task or shutdown hook is added.
+The Buck2 utility-reuse decision is no extraction/import: reuse existing
+`Arc<Result<...>>`, `Dupe`, `Allocative`, compact identity types and
+`PathObservationEpoch`. Add no `String`/`Vec`/map/set in retained state, new
+hasher, interner or cache. Record this no-extraction decision in Stage 9.
 
-The Buck2 utility-reuse review chooses concept/test only. Existing V2
-CompactString, Arc slices and Allocative support are sufficient. SmallSet is
-insertion-preserving and set-equal, but would make immutable schema clones
-deep; a sorted Arc slice provides cheaper retained clones and deterministic
-diagnostics. No V1 extraction is justified.
+Zabel commit `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only:
 
-Zabel commit 0795445f3ab60f4e49070bdd0b94425c5610f73a is peer guidance only:
+- `session_composed_bzl_repository_source.zig` composes root and external
+  source producers behind one loading source family; and
+- `session_selected_materialized_package_source.zig` makes package loading
+  consume an already-composed repository source.
 
-- build_rule_declaration.zig
-  f2221daad6d0ad61177d860e58faf3ade1bb249cce9789d7150f22bc18804fcd
-  demonstrates one dependency-attribute declaration slot and complete sequence
-  validation;
-- target_kind_projection.zig
-  0e4e233a75b32988c200b2daf88659d985d02b1cc6303d944dc7df51246c0213
-  keeps native and Starlark rule-class identity in loading-owned facts; and
-- ordinary_dependency_facts.zig
-  1048b681a1e575cbd9fc1be8b1a5b7765d19f0a72426297fcdfbaed0c7b1d24f
-  demonstrates retained schema/invocation separation.
-
-These are concept/test inputs, not compatibility authority. Copy no Zig type,
-allocator, evaluator value, scheduler, cache, error or behavior. Zabel's
-current non-None subrule restriction is specifically not adopted because
-Bazel 9.2 admits that surface.
+Slug adopts only that ownership/test lesson. Copy no Zig type, allocator,
+registration family, store, scheduler, cache, representation, error or
+compatibility claim. Bazel 9.2 remains the sole behavioral authority.
 
 ## Evidence and proof contract
 
-Reuse existing property-flag, provider, file-policy, macro/subrule, alias and
-A/B/A test scaffolding. Add no external fixture. Focused tests must prove:
+Focused proof must cover:
 
-- constructor inclusion/exclusion and named-only binding;
-- default/flags/file/allow_rules/providers/cfg/aspects dual-invalid failure
-  order;
-- None, empty, duplicate and permuted-set identity;
-- propagation through rule, aspect declaration, inherited macro and lifted
-  subrule schemas;
-- ordinary exact accept/reject cases on all five shapes;
-- provider-only acceptance, class-only acceptance and combined mismatch;
-- source/generated/package-group bypass;
-- direct rule alias, alias chain and alias-to-configured-nonrule behavior;
-- stable silent scalar/list/label-keyed projection, provider non-rescue and
-  executable omission while every configured edge remains present;
-- fail-closed mismatch behavior for the two Bazel-crashing dictionary shapes;
-- repository/tag unrestricted acceptance and restricted failure;
-- dependency/provider error precedence before existing generated-file checks;
-  and
-- unrestricted/restricted/unrestricted A/B/A restoration.
+- key identity, admission distinction, root rejection, Display and
+  complete-only equality/validity;
+- direct-local, built-in and selected root-route success without canonical
+  fallback activation;
+- generated mapping/load success with no fabricated apparent alias;
+- mapping Missing and mapped non-generated neutrality restoring the exact
+  original root-route error;
+- context mismatch, mapping semantic failure, canonical load failure and wrong
+  generated-kind terminals;
+- observed Need carrierlessness, Path/Infrastructure polarity, left-first
+  epoch union, contradictory-epoch failure and lower-outer retention rules;
+- warm reuse, cancellation/recovery and generated/missing/generated A/B/A;
+- root BUILD direct load of a generated `.bzl`, including recursive generated
+  repository mapping;
+- external generated package success in query and exported-source build;
+- byte-identical protected direct-local/built-in/unknown behavior; and
+- deletion/nonactivation proof for core's private generated-package bridge and
+  absence of ruleset/C++/parser special cases.
 
-Upstream Java unit tests are not copied because their builder-internal identity
-assertions are implementation details. Public Starlark behavior is covered by
-the focused tests plus the disposable Bazel oracle above, which is stronger for
-alias, provider and silent-filter interactions. No fixture.toml is applicable
-because no fixture is committed.
+Run focused Bzlmod/loading/query/core tests and named direct dependents,
+`cargo fmt --check`, `git diff --check`, archive status, full core at its exact
+recorded baseline, rebuilt `slug_cli_v2`, the accepted generated-repository
+fixture and the authentic rules_rust replay. Clean stale `slugd` processes
+before and after daemon-sensitive commands. Cargo validation is serial.
 
-There is no fallback or temporary bridge. Each unsupported combination fails
-closed at its natural configured or conversion boundary.
-
-## Scope, complexity and stops
+## Scope, caps and complexity decisions
 
 Production allowlist:
 
-- app/slug_loading_v2/src/attrs.rs
-- app/slug_loading_v2/src/package.rs
-- app/slug_loading_v2/src/subrule.rs
-- app/slug_analysis_v2/src/configured_target.rs
-- app/slug_analysis_v2/src/result.rs
-- app/slug_analysis_v2/src/dice.rs
-- app/slug_analysis_v2/src/subrule.rs
-- app/slug_analysis_v2/src/starlark_rule.rs
+- `app/slug_bzlmod_v2/src/selected_repo_spec.rs`
+- `app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs`
+- `app/slug_loading_v2/src/lib.rs`
+- `app/slug_loading_v2/src/canonical_repository_mapping.rs`
+- `app/slug_loading_v2/src/canonical_repository_route.rs`
+- `app/slug_loading_v2/src/canonical_repository_load_route.rs`
+- `app/slug_loading_v2/src/generated_repository_definition.rs`
+- `app/slug_loading_v2/src/module_extension.rs`
+- `app/slug_loading_v2/src/module_extension_innate_repository.rs`
+- `app/slug_loading_v2/src/module_extension_repository_validation.rs`
+- `app/slug_loading_v2/src/module_extension_repository_file_effect.rs`
+- new `app/slug_loading_v2/src/root_repository_load_route.rs`
+- `app/slug_loading_v2/src/bzl_module.rs`
+- `app/slug_core_v2/src/runtime/mod.rs`
+- `app/slug_core_v2/src/runtime/dice.rs`
+- delete `app/slug_core_v2/src/runtime/generated_package_route.rs`
+- `app/slug_query_v2/src/graph.rs`
+- `app/slug_query_v2/src/loading_environment.rs`
 
-Proof allowlist:
+Proof allowlist is colocated tests, one new
+`root_repository_load_route_tests.rs`, existing loading/query integration
+tests and `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`. No Cargo,
+BUILD, fixture, ruleset, C++, CLI production or parked-proof edit is allowed.
 
-- colocated tests in the production files above
-- app/slug_loading_v2/tests/build_file_loading.rs
-- app/slug_loading_v2/tests/subrule_loading.rs
-- app/slug_analysis_v2/tests/configured_target.rs
-- app/slug_analysis_v2/tests/starlark_rule.rs
+Caps are 1,250 added production Rust lines, 1,600 proof lines and 2,850 total;
+deletion of the 997-line private core bridge does not offset these addition
+caps. The new route module must remain under 650 production lines and use a
+separate test module. No new function may exceed 150 lines.
 
-Gross caps are 850 production Rust lines, 1,100 proof Rust lines and 1,950
-total. Documentation/routing updates do not count toward Rust caps.
+`bzl_module.rs`, core `dice.rs`, query `graph.rs` and
+`loading_environment.rs`, plus the selected-repo parent, exceed the 2,000-line
+trigger. Their edits are restricted to existing consumer call sites and
+frontier projection matches. The new key/driver lives in its own cohesive
+loading module; do not add another semantic key to those large files. The
+smaller observation-error owners remain cohesive because their changes are
+one read-only projection per existing error algebra.
 
-package.rs and dice.rs exceed the 2,000-line review trigger. They remain the
-cohesive owners because the changes are local constructor/schema lowering and
-existing finish-analysis orchestration respectively. Creating a parallel
-attribute factory or dependency-graph coordinator would split semantic
-ownership. No function may grow past the 150-line trigger without a bounded
-local helper extraction.
+## Stops
 
-Do not edit configuration, toolchain, action, query, CLI, repository, BCR,
-ruleset, C++, cc_common or cc_internal production code. Query topology is
-validated through the existing configured edges, not a query-side patch.
+Return `REPLAN` before Rust if independent review finds that:
 
-Run focused loading/analysis tests, direct dependent crate tests, rustfmt,
-reference hash checks, parked-proof integrity, archive baseline, rebuilt
-slug_cli_v2 and authentic replay. Clean stale slugd processes before and after
-daemon-sensitive validation.
+- loading cannot own the shared apparent adapter without a dependency cycle;
+- any consumer needs a second mapping, generated-definition, file-effect,
+  materializer or repository-source owner;
+- observed Path versus Infrastructure polarity cannot be derived from existing
+  typed child errors without string matching or a fabricated carrier;
+- query/core require an apparent alias inside canonical source identity rather
+  than retaining it beside the source route;
+- the consumer cutover widens ordinary selected-nonregistry behavior;
+- exact existing diagnostics cannot survive neutral fallback;
+- implementation exceeds the allowlist/caps or needs a second correction;
+- a new fixture is needed without a demonstrated evidence gap; or
+- implementation requires ruleset/C++, parser/builtin specialization,
+  Java/JVM semantics, exact identity-byte work or a lock across DICE compute.
 
-Return REPLAN before Rust if independent review finds that:
-
-- the actual rule class cannot be derived from the existing child result
-  without a second semantic registry or DICE key;
-- implementation would need to repair alias-to-file actual identity or execute
-  configured aspects;
-- silent filtering would require deleting configured/query edges;
-- class/provider OR would create a second validation owner;
-- macro/subrule propagation cannot use the shared schema representation;
-- a stable Bazel dictionary projection differs from the oracle evidence;
-- the two crash boundaries cannot fail closed at configured validation; or
-- implementation exceeds the allowlist/caps or needs configuration, query,
-  ruleset or C++ specialization.
-
-Focused independent architecture rereview accepts this R2 contract. Implement
-only the frozen boundary above.
+Independent review must answer whether the one shared admission-aware key is
+the natural owner, whether all three consumers belong in this category packet,
+and whether the recursive frontier projections preserve retry/infrastructure
+polarity without introducing a second semantic route.
