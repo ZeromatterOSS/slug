@@ -22933,3 +22933,33 @@ category and stops at the next generic rules_shell declaration surface,
 `attr.label_list(allow_rules = ["sh_library"])`. Schedule a complete Bazel 9.2
 rule-class restriction audit; add no ruleset, C++, `cc_common`, `cc_internal`
 or parser branch.
+
+### WP-6-7D dependency rule-class restrictions (2026-09-01)
+
+Candidate packet
+`WP-6-7D-rule-class-restriction-category-implementation-r2` covers the
+complete admitted Bazel 9.2 `allow_rules` category, rather than the replay's
+rules_shell spelling. One canonical unrestricted/only predicate survives all
+existing descriptor and schema projections. Configured validation checks the
+effective alias actual rule class and implements the class/provider OR rule;
+files and non-rules bypass it.
+
+The adjacent retained `SILENT_RULECLASS_FILTER` effect joins the packet where
+Bazel 9.2 has stable public behavior: scalar, list and label-keyed dictionary
+views filter mismatches while configured/query topology remains complete.
+Fresh Bazel 9.2 evidence shows internal null-value crashes for filtered
+string-keyed and label-list dictionary entries. Slug accepts those declarations
+and matching values but fails closed only when a mismatch would trigger the
+crash; this boundary is unsupported rather than an exactness claim. The packet
+adds no query-side repair, class registry or DICE key. Independent architecture
+review is required before Rust.
+
+R1 architecture review returned `REPLAN` because Slug's existing alias result
+cannot represent an alias-to-file actual identity and configured aspect
+execution is not yet admitted. R2 defers those two runtime effects, retains
+exact aspect declaration identity and configured-target alias semantics, and
+corrects the oracle wording to filter-before-provider. The representation,
+allowlist, caps and remaining behavior are unchanged; focused rereview is
+required.
+
+Focused R2 architecture rereview returns `ACCEPT`; implement only R2.

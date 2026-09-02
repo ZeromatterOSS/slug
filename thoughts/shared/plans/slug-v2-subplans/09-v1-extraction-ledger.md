@@ -2412,3 +2412,26 @@ keeps the same one-word V2 owner and adds no predicate representation,
 provenance state, cache, interner or DICE key. Focused design and terminal
 implementation rereviews return `ACCEPT`. The implementation closes at 537
 production/371 proof/908 total gross Rust lines with no V1 extraction.
+
+### Stage 6 rule-class restriction utility decision (2026-09-01)
+
+`WP-6-7D-rule-class-restriction-category-implementation-r2` requires no V1
+extraction. Use one canonical sorted `Arc<[CompactString]>` behind an
+unrestricted/only enum in the existing loading schema owner. This keeps clones
+cheap and equality set-like without retaining evaluator values, insertion
+order or duplicate count. The effective alias actual class belongs on the
+existing alias child edge; no registry, cache, interner or new DICE key is
+introduced.
+
+Buck2 compact collections and Zabel's declaration/target-kind separation are
+concept and test guidance only. Existing V2 `CompactString`, immutable Arc
+slices and `Allocative` are sufficient. Independent architecture review must
+accept the retained representation before Rust.
+
+R1 review narrowed only runtime boundaries for alias-to-file and configured
+aspects; it did not change the representation or no-extraction decision. R2
+keeps the same sorted Arc predicate and alias-edge class projection for
+configured actual targets.
+
+Focused R2 architecture rereview returns `ACCEPT`; the no-extraction decision
+is final for this packet.

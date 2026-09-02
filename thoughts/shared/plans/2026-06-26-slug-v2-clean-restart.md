@@ -7277,3 +7277,25 @@ the complete property-flag category and selects the next generic declaration
 surface, `attr.label_list(allow_rules = ["sh_library"])` in rules_shell. Audit
 the complete Bazel 9.2 rule-class restriction category next; do not add a
 rules_shell, rules_rust, C++, `cc_common`, `cc_internal` or parser special case.
+
+Activate docs-first
+`WP-6-7D-rule-class-restriction-category-implementation-r2` only after
+independent architecture review. It owns one compact unrestricted/only
+rule-class predicate across all five dependency constructors and existing
+rule, aspect, macro and subrule projections; validates effective alias actual
+classes with Bazel's class/provider OR rule; and keeps silent-filtered values
+out of analysis views without deleting configured/query topology. Bazel 9.2's
+stable label, label-list and label-keyed-dictionary projections are exact. A
+would-be silent mismatch in the two dictionary projections that crash Bazel
+9.2 fails closed rather than reproducing the JVM internal error. Zabel remains
+peer guidance only; C++ and BCR rules remain consumers only.
+
+R1 independent review returned `REPLAN`: alias-to-file needs a broader actual-
+node identity owner, and configured aspect execution is still deferred. R2
+keeps exact restriction retention in aspect declarations, limits runtime alias
+claims to configured actual targets, defers alias-to-file behavior, and fixes
+the evidence wording to filter-before-provider. Focused rereview is required
+before Rust.
+
+Focused R2 architecture rereview returns `ACCEPT`; implement only the frozen
+boundary.
