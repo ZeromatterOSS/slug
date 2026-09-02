@@ -7,7 +7,7 @@
  */
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::collections::BTreeMap;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::Hash;
@@ -126,8 +126,8 @@ mod tests {
     use crate::package::loading_globals;
     use crate::provider::BzlEvaluationContext;
 
-    const ROOT_MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='parent', version='1', repo_name='parent_alias')\n";
-    const PARENT_MODULE: &[u8] =
+    pub(crate) const ROOT_MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='parent', version='1', repo_name='parent_alias')\n";
+    pub(crate) const PARENT_MODULE: &[u8] =
         b"module(name='parent', version='1')\nbazel_dep(name='leaf', version='1', repo_name='leaf_from_parent')\n";
     const GENERATED_PARENT_MODULE: &[u8] = b"module(name='parent', version='1')\ne=use_extension('//:compatibility.bzl','compatibility')\nuse_repo(e, compatibility_repo='compatibility_repo')\n";
     const GENERATED_PARENT_EXTENSION: &[u8] = br#"
@@ -135,10 +135,10 @@ repo=repository_rule(implementation=lambda ctx: None)
 def impl(ctx): repo(name='compatibility_repo')
 compatibility=module_extension(implementation=impl)
 "#;
-    const LEAF_MAPPING_A: &[u8] = b"module(name='leaf', version='1')\nbazel_dep(name='mapped', version='1', repo_name='alias_a')\n";
+    pub(crate) const LEAF_MAPPING_A: &[u8] = b"module(name='leaf', version='1')\nbazel_dep(name='mapped', version='1', repo_name='alias_a')\n";
     const LEAF_MAPPING_B: &[u8] = b"module(name='leaf', version='1')\nbazel_dep(name='mapped', version='1', repo_name='alias_b')\n";
     const MAPPED_MODULE: &[u8] = b"module(name='mapped', version='1')\n";
-    const SOURCE_A: &[u8] =
+    pub(crate) const SOURCE_A: &[u8] =
         br#"{"url":"https://origin.invalid/leaf-a.tgz","integrity":"sha256-a"}"#;
     const SOURCE_B: &[u8] =
         br#"{"url":"https://origin.invalid/leaf-b.tgz","integrity":"sha256-b"}"#;
@@ -233,7 +233,7 @@ compatibility=module_extension(implementation=impl)
         StaticRegistryIo(files)
     }
 
-    fn registry_dice(
+    pub(crate) fn registry_dice(
         parent_module: &'static [u8],
         leaf_module: &'static [u8],
         leaf_source: &'static [u8],

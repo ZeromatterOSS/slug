@@ -18,15 +18,17 @@ use compact_str::CompactString;
 use dice::DiceComputations;
 use dupe::Dupe;
 use regex::Regex;
+use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::HostRootPackageBoundaryKey;
 use slug_bzlmod_v2::HostRootPackageBoundaryKind;
 use slug_bzlmod_v2::HostRootPackageBoundaryObservationKey;
-use slug_bzlmod_v2::RootRepositoryRoute;
-use slug_bzlmod_v2::RootRepositoryRouteKey;
-use slug_bzlmod_v2::RootRepositoryRouteObservationKey;
+use slug_bzlmod_v2::HostSelectedObservationFrontier;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetPattern;
+use slug_loading_v2::HostRootRepositoryLoadRoute;
+use slug_loading_v2::HostRootRepositoryLoadRouteKey;
+use slug_loading_v2::HostRootRepositoryLoadRouteObservationKey;
 use slug_loading_v2::LoadingPreparationNeeds;
 use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::RepositoryPackageLoadKey;
@@ -244,11 +246,11 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
     async fn repository_route(
         &mut self,
         apparent_repo: &slug_identity_v2::ApparentRepoName,
-    ) -> Result<RootRepositoryRoute, QueryError> {
+    ) -> Result<HostRootRepositoryLoadRoute, QueryError> {
         let workspace = self.root_workspace.clone().ok_or_else(|| {
             QueryError::evaluation("external repository query requires Host mode")
         })?;
-        let key = RootRepositoryRouteKey::new(workspace.clone(), apparent_repo.clone())
+        let key = HostRootRepositoryLoadRouteKey::new(workspace.clone(), apparent_repo.clone())
             .map_err(QueryError::evaluation)?;
         match self.observation_mode {
             QueryObservationMode::Legacy => match self
@@ -267,15 +269,25 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             QueryObservationMode::Observed => match self
                 .ctx
                 .compute(
-                    &RootRepositoryRouteObservationKey::new(workspace, apparent_repo.clone())
-                        .map_err(QueryError::evaluation)?,
+                    &HostRootRepositoryLoadRouteObservationKey::new(
+                        workspace,
+                        apparent_repo.clone(),
+                    )
+                    .map_err(QueryError::evaluation)?,
                 )
                 .await
                 .expect("observed root repository route DICE invariant")
             {
                 LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
                 LoadingPreparationOutcome::Complete(Err(error)) => {
-                    Err(self.observation_restart(error.ordinary_path()))
+                    match error.selected_frontier() {
+                        HostSelectedObservationFrontier::Path(error) => {
+                            Err(self.observation_restart(error))
+                        }
+                        HostSelectedObservationFrontier::Infrastructure(message) => {
+                            Err(QueryError::evaluation(message.to_string()))
+                        }
+                    }
                 }
                 LoadingPreparationOutcome::Complete(Ok(value)) => {
                     self.merge_observations(value.observations())?;
@@ -291,7 +303,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
     async fn verified_repository_route(
         &mut self,
         owner: &QueryPackageIdentity,
-    ) -> Result<RootRepositoryRoute, QueryError> {
+    ) -> Result<HostRootRepositoryLoadRoute, QueryError> {
         let apparent_repo = owner.apparent_repo().ok_or_else(|| {
             QueryError::evaluation("external package owner lost its apparent repository route")
         })?;
@@ -471,10 +483,17 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         match self.observation_mode {
             QueryObservationMode::Legacy => match self
                 .ctx
-                .compute(&RepositoryPackageLoadKey::new(
-                    route,
-                    owner.package().clone(),
-                ))
+                .compute(&match route.source() {
+                    HostRepositorySourceRoute::Root(root) => {
+                        RepositoryPackageLoadKey::new(root.clone(), owner.package().clone())
+                    }
+                    HostRepositorySourceRoute::Canonical(input) => {
+                        RepositoryPackageLoadKey::new_canonical(
+                            input.clone(),
+                            owner.package().clone(),
+                        )
+                    }
+                })
                 .await
                 .expect("external package loading DICE invariant")
             {
@@ -486,10 +505,20 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             },
             QueryObservationMode::Observed => match self
                 .ctx
-                .compute(&RepositoryPackageLoadObservationKey::new(
-                    route,
-                    owner.package().clone(),
-                ))
+                .compute(&match route.source() {
+                    HostRepositorySourceRoute::Root(root) => {
+                        RepositoryPackageLoadObservationKey::new(
+                            root.clone(),
+                            owner.package().clone(),
+                        )
+                    }
+                    HostRepositorySourceRoute::Canonical(input) => {
+                        RepositoryPackageLoadObservationKey::new_canonical(
+                            input.clone(),
+                            owner.package().clone(),
+                        )
+                    }
+                })
                 .await
                 .expect("observed external package loading DICE invariant")
             {

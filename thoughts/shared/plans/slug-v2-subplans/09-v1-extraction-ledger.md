@@ -2438,7 +2438,7 @@ is final for this packet.
 
 ### Stage 4/5/6 root repository load-route utility decision (2026-09-01)
 
-`WP-4-5-6-7A-root-repository-load-route-publication-implementation-r1` requires no V1
+`WP-4-5-6-7A-root-repository-load-route-publication-replan-r1` requires no V1
 or Buck2 extraction. Reuse existing V2 `Arc<Result<...>>`, `Dupe`,
 `Allocative`, typed workspace/apparent/canonical identities,
 `HostRepositorySourceRoute` and `PathObservationEpoch`. The new retained key
@@ -2452,3 +2452,11 @@ source are concept/test guidance only; copy no Zig representation, allocator,
 store, scheduler or behavior. The existing compact utility set is sufficient,
 Independent public-DICE architecture review returns `ACCEPT`; the
 no-extraction decision is final for this packet.
+
+The recursive sibling-load replan does not alter that decision. Selected
+mappings already retain each graph-derived extension unique name, and the
+owner certificate already retains the complete validated repository-call
+result. Authenticate the canonical namespace in the existing demand helper;
+do not add an index, map, cache, interner or copied generated-definition set.
+Zabel's complete generated-repository projection remains concept/test guidance
+only, while Bazel 9.2 owns the exact namespace and sibling visibility behavior.

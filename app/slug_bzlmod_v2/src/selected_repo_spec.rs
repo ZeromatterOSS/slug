@@ -1792,6 +1792,13 @@ pub struct HostBuiltinBazelToolsRepositoryMappingObservationError(
     HostSelectedRepositoryMappingsObservationError,
 );
 
+impl HostBuiltinBazelToolsRepositoryMappingObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(&self) -> crate::HostSelectedObservationFrontier {
+        selected_mappings_observation_frontier(&self.0)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct HostSelectedModuleRoute {
     entry: HostSelectedModuleEntry,
@@ -3265,15 +3272,9 @@ fn selected_routes_observation_frontier(
         HostSelectedModuleRoutesObservationError::Graph(error) => {
             selected_graph_observation_frontier(error)
         }
-        HostSelectedModuleRoutesObservationError::Mappings(error) => match error {
-            HostSelectedRepositoryMappingsObservationError::Graph(error) => {
-                selected_graph_observation_frontier(error)
-            }
-            HostSelectedRepositoryMappingsObservationError::Root(error)
-            | HostSelectedRepositoryMappingsObservationError::Merge(error) => {
-                crate::HostSelectedObservationFrontier::Path(error.clone())
-            }
-        },
+        HostSelectedModuleRoutesObservationError::Mappings(error) => {
+            selected_mappings_observation_frontier(error)
+        }
         HostSelectedModuleRoutesObservationError::RepoSpecs(error) => match error {
             HostSelectedRegistryRepoSpecsObservationError::Graph(error) => {
                 selected_graph_observation_frontier(error)
@@ -3286,6 +3287,20 @@ fn selected_routes_observation_frontier(
             }
         },
         HostSelectedModuleRoutesObservationError::Merge { error, .. } => {
+            crate::HostSelectedObservationFrontier::Path(error.clone())
+        }
+    }
+}
+
+fn selected_mappings_observation_frontier(
+    error: &HostSelectedRepositoryMappingsObservationError,
+) -> crate::HostSelectedObservationFrontier {
+    match error {
+        HostSelectedRepositoryMappingsObservationError::Graph(error) => {
+            selected_graph_observation_frontier(error)
+        }
+        HostSelectedRepositoryMappingsObservationError::Root(error)
+        | HostSelectedRepositoryMappingsObservationError::Merge(error) => {
             crate::HostSelectedObservationFrontier::Path(error.clone())
         }
     }

@@ -2810,8 +2810,8 @@ second=module_extension(implementation=second_impl)
         let producer = &source[source.find("type CanonicalRepositoryApparentMappingResult").unwrap()..];
         assert_eq!(producer.matches("HostRootRepositoryMappingObservationKey::new").count(), 1);
         assert_eq!(producer.matches("HostCanonicalRepositoryRouteObservationKey::new").count(), 1);
-        assert_eq!(producer.matches("CanonicalRepositoryApparentMappingObservationError::RootMapping(error)").count(), 1);
-        assert_eq!(producer.matches("CanonicalRepositoryApparentMappingObservationError::Route(error)").count(), 1);
+        assert_eq!(producer.matches("CanonicalRepositoryApparentMappingObservationError::RootMapping(error)").count(), 2);
+        assert_eq!(producer.matches("CanonicalRepositoryApparentMappingObservationError::Route(error)").count(), 2);
         assert_eq!(producer.matches("HostCanonicalRepositoryApparentMappingObservationError(error)").count(), 1);
         assert_eq!(producer.matches("HostCanonicalRepositoryRouteObservationError(error)").count(), 0);
         for forbidden in ["merge_route_observations", "union_", "store_evaluation_data", "HostRootApparentRepositoryDefinitionKey", "HostSelectedRepositoryFileEffectKey"] { assert!(!producer.contains(forbidden)); }

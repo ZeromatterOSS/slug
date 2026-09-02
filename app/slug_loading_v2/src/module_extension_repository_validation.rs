@@ -214,6 +214,20 @@ pub struct HostSelectedExtensionOwnerCertificateObservationError(
     PrivateOwnerCertificateObservationError,
 );
 
+impl HostSelectedExtensionOwnerCertificateObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(&self) -> slug_bzlmod_v2::HostSelectedObservationFrontier {
+        match &self.0 {
+            PrivateOwnerCertificateObservationError::ModuleExtension(error) => {
+                error.selected_frontier()
+            }
+            PrivateOwnerCertificateObservationError::InnateRepositoryRule(error) => {
+                error.selected_frontier()
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 enum PrivateOwnerCertificateObservationError {
     ModuleExtension(HostSelectedExtensionOwnerPureObservationError),

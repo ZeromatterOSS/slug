@@ -48,6 +48,7 @@ mod registration_expansion;
 mod registration_expansion_tests;
 #[doc(hidden)]
 pub mod repository_rule_context;
+mod root_repository_load_route;
 mod root_subtree_package_set;
 pub mod rule_outputs;
 mod starlark_label;
@@ -228,6 +229,20 @@ pub use registration_expansion::ModuleRegistrationFamily;
 pub use registration_expansion::ObservedCommandRegistrationExpansion;
 #[doc(hidden)]
 pub use registration_expansion::ObservedModuleRegistrationExpansion;
+#[doc(hidden)]
+pub use root_repository_load_route::HostRootRepositoryLoadRoute;
+#[doc(hidden)]
+pub use root_repository_load_route::HostRootRepositoryLoadRouteError;
+#[doc(hidden)]
+pub use root_repository_load_route::HostRootRepositoryLoadRouteKey;
+#[doc(hidden)]
+pub use root_repository_load_route::HostRootRepositoryLoadRouteObservationError;
+#[doc(hidden)]
+pub use root_repository_load_route::HostRootRepositoryLoadRouteObservationKey;
+#[doc(hidden)]
+pub use root_repository_load_route::HostRootRepositoryLoadRouteOutcome;
+#[doc(hidden)]
+pub use root_repository_load_route::ObservedHostRootRepositoryLoadRoute;
 #[doc(hidden)]
 pub use root_subtree_package_set::ObservedRootSubtreePackageSet;
 #[doc(hidden)]

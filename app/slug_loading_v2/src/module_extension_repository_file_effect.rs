@@ -239,6 +239,19 @@ pub enum HostSelectedRepositoryFileEffectObservationError {
     },
 }
 
+impl HostSelectedRepositoryFileEffectObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(&self) -> slug_bzlmod_v2::HostSelectedObservationFrontier {
+        match self {
+            Self::Certificate(error) => error.selected_frontier(),
+            Self::CanonicalRoute { error, .. } => error.selected_frontier(),
+            Self::HostBzl { error, .. } | Self::Merge { error, .. } => {
+                slug_bzlmod_v2::HostSelectedObservationFrontier::Path(error.clone())
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 enum EffectMode {
     Legacy,

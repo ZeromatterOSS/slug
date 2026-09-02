@@ -657,6 +657,16 @@ pub(crate) struct OwnerProjection { manifest: crate::bzl_module::BzlLoadManifest
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub(crate) enum HostSelectedExtensionOwnerPureObservationError { Inputs(HostSelectedExtensionOwnerInputsObservationError), HostBzl { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError }, Merge { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError } }
+impl HostSelectedExtensionOwnerPureObservationError {
+    pub(crate) fn selected_frontier(&self) -> slug_bzlmod_v2::HostSelectedObservationFrontier {
+        match self {
+            Self::Inputs(error) => error.selected_frontier(),
+            Self::HostBzl { error, .. } | Self::Merge { error, .. } => {
+                slug_bzlmod_v2::HostSelectedObservationFrontier::Path(error.clone())
+            }
+        }
+    }
+}
 type OwnerPureDriver = SourcePreparationOutcome<
     Result<(OwnerPureResult, PathObservationEpoch), HostSelectedExtensionOwnerPureObservationError>,
 >;

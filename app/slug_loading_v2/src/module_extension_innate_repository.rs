@@ -86,6 +86,17 @@ impl ObservedHostPureInnateRepositoryOwner { pub(crate) fn result(&self) -> &Pur
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub(crate) enum HostPureInnateRepositoryOwnerObservationError { Inputs(HostSelectedInnateRepositoryOwnerInputsObservationError), LoadRoute(Arc<HostCanonicalRepositoryLoadRouteObservationError>), Path(ObservedPathFrontierError) }
+impl HostPureInnateRepositoryOwnerObservationError {
+    pub(crate) fn selected_frontier(&self) -> slug_bzlmod_v2::HostSelectedObservationFrontier {
+        match self {
+            Self::Inputs(error) => error.selected_frontier(),
+            Self::LoadRoute(error) => error.selected_frontier(),
+            Self::Path(error) => {
+                slug_bzlmod_v2::HostSelectedObservationFrontier::Path(error.clone())
+            }
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 enum Mode {

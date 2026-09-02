@@ -1231,12 +1231,12 @@ async fn root_package_loads_selected_registry_bzl_through_admitted_route() {
         .iter()
         .find(|row| {
             row.iter()
-                .any(|dep| dep.starts_with("observed-root-build-repository-route:"))
+                .any(|dep| dep.starts_with("observed-root-build-repository-load-route:"))
         })
         .expect("root package must depend on the admitted route");
     let route = row
         .iter()
-        .position(|dep| dep.starts_with("observed-root-build-repository-route:"))
+        .position(|dep| dep.starts_with("observed-root-build-repository-load-route:"))
         .unwrap();
     let root_bzl = row
         .iter()

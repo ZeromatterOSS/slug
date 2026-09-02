@@ -348,6 +348,17 @@ enum DemandObservationError {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct HostSelectedExtensionDemandObservationError(DemandObservationError);
 
+impl HostSelectedExtensionDemandObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(&self) -> crate::HostSelectedObservationFrontier {
+        match &self.0 {
+            DemandObservationError::Mappings(error) => {
+                super::extension_mappings_observation_frontier(error)
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct HostSelectedExtensionOwnerInputsKey {
     workspace: NormalizedAbsolutePath,
@@ -430,9 +441,31 @@ enum OwnerInputsObservationError {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct HostSelectedExtensionOwnerInputsObservationError(OwnerInputsObservationError);
 
+impl HostSelectedExtensionOwnerInputsObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(&self) -> crate::HostSelectedObservationFrontier {
+        match &self.0 {
+            OwnerInputsObservationError::Mappings(error) => {
+                super::extension_mappings_observation_frontier(error)
+            }
+        }
+    }
+}
+
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct HostSelectedInnateRepositoryOwnerInputsObservationError(OwnerInputsObservationError);
+
+impl HostSelectedInnateRepositoryOwnerInputsObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(&self) -> crate::HostSelectedObservationFrontier {
+        match &self.0 {
+            OwnerInputsObservationError::Mappings(error) => {
+                super::extension_mappings_observation_frontier(error)
+            }
+        }
+    }
+}
 
 type MappingChild = SourcePreparationOutcome<
     Result<(ExtensionMappingsResult, PathObservationEpoch), ExtensionMappingsObservationError>,
@@ -487,11 +520,14 @@ fn demand_from_mappings(
     mappings: &HostSelectedExtensionMappings,
 ) -> Result<HostSelectedExtensionDemand, HostSelectedExtensionDemandError> {
     let mut found = None;
-    for usage in mappings
-        .usages
-        .iter()
-        .filter(|usage| usage.imports.values().any(|name| name == requested))
-    {
+    for usage in mappings.usages.iter().filter(|usage| {
+        let suffix = requested
+            .as_str()
+            .strip_prefix(usage.unique_name.as_str())
+            .and_then(|suffix| suffix.strip_prefix('+'));
+        suffix.is_some_and(|internal_name| !internal_name.is_empty())
+            || usage.imports.values().any(|name| name == requested)
+    }) {
         let owner = Arc::new(HostSelectedExtensionOwner {
             id: usage.id.clone(),
             unique_name: usage.unique_name.clone(),
@@ -1341,7 +1377,7 @@ mod tests {
     }
 
     #[test]
-    fn demand_authenticates_recorded_imports_and_has_typed_dispositions() {
+    fn demand_authenticates_owner_namespaces_and_has_typed_dispositions() {
         let requested = CanonicalRepoName::new("+extension+generated").unwrap();
         let owner = owner_id("extension");
         let result = demand_from_mappings(
@@ -1366,6 +1402,50 @@ mod tests {
         assert_eq!(
             result.owner().unique_name,
             CanonicalRepoName::new("+extension").unwrap()
+        );
+
+        let sibling = CanonicalRepoName::new("+extension+sibling").unwrap();
+        let sibling_result = demand_from_mappings(
+            &sibling,
+            &mappings([usage(
+                HostGraphModuleKey::Root,
+                owner_id("extension"),
+                "+extension",
+                "+extension+generated",
+            )]),
+        )
+        .unwrap();
+        assert_eq!(sibling_result.requested(), &sibling);
+        assert_eq!(sibling_result.owner().unique_name().as_str(), "+extension");
+
+        let colliding = demand_from_mappings(
+            &CanonicalRepoName::new("+extension+sibling").unwrap(),
+            &mappings([usage(
+                HostGraphModuleKey::Root,
+                owner_id("ext"),
+                "+ext",
+                "+ext+generated",
+            )]),
+        )
+        .unwrap_err();
+        assert_eq!(
+            colliding.disposition(),
+            HostSelectedExtensionDemandErrorDisposition::Missing
+        );
+
+        let empty_internal = demand_from_mappings(
+            &CanonicalRepoName::new("+extension+").unwrap(),
+            &mappings([usage(
+                HostGraphModuleKey::Root,
+                owner_id("extension"),
+                "+extension",
+                "+extension+generated",
+            )]),
+        )
+        .unwrap_err();
+        assert_eq!(
+            empty_internal.disposition(),
+            HostSelectedExtensionDemandErrorDisposition::Missing
         );
 
         let id = owner_id("extension");

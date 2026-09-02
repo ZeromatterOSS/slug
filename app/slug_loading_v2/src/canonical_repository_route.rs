@@ -179,6 +179,22 @@ pub struct HostCanonicalRepositoryRouteObservationError(
 
 impl Dupe for HostCanonicalRepositoryRouteObservationError {}
 
+impl HostCanonicalRepositoryRouteObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(&self) -> slug_bzlmod_v2::HostSelectedObservationFrontier {
+        match &self.0 {
+            CanonicalRepositoryRouteObservationError::Builtin(error) => error.selected_frontier(),
+            CanonicalRepositoryRouteObservationError::Selected(error) => error.selected_frontier(),
+            CanonicalRepositoryRouteObservationError::Generated { error, .. } => {
+                error.selected_frontier()
+            }
+            CanonicalRepositoryRouteObservationError::Merge { error, .. } => {
+                slug_bzlmod_v2::HostSelectedObservationFrontier::Path(error.clone())
+            }
+        }
+    }
+}
+
 pub(super) fn complete_route_driver(
     value: Result<HostCanonicalRepositoryRoute, HostCanonicalRepositoryRouteError>,
     observations: PathObservationEpoch,

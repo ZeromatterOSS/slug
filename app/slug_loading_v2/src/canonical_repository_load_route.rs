@@ -175,6 +175,19 @@ pub enum HostCanonicalRepositoryLoadRouteObservationError {
 
 impl Dupe for HostCanonicalRepositoryLoadRouteObservationError {}
 
+impl HostCanonicalRepositoryLoadRouteObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(&self) -> slug_bzlmod_v2::HostSelectedObservationFrontier {
+        match self {
+            Self::Route(error) => error.selected_frontier(),
+            Self::Effect { error, .. } => error.selected_frontier(),
+            Self::Merge { error, .. } => {
+                slug_bzlmod_v2::HostSelectedObservationFrontier::Path(error.clone())
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 enum CanonicalLoadRouteMode {
     Legacy,

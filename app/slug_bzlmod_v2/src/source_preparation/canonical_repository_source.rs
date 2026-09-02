@@ -320,7 +320,8 @@ impl Hash for HostRepositorySourceRoute {
 }
 
 impl HostRepositorySourceObservationError {
-    pub(crate) fn request_error(&self) -> Option<&RepositorySourceFileError> {
+    #[doc(hidden)]
+    pub fn request_error(&self) -> Option<&RepositorySourceFileError> {
         match &self.kind {
             HostRepositorySourceObservationErrorKind::Request(error) => Some(error),
             HostRepositorySourceObservationErrorKind::BuiltinPath

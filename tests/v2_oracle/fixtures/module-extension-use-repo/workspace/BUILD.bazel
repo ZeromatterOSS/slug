@@ -1,1 +1,4 @@
+load("@generated//:defs.bzl", "GENERATED_VALUE")
+
 exports_files(["MODULE.bazel"])
+filegroup(name = GENERATED_VALUE)

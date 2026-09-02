@@ -74,9 +74,6 @@ use slug_bzlmod_v2::RootPackageSourceKey;
 use slug_bzlmod_v2::RootPackageSourceObservationKey;
 use slug_bzlmod_v2::RootRepositoryBzlLoadRoute;
 use slug_bzlmod_v2::RootRepositoryRoute;
-use slug_bzlmod_v2::RootRepositoryRouteError;
-use slug_bzlmod_v2::RootRepositoryRouteKey;
-use slug_bzlmod_v2::RootRepositoryRouteObservationKey;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_bzlmod_v2::host_repository_relative_path;
 use slug_events_v2::CaptureEvaluationEvents;
@@ -105,6 +102,9 @@ use starlark_map::small_set::SmallSet;
 
 use crate::HostCanonicalRepositoryLoadRouteKey;
 use crate::HostCanonicalRepositoryLoadRouteObservationKey;
+use crate::HostRootRepositoryLoadRouteError;
+use crate::HostRootRepositoryLoadRouteKey;
+use crate::HostRootRepositoryLoadRouteObservationKey;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::bzl_visibility::BzlLoadVisibilityError;
 use crate::bzl_visibility::validate_bzl_load_visibility;
@@ -1949,7 +1949,7 @@ enum RootPackageLoadErrorInner {
     ExternalRoute {
         load: Arc<str>,
         apparent_repo: slug_identity_v2::ApparentRepoName,
-        error: RootRepositoryRouteError,
+        error: HostRootRepositoryLoadRouteError,
     },
     ExternalInfrastructure {
         load: Arc<str>,
@@ -5208,11 +5208,11 @@ async fn load_root_package_external_route(
     apparent_repo: &slug_identity_v2::ApparentRepoName,
     load: &str,
     observations: &mut PathObservationEpoch,
-) -> Result<RootRepositoryRoute, RootPackageLoadDriverOutcome> {
+) -> Result<HostRepositorySourceRoute, RootPackageLoadDriverOutcome> {
     let route = match mode {
         HostPackageLoadMode::Legacy => match ctx
             .compute(
-                &RootRepositoryRouteKey::for_root_build(
+                &HostRootRepositoryLoadRouteKey::for_root_build(
                     key.workspace.dupe(),
                     apparent_repo.clone(),
                 )
@@ -5236,7 +5236,7 @@ async fn load_root_package_external_route(
         },
         HostPackageLoadMode::Observed => match ctx
             .compute(
-                &RootRepositoryRouteObservationKey::for_root_build(
+                &HostRootRepositoryLoadRouteObservationKey::for_root_build(
                     key.workspace.dupe(),
                     apparent_repo.clone(),
                 )
@@ -5283,7 +5283,7 @@ async fn load_root_package_external_route(
             }
         },
     };
-    route.map_err(|error| {
+    route.map(|route| route.source().clone()).map_err(|error| {
         root_package_load_terminal(
             RootPackageLoadErrorInner::ExternalRoute {
                 load: Arc::from(load),
@@ -5298,16 +5298,20 @@ async fn load_root_package_external_route(
 async fn load_root_package_external_bzl(
     ctx: &mut DiceComputations<'_>,
     mode: HostPackageLoadMode,
-    route: RootRepositoryRoute,
+    route: HostRepositorySourceRoute,
     label: RepositoryBzlLabel,
     origin: Arc<str>,
     load: &str,
     observations: &mut PathObservationEpoch,
 ) -> RootPackageModuleOutcome {
-    let canonical = label.canonical_label(&HostRepositorySourceRoute::root(route.clone()));
+    let canonical = label.canonical_label(&route);
     let child = match mode {
         HostPackageLoadMode::Legacy => match ctx
-            .compute(&ExternalBzlModuleEvalKey::new(route, label))
+            .compute(&ExternalBzlModuleEvalKey::from_source_route(
+                route,
+                label,
+                BzlModuleContext::Build,
+            ))
             .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
@@ -5325,7 +5329,11 @@ async fn load_root_package_external_bzl(
             }
         },
         HostPackageLoadMode::Observed => match ctx
-            .compute(&ExternalBzlModuleObservationKey::new(route, label))
+            .compute(&ExternalBzlModuleObservationKey::from_source_route(
+                route,
+                label,
+                BzlModuleContext::Build,
+            ))
             .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
@@ -8033,9 +8041,11 @@ mod module_extension_definition_loading_tests {
             None,
         )
         .await;
-        let route_key =
-            RootRepositoryRouteKey::new(workspace.dupe(), ApparentRepoName::new("dep").unwrap())
-                .unwrap();
+        let route_key = slug_bzlmod_v2::RootRepositoryRouteKey::new(
+            workspace.dupe(),
+            ApparentRepoName::new("dep").unwrap(),
+        )
+        .unwrap();
         let SourcePreparationOutcome::Complete(route) =
             transaction.compute(&route_key).await.unwrap()
         else {

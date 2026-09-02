@@ -14,7 +14,6 @@ pub mod dice;
 mod events;
 mod file_write_aquery_text;
 mod file_write_identity;
-mod generated_package_route;
 mod generated_repository_definition;
 mod path_observation;
 mod process_host;

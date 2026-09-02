@@ -4210,6 +4210,38 @@ extension, materializer, lockfile or environment semantic owner moves. Bazel
 Independent Sol architecture review returns `ACCEPT`; implementation is active
 only within the frozen shared-route packet.
 
+### Generated owner-namespace demand replan (2026-09-01)
+
+Recursive route proof found that selected demand authenticates only canonical
+repositories named by a `use_repo` import. That is insufficient after an
+imported generated repository resolves an unimported sibling through its own
+complete owner mapping. Bazel 9.2's `SingleExtensionValue` publishes every
+generated name from one extension result, and
+`generatedReposHaveCorrectMappings` proves the sibling load.
+
+Keep selected mappings as the producer of graph-derived extension unique names
+and the existing owner certificate as the sole proof of actual generated
+repository calls. The replan may change only the existing demand helper to
+authenticate the exact `unique_name + "+"` namespace boundary; it adds no
+retained index or second definition owner. A missing internal name still
+evaluates the authentic owner and returns the existing typed missing result.
+Independent review is required before Rust resumes.
+
+Independent Sol review returns `ACCEPT`; implementation may resume inside that
+bounded owner-namespace correction with delimiter-collision and typed-missing
+proof.
+
+The superseding packet is terminally accepted. One loading-owned retained
+route now serves root BUILD direct loads, exported-source build and external
+query; the exact owner namespace admits unimported sibling-generated
+repositories without moving existence proof out of the owner certificate.
+The bounded Bazel/Slug fixture, adapter DICE/frontier matrix and serial direct
+dependents pass, and core's temporary private generated-package route is
+deleted. The authentic rules_rust replay clears this boundary and next stops
+at the generic `repository_rule(build_file = ...)` declaration schema. Audit
+that complete applicable declaration category next; do not specialize for
+rules_rust, `cc_common`, `cc_internal`, parser or C++ consumers.
+
 ### Compilation-helper acceptance and Stage 4 continuation (2026-08-26)
 
 Commit `3060e4d4d` accepts the complete rules_cc compilation-helper freeze with

@@ -67,6 +67,11 @@ use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::HostRepositorySourceFileKey;
 use slug_bzlmod_v2::HostRepositorySourceFileObservationKey;
 use slug_bzlmod_v2::HostRepositorySourceFileValue;
+use slug_bzlmod_v2::HostRepositorySourceObservation;
+use slug_bzlmod_v2::HostRepositorySourceObservationEpochKey;
+use slug_bzlmod_v2::HostRepositorySourceObservationError;
+use slug_bzlmod_v2::HostRepositorySourceObservationKey;
+use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RegistryRequestGeneration;
 use slug_bzlmod_v2::RegistryRequestGenerationKey;
@@ -89,10 +94,12 @@ use slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey;
 use slug_bzlmod_v2::RootModuleLockfileModeKey;
 use slug_bzlmod_v2::RootModuleRegistryUrlsKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
-use slug_bzlmod_v2::RootRepositoryRouteError;
+#[cfg(test)]
 use slug_bzlmod_v2::RootRepositoryRouteKey;
+#[cfg(test)]
 use slug_bzlmod_v2::RootRepositoryRouteObservationKey;
 use slug_bzlmod_v2::SourcePreparationOutcome as PreparationOutcome;
+use slug_bzlmod_v2::host_repository_relative_path;
 use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
@@ -106,6 +113,10 @@ use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetName;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
+use slug_loading_v2::HostRootRepositoryLoadRouteError;
+use slug_loading_v2::HostRootRepositoryLoadRouteKey;
+use slug_loading_v2::HostRootRepositoryLoadRouteObservationError;
+use slug_loading_v2::HostRootRepositoryLoadRouteObservationKey;
 use slug_loading_v2::LegacyLoadedPackage;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationOutcome;
@@ -176,10 +187,6 @@ use super::events::ProvisionalEventEpoch;
 use super::events::SealedCommandAttempt;
 use super::events::SelectedCommandSidecars;
 use super::events::SelectedTerminalToken;
-use super::generated_package_route::GeneratedPackageRouteError;
-use super::generated_package_route::GeneratedPackageRouteKey;
-use super::generated_package_route::GeneratedPackageRouteObservationError;
-use super::generated_package_route::GeneratedPackageRouteObservationKey;
 use super::request_revision::NativeFinalization;
 use super::request_revision::RequestRevisionError;
 use super::request_revision::RequestRevisionKey;
@@ -3003,10 +3010,17 @@ pub struct BuildCommandError {
 enum BuildCommandErrorKind {
     RootAnchor(RootModuleLoadingAnchorError),
     Package(RootPackageLoadError),
-    RepositoryRoute(RootRepositoryRouteError),
-    GeneratedRoute(GeneratedPackageRouteError),
+    RepositoryRoute(HostRootRepositoryLoadRouteError),
+    GeneratedRouteObservation {
+        apparent_repo: slug_identity_v2::ApparentRepoName,
+        error: HostRootRepositoryLoadRouteObservationError,
+    },
     RepositoryPackage(RepositoryPackageLoadError),
     RepositorySource(RepositorySourceFileError, Option<Box<SourceCertificate>>),
+    RepositorySourceObservation(
+        HostRepositorySourceObservationError,
+        Option<Box<SourceCertificate>>,
+    ),
     SourceMissing(CanonicalLabel, Option<Box<SourceCertificate>>),
     RootSource {
         observation: PathObservationResult,
@@ -3074,15 +3088,15 @@ fn external_build_complete(
 
 fn external_build_generated_route_outer(
     apparent_repo: slug_identity_v2::ApparentRepoName,
-    outer: GeneratedPackageRouteObservationError,
+    error: HostRootRepositoryLoadRouteObservationError,
     observations: PathObservationEpoch,
 ) -> ExternalBuildBranchResult {
     external_build_complete(
         Err(BuildCommandError::new(
-            BuildCommandErrorKind::GeneratedRoute(GeneratedPackageRouteError::compute(
+            BuildCommandErrorKind::GeneratedRouteObservation {
                 apparent_repo,
-                outer,
-            )),
+                error,
+            },
         )),
         observations,
     )
@@ -3647,6 +3661,7 @@ impl BuildCommandError {
                 source_certificate, ..
             }
             | BuildCommandErrorKind::RepositorySource(_, source_certificate)
+            | BuildCommandErrorKind::RepositorySourceObservation(_, source_certificate)
             | BuildCommandErrorKind::SourceMissing(_, source_certificate) => {
                 source_certificate.as_deref()
             }
@@ -3660,6 +3675,7 @@ impl BuildCommandError {
                 source_certificate, ..
             }
             | BuildCommandErrorKind::RepositorySource(_, source_certificate)
+            | BuildCommandErrorKind::RepositorySourceObservation(_, source_certificate)
             | BuildCommandErrorKind::SourceMissing(_, source_certificate) => {
                 source_certificate.take().map(|certificate| *certificate)
             }
@@ -3689,9 +3705,17 @@ impl fmt::Display for BuildCommandError {
             BuildCommandErrorKind::RootAnchor(error) => error.fmt(f),
             BuildCommandErrorKind::Package(error) => error.fmt(f),
             BuildCommandErrorKind::RepositoryRoute(error) => error.fmt(f),
-            BuildCommandErrorKind::GeneratedRoute(error) => error.fmt(f),
+            BuildCommandErrorKind::GeneratedRouteObservation {
+                apparent_repo,
+                error,
+            } => write!(
+                f,
+                "generated repository route @{}: {error}",
+                apparent_repo.as_str()
+            ),
             BuildCommandErrorKind::RepositoryPackage(error) => error.fmt(f),
             BuildCommandErrorKind::RepositorySource(error, _) => write!(f, "{error:?}"),
+            BuildCommandErrorKind::RepositorySourceObservation(error, _) => error.fmt(f),
             BuildCommandErrorKind::SourceMissing(label, _) => {
                 write!(f, "{label}: missing input file '{label}'")
             }
@@ -3744,8 +3768,9 @@ impl std::error::Error for BuildCommandError {
             BuildCommandErrorKind::RootAnchor(error) => Some(error),
             BuildCommandErrorKind::Package(error) => Some(error),
             BuildCommandErrorKind::RepositoryRoute(error) => Some(error),
-            BuildCommandErrorKind::GeneratedRoute(error) => Some(error),
+            BuildCommandErrorKind::GeneratedRouteObservation { error, .. } => Some(error),
             BuildCommandErrorKind::RepositoryPackage(error) => Some(error),
+            BuildCommandErrorKind::RepositorySourceObservation(error, _) => Some(error),
             BuildCommandErrorKind::Analysis(error) => Some(error),
             _ => None,
         }
@@ -4823,102 +4848,85 @@ async fn drive_external_exported_source_build_branch(
     mode: BuildAnalysisMode,
     observations: PathObservationEpoch,
 ) -> ExternalBuildBranchResult {
-    let route_key = RootRepositoryRouteKey::new(workspace.dupe(), label.repo().clone())
+    let route_key = HostRootRepositoryLoadRouteKey::new(workspace.dupe(), label.repo().clone())
         .expect("external single target has a nonroot repository route");
     let observed_route_key =
-        RootRepositoryRouteObservationKey::new(workspace.dupe(), label.repo().clone())
+        HostRootRepositoryLoadRouteObservationKey::new(workspace.dupe(), label.repo().clone())
             .expect("external single target has a nonroot repository route");
-    let (route, mut observations, _) = compute_external_build_child!(
-        ctx,
-        mode,
-        &observations,
-        route_key,
-        |result: Arc<Result<slug_bzlmod_v2::RootRepositoryRoute, RootRepositoryRouteError>>| result
-            .as_ref()
-            .clone(),
-        observed_route_key,
-        |error: slug_bzlmod_v2::RootRepositoryRouteObservationError| error.ordinary_path(),
-        |observed: slug_bzlmod_v2::ObservedRootRepositoryRoute| (
-            observed.result().as_ref().clone(),
-            observed.observations().dupe()
-        )
-    );
-    let route = match route {
-        Ok(route) => route,
-        Err(route_error) => {
-            if !route_error.is_generated_route_fallback() {
-                return external_build_complete(
-                    Err(BuildCommandError::new(
-                        BuildCommandErrorKind::RepositoryRoute(route_error),
-                    )),
+    let (route, incoming) = match mode {
+        BuildAnalysisMode::Legacy => match ctx.compute(&route_key).await {
+            Ok(PreparationOutcome::Need(need)) => return Ok(PreparationOutcome::Need(need)),
+            Ok(PreparationOutcome::Complete(result)) => {
+                (result.as_ref().clone(), PathObservationEpoch::empty())
+            }
+            Err(error) => return external_build_compute_error(mode, error, observations),
+        },
+        BuildAnalysisMode::Observed => match ctx.compute(&observed_route_key).await {
+            Ok(PreparationOutcome::Need(need)) => return Ok(PreparationOutcome::Need(need)),
+            Ok(PreparationOutcome::Complete(Err(error))) => {
+                if let HostRootRepositoryLoadRouteObservationError::Root(root) = &error {
+                    match root.clone().selected_frontier() {
+                        slug_bzlmod_v2::HostSelectedObservationFrontier::Path(error) => {
+                            return Ok(PreparationOutcome::Complete(Err(error)));
+                        }
+                        slug_bzlmod_v2::HostSelectedObservationFrontier::Infrastructure(_) => {}
+                    }
+                }
+                return external_build_generated_route_outer(
+                    label.repo().clone(),
+                    error,
                     observations,
                 );
             }
-            let bridge_key = GeneratedPackageRouteKey::new(workspace.dupe(), label.repo().clone())
-                .expect("external single target has a nonroot repository route");
-            let bridge_observed_key =
-                GeneratedPackageRouteObservationKey::new(workspace.dupe(), label.repo().clone())
-                    .expect("external single target has a nonroot repository route");
-            let (bridged, incoming) = match mode {
-                BuildAnalysisMode::Legacy => match ctx.compute(&bridge_key).await {
-                    Ok(PreparationOutcome::Need(need)) => {
-                        return Ok(PreparationOutcome::Need(need));
-                    }
-                    Ok(PreparationOutcome::Complete(result)) => {
-                        (result.as_ref().clone(), PathObservationEpoch::empty())
-                    }
-                    Err(error) => return external_build_compute_error(mode, error, observations),
-                },
-                BuildAnalysisMode::Observed => match ctx.compute(&bridge_observed_key).await {
-                    Ok(PreparationOutcome::Need(need)) => {
-                        return Ok(PreparationOutcome::Need(need));
-                    }
-                    Ok(PreparationOutcome::Complete(Err(error))) => {
-                        return external_build_generated_route_outer(
-                            label.repo().clone(),
-                            error,
-                            observations,
-                        );
-                    }
-                    Ok(PreparationOutcome::Complete(Ok(observed))) => (
-                        observed.result().as_ref().clone(),
-                        observed.observations().dupe(),
-                    ),
-                    Err(error) => return external_build_compute_error(mode, error, observations),
-                },
-            };
-            observations = match union_build_observations(&observations, &incoming) {
-                Ok(observations) => observations,
-                Err(error) => return Ok(PreparationOutcome::Complete(Err(error))),
-            };
-            match bridged {
-                Ok(route) => route,
-                Err(error) if error.is_fallback_neutral() => {
-                    return external_build_complete(
-                        Err(BuildCommandError::new(
-                            BuildCommandErrorKind::RepositoryRoute(route_error),
-                        )),
-                        observations,
-                    );
-                }
-                Err(error) => {
-                    return external_build_complete(
-                        Err(BuildCommandError::new(
-                            BuildCommandErrorKind::GeneratedRoute(error),
-                        )),
-                        observations,
-                    );
-                }
-            }
+            Ok(PreparationOutcome::Complete(Ok(observed))) => (
+                observed.result().as_ref().clone(),
+                observed.observations().dupe(),
+            ),
+            Err(error) => return external_build_compute_error(mode, error, observations),
+        },
+    };
+    let observations = match union_build_observations(&observations, &incoming) {
+        Ok(observations) => observations,
+        Err(error) => return Ok(PreparationOutcome::Complete(Err(error))),
+    };
+    let route = match route {
+        Ok(route) => route,
+        Err(error) => {
+            return external_build_complete(
+                Err(BuildCommandError::new(
+                    BuildCommandErrorKind::RepositoryRoute(error),
+                )),
+                observations,
+            );
+        }
+    };
+    let source_route = route.source().clone();
+    let package_key = match &source_route {
+        HostRepositorySourceRoute::Root(root) => {
+            RepositoryPackageLoadKey::new(root.clone(), label.package().clone())
+        }
+        HostRepositorySourceRoute::Canonical(input) => {
+            RepositoryPackageLoadKey::new_canonical(input.clone(), label.package().clone())
+        }
+    };
+    let observed_package_key = match &source_route {
+        HostRepositorySourceRoute::Root(root) => {
+            RepositoryPackageLoadObservationKey::new(root.clone(), label.package().clone())
+        }
+        HostRepositorySourceRoute::Canonical(input) => {
+            RepositoryPackageLoadObservationKey::new_canonical(
+                input.clone(),
+                label.package().clone(),
+            )
         }
     };
     let (package, observations, _) = compute_external_build_child!(
         ctx,
         mode,
         &observations,
-        RepositoryPackageLoadKey::new(route.clone(), label.package().clone()),
+        package_key,
         |result: Arc<Result<LoadedPackage, RepositoryPackageLoadError>>| result.as_ref().clone(),
-        RepositoryPackageLoadObservationKey::new(route.clone(), label.package().clone()),
+        observed_package_key,
         |error| error,
         |observed: slug_loading_v2::ObservedRepositoryPackageLoad| (
             observed.result().as_ref().clone(),
@@ -4978,19 +4986,80 @@ async fn drive_external_exported_source_build_branch(
     ))
     .expect("validated routed external label has a canonical projection");
     let source = PathBuf::from(label.package().as_str()).join(label.target().as_str());
-    let (source_result, observations, source_observations) = compute_external_build_child!(
-        ctx,
-        mode,
-        &observations,
-        HostRepositorySourceFileKey::new(route.clone(), source.clone()),
-        |result: Result<HostRepositorySourceFileValue, RepositorySourceFileError>| result,
-        HostRepositorySourceFileObservationKey::new(route, source),
-        |error| error,
-        |observed: slug_bzlmod_v2::ObservedHostRepositorySourceFile| (
-            observed.result().as_ref().clone(),
-            observed.observations().dupe()
-        )
-    );
+    enum ExternalSourceState {
+        Present,
+        Absent,
+        RootError(RepositorySourceFileError),
+        ObservationError(HostRepositorySourceObservationError),
+    }
+    let (source_state, observations, source_observations) = match &source_route {
+        HostRepositorySourceRoute::Root(root) => {
+            let (result, observations, incoming) = compute_external_build_child!(
+                ctx,
+                mode,
+                &observations,
+                HostRepositorySourceFileKey::new(root.clone(), source.clone()),
+                |result: Result<HostRepositorySourceFileValue, RepositorySourceFileError>| result,
+                HostRepositorySourceFileObservationKey::new(root.clone(), source.clone()),
+                |error| error,
+                |observed: slug_bzlmod_v2::ObservedHostRepositorySourceFile| (
+                    observed.result().as_ref().clone(),
+                    observed.observations().dupe()
+                )
+            );
+            let state = match result {
+                Ok(HostRepositorySourceFileValue::Present { .. })
+                | Err(RepositorySourceFileError::WrongKind {
+                    actual: PathNodeKind::Directory,
+                    ..
+                }) => ExternalSourceState::Present,
+                Ok(HostRepositorySourceFileValue::Absent) => ExternalSourceState::Absent,
+                Err(error) => ExternalSourceState::RootError(error),
+            };
+            (state, observations, incoming)
+        }
+        HostRepositorySourceRoute::Canonical(input) => {
+            let relative = host_repository_relative_path(source.clone())
+                .expect("validated package and target form a repository-relative source path");
+            let (result, observations, incoming) = compute_external_build_child!(
+                ctx,
+                mode,
+                &observations,
+                HostRepositorySourceObservationKey::new_canonical(input.clone(), relative.clone(),),
+                |result: Arc<
+                    Result<HostRepositorySourceObservation, HostRepositorySourceObservationError>,
+                >| result.as_ref().clone(),
+                HostRepositorySourceObservationEpochKey::new_canonical(input.clone(), relative),
+                |error| error,
+                |observed: slug_bzlmod_v2::ObservedHostRepositorySourceObservation| (
+                    observed.result().as_ref().clone(),
+                    observed.observations().dupe()
+                )
+            );
+            let state = match result {
+                Ok(HostRepositorySourceObservation::Builtin(_))
+                | Ok(HostRepositorySourceObservation::Request(
+                    HostRepositorySourceFileValue::Present { .. },
+                )) => ExternalSourceState::Present,
+                Ok(HostRepositorySourceObservation::Request(
+                    HostRepositorySourceFileValue::Absent,
+                )) => ExternalSourceState::Absent,
+                Err(error)
+                    if matches!(
+                        error.request_error(),
+                        Some(RepositorySourceFileError::WrongKind {
+                            actual: PathNodeKind::Directory,
+                            ..
+                        })
+                    ) =>
+                {
+                    ExternalSourceState::Present
+                }
+                Err(error) => ExternalSourceState::ObservationError(error),
+            };
+            (state, observations, incoming)
+        }
+    };
     let source_certificate = match mode {
         BuildAnalysisMode::Legacy => None,
         BuildAnalysisMode::Observed => Some(
@@ -4998,12 +5067,8 @@ async fn drive_external_exported_source_build_branch(
                 .expect("observed repository source has a nonempty epoch"),
         ),
     };
-    match source_result {
-        Ok(HostRepositorySourceFileValue::Present { .. })
-        | Err(RepositorySourceFileError::WrongKind {
-            actual: PathNodeKind::Directory,
-            ..
-        }) => external_build_complete(
+    match source_state {
+        ExternalSourceState::Present => external_build_complete(
             Ok(BuildRequestedTarget {
                 pattern,
                 package,
@@ -5013,7 +5078,7 @@ async fn drive_external_exported_source_build_branch(
             }),
             observations,
         ),
-        Ok(HostRepositorySourceFileValue::Absent) => external_build_complete(
+        ExternalSourceState::Absent => external_build_complete(
             Err(BuildCommandError::new(
                 BuildCommandErrorKind::SourceMissing(
                     source_label,
@@ -5022,9 +5087,18 @@ async fn drive_external_exported_source_build_branch(
             )),
             observations,
         ),
-        Err(error) => external_build_complete(
+        ExternalSourceState::RootError(error) => external_build_complete(
             Err(BuildCommandError::new(
                 BuildCommandErrorKind::RepositorySource(error, source_certificate.map(Box::new)),
+            )),
+            observations,
+        ),
+        ExternalSourceState::ObservationError(error) => external_build_complete(
+            Err(BuildCommandError::new(
+                BuildCommandErrorKind::RepositorySourceObservation(
+                    error,
+                    source_certificate.map(Box::new),
+                ),
             )),
             observations,
         ),

@@ -25,7 +25,7 @@ use dice::CancellationContext;
 use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
-use slug_bzlmod_v2::RootRepositoryRoute;
+use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
@@ -35,6 +35,7 @@ use slug_identity_v2::PackagePath;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::AttributeQueryValue;
 use slug_loading_v2::ConfiguredDependencyDefault;
+use slug_loading_v2::HostRootRepositoryLoadRoute;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::PackageEvaluation;
@@ -336,7 +337,7 @@ pub(crate) struct RootUnconfiguredPackageGraphKey {
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub(crate) struct ExternalUnconfiguredPackageGraphKey {
-    route: RootRepositoryRoute,
+    route: HostRootRepositoryLoadRoute,
     package: PackagePath,
 }
 
@@ -383,13 +384,13 @@ impl RootUnconfiguredPackageGraphObservationKey {
 }
 
 impl ExternalUnconfiguredPackageGraphKey {
-    pub(crate) fn new(route: RootRepositoryRoute, package: PackagePath) -> Self {
+    pub(crate) fn new(route: HostRootRepositoryLoadRoute, package: PackagePath) -> Self {
         Self { route, package }
     }
 }
 
 impl ExternalUnconfiguredPackageGraphObservationKey {
-    pub(crate) fn new(route: RootRepositoryRoute, package: PackagePath) -> Self {
+    pub(crate) fn new(route: HostRootRepositoryLoadRoute, package: PackagePath) -> Self {
         Self(ExternalUnconfiguredPackageGraphKey::new(route, package))
     }
 }
@@ -781,10 +782,14 @@ async fn compute_external_unconfigured_package_graph(
 ) -> ObservedGraphValue {
     let (loaded, observations) = match mode {
         QueryObservationMode::Legacy => match ctx
-            .compute(&RepositoryPackageLoadKey::new(
-                key.route.clone(),
-                key.package.clone(),
-            ))
+            .compute(&match key.route.source() {
+                HostRepositorySourceRoute::Root(route) => {
+                    RepositoryPackageLoadKey::new(route.clone(), key.package.clone())
+                }
+                HostRepositorySourceRoute::Canonical(input) => {
+                    RepositoryPackageLoadKey::new_canonical(input.clone(), key.package.clone())
+                }
+            })
             .await
             .expect("external package loading DICE invariant")
         {
@@ -794,10 +799,17 @@ async fn compute_external_unconfigured_package_graph(
             LoadingPreparationOutcome::Complete(loaded) => (loaded, PathObservationEpoch::empty()),
         },
         QueryObservationMode::Observed => match ctx
-            .compute(&RepositoryPackageLoadObservationKey::new(
-                key.route.clone(),
-                key.package.clone(),
-            ))
+            .compute(&match key.route.source() {
+                HostRepositorySourceRoute::Root(route) => {
+                    RepositoryPackageLoadObservationKey::new(route.clone(), key.package.clone())
+                }
+                HostRepositorySourceRoute::Canonical(input) => {
+                    RepositoryPackageLoadObservationKey::new_canonical(
+                        input.clone(),
+                        key.package.clone(),
+                    )
+                }
+            })
             .await
             .expect("observed external package loading DICE invariant")
         {
@@ -1165,7 +1177,7 @@ fn package_graph_from_loaded(
 }
 
 fn external_package_graph_from_loaded(
-    route: &RootRepositoryRoute,
+    route: &HostRootRepositoryLoadRoute,
     package: &PackagePath,
     loaded: &LoadedPackage,
 ) -> Result<UnconfiguredPackageGraph, QueryError> {

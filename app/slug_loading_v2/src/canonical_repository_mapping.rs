@@ -229,6 +229,20 @@ pub struct HostCanonicalRepositoryApparentMappingObservationError(
     pub(super) CanonicalRepositoryApparentMappingObservationError,
 );
 
+impl HostCanonicalRepositoryApparentMappingObservationError {
+    #[doc(hidden)]
+    pub fn selected_frontier(&self) -> slug_bzlmod_v2::HostSelectedObservationFrontier {
+        match &self.0 {
+            CanonicalRepositoryApparentMappingObservationError::RootMapping(error) => {
+                error.selected_frontier()
+            }
+            CanonicalRepositoryApparentMappingObservationError::Route(error) => {
+                error.selected_frontier()
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 enum CanonicalRepositoryApparentMappingMode {
     Legacy,

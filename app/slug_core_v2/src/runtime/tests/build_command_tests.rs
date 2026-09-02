@@ -1851,6 +1851,12 @@ impl ActivationTracker for ObservedBuildTracker {
             && key
                 .downcast_ref::<RootRepositoryRouteObservationKey>()
                 .is_none()
+            && key
+                .downcast_ref::<HostRootRepositoryLoadRouteKey>()
+                .is_none()
+            && key
+                .downcast_ref::<HostRootRepositoryLoadRouteObservationKey>()
+                .is_none()
             && key.downcast_ref::<RepositoryPackageLoadKey>().is_none()
             && key
                 .downcast_ref::<RepositoryPackageLoadObservationKey>()
@@ -2339,7 +2345,7 @@ fn observed_build_identity_and_epoch_union_are_restricted_and_left_stable() {
     let merged = union_build_observations(&left, &duplicate).unwrap();
     assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
     let conflicting = PathObservationEpoch::new([(
-        demand,
+        demand.dupe(),
         PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
             PathNodeKind::RegularFile,
             1,
@@ -4009,9 +4015,17 @@ fn generated_route_observed_outer_preserves_only_the_public_prefix() {
     );
     let result = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
     let prefix = PathObservationEpoch::from_shared([(demand.dupe(), result.dupe())]).unwrap();
+    let outer = PathObservationEpoch::from_shared([(
+        demand.dupe(),
+        Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Missing,
+        )),
+    )])
+    .unwrap_err()
+    .into();
     let outcome = external_build_generated_route_outer(
         slug_identity_v2::ApparentRepoName::new("generated").unwrap(),
-        GeneratedPackageRouteObservationError,
+        HostRootRepositoryLoadRouteObservationError::Merge(outer),
         prefix,
     )
     .unwrap();
@@ -4020,7 +4034,7 @@ fn generated_route_observed_outer_preserves_only_the_public_prefix() {
     };
     assert!(matches!(
         error.kind,
-        BuildCommandErrorKind::GeneratedRoute(_)
+        BuildCommandErrorKind::GeneratedRouteObservation { .. }
     ));
     assert!(error.source_certificate().is_none());
     assert_eq!(returned.observations().len(), 1);

@@ -1,8 +1,8 @@
 [fixture]
 name = "module-extension-use-repo"
-description = "Bazel 9.2 loads and builds an exported source from a local module-extension-generated repository imported with use_repo."
+description = "Bazel 9.2 loads and builds an exported source from a local module-extension-generated repository, recursively loads an unimported sibling repository from root BUILD, and queries the external package."
 comparison = "message_shape"
-oracle_notes = "Self-contained M7A generated-build evidence. Exact claims are exit zero, canonical generated target identity, source-file classification, and successful completion; timing, progress, server, process, and path text are normalized presentation."
+oracle_notes = "Self-contained M7A generated loading/build/query evidence. Exact claims are exit zero, canonical generated target identity, source-file classification, root BUILD loading of an imported generated .bzl, recursive resolution of an unimported sibling from the generated owner mapping, and external query success; timing, progress, server, process, and path text are normalized presentation."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -16,7 +16,7 @@ source_anchors = [
   "src/test/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionResolutionTest.java#generatedReposHaveCorrectMappings",
   "src/test/java/com/google/devtools/build/lib/analysis/BuildViewTest.java#testTopLevelInputFile",
 ]
-translation_notes = "The fixture composes the generated-repository mapping test with the top-level exported-source build test into one smaller public CLI discriminator; it is not a verbatim migration of either workspace. The extension and repository rule are local and require no network access."
+translation_notes = "The fixture composes generatedReposHaveCorrectMappings with the top-level exported-source build test into one smaller public CLI discriminator. The root BUILD loads the imported generated repository, whose .bzl loads an unimported sibling from the same complete extension result. It is not a verbatim migration of either workspace. The extension and repository rule are local and require no network access."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture module-extension-use-repo --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture module-extension-use-repo --tool bazel --bazel /usr/bin/bazel"
 
@@ -28,3 +28,17 @@ expected_exit = 0
 bazel_stderr_contains = ["@@+ext+generated//:generated.txt is a source file", "Build completed successfully"]
 bazel_stderr_patterns = ['(?s)Analyzed target @@\+ext\+generated//:generated\.txt.*Build completed successfully']
 slug_stderr_patterns = ['\A\{"success":true,"command":"build","target_count":1,"loaded_package_count":1,"analyzed_target_count":0,"declared_action_count":0,"runtime_mode":"one-shot","completed_boundary":"dice_exported_source_file"\}\n?\Z']
+
+[[commands]]
+name = "query_root_generated_sibling_load"
+argv = ["query", "//:loaded"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ['\A//:loaded\n?\Z']
+
+[[commands]]
+name = "query_generated_repo_file"
+argv = ["query", "@generated//:generated.txt"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ['\A@generated//:generated\.txt\n?\Z']

@@ -128,6 +128,18 @@ pub(super) enum HostGeneratedRepositoryDefinitionObservationError {
     },
 }
 
+impl HostGeneratedRepositoryDefinitionObservationError {
+    pub(super) fn selected_frontier(&self) -> slug_bzlmod_v2::HostSelectedObservationFrontier {
+        match self {
+            Self::Demand(error) => error.selected_frontier(),
+            Self::Validation { error, .. } => error.selected_frontier(),
+            Self::Merge { error, .. } => {
+                slug_bzlmod_v2::HostSelectedObservationFrontier::Path(error.clone())
+            }
+        }
+    }
+}
+
 impl HostGeneratedRepositoryDefinitionKey {
     pub(super) fn new(
         workspace: NormalizedAbsolutePath,
