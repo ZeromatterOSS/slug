@@ -4310,6 +4310,14 @@ namespace, retained state, production allowlist or cap changes; focused R3
 rereview is required before Rust resumes.
 Focused R3 architecture rereview returns `ACCEPT`; no Bzlmod owner moves.
 
+Terminal R3 implementation review returns `REPLAN` only for repository output
+conversion. R4 uses the selected extension evaluation package solely for the
+five dependency-label shapes; repository `Output`/`OutputList` retain the
+repository-rule definition package, full existing namespace visibility and
+pre-packet special-package behavior. No Bzlmod key, mapping owner, namespace,
+RepoSpec identity, retained state, allowlist or cap moves. Focused R4
+architecture rereview is required before Rust resumes.
+
 ### Compilation-helper acceptance and Stage 4 continuation (2026-08-26)
 
 Commit `3060e4d4d` accepts the complete rules_cc compilation-helper freeze with

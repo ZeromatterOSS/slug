@@ -76,6 +76,17 @@ after focused R3 architecture `ACCEPT`.
 Focused R3 architecture rereview returns `ACCEPT`; implement only those three
 bounded corrections.
 
+Terminal R3 implementation review returns `REPLAN`: repository
+`Output`/`OutputList` strings still inherited the extension evaluation base and
+dependency-only special-main-package handling. Activate docs-first
+`WP-4-5-7A-package-context-label-string-category-design-r4`. Only the five
+dependency-label shapes use the extension evaluation package; repository
+outputs retain the repository-rule definition package and pre-packet parser,
+including definition-repository `//conditions`/`//visibility`. Add one imported-
+rule output discriminator. All owners, compatibility classes, allowlists, caps,
+validation and replay gates remain unchanged; Rust resumes only after focused
+R4 architecture `ACCEPT`.
+
 Commit `20bbe8661` terminally accepts
 `WP-6-7A-default-exec-configured-label-dependency-implementation-r2`. The
 complete default-group category spans all five

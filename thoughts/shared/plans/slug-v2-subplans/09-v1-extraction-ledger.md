@@ -2524,3 +2524,10 @@ or I/O. Focused R3 rereview must accept the corrected call-site ownership and
 non-widening boundary before Rust resumes.
 Focused R3 architecture rereview returns `ACCEPT`; the no-extraction decision
 remains final for this packet.
+
+Terminal R3 implementation review's repository-output correction does not
+change the utility decision. R4 selects an existing definition label at the
+call site and preserves the old private output parser; it adds no utility,
+retained context, mapping copy, collection, cache, interner, registry, DICE key
+or I/O. Focused R4 architecture rereview must accept that bounded call-site
+correction before Rust resumes.

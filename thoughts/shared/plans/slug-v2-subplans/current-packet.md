@@ -1,27 +1,22 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-5-7A-package-context-label-string-category-design-r3
+Packet: WP-4-5-7A-package-context-label-string-category-design-r4
 
 Milestone: M7A bootstrap-critical generic Starlark/loading and repository
 closure. Converge every currently admitted package-context dependency-label
 string consumer on one Bazel 9.2 grammar and typed canonical projection.
 
-Status: focused terminal review of the R2 implementation returned `REPLAN`;
-the docs-only R3 correction is accepted by focused independent architecture
-rereview and Rust may resume only within its bounded corrections. R1 returned
-`REPLAN` for innate repository-call context ownership,
-empty apparent versus canonical repository spellings, converted dictionary-key
-collisions and an incomplete inventory of existing `PackageRecorder` consumers;
-R2 corrected those four boundaries without changing the central owner. Its
-terminal implementation review found three bounded misses: ordinary extension
-calls still selected the repository rule's defining package instead of the
-extension evaluation package, dependency-label convergence widened three
-deferred output routes, and the exact ordinary BUILD proof owner was absent
-from the proof allowlist. R3 corrects only those context, non-widening and
-allowlist boundaries. The
-predecessor repository-rule file-admissibility category is terminally accepted
-and committed in `95b4f0da6`; its current-packet and canonical scheduling
-records were one integration step stale before this packet was materialized.
+Status: terminal review of the R3 implementation returned `REPLAN` after its
+focused architecture acceptance. R3 correctly selected the ordinary extension
+evaluation package for dependency labels, but accidentally applied that base
+and the dependency parser's special-main-package rule to repository
+`Output`/`OutputList` strings. R4 changes only that deferred route: the five
+dependency-label shapes use the evaluation base, while repository outputs keep
+the repository-rule definition base and pre-packet parser. R1/R2/R3 already
+settled innate ownership, `@//`/`@@//`, collision projection, complete consumer
+inventory, BUILD/tag output non-widening and the BUILD proof allowlist. The
+predecessor repository-rule file-admissibility category remains terminally
+accepted in `95b4f0da6`.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -102,16 +97,22 @@ Loading retains every context decision:
    repository mapping;
 3. explicit module-extension tag values use the calling module's root package
    and mapping, never the tag-class definition mapping;
-4. explicit ordinary extension repository-rule values use the selected
-   extension evaluation `.bzl` package from the selected request plus the full
-   generated-repository namespace, even when the repository rule was imported
-   from another `.bzl` package;
+4. explicit ordinary extension repository-rule dependency values use the
+   selected extension evaluation `.bzl` package from the selected request plus
+   the full generated-repository namespace, even when the repository rule was
+   imported from another `.bzl` package;
 5. explicit innate `use_repo_rule` values use the repository-rule `.bzl`
    package and the calling module's mapping, not the generated namespace;
 6. every pretyped Label remains unchanged rather than being parsed or mapped
    again; and
 7. apparent-name ambiguity/missing visibility remains diagnosed by the
    existing caller that owns that mapping.
+
+Repository `Output`/`OutputList` strings are the deliberate non-dependency
+exception: retain the repository-rule definition package, the existing
+namespace visibility map, rejection of canonical strings and repository
+shorthand, and the pre-packet treatment of unqualified `//conditions` and
+`//visibility` in the definition repository. Typed output policy is unchanged.
 
 Do not widen `ApparentLabel::parse` or `CanonicalLabel::parse`: those APIs own
 already-unambiguous absolute identity and are deliberately used by load,
@@ -258,9 +259,10 @@ Add focused proof for:
   tags, ordinary extension namespace for ordinary repository calls, and
   repository-rule `.bzl` package plus calling-module mapping for innate calls;
 - an ordinary extension importing a repository rule from another `.bzl`
-  package, proving explicit relative strings use the extension evaluation
-  package while descriptor defaults retain the repository-rule definition
-  package;
+  package, proving explicit dependency strings use the extension evaluation
+  package while descriptor defaults, `RepoRuleId`, relative output strings and
+  unqualified special-package output strings retain the repository-rule
+  definition package;
 - ordinary/symbolic-macro BUILD package conversion, selector keys, and
   representative direct consumers covering visibility/package metadata,
   alias/filegroup/test-suite/config-setting and platform/toolchain families;
@@ -336,7 +338,9 @@ Return `REPLAN` before or during Rust if:
   or pretyped Labels are remapped;
 - `@//` and `@@//` collapse to one repository choice or converted label-key
   collisions are retained/overwritten;
-- output/load/transition/command semantics, non-visible retained labels or
+- dependency conversion rebases repository outputs or gives them special-main
+  package handling; output/load/transition/command semantics otherwise widen;
+  non-visible retained labels or
   exact invalid-diagnostic parity become necessary;
 - any rule/ruleset/C++/`cc_common`/`cc_internal` specialization appears;
 - a cache/interner/global registry or retained raw spelling is introduced;
@@ -368,3 +372,14 @@ after focused R3 rereview returns `ACCEPT`.
 Focused independent R3 architecture rereview returns `ACCEPT`. The ordinary
 evaluation-base owner, deferred output non-widening boundary, narrow BUILD proof
 allowlist, unchanged caps and unchanged retained-state architecture are accepted.
+
+Focused terminal R3 implementation review returns `REPLAN`. The implementation
+correctly separates ordinary dependency strings from definition-owned defaults
+and rule identity, but still feeds repository outputs through the ordinary
+evaluation base and dependency parser. R4 selects the conversion base by
+attribute kind: only the five dependency-label shapes use the extension
+evaluation base; `Output`/`OutputList` use the repository-rule definition base
+and preserve pre-packet `//conditions`/`//visibility` behavior. Add one imported-
+rule output discriminator. No compatibility class, owner, mapping, retained
+state, allowlist, cap, validation gate or replay boundary changes. Rust resumes
+only after focused independent R4 architecture rereview returns `ACCEPT`.

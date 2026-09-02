@@ -7761,3 +7761,12 @@ DICE boundary, production allowlist or cap changes. Rust resumes only after
 focused R3 rereview returns `ACCEPT`.
 Focused R3 architecture rereview returns `ACCEPT`; Rust may resume only within
 the corrected ordinary-base, deferred-output and BUILD-proof boundaries.
+
+Terminal R3 implementation review returns `REPLAN`: imported repository-rule
+outputs still used the extension evaluation base and dependency parser's
+special-main-package handling. R4 keeps the accepted shared dependency parser
+unchanged but selects the repository-rule definition package and pre-packet
+parser for `Output`/`OutputList`, including definition-repository
+`//conditions`/`//visibility`. Add one imported-rule output discriminator; no
+other owner, compatibility class, allowlist, cap or gate changes. Focused R4
+architecture rereview is required before Rust resumes.
