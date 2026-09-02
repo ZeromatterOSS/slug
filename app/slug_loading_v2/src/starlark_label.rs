@@ -109,55 +109,26 @@ pub(crate) fn resolve_label(
     raw: &str,
     defining_source: &BzlModuleIdentity,
 ) -> anyhow::Result<CanonicalLabel> {
-    if let Some(rest) = raw.strip_prefix('@') {
-        if rest.starts_with('@') {
-            anyhow::bail!("canonical Label input is not admitted in this loading slice");
-        }
-        let (requested, label) = rest
-            .split_once("//")
-            .ok_or_else(|| anyhow::anyhow!("apparent repository Label has no package separator"))?;
-        if requested.is_empty() {
-            anyhow::bail!("empty apparent repository Label is not admitted in this loading slice");
-        }
+    CanonicalLabel::parse_with_package_context(raw, defining_source.label.package(), |requested| {
         let mut matches = defining_source
             .repository_mapping
             .iter()
             .filter(|(apparent, _)| apparent.as_str() == requested);
         let canonical = matches.next().ok_or_else(|| {
-            anyhow::anyhow!(
+            format!(
                 "repository '@{requested}' is not visible from {}",
                 defining_source.label
             )
         })?;
         if matches.next().is_some() {
-            anyhow::bail!(
+            return Err(format!(
                 "repository mapping for '@{requested}' is ambiguous from {}",
                 defining_source.label
-            );
+            ));
         }
-        let spelling = if canonical.1.is_root() {
-            format!("@@//{label}")
-        } else {
-            format!("@@{}//{label}", canonical.1.as_str())
-        };
-        return CanonicalLabel::parse(&spelling).map_err(anyhow::Error::msg);
-    }
-    if raw.starts_with(':') {
-        return CanonicalLabel::parse(&format!("{}{}", defining_source.label.package(), raw))
-            .map_err(anyhow::Error::msg);
-    }
-    if !raw.starts_with("//") {
-        anyhow::bail!("Label input must begin with '//' or ':' in the admitted loading slice");
-    }
-    let provisional = CanonicalLabel::parse(&format!("@@{raw}")).map_err(anyhow::Error::msg)?;
-    let repo = defining_source.label.package().repo();
-    if repo.is_root() {
-        Ok(provisional)
-    } else {
-        provisional
-            .rebind_provisional_root_repository(repo)
-            .map_err(anyhow::Error::msg)
-    }
+        Ok(canonical.1.clone())
+    })
+    .map_err(anyhow::Error::msg)
 }
 
 #[starlark_module]

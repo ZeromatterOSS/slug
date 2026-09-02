@@ -4318,6 +4318,12 @@ pre-packet special-package behavior. No Bzlmod key, mapping owner, namespace,
 RepoSpec identity, retained state, allowlist or cap moves. Focused R4
 architecture rereview is required before Rust resumes.
 
+Focused R4 architecture and terminal implementation rereviews return `ACCEPT`.
+Ordinary and innate explicit dependency strings, definition-owned defaults,
+rule identity and deferred output contexts now retain their distinct existing
+owners. No Bzlmod key, mapping owner, namespace, RepoSpec identity or retained
+state moved; the authentic replay advances to built-in-catalog glob loading.
+
 ### Compilation-helper acceptance and Stage 4 continuation (2026-08-26)
 
 Commit `3060e4d4d` accepts the complete rules_cc compilation-helper freeze with

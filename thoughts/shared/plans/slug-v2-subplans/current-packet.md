@@ -6,17 +6,15 @@ Milestone: M7A bootstrap-critical generic Starlark/loading and repository
 closure. Converge every currently admitted package-context dependency-label
 string consumer on one Bazel 9.2 grammar and typed canonical projection.
 
-Status: terminal review of the R3 implementation returned `REPLAN` after its
-focused architecture acceptance. R3 correctly selected the ordinary extension
-evaluation package for dependency labels, but accidentally applied that base
-and the dependency parser's special-main-package rule to repository
-`Output`/`OutputList` strings. R4 changes only that deferred route: the five
-dependency-label shapes use the evaluation base, while repository outputs keep
-the repository-rule definition base and pre-packet parser. R1/R2/R3 already
-settled innate ownership, `@//`/`@@//`, collision projection, complete consumer
-inventory, BUILD/tag output non-widening and the BUILD proof allowlist. The
-predecessor repository-rule file-admissibility category remains terminally
-accepted in `95b4f0da6`.
+Status: terminal R4 implementation review returns `ACCEPT`. The five ordinary
+repository dependency-label shapes use the extension evaluation package while
+repository outputs retain the definition package and pre-packet parser. R4
+closes R3's final output-context miss without changing the shared parser,
+retained identity or compatibility boundary. R1/R2/R3 already settled innate
+ownership, `@//`/`@@//`, collision projection, complete consumer inventory,
+BUILD/tag output non-widening and the BUILD proof allowlist. The predecessor
+repository-rule file-admissibility category remains terminally accepted in
+`95b4f0da6`.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -383,3 +381,13 @@ and preserve pre-packet `//conditions`/`//visibility` behavior. Add one imported
 rule output discriminator. No compatibility class, owner, mapping, retained
 state, allowlist, cap, validation gate or replay boundary changes. Rust resumes
 only after focused independent R4 architecture rereview returns `ACCEPT`.
+
+Focused R4 architecture and terminal implementation rereviews return `ACCEPT`.
+The implementation is 312 production, 692 proof and 1,004 total gross added
+Rust lines. Identity passes 16/16; loading passes 506 active plus one ignored
+and every integration target; query passes 55/55; the CLI rebuild, formatting,
+diff and parked-proof gates pass. The archive checker reproduces only its three
+unchanged thoughts-path baseline failures. A fresh authenticated rules_rust
+0.73 replay clears `@rust_host_tools` and stops at the separate generic built-in
+catalog `glob()` boundary in `@@bazel_tools//tools/res`; no ruleset or C++
+special case is selected.

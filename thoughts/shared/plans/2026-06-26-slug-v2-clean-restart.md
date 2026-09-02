@@ -87,6 +87,15 @@ rule output discriminator. All owners, compatibility classes, allowlists, caps,
 validation and replay gates remain unchanged; Rust resumes only after focused
 R4 architecture `ACCEPT`.
 
+Focused R4 architecture and terminal implementation rereviews return `ACCEPT`.
+The complete package-context dependency-label category passes loading/query
+validation at 312/692/1,004 gross production/proof/total Rust lines. A fresh
+authenticated rules_rust replay clears `@rust_host_tools` and stops at the
+separate generic built-in-catalog `glob()` boundary in
+`@@bazel_tools//tools/res`. Audit that complete Host/catalog glob category next;
+do not add a `tools/res`, rules_rust, rules_cc, `cc_common` or `cc_internal`
+special case.
+
 Commit `20bbe8661` terminally accepts
 `WP-6-7A-default-exec-configured-label-dependency-implementation-r2`. The
 complete default-group category spans all five

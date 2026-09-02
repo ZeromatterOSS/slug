@@ -33843,6 +33843,87 @@ fn label_attribute_defaults_keep_defining_module_identity() {
 }
 
 #[test]
+fn aggregate_label_defaults_use_defining_mapping_and_reject_canonical_key_collisions() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@owner+//defs:attrs.bzl").unwrap(),
+        workspace_path: PathBuf::from("/workspace/owner/defs/attrs.bzl"),
+        repository_mapping: Arc::from([
+            (
+                ApparentRepoName::new("alias").unwrap(),
+                CanonicalRepoName::new("mapped+").unwrap(),
+            ),
+            (
+                ApparentRepoName::new("same_a").unwrap(),
+                CanonicalRepoName::new("same+").unwrap(),
+            ),
+            (
+                ApparentRepoName::new("same_b").unwrap(),
+                CanonicalRepoName::new("same+").unwrap(),
+            ),
+        ]),
+    };
+    let module = eval_bzl_with_identity(
+        r#"
+def impl(ctx): return None
+R = rule(implementation = impl, attrs = {
+  'scalar': attr.label(default = '@alias'),
+  'labels': attr.label_list(default = ['@alias//pkg/item', Label('@@direct+//:typed')]),
+  'by_string': attr.string_keyed_label_dict(default = {'key': '@alias//pkg:item'}),
+  'by_label': attr.label_keyed_string_dict(default = {'@alias//pkg:item': 'value'}),
+  'lists': attr.label_list_dict(default = {'key': ['@alias', Label(':local')]}),
+})
+"#,
+        owner.clone(),
+    )
+    .unwrap();
+    let rule = module
+        .get("R")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    let default = |name| {
+        rule.schema
+            .iter()
+            .find(|schema| schema.name == name)
+            .unwrap()
+            .default
+            .as_ref()
+            .unwrap()
+    };
+    assert!(
+        matches!(default("scalar"), CoercedAttributeValue::Label(label) if label.to_string() == "@@mapped+//:alias")
+    );
+    assert!(
+        matches!(default("labels"), CoercedAttributeValue::LabelList(labels) if labels.iter().map(ToString::to_string).collect::<Vec<_>>() == ["@@mapped+//pkg/item:item", "@@direct+//:typed"])
+    );
+    assert!(
+        matches!(default("by_string"), CoercedAttributeValue::StringKeyedLabelDict(values) if values[0].1.to_string() == "@@mapped+//pkg:item")
+    );
+    assert!(
+        matches!(default("by_label"), CoercedAttributeValue::LabelKeyedStringDict(values) if values[0].0.to_string() == "@@mapped+//pkg:item")
+    );
+    assert!(
+        matches!(default("lists"), CoercedAttributeValue::LabelListDict(values) if values[0].1.iter().map(ToString::to_string).collect::<Vec<_>>() == ["@@mapped+//:alias", "@@owner+//defs:local"])
+    );
+
+    for default in [
+        "{'@same_a//:x': 'a', '@same_b//:x': 'b'}",
+        "{'@alias//:x': 'a', Label('@@mapped+//:x'): 'b'}",
+    ] {
+        let source = format!(
+            "def impl(ctx): return None\nR=rule(implementation=impl, attrs={{'x': attr.label_keyed_string_dict(default={default})}})"
+        );
+        assert!(
+            eval_bzl_with_identity(&source, owner.clone())
+                .unwrap_err()
+                .to_string()
+                .contains("duplicate canonical label"),
+            "{default}"
+        );
+    }
+}
+
+#[test]
 fn label_attribute_default_rejects_unadmitted_apparent_mapping() {
     let evaluate = |mapping| {
         let owner = BzlModuleIdentity {
@@ -33978,12 +34059,62 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
 }
 
 #[test]
-fn bazel_label_rejects_unadmitted_inputs_and_missing_function_provenance() {
+fn bazel_label_admits_package_context_grammar_and_rejects_invalid_provenance() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@owner+//pkg:defs.bzl").unwrap(),
+        workspace_path: PathBuf::from("/workspace/owner/pkg/defs.bzl"),
+        repository_mapping: Arc::from([
+            (
+                ApparentRepoName::new("alias").unwrap(),
+                CanonicalRepoName::new("mapped+").unwrap(),
+            ),
+            (
+                ApparentRepoName::root(),
+                CanonicalRepoName::new("empty+").unwrap(),
+            ),
+        ]),
+    };
+    let module = eval_bzl_with_identity(
+        r#"
+BARE = str(Label('bare/path'))
+APPARENT = str(Label('@alias'))
+APPARENT_FULL = str(Label('@alias//tools/compiler'))
+CANONICAL = str(Label('@@direct+'))
+EMPTY_APPARENT = str(Label('@//tools:empty'))
+EMPTY_CANONICAL = str(Label('@@//tools:main'))
+CURRENT = str(Label('//tools/compiler'))
+SPECIAL = str(Label('//conditions:default'))
+NORMALIZED = str(Label(':dir/name/.'))
+IDEMPOTENT = Label(Label('@alias//:same')) == Label('@alias//:same')
+"#,
+        owner,
+    )
+    .unwrap();
+    for (name, expected) in [
+        ("BARE", "@@owner+//pkg:bare/path"),
+        ("APPARENT", "@@mapped+//:alias"),
+        ("APPARENT_FULL", "@@mapped+//tools/compiler:compiler"),
+        ("CANONICAL", "@@direct+//:direct+"),
+        ("EMPTY_APPARENT", "@@empty+//tools:empty"),
+        ("EMPTY_CANONICAL", "@@//tools:main"),
+        ("CURRENT", "@@owner+//tools/compiler:compiler"),
+        ("SPECIAL", "@@//conditions:default"),
+        ("NORMALIZED", "@@owner+//pkg:dir/name"),
+    ] {
+        assert_eq!(
+            module.get(name).unwrap().unpack_str(),
+            Some(expected),
+            "{name}"
+        );
+    }
+    assert_eq!(module.get("IDEMPOTENT").unwrap().unpack_bool(), Some(true));
+
     for source in [
-        "X = Label('bare')",
         "X = Label('@repo//pkg:target')",
-        "X = Label('@@repo//pkg:target')",
         "X = Label(1)",
+        "X = Label('/single:slash')",
+        "X = Label('relative/package:target')",
+        "X = Label('//pkg/...:all')",
         "def impl(ctx): return None\nR = rule(implementation = impl, toolchains = ['@repo//pkg:target'])",
     ] {
         assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
@@ -34895,6 +35026,21 @@ FromCommon(name = "from_common", tags = ["tag"])
 "#;
     let (result, active) = symbolic_macro_build_attempt(defs, build);
     assert!(result.is_ok(), "{:?}", result.unwrap_err());
+    assert!(!active);
+
+    let collision_defs = r#"
+def _impl(name, visibility, values):
+    pass
+M = macro(
+    implementation = _impl,
+    attrs = {"values": attr.label_keyed_string_dict()},
+)
+"#;
+    let (collision, active) = symbolic_macro_build_attempt(
+        collision_defs,
+        "load(':defs.bzl', 'M')\nM(name='x', values={':same': 'a', '//:same': 'b'})\n",
+    );
+    assert!(collision.unwrap_err().contains("duplicate canonical label"));
     assert!(!active);
 }
 

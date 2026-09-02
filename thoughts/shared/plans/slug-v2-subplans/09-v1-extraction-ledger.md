@@ -2531,3 +2531,8 @@ call site and preserves the old private output parser; it adds no utility,
 retained context, mapping copy, collection, cache, interner, registry, DICE key
 or I/O. Focused R4 architecture rereview must accept that bounded call-site
 correction before Rust resumes.
+
+Focused R4 architecture and terminal implementation rereviews return `ACCEPT`.
+The borrowed parser, existing `CanonicalLabel`, request-local collision probes
+and caller-owned mappings are sufficient; no V1/Buck2 extraction, copied donor
+type, mapping copy, retained syntax, collection, cache or interner was added.

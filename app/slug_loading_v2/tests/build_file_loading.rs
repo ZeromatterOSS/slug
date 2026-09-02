@@ -1163,7 +1163,7 @@ toolchain_type(name = "demo_type")
 toolchain(
     name = "demo_toolchain",
     exec_compatible_with = [":first", ":second"],
-    toolchain = ":implementation",
+    toolchain = "@@external+//tools:implementation",
     toolchain_type = ":demo_type",
 )
 "#,
@@ -1227,7 +1227,7 @@ toolchain(
             use_target_platform_constraints,
             target_settings,
         }) if toolchain_type == &CanonicalLabel::parse("@@//pkg:demo_type").unwrap()
-            && implementation == &CanonicalLabel::parse("@@//pkg:implementation").unwrap()
+            && implementation == &CanonicalLabel::parse("@@external+//tools:implementation").unwrap()
             && exec_compatible_with.value().as_ref() == [
                 CanonicalLabel::parse("@@//pkg:first").unwrap(),
                 CanonicalLabel::parse("@@//pkg:second").unwrap(),
@@ -1548,7 +1548,7 @@ fn native_toolchain_targets_fail_closed_for_wrong_shapes_and_name_collisions() {
         ),
         (
             "toolchain(name = 'bad', exec_compatible_with = [], toolchain = '@repo//:impl', toolchain_type = ':type')",
-            "external repository dependency labels are not supported",
+            "no repository visible as '@repo'",
         ),
         (
             "toolchain_type(name = 'bad', data = [':leaf'])",
@@ -2498,7 +2498,7 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
     .unwrap();
     fs::write(
         package.join(BUILD_FILE_PRIMARY),
-        "load(\":defs.bzl\", \"with_deps\")\nwith_deps(name = \"ordered\", deps = (\"//leaf:second\", \"bare\", \"dir/name\", \":local\", \"//leaf:first\"), visibility = [\"//visibility:public\"])\nwith_deps(name = \"omitted\")\n",
+        "load(\":defs.bzl\", \"with_deps\")\nwith_deps(name = \"ordered\", deps = (\"//leaf:second\", \"bare\", \"dir/name\", \":local\", \"//leaf:first\", \"@@external+//leaf:item\"), visibility = [\"//visibility:public\"])\nwith_deps(name = \"omitted\")\n",
     )
     .unwrap();
 
@@ -2521,6 +2521,7 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
             CanonicalLabel::parse("@@//parent:dir/name").unwrap(),
             CanonicalLabel::parse("@@//parent:local").unwrap(),
             CanonicalLabel::parse("@@//leaf:first").unwrap(),
+            CanonicalLabel::parse("@@external+//leaf:item").unwrap(),
         ]
     );
     let omitted = loaded
@@ -2550,39 +2551,35 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
         ),
         (
             "with_deps(name = \"bad\", deps = [\"pkg:target\"])\n",
-            "invalid label 'pkg:target': absolute label must begin with '@' or '//'",
+            "absolute label must begin with '@' or '//'",
         ),
         (
             "with_deps(name = \"bad\", deps = [\"...\"])\n",
-            "invalid label '...': package name cannot contain '...'",
+            "package name cannot contain '...'",
         ),
         (
             "with_deps(name = \"bad\", deps = [\"foo/...\"])\n",
-            "invalid label 'foo/...': package name cannot contain '...'",
+            "package name cannot contain '...'",
         ),
         (
             "with_deps(name = \"bad\", deps = [\"...:all\"])\n",
-            "invalid label '...:all': package name cannot contain '...'",
+            "absolute label must begin with '@' or '//'",
         ),
         (
             "with_deps(name = \"bad\", deps = [\"foo/...:all\"])\n",
-            "invalid label 'foo/...:all': package name cannot contain '...'",
+            "absolute label must begin with '@' or '//'",
         ),
         (
             "with_deps(name = \"bad\", deps = [\"//foo/...\"])\n",
-            "invalid label '//foo/...': package name cannot contain '...'",
+            "package name cannot contain '...'",
         ),
         (
             "with_deps(name = \"bad\", deps = [\"//foo/...:all\"])\n",
-            "invalid label '//foo/...:all': package name cannot contain '...'",
+            "package name cannot contain '...'",
         ),
         (
             "with_deps(name = \"bad\", deps = [\"@repo//leaf:one\"])\n",
-            "external repository dependency labels are not supported",
-        ),
-        (
-            "with_deps(name = \"bad\", deps = [\"@@repo//leaf:one\"])\n",
-            "external repository dependency labels are not supported",
+            "no repository visible as '@repo'",
         ),
     ];
     for (invocation, expected) in bad_builds {
@@ -3518,6 +3515,39 @@ probe = rule(
 }
 
 #[test]
+fn build_label_keyed_dictionary_rejects_keys_that_canonicalize_alike() {
+    let workspace = scratch("label-key-collision");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+def _impl(ctx):
+    return [DefaultInfo()]
+
+probe = rule(
+    implementation = _impl,
+    attrs = {"values": attr.label_keyed_string_dict()},
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"
+load(":defs.bzl", "probe")
+probe(name = "subject", values = {":same": "first", "//pkg:same": "second"})
+"#,
+    )
+    .unwrap();
+    let error = try_load_package_with_extra_bzl(&workspace, &package, &[package.join("defs.bzl")])
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("duplicate canonical label"), "{error}");
+}
+
+#[test]
 fn rule_attribute_schema_retains_provenance_selectors_dicts_and_generated_outputs() {
     let workspace = scratch("attribute-metadata");
     let package = workspace.join("pkg");
@@ -3798,7 +3828,7 @@ probe(
             .to_string()
             .contains("attribute `out` is not configurable")
     );
-    for invalid in ["//other:out", "../out", "bad:name"] {
+    for invalid in ["//other:out", "../out", "bad:name", "@@//pkg:out", "@dep"] {
         fs::write(
             package.join(BUILD_FILE_PRIMARY),
             format!("load(\":defs.bzl\", \"probe\")\nprobe(name = \"bad_output\", out = \"{invalid}\", outs = [])\n"),

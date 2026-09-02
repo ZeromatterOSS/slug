@@ -114,19 +114,30 @@ fn package(repo: &str, path: &str) -> PackageIdentifier {
 #[test]
 fn canonical_package_context_resolves_repository_aware_label_matrix() {
     let context = package("dep+", "pkg");
-    let mapping = [(
-        ApparentRepoName::new("alias").unwrap(),
-        CanonicalRepoName::new("mapped+").unwrap(),
-    )];
+    let mapping = [
+        (
+            ApparentRepoName::new("alias").unwrap(),
+            CanonicalRepoName::new("mapped+").unwrap(),
+        ),
+        (
+            ApparentRepoName::root(),
+            CanonicalRepoName::new("empty+").unwrap(),
+        ),
+    ];
     for (raw, expected) in [
         (":local", "@@dep+//pkg:local"),
         ("bare", "@@dep+//pkg:bare"),
         ("//same:target", "@@dep+//same:target"),
+        ("//same/path", "@@dep+//same/path:path"),
         ("@@//root:target", "@@//root:target"),
         ("@@other+//other:target", "@@other+//other:target"),
+        ("@@other+", "@@other+//:other+"),
         ("@alias//mapped:target", "@@mapped+//mapped:target"),
+        ("@alias", "@@mapped+//:alias"),
+        ("@//empty:target", "@@empty+//empty:target"),
         ("//conditions:default", "@@//conditions:default"),
         ("//visibility:public", "@@//visibility:public"),
+        (":dir/name/.", "@@dep+//pkg:dir/name"),
     ] {
         assert_eq!(
             package_context_label_with_repository(&context, &mapping, raw).unwrap(),
@@ -153,6 +164,20 @@ fn canonical_package_context_resolves_repository_aware_label_matrix() {
     assert_ne!(
         package_context_label_with_repository(&package("dep_a+", "pkg"), &[], ":same").unwrap(),
         package_context_label_with_repository(&package("dep_b+", "pkg"), &[], ":same").unwrap(),
+    );
+    let alias = ApparentRepoName::new("alias").unwrap();
+    assert!(
+        package_context_label_with_repository(
+            &context,
+            &[
+                (alias.clone(), CanonicalRepoName::new("one+").unwrap()),
+                (alias, CanonicalRepoName::new("two+").unwrap()),
+            ],
+            "@alias//:target",
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("ambiguous")
     );
 }
 

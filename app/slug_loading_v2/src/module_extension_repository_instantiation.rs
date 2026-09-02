@@ -24,7 +24,6 @@ use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RepoRuleId;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::SourcePreparationOutcome;
-use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
@@ -464,6 +463,7 @@ pub(crate) fn instantiate_request(
     HostInstantiatedModuleExtensionRepositoriesForRequest,
     HostInstantiateModuleExtensionRequestError,
 > {
+    let (label_conversion_base, _, _, _) = receipt.request.parts();
     let (unique_name, context_repo, base, overrides) = receipt.request.namespace_parts();
     let (mapping_entries, repositories) = instantiate_parts(
         unique_name,
@@ -471,6 +471,7 @@ pub(crate) fn instantiate_request(
         base,
         overrides,
         &receipt.repository_rule_calls,
+        Some(label_conversion_base),
         None,
     )?;
     Ok(HostInstantiatedModuleExtensionRepositoriesForRequest {
@@ -485,7 +486,7 @@ pub(crate) fn instantiate_innate_request(
     calls: &[RepositoryRuleCallRecord],
 ) -> Result<HostInstantiatedInnateRepositoryOwner, HostInstantiateModuleExtensionRequestError> {
     let (unique_name, context_repo, base, overrides) = inputs.namespace_parts();
-    let (_, _, label_conversion_base, _) = inputs.definition_parts();
+    let (_, _, label_conversion_base, label_conversion_mapping) = inputs.definition_parts();
     let (mapping_entries, repositories) = instantiate_parts(
         unique_name,
         context_repo,
@@ -493,6 +494,7 @@ pub(crate) fn instantiate_innate_request(
         overrides,
         calls,
         Some(label_conversion_base),
+        Some(label_conversion_mapping),
     )?;
     Ok(HostInstantiatedInnateRepositoryOwner {
         inputs,
@@ -541,6 +543,7 @@ fn instantiate_parts(
     overrides: &[HostSelectedExtensionDefinitionOverride],
     calls: &[RepositoryRuleCallRecord],
     label_conversion_base: Option<&CanonicalLabel>,
+    label_conversion_mapping: Option<&SmallMap<ApparentRepoName, CanonicalRepoName>>,
 ) -> Result<
     (
         Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
@@ -573,18 +576,18 @@ fn instantiate_parts(
                 HostInstantiatedModuleExtensionRepositoryError::Namespace(message),
             )
         })?;
-        let repo_spec = instantiate_call_with_base(
-            call,
-            &mapping,
-            label_conversion_base.unwrap_or(&call.definition.defining_label),
-        )
-        .map_err(|message| {
-            fail(
-                &current,
-                Some(call),
-                HostInstantiatedModuleExtensionRepositoryError::Attribute(message),
-            )
-        })?;
+        let label_conversion_base =
+            label_conversion_base.unwrap_or(&call.definition.defining_label);
+        let label_conversion_mapping = label_conversion_mapping.unwrap_or(mapping.1.as_ref());
+        let repo_spec =
+            instantiate_call_with_conversion(call, label_conversion_base, label_conversion_mapping)
+                .map_err(|message| {
+                    fail(
+                        &current,
+                        Some(call),
+                        HostInstantiatedModuleExtensionRepositoryError::Attribute(message),
+                    )
+                })?;
         current.push(HostInstantiatedModuleExtensionRepository {
             generated_name: call.name.clone(),
             canonical_name,
@@ -606,6 +609,7 @@ fn instantiate_call(
     instantiate_call_with_base(call, mapping, &call.definition.defining_label)
 }
 
+#[cfg(test)]
 fn instantiate_call_with_base(
     call: &RepositoryRuleCallRecord,
     mapping: &(
@@ -613,6 +617,14 @@ fn instantiate_call_with_base(
         Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     ),
     label_conversion_base: &CanonicalLabel,
+) -> Result<RepoSpec, CompactString> {
+    instantiate_call_with_conversion(call, label_conversion_base, mapping.1.as_ref())
+}
+
+fn instantiate_call_with_conversion(
+    call: &RepositoryRuleCallRecord,
+    label_conversion_base: &CanonicalLabel,
+    label_conversion_mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
 ) -> Result<RepoSpec, CompactString> {
     let mut converted = SmallMap::new();
     for (name, raw) in call.kwargs.iter() {
@@ -625,9 +637,13 @@ fn instantiate_call_with_base(
             .iter()
             .find(|attribute| attribute.name == *name)
             .ok_or_else(|| CompactString::from(format!("unknown attribute '{name}' provided")))?;
+        let conversion_base = match attribute.kind {
+            AttributeKind::Output | AttributeKind::OutputList => &call.definition.defining_label,
+            _ => label_conversion_base,
+        };
         converted.insert(
             name.clone(),
-            convert_supplied(attribute, raw, label_conversion_base, mapping)?,
+            convert_supplied(attribute, raw, conversion_base, label_conversion_mapping)?,
         );
     }
     for attribute in call.definition.attributes.iter() {
@@ -642,7 +658,12 @@ fn instantiate_call_with_base(
             .into());
         }
         if let Some(default) = attribute.default.as_ref() {
-            validate_default(attribute, default, &call.definition.defining_label, mapping)?;
+            validate_default(
+                attribute,
+                default,
+                &call.definition.defining_label,
+                label_conversion_mapping,
+            )?;
         }
     }
     Ok(RepoSpec {
@@ -662,10 +683,7 @@ fn convert_supplied(
     attribute: &RepositoryRuleAttribute,
     raw: &RepositoryRuleCallValue,
     defining_label: &CanonicalLabel,
-    mapping: &(
-        CanonicalRepoName,
-        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
-    ),
+    mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
 ) -> Result<OverrideAttributeValue, CompactString> {
     coerce_value(attribute.kind, raw, defining_label, mapping)
 }
@@ -674,10 +692,7 @@ fn coerce_value(
     kind: AttributeKind,
     raw: &RepositoryRuleCallValue,
     base: &CanonicalLabel,
-    mapping: &(
-        CanonicalRepoName,
-        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
-    ),
+    mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
 ) -> Result<OverrideAttributeValue, CompactString> {
     match kind {
         AttributeKind::String => string_value(raw),
@@ -706,11 +721,7 @@ fn coerce_value(
             |key| string_key(key),
             |value| label_value(value, base, mapping, false),
         ),
-        AttributeKind::LabelKeyedStringDict => map_value(
-            raw,
-            |key| label_key(key, base, mapping),
-            |value| string_value(value),
-        ),
+        AttributeKind::LabelKeyedStringDict => label_keyed_map_value(raw, base, mapping),
         AttributeKind::LabelListDict => map_value(
             raw,
             |key| string_key(key),
@@ -743,24 +754,56 @@ fn int_value(raw: &RepositoryRuleCallValue) -> Result<OverrideAttributeValue, Co
 fn label_value(
     raw: &RepositoryRuleCallValue,
     base: &CanonicalLabel,
-    mapping: &(
-        CanonicalRepoName,
-        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
-    ),
+    mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
     output: bool,
 ) -> Result<OverrideAttributeValue, CompactString> {
     let label = match raw {
+        RepositoryRuleCallValue::String(value) if output => {
+            resolve_repository_output_label(value, base, mapping)?
+        }
         RepositoryRuleCallValue::String(value) => resolve_label(value, base, mapping)?,
-        RepositoryRuleCallValue::Label(value) => {
-            ensure_visible(value, base, mapping)?;
+        RepositoryRuleCallValue::Label(value) if output => {
+            let repository = value.package().repo();
+            if repository != base.package().repo()
+                && !mapping.values().any(|candidate| candidate == repository)
+            {
+                return Err(format!("label '{value}' is not visible from '{base}'").into());
+            }
             value.clone()
         }
+        RepositoryRuleCallValue::Label(value) => value.clone(),
         _ => return repository_value_error(),
     };
     if output && label.package() != base.package() {
         return Err(format!("label '{label}' is not in the current package").into());
     }
     Ok(OverrideAttributeValue::Label(label))
+}
+
+fn resolve_repository_output_label(
+    raw: &str,
+    base: &CanonicalLabel,
+    mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
+) -> Result<CanonicalLabel, CompactString> {
+    if raw.starts_with("@@") || (raw.starts_with('@') && !raw.contains("//")) {
+        return Err(format!("unsupported output label '{raw}'").into());
+    }
+    let rewritten = raw.strip_prefix("@//").map(|rest| format!("//{rest}"));
+    let raw = rewritten.as_deref().unwrap_or(raw);
+    let label = resolve_label(raw, base, mapping)?;
+    if label.package().repo().is_root()
+        && !base.package().repo().is_root()
+        && raw.starts_with("//")
+        && matches!(
+            label.package().package().as_str(),
+            "conditions" | "visibility"
+        )
+    {
+        return label
+            .rebind_provisional_root_repository(base.package().repo())
+            .map_err(CompactString::from);
+    }
+    Ok(label)
 }
 
 fn sequence_value(
@@ -792,6 +835,30 @@ fn map_value(
         .map(|values| OverrideAttributeValue::Map(Arc::new(values)))
 }
 
+fn label_keyed_map_value(
+    raw: &RepositoryRuleCallValue,
+    base: &CanonicalLabel,
+    mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
+) -> Result<OverrideAttributeValue, CompactString> {
+    let RepositoryRuleCallValue::Map(values) = raw else {
+        return repository_value_error();
+    };
+    let mut converted = SmallMap::new();
+    let mut labels = Vec::with_capacity(values.len());
+    for (raw_key, raw_value) in values.iter() {
+        let label = label_key(raw_key, base, mapping)?;
+        if labels
+            .iter()
+            .any(|existing: &CanonicalLabel| existing.bazel_natural_cmp(&label).is_eq())
+        {
+            return Err(format!("duplicate canonical label dictionary key '{label}'").into());
+        }
+        labels.push(label.clone());
+        converted.insert(OverrideAttributeKey::Label(label), string_value(raw_value)?);
+    }
+    Ok(OverrideAttributeValue::Map(Arc::new(converted)))
+}
+
 fn string_key(raw: &RepositoryRuleCallKey) -> Result<OverrideAttributeKey, CompactString> {
     match raw {
         RepositoryRuleCallKey::String(value) => Ok(OverrideAttributeKey::String(value.clone())),
@@ -802,19 +869,13 @@ fn string_key(raw: &RepositoryRuleCallKey) -> Result<OverrideAttributeKey, Compa
 fn label_key(
     raw: &RepositoryRuleCallKey,
     base: &CanonicalLabel,
-    mapping: &(
-        CanonicalRepoName,
-        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
-    ),
-) -> Result<OverrideAttributeKey, CompactString> {
+    mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
+) -> Result<CanonicalLabel, CompactString> {
     let value = match raw {
         RepositoryRuleCallKey::String(value) => resolve_label(value, base, mapping)?,
-        RepositoryRuleCallKey::Label(value) => {
-            ensure_visible(value, base, mapping)?;
-            value.clone()
-        }
+        RepositoryRuleCallKey::Label(value) => value.clone(),
     };
-    Ok(OverrideAttributeKey::Label(value))
+    Ok(value)
 }
 
 fn repository_value_error<T>() -> Result<T, CompactString> {
@@ -825,10 +886,7 @@ fn validate_default(
     attribute: &RepositoryRuleAttribute,
     default: &CoercedAttributeValue,
     defining_label: &CanonicalLabel,
-    mapping: &(
-        CanonicalRepoName,
-        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
-    ),
+    mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
 ) -> Result<(), CompactString> {
     if matches!(
         (attribute.kind, default),
@@ -920,64 +978,15 @@ fn map_call(
 fn resolve_label(
     raw: &str,
     defining_label: &CanonicalLabel,
-    mapping: &(
-        CanonicalRepoName,
-        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
-    ),
+    mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
 ) -> Result<CanonicalLabel, CompactString> {
-    let defining_package = defining_label.package().package().as_str();
-    let spelling = if let Some(target) = raw.strip_prefix(':') {
-        format!("//{defining_package}:{target}")
-    } else if !raw.starts_with('@') && !raw.starts_with("//") {
-        format!("//{defining_package}:{raw}")
-    } else {
-        raw.to_owned()
-    };
-    let apparent = ApparentLabel::parse(&spelling).map_err(CompactString::from)?;
-    let repository = if apparent.repo().is_root() {
-        defining_label.package().repo()
-    } else {
-        mapping.1.get(apparent.repo()).ok_or_else(|| {
-            CompactString::from(format!(
-                "no repository visible as '@{}'",
-                apparent.repo().as_str()
-            ))
-        })?
-    };
-    let canonical = if repository.is_root() {
-        format!("@@//{}:{}", apparent.package(), apparent.target())
-    } else {
-        format!(
-            "@@{}//{}:{}",
-            repository.as_str(),
-            apparent.package(),
-            apparent.target()
-        )
-    };
-    CanonicalLabel::parse(&canonical).map_err(Into::into)
-}
-
-fn ensure_visible(
-    label: &CanonicalLabel,
-    defining_label: &CanonicalLabel,
-    mapping: &(
-        CanonicalRepoName,
-        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
-    ),
-) -> Result<(), CompactString> {
-    let repository = label.package().repo();
-    if repository == defining_label.package().repo()
-        || mapping.1.values().any(|candidate| candidate == repository)
-    {
-        Ok(())
-    } else {
-        Err(format!(
-            "no repository visible as '@{}', but referenced by label '{}'",
-            repository.as_str(),
-            label
-        )
-        .into())
-    }
+    CanonicalLabel::parse_with_package_context(raw, defining_label.package(), |requested| {
+        mapping
+            .iter()
+            .find_map(|(name, repository)| (name.as_str() == requested).then(|| repository.clone()))
+            .ok_or_else(|| format!("no repository visible as '@{requested}'"))
+    })
+    .map_err(Into::into)
 }
 
 #[cfg(test)]
@@ -1094,10 +1103,16 @@ pub(crate) mod tests {
     ) {
         (
             CanonicalRepoName::root(),
-            Arc::new(SmallMap::from_iter([(
-                ApparentRepoName::new("dep").unwrap(),
-                CanonicalRepoName::new("dep+").unwrap(),
-            )])),
+            Arc::new(SmallMap::from_iter([
+                (
+                    ApparentRepoName::new("dep").unwrap(),
+                    CanonicalRepoName::new("dep+").unwrap(),
+                ),
+                (
+                    ApparentRepoName::root(),
+                    CanonicalRepoName::new("empty+").unwrap(),
+                ),
+            ])),
         )
     }
 
@@ -1446,52 +1461,56 @@ pub(crate) mod tests {
                         if raw.to_string() == "@@dep+//p:nested_raw" && typed == &dep_typed))
         ));
 
-        for invalid in [
-            call(
-                [schema(
+        let missing = call(
+            [schema(
+                "value",
+                AttributeKind::StringKeyedLabelDict,
+                false,
+                None,
+            )],
+            [
+                ("name", RepositoryRuleCallValue::String("generated".into())),
+                (
                     "value",
-                    AttributeKind::StringKeyedLabelDict,
-                    false,
-                    None,
-                )],
-                [
-                    ("name", RepositoryRuleCallValue::String("generated".into())),
-                    (
-                        "value",
-                        map(vec![(
-                            RepositoryRuleCallKey::String("k".into()),
-                            RepositoryRuleCallValue::String("@missing//:x".into()),
-                        )]),
-                    ),
-                ],
-            ),
-            call(
-                [schema(
+                    map(vec![(
+                        RepositoryRuleCallKey::String("k".into()),
+                        RepositoryRuleCallValue::String("@missing//:x".into()),
+                    )]),
+                ),
+            ],
+        );
+        assert!(
+            instantiate_call(&missing, &mapping())
+                .unwrap_err()
+                .contains("no repository visible")
+        );
+        let hidden = CanonicalLabel::parse("@@hidden+//:x").unwrap();
+        let typed = call(
+            [schema(
+                "value",
+                AttributeKind::LabelKeyedStringDict,
+                false,
+                None,
+            )],
+            [
+                ("name", RepositoryRuleCallValue::String("generated".into())),
+                (
                     "value",
-                    AttributeKind::LabelKeyedStringDict,
-                    false,
-                    None,
-                )],
-                [
-                    ("name", RepositoryRuleCallValue::String("generated".into())),
-                    (
-                        "value",
-                        map(vec![(
-                            RepositoryRuleCallKey::Label(
-                                CanonicalLabel::parse("@@hidden+//:x").unwrap(),
-                            ),
-                            RepositoryRuleCallValue::String("v".into()),
-                        )]),
-                    ),
-                ],
-            ),
-        ] {
-            assert!(
-                instantiate_call(&invalid, &mapping())
-                    .unwrap_err()
-                    .contains("no repository visible")
-            );
-        }
+                    map(vec![(
+                        RepositoryRuleCallKey::Label(hidden.clone()),
+                        RepositoryRuleCallValue::String("v".into()),
+                    )]),
+                ),
+            ],
+        );
+        assert!(matches!(
+            instantiate_call(&typed, &mapping())
+                .unwrap()
+                .attributes
+                .get("value"),
+            Some(OverrideAttributeValue::Map(values))
+                if values.contains_key(&OverrideAttributeKey::Label(hidden))
+        ));
     }
 
     #[test]
@@ -1787,10 +1806,11 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn innate_call_uses_module_base_but_keeps_actual_rule_id() {
+    fn innate_call_uses_module_base_and_calling_mapping_but_keeps_actual_rule_id() {
         let mut call = call(
             [
                 schema("target", AttributeKind::Label, true, None),
+                schema("mapped", AttributeKind::Label, true, None),
                 schema(
                     "default_target",
                     AttributeKind::Label,
@@ -1803,11 +1823,17 @@ pub(crate) mod tests {
             [
                 ("name", RepositoryRuleCallValue::String("generated".into())),
                 ("target", RepositoryRuleCallValue::String(":dep".into())),
+                ("mapped", RepositoryRuleCallValue::String("@dep".into())),
             ],
         );
         call.definition.defining_label = CanonicalLabel::parse("@@hidden+//defs:repo.bzl").unwrap();
         let module_base = CanonicalLabel::parse("@@//:MODULE.bazel").unwrap();
-        let innate = instantiate_call_with_base(&call, &mapping(), &module_base).unwrap();
+        let caller_mapping = SmallMap::from_iter([(
+            ApparentRepoName::new("dep").unwrap(),
+            CanonicalRepoName::new("caller+").unwrap(),
+        )]);
+        let innate =
+            instantiate_call_with_conversion(&call, &module_base, &caller_mapping).unwrap();
         assert_eq!(
             innate.rule_id.bzl_file.to_string(),
             "@@hidden+//defs:repo.bzl"
@@ -1816,6 +1842,12 @@ pub(crate) mod tests {
             innate.attributes.get("target"),
             Some(&OverrideAttributeValue::Label(
                 CanonicalLabel::parse("@@//:dep").unwrap()
+            ))
+        );
+        assert_eq!(
+            innate.attributes.get("mapped"),
+            Some(&OverrideAttributeValue::Label(
+                CanonicalLabel::parse("@@caller+//:dep").unwrap()
             ))
         );
         assert!(!innate.attributes.contains_key("default_target"));
@@ -1874,6 +1906,11 @@ pub(crate) mod tests {
             (":local", "@@//defs:local"),
             ("other", "@@//defs:other"),
             ("@dep//pkg:item", "@@dep+//pkg:item"),
+            ("@dep", "@@dep+//:dep"),
+            ("@@direct+", "@@direct+//:direct+"),
+            ("@//pkg:item", "@@empty+//pkg:item"),
+            ("@@//pkg:item", "@@//pkg:item"),
+            ("//pkg/item", "@@//pkg/item:item"),
         ] {
             let labeled = call(
                 attributes.clone(),
@@ -1905,15 +1942,42 @@ pub(crate) mod tests {
         );
         assert!(instantiate_call(&canonical, &mapping()).is_ok());
 
+        let collision = call(
+            [schema(
+                "values",
+                AttributeKind::LabelKeyedStringDict,
+                false,
+                None,
+            )],
+            [
+                ("name", RepositoryRuleCallValue::String("generated".into())),
+                (
+                    "values",
+                    RepositoryRuleCallValue::Map(Arc::from([
+                        (
+                            RepositoryRuleCallKey::String("@dep//:same".into()),
+                            RepositoryRuleCallValue::String("first".into()),
+                        ),
+                        (
+                            RepositoryRuleCallKey::Label(
+                                CanonicalLabel::parse("@@dep+//:same").unwrap(),
+                            ),
+                            RepositoryRuleCallValue::String("second".into()),
+                        ),
+                    ])),
+                ),
+            ],
+        );
+        assert!(
+            instantiate_call(&collision, &mapping())
+                .unwrap_err()
+                .contains("duplicate canonical label")
+        );
+
         for (kind, value, expected) in [
             (
                 AttributeKind::Label,
                 RepositoryRuleCallValue::String("@missing//:x".into()),
-                "no repository visible",
-            ),
-            (
-                AttributeKind::Label,
-                RepositoryRuleCallValue::Label(CanonicalLabel::parse("@@hidden+//:x").unwrap()),
                 "no repository visible",
             ),
             (
@@ -1927,6 +1991,16 @@ pub(crate) mod tests {
                     "//other:x".into(),
                 )])),
                 "not in the current package",
+            ),
+            (
+                AttributeKind::Output,
+                RepositoryRuleCallValue::String("@@//defs:x".into()),
+                "unsupported output label",
+            ),
+            (
+                AttributeKind::Output,
+                RepositoryRuleCallValue::String("@dep".into()),
+                "unsupported output label",
             ),
         ] {
             let invalid = call(
@@ -1942,6 +2016,22 @@ pub(crate) mod tests {
                     .contains(expected)
             );
         }
+
+        let hidden = CanonicalLabel::parse("@@hidden+//:x").unwrap();
+        let typed_hidden = call(
+            [schema("value", AttributeKind::Label, false, None)],
+            [
+                ("name", RepositoryRuleCallValue::String("generated".into())),
+                ("value", RepositoryRuleCallValue::Label(hidden.clone())),
+            ],
+        );
+        assert_eq!(
+            instantiate_call(&typed_hidden, &mapping())
+                .unwrap()
+                .attributes
+                .get("value"),
+            Some(&OverrideAttributeValue::Label(hidden))
+        );
 
         let invisible_default = call(
             [
@@ -1960,11 +2050,7 @@ pub(crate) mod tests {
                 ("required", RepositoryRuleCallValue::String("ok".into())),
             ],
         );
-        assert!(
-            instantiate_call(&invisible_default, &mapping())
-                .unwrap_err()
-                .contains("no repository visible")
-        );
+        assert!(instantiate_call(&invisible_default, &mapping()).is_ok());
         let mandatory_first = call(
             [
                 schema("required", AttributeKind::String, true, None),
@@ -2376,13 +2462,13 @@ pub(crate) mod tests {
             format!(
                 "module(name='bazel_tools')\n\
                  e=use_extension('//:ext.bzl','ext')\n\
-                 use_repo(e, replacement='replacement')\n\
+                 use_repo(e, {target}='{target}')\n\
                  override_repo(e, second='{target}')\n"
             )
         };
-        let source = |value: &str| {
+        let source = |value: &str, default_target: &str| {
             format!(
-                r#"repo=repository_rule(lambda ctx: None, attrs={{'text':attr.string(mandatory=True),'target':attr.label(),'peer':attr.label()}}, local=True, configure=True, environ=['B','A','B'])
+                r#"repo=repository_rule(lambda ctx: None, attrs={{'text':attr.string(mandatory=True),'target':attr.label(),'peer':attr.label(),'default_target':attr.label(default='{default_target}')}}, local=True, configure=True, environ=['B','A','B'])
 def impl(ctx):
     repo(name='first', text='{value}')
     repo(name='second', text='two', target='@second//:item', peer='@first//:item')
@@ -2390,8 +2476,9 @@ ext=module_extension(implementation=impl)
 "#
             )
         };
-        let a = compute(&dice, &module("replacement"), &source("one"), true).await;
-        let warm = compute(&dice, &module("replacement"), &source("one"), true).await;
+        let source_a = source("one", ":default_a");
+        let a = compute(&dice, &module("replacement"), &source_a, true).await;
+        let warm = compute(&dice, &module("replacement"), &source_a, true).await;
         assert!(HostInstantiatedModuleExtensionRepositoriesKey::equality(
             &a, &warm
         ));
@@ -2405,6 +2492,17 @@ ext=module_extension(implementation=impl)
         assert_eq!(rows[0].generated_name, "first");
         assert_eq!(rows[0].canonical_name.as_str(), "+ext+first");
         assert_eq!(rows[1].canonical_name.as_str(), "+ext+second");
+        assert!(matches!(
+            rows[0]
+                .call()
+                .definition
+                .attributes
+                .iter()
+                .find(|attribute| attribute.name == "default_target")
+                .and_then(|attribute| attribute.default.as_ref()),
+            Some(CoercedAttributeValue::Label(label))
+                if label == &CanonicalLabel::parse("@@//:default_a").unwrap()
+        ));
         assert!(rows[0].call().definition.local);
         assert!(rows[0].call().definition.configure);
         assert_eq!(
@@ -2444,13 +2542,133 @@ ext=module_extension(implementation=impl)
             "second"
         );
 
-        let b = compute(&dice, &module("replacement"), &source("changed"), true).await;
+        let mut imported_receipt = a_value.predecessor.invoked[0].clone();
+        let mut imported_call = imported_receipt.repository_rule_calls[0].clone();
+        imported_call.definition.defining_label =
+            CanonicalLabel::parse("@@defs+//rules:repo.bzl").unwrap();
+        let mut imported_attributes = imported_call.definition.attributes.to_vec();
+        imported_attributes
+            .iter_mut()
+            .find(|attribute| attribute.name == "default_target")
+            .unwrap()
+            .default = Some(CoercedAttributeValue::Label(
+            CanonicalLabel::parse("@@defs+//rules:default").unwrap(),
+        ));
+        imported_attributes.push(schema("output", AttributeKind::Output, false, None));
+        imported_call.definition.attributes = imported_attributes.into();
+        let mut imported_kwargs = imported_call.kwargs.to_vec();
+        imported_kwargs.push((
+            "target".into(),
+            RepositoryRuleCallValue::String(":explicit".into()),
+        ));
+        imported_kwargs.push((
+            "output".into(),
+            RepositoryRuleCallValue::String(":generated".into()),
+        ));
+        imported_call.kwargs = imported_kwargs.into();
+        imported_receipt.repository_rule_calls = Arc::from([imported_call]);
+        let imported = instantiate_request(&imported_receipt).unwrap();
+        let imported_row = &imported.repositories[0];
+        assert_eq!(
+            imported_row.repo_spec.attributes.get("target"),
+            Some(&OverrideAttributeValue::Label(
+                CanonicalLabel::parse("@@//:explicit").unwrap()
+            ))
+        );
+        assert_eq!(
+            imported_row.repo_spec.attributes.get("output"),
+            Some(&OverrideAttributeValue::Label(
+                CanonicalLabel::parse("@@defs+//rules:generated").unwrap()
+            ))
+        );
+        assert_eq!(
+            imported_row.repo_spec.rule_id.bzl_file,
+            CanonicalLabel::parse("@@defs+//rules:repo.bzl").unwrap()
+        );
+        assert!(matches!(
+            imported_row
+                .call
+                .definition
+                .attributes
+                .iter()
+                .find(|attribute| attribute.name == "default_target")
+                .and_then(|attribute| attribute.default.as_ref()),
+            Some(CoercedAttributeValue::Label(label))
+                if label == &CanonicalLabel::parse("@@defs+//rules:default").unwrap()
+        ));
+        for package in ["conditions", "visibility"] {
+            assert_eq!(
+                resolve_repository_output_label(
+                    &format!("//{package}:generated"),
+                    &imported_row.call.definition.defining_label,
+                    imported.mapping_entries.as_ref(),
+                )
+                .unwrap(),
+                CanonicalLabel::parse(&format!("@@defs+//{package}:generated")).unwrap()
+            );
+        }
+
+        let b = compute(
+            &dice,
+            &module("replacement"),
+            &source("changed", ":default_a"),
+            true,
+        )
+        .await;
         assert!(!HostInstantiatedModuleExtensionRepositoriesKey::equality(
             &a, &b
         ));
-        let restored = compute(&dice, &module("replacement"), &source("one"), true).await;
+        let restored = compute(&dice, &module("replacement"), &source_a, true).await;
         assert!(HostInstantiatedModuleExtensionRepositoriesKey::equality(
             &a, &restored
+        ));
+        let mapping_b = compute(&dice, &module("other"), &source_a, true).await;
+        assert!(!HostInstantiatedModuleExtensionRepositoriesKey::equality(
+            &a, &mapping_b
+        ));
+        let SourcePreparationOutcome::Complete(mapping_b_value) = &mapping_b else {
+            panic!("mapping-changed instantiation must complete")
+        };
+        assert_ne!(
+            rows[1].repo_spec.attributes.get("target"),
+            mapping_b_value.as_ref().as_ref().unwrap().extensions[0].repositories[1]
+                .repo_spec
+                .attributes
+                .get("target")
+        );
+        let mapping_restored = compute(&dice, &module("replacement"), &source_a, true).await;
+        assert!(HostInstantiatedModuleExtensionRepositoriesKey::equality(
+            &a,
+            &mapping_restored
+        ));
+        let default_b = compute(
+            &dice,
+            &module("replacement"),
+            &source("one", ":default_b"),
+            true,
+        )
+        .await;
+        assert!(!HostInstantiatedModuleExtensionRepositoriesKey::equality(
+            &a, &default_b
+        ));
+        let SourcePreparationOutcome::Complete(default_b_value) = &default_b else {
+            panic!("default-changed instantiation must complete")
+        };
+        assert!(matches!(
+            default_b_value.as_ref().as_ref().unwrap().extensions[0].repositories[0]
+                .call()
+                .definition
+                .attributes
+                .iter()
+                .find(|attribute| attribute.name == "default_target")
+                .and_then(|attribute| attribute.default.as_ref()),
+            Some(CoercedAttributeValue::Label(label))
+                if label == &CanonicalLabel::parse("@@//:default_b").unwrap()
+        ));
+        let default_restored = compute(&dice, &module("replacement"), &source_a, true).await;
+        assert!(HostInstantiatedModuleExtensionRepositoriesKey::equality(
+            &a,
+            &default_restored
         ));
         let empty_source = "def impl(ctx):\n    pass\next=module_extension(implementation=impl)\n";
         let empty = compute(&dice, &module("replacement"), empty_source, true).await;
@@ -2516,7 +2734,7 @@ second_ext=module_extension(implementation=second_impl)
                         && message.contains("unknown attribute")
                 )
         ));
-        let missing = compute(&dice, &module("replacement"), &source("one"), false).await;
+        let missing = compute(&dice, &module("replacement"), &source_a, false).await;
         assert!(matches!(
             missing,
             SourcePreparationOutcome::Complete(value)
@@ -2537,7 +2755,7 @@ second_ext=module_extension(implementation=second_impl)
         ));
 
         let alternate_module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, alias='replacement')\noverride_repo(e, second='alias')\n";
-        let alternate = compute(&dice, alternate_module, &source("one"), true).await;
+        let alternate = compute(&dice, alternate_module, &source_a, true).await;
         let SourcePreparationOutcome::Complete(alternate_value) = alternate else {
             panic!("alternate request must complete")
         };

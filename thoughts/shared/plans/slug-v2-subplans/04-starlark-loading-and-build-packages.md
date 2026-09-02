@@ -7770,3 +7770,10 @@ parser for `Output`/`OutputList`, including definition-repository
 `//conditions`/`//visibility`. Add one imported-rule output discriminator; no
 other owner, compatibility class, allowlist, cap or gate changes. Focused R4
 architecture rereview is required before Rust resumes.
+
+Focused R4 architecture and terminal implementation rereviews return `ACCEPT`.
+One borrowed spelling parser now projects every admitted dependency-label
+consumer to the existing `CanonicalLabel` with caller-owned context; deferred
+outputs retain their old routes. Full loading/query validation and fresh
+rules_rust replay pass the label boundary and select the separate generic
+built-in-catalog `glob()` stop in `@@bazel_tools//tools/res`.

@@ -26,7 +26,6 @@ use slug_build_api_v2::RunfilesRepositoryMapping;
 use slug_bzlmod_v2::BuiltinBazelToolsSnapshot;
 use slug_bzlmod_v2::NonrootAttributeKey;
 use slug_bzlmod_v2::NonrootAttributeValue;
-use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
@@ -1503,7 +1502,9 @@ impl PackageRecorder {
                     let label = self.dependency_label(&label)?;
                     if result
                         .iter()
-                        .any(|(existing, _): &(CanonicalLabel, CompactString)| existing == &label)
+                        .any(|(existing, _): &(CanonicalLabel, CompactString)| {
+                            existing.bazel_natural_cmp(&label).is_eq()
+                        })
                     {
                         anyhow::bail!("duplicate canonical label `{label}` in flag_values")
                     }
@@ -1716,11 +1717,6 @@ impl PackageRecorder {
     }
 
     fn dependency_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
-        if self.package_identifier.repo().is_root()
-            && matches!(&self.glob_source, PackageGlobSource::Listing(_))
-        {
-            return package_context_label(&self.package, value);
-        }
         package_context_label_with_repository(
             &self.package_identifier,
             self.repository_mapping.entries(),
@@ -1729,7 +1725,21 @@ impl PackageRecorder {
     }
 
     fn output_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
-        let label = self.dependency_label(value).map_err(|_| {
+        let label = if self.package_identifier.repo().is_root()
+            && matches!(&self.glob_source, PackageGlobSource::Listing(_))
+        {
+            package_context_label(&self.package, value)
+        } else if value.starts_with('@') && !value.contains("//") {
+            Err(anyhow::anyhow!("repository shorthand output"))
+        } else {
+            let rewritten = value.strip_prefix("@//").map(|rest| format!("@@//{rest}"));
+            package_context_label_with_repository(
+                &self.package_identifier,
+                self.repository_mapping.entries(),
+                rewritten.as_deref().unwrap_or(value),
+            )
+        }
+        .map_err(|_| {
             anyhow::anyhow!("output label must name a valid target in this package: {value}")
         })?;
         if label.package() != &self.package_identifier {
@@ -2754,56 +2764,21 @@ pub(crate) fn package_context_label_with_repository(
     mapping: &[(ApparentRepoName, CanonicalRepoName)],
     raw: &str,
 ) -> anyhow::Result<CanonicalLabel> {
-    let direct = |label: CanonicalLabel| {
-        let label_package = label.package().package().as_str();
-        if label_package == "..." || label_package.ends_with("/...") {
-            anyhow::bail!("invalid label '{raw}': package name cannot contain '...'");
+    CanonicalLabel::parse_with_package_context(raw, package, |requested| {
+        let mut matches = mapping
+            .iter()
+            .filter(|(name, _)| name.as_str() == requested);
+        let repository = matches
+            .next()
+            .ok_or_else(|| format!("no repository visible as '@{requested}'"))?;
+        if matches.next().is_some() {
+            return Err(format!(
+                "repository mapping for '@{requested}' is ambiguous"
+            ));
         }
-        Ok(label)
-    };
-    if raw.starts_with("@@") {
-        return direct(CanonicalLabel::parse(raw).map_err(anyhow::Error::msg)?);
-    }
-    if raw.starts_with('@') {
-        let apparent = ApparentLabel::parse(raw).map_err(anyhow::Error::msg)?;
-        let repository = if apparent.repo().is_root() {
-            CanonicalRepoName::root()
-        } else {
-            mapping
-                .iter()
-                .find_map(|(name, repository)| {
-                    (name == apparent.repo()).then_some(repository.clone())
-                })
-                .ok_or_else(|| {
-                    anyhow::anyhow!("no repository visible as '@{}'", apparent.repo().as_str())
-                })?
-        };
-        let canonical = if repository.is_root() {
-            format!("@@//{}:{}", apparent.package(), apparent.target())
-        } else {
-            format!(
-                "@@{}//{}:{}",
-                repository.as_str(),
-                apparent.package(),
-                apparent.target()
-            )
-        };
-        return direct(CanonicalLabel::parse(&canonical).map_err(anyhow::Error::msg)?);
-    }
-
-    let provisional = package_context_label(package.package().as_str(), raw)?;
-    let absolute_main = raw.starts_with("//")
-        && matches!(
-            provisional.package().package().as_str(),
-            "conditions" | "visibility"
-        );
-    if package.repo().is_root() || absolute_main {
-        Ok(provisional)
-    } else {
-        provisional
-            .rebind_provisional_root_repository(package.repo())
-            .map_err(anyhow::Error::msg)
-    }
+        Ok(repository.1.clone())
+    })
+    .map_err(anyhow::Error::msg)
 }
 
 fn package_output_label(base_package: &str, raw: &str) -> anyhow::Result<CanonicalLabel> {
@@ -2847,21 +2822,7 @@ fn direct_toolchain_label(
     if recursive || matches!(target, Some("all" | "all-targets" | "*")) {
         anyhow::bail!("toolchains requires a direct target label: {value}");
     }
-    if value.starts_with("@@") {
-        CanonicalLabel::parse(value).map_err(anyhow::Error::msg)
-    } else if value.starts_with('@') || value.starts_with("//") || value.starts_with(':') {
-        resolve_label(value, source)
-    } else {
-        let provisional = package_context_label(source.label.package().package().as_str(), value)?;
-        let repo = source.label.package().repo();
-        if repo.is_root() {
-            Ok(provisional)
-        } else {
-            provisional
-                .rebind_provisional_root_repository(repo)
-                .map_err(anyhow::Error::msg)
-        }
-    }
+    resolve_label(value, source)
 }
 
 /// Resolve a rule-implementation string in the defining `.bzl` module's
@@ -3346,6 +3307,7 @@ fn intrinsic_default(kind: AttributeKind) -> CoercedAttributeValue {
 #[derive(Clone, Copy)]
 enum RawLabelContext<'a> {
     Root(&'a str),
+    Definition(&'a BzlModuleIdentity),
     Package(&'a PackageRecorder),
 }
 
@@ -3356,6 +3318,7 @@ impl RawLabelContext<'_> {
         }
         match self {
             Self::Root(package) => raw_label(package, value, context),
+            Self::Definition(source) => resolve_label(&raw_string(value, context)?, source),
             Self::Package(recorder) => recorder.dependency_label(&raw_string(value, context)?),
         }
     }
@@ -3367,6 +3330,7 @@ impl RawLabelContext<'_> {
                     value.package().repo().is_root()
                         && value.package().package().as_str() == package
                 }
+                Self::Definition(source) => value.package() == source.label.package(),
                 Self::Package(recorder) => value.package() == &recorder.package_identifier,
             };
             if !expected_package {
@@ -3376,6 +3340,9 @@ impl RawLabelContext<'_> {
         }
         match self {
             Self::Root(package) => raw_output(package, value, context),
+            Self::Definition(source) => {
+                raw_output(source.label.package().package().as_str(), value, context)
+            }
             Self::Package(recorder) => recorder.output_label(&raw_string(value, context)?),
         }
     }
@@ -3509,17 +3476,21 @@ fn coerce_raw_value(
             let RawAttributeValue::Dict(values) = raw else {
                 anyhow::bail!("attribute must be a dictionary");
             };
-            Ok(CoercedAttributeValue::LabelKeyedStringDict(
-                values
+            let mut converted = Vec::with_capacity(values.len());
+            for (key, value) in values.iter() {
+                let key = context.label(key, "dictionary key")?;
+                if converted
                     .iter()
-                    .map(|(key, value)| {
-                        Ok((
-                            context.label(key, "dictionary key")?,
-                            raw_string(value, "dictionary value")?,
-                        ))
+                    .any(|(existing, _): &(CanonicalLabel, CompactString)| {
+                        existing.bazel_natural_cmp(&key).is_eq()
                     })
-                    .collect::<anyhow::Result<Vec<_>>>()?
-                    .into(),
+                {
+                    anyhow::bail!("duplicate canonical label dictionary key '{key}'");
+                }
+                converted.push((key, raw_string(value, "dictionary value")?));
+            }
+            Ok(CoercedAttributeValue::LabelKeyedStringDict(
+                converted.into(),
             ))
         }
         AttributeKind::LabelListDict => {
@@ -5589,38 +5560,16 @@ pub(crate) type ModuleExtensionTagCoercionError = CompactString;
 
 fn module_extension_label(
     raw: &str,
-    context_repo: &CanonicalRepoName,
+    context_package: &PackageIdentifier,
     mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
 ) -> Result<CanonicalLabel, ModuleExtensionTagCoercionError> {
-    let spelling = if raw.starts_with('@') || raw.starts_with("//") {
-        raw.to_owned()
-    } else if raw.starts_with(':') {
-        format!("//{raw}")
-    } else {
-        format!("//:{raw}")
-    };
-    let apparent = ApparentLabel::parse(&spelling).map_err(CompactString::from)?;
-    let repository = if apparent.repo().is_root() {
-        context_repo
-    } else {
-        mapping.get(apparent.repo()).ok_or_else(|| {
-            CompactString::from(format!(
-                "no repository visible as '@{}'",
-                apparent.repo().as_str()
-            ))
-        })?
-    };
-    let canonical = if repository.is_root() {
-        format!("@@//{}:{}", apparent.package(), apparent.target())
-    } else {
-        format!(
-            "@@{}//{}:{}",
-            repository.as_str(),
-            apparent.package(),
-            apparent.target()
-        )
-    };
-    CanonicalLabel::parse(&canonical).map_err(CompactString::from)
+    CanonicalLabel::parse_with_package_context(raw, context_package, |requested| {
+        mapping
+            .iter()
+            .find_map(|(name, repository)| (name.as_str() == requested).then(|| repository.clone()))
+            .ok_or_else(|| format!("no repository visible as '@{requested}'"))
+    })
+    .map_err(CompactString::from)
 }
 
 fn module_extension_sequence(
@@ -5647,7 +5596,7 @@ fn module_extension_dict(
 fn coerce_module_extension_value(
     kind: AttributeKind,
     raw: &NonrootAttributeValue,
-    context_repo: &CanonicalRepoName,
+    context_package: &PackageIdentifier,
     mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
 ) -> Result<CoercedAttributeValue, ModuleExtensionTagCoercionError> {
     let string = |raw: &NonrootAttributeValue| match raw {
@@ -5657,15 +5606,27 @@ fn coerce_module_extension_value(
         )),
     };
     let label = |raw: &NonrootAttributeValue| match raw {
-        NonrootAttributeValue::String(value) | NonrootAttributeValue::Label(value) => {
-            module_extension_label(value, context_repo, mapping)
+        NonrootAttributeValue::String(value) => {
+            module_extension_label(value, context_package, mapping)
+        }
+        NonrootAttributeValue::Label(value) => {
+            CanonicalLabel::parse(value).map_err(CompactString::from)
         }
         _ => Err(CompactString::from(
             "module-extension attribute value must be a label",
         )),
     };
     let output = |raw: &NonrootAttributeValue| {
-        let value = label(raw)?;
+        let raw = match raw {
+            NonrootAttributeValue::String(value) | NonrootAttributeValue::Label(value) => value,
+            _ => return Err("module-extension attribute value must be a label".into()),
+        };
+        if raw.starts_with("@@") || (raw.starts_with('@') && !raw.contains("//")) {
+            return Err(format!("unsupported module-extension output label '{raw}'").into());
+        }
+        let rewritten = raw.strip_prefix("@//").map(|rest| format!("//{rest}"));
+        let raw = rewritten.as_deref().unwrap_or(raw);
+        let value = module_extension_label(raw, context_package, mapping)?;
         if !value.package().package().as_str().is_empty() {
             return Err(CompactString::from(format!(
                 "output label '{value}' is not in the current package"
@@ -5680,8 +5641,11 @@ fn coerce_module_extension_value(
         )),
     };
     let label_key = |key: &NonrootAttributeKey| match key {
-        NonrootAttributeKey::String(value) | NonrootAttributeKey::Label(value) => {
-            module_extension_label(value, context_repo, mapping)
+        NonrootAttributeKey::String(value) => {
+            module_extension_label(value, context_package, mapping)
+        }
+        NonrootAttributeKey::Label(value) => {
+            CanonicalLabel::parse(value).map_err(CompactString::from)
         }
         _ => Err(CompactString::from(
             "module-extension dictionary key must be a label",
@@ -5698,10 +5662,7 @@ fn coerce_module_extension_value(
             .as_i32()
             .map(CoercedAttributeValue::Integer)
             .ok_or_else(|| CompactString::from("integer is outside i32")),
-        (
-            AttributeKind::Label,
-            NonrootAttributeValue::String(value) | NonrootAttributeValue::Label(value),
-        ) => module_extension_label(value, context_repo, mapping).map(CoercedAttributeValue::Label),
+        (AttributeKind::Label, _) => label(raw).map(CoercedAttributeValue::Label),
         (AttributeKind::Output, _) => output(raw).map(CoercedAttributeValue::Output),
         (AttributeKind::IntegerList, _) => module_extension_sequence(raw)?
             .iter()
@@ -5763,7 +5724,9 @@ fn coerce_module_extension_value(
                 let key = label_key(key)?;
                 if values
                     .iter()
-                    .any(|(existing, _): &(CanonicalLabel, CompactString)| existing == &key)
+                    .any(|(existing, _): &(CanonicalLabel, CompactString)| {
+                        existing.bazel_natural_cmp(&key).is_eq()
+                    })
                 {
                     return Err(format!("duplicate canonical label dictionary key '{key}'").into());
                 }
@@ -5854,6 +5817,7 @@ pub(crate) fn prepare_module_extension_tag_attributes(
     mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
 ) -> Result<Arc<[(CompactString, CoercedAttributeValue)]>, ModuleExtensionTagCoercionError> {
     validate_module_extension_tag_schema(schema)?;
+    let context_package = PackageIdentifier::new(context_repo.clone(), PackagePath::root());
     let mut supplied = SmallMap::new();
     for (name, raw) in raw {
         if matches!(raw, NonrootAttributeValue::None) {
@@ -5865,7 +5829,7 @@ pub(crate) fn prepare_module_extension_tag_attributes(
             .ok_or_else(|| CompactString::from(format!("unknown attribute '{name}'")))?;
         supplied.insert(
             name.clone(),
-            coerce_module_extension_value(attribute.kind, raw, context_repo, mapping)?,
+            coerce_module_extension_value(attribute.kind, raw, &context_package, mapping)?,
         );
     }
     schema
@@ -5885,16 +5849,6 @@ pub(crate) fn prepare_module_extension_tag_attributes(
                     .clone()
                     .unwrap_or_else(|| module_extension_intrinsic_default(attribute.kind))
             };
-            let mut labels = Vec::new();
-            value.labels(&mut labels);
-            for label in labels {
-                let repo = label.package().repo();
-                if repo != context_repo && !mapping.values().any(|visible| visible == repo) {
-                    return Err(
-                        format!("no repository visible as '{}': default label", repo).into(),
-                    );
-                }
-            }
             validate_allowed_value(&attribute.name, &value, &attribute.allowed_values)
                 .map_err(|error| CompactString::from(error.to_string()))?;
             Ok((attribute.name.clone(), value))
@@ -6245,13 +6199,24 @@ fn attribute_definition_before_later_properties<'v>(
                 return coerce_label_default(value, source).map(Some);
             }
             let raw = raw_attribute_value(value)?;
-            let source = context.source_label_for_call(eval)?;
-            coerce_raw_value(
-                RawLabelContext::Root(source.package().package().as_str()),
+            if matches!(
                 kind,
-                &raw,
-            )
-            .map(Some)
+                AttributeKind::LabelList
+                    | AttributeKind::StringKeyedLabelDict
+                    | AttributeKind::LabelKeyedStringDict
+                    | AttributeKind::LabelListDict
+            ) {
+                let source = context.source_identity_for_call(eval)?;
+                coerce_raw_value(RawLabelContext::Definition(source), kind, &raw).map(Some)
+            } else {
+                let source = context.source_label_for_call(eval)?;
+                coerce_raw_value(
+                    RawLabelContext::Root(source.package().package().as_str()),
+                    kind,
+                    &raw,
+                )
+                .map(Some)
+            }
         })
         .transpose()?
         .flatten();
@@ -6321,19 +6286,11 @@ fn coerce_label_default(
         return Ok(CoercedAttributeValue::Label(label.canonical().clone()));
     }
     let raw = raw_attribute_value(value)?;
-    let RawAttributeValue::String(raw) = &raw else {
-        return coerce_raw_value(
-            RawLabelContext::Root(source.label.package().package().as_str()),
-            AttributeKind::Label,
-            &raw,
-        );
-    };
-    let label = if raw.starts_with('@') || raw.starts_with("//") || raw.starts_with(':') {
-        resolve_label(raw, source)?
-    } else {
-        resolve_label(&format!(":{raw}"), source)?
-    };
-    Ok(CoercedAttributeValue::Label(label))
+    coerce_raw_value(
+        RawLabelContext::Definition(source),
+        AttributeKind::Label,
+        &raw,
+    )
 }
 
 fn discard_attribute_doc(doc: Option<Value>) -> anyhow::Result<()> {
@@ -10146,11 +10103,98 @@ mod module_extension_definition_tests {
     ) {
         (
             CanonicalRepoName::root(),
-            SmallMap::from_iter([(
+            SmallMap::from_iter([
+                (
+                    ApparentRepoName::new("dep").unwrap(),
+                    CanonicalRepoName::new("dep+").unwrap(),
+                ),
+                (
+                    ApparentRepoName::root(),
+                    CanonicalRepoName::new("empty+").unwrap(),
+                ),
+            ]),
+        )
+    }
+
+    #[test]
+    fn prepared_tag_label_values_use_calling_module_context_and_typed_passthrough() {
+        let context = CanonicalRepoName::new("caller+").unwrap();
+        let mapping = SmallMap::from_iter([
+            (
                 ApparentRepoName::new("dep").unwrap(),
                 CanonicalRepoName::new("dep+").unwrap(),
-            )]),
+            ),
+            (
+                ApparentRepoName::root(),
+                CanonicalRepoName::new("empty+").unwrap(),
+            ),
+        ]);
+        let raw = SmallMap::from_iter([(
+            CompactString::from("labels"),
+            NonrootAttributeValue::List(Arc::from([
+                NonrootAttributeValue::String("bare".into()),
+                NonrootAttributeValue::String("@dep".into()),
+                NonrootAttributeValue::String("@//:empty".into()),
+                NonrootAttributeValue::String("@@//:main".into()),
+                NonrootAttributeValue::String("//conditions:default".into()),
+                NonrootAttributeValue::Label("@@typed+//pkg:value".into()),
+            ])),
+        )]);
+        let prepared = prepare_module_extension_tag_attributes(
+            &[tag_attribute(
+                "labels",
+                AttributeKind::LabelList,
+                false,
+                None,
+            )],
+            &raw,
+            &context,
+            &mapping,
         )
+        .unwrap();
+        let CoercedAttributeValue::LabelList(labels) = &prepared[0].1 else {
+            panic!("expected label list")
+        };
+        assert_eq!(
+            labels.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            [
+                "@@caller+//:bare",
+                "@@dep+//:dep",
+                "@@empty+//:empty",
+                "@@//:main",
+                "@@//conditions:default",
+                "@@typed+//pkg:value",
+            ]
+        );
+
+        let collision = SmallMap::from_iter([(
+            CompactString::from("labels"),
+            NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter([
+                (
+                    NonrootAttributeKey::String("@dep//:same".into()),
+                    NonrootAttributeValue::String("first".into()),
+                ),
+                (
+                    NonrootAttributeKey::Label("@@dep+//:same".into()),
+                    NonrootAttributeValue::String("second".into()),
+                ),
+            ]))),
+        )]);
+        assert!(
+            prepare_module_extension_tag_attributes(
+                &[tag_attribute(
+                    "labels",
+                    AttributeKind::LabelKeyedStringDict,
+                    false,
+                    None,
+                )],
+                &collision,
+                &context,
+                &mapping,
+            )
+            .unwrap_err()
+            .contains("duplicate canonical label")
+        );
     }
 
     #[test]
@@ -10176,7 +10220,7 @@ mod module_extension_definition_tests {
             ),
             (
                 CompactString::from("target"),
-                NonrootAttributeValue::Label("@dep//pkg:item".into()),
+                NonrootAttributeValue::String("@dep//pkg:item".into()),
             ),
         ]);
         let (context, mapping) = root_context();
@@ -10201,7 +10245,7 @@ mod module_extension_definition_tests {
     }
 
     #[test]
-    fn prepared_tag_preserves_supplied_then_schema_error_order() {
+    fn prepared_tag_preserves_error_order_and_preconverted_default_labels() {
         let schema = [
             tag_attribute("first", AttributeKind::String, true, None),
             tag_attribute("second", AttributeKind::Boolean, true, None),
@@ -10300,36 +10344,41 @@ mod module_extension_definition_tests {
             .as_str(),
             "mandatory attribute 'first' isn't being specified"
         );
-        assert!(
-            prepare_module_extension_tag_attributes(
-                &invisible_default,
-                &SmallMap::from_iter([(
-                    CompactString::from("first"),
-                    NonrootAttributeValue::String("set".into()),
-                )]),
-                &context,
-                &mapping,
-            )
-            .unwrap_err()
-            .contains("missing+")
+        let prepared = prepare_module_extension_tag_attributes(
+            &invisible_default,
+            &SmallMap::from_iter([(
+                CompactString::from("first"),
+                NonrootAttributeValue::String("set".into()),
+            )]),
+            &context,
+            &mapping,
+        )
+        .unwrap();
+        assert_eq!(
+            prepared[1].1,
+            CoercedAttributeValue::Label(CanonicalLabel::parse("@@missing+//:default").unwrap())
         );
-        assert!(
-            prepare_module_extension_tag_attributes(
-                &[tag_attribute(
-                    "targets",
-                    AttributeKind::LabelListDict,
-                    false,
-                    Some(CoercedAttributeValue::LabelListDict(Arc::from([(
-                        "group".into(),
-                        Arc::from([CanonicalLabel::parse("@@missing+//:nested").unwrap(),]),
-                    )]))),
-                )],
-                &SmallMap::new(),
-                &context,
-                &mapping,
-            )
-            .unwrap_err()
-            .contains("missing+")
+        let prepared = prepare_module_extension_tag_attributes(
+            &[tag_attribute(
+                "targets",
+                AttributeKind::LabelListDict,
+                false,
+                Some(CoercedAttributeValue::LabelListDict(Arc::from([(
+                    "group".into(),
+                    Arc::from([CanonicalLabel::parse("@@missing+//:nested").unwrap()]),
+                )]))),
+            )],
+            &SmallMap::new(),
+            &context,
+            &mapping,
+        )
+        .unwrap();
+        assert_eq!(
+            prepared[0].1,
+            CoercedAttributeValue::LabelListDict(Arc::from([(
+                CompactString::from("group"),
+                Arc::from([CanonicalLabel::parse("@@missing+//:nested").unwrap()]),
+            )]))
         );
     }
 
@@ -10406,7 +10455,7 @@ mod module_extension_definition_tests {
             (
                 CompactString::from("strings_by_label"),
                 dict([(
-                    NonrootAttributeKey::Label("@dep//pkg:item".into()),
+                    NonrootAttributeKey::Label("@@dep+//pkg:item".into()),
                     string("value"),
                 )]),
             ),
@@ -10533,6 +10582,18 @@ mod module_extension_definition_tests {
             .unwrap_err()
             .contains("current package")
         );
+        for raw in ["@@//:out", "@dep"] {
+            assert!(
+                prepare_module_extension_tag_attributes(
+                    &[tag_attribute("value", AttributeKind::Output, false, None)],
+                    &SmallMap::from_iter([(CompactString::from("value"), string(raw),)]),
+                    &context,
+                    &mapping,
+                )
+                .unwrap_err()
+                .contains("unsupported module-extension output")
+            );
+        }
         let mut duplicate_mapping = mapping.clone();
         duplicate_mapping.insert(
             ApparentRepoName::new("alias").unwrap(),

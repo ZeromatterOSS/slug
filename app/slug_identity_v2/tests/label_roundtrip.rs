@@ -760,6 +760,57 @@ fn option_label_context_parses_the_three_bazel_modes() {
 }
 
 #[test]
+fn package_context_label_parser_covers_complete_bazel_spelling_table() {
+    let base = PackageIdentifier::new(
+        CanonicalRepoName::new("owner+").unwrap(),
+        PackagePath::parse("base/pkg").unwrap(),
+    );
+    let parse = |input: &str| {
+        CanonicalLabel::parse_with_package_context(input, &base, |requested| match requested {
+            "alias" => Ok(CanonicalRepoName::new("mapped+").unwrap()),
+            "" => Ok(CanonicalRepoName::new("empty+").unwrap()),
+            _ => Err(format!("missing apparent repository '{requested}'")),
+        })
+    };
+    for (input, expected) in [
+        (":local", "@@owner+//base/pkg:local"),
+        ("path/to/target", "@@owner+//base/pkg:path/to/target"),
+        ("//tools/compiler", "@@owner+//tools/compiler:compiler"),
+        ("//:root", "@@owner+//:root"),
+        (
+            "@alias//tools/compiler",
+            "@@mapped+//tools/compiler:compiler",
+        ),
+        ("@alias", "@@mapped+//:alias"),
+        (
+            "@@direct+//tools/compiler",
+            "@@direct+//tools/compiler:compiler",
+        ),
+        ("@@direct+", "@@direct+//:direct+"),
+        ("@//tools:empty", "@@empty+//tools:empty"),
+        ("@@//tools:main", "@@//tools:main"),
+        ("//conditions:default", "@@//conditions:default"),
+        ("//visibility:public", "@@//visibility:public"),
+        (":dir/name/.", "@@owner+//base/pkg:dir/name"),
+    ] {
+        assert_eq!(
+            parse(input).unwrap(),
+            CanonicalLabel::parse(expected).unwrap(),
+            "{input}"
+        );
+    }
+    for input in [
+        "/single:slash",
+        "relative/package:target",
+        "//pkg/...:all",
+        "@bad!//pkg:target",
+    ] {
+        assert!(parse(input).is_err(), "{input}");
+    }
+    assert!(parse("@missing//pkg:target").is_err());
+}
+
+#[test]
 fn option_label_private_bazel_validators_cover_option_only_spellings() {
     let mapping = RepositoryMapping::new(RepositoryMappingId::new("validator").unwrap());
     let base = PackageIdentifier::new(
