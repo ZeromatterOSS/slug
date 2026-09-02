@@ -2460,3 +2460,23 @@ result. Authenticate the canonical namespace in the existing demand helper;
 do not add an index, map, cache, interner or copied generated-definition set.
 Zabel's complete generated-repository projection remains concept/test guidance
 only, while Bazel 9.2 owns the exact namespace and sibling visibility behavior.
+
+### Stage 4/5 repository-rule file-admissibility utility decision (2026-09-01)
+
+`WP-4-5-7A-repository-rule-file-admissibility-category-implementation-r1`
+requires no V1 or Buck2 extraction. Reuse the already adopted V2
+`FileAdmissibility` value: a small enum containing NoFiles, AnyFile or one
+immutable ordered `Arc<[CompactString]>` suffix slice plus an independent
+single-artifact bit. Add it directly to the existing Allocative frozen
+repository attribute schema so projection and DICE equality remain structural.
+
+Add no `String`, `Vec`, second collection, map/set, hasher, interner or cache;
+do not copy suffix storage per invocation. Zabel's generic repository
+declaration host is concept/test guidance for retaining ordinary schemas apart
+from explicit invocation values. Copy no Zig representation or behavior.
+Independent retained-representation review must accept this no-extraction
+decision before Rust.
+
+Independent review returns `ACCEPT`; the no-extraction decision is final for
+this packet. Preserve Arc sharing within one frozen definition/call cohort, but
+do not assert pointer identity across separately evaluated declarations.

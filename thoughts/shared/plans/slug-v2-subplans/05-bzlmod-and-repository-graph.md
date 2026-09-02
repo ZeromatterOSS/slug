@@ -4242,6 +4242,20 @@ at the generic `repository_rule(build_file = ...)` declaration schema. Audit
 that complete applicable declaration category next; do not specialize for
 rules_rust, `cc_common`, `cc_internal`, parser or C++ consumers.
 
+The audit selects the complete repository-rule file-admissibility category,
+not the single `build_file` attribute. Bazel 9.2 builds ordinary Attribute
+descriptors into the repository rule and does not apply file resolution in
+`RepoRule.instantiate`/`AttributeUtils`. Loading must therefore retain its
+existing NoFiles/AnyFile/ordered-suffix plus single-artifact policy in the
+frozen definition and existing DICE identity, while leaving actual observed
+path/read/symlink use to later repository-context capability packets. Review
+the retained representation before implementation; no Bzlmod owner, RepoSpec,
+mapping, generated repository or materializer semantics move.
+
+Independent review returns `ACCEPT`; implementation may retain only the
+existing file policy in frozen definition identity. Actual path/file semantics
+and every Bzlmod owner remain unchanged.
+
 ### Compilation-helper acceptance and Stage 4 continuation (2026-08-26)
 
 Commit `3060e4d4d` accepts the complete rules_cc compilation-helper freeze with

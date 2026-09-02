@@ -7685,3 +7685,23 @@ Pinned Bazel 9.2 `ModuleExtensionResolutionTest.simpleExtension` and
 are ownership guidance only. Independent public-DICE architecture review
 returns `ACCEPT`; implementation is active only within the frozen shared-route
 packet.
+
+### Repository-rule file-admissibility category selected (2026-09-01)
+
+Commit `75fad534c` accepts the shared root route. Its authentic replay next
+loads verbatim Bazel-tools `git.bzl`, where the existing repository-rule filter
+rejects `build_file = attr.label(allow_single_file = True)` after the general
+attr constructor has already produced the correct compact policy.
+
+Select
+`WP-4-5-7A-repository-rule-file-admissibility-category-implementation-r1`.
+Retain the existing `FileAdmissibility` value through the frozen repository
+definition for all five label-bearing constructors; do not add a second parser,
+target/file resolution, repository effect, private-attribute name semantics or
+consumer special case. Pinned Bazel 9.2 owns behavior. Clean Zabel
+`0795445f...` supplies only the declaration-schema/explicit-invocation ownership
+lesson. Independent retained-representation review is required before Rust.
+
+Independent review returns `ACCEPT`; the existing compact policy, frozen
+repository-definition owner, no-resolution phase and proof/cap boundary are
+accepted. Implementation is active only within the current packet.
