@@ -2490,3 +2490,28 @@ Implementation and terminal review return `ACCEPT`. The existing
 `FileAdmissibility`, `Arc<[RepositoryRuleAttribute]>`, `CompactString` and
 `Allocative` owners are sufficient; no V1/Buck2 extraction, copied suffix
 storage, collection, cache or interner was added.
+
+### Stage 4/5 package-context label parser utility decision (2026-09-01)
+
+`WP-4-5-7A-package-context-label-string-category-design-r2` requires no V1 or
+Buck2 extraction. Refactor the existing V2 `ResolvedOptionLabel` lexical
+grammar into a private borrowed spelling owner and add a package-context
+projection to the existing `CanonicalLabel`. Reuse `PackagePath`, `TargetName`
+and `CanonicalRepoName`; add no retained syntax/raw-label type, second label
+identity, mapping copy, collection, cache, interner, registry, DICE key or I/O.
+
+starlark-rust's Bazel binary example independently demonstrates the complete
+shorthand grammar but is not a production utility owner. Clean Zabel
+`0795445f...` supplies peer guidance for separating borrowed syntax from active
+module mapping. Copy neither implementation's retained type, allocator,
+evaluator host, cache, diagnostic nor behavior claim. Independent architecture
+review must accept this no-extraction decision before Rust.
+
+R1 review changes no utility decision. R2 adds only caller selection among
+already-retained mappings and construction-time duplicate detection after
+canonical label-key conversion. It retains no conversion context, raw key,
+collision index or mapping copy; request-local vectors/`SmallMap` probes are
+sufficient. Focused R2 rereview must accept the corrected category before Rust.
+Focused R2 rereview returns `ACCEPT`; duplicate checks compare canonical
+repository/package/target projection rather than optional Slug mapping
+provenance and retain no collision index.

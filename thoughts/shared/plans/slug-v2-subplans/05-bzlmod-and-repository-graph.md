@@ -4267,6 +4267,36 @@ Independent review returns `ACCEPT`; implementation may retain only the
 existing file policy in frozen definition identity. Actual path/file semantics
 and every Bzlmod owner remain unchanged.
 
+### Package-context label conversion preserves caller ownership (2026-09-01)
+
+Commit `95b4f0da6` clears repository-rule file policy and exposes the generic
+`@rust_host_tools` label-default boundary. Select the corrected docs-only
+package-context label-string category, not a Bzlmod resolver or rules_rust
+special case. Descriptor defaults use their defining `.bzl` package/mapping;
+explicit module tags use the calling module's root package/mapping; explicit
+ordinary extension repository-rule values use the selected extension-evaluation
+base package and full generated-repository mapping; explicit innate
+`use_repo_rule` values use the repository-rule `.bzl` package and calling
+module's mapping. Pretyped Labels remain unchanged.
+
+No repository mapping, RepoSpec, extension owner certificate, generated
+definition/effect, lockfile fact, graph edge, materializer or DICE key moves.
+The shared identity parser accepts only caller-supplied context and returns the
+existing typed canonical label. Output, load, transition and command contexts
+remain deferred/separate. Independent architecture review must accept these
+ownership boundaries before Rust.
+
+R1 review returned `REPLAN` because the initial prose conflated ordinary and
+innate repository-call conversion. R2 follows Bazel 9.2
+`InnateRunnableExtension`: borrow the already-retained calling-module mapping
+for innate explicit strings while keeping the repository-rule `.bzl` package as
+the base. Namespace construction and retained mappings do not move or copy.
+R2 also requires `@//`/`@@//` discrimination and converted label-key collision
+rejection at both repository-call kinds. Focused rereview is required.
+Focused R2 rereview returns `ACCEPT`; innate implementation must borrow the
+calling-module mapping exposed by `definition_parts`, never the generated
+namespace returned by `namespace_parts`.
+
 ### Compilation-helper acceptance and Stage 4 continuation (2026-08-26)
 
 Commit `3060e4d4d` accepts the complete rules_cc compilation-helper freeze with

@@ -7717,3 +7717,33 @@ compact policy now participates in frozen repository-definition, repeated-call
 and DICE identity across the complete admitted category; complete loading and
 query validation pass. The authentic replay clears Bazel-tools `build_file`
 and selects the separate generic `@rust_host_tools` label-default boundary.
+
+### Package-context label-string category selected (2026-09-01)
+
+Commit `95b4f0da6` accepts the repository-rule file-admissibility category and
+its authentic replay selects the generic `@rust_host_tools` descriptor-default
+boundary. Activate docs-only
+`WP-4-5-7A-package-context-label-string-category-design-r2`, covering the
+complete Bazel 9.2 package-context dependency-label string grammar across
+`Label()`, all five dependency constructors/default shapes, ordinary BUILD
+values, explicit module tags, explicit repository-rule values and toolchain
+declarations.
+
+One pure borrowed spelling owner in `slug_identity_v2::label` must project to
+the existing `CanonicalLabel`; loading retains the defining `.bzl`, BUILD
+package, calling module and extension-evaluation mapping decisions. Add no
+second label representation, DICE key, I/O, target/file resolution, output,
+load, transition, command-pattern, ruleset or C++ behavior. Bazel 9.2 is
+authority. starlark-rust and clean Zabel `0795445f...` provide only shared-parser
+and syntax/mapping-separation guidance. Independent architecture review is
+required before Rust.
+
+R1 review returned `REPLAN` without rejecting the shared owner. R2 explicitly
+separates `@//` mapping from `@@//` main-repository bypass, rejects distinct raw
+label-keyed dictionary keys that canonicalize alike, and inventories every
+admitted `PackageRecorder` consumer: generic/symbolic-macro attrs and selector
+keys, visibility/package metadata, package groups, alias/filegroup/test-suite,
+config-setting and constraint/platform/toolchain declarations. It also splits
+ordinary extension repository calls from innate calls. Focused R2 rereview is
+required before Rust and returns `ACCEPT`; implementation may proceed only
+through the shared parser and inventoried conversion paths.
