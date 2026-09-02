@@ -4441,3 +4441,28 @@ Run only docs-first `WP-5-7A-repository-context-path-audit`. Determine Bazel
 existence/error behavior, host observations and revision identity before
 selecting Rust. Do not infer filesystem semantics from the Label context bridge
 or add a rules_cc/toolchain special case.
+
+### Repository-context path audit returns REPLAN (2026-09-02)
+
+Bazel 9.2 package-looks-up a Label and returns its lexical rooted path without
+checking the target. Its default `incompatible_no_implicit_watch_label=true`
+adds no target watch. The existing Bzlmod `HostRepositoryPathKey` instead
+observes the requested target, expands symlinks and returns a resolved path;
+using it would silently widen invalidation and change value identity.
+
+The necessary source route, package lookup, materialization root and immutable
+observation namespace already have owners, but no public narrow projection
+composes them for repository execution. Root-workspace package lookup and the
+in-memory built-in catalog also require explicit dispositions, while generated
+repository working roots do not exist until after the current file-only effect
+plan is materialized.
+
+Select docs-only
+`WP-2-4-5-7A-repository-label-path-owner-design-r1`. It must define one lexical
+Label-path projection over the existing route/package/materialization owners
+and a lock-safe invocation retry protocol, with exact no-target-observation and
+A/B/A revision proof. It must not reuse the resolved-path key, infer roots from
+loaded `.bzl` paths, load BUILD files, or widen into string paths, built-in
+catalog materialization, path filesystem methods, symlink/template effects or
+ruleset special cases. The audit changes documentation only and authorizes no
+Rust.

@@ -8021,3 +8021,21 @@ query gates pass. The rebuilt authentic replay clears the Label constructor and
 next rejects the independent `repository_ctx.path(Label(label))` method. Stage
 5 owns the docs-only path audit; no Label grammar or rules_cc branch follows
 from this acceptance.
+
+### Repository-context path audit replans to a dedicated Label-path owner (2026-09-02)
+
+Pinned Bazel 9.2 separates Label construction from filesystem projection.
+`repository_ctx.path(Label)` first requires the Label package to exist, then
+returns the lexical package-root path without inspecting the target or
+resolving symlinks. With the Bazel 9.2 default it does not implicitly watch the
+target. Slug's existing `HostRepositoryPathKey` therefore cannot be reused: it
+observes existence and performs exact symlink resolution for source reads.
+
+The Stage 4 evaluator is synchronous while route, package and materialization
+owners are DICE computations. Select docs-only
+`WP-2-4-5-7A-repository-label-path-owner-design-r1`: freeze a bounded
+invocation-demand/retry contract that drops the evaluator and all invocation
+borrows before awaiting those owners, and return a real immutable path value
+backed by their lexical materialized root. String/generated-root paths, path
+filesystem methods, built-in catalog paths, symlink/template effects and all
+other repository APIs remain deferred. No Rust is authorized by this audit.
