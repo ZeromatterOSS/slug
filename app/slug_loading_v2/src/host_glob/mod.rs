@@ -9,7 +9,6 @@
 
 #![allow(dead_code)] // Dormant until the package-aware Host glob owner lands.
 
-#[cfg(unix)]
 use std::ffi::OsString;
 use std::fmt;
 #[cfg(unix)]
@@ -24,12 +23,12 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_bzlmod_v2::HostRepositoryDirectoryListingError;
 use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
-#[cfg(unix)]
 use slug_workspace_v2::PathDirectoryEntryKind;
 #[cfg(unix)]
 use slug_workspace_v2::PathDirectoryListing;
@@ -58,7 +57,9 @@ use slug_workspace_v2::ResolvedPathObservationKey;
 use slug_workspace_v2::ResolvedPathState;
 
 use crate::glob::GlobSegmentPattern as HostGlobSegmentPattern;
+#[cfg(unix)]
 use crate::glob::GlobSegmentPatternKind as HostGlobSegmentPatternKind;
+#[cfg(unix)]
 use crate::glob::glob_segment_matches;
 
 mod adapter;
@@ -66,6 +67,8 @@ pub(crate) use adapter::HostGlobLoadingOperation;
 pub(crate) use adapter::HostGlobLoadingRequest;
 pub(crate) use adapter::HostGlobPrepared;
 pub(crate) use adapter::HostGlobRequestInputError;
+#[cfg(test)]
+pub(crate) use adapter::HostGlobRequestOutcome;
 pub(crate) use adapter::HostGlobRequestTraversalError;
 pub(crate) use adapter::compute_host_glob_request;
 pub(crate) use traversal::HostGlobBoundaryScope;
@@ -113,6 +116,10 @@ impl HostGlobSegmentCandidates {
 enum HostGlobSegmentError {
     UnsupportedHost,
     DirectoryListing(PathDirectoryListingError),
+    RepositoryDirectoryListing(HostRepositoryDirectoryListingError),
+    CatalogDirectoryMissing,
+    CatalogComponentEncoding,
+    CatalogEntryKind(PathDirectoryEntryKind),
     DirectoryDisappeared {
         logical_directory: NormalizedAbsolutePath,
     },
@@ -149,6 +156,21 @@ impl fmt::Display for HostGlobSegmentError {
             Self::UnsupportedHost => f.write_str("Host glob segment names are unsupported here"),
             Self::DirectoryListing(error) => {
                 write!(f, "Host glob directory listing failed: {error:?}")
+            }
+            Self::RepositoryDirectoryListing(error) => {
+                write!(f, "repository glob directory listing failed: {error:?}")
+            }
+            Self::CatalogDirectoryMissing => {
+                f.write_str("built-in catalog glob directory disappeared")
+            }
+            Self::CatalogComponentEncoding => {
+                f.write_str("built-in catalog glob component is not Latin-1")
+            }
+            Self::CatalogEntryKind(kind) => {
+                write!(
+                    f,
+                    "built-in catalog glob entry kind is unsupported: {kind:?}"
+                )
             }
             Self::DirectoryDisappeared { logical_directory } => write!(
                 f,
@@ -696,9 +718,16 @@ impl HostGlobSegmentCandidatesKey {
     }
 }
 
-#[cfg(unix)]
 fn logical_child(parent: &NormalizedAbsolutePath, component: &[u8]) -> NormalizedAbsolutePath {
+    #[cfg(unix)]
     let component = OsString::from_vec(component.to_vec());
+    #[cfg(not(unix))]
+    let component = OsString::from(
+        component
+            .iter()
+            .map(|byte| char::from(*byte))
+            .collect::<String>(),
+    );
     NormalizedAbsolutePath::new(parent.as_path().join(component))
         .expect("a validated component joined to an absolute directory remains absolute")
 }

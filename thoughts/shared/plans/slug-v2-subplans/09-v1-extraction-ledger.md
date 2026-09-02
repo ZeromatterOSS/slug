@@ -2539,7 +2539,7 @@ type, mapping copy, retained syntax, collection, cache or interner was added.
 
 ### Stage 4/5 repository-source glob routing utility decision (2026-09-01)
 
-`WP-4-5-7A-repository-source-glob-routing-category-implementation-r1`
+`WP-4-5-7A-repository-source-glob-routing-category-implementation-r2`
 requires no V1 or Buck2 extraction. Extend only the existing traversal scope
 with the already-retained `HostRepositorySourceRoute`; consume the existing
 catalog directory-listing and external package-boundary keys directly. Keep
@@ -2561,3 +2561,15 @@ all candidate rows remain traversal scratch, and no retained utility, key,
 collection or donor extraction is added. Focused rereview is required.
 Focused rereview returns `ACCEPT`; the no-extraction and scratch-lifetime
 decision is final for this packet.
+
+R1's proof-only `REPLAN` changes no utility decision. R2 replaces an
+unobservable successfully published `tools/res` package assertion with exact
+raw request-adapter match slices and a later typed declaration-error stop. It
+adds no retained type, collection, cache, key, lock, donor code or extraction.
+
+The implemented R2 route retains that decision: 228 gross production and 302
+gross proof Rust lines reuse the existing compact traversal state, catalog
+listing and external-boundary owners. Complete serial validation and authentic
+replay pass to the next generic declaration-schema boundary. No V1, Buck2 or
+Zabel code extraction is required for the next audit; Zabel remains peer
+architecture guidance only.

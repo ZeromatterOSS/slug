@@ -22993,7 +22993,10 @@ The accepted package-context label category reaches the next generic loading
 boundary at verbatim `@@bazel_tools//tools/res:BUILD`. The selected packet is
 not registration, toolchain, rules_rust, rules_cc, C++, `cc_common` or
 `cc_internal` work. It routes built-in catalog directory facts through the
-already-accepted BUILD glob traversal and package-boundary owners. A fresh
-authentic registration/rules_rust replay must clear this package and stop at
-the next honest generic boundary; configured registration and toolchain owners
-remain unchanged.
+already-accepted BUILD glob traversal and package-boundary owners. R1 proves
+those globs and then reaches the existing `toolchain_type` Label-versus-string
+declaration-schema boundary. R2 proves the raw matches, and fresh authentic
+rules_rust replay stops at that later generic error. Terminal review returns
+`ACCEPT`; configured registration and toolchain owners remain unchanged, and
+the next packet must audit the complete generic builtin parameter category
+before any toolchain-analysis widening.

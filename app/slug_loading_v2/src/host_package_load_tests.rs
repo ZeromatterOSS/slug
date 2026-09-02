@@ -36234,16 +36234,18 @@ fn external_repository_glob_root_derivation_checks_build_and_package_suffixes() 
         NormalizedAbsolutePath::new("/materialized/dep/pkg/BUILD.bazel").unwrap(),
     );
     assert_eq!(
-        super::repository_package_host_root(
+        super::repository_package_glob_source(
             &address,
             "BUILD.bazel",
             &PackagePath::parse("pkg").unwrap(),
         )
         .unwrap(),
-        Some(NormalizedAbsolutePath::new("/materialized/dep").unwrap())
+        super::RepositoryPackageGlobSource::Host(
+            NormalizedAbsolutePath::new("/materialized/dep").unwrap()
+        )
     );
     assert!(
-        super::repository_package_host_root(
+        super::repository_package_glob_source(
             &address,
             "BUILD",
             &PackagePath::parse("pkg").unwrap(),
@@ -36251,7 +36253,7 @@ fn external_repository_glob_root_derivation_checks_build_and_package_suffixes() 
         .is_err()
     );
     assert!(
-        super::repository_package_host_root(
+        super::repository_package_glob_source(
             &address,
             "BUILD.bazel",
             &PackagePath::parse("other").unwrap(),

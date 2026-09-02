@@ -8,6 +8,7 @@
  */
 
 use std::collections::VecDeque;
+use std::ffi::OsStr;
 use std::fmt;
 use std::sync::Arc;
 
@@ -17,53 +18,43 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
-#[cfg(unix)]
 use slug_bzlmod_v2::HostExternalPackageBoundary;
 use slug_bzlmod_v2::HostExternalPackageBoundaryError;
-#[cfg(unix)]
 use slug_bzlmod_v2::HostExternalPackageBoundaryKey;
-#[cfg(unix)]
 use slug_bzlmod_v2::HostExternalPackageBoundaryKind;
-#[cfg(unix)]
 use slug_bzlmod_v2::HostExternalPackageBoundaryObservationKey;
+use slug_bzlmod_v2::HostRepositoryDirectoryListingError;
+use slug_bzlmod_v2::HostRepositoryDirectoryListingKey;
+use slug_bzlmod_v2::HostRepositoryDirectoryListingObservationKey;
 use slug_bzlmod_v2::HostRepositorySourceRoute;
-#[cfg(unix)]
 use slug_bzlmod_v2::HostRootPackageBoundary;
 use slug_bzlmod_v2::HostRootPackageBoundaryError;
-#[cfg(unix)]
 use slug_bzlmod_v2::HostRootPackageBoundaryKey;
-#[cfg(unix)]
 use slug_bzlmod_v2::HostRootPackageBoundaryKind;
-#[cfg(unix)]
 use slug_bzlmod_v2::HostRootPackageBoundaryObservationKey;
 use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathDirectoryEntryKind;
+use slug_workspace_v2::PathDirectoryListing;
 use slug_workspace_v2::PathObservationEpoch;
-#[cfg(unix)]
 use slug_workspace_v2::PathOutcome;
 use starlark_map::small_set::SmallSet;
 
 use super::HexBytes;
-#[cfg(unix)]
 use super::HostGlobSegmentCandidateKind;
-#[cfg(unix)]
 use super::HostGlobSegmentCandidates;
-#[cfg(unix)]
 use super::HostGlobSegmentCandidatesKey;
-#[cfg(unix)]
 use super::HostGlobSegmentCandidatesObservationKey;
 use super::HostGlobSegmentError;
 use super::HostGlobSegmentPattern;
-#[cfg(unix)]
 use super::dice_invariant;
-#[cfg(unix)]
 use super::logical_child;
-#[cfg(unix)]
 use super::union_observation_epochs;
 use crate::glob::GlobPattern;
+use crate::glob::glob_segment_matches;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub(super) enum HostGlobTraversalOperation {
@@ -75,6 +66,7 @@ pub(super) enum HostGlobTraversalOperation {
 pub(crate) enum HostGlobBoundaryScope {
     Root,
     External(HostRepositorySourceRoute),
+    BuiltinCatalog(HostRepositorySourceRoute),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -254,20 +246,17 @@ enum HostGlobTraversalMode {
     Observed,
 }
 
-#[cfg(unix)]
 struct TraversalChild<T, E> {
     result: Arc<Result<T, E>>,
     observations: PathObservationEpoch,
 }
 
-#[cfg(unix)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 enum HostGlobBoundary {
     Continue,
     Stop,
 }
 
-#[cfg(unix)]
 type TraversalChildOutcome<T, E> =
     SourcePreparationOutcome<Result<TraversalChild<T, E>, ObservedPathFrontierError>>;
 
@@ -293,7 +282,6 @@ fn driver_need(need: SourcePreparationNeeds) -> HostGlobTraversalDriverOutcome {
     SourcePreparationOutcome::Need(need)
 }
 
-#[cfg(unix)]
 struct TraversalTerminals {
     needs: Option<SourcePreparationNeeds>,
     observations: PathObservationEpoch,
@@ -301,7 +289,6 @@ struct TraversalTerminals {
     first_error: Option<((usize, usize), HostGlobTraversalError, PathObservationEpoch)>,
 }
 
-#[cfg(unix)]
 impl TraversalTerminals {
     fn new() -> Self {
         Self {
@@ -356,14 +343,18 @@ impl TraversalTerminals {
     }
 }
 
-#[cfg(unix)]
 impl HostGlobTraversalMode {
     async fn segment(
         self,
         ctx: &mut DiceComputations<'_>,
+        scope: &HostGlobBoundaryScope,
         logical_directory: NormalizedAbsolutePath,
+        package: PackagePath,
         pattern: HostGlobSegmentPattern,
     ) -> TraversalChildOutcome<HostGlobSegmentCandidates, HostGlobSegmentError> {
+        if let HostGlobBoundaryScope::BuiltinCatalog(route) = scope {
+            return self.catalog_segment(ctx, route, package, pattern).await;
+        }
         match self {
             Self::Legacy => dice_invariant(
                 ctx.compute(&HostGlobSegmentCandidatesKey::new(
@@ -394,6 +385,57 @@ impl HostGlobTraversalMode {
         }
     }
 
+    async fn catalog_segment(
+        self,
+        ctx: &mut DiceComputations<'_>,
+        route: &HostRepositorySourceRoute,
+        package: PackagePath,
+        pattern: HostGlobSegmentPattern,
+    ) -> TraversalChildOutcome<HostGlobSegmentCandidates, HostGlobSegmentError> {
+        let key = match route {
+            HostRepositorySourceRoute::Root(route) => {
+                HostRepositoryDirectoryListingKey::new(route.clone(), package.clone())
+            }
+            HostRepositorySourceRoute::Canonical(input) => {
+                HostRepositoryDirectoryListingKey::new_canonical(input.clone(), package.clone())
+            }
+        };
+        let observed_key = match route {
+            HostRepositorySourceRoute::Root(route) => {
+                HostRepositoryDirectoryListingObservationKey::new(route.clone(), package)
+            }
+            HostRepositorySourceRoute::Canonical(input) => {
+                HostRepositoryDirectoryListingObservationKey::new_canonical(input.clone(), package)
+            }
+        };
+        match self {
+            Self::Legacy => match dice_invariant(ctx.compute(&key).await) {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(result) => {
+                    SourcePreparationOutcome::Complete(Ok(TraversalChild {
+                        result: Arc::new(project_catalog_listing(&result, &pattern)),
+                        observations: PathObservationEpoch::empty(),
+                    }))
+                }
+            },
+            Self::Observed => match dice_invariant(ctx.compute(&observed_key).await) {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    SourcePreparationOutcome::Complete(Err(error))
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => {
+                    SourcePreparationOutcome::Complete(Ok(TraversalChild {
+                        result: Arc::new(project_catalog_listing(
+                            observed.result().as_ref(),
+                            &pattern,
+                        )),
+                        observations: observed.observations().dupe(),
+                    }))
+                }
+            },
+        }
+    }
+
     async fn boundary(
         self,
         ctx: &mut DiceComputations<'_>,
@@ -403,7 +445,8 @@ impl HostGlobTraversalMode {
     ) -> TraversalChildOutcome<HostGlobBoundary, HostGlobBoundaryError> {
         match scope {
             HostGlobBoundaryScope::Root => self.root_boundary(ctx, workspace, package).await,
-            HostGlobBoundaryScope::External(route) => {
+            HostGlobBoundaryScope::External(route)
+            | HostGlobBoundaryScope::BuiltinCatalog(route) => {
                 self.external_boundary(ctx, route, package).await
             }
         }
@@ -495,7 +538,47 @@ impl HostGlobTraversalMode {
     }
 }
 
-#[cfg(unix)]
+fn catalog_component_bytes(component: &OsStr) -> Result<Arc<[u8]>, HostGlobSegmentError> {
+    let component = component
+        .to_str()
+        .ok_or(HostGlobSegmentError::CatalogComponentEncoding)?;
+    let mut bytes = Vec::with_capacity(component.chars().count());
+    for scalar in component.chars() {
+        bytes.push(
+            u8::try_from(scalar as u32)
+                .map_err(|_| HostGlobSegmentError::CatalogComponentEncoding)?,
+        );
+    }
+    Ok(bytes.into())
+}
+
+fn project_catalog_listing(
+    result: &Result<PathDirectoryListing, HostRepositoryDirectoryListingError>,
+    pattern: &HostGlobSegmentPattern,
+) -> Result<HostGlobSegmentCandidates, HostGlobSegmentError> {
+    let listing = result
+        .as_ref()
+        .map_err(|error| HostGlobSegmentError::RepositoryDirectoryListing(error.dupe()))?;
+    let PathDirectoryListing::Present(entries) = listing else {
+        return Err(HostGlobSegmentError::CatalogDirectoryMissing);
+    };
+    let mut candidates = Vec::new();
+    for entry in entries.entries() {
+        let component = catalog_component_bytes(entry.name().as_os_str())?;
+        let kind = match entry.kind() {
+            PathDirectoryEntryKind::File => HostGlobSegmentCandidateKind::NonDirectory,
+            PathDirectoryEntryKind::Directory => HostGlobSegmentCandidateKind::Directory,
+            PathDirectoryEntryKind::Symlink | PathDirectoryEntryKind::Unknown => {
+                return Err(HostGlobSegmentError::CatalogEntryKind(entry.kind()));
+            }
+        };
+        if glob_segment_matches(pattern, &component) {
+            candidates.push(super::HostGlobSegmentCandidate { component, kind });
+        }
+    }
+    Ok(HostGlobSegmentCandidates::from_vec(candidates))
+}
+
 fn project_root_boundary(
     result: &Result<HostRootPackageBoundary, HostRootPackageBoundaryError>,
 ) -> Result<HostGlobBoundary, HostGlobBoundaryError> {
@@ -510,7 +593,6 @@ fn project_root_boundary(
         .map_err(|error| HostGlobBoundaryError::Root(error.clone()))
 }
 
-#[cfg(unix)]
 fn project_external_boundary(
     result: &Result<HostExternalPackageBoundary, HostExternalPackageBoundaryError>,
 ) -> Result<HostGlobBoundary, HostGlobBoundaryError> {
@@ -562,9 +644,8 @@ fn enqueue(
     frontier.push_back(state);
 }
 
-#[cfg(unix)]
 impl HostGlobTraversalKey {
-    async fn compute_unix(
+    async fn compute_driver(
         &self,
         ctx: &mut DiceComputations<'_>,
         mode: HostGlobTraversalMode,
@@ -621,7 +702,13 @@ impl HostGlobTraversalKey {
                     .expect("a non-recursive fragment is a segment")
             };
             let candidates = match mode
-                .segment(ctx, state.logical_directory.dupe(), candidate_pattern)
+                .segment(
+                    ctx,
+                    &self.boundary_scope,
+                    state.logical_directory.dupe(),
+                    state.package.clone(),
+                    candidate_pattern,
+                )
                 .await
             {
                 SourcePreparationOutcome::Need(need) => {
@@ -735,25 +822,27 @@ impl Key for HostGlobTraversalKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        #[cfg(unix)]
-        {
-            match self.compute_unix(ctx, HostGlobTraversalMode::Legacy).await {
-                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-                SourcePreparationOutcome::Complete(Ok((result, observations))) => {
-                    debug_assert!(observations.observations().is_empty());
-                    SourcePreparationOutcome::Complete(result)
-                }
-                SourcePreparationOutcome::Complete(Err(error)) => {
-                    panic!("legacy Host glob traversal produced frontier error: {error}")
-                }
-            }
-        }
         #[cfg(not(unix))]
-        {
-            let _ = ctx;
-            SourcePreparationOutcome::Complete(Arc::new(Err(
+        if !matches!(
+            self.boundary_scope,
+            HostGlobBoundaryScope::BuiltinCatalog(_)
+        ) {
+            return SourcePreparationOutcome::Complete(Arc::new(Err(
                 HostGlobTraversalError::UnsupportedHost,
-            )))
+            )));
+        }
+        match self
+            .compute_driver(ctx, HostGlobTraversalMode::Legacy)
+            .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                debug_assert!(observations.observations().is_empty());
+                SourcePreparationOutcome::Complete(result)
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                panic!("legacy Host glob traversal produced frontier error: {error}")
+            }
         }
     }
 
@@ -775,19 +864,20 @@ impl Key for HostGlobTraversalObservationKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        #[cfg(unix)]
+        #[cfg(not(unix))]
+        if !matches!(
+            self.0.boundary_scope,
+            HostGlobBoundaryScope::BuiltinCatalog(_)
+        ) {
+            return SourcePreparationOutcome::Complete(Ok(ObservedHostGlobTraversal {
+                result: Arc::new(Err(HostGlobTraversalError::UnsupportedHost)),
+                observations: PathObservationEpoch::empty(),
+            }));
+        }
         let outcome = self
             .0
-            .compute_unix(ctx, HostGlobTraversalMode::Observed)
+            .compute_driver(ctx, HostGlobTraversalMode::Observed)
             .await;
-        #[cfg(not(unix))]
-        let outcome = {
-            let _ = ctx;
-            complete_driver(
-                Err(HostGlobTraversalError::UnsupportedHost),
-                PathObservationEpoch::empty(),
-            )
-        };
         match outcome {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
             SourcePreparationOutcome::Complete(Err(error)) => {

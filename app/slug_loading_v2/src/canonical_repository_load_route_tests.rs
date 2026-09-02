@@ -10,21 +10,25 @@
 pub(crate) mod tests {
     use std::collections::BTreeMap;
     use std::collections::hash_map::DefaultHasher;
+    use std::fmt;
     use std::hash::Hash;
     use std::hash::Hasher;
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::sync::Mutex;
 
+    use allocative::Allocative;
     use async_trait::async_trait;
     use compact_str::CompactString;
     use dice::ActivationData;
     use dice::ActivationTracker;
     use dice::DetectCycles;
     use dice::Dice;
+    use dice::DiceComputations;
     use dice::DynKey;
     use dice::Key;
     use dice::UserComputationData;
+    use dice_futures::cancellation::CancellationContext;
     use dupe::Dupe;
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
     use slug_bzlmod_v2::HostCanonicalRepositoryRouteKind;
@@ -123,6 +127,13 @@ pub(crate) mod tests {
     use crate::external_subtree_package_set::ExternalSubtreePackageSetKey;
     use crate::external_subtree_package_set::ExternalSubtreePackageSetObservationKey;
     use crate::external_subtree_package_set::ObservedExternalSubtreePackageSet;
+    use crate::glob::GlobPattern;
+    use crate::host_glob::HostGlobBoundaryScope;
+    use crate::host_glob::HostGlobLoadingOperation;
+    use crate::host_glob::HostGlobLoadingRequest;
+    use crate::host_glob::HostGlobRequestInputError;
+    use crate::host_glob::HostGlobRequestOutcome;
+    use crate::host_glob::compute_host_glob_request;
     use crate::package::loading_globals;
     use crate::provider::BzlEvaluationContext;
 
@@ -200,6 +211,64 @@ compatibility=module_extension(implementation=impl)
                 .iter()
                 .map(|(key, _)| key.clone())
                 .collect()
+        }
+
+        fn clear(&self) {
+            self.0.lock().unwrap().clear();
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+    struct CatalogGlobProbeKey {
+        workspace: NormalizedAbsolutePath,
+        input: HostCanonicalRepositorySourceInput,
+        package: PackagePath,
+        request: HostGlobLoadingRequest,
+        observed: bool,
+    }
+
+    impl fmt::Display for CatalogGlobProbeKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "catalog-glob-probe:{}//{}", self.workspace, self.package)
+        }
+    }
+
+    #[async_trait]
+    impl Key for CatalogGlobProbeKey {
+        type Value = Result<HostGlobRequestOutcome, HostGlobRequestInputError>;
+
+        async fn compute(
+            &self,
+            ctx: &mut DiceComputations,
+            _: &CancellationContext,
+        ) -> Self::Value {
+            compute_host_glob_request(
+                ctx,
+                self.workspace.dupe(),
+                HostGlobBoundaryScope::BuiltinCatalog(HostRepositorySourceRoute::Canonical(
+                    self.input.clone(),
+                )),
+                self.workspace.dupe(),
+                self.package.clone(),
+                self.request.dupe(),
+                self.observed,
+            )
+            .await
+        }
+
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            match (x, y) {
+                (Ok(x), Ok(y)) => x.complete_eq(y),
+                (Err(x), Err(y)) => x == y,
+                _ => false,
+            }
+        }
+
+        fn validity(value: &Self::Value) -> bool {
+            match value {
+                Ok(value) => value.is_complete(),
+                Err(_) => true,
+            }
         }
     }
 
@@ -1304,6 +1373,177 @@ compatibility=module_extension(implementation=impl)
         assert!(tools.reachable_loads.iter().any(|load| {
             load.label == CanonicalLabel::parse("@@platforms//host:constraints.bzl").unwrap()
         }));
+
+        let source_route = HostRepositorySourceRoute::Canonical(route.input().clone());
+        let host_scope = HostGlobBoundaryScope::External(source_route.clone());
+        let catalog_scope = HostGlobBoundaryScope::BuiltinCatalog(source_route.clone());
+        assert_ne!(host_scope, catalog_scope);
+        assert_eq!(
+            catalog_scope,
+            HostGlobBoundaryScope::BuiltinCatalog(source_route)
+        );
+
+        let launcher_probe = CatalogGlobProbeKey {
+            workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            input: route.input().clone(),
+            package: PackagePath::parse("src/tools/launcher").unwrap(),
+            request: HostGlobLoadingRequest::new(
+                GlobPattern::include("**").unwrap(),
+                HostGlobLoadingOperation::Files,
+            ),
+            observed: true,
+        };
+        tracker.clear();
+        let launcher = tx.compute(&launcher_probe).await.unwrap().unwrap();
+        let SourcePreparationOutcome::Complete(Ok((launcher, observations))) = launcher else {
+            panic!("built-in launcher glob must complete: {launcher:?}")
+        };
+        assert!(observations.observations().is_empty());
+        let launcher = launcher.as_ref().as_ref().unwrap();
+        let launcher_paths = launcher
+            .paths()
+            .iter()
+            .map(|path| path.to_vec())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            launcher_paths.iter().map(Vec::as_slice).collect::<Vec<_>>(),
+            [
+                b"BUILD".as_slice(),
+                b"bash_launcher.cc".as_slice(),
+                b"bash_launcher.h".as_slice(),
+                b"dummy.cc".as_slice(),
+                b"java_launcher.cc".as_slice(),
+                b"java_launcher.h".as_slice(),
+                b"launcher.cc".as_slice(),
+                b"launcher.h".as_slice(),
+                b"launcher_main.cc".as_slice(),
+                b"launcher_maker.cc".as_slice(),
+                b"launcher_maker_test.bzl".as_slice(),
+                b"launcher_maker_test.cc".as_slice(),
+                b"python_launcher.cc".as_slice(),
+                b"python_launcher.h".as_slice(),
+                b"win_manifest.xml".as_slice(),
+                b"win_resources.rc".as_slice(),
+                b"win_rules.bzl".as_slice(),
+            ]
+        );
+        let launcher_keys = tracker.all_keys();
+        assert!(launcher_keys.iter().any(|key| {
+            key.starts_with("observed-host-external-package-boundary:")
+                && key.ends_with("//src/tools/launcher/util")
+        }));
+        assert!(launcher_keys.iter().any(|key| {
+            key.starts_with("observed-host-repository-directory-listing:")
+                && key.ends_with("//src/tools/launcher")
+        }));
+        assert!(
+            launcher_keys
+                .iter()
+                .any(|key| { key == "builtin-bazel-tools-directory-listing:src/tools/launcher" })
+        );
+        assert!(launcher_keys.iter().all(|key| {
+            !key.starts_with("path-directory-listing:")
+                && !key.starts_with("observed-path-directory-listing:")
+                && !key.contains("repository-materialization-result:@@bazel_tools")
+        }));
+        tracker.clear();
+        let warm = tx.compute(&launcher_probe).await.unwrap().unwrap();
+        let SourcePreparationOutcome::Complete(Ok((warm, observations))) = warm else {
+            panic!("warm built-in launcher glob must complete: {warm:?}")
+        };
+        assert!(observations.observations().is_empty());
+        assert_eq!(
+            warm.as_ref()
+                .as_ref()
+                .unwrap()
+                .paths()
+                .iter()
+                .map(|path| path.to_vec())
+                .collect::<Vec<_>>(),
+            launcher_paths
+        );
+        assert_no_activation(&tracker, "observed-host-repository-directory-listing:");
+        assert_no_activation(&tracker, "observed-host-external-package-boundary:");
+
+        tracker.clear();
+        for (glob_pattern, expected) in [
+            (
+                "**",
+                vec![
+                    b"BUILD".to_vec(),
+                    b"win_res.bzl".to_vec(),
+                    b"winsdk_configure.bzl".to_vec(),
+                    b"winsdk_toolchain.bzl".to_vec(),
+                ],
+            ),
+            (
+                "*.bzl",
+                vec![
+                    b"win_res.bzl".to_vec(),
+                    b"winsdk_configure.bzl".to_vec(),
+                    b"winsdk_toolchain.bzl".to_vec(),
+                ],
+            ),
+        ] {
+            let probe = CatalogGlobProbeKey {
+                workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                input: route.input().clone(),
+                package: PackagePath::parse("tools/res").unwrap(),
+                request: HostGlobLoadingRequest::new(
+                    GlobPattern::include(glob_pattern).unwrap(),
+                    HostGlobLoadingOperation::Files,
+                ),
+                observed: true,
+            };
+            let outcome = tx.compute(&probe).await.unwrap().unwrap();
+            let SourcePreparationOutcome::Complete(Ok((matches, observations))) = outcome else {
+                panic!("built-in tools/res {glob_pattern} glob must complete: {outcome:?}")
+            };
+            assert!(observations.observations().is_empty());
+            assert_eq!(
+                matches
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .paths()
+                    .iter()
+                    .map(|path| path.to_vec())
+                    .collect::<Vec<_>>(),
+                expected
+            );
+            let keys = tracker.all_keys();
+            assert!(keys.iter().any(|key| {
+                key.starts_with("observed-host-repository-directory-listing:")
+                    && key.ends_with("//tools/res")
+            }));
+            assert!(keys.iter().all(|key| {
+                !key.starts_with("path-directory-listing:")
+                    && !key.starts_with("observed-path-directory-listing:")
+                    && !key.contains("repository-materialization-result:@@bazel_tools")
+            }));
+        }
+
+        tracker.clear();
+        let res_key = RepositoryPackageLoadObservationKey::new_canonical(
+            route.input().clone(),
+            PackagePath::parse("tools/res").unwrap(),
+        );
+        let res = tx.compute(&res_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(res)) = res else {
+            panic!("built-in tools/res package must complete: {res:?}")
+        };
+        assert!(res.observations().observations().is_empty());
+        let error = res.result().as_ref().as_ref().unwrap_err().to_string();
+        assert!(error.contains("parameter `toolchain_type`"));
+        assert!(error.contains("expected `str`, actual `Label"));
+        assert!(!error.contains("BUILD globs are deferred"));
+        let res_keys = tracker.all_keys();
+        assert!(res_keys.iter().all(|key| {
+            !key.starts_with("path-directory-listing:")
+                && !key.starts_with("observed-path-directory-listing:")
+                && !key.contains("repository-materialization-result:@@bazel_tools")
+        }));
+
         let package_key = RepositoryPackageLoadObservationKey::new_canonical(
             route.input().clone(),
             PackagePath::parse("src/conditions").unwrap(),

@@ -29,6 +29,7 @@ use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathDirectoryEntries;
 use slug_workspace_v2::PathDirectoryEntry;
 use slug_workspace_v2::PathDirectoryEntryKind;
+use slug_workspace_v2::PathDirectoryListing;
 use slug_workspace_v2::PathDirectoryName;
 use slug_workspace_v2::PathIoErrorKind;
 use slug_workspace_v2::PathLstat;
@@ -384,6 +385,61 @@ fn package_path_latin1_lifting_keeps_distinct_raw_byte_names_distinct() {
     assert_eq!(one_byte.package_bytes.as_ref(), b"\xe9");
     assert_eq!(utf8_bytes_as_scalars.package_bytes.as_ref(), b"\xc3\xa9");
     assert_ne!(one_byte, utf8_bytes_as_scalars);
+}
+
+fn catalog_listing(entries: Vec<(OsString, PathDirectoryEntryKind)>) -> PathDirectoryListing {
+    PathDirectoryListing::Present(PathDirectoryEntries::new(entries.into_iter().map(
+        |(name, kind)| PathDirectoryEntry::new(PathDirectoryName::new(name).unwrap(), kind),
+    )))
+}
+
+#[test]
+fn catalog_projection_lifts_valid_latin1_components_to_matcher_bytes() {
+    let listing = Ok(catalog_listing(vec![(
+        OsString::from("\u{e9}"),
+        PathDirectoryEntryKind::File,
+    )]));
+    let segment = pattern(b"*").segment(0).unwrap();
+    let projected = project_catalog_listing(&listing, &segment).unwrap();
+    assert_eq!(projected.candidates().len(), 1);
+    assert_eq!(projected.candidates()[0].component.as_ref(), b"\xe9");
+    assert_eq!(
+        projected.candidates()[0].kind,
+        HostGlobSegmentCandidateKind::NonDirectory
+    );
+}
+
+#[test]
+fn catalog_projection_rejects_unrepresentable_components_without_partial_matches() {
+    let segment = pattern(b"*").segment(0).unwrap();
+    for invalid in [OsString::from_vec(vec![0xff]), OsString::from("\u{100}")] {
+        let listing = Ok(catalog_listing(vec![
+            (OsString::from("a-valid"), PathDirectoryEntryKind::File),
+            (invalid, PathDirectoryEntryKind::File),
+        ]));
+        assert!(matches!(
+            project_catalog_listing(&listing, &segment),
+            Err(HostGlobSegmentError::CatalogComponentEncoding)
+        ));
+    }
+}
+
+#[test]
+fn catalog_projection_rejects_unsupported_entry_kinds_without_partial_matches() {
+    let segment = pattern(b"*").segment(0).unwrap();
+    for kind in [
+        PathDirectoryEntryKind::Symlink,
+        PathDirectoryEntryKind::Unknown,
+    ] {
+        let listing = Ok(catalog_listing(vec![
+            (OsString::from("a-valid"), PathDirectoryEntryKind::File),
+            (OsString::from("z-unsupported"), kind),
+        ]));
+        assert!(matches!(
+            project_catalog_listing(&listing, &segment),
+            Err(HostGlobSegmentError::CatalogEntryKind(actual)) if actual == kind
+        ));
+    }
 }
 
 #[test]

@@ -7803,3 +7803,19 @@ classes plus symlink/unknown kinds before publication, and narrows exact output
 claims to named catalog packages. Focused correction rereview is required.
 Focused correction rereview returns `ACCEPT`; Rust may proceed only through the
 corrected source-routed traversal and proof boundary.
+
+R1 implementation ends `REPLAN` because its proof required complete
+`tools/res` package publication after the globs. The catalog globs now succeed,
+then the existing `toolchain()` schema rejects `toolchain_type` as a `Label`
+where Slug expects `str`. R2 changes no glob owner or production route: prove
+the exact raw match slices through the shared request adapter and treat the
+later package/declaration publication as deferred. Focused R2 correction
+review is required before Rust resumes; no toolchain or consumer special case
+is authorized.
+
+R2 passes the complete serial owner/direct-dependent gates and an authentic
+rules_rust workspace replay at 228/302/530 gross production/proof/total Rust
+lines. Catalog glob routing is implemented; successful `tools/res` package
+publication remains deferred at the later generic `toolchain_type` Label-versus-
+string schema boundary. The next packet must audit that complete builtin
+parameter category rather than specialize this package or consumer.

@@ -1,17 +1,37 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-5-7A-repository-source-glob-routing-category-implementation-r1
+Packet: WP-4-5-7A-repository-source-glob-routing-category-implementation-r2
 
 Milestone: M7A bootstrap-critical generic Starlark/loading and repository
 closure. Make every admitted repository package source kind feed the same
 Bazel 9.2 BUILD `glob()` evaluator through its natural directory-fact owner.
 
-Status: initial DICE/ownership review returned `REVISE` on integrated catalog-
-boundary and fail-closed projection proof plus one overbroad equivalence claim.
-The corrected contract requires those discriminators and narrows the claim;
-focused rereview returns `ACCEPT`. Rust is authorized only within this packet.
-The predecessor complete package-context dependency-label category is
-terminally accepted in `5f9f9a98a`.
+Status: terminal implementation review returns `ACCEPT`. Initial DICE/ownership
+review returned `REVISE` on integrated catalog-boundary and fail-closed
+projection proof plus one overbroad equivalence claim; focused rereview
+accepted the correction. R1 then `REPLAN`ed only its overbroad successful-
+package proof, and focused R2 review accepted the narrowed contract. The
+predecessor complete package-context dependency-label category is terminally
+accepted in `5f9f9a98a`.
+
+Pre-implementation proof review corrects one expected-value typo without
+changing the accepted architecture: the verbatim `tools/res/BUILD` target
+`srcs = glob(["**"])` includes its `BUILD` file plus the three `.bzl` files,
+while `bzl_srcs = glob(["*.bzl"])` includes only the three `.bzl` files. The
+accepted Bazel 9.2 `glob-callable-contract` fixture already discriminates that
+BUILD files are ordinary glob candidates, so this needs no new oracle.
+
+R1 implementation proves the source-routed traversal but ends `REPLAN` on one
+overbroad proof contract. `@@bazel_tools//tools/res:BUILD` evaluates both globs
+successfully and then reaches the independent existing `toolchain()` schema
+error: Bazel supplies the `toolchain_type` argument as a `Label`, while Slug's
+current declaration expects `str`. This packet must not admit that later
+toolchain/declaration category. R2 proves the two exact raw glob match slices
+through the same request adapter, then requires package loading and authentic
+replay to reach that later error instead of claiming a successfully published
+package or frozen filegroup targets. Production architecture, compatibility of
+the glob result itself, owners, allowlists, caps and all other gates are
+unchanged. Focused R2 correction review is required before Rust resumes.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -107,8 +127,8 @@ Admit as **exact** for the named Bazel 9.2 successful surface:
 - immediate file/directory membership from the exact catalog manifest;
 - BUILD/BUILD.bazel package-boundary pruning through the existing external
   package lookup; and
-- exact frozen target labels and filegroup membership for the named catalog
-  packages and patterns.
+- exact raw match slices for the named catalog packages and patterns before
+  any independent later BUILD declaration error.
 
 Keep **Slug-native**:
 
@@ -127,6 +147,9 @@ Keep **unsupported/deferred**:
   widened by platform-independent catalog traversal; and
 - ruleset, toolchain, configured analysis, action/execution or
   `cc_common`/`cc_internal` behavior beyond ordinary downstream consumption.
+- successful `@@bazel_tools//tools/res` package publication and its frozen
+  filegroup targets until the independent `toolchain_type = Label(...)`
+  declaration-schema category is admitted.
 
 ## DICE identity, revision and memory
 
@@ -177,11 +200,14 @@ Add focused proof that:
 
 - otherwise-identical Host-external and catalog-external traversal scopes are
   structurally unequal while restored catalog keys compare equal;
-- loading `@@bazel_tools//tools/res` evaluates both `glob(["**"])` and
-  `glob(["*.bzl"])` to the exact three catalog `.bzl` labels;
-- the observed load depends on built-in catalog directory-listing keys,
+- direct requests for `@@bazel_tools//tools/res` evaluate `glob(["**"])` to
+  raw `BUILD` plus the exact three catalog `.bzl` paths, and evaluate
+  `glob(["*.bzl"])` to exactly those three `.bzl` paths;
+- the observed traversal depends on built-in catalog directory-listing keys,
   carries no Host observations, activates no path-listing/materialization key,
   and reuses its warm complete value;
+- loading `@@bazel_tools//tools/res` clears `GlobUnsupported` and reaches the
+  independent existing `toolchain_type` Label-versus-string schema error;
 - an integrated test-only catalog traversal over
   `@@bazel_tools//src/tools/launcher:**` activates the external-boundary key for
   `src/tools/launcher/util`, excludes `util/BUILD` and every path beneath that
@@ -192,9 +218,9 @@ Add focused proof that:
 - Host root/external raw-name, symlink, recursive, Need, error-order and A/B/A
   tests remain unchanged.
 
-The authentic rules_rust replay must clear `@@bazel_tools//tools/res` and stop
-at the next honest generic boundary. It is acceptance evidence, not authority
-for a ruleset-specific branch.
+The authentic rules_rust replay must clear the catalog `GlobUnsupported`
+boundary and stop at the later `toolchain_type` Label-versus-string schema
+error. It is acceptance evidence, not authority for a ruleset-specific branch.
 
 ## Allowlist, caps and complexity
 
@@ -255,10 +281,43 @@ Return `REPLAN` before or during Rust if:
   correction; or
 - production/proof caps or file allowlists are exceeded.
 
-Rust begins only after independent review accepts the source-scope identity,
-existing-key dependency graph, platform split, proof matrix and bounds.
+R2 Rust resumes only after independent review accepts the proof-only correction
+that separates exact glob match publication from deferred later package
+declaration publication.
 
 Focused independent correction rereview returns `ACCEPT`. The integrated
 catalog-boundary proof, exact component lifting and four fail-closed negative
 rows, narrowed named-catalog output claim, existing-key ownership, platform
 split, allowlist, caps and stops are accepted.
+
+## Implementation and WIP handoff
+
+The R2 candidate routes built-in catalog membership through the existing
+repository directory-listing owner and package boundaries through the existing
+external-boundary owner while retaining the shared glob request, traversal and
+package projection. It adds no DICE key, retained collection, materialization
+or consumer-specific branch. Gross additions are 228 production Rust lines,
+302 proof lines and 530 total, within the 300/420/720 caps.
+
+Serial validation passes: 509 loading library tests with one documented
+ignore, every loading integration suite, 596 Bzlmod tests, 55 query tests, the
+Windows cross-target check, the V2 CLI build, formatting and diff hygiene. An
+authentic fresh rules_rust 0.73 workspace replay through Slug's admitted
+`cquery --output=label` surface clears `GlobUnsupported` and stops at the
+deferred generic `toolchain_type` parameter mismatch (`Label` supplied where
+the current declaration expects `str`). The fixture's Bazel-only
+`--starlark:file` and `--noshow_progress` options remain outside Slug's admitted
+cquery CLI surface and were omitted from the product-path replay.
+
+The overall milestone remains WIP. Next, audit the complete generic builtin
+declaration/schema category exposed by the `toolchain_type = Label(...)` stop,
+including sibling builtins that accept label-like values, before authorizing
+Rust. Keep rules_rust, rules_cc, `cc_common`, `cc_internal` and
+`@@bazel_tools//tools/res` as ordinary consumers; do not patch this one call
+site or widen toolchain/configured-analysis semantics implicitly.
+
+Independent terminal implementation review returns `ACCEPT`: the source
+scopes are structurally distinct, existing listing/boundary dependencies own
+catalog facts, failures precede publication, Host/platform behavior remains
+bounded, the proof is discriminating, and the implementation stays within the
+allowlist and caps.

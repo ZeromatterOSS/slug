@@ -4387,6 +4387,14 @@ changes.
 Focused correction rereview returns `ACCEPT`; the existing listing, route and
 boundary owners remain final for implementation.
 
+R1's later `tools/res` declaration error changes no Stage 5 owner. The built-in
+listing and boundary dependencies already publish the exact glob matches with
+empty Host observations; successful loaded-package publication remains a
+Stage 4 declaration-schema prerequisite. R2 narrows only that proof and keeps
+the route snapshot, manifest digest, source identity and all keys unchanged.
+Terminal R2 review returns `ACCEPT` after complete serial validation and
+authentic replay; Stage 5 gains no new owner or follow-up work from this packet.
+
 ### LTO-backends acceptance and Stage 4 continuation (2026-08-27)
 
 Commit `ccab93d4c` accepts complete LTO backends with no Stage 5 production or
