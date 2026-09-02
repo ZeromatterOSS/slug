@@ -1565,6 +1565,7 @@ async fn root_declared_dependency_keys(
                 path_flavor,
                 validation: Some(ConfiguredDependencyValidation::new(
                     schema.file_admissibility().clone(),
+                    schema.skip_analysis_time_filetype_check(),
                     schema.executable(),
                     schema.required_providers().clone(),
                 )),

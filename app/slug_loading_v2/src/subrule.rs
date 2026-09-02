@@ -43,6 +43,8 @@ use starlark_map::small_set::SmallSet;
 use crate::attrs::AllowedAttributeValues;
 use crate::attrs::AttributeDependencyConfiguration;
 use crate::attrs::AttributeKind;
+use crate::attrs::AttributePropertyFlag;
+use crate::attrs::AttributePropertyFlags;
 use crate::attrs::AttributeSchema;
 use crate::attrs::CoercedAttributeValue;
 use crate::attrs::FileAdmissibility;
@@ -128,6 +130,7 @@ pub(crate) struct SubruleAttribute {
     pub(crate) configurable: bool,
     pub(crate) default: SubruleAttributeDefault,
     pub(crate) file_admissibility: FileAdmissibility,
+    pub(crate) flags: AttributePropertyFlags,
     pub(crate) allowed_values: AllowedAttributeValues,
     pub(crate) executable: bool,
     pub(crate) exec_configuration: bool,
@@ -171,6 +174,7 @@ pub(crate) struct LiftedSubruleAttribute {
     pub(crate) configurable: bool,
     pub(crate) default: SubruleAttributeDefault,
     pub(crate) file_admissibility: FileAdmissibility,
+    pub(crate) flags: AttributePropertyFlags,
     pub(crate) allowed_values: AllowedAttributeValues,
     pub(crate) executable: bool,
     pub(crate) exec_configuration: bool,
@@ -196,6 +200,7 @@ impl LiftedSubruleAttribute {
             configurable: attribute.configurable,
             default: attribute.default.clone(),
             file_admissibility: attribute.file_admissibility.clone(),
+            flags: attribute.flags,
             allowed_values: attribute.allowed_values.clone(),
             executable: attribute.executable,
             exec_configuration: attribute.exec_configuration,
@@ -255,6 +260,7 @@ pub struct ConfiguredDependencyAttribute<'a> {
     kind: AttributeKind,
     default: ConfiguredDependencyDefault<'a>,
     file_admissibility: &'a FileAdmissibility,
+    skip_analysis_time_filetype_check: bool,
     executable: bool,
     exec_configuration: bool,
     required_providers: &'a [Arc<[ProviderIdentity]>],
@@ -272,6 +278,7 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
             kind: schema.kind(),
             default: ConfiguredDependencyDefault::ConfigurationField(&attribute.identity),
             file_admissibility: schema.file_admissibility(),
+            skip_analysis_time_filetype_check: schema.skip_analysis_time_filetype_check(),
             executable: schema.executable(),
             exec_configuration: matches!(
                 schema.dependency_configuration(),
@@ -295,6 +302,9 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
             kind: attribute.kind,
             default,
             file_admissibility: &attribute.file_admissibility,
+            skip_analysis_time_filetype_check: attribute
+                .flags
+                .contains(AttributePropertyFlag::SkipAnalysisTimeFiletypeCheck),
             executable: attribute.executable,
             exec_configuration: attribute.exec_configuration,
             required_providers: &attribute.required_providers,
@@ -319,6 +329,10 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
 
     pub fn file_admissibility(self) -> &'a FileAdmissibility {
         self.file_admissibility
+    }
+
+    pub fn skip_analysis_time_filetype_check(self) -> bool {
+        self.skip_analysis_time_filetype_check
     }
 
     pub fn executable(self) -> bool {
@@ -869,5 +883,36 @@ mod tests {
             "attribute span: {}",
             size_of::<SubruleAttributeSpan>()
         );
+    }
+
+    #[test]
+    fn lifted_subrule_attributes_retain_complete_property_flags() {
+        let mut flags = AttributePropertyFlags::default();
+        flags.insert(AttributePropertyFlag::StarlarkDefined);
+        flags.insert(AttributePropertyFlag::DirectCompileTimeInput);
+        flags.insert(AttributePropertyFlag::SkipAnalysisTimeFiletypeCheck);
+        let attribute = SubruleAttribute {
+            user_name: "_deps".into(),
+            kind: AttributeKind::LabelList,
+            configurable: true,
+            default: SubruleAttributeDefault::Literal(CoercedAttributeValue::LabelList(Arc::from(
+                [],
+            ))),
+            file_admissibility: FileAdmissibility::default(),
+            flags,
+            allowed_values: AllowedAttributeValues::None,
+            executable: false,
+            exec_configuration: false,
+            required_providers: Arc::from([]),
+        };
+        let identity = Arc::new(SubruleIdentity {
+            defining_label: CanonicalLabel::parse("@@//:defs.bzl").unwrap(),
+            exported_name: "S".into(),
+        });
+
+        let lifted = LiftedSubruleAttribute::new(&identity, &attribute);
+        assert_eq!(lifted.flags, flags);
+        let configured = ConfiguredDependencyAttribute::from_hidden(&lifted);
+        assert!(configured.skip_analysis_time_filetype_check());
     }
 }

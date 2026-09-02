@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[Design the complete module-extension metadata construction and capture category](./slug-v2-subplans/current-packet.md).
+[Implement the complete dependency-attribute property-flag category](./slug-v2-subplans/current-packet.md).
 
 Commit `20bbe8661` terminally accepts
 `WP-6-7A-default-exec-configured-label-dependency-implementation-r2`. The
@@ -7259,3 +7259,21 @@ preserved. Missing constraint, license, validation, instrumentation and
 dependency-resolution consumers remain explicit deferred surfaces, not parity
 claims. Implement under the frozen five-file 650/900/1,550 gross envelope with
 no ruleset, C++, `cc_common` or `cc_internal` branch.
+
+R3 terminal implementation review returned `REPLAN`: raw
+`CHECK_ALLOWED_VALUES` reached ordinary publication without an owned
+predicate, later file/provider/cfg/aspect parsing preceded raw-flag resolution,
+and tag/repository prose still described provenance despite the canonical
+final-property masks. R4 retains the bare descriptor but fails closed at
+publication, freezes Bazel's default-then-flags-then-later-property order, and
+makes supported final properties the explicit conversion boundary. Focused R4
+design and terminal implementation rereviews return `ACCEPT`.
+
+R4 implementation is terminally `ACCEPTED` at 537 production/371 proof/908
+total gross Rust lines. Full loading and analysis owner/direct-dependent
+suites, formatting, pinned Bazel and Zabel hashes, parked-proof integrity,
+archive baseline and rebuilt CLI pass. Authentic rules_rust 0.73 replay clears
+the complete property-flag category and selects the next generic declaration
+surface, `attr.label_list(allow_rules = ["sh_library"])` in rules_shell. Audit
+the complete Bazel 9.2 rule-class restriction category next; do not add a
+rules_shell, rules_rust, C++, `cc_common`, `cc_internal` or parser special case.

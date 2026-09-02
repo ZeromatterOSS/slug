@@ -35,6 +35,7 @@ use crate::result::ConfiguredNodeResult;
 #[derive(Debug, Clone)]
 pub(crate) struct ConfiguredDependencyValidation {
     file_admissibility: FileAdmissibility,
+    skip_analysis_time_filetype_check: bool,
     executable: bool,
     required_providers: Arc<[Arc<[ProviderIdentity]>]>,
 }
@@ -114,11 +115,13 @@ impl ConfiguredDependencyValidation {
 
     pub(crate) fn new(
         file_admissibility: FileAdmissibility,
+        skip_analysis_time_filetype_check: bool,
         executable: bool,
         required_providers: Arc<[Arc<[ProviderIdentity]>]>,
     ) -> Self {
         Self {
             file_admissibility,
+            skip_analysis_time_filetype_check,
             executable,
             required_providers,
         }
@@ -181,6 +184,7 @@ pub(crate) fn configured_dependency_rows(
                 },
                 validation: ConfiguredDependencyValidation::new(
                     attribute.file_admissibility().clone(),
+                    attribute.skip_analysis_time_filetype_check(),
                     attribute.executable(),
                     Arc::from(attribute.required_providers()),
                 ),
@@ -265,6 +269,11 @@ fn validate_file_admissibility(
     direct_file: bool,
 ) -> Result<(), AnalysisError> {
     let policy = &validation.file_admissibility;
+    if validation.skip_analysis_time_filetype_check
+        && !matches!(result.kind(), ConfiguredNodeKind::SourceFile)
+    {
+        return Ok(());
+    }
     if direct_file {
         let filename = result
             .key()

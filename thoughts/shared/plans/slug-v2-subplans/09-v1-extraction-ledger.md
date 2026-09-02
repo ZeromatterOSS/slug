@@ -2393,7 +2393,7 @@ docs-first audit rather than an extraction continuation.
 
 ### Stage 6 attribute-property flag utility decision (2026-09-01)
 
-`WP-6-7C-attribute-property-flag-category-implementation-r3` requires no V1
+`WP-6-7C-attribute-property-flag-category-implementation-r4` requires no V1
 extraction. Generalize the existing V2 `AttributeFlags(u32)` owner in place to
 the complete Bazel 9.2 property set and retain it through existing immutable
 schema/macro/subrule projections. Add no strings in frozen schemas, per-flag
@@ -2406,3 +2406,9 @@ invocation freezing are peer optimization guidance only. Copy no Zig type,
 allocator, evaluator, scheduler, cache, diagnostic or behavior. Bazel 9.2 is
 the sole authority for the fourteen ordinary kinds, conversion/default/error
 order and label semantics.
+
+R3 terminal review changed only failure-order and publication boundaries; R4
+keeps the same one-word V2 owner and adds no predicate representation,
+provenance state, cache, interner or DICE key. Focused design and terminal
+implementation rereviews return `ACCEPT`. The implementation closes at 537
+production/371 proof/908 total gross Rust lines with no V1 extraction.

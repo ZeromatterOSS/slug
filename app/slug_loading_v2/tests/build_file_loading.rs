@@ -2762,11 +2762,8 @@ fn direct_compile_input_flags_reach_instantiated_rule_schema() {
     let package = workspace.join("pkg");
     fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
     fs::create_dir_all(&package).unwrap();
-    fs::write(
-        package.join("defs.bzl"),
-        "def _impl(ctx): return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {'srcs': attr.label_list(flags = ['DIRECT_COMPILE_TIME_INPUT']), 'deps': attr.label_list()})\n",
-    )
-    .unwrap();
+    let definitions = "def _impl(ctx): return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {'srcs': attr.label_list(flags = ['DIRECT_COMPILE_TIME_INPUT']), 'deps': attr.label_list()})\n";
+    fs::write(package.join("defs.bzl"), definitions).unwrap();
     fs::write(
         package.join(BUILD_FILE_PRIMARY),
         "load(':defs.bzl', 'probe')\nprobe(name = 'subject')\n",
@@ -2786,6 +2783,27 @@ fn direct_compile_input_flags_reach_instantiated_rule_schema() {
     };
     assert!(flag("srcs"));
     assert!(!flag("deps"));
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    tokio::runtime::Runtime::new().unwrap().block_on(async {
+        let first = load_package_with_retained_dice(&dice, &workspace, &package)
+            .await
+            .unwrap();
+        fs::write(
+            package.join("defs.bzl"),
+            definitions.replace("DIRECT_COMPILE_TIME_INPUT", "SKIP_CONSTRAINTS_OVERRIDE"),
+        )
+        .unwrap();
+        let changed = load_package_with_retained_dice(&dice, &workspace, &package)
+            .await
+            .unwrap();
+        assert_ne!(first, changed);
+        fs::write(package.join("defs.bzl"), definitions).unwrap();
+        let restored = load_package_with_retained_dice(&dice, &workspace, &package)
+            .await
+            .unwrap();
+        assert_eq!(first, restored);
+    });
 }
 
 #[test]

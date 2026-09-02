@@ -1,12 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7C-attribute-property-flag-category-implementation-r3`
+Packet: `WP-6-7C-attribute-property-flag-category-implementation-r4`
 
 Milestone: M7A generic Starlark/ruleset closure; complete dependency-attribute
 property-flag architecture.
 
-Status: independent architecture review and focused correction rereviews
-return `ACCEPT`. Rust is authorized only within the frozen R3 boundary.
+Status: terminally `ACCEPTED`. R3 terminal implementation review returned
+`REPLAN` on three bounded publication/ordering/boundary-proof corrections;
+focused R4 design and implementation rereviews return `ACCEPT`.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -80,7 +81,7 @@ implementation cohort:
 | `SINGLE_ARTIFACT` | `allow_single_file`; configured files-to-build check | existing file policy, reconcile exactly |
 | `SILENT_RULECLASS_FILTER` | raw/Java builder; prerequisite filtering | owner deferred |
 | `SKIP_ANALYSIS_TIME_FILETYPE_CHECK` | raw; configured prerequisite file check | existing validator; connect exactly |
-| `CHECK_ALLOWED_VALUES` | `values`; scalar allowed-value validation | raw bit on these five constructors has no predicate; retain and fail closed before a predicate consumer |
+| `CHECK_ALLOWED_VALUES` | `values`; scalar allowed-value validation | raw bit on these five constructors has no predicate; retain in the descriptor, then fail closed when any rule, aspect, macro or subrule publishes it |
 | `NONCONFIGURABLE` | `configurable=False`; selector admission | existing `configurable`, reconcile exactly |
 | `CONFIGURABLE_ATTR_WAS_USER_SET` | explicit `configurable`; rule-class validation | explicitness bit absent; retain, consumer deferred |
 | `SKIP_PREREQ_VALIDATOR_CHECKS` | raw/Java builder; visibility/prerequisite validator | owner deferred |
@@ -153,8 +154,13 @@ classification method. Do not retain the source list, duplicate count or
 order. Do not create 25 booleans, strings in frozen schemas, another flags
 value in analysis, a cache, interner or DICE key.
 
-Parse once in the common five-constructor helper after starlark-rust has fully
-unpacked the sequence. Preserve the property set through the existing
+Parse once in the common five-constructor helper. Preserve Bazel's observable
+lowering order: coerce the default first; then cast the complete raw flags
+sequence before resolving any flag name; then process executable/cfg presence,
+file/rule restrictions, providers, cfg conversion and aspects. The raw flags
+argument must therefore remain an uncast Starlark value until after default
+coercion rather than using a binder that casts elements before the function
+body. Preserve the property set through the existing
 `AttributeDefinition` and `AttributeSchema` path. Produce one canonical final
 set by applying Bazel's fixed `buildAttribute` mutations in source order after
 the raw set: keyword setters may add bits, and
@@ -181,10 +187,12 @@ errors still occur during descriptor construction before subrule validation.
 All recognized flags retain identity; only effects admitted by this packet run
 at analysis, and deferred consumers remain classified as above. Bazel tag
 classes and repository rules can consume ordinary label-bearing descriptors
-with their property sets unchanged. Slug already accepts their unflagged
-descriptor forms but currently rejects nonempty flags during conversion; this
-packet preserves that unsupported/fail-closed flagged-conversion boundary and
-must prove it without rejecting or changing the existing unflagged forms.
+with their property sets unchanged. Slug's boundary is expressed only in
+terms of supported final properties, never raw-flag provenance: baseline and
+already-owned projected properties remain accepted whether they came from a
+sibling keyword or an explicit raw flag, while every other final property
+fails closed at conversion. Prove both supported explicit properties and an
+unsupported property without rejecting or changing ordinary forms.
 
 The implementation successor production allowlist is exactly:
 
@@ -230,14 +238,17 @@ allocator, evaluator, diagnostic, cache or unsupported-effect claim.
 ## Required design evidence and stop conditions
 
 The 25-row table above is the required effect ledger. The implementation must
-prove constructor inclusion/exclusion, complete-cast-before-name failure
-order, duplicates/set equality, Bazel-ordered raw/keyword mutations (including
-the false removal case), rule/aspect/macro/subrule retention and A/B/A identity.
+prove constructor inclusion/exclusion, default-before-flags and flags-before-
+later-property dual-invalid failures, complete-cast-before-name failure order,
+duplicates/set equality, Bazel-ordered raw/keyword mutations (including the
+false removal case), rule/aspect/macro/subrule retention and A/B/A identity.
+It must also prove that `CHECK_ALLOWED_VALUES` is retained by a bare descriptor
+but fails closed at rule, aspect, macro and subrule publication.
 The file-type-skip proof must discriminate direct source rejection, generated
 suffix bypass and ordinary rule-output bypass. Add downstream proof only for
 effects admitted exact. Add tag-class and repository-rule boundary rows proving
-that their unflagged label descriptors remain accepted while flagged variants
-fail closed at the existing conversion boundary.
+that their ordinary and explicitly supported final properties remain accepted
+while unsupported final properties fail closed at the conversion boundary.
 
 Stop with `REPLAN` if any admitted bit needs a second semantic owner, if accepting a
 flag would silently bypass an existing Slug validation, if macro/subrule
@@ -257,6 +268,34 @@ repository schemas exclude the descriptors; the correction records Bazel's
 acceptance and preserves Slug's narrower flagged-conversion fail-closed
 boundary. Focused correction rereview returns `ACCEPT`; implement only the
 frozen R3 boundary.
+
+R3 terminal implementation review returned `REPLAN` on three bounded points.
+First, a raw `CHECK_ALLOWED_VALUES` bit with no predicate was retained through
+ordinary publication and therefore silently lost its effect; R4 retains the
+descriptor but fails closed generically at rule, aspect, macro and subrule
+publication. Second, the implementation parsed file restrictions, providers
+and cfg before raw flags even though Bazel 9.2 coerces defaults, then resolves
+flags, then processes those later properties; R4 freezes that error order and
+requires dual-invalid proofs. Third, repository/tag behavior was implemented
+as supported final-property masks while R3 prose still described provenance-
+based rejection; R4 makes the masks authoritative and requires explicit
+supported/unsupported proofs without adding source provenance. The compact
+carrier, five-constructor surface, ordered final mutations, propagation,
+analysis effect, allowlists and caps are unchanged. Focused independent R4
+review is required before correction Rust resumes.
+
+Focused R4 design review and terminal implementation rereview return
+`ACCEPT`. The implementation closes at 537 production, 371 proof and 908 total
+gross Rust lines. Full loading unit, build-loading, subrule-loading and
+Starlark-analysis suites pass; formatting, source/peer hashes, parked-proof
+integrity, archive baseline and rebuilt CLI pass. The complete compact final
+property set, Bazel-ordered default/flag/later-property lowering, generic
+publication guard, propagation and generated-only file-check bypass remain
+within the frozen owners. An authentic rules_rust 0.73 configured-query replay
+clears `SKIP_CONSTRAINTS_OVERRIDE` and stops at rules_shell's next generic
+constructor surface, `attr.label_list(allow_rules = ["sh_library"])`. No
+rules_shell, rules_rust, C++, `cc_common`, `cc_internal` or parser special case
+was added.
 
 ## Immediate predecessor
 

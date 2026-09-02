@@ -22917,3 +22917,19 @@ generated/rule file-type-check bypass; every other bit remains structural and
 its absent owner is classified unsupported/deferred. `SKIP_CONSTRAINTS_OVERRIDE`
 does not claim a dependency constraint checker. Bazel 9.2 is authority; Zabel's
 complete-name table and compact derived properties are peer guidance only.
+
+R3 terminal implementation review returned `REPLAN` on unowned
+`CHECK_ALLOWED_VALUES` publication, flags-after-later-property failure order,
+and provenance-oriented tag/repository prose. R4 adds one generic publication
+guard, preserves default-then-flags-then-later-property lowering and defines
+tag/repository conversion by supported final properties. Focused R4 design and
+terminal implementation rereviews return `ACCEPT`.
+
+R4 is terminally `ACCEPTED` at 537 production/371 proof/908 total gross Rust
+lines. Full loading/analysis owner and direct-dependent suites, formatting,
+source/peer integrity, parked proof, archive baseline and rebuilt CLI pass.
+Authentic rules_rust 0.73 configured-query replay clears the property-flag
+category and stops at the next generic rules_shell declaration surface,
+`attr.label_list(allow_rules = ["sh_library"])`. Schedule a complete Bazel 9.2
+rule-class restriction audit; add no ruleset, C++, `cc_common`, `cc_internal`
+or parser branch.

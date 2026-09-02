@@ -77,8 +77,9 @@ use starlark_map::small_set::SmallSet;
 
 use crate::attrs::AllowedAttributeValues;
 use crate::attrs::AttributeDependencyConfiguration;
-use crate::attrs::AttributeFlags;
 use crate::attrs::AttributeKind;
+use crate::attrs::AttributePropertyFlag;
+use crate::attrs::AttributePropertyFlags;
 use crate::attrs::AttributeProvenance;
 use crate::attrs::AttributeSchema;
 use crate::attrs::AttributeValue;
@@ -3748,6 +3749,7 @@ struct MacroAttributeSchema {
     default: Option<CoercedAttributeValue>,
     default_to_none: bool,
     file_admissibility: FileAdmissibility,
+    flags: AttributePropertyFlags,
     allowed_values: AllowedAttributeValues,
     allow_empty: bool,
 }
@@ -3759,7 +3761,6 @@ impl MacroAttributeSchema {
             || definition.attached_aspect.is_some()
             || definition.transition.is_some()
             || !definition.required_providers.is_empty()
-            || !definition.flags.is_empty()
         {
             anyhow::bail!("macro attribute '{name}' uses an unsupported dependency constraint");
         }
@@ -3771,6 +3772,7 @@ impl MacroAttributeSchema {
             default: definition.default.clone(),
             default_to_none: false,
             file_admissibility: definition.file_admissibility.clone(),
+            flags: definition.flags,
             allowed_values: definition.allowed_values.clone(),
             allow_empty: definition.allow_empty,
         })
@@ -3797,6 +3799,7 @@ impl MacroAttributeSchema {
             default: schema.default.clone(),
             default_to_none: !schema.mandatory,
             file_admissibility: schema.file_admissibility.clone(),
+            flags: schema.flags,
             allowed_values: schema.allowed_values.clone(),
             allow_empty: schema.allow_empty,
         })
@@ -3823,6 +3826,7 @@ impl MacroAttributeSchema {
             default: schema.default.clone(),
             default_to_none: !schema.mandatory,
             file_admissibility: schema.file_admissibility.clone(),
+            flags: schema.flags,
             allowed_values: schema.allowed_values.clone(),
             allow_empty: schema.allow_empty,
         })
@@ -3833,16 +3837,6 @@ impl MacroAttributeSchema {
             default_to_none: !schema.mandatory,
             ..schema.clone()
         }
-    }
-
-    fn reject_inherited_flags<V>(schema: &[RuleAttributeSchemaGen<V>]) -> anyhow::Result<()> {
-        if let Some(attribute) = schema.iter().find(|attribute| !attribute.flags.is_empty()) {
-            anyhow::bail!(
-                "macro inheritance does not support attribute flags on '{}'",
-                attribute.name
-            );
-        }
-        Ok(())
     }
 }
 
@@ -4659,7 +4653,7 @@ fn aspect_attributes<'v>(
         if !is_starlark_identifier(&name) {
             anyhow::bail!("attribute name `{name}` is not a valid identifier.");
         }
-        let definition = attribute_definition_from_value(value)
+        let definition = attribute_definition_from_value(value)?
             .ok_or_else(|| anyhow::anyhow!("aspect attribute `{name}` must use attr.*()"))?;
         if definition.configurable_set {
             anyhow::bail!(
@@ -4778,7 +4772,7 @@ pub(crate) struct RuleAttributeSchemaGen<V> {
     #[trace(unsafe_ignore)]
     pub(crate) file_admissibility: FileAdmissibility,
     #[trace(unsafe_ignore)]
-    pub(crate) flags: AttributeFlags,
+    pub(crate) flags: AttributePropertyFlags,
     #[trace(unsafe_ignore)]
     pub(crate) allowed_values: AllowedAttributeValues,
     #[trace(unsafe_ignore)]
@@ -4840,7 +4834,7 @@ fn starlark_builtin_schema<V>(
             builtin: true,
             configurable_set: false,
             file_admissibility: FileAdmissibility::default(),
-            flags: AttributeFlags::default(),
+            flags: AttributePropertyFlags::default(),
             allowed_values: AllowedAttributeValues::None,
             allow_empty: true,
             executable: false,
@@ -5347,7 +5341,7 @@ struct AttributeDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     file_admissibility: FileAdmissibility,
     #[trace(unsafe_ignore)]
-    flags: AttributeFlags,
+    flags: AttributePropertyFlags,
     #[trace(unsafe_ignore)]
     allowed_values: AllowedAttributeValues,
     #[trace(unsafe_ignore)]
@@ -5371,10 +5365,15 @@ type AttributeDefinition<'v> = AttributeDefinitionGen<Value<'v>>;
 type FrozenAttributeDefinition = AttributeDefinitionGen<FrozenValue>;
 starlark::starlark_complex_values!(AttributeDefinition);
 
-fn attribute_definition_from_value<'v>(value: Value<'v>) -> Option<AttributeDefinition<'v>> {
-    match AttributeDefinition::from_value(value)? {
-        starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
-        starlark::__macro_refs::Either::Right(value) => Some(AttributeDefinitionGen {
+fn attribute_definition_from_value<'v>(
+    value: Value<'v>,
+) -> anyhow::Result<Option<AttributeDefinition<'v>>> {
+    let Some(definition) = AttributeDefinition::from_value(value) else {
+        return Ok(None);
+    };
+    let definition = match definition {
+        starlark::__macro_refs::Either::Left(value) => value.clone(),
+        starlark::__macro_refs::Either::Right(value) => AttributeDefinitionGen {
             kind: value.kind,
             mandatory: value.mandatory,
             configurable: value.configurable,
@@ -5400,8 +5399,18 @@ fn attribute_definition_from_value<'v>(value: Value<'v>) -> Option<AttributeDefi
                     definition_source: transition.definition_source.clone(),
                     source_identities_by_filename: transition.source_identities_by_filename.clone(),
                 }),
-        }),
+        },
+    };
+    if definition
+        .flags
+        .contains(AttributePropertyFlag::CheckAllowedValues)
+        && matches!(definition.allowed_values, AllowedAttributeValues::None)
+    {
+        anyhow::bail!(
+            "attribute property CHECK_ALLOWED_VALUES has no owned allowed-values predicate"
+        );
     }
+    Ok(Some(definition))
 }
 
 pub(crate) fn subrule_attribute_from_value<'v>(
@@ -5458,15 +5467,13 @@ pub(crate) fn subrule_attribute_from_value<'v>(
         if definition.attached_aspect.is_some() {
             anyhow::bail!("subrule attribute '{name}' uses a deferred attached aspect");
         }
-        if !definition.flags.is_empty() {
-            anyhow::bail!("subrule attribute '{name}' uses unsupported attribute flags");
-        }
         Ok(SubruleAttribute {
             user_name: name.into(),
             kind: definition.kind,
             configurable: definition.configurable,
             default,
             file_admissibility: definition.file_admissibility.clone(),
+            flags: definition.flags,
             allowed_values: definition.allowed_values.clone(),
             executable: definition.executable,
             exec_configuration: definition.exec_configuration,
@@ -5474,7 +5481,7 @@ pub(crate) fn subrule_attribute_from_value<'v>(
         })
     }
 
-    let definition = attribute_definition_from_value(value)
+    let definition = attribute_definition_from_value(value)?
         .ok_or_else(|| anyhow::anyhow!("subrule attribute '{name}' must use attr.*()"))?;
     convert(name, &definition)
 }
@@ -6177,9 +6184,28 @@ fn attribute_definition<'v>(
     cfg: Option<Value<'v>>,
     eval: &Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<AttributeDefinition<'v>> {
-    if executable && !cfg.as_ref().is_some_and(|value| !value.is_none()) {
-        anyhow::bail!("cfg parameter is mandatory when executable=True is provided");
-    }
+    let mut definition = attribute_definition_before_later_properties(
+        kind,
+        mandatory,
+        configurable,
+        executable,
+        default,
+        eval,
+    )?;
+    validate_executable_cfg_presence(executable, cfg)?;
+    definition.file_admissibility = file_admissibility;
+    set_attribute_cfg(&mut definition, cfg)?;
+    Ok(definition)
+}
+
+fn attribute_definition_before_later_properties<'v>(
+    kind: AttributeKind,
+    mandatory: bool,
+    configurable: Option<bool>,
+    executable: bool,
+    default: Option<Value<'v>>,
+    eval: &Evaluator<'v, '_, '_>,
+) -> anyhow::Result<AttributeDefinition<'v>> {
     let mut late_bound_default = None;
     let mut computed_default = false;
     let default = default
@@ -6214,6 +6240,47 @@ fn attribute_definition<'v>(
         })
         .transpose()?
         .flatten();
+    Ok(AttributeDefinition {
+        kind,
+        mandatory,
+        configurable: configurable.unwrap_or(!matches!(
+            kind,
+            AttributeKind::Output | AttributeKind::OutputList
+        )),
+        configurable_set: configurable.is_some(),
+        file_admissibility: FileAdmissibility::default(),
+        flags: {
+            let mut flags = AttributePropertyFlags::default();
+            flags.insert(AttributePropertyFlag::StarlarkDefined);
+            flags
+        },
+        allowed_values: AllowedAttributeValues::None,
+        allow_empty: true,
+        default,
+        late_bound_default,
+        computed_default,
+        executable,
+        exec_configuration: false,
+        required_providers: Arc::from([]),
+        attached_aspect: None,
+        transition: None,
+    })
+}
+
+fn validate_executable_cfg_presence(
+    executable: bool,
+    cfg: Option<Value<'_>>,
+) -> anyhow::Result<()> {
+    if executable && !cfg.is_some_and(|value| !value.is_none()) {
+        anyhow::bail!("cfg parameter is mandatory when executable=True is provided");
+    }
+    Ok(())
+}
+
+fn set_attribute_cfg<'v>(
+    definition: &mut AttributeDefinition<'v>,
+    cfg: Option<Value<'v>>,
+) -> anyhow::Result<()> {
     let (exec_configuration, transition) = match cfg {
         None => (false, None),
         Some(value) if value.is_none() || value.unpack_str() == Some("target") => (false, None),
@@ -6225,27 +6292,9 @@ fn attribute_definition<'v>(
             })?),
         ),
     };
-    Ok(AttributeDefinition {
-        kind,
-        mandatory,
-        configurable: configurable.unwrap_or(!matches!(
-            kind,
-            AttributeKind::Output | AttributeKind::OutputList
-        )),
-        configurable_set: configurable.is_some(),
-        file_admissibility,
-        flags: AttributeFlags::default(),
-        allowed_values: AllowedAttributeValues::None,
-        allow_empty: true,
-        default,
-        late_bound_default,
-        computed_default,
-        executable,
-        exec_configuration,
-        required_providers: Arc::from([]),
-        attached_aspect: None,
-        transition,
-    })
+    definition.exec_configuration = exec_configuration;
+    definition.transition = transition;
+    Ok(())
 }
 
 fn coerce_label_default(
@@ -6278,43 +6327,89 @@ fn discard_attribute_doc(doc: Option<Value>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn unpack_attribute_flags(
-    flags: Option<UnpackListOrTuple<&str>>,
-) -> anyhow::Result<AttributeFlags> {
-    let mut result = AttributeFlags::default();
-    for flag in flags.unwrap_or_default().items {
-        match flag {
-            "DIRECT_COMPILE_TIME_INPUT" => result.insert_direct_compile_time_input(),
-            "MANDATORY"
-            | "EXECUTABLE"
-            | "UNDOCUMENTED"
-            | "TAGGABLE"
-            | "ORDER_INDEPENDENT"
-            | "STRICT_LABEL_CHECKING"
-            | "NON_EMPTY"
-            | "SINGLE_ARTIFACT"
-            | "SILENT_RULECLASS_FILTER"
-            | "SKIP_ANALYSIS_TIME_FILETYPE_CHECK"
-            | "CHECK_ALLOWED_VALUES"
-            | "NONCONFIGURABLE"
-            | "CONFIGURABLE_ATTR_WAS_USER_SET"
-            | "SKIP_PREREQ_VALIDATOR_CHECKS"
-            | "CHECK_CONSTRAINTS_OVERRIDE"
-            | "SKIP_CONSTRAINTS_OVERRIDE"
-            | "OUTPUT_LICENSES"
-            | "HAS_STARLARK_DEFINED_TRANSITION"
-            | "HAS_ANALYSIS_TEST_TRANSITION"
-            | "IS_TOOL_DEPENDENCY"
-            | "STARLARK_DEFINED"
-            | "SKIP_VALIDATIONS"
-            | "FOR_DEPENDENCY_RESOLUTION"
-            | "FOR_DEPENDENCY_RESOLUTION_EXPLICITLY_SET" => {
-                anyhow::bail!("attribute flag '{flag}' is not supported")
-            }
-            _ => anyhow::bail!("unknown attribute flag '{flag}'"),
-        }
+fn unpack_attribute_flags(flags: Option<Value<'_>>) -> anyhow::Result<AttributePropertyFlags> {
+    let mut result = AttributePropertyFlags::default();
+    result.insert(AttributePropertyFlag::StarlarkDefined);
+    let Some(flags) = flags else {
+        return Ok(result);
+    };
+    let values = if let Some(values) = ListRef::from_value(flags) {
+        values.iter().collect::<Vec<_>>()
+    } else if let Some(values) = TupleRef::from_value(flags) {
+        values.iter().collect::<Vec<_>>()
+    } else {
+        anyhow::bail!("attribute flags must be a list or tuple of strings")
+    };
+    let names = values
+        .into_iter()
+        .map(|value| {
+            value
+                .unpack_str()
+                .ok_or_else(|| anyhow::anyhow!("attribute flags must contain only strings"))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    for flag in names {
+        let property = AttributePropertyFlag::from_name(flag)
+            .ok_or_else(|| anyhow::anyhow!("unknown attribute flag '{flag}'"))?;
+        result.insert(property);
     }
     Ok(result)
+}
+
+fn finalize_dependency_attribute_properties<V>(
+    definition: &mut AttributeDefinitionGen<V>,
+    mut flags: AttributePropertyFlags,
+    for_dependency_resolution: Option<bool>,
+    skip_validations: bool,
+) {
+    // Bazel mutates the raw set in this fixed order. These are deliberately
+    // not a commutative union: explicit false removes the active dependency-
+    // resolution bit after the raw flags have been installed.
+    if definition.mandatory {
+        flags.insert(AttributePropertyFlag::Mandatory);
+    }
+    if let Some(for_dependency_resolution) = for_dependency_resolution {
+        flags.insert(AttributePropertyFlag::ForDependencyResolutionExplicitlySet);
+        if for_dependency_resolution {
+            flags.insert(AttributePropertyFlag::ForDependencyResolution);
+        } else {
+            flags.remove(AttributePropertyFlag::ForDependencyResolution);
+        }
+    }
+    if definition.configurable_set {
+        flags.insert(AttributePropertyFlag::ConfigurableAttrWasUserSet);
+        if !definition.configurable {
+            flags.insert(AttributePropertyFlag::Nonconfigurable);
+        }
+    }
+    if skip_validations {
+        flags.insert(AttributePropertyFlag::SkipValidations);
+    }
+    if !definition.allow_empty {
+        flags.insert(AttributePropertyFlag::NonEmpty);
+    }
+    if definition.executable {
+        flags.insert(AttributePropertyFlag::Executable);
+    }
+    // Every dependency-label descriptor installs NO_FILE even when neither
+    // file keyword is supplied, and Attribute.Builder records that as strict.
+    flags.insert(AttributePropertyFlag::StrictLabelChecking);
+    if definition.file_admissibility.single_artifact() {
+        flags.insert(AttributePropertyFlag::SingleArtifact);
+    }
+    if definition.transition.is_some() {
+        flags.insert(AttributePropertyFlag::HasStarlarkDefinedTransition);
+    }
+
+    definition.mandatory |= flags.contains(AttributePropertyFlag::Mandatory);
+    definition.executable |= flags.contains(AttributePropertyFlag::Executable);
+    definition.allow_empty &= !flags.contains(AttributePropertyFlag::NonEmpty);
+    definition.configurable &= !flags.contains(AttributePropertyFlag::Nonconfigurable);
+    if flags.contains(AttributePropertyFlag::SingleArtifact) {
+        definition.file_admissibility =
+            definition.file_admissibility.clone().with_single_artifact();
+    }
+    definition.flags = flags;
 }
 
 fn unpack_file_admissibility<'v>(
@@ -6396,6 +6491,8 @@ fn attr_methods(builder: &mut MethodsBuilder) {
     fn label<'v>(
         #[starlark(this)] _attr: Value<'v>,
         #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] skip_validations: Option<bool>,
+        #[starlark(require = named)] for_dependency_resolution: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
@@ -6404,28 +6501,36 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] executable: Option<bool>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
-        #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] flags: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        let file_admissibility = unpack_file_admissibility(allow_files, allow_single_file)?;
-        let mut definition = attribute_definition(
+        let mut definition = attribute_definition_before_later_properties(
             AttributeKind::Label,
             mandatory.unwrap_or(false),
             configurable,
-            file_admissibility,
             executable.unwrap_or(false),
             default,
-            cfg,
             eval,
         )?;
+        let flags = unpack_attribute_flags(flags)?;
+        validate_executable_cfg_presence(definition.executable, cfg)?;
+        definition.file_admissibility = unpack_file_admissibility(allow_files, allow_single_file)?;
         definition.required_providers = label_required_provider(providers)?;
-        definition.flags = unpack_attribute_flags(flags)?;
+        set_attribute_cfg(&mut definition, cfg)?;
+        finalize_dependency_attribute_properties(
+            &mut definition,
+            flags,
+            for_dependency_resolution,
+            skip_validations.unwrap_or(false),
+        );
         Ok(definition)
     }
     fn label_list<'v>(
         #[starlark(this)] _attr: Value<'v>,
         #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] skip_validations: Option<bool>,
+        #[starlark(require = named)] for_dependency_resolution: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
@@ -6434,30 +6539,36 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] aspects: Option<Value<'v>>,
-        #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] flags: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        let required_providers = label_list_required_providers(providers)?;
-        let mut definition = attribute_definition(
+        let mut definition = attribute_definition_before_later_properties(
             AttributeKind::LabelList,
             mandatory.unwrap_or(false),
             configurable,
-            unpack_file_admissibility(allow_files, None)?,
             false,
             default,
-            cfg,
             eval,
         )?;
-        definition.required_providers = required_providers;
-        definition.attached_aspect = label_list_attached_aspect(aspects)?;
-        definition.flags = unpack_attribute_flags(flags)?;
         definition.allow_empty = allow_empty.unwrap_or(true);
+        let flags = unpack_attribute_flags(flags)?;
+        definition.file_admissibility = unpack_file_admissibility(allow_files, None)?;
+        definition.required_providers = label_list_required_providers(providers)?;
+        set_attribute_cfg(&mut definition, cfg)?;
+        definition.attached_aspect = label_list_attached_aspect(aspects)?;
+        finalize_dependency_attribute_properties(
+            &mut definition,
+            flags,
+            for_dependency_resolution,
+            skip_validations.unwrap_or(false),
+        );
         Ok(definition)
     }
     fn string_keyed_label_dict<'v>(
         #[starlark(this)] _attr: Value<'v>,
         #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] for_dependency_resolution: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
@@ -6465,29 +6576,37 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
-        #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] flags: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        let mut definition = attribute_definition(
+        let mut definition = attribute_definition_before_later_properties(
             AttributeKind::StringKeyedLabelDict,
             mandatory.unwrap_or(false),
             configurable,
-            unpack_file_admissibility(allow_files, None)?,
             false,
             default,
-            cfg,
             eval,
         )?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
+        let flags = unpack_attribute_flags(flags)?;
+        definition.file_admissibility = unpack_file_admissibility(allow_files, None)?;
         definition.required_providers =
             declaration_required_providers(providers, "attribute providers")?;
-        definition.flags = unpack_attribute_flags(flags)?;
-        definition.allow_empty = allow_empty.unwrap_or(true);
+        set_attribute_cfg(&mut definition, cfg)?;
+        finalize_dependency_attribute_properties(
+            &mut definition,
+            flags,
+            for_dependency_resolution,
+            false,
+        );
         Ok(definition)
     }
     fn label_keyed_string_dict<'v>(
         #[starlark(this)] _attr: Value<'v>,
         #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] skip_validations: Option<bool>,
+        #[starlark(require = named)] for_dependency_resolution: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
@@ -6495,24 +6614,30 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
-        #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] flags: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        let mut definition = attribute_definition(
+        let mut definition = attribute_definition_before_later_properties(
             AttributeKind::LabelKeyedStringDict,
             mandatory.unwrap_or(false),
             configurable,
-            unpack_file_admissibility(allow_files, None)?,
             false,
             default,
-            cfg,
             eval,
         )?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
+        let flags = unpack_attribute_flags(flags)?;
+        definition.file_admissibility = unpack_file_admissibility(allow_files, None)?;
         definition.required_providers =
             declaration_required_providers(providers, "attribute providers")?;
-        definition.flags = unpack_attribute_flags(flags)?;
-        definition.allow_empty = allow_empty.unwrap_or(true);
+        set_attribute_cfg(&mut definition, cfg)?;
+        finalize_dependency_attribute_properties(
+            &mut definition,
+            flags,
+            for_dependency_resolution,
+            skip_validations.unwrap_or(false),
+        );
         Ok(definition)
     }
     fn bool<'v>(
@@ -6589,6 +6714,8 @@ fn attr_methods(builder: &mut MethodsBuilder) {
     fn label_list_dict<'v>(
         #[starlark(this)] _attr: Value<'v>,
         #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] skip_validations: Option<bool>,
+        #[starlark(require = named)] for_dependency_resolution: Option<bool>,
         #[starlark(require = named)] configurable: Option<bool>,
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
@@ -6596,24 +6723,30 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
-        #[starlark(require = named)] flags: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] flags: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
-        let mut definition = attribute_definition(
+        let mut definition = attribute_definition_before_later_properties(
             AttributeKind::LabelListDict,
             mandatory.unwrap_or(false),
             configurable,
-            unpack_file_admissibility(allow_files, None)?,
             false,
             default,
-            cfg,
             eval,
         )?;
+        definition.allow_empty = allow_empty.unwrap_or(true);
+        let flags = unpack_attribute_flags(flags)?;
+        definition.file_admissibility = unpack_file_admissibility(allow_files, None)?;
         definition.required_providers =
             declaration_required_providers(providers, "attribute providers")?;
-        definition.flags = unpack_attribute_flags(flags)?;
-        definition.allow_empty = allow_empty.unwrap_or(true);
+        set_attribute_cfg(&mut definition, cfg)?;
+        finalize_dependency_attribute_properties(
+            &mut definition,
+            flags,
+            for_dependency_resolution,
+            skip_validations.unwrap_or(false),
+        );
         Ok(definition)
     }
     fn output<'v>(
@@ -7715,7 +7848,12 @@ fn invoke_symbolic_macro<'v>(
                     )
                     .and_then(|value| {
                         validate_allowed_value(&schema.name, &value, &schema.allowed_values)?;
-                        Ok(value)
+                        Ok(normalize_starlark_value(
+                            value,
+                            schema
+                                .flags
+                                .contains(AttributePropertyFlag::OrderIndependent),
+                        ))
                     })
                     .map_err(starlark::Error::new_other)?,
                 ),
@@ -7864,7 +8002,7 @@ fn symbolic_macro_global<'v>(
         if value.is_none() {
             continue;
         }
-        let definition = attribute_definition_from_value(*value)
+        let definition = attribute_definition_from_value(*value)?
             .ok_or_else(|| anyhow::anyhow!("macro attribute '{name}' must use attr.*()"))?;
         attributes.push(MacroAttributeSchema::from_definition(name, &definition)?);
     }
@@ -7893,19 +8031,16 @@ fn symbolic_macro_global<'v>(
                     if rule.rule_class.get().is_none() {
                         anyhow::bail!("inherit_attrs rule must be exported");
                     }
-                    MacroAttributeSchema::reject_inherited_flags(&rule.schema)?;
                     rule.schema
                         .iter()
                         .filter_map(MacroAttributeSchema::inherited_transient)
                         .collect()
                 }
-                starlark::__macro_refs::Either::Right(rule) => {
-                    MacroAttributeSchema::reject_inherited_flags(&rule.schema)?;
-                    rule.schema
-                        .iter()
-                        .filter_map(MacroAttributeSchema::inherited)
-                        .collect()
-                }
+                starlark::__macro_refs::Either::Right(rule) => rule
+                    .schema
+                    .iter()
+                    .filter_map(MacroAttributeSchema::inherited)
+                    .collect(),
             }
         } else if let Some(symbolic_macro) = SymbolicMacroDefinition::from_value(inherit) {
             match symbolic_macro {
@@ -8016,7 +8151,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             if !is_repository_rule_attribute_name(&name) {
                 anyhow::bail!("unsupported repository_rule attribute name '{name}'");
             }
-            let definition = attribute_definition_from_value(value).ok_or_else(|| {
+            let definition = attribute_definition_from_value(value)?.ok_or_else(|| {
                 anyhow::anyhow!("repository attribute '{name}' must use attr.*()")
             })?;
             if definition.configurable_set
@@ -8027,7 +8162,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 || definition.exec_configuration
                 || !definition.file_admissibility.is_no_files()
                 || definition.file_admissibility.single_artifact()
-                || !definition.flags.is_empty()
+                || definition.flags.has_any_except(&[
+                    AttributePropertyFlag::StarlarkDefined,
+                    AttributePropertyFlag::StrictLabelChecking,
+                    AttributePropertyFlag::Mandatory,
+                ])
                 || !definition.required_providers.is_empty()
                 || !matches!(definition.allowed_values, AllowedAttributeValues::None)
                 || definition
@@ -8061,7 +8200,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let _ = doc;
         let mut attributes = Vec::new();
         for (name, value) in attrs.unwrap_or_default() {
-            let definition = attribute_definition_from_value(value)
+            let definition = attribute_definition_from_value(value)?
                 .ok_or_else(|| anyhow::anyhow!("tag attribute `{name}` must use attr.*()"))?;
             if definition.transition.is_some()
                 || definition.executable
@@ -8082,8 +8221,15 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             {
                 anyhow::bail!("tag attribute `{name}` does not support allow_files");
             }
-            if !definition.flags.is_empty() {
-                anyhow::bail!("tag attribute `{name}` does not support attribute flags");
+            if definition.flags.has_any_except(&[
+                AttributePropertyFlag::StarlarkDefined,
+                AttributePropertyFlag::StrictLabelChecking,
+                AttributePropertyFlag::Mandatory,
+                AttributePropertyFlag::NonEmpty,
+                AttributePropertyFlag::SingleArtifact,
+                AttributePropertyFlag::Nonconfigurable,
+            ]) {
+                anyhow::bail!("tag attribute `{name}` has unsupported attribute properties");
             }
             if !definition.required_providers.is_empty() {
                 anyhow::bail!("tag attribute `{name}` does not support providers");
@@ -8428,7 +8574,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 {
                     anyhow::bail!("rule attribute `{name}` is built in and cannot be redeclared");
                 }
-                let definition = attribute_definition_from_value(value)
+                let definition = attribute_definition_from_value(value)?
                     .ok_or_else(|| anyhow::anyhow!("rule attribute `{name}` must use attr.*()"))?;
                 if definition.configurable_set {
                     anyhow::bail!(
@@ -9274,7 +9420,7 @@ mod module_extension_definition_tests {
             configurable: bool,
             configurable_set: bool,
             file_admissibility: FileAdmissibility,
-            flags: AttributeFlags,
+            flags: AttributePropertyFlags,
             allowed_values: AllowedAttributeValues,
             default: Option<CoercedAttributeValue>,
             late_bound_default: bool,
@@ -9411,7 +9557,7 @@ mod module_extension_definition_tests {
     }
 
     #[test]
-    fn attribute_direct_compile_input_flags_are_normalized_and_fail_closed() {
+    fn dependency_attribute_property_flags_bind_and_mutate_as_bazel() {
         let descriptor_flags = |constructor: &str, arguments: &str| {
             let module = evaluate(&format!("X = attr.{constructor}({arguments})\n")).unwrap();
             module
@@ -9421,32 +9567,99 @@ mod module_extension_definition_tests {
                 .unwrap()
                 .flags
         };
-        let direct = "DIRECT_COMPILE_TIME_INPUT";
-        for constructor in [
+        let constructors = [
             "label",
             "label_list",
             "string_keyed_label_dict",
             "label_keyed_string_dict",
             "label_list_dict",
-        ] {
+        ];
+        for constructor in constructors {
             let omitted = descriptor_flags(constructor, "");
-            assert!(omitted.is_empty(), "{constructor}");
+            assert!(omitted.contains(AttributePropertyFlag::StarlarkDefined));
+            assert!(omitted.contains(AttributePropertyFlag::StrictLabelChecking));
             assert_eq!(omitted, descriptor_flags(constructor, "flags = []"));
             assert_eq!(omitted, descriptor_flags(constructor, "flags = ()"));
 
-            let admitted = descriptor_flags(constructor, &format!("flags = ['{direct}']"));
+            let admitted = descriptor_flags(constructor, "flags = ['DIRECT_COMPILE_TIME_INPUT']");
             assert!(admitted.direct_compile_time_input(), "{constructor}");
             assert_eq!(
                 admitted,
-                descriptor_flags(constructor, &format!("flags = ('{direct}',)"))
+                descriptor_flags(constructor, "flags = ('DIRECT_COMPILE_TIME_INPUT',)")
             );
             assert_eq!(
                 admitted,
-                descriptor_flags(constructor, &format!("flags = ['{direct}', '{direct}']"))
+                descriptor_flags(
+                    constructor,
+                    "flags = ['DIRECT_COMPILE_TIME_INPUT', 'DIRECT_COMPILE_TIME_INPUT']",
+                )
             );
             assert!(
-                evaluate(&format!("X = attr.{constructor}(['{direct}'])\n")).is_err(),
+                evaluate(&format!(
+                    "X = attr.{constructor}(['DIRECT_COMPILE_TIME_INPUT'])\n"
+                ))
+                .is_err(),
                 "{constructor} accepted positional flags"
+            );
+
+            let false_override = descriptor_flags(
+                constructor,
+                "flags = ['FOR_DEPENDENCY_RESOLUTION'], for_dependency_resolution = False",
+            );
+            assert!(!false_override.contains(AttributePropertyFlag::ForDependencyResolution));
+            assert!(
+                false_override
+                    .contains(AttributePropertyFlag::ForDependencyResolutionExplicitlySet)
+            );
+            let true_override = descriptor_flags(constructor, "for_dependency_resolution = True");
+            assert!(true_override.contains(AttributePropertyFlag::ForDependencyResolution));
+            assert!(
+                true_override.contains(AttributePropertyFlag::ForDependencyResolutionExplicitlySet)
+            );
+        }
+
+        let all_names = [
+            "MANDATORY",
+            "EXECUTABLE",
+            "UNDOCUMENTED",
+            "TAGGABLE",
+            "ORDER_INDEPENDENT",
+            "STRICT_LABEL_CHECKING",
+            "DIRECT_COMPILE_TIME_INPUT",
+            "NON_EMPTY",
+            "SINGLE_ARTIFACT",
+            "SILENT_RULECLASS_FILTER",
+            "SKIP_ANALYSIS_TIME_FILETYPE_CHECK",
+            "CHECK_ALLOWED_VALUES",
+            "NONCONFIGURABLE",
+            "CONFIGURABLE_ATTR_WAS_USER_SET",
+            "SKIP_PREREQ_VALIDATOR_CHECKS",
+            "CHECK_CONSTRAINTS_OVERRIDE",
+            "SKIP_CONSTRAINTS_OVERRIDE",
+            "OUTPUT_LICENSES",
+            "HAS_STARLARK_DEFINED_TRANSITION",
+            "HAS_ANALYSIS_TEST_TRANSITION",
+            "IS_TOOL_DEPENDENCY",
+            "STARLARK_DEFINED",
+            "SKIP_VALIDATIONS",
+            "FOR_DEPENDENCY_RESOLUTION",
+            "FOR_DEPENDENCY_RESOLUTION_EXPLICITLY_SET",
+        ];
+        let all = descriptor_flags(
+            "label_list",
+            &format!(
+                "flags = [{}]",
+                all_names
+                    .iter()
+                    .map(|name| format!("'{name}'"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        );
+        for name in all_names {
+            assert!(
+                all.contains(AttributePropertyFlag::from_name(name).unwrap()),
+                "missing {name}"
             );
         }
 
@@ -9466,19 +9679,87 @@ mod module_extension_definition_tests {
             );
         }
 
-        for invalid in [
-            "None",
-            "1",
-            "['DIRECT_COMPILE_TIME_INPUT', 1]",
-            "['direct_compile_time_input']",
-            "['UNKNOWN']",
-            "['MANDATORY']",
-        ] {
+        for invalid in ["None", "1", "['direct_compile_time_input']", "['UNKNOWN']"] {
             assert!(
                 evaluate(&format!("X = attr.label_list(flags = {invalid})\n")).is_err(),
                 "accepted flags={invalid}"
             );
         }
+        let cast_error = evaluate("X = attr.label_list(flags = ['UNKNOWN', 1])\n")
+            .unwrap_err()
+            .to_string();
+        assert!(
+            !cast_error.contains("unknown attribute flag"),
+            "{cast_error}"
+        );
+        let default_error =
+            evaluate("X = attr.label(default = 1, flags = ['UNKNOWN', 1], allow_files = 1)\n")
+                .unwrap_err()
+                .to_string();
+        assert!(
+            !default_error.contains("unknown attribute flag")
+                && !default_error.contains("attribute flags must contain only strings"),
+            "flags ran before default coercion: {default_error}"
+        );
+        for later in [
+            "allow_files = 1",
+            "providers = 1",
+            "cfg = 'host'",
+            "executable = True",
+        ] {
+            let error = evaluate(&format!("X = attr.label(flags = ['UNKNOWN'], {later})\n"))
+                .unwrap_err()
+                .to_string();
+            assert!(
+                error.contains("unknown attribute flag 'UNKNOWN'"),
+                "{error}"
+            );
+        }
+        let aspect_error = evaluate("X = attr.label_list(flags = ['UNKNOWN'], aspects = [1])\n")
+            .unwrap_err()
+            .to_string();
+        assert!(
+            aspect_error.contains("unknown attribute flag 'UNKNOWN'"),
+            "{aspect_error}"
+        );
+
+        for constructor in [
+            "label",
+            "label_list",
+            "label_keyed_string_dict",
+            "label_list_dict",
+        ] {
+            let flags = descriptor_flags(constructor, "skip_validations = True");
+            assert!(flags.contains(AttributePropertyFlag::SkipValidations));
+        }
+        assert!(evaluate("X = attr.string_keyed_label_dict(skip_validations = True)\n").is_err());
+        for invalid in ["None", "1", "'true'"] {
+            assert!(
+                evaluate(&format!(
+                    "X = attr.label(for_dependency_resolution = {invalid})\n"
+                ))
+                .is_err()
+            );
+            assert!(evaluate(&format!("X = attr.label(skip_validations = {invalid})\n")).is_err());
+        }
+
+        let projected = evaluate(
+            "X = attr.label_list(flags = ['MANDATORY', 'EXECUTABLE', 'ORDER_INDEPENDENT', 'NON_EMPTY', 'SINGLE_ARTIFACT', 'NONCONFIGURABLE'])\n",
+        )
+        .unwrap();
+        let projected = projected
+            .get("X")
+            .unwrap()
+            .downcast::<FrozenAttributeDefinition>()
+            .unwrap();
+        assert!(projected.mandatory && projected.executable);
+        assert!(!projected.configurable && !projected.allow_empty);
+        assert!(projected.file_admissibility.single_artifact());
+    }
+
+    #[test]
+    fn dependency_attribute_property_flags_propagate_or_fail_closed() {
+        let direct = "DIRECT_COMPILE_TIME_INPUT";
 
         let rule_flags = |arguments: &str| {
             let module = evaluate(&format!(
@@ -9499,7 +9780,7 @@ mod module_extension_definition_tests {
         let first = rule_flags("");
         let changed = rule_flags(&format!("flags = ['{direct}']"));
         let restored = rule_flags("");
-        assert!(first.is_empty());
+        assert!(first.contains(AttributePropertyFlag::StarlarkDefined));
         assert!(changed.direct_compile_time_input());
         assert_eq!(first, restored);
 
@@ -9517,33 +9798,56 @@ mod module_extension_definition_tests {
             .unwrap();
         assert!(aspect.attributes[0].flags.direct_compile_time_input());
 
-        for (control, flagged) in [
-            (
-                "def impl(name, visibility, deps): pass\nM = macro(implementation = impl, attrs = {'deps': attr.label_list()})\n",
-                "def impl(name, visibility, deps): pass\nM = macro(implementation = impl, attrs = {'deps': attr.label_list(flags = ['DIRECT_COMPILE_TIME_INPUT'])})\n",
-            ),
-            (
-                "def impl(ctx): pass\nS = subrule(implementation = impl, attrs = {'_deps': attr.label_list(default = [])})\n",
-                "def impl(ctx): pass\nS = subrule(implementation = impl, attrs = {'_deps': attr.label_list(default = [], flags = ['DIRECT_COMPILE_TIME_INPUT'])})\n",
-            ),
+        for source in [
+            "def impl(name, visibility, deps): pass\nM = macro(implementation = impl, attrs = {'deps': attr.label_list(flags = ['DIRECT_COMPILE_TIME_INPUT'])})\n",
+            "def rule_impl(ctx): pass\nR = rule(implementation = rule_impl, attrs = {'deps': attr.label_list(flags = ['DIRECT_COMPILE_TIME_INPUT'])})\ndef macro_impl(name, visibility, **kwargs): pass\nM = macro(implementation = macro_impl, inherit_attrs = R)\n",
+        ] {
+            let module = evaluate(source).unwrap();
+            let definition = module
+                .get("M")
+                .unwrap()
+                .downcast::<FrozenSymbolicMacroDefinition>()
+                .unwrap();
+            assert!(
+                definition
+                    .attributes
+                    .iter()
+                    .find(|attribute| attribute.name == "deps")
+                    .unwrap()
+                    .flags
+                    .direct_compile_time_input()
+            );
+        }
+        evaluate(
+            "def impl(ctx): pass\nS = subrule(implementation = impl, attrs = {'_deps': attr.label_list(default = [], flags = ['DIRECT_COMPILE_TIME_INPUT'])})\n",
+        )
+        .unwrap();
+
+        for source in [
+            "def impl(ctx): pass\nR = rule(implementation = impl, attrs = {'deps': attr.label_list(flags = ['CHECK_ALLOWED_VALUES'])})\n",
+            "def impl(target, ctx): pass\nA = aspect(implementation = impl, attrs = {'_deps': attr.label_list(default = [], flags = ['CHECK_ALLOWED_VALUES'])})\n",
+            "def impl(name, visibility, deps): pass\nM = macro(implementation = impl, attrs = {'deps': attr.label_list(flags = ['CHECK_ALLOWED_VALUES'])})\n",
+            "def impl(ctx): pass\nS = subrule(implementation = impl, attrs = {'_deps': attr.label_list(default = [], flags = ['CHECK_ALLOWED_VALUES'])})\n",
+        ] {
+            let error = evaluate(source).unwrap_err().to_string();
+            assert!(error.contains("CHECK_ALLOWED_VALUES"), "{error}");
+        }
+
+        for (control, supported, unsupported) in [
             (
                 "def impl(ctx): pass\nR = repository_rule(impl, attrs = {'deps': attr.label_list()})\n",
-                "def impl(ctx): pass\nR = repository_rule(impl, attrs = {'deps': attr.label_list(flags = ['DIRECT_COMPILE_TIME_INPUT'])})\n",
+                "def impl(ctx): pass\nR = repository_rule(impl, attrs = {'deps': attr.label_list(flags = ['MANDATORY'])})\n",
+                "def impl(ctx): pass\nR = repository_rule(impl, attrs = {'deps': attr.label_list(flags = ['SKIP_CONSTRAINTS_OVERRIDE'])})\n",
             ),
             (
                 "T = tag_class(attrs = {'deps': attr.label_list()})\n",
-                "T = tag_class(attrs = {'deps': attr.label_list(flags = ['DIRECT_COMPILE_TIME_INPUT'])})\n",
-            ),
-            (
-                "def rule_impl(ctx): pass\nR = rule(implementation = rule_impl, attrs = {'deps': attr.label_list()})\ndef macro_impl(name, visibility, **kwargs): pass\nM = macro(implementation = macro_impl, inherit_attrs = R)\n",
-                "def rule_impl(ctx): pass\nR = rule(implementation = rule_impl, attrs = {'deps': attr.label_list(flags = ['DIRECT_COMPILE_TIME_INPUT'])})\ndef macro_impl(name, visibility, **kwargs): pass\nM = macro(implementation = macro_impl, inherit_attrs = R)\n",
+                "T = tag_class(attrs = {'deps': attr.label_list(flags = ['MANDATORY'])})\n",
+                "T = tag_class(attrs = {'deps': attr.label_list(flags = ['SKIP_CONSTRAINTS_OVERRIDE'])})\n",
             ),
         ] {
-            evaluate(control).unwrap_or_else(|error| panic!("invalid control {control}: {error}"));
-            assert!(
-                evaluate(flagged).is_err(),
-                "consumer discarded flags: {flagged}"
-            );
+            evaluate(control).unwrap();
+            evaluate(supported).unwrap();
+            assert!(evaluate(unsupported).is_err(), "discarded {unsupported}");
         }
     }
 

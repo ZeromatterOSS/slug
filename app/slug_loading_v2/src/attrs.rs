@@ -138,20 +138,102 @@ pub(crate) enum AllowedAttributeValues {
     String(Arc<[CompactString]>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+#[repr(u8)]
+pub(crate) enum AttributePropertyFlag {
+    Mandatory,
+    Executable,
+    Undocumented,
+    Taggable,
+    OrderIndependent,
+    StrictLabelChecking,
+    DirectCompileTimeInput,
+    NonEmpty,
+    SingleArtifact,
+    SilentRuleclassFilter,
+    SkipAnalysisTimeFiletypeCheck,
+    CheckAllowedValues,
+    Nonconfigurable,
+    ConfigurableAttrWasUserSet,
+    SkipPrereqValidatorChecks,
+    CheckConstraintsOverride,
+    SkipConstraintsOverride,
+    OutputLicenses,
+    HasStarlarkDefinedTransition,
+    HasAnalysisTestTransition,
+    IsToolDependency,
+    StarlarkDefined,
+    SkipValidations,
+    ForDependencyResolution,
+    ForDependencyResolutionExplicitlySet,
+}
+
+impl AttributePropertyFlag {
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "MANDATORY" => Self::Mandatory,
+            "EXECUTABLE" => Self::Executable,
+            "UNDOCUMENTED" => Self::Undocumented,
+            "TAGGABLE" => Self::Taggable,
+            "ORDER_INDEPENDENT" => Self::OrderIndependent,
+            "STRICT_LABEL_CHECKING" => Self::StrictLabelChecking,
+            "DIRECT_COMPILE_TIME_INPUT" => Self::DirectCompileTimeInput,
+            "NON_EMPTY" => Self::NonEmpty,
+            "SINGLE_ARTIFACT" => Self::SingleArtifact,
+            "SILENT_RULECLASS_FILTER" => Self::SilentRuleclassFilter,
+            "SKIP_ANALYSIS_TIME_FILETYPE_CHECK" => Self::SkipAnalysisTimeFiletypeCheck,
+            "CHECK_ALLOWED_VALUES" => Self::CheckAllowedValues,
+            "NONCONFIGURABLE" => Self::Nonconfigurable,
+            "CONFIGURABLE_ATTR_WAS_USER_SET" => Self::ConfigurableAttrWasUserSet,
+            "SKIP_PREREQ_VALIDATOR_CHECKS" => Self::SkipPrereqValidatorChecks,
+            "CHECK_CONSTRAINTS_OVERRIDE" => Self::CheckConstraintsOverride,
+            "SKIP_CONSTRAINTS_OVERRIDE" => Self::SkipConstraintsOverride,
+            "OUTPUT_LICENSES" => Self::OutputLicenses,
+            "HAS_STARLARK_DEFINED_TRANSITION" => Self::HasStarlarkDefinedTransition,
+            "HAS_ANALYSIS_TEST_TRANSITION" => Self::HasAnalysisTestTransition,
+            "IS_TOOL_DEPENDENCY" => Self::IsToolDependency,
+            "STARLARK_DEFINED" => Self::StarlarkDefined,
+            "SKIP_VALIDATIONS" => Self::SkipValidations,
+            "FOR_DEPENDENCY_RESOLUTION" => Self::ForDependencyResolution,
+            "FOR_DEPENDENCY_RESOLUTION_EXPLICITLY_SET" => {
+                Self::ForDependencyResolutionExplicitlySet
+            }
+            _ => return None,
+        })
+    }
+
+    const fn bit(self) -> u32 {
+        1 << self as u8
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Allocative)]
-pub(crate) struct AttributeFlags(u32);
+pub(crate) struct AttributePropertyFlags(u32);
 
-impl AttributeFlags {
-    const DIRECT_COMPILE_TIME_INPUT: u32 = 1 << 6;
-
-    pub(crate) fn insert_direct_compile_time_input(&mut self) {
-        self.0 |= Self::DIRECT_COMPILE_TIME_INPUT;
+impl AttributePropertyFlags {
+    pub(crate) fn insert(&mut self, flag: AttributePropertyFlag) {
+        self.0 |= flag.bit();
     }
 
+    pub(crate) fn remove(&mut self, flag: AttributePropertyFlag) {
+        self.0 &= !flag.bit();
+    }
+
+    pub(crate) fn contains(self, flag: AttributePropertyFlag) -> bool {
+        self.0 & flag.bit() != 0
+    }
+
+    #[cfg(test)]
     pub(crate) fn direct_compile_time_input(self) -> bool {
-        self.0 & Self::DIRECT_COMPILE_TIME_INPUT != 0
+        self.contains(AttributePropertyFlag::DirectCompileTimeInput)
     }
 
+    pub(crate) fn has_any_except(self, supported: &[AttributePropertyFlag]) -> bool {
+        let supported = supported.iter().fold(0, |bits, flag| bits | flag.bit());
+        self.0 & !supported != 0
+    }
+
+    #[cfg(test)]
     pub(crate) fn is_empty(self) -> bool {
         self.0 == 0
     }
@@ -202,7 +284,7 @@ pub struct AttributeSchema {
     ordinary_dependency: bool,
     builtin: bool,
     file_admissibility: FileAdmissibility,
-    flags: AttributeFlags,
+    flags: AttributePropertyFlags,
     allowed_values: AllowedAttributeValues,
     allow_empty: bool,
     required_providers: Arc<[Arc<[ProviderIdentity]>]>,
@@ -235,7 +317,7 @@ impl AttributeSchema {
             ordinary_dependency: kind.contributes_ordinary_dependencies(),
             builtin: false,
             file_admissibility: FileAdmissibility::default(),
-            flags: AttributeFlags::default(),
+            flags: AttributePropertyFlags::default(),
             allowed_values: AllowedAttributeValues::None,
             allow_empty: true,
             required_providers: Arc::from([]),
@@ -295,7 +377,12 @@ impl AttributeSchema {
         self.order_independent
     }
     pub fn direct_compile_time_input(&self) -> bool {
-        self.flags.direct_compile_time_input()
+        self.flags
+            .contains(AttributePropertyFlag::DirectCompileTimeInput)
+    }
+    pub fn skip_analysis_time_filetype_check(&self) -> bool {
+        self.flags
+            .contains(AttributePropertyFlag::SkipAnalysisTimeFiletypeCheck)
     }
     pub(crate) fn allowed_values(&self) -> &AllowedAttributeValues {
         &self.allowed_values
@@ -311,7 +398,15 @@ impl AttributeSchema {
         self.file_admissibility = file_admissibility;
         self
     }
-    pub(crate) fn with_flags(mut self, flags: AttributeFlags) -> Self {
+    pub(crate) fn with_flags(mut self, flags: AttributePropertyFlags) -> Self {
+        self.mandatory |= flags.contains(AttributePropertyFlag::Mandatory);
+        self.executable |= flags.contains(AttributePropertyFlag::Executable);
+        self.order_independent |= flags.contains(AttributePropertyFlag::OrderIndependent);
+        self.allow_empty &= !flags.contains(AttributePropertyFlag::NonEmpty);
+        self.configurable &= !flags.contains(AttributePropertyFlag::Nonconfigurable);
+        if flags.contains(AttributePropertyFlag::SingleArtifact) {
+            self.file_admissibility = self.file_admissibility.with_single_artifact();
+        }
         self.flags = flags;
         self
     }
@@ -1487,8 +1582,9 @@ mod tests {
     use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
 
-    use super::AttributeFlags;
     use super::AttributeKind;
+    use super::AttributePropertyFlag;
+    use super::AttributePropertyFlags;
     use super::AttributeProvenance;
     use super::AttributeQueryValue;
     use super::AttributeSchema;
@@ -1499,18 +1595,26 @@ mod tests {
     use super::NativeRuleClass;
 
     #[test]
-    fn attribute_flags_are_one_word_and_project_through_schema() {
-        assert_eq!(std::mem::size_of::<AttributeFlags>(), 4);
-        let mut flags = AttributeFlags::default();
+    fn attribute_property_flags_are_one_word_and_project_through_schema() {
+        assert_eq!(std::mem::size_of::<AttributePropertyFlags>(), 4);
+        let mut flags = AttributePropertyFlags::default();
         assert!(flags.is_empty());
-        flags.insert_direct_compile_time_input();
-        flags.insert_direct_compile_time_input();
-        assert!(flags.direct_compile_time_input());
-        assert!(
-            AttributeSchema::new("deps", AttributeKind::LabelList, false, true, None)
-                .with_flags(flags)
-                .direct_compile_time_input()
-        );
+        flags.insert(AttributePropertyFlag::DirectCompileTimeInput);
+        flags.insert(AttributePropertyFlag::DirectCompileTimeInput);
+        flags.insert(AttributePropertyFlag::Mandatory);
+        flags.insert(AttributePropertyFlag::Executable);
+        flags.insert(AttributePropertyFlag::OrderIndependent);
+        flags.insert(AttributePropertyFlag::NonEmpty);
+        flags.insert(AttributePropertyFlag::SingleArtifact);
+        flags.insert(AttributePropertyFlag::Nonconfigurable);
+        assert!(flags.contains(AttributePropertyFlag::DirectCompileTimeInput));
+        let schema = AttributeSchema::new("deps", AttributeKind::LabelList, false, true, None)
+            .with_flags(flags);
+        assert!(schema.direct_compile_time_input());
+        assert!(schema.mandatory() && schema.executable());
+        assert!(!schema.configurable() && !schema.allow_empty());
+        assert!(schema.order_independent());
+        assert!(schema.file_admissibility().single_artifact());
     }
 
     #[test]

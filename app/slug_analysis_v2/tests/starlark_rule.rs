@@ -9568,6 +9568,36 @@ suffix = rule(
     implementation = _pass,
     attrs = {"dep": attr.label(allow_files = [".rs"], mandatory = True)},
 )
+skip_generated_filetypes = rule(
+    implementation = _pass,
+    attrs = {
+        "dep": attr.label(
+            allow_files = [".rs"],
+            mandatory = True,
+            flags = ["SKIP_ANALYSIS_TIME_FILETYPE_CHECK"],
+        ),
+    },
+)
+
+def _hidden(ctx, **kwargs):
+    pass
+
+strict_hidden = subrule(
+    implementation = _hidden,
+    attrs = {"_dep": attr.label(default = "//:bad", allow_files = [".rs"])},
+)
+skip_hidden = subrule(
+    implementation = _hidden,
+    attrs = {
+        "_dep": attr.label(
+            default = "//:bad",
+            allow_files = [".rs"],
+            flags = ["SKIP_ANALYSIS_TIME_FILETYPE_CHECK"],
+        ),
+    },
+)
+strict_hidden_rule = rule(implementation = _pass, subrules = [strict_hidden])
+skip_hidden_rule = rule(implementation = _pass, subrules = [skip_hidden])
 default_files = rule(
     implementation = _pass,
     attrs = {"dep": attr.label(mandatory = True)},
@@ -9659,10 +9689,13 @@ load(
     "nonempty",
     "producer",
     "shape",
+    "skip_generated_filetypes",
+    "skip_hidden_rule",
     "single",
     "single_false",
     "single_suffix",
     "string_map",
+    "strict_hidden_rule",
     "suffix",
 )
 
@@ -9697,6 +9730,11 @@ suffix(name = "generated_rule_ok", dep = ":good")
 suffix(name = "generated_rule_bad", dep = ":bad")
 suffix(name = "generated_rule_mixed", dep = ":mixed")
 suffix(name = "upper", dep = "upper.RS")
+skip_generated_filetypes(name = "skip_source_bad", dep = "source.bin")
+skip_generated_filetypes(name = "skip_generated_file_bad", dep = ":generated.bin")
+skip_generated_filetypes(name = "skip_generated_rule_bad", dep = ":bad")
+strict_hidden_rule(name = "strict_hidden_bad")
+skip_hidden_rule(name = "skip_hidden_bad")
 default_files(name = "default_source", dep = "source.rs")
 no_files(name = "false_source", dep = "source.rs")
 no_files(name = "no_files_rule", dep = ":zero")
@@ -9737,6 +9775,9 @@ async fn ordinary_file_admissibility_covers_sources_outputs_platforms_and_dictio
         "generated_file_ok",
         "generated_rule_ok",
         "generated_rule_mixed",
+        "skip_generated_file_bad",
+        "skip_generated_rule_bad",
+        "skip_hidden_bad",
         "no_files_rule",
         "nonempty_ok",
         "any_upper",
@@ -9756,6 +9797,8 @@ async fn ordinary_file_admissibility_covers_sources_outputs_platforms_and_dictio
 
     for (target, expected) in [
         ("source_bad", "does not match its admitted file types"),
+        ("skip_source_bad", "does not match its admitted file types"),
+        ("strict_hidden_bad", "does not produce any file matching"),
         (
             "generated_file_bad",
             "does not match its admitted file types",
