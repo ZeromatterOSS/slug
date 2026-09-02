@@ -7980,3 +7980,30 @@ the constructor as outside a `.bzl` module. Run docs-only
 `WP-4-7A-repository-rule-label-constructor-context-audit` next. Audit the
 complete Bazel 9.2 context and lifetime category; add no rules_cc, toolchain or
 repository-name special case.
+
+### Repository-rule Label runtime context audited (2026-09-02)
+
+Pinned Bazel 9.2 `StarlarkRuleClassFunctions.label`, `BazelModuleContext` and
+`RepositoryFetchFunction` establish that repository execution does not create
+a new Label owner. `Label()` uses the package and mapping of the innermost
+executing Starlark function. An isolated Bzlmod oracle discriminates a direct
+call in `//defs:ext.bzl` as `@@//defs:direct_target` from a call inside its
+imported `//helper:support.bzl` helper as `@@//helper:helper_target`.
+
+Select
+`WP-4-5-7A-repository-rule-label-constructor-context-implementation-r1`.
+The authenticated repository-file-effect owner already reacquires the exact
+frozen definition module and recursive manifest. Pass that manifest by borrow
+to the synchronous invocation and nest the existing `BzlEvaluationContext` in
+the existing invocation-only repository state. Reuse the accepted caller-
+source resolver for direct functions, imported helpers, builtin aliases and
+per-module mappings. Add no retained field, DICE key, label resolver, mapping,
+I/O path, lock, rules_cc or toolchain branch.
+
+Exact compatibility is the existing Label grammar/idempotence under the
+innermost function's package and mapping during admitted selected repository
+effects. Flat manifest lookup, runtime-extra composition, diagnostics and DICE
+cutoff are Slug-native. Wider Label/repository_ctx/repository-rule surfaces,
+native rules, mapping-recorder identity, materialization, lockfiles and
+configured semantics remain unsupported/deferred. The active manifest owns
+proof, caps and terminal stops; audit and architecture return `ACCEPT`.

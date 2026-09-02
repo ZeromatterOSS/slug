@@ -4412,3 +4412,20 @@ backends because all four children are accepted. The shared universal owner
 already supplies every required builtin; no MODULE/REPO/core overlay or
 additional builtin is selected. Zabel remains peer ownership guidance and
 Bazel 9.2 remains sole authority.
+
+### Repository-rule Label runtime context selected (2026-09-02)
+
+The selected repository-file-effect DICE key, owner certificate, source route
+and recursive frozen-module reacquisition remain the complete semantic owner.
+The reacquired module's manifest already contains every caller source package
+and selected mapping needed by Bazel's innermost-function Label rule, and the
+exported repository-rule projection is authenticated before its callable is
+released.
+
+The Stage 4/5 implementation therefore passes the existing manifest by borrow
+into the synchronous repository invocation and composes an existing
+`BzlEvaluationContext` with the invocation-only effect state. It adds no
+definition/call/certificate projection, DICE key, dependency, retained mapping,
+cache, lock or repository materialization behavior. Source, recursive-load or
+mapping changes continue to invalidate through the frozen-module dependency;
+missing or ambiguous caller provenance fails before effect publication.

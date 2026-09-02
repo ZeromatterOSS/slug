@@ -36,7 +36,23 @@ and must name the same packet.
 
 ### Current packet
 
-[Accepted applicable-license aliases; audit repository-rule `Label()` context next](./slug-v2-subplans/current-packet.md).
+[Repository-rule `Label()` runtime-context implementation selected](./slug-v2-subplans/current-packet.md).
+
+The docs-only
+`WP-4-7A-repository-rule-label-constructor-context-audit` returns `ACCEPT` and
+selects
+`WP-4-5-7A-repository-rule-label-constructor-context-implementation-r1`.
+Pinned Bazel 9.2 stack-inspects the innermost executing Starlark function, so a
+direct repository-rule call uses its definition module while an imported
+helper uses the helper module's package and mapping. An isolated Bzlmod oracle
+confirms `@@//defs:direct_target` versus `@@//helper:helper_target`.
+
+Slug's authenticated repository-file-effect path already reacquires the exact
+frozen definition module and its complete recursive `BzlLoadManifest`. Compose
+that existing manifest with the invocation-only repository state and let the
+existing caller-aware `BzlEvaluationContext` resolver select each function's
+identity. Add no retained definition/call/certificate field, DICE key, mapping,
+resolver, filesystem lookup, rules_cc or toolchain special case.
 
 Commit `95b4f0da6` terminally accepts the complete repository-rule
 file-admissibility category. The existing compact policy now survives frozen

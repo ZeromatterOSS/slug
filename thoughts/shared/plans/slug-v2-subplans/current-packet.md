@@ -1,224 +1,215 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-7A-applicable-licenses-loading-alias-design-r1
+Packet: WP-4-5-7A-repository-rule-label-constructor-context-implementation-r1
 
-Milestone: M7A bootstrap-critical generic Starlark/loading closure. Implement
-the bounded Bazel 9.2 compatibility aliases
-`default_applicable_licenses` and `applicable_licenses` by canonicalizing them
-immediately into Slug's accepted `default_package_metadata` package field and
-`package_metadata` rule-attribute slot.
+Milestone: M7A bootstrap-critical loading/repository execution closure. Make
+the existing `.bzl` `Label()` constructor see the exact defining-function
+module context while an admitted repository-rule implementation executes.
 
-Status: implementation terminally `ACCEPTED`. The exact claim is limited to
-single BUILD-package declarations and admitted rule instances. It does not
-widen the existing package-call, REPO.bazel, symbolic-macro, rules_license or
-configured-analysis surfaces.
+Status: docs-only audit and architecture `ACCEPTED`; bounded Rust is selected.
+The packet composes two existing evaluation-time owners and adds no retained
+repository-rule, BZL-manifest or DICE state.
 
 Immediate predecessor
-`WP-4-7A-analysis-test-transition-loading-declaration-design-r1` is terminally
-accepted in `3f90b41b5`. Its rebuilt authenticated rules_rust replay clears the
-missing BZL global and stops while loading
-`@@bazel_skylib+//toolchains/unittest:BUILD` at
-`package(default_applicable_licenses = ["//:license"])`.
+`WP-4-7A-applicable-licenses-loading-alias-design-r1` is terminally accepted in
+`9c6b8bb0b`. Its authenticated rules_rust 0.73.0 replay clears the Skylib
+package alias and reaches rules_cc toolchain registration row 8. Execution of
+`@@rules_cc+//cc/private/toolchain:lib_cc_configure.bzl` stops when the
+repository-rule implementation calls `Label(label)` because Slug installs only
+its repository-effect state as evaluator extra data.
 
 ## Learned facts and research basis
 
 Pinned Bazel 9.2.0 commit
 `8220c6198837d5c13d53fea211cf3282aa12408a` owns the category:
 
-- `PackageArgs.java` sends both `default_applicable_licenses` and
-  `default_package_metadata` through the same `LABEL_LIST` conversion and
-  `defaultPackageMetadata` builder field. It rejects canonical-label
-  duplicates using the supplied spelling and rejects both spellings together
-  with the fixed migration diagnostic.
-- `PackageCallable.java` exposes those package arguments only while evaluating
-  a BUILD file. `RepoFileGlobals.java` exposes the same `PackageArgs` through
-  REPO.bazel's distinct `repo()` call.
-- `RuleClass.java` names the stored common attribute `package_metadata` and its
-  alternate input spelling `applicable_licenses`.
-- `AttributeProvider.java` rewrites the alternate spelling before schema
-  lookup for rule instances, ignores `None` after checking that the canonical
-  schema exists, converts through the canonical attribute, and stores only the
-  canonical slot. If both spellings are supplied, ordered keyword traversal
-  makes the last non-`None` value win.
-- `BaseRuleClasses.java` gives ordinary native and Starlark rules the
-  nonconfigurable, no-configuration `package_metadata` label-list attribute,
-  whose computed default reads the package's `defaultPackageMetadata`.
-- `StarlarkRuleClassFunctions.java` removes `package_metadata` from dependency-
-  resolution and materializer base rules. Platform, constraint-setting and
-  constraint-value rule classes likewise remove it.
-- `MacroClass.java` checks user keywords against the macro schema before its
-  shared `AttributeProvider` population step. A macro that declares
-  `package_metadata` therefore still rejects `applicable_licenses`; the alias
-  is not a symbolic-macro input surface.
-- `RuleClass.isPackageMetadataRule` and `AttributeProvider` suppress the
-  package default for Starlark rules defined in the canonical repository named
-  `rules_license`, avoiding metadata self-edges.
-- `RuleClassTest.testPackageMetadataAlternateName` is the focused pinned-source
-  regression: alternate input is converted to a label and observed only under
-  the canonical slot. `StarlarkRuleClassFunctionsTest` proves the canonical
-  common attribute. The accepted Stage 4 package-license matrix already proves
-  package-default propagation for native, Starlark and config-setting rules.
+- `StarlarkRuleFunctionsApi.Label` documents that a string resolves in the
+  package containing the calling `.bzl` source file and that an existing Label
+  is returned unchanged.
+- `StarlarkRuleClassFunctions.label` deliberately stack-inspects the innermost
+  executing Starlark function, obtains that function's `BazelModuleContext`,
+  and calls `Label.parseWithPackageContext` with the module package and
+  repository mapping. Its source comment rejects binding resolution to the
+  module that exported or aliased the shared builtin.
+- `BazelModuleContext` stores one immutable label and repository mapping on
+  each loaded Starlark module. `ofInnermostBzlOrFail` selects the module of the
+  innermost executing Starlark function rather than the repository being
+  generated or the outer evaluator.
+- `RepositoryFetchFunction.fetch` invokes the retained repository-rule
+  callable directly with `Starlark.positionalOnlyCall`. It does not replace
+  the callable's defining module, so the ordinary Label stack rule applies
+  during repository fetching.
 
-Slug already owns one `PackageState.default_package_metadata` field as
-`Arc<[CanonicalLabel]>`, one canonical Starlark builtin schema declaration and
-one canonical native schema slot. Filegroup, alias, config_setting, test_suite,
-toolchain_type and toolchain own that native slot; constraint_setting,
-constraint_value and platform intentionally do not. Both BUILD `package()` and
-`native.package()` route through `package_global`, and rule labels already use
-the package recorder's canonical repository mapping.
+An isolated Bzlmod oracle run with pinned `bazel 9.2.0` defined a repository
+rule in `//defs:ext.bzl` and called an imported helper from
+`//helper:support.bzl` during repository generation. The generated evidence was
+exactly:
 
-Slug's REPO.bazel evaluator currently validates `repo()` call placement but
-deliberately discards all keyword values; its file is marked dormant until a
-root package-policy activation packet. This is not a lawful place to add one
-metadata exception.
+```text
+direct=@@//defs:direct_target
+helper=@@//helper:helper_target
+```
+
+This discriminates the defining function from both the generated repository
+and the outer repository-rule implementation. The checked-in recursive-BZL
+Label regression already proves the same direct-builtin-alias versus imported-
+function ownership rule and distinct module mappings during module loading.
+
+Slug already reacquires the defining `FrozenBzlModule` before every selected
+repository file effect. Its `BzlLoadManifest` contains the root and complete
+reachable source-name-to-`BzlModuleIdentity` closure; every identity includes
+the canonical package and already-selected repository mapping. Authentication
+then compares the reacquired exported repository-rule projection with the
+certificate call record before releasing its implementation callable.
+
+`BzlEvaluationContext::from_manifest` and `source_identity_for_call` already
+implement the accepted caller-source selection, imported-helper ownership,
+missing/ambiguous-source rejection and mapping lookup used by ordinary `.bzl`
+evaluation, macros and transitions. The gap is solely that
+`invoke_repository_rule` puts a different runtime-only invocation state in
+`Evaluator.extra`, and `BzlEvaluationContext::from_evaluator` cannot project a
+BZL context from it.
 
 ## Decision and compatibility classification
 
-Implement as **exact** within the named Bazel 9.2 loading slice:
+Implement as **exact** within the admitted Bazel 9.2 repository-file-effect
+slice:
 
-1. On one otherwise-admitted BUILD package declaration,
-   `default_applicable_licenses` is a true input alias for
-   `default_package_metadata` in both `package()` and `native.package()`.
-   String and `Label` members, package-relative and mapped labels, order,
-   duplicate rejection, explicit empty lists and type errors use the existing
-   canonical conversion path. Supplying both spellings with convertible values
-   fails with Bazel's pinned migration diagnostic before package-state
-   mutation.
-2. On admitted native and Starlark rule instances,
-   `applicable_licenses` resolves to `package_metadata` before schema lookup.
-   It is accepted only where that canonical slot exists, is coerced and
-   defaulted exactly as that slot, and is stored/query-visible only as
-   `package_metadata`.
-3. Explicit non-`None` canonical or alternate values override the package
-   default; an explicit empty list suppresses it. `None` is omission after the
-   canonical schema-existence check. If both spellings occur, the last
-   non-`None` value in BUILD keyword order wins.
-4. A rule class without `package_metadata` rejects the alternate spelling as a
-   missing canonical attribute. Symbolic macros continue to reject the
-   alternate spelling even when they declare canonical `package_metadata`.
+1. A string passed to the existing `Label()` global from a repository-rule
+   implementation resolves with the package and repository mapping of the
+   innermost executing `.bzl` function.
+2. A direct call in the implementation uses the implementation module. A call
+   inside an imported helper uses the helper's own module, including its own
+   package and mapping. Aliasing the shared builtin does not change this rule.
+3. Every label spelling already admitted by Slug's `.bzl` constructor keeps
+   its existing grammar and canonical result. Passing an existing Label stays
+   idempotent.
+4. Root and selected canonical external definition-module routes use the same
+   authenticated behavior. Missing or ambiguous caller provenance fails
+   closed before an effect plan is published.
 
-Keep **Slug-native** only the already-admitted Rust/starlark-rust diagnostic
-framing, source spans, evaluator layout, collision-safe canonical repository
-identity, and incidental query presentation outside the canonical attribute
-name and value. If both package spellings are present and either value is
-malformed, the relative type-error-versus-migration-error precedence is also
-Slug-native because the existing typed Rust binding does not retain keyword
-order.
+Keep **Slug-native** the flat recursive-manifest representation, native-call
+source accessor, Rust/starlark-rust evaluator-extra composition, diagnostics,
+source spans, effect-plan representation, collision-safe canonical repository
+identity and DICE equality/cutoff behavior.
 
 Keep **unsupported/deferred**:
 
-- more than one `package()`/`native.package()` call in a BUILD file and every
-  interaction that relies on Slug's currently broader call multiplicity;
-- REPO.bazel `repo()` package-argument retention, merge precedence and
-  propagation to repository packages;
-- the Bazel `rules_license` repository-name special case and metadata-rule
-  default self-edge suppression;
-- `applicable_licenses` on symbolic macros, repository rules, tag classes,
-  aspects or subrules; rule initializers and initializer-returned aliases;
-- dependency-resolution/materializer rules and native rule classes outside
-  Slug's admitted catalog;
-- configured metadata providers, license policy interpretation, action or
-  output identity, query/cquery/aquery semantics beyond the already-loaded
-  canonical attribute, and any Skylib/toolchain/ruleset special case; and
-- Java/HotSpot object identity, legacy toolchain resolution and exact
-  incidental diagnostics not named above.
+- new Label string grammar, fields or methods, BUILD aliases and calls outside
+  an executing `.bzl` function;
+- repository-rule declaration or attribute breadth not already admitted;
+- repository_ctx methods, host operations and return-value forms outside the
+  existing file/getenv subset;
+- non-Starlark/native repository-rule implementations, built-in native
+  repository rules and repository execution routes not selected by the
+  existing authenticated module-extension/innate-repository owner;
+- Bazel's Java `RepoMappingRecorder` object/event identity, evaluator or
+  HotSpot state, incidental diagnostic bytes and exact generated-repository
+  filesystem layout;
+- materialization, lockfile update, remote repository execution, configured
+  analysis/actions and any rules_cc, toolchain or repository-name special
+  case.
 
-The package and rule aliases are distinct inputs. Do not infer a second
-attribute named `applicable_licenses`, a license provider, or full applicable-
-license policy from this packet.
+This packet supplies context to an already-admitted pure constructor. It does
+not make labels filesystem inputs and does not authorize a new DICE compute
+from inside Starlark execution.
 
 ## Natural owner, identity and revision behavior
 
-`PackageRecorder::set_package_defaults` and its `PackageState` remain the sole
-producer and retained owner of package metadata defaults.
-`FrozenRuleDefinition::invoke` and `coerce_native_overrides` remain the sole
-Starlark/native rule-input owners and publish only the existing canonical
-attribute values. Add one small name-canonicalization helper shared where
-useful; do not retain the original alias spelling.
+`HostSelectedRepositoryFileEffectKey` remains the only semantic owner. It
+already depends on the selected owner certificate, definition source route,
+recursive frozen module, host inputs and platform, and it authenticates the
+reacquired definition before invocation. Pass that same module's manifest by
+borrow to `invoke_repository_rule`; never reconstruct an identity from the
+call record's defining label or the generated repository name.
 
-The BUILD source observation and package-load DICE key already own source
-bytes, BZL imports, repository mapping, evaluation success and the final
-`LoadedPackage`. An alias/canonical source edit invalidates through that same
-graph. Equivalent spellings may equality-cut off at the existing canonical
-loaded value; failures publish no partial package. Overlapping requests keep
-their existing immutable observations and transaction boundaries. No command
-overlay, host fallback or historical filesystem inference is added.
+Extend the existing runtime-only repository invocation state with one
+`BzlEvaluationContext::from_manifest` value. Keep the effect builder, dynamic
+environment names, invocation error and BZL context in this single evaluator
+extra object. Let `BzlEvaluationContext::from_evaluator` project the nested
+context just as it already does for transition and macro runtime wrappers.
+Repository_ctx methods continue to project the same outer invocation state.
 
-All retained memory is the existing DICE-retained `Arc<[CanonicalLabel]>` or
-canonical `AttributeValue`. Keyword maps and the supplied spelling are
-evaluation scratch and release when invocation returns. No new enum, string,
-map, interner, registry, cache, DICE key, lock, task, I/O or async-transfer
-memory is permitted. Cancellation, invalidation, eviction and shutdown remain
-those of the existing package-load graph.
+The manifest is already DICE-retained and compared as part of the reacquired
+`FrozenBzlModule`; the effect key already observes changes to source bytes,
+recursive loads, packages and mappings. The new context is evaluation scratch:
+it clones existing Arc-backed mapping/manifest identities for the duration of
+one synchronous invocation and is dropped before publication. Cancellation,
+retry, invalidation, eviction, shutdown and A/B/A restoration do not change.
+No lock is introduced or held across a DICE computation.
 
-This immediate canonicalization changes no retained data structure, hashing,
-compact collection, clone path or memory accounting, so the Buck2 hot-path
-utility skill is not triggered and Stage 9 gains no extraction row.
+Do not add a field to `RepositoryRuleDefinitionProjection`,
+`RepositoryRuleCallRecord`, `RepositoryRuleInvocationInput`, the selected owner
+certificate, `FrozenBzlModule`, any DICE key or any published effect. Do not add
+a map, interner, cache, registry, process global, I/O lookup or second label
+identity.
+
+The Buck2 utility-reuse audit selects the existing `Arc`-backed
+`BzlLoadManifest`, compact `BzlModuleIdentity` values, immutable repository
+mappings, `CompactString`, `SmallMap`, `Dupe` and `Allocative` owners. Because
+the change adds only invocation-scoped composition and changes no retained
+representation, Stage 9 gains no extraction row. The DICE ownership audit also
+accepts the existing key and dependency set unchanged.
 
 ## Evidence and proof
 
-Reuse the pinned-source regression and accepted Stage 4 package-metadata
-evidence rather than adding an oracle fixture. Add focused loading tests that
-prove:
+Reuse the pinned-source implementation, the isolated Bazel 9.2 discriminator
+above and the accepted recursive-BZL Label/mapping regression. Add focused Rust
+proof that:
 
-- `package()` and `native.package()` accept the alternate default spelling,
-  including String/`Label`, relative-label, explicit-empty and canonical-
-  duplicate cases;
-- both package spellings together produce the pinned diagnostic before any
-  target/package publication;
-- canonical and alternate package spellings produce equal canonical loaded
-  defaults and equivalent rule projection;
-- admitted native and Starlark rules accept `applicable_licenses`, publish only
-  `package_metadata`, override defaults, distinguish explicit empty, treat
-  `None` as omission, and preserve last-non-`None` behavior when both spellings
-  are present;
-- constraint_setting, constraint_value and platform reject through the absent
-  canonical slot, while symbolic macros keep their pre-provider rejection;
-- ordinary canonical `default_package_metadata` and `package_metadata`
-  behavior remains unchanged; and
-- the rebuilt authentic rules_rust replay clears the Skylib package argument
-  and selects only the next independent generic boundary.
+- repository invocation writes canonical results for a direct Label call and
+  a call inside an imported helper from a different package;
+- direct and helper modules can carry different apparent-to-canonical mappings
+  and each call selects its own mapping;
+- a direct builtin alias resolves against the calling function rather than the
+  builtin exporter;
+- an existing Label is unchanged;
+- missing and ambiguous source provenance reject without publishing an effect;
+- ordinary repository_ctx file/getenv behavior and its invocation-state access
+  remain unchanged; and
+- the rebuilt authentic rules_rust replay clears the rules_cc Label stop and
+  selects only the next independent generic boundary.
 
-`RuleClassTest.testPackageMetadataAlternateName` is adapted as a Rust loading
-regression. The configured proto-output and materializer tests are skipped
-because those phases/rule families remain unsupported. The accepted package-
-license oracle is stronger than adding another fixture for default propagation.
+The imported-helper test is the integration discriminator. A source-shape
+assertion alone is insufficient. No checked-in Bazel fixture is needed because
+the isolated oracle is complete for caller-package selection and the existing
+accepted mapping evidence covers the unchanged resolver.
 
 ## Allowlist, caps and complexity
 
 Production Rust may change only:
 
-- `app/slug_loading_v2/src/package.rs`.
+- `app/slug_loading_v2/src/provider.rs`;
+- `app/slug_loading_v2/src/repository_rule_context.rs`; and
+- `app/slug_loading_v2/src/module_extension_repository_file_effect.rs`.
 
 Proof Rust may change only:
 
-- `app/slug_loading_v2/tests/build_file_loading.rs`.
+- the `#[cfg(test)]` modules in those same files.
 
-Scheduling records may change only the canonical plan, Stage 4 owner and this
-manifest. Do not change Stage 9, oracle fixtures, Bazel/Skylib sources, query
-production, Bzlmod production or Cargo metadata.
+Scheduling records may change only the canonical plan, Stage 4 owner, Stage 5
+owner and this manifest. Do not change repository-rule definition/call
+projections, BZL manifest representation, DICE keys, oracle fixtures,
+Bazel/rules_cc sources, Cargo metadata or vendored starlark-rust.
 
-Caps are 90 gross added production Rust lines, 230 proof lines and 320 total.
-No new function may exceed 100 lines, and no existing function may grow by
-more than 20 lines.
+Caps are 55 gross added production Rust lines, 150 proof lines and 205 total.
+No new function may exceed 80 lines and no existing function may grow by more
+than 15 lines.
 
-`package.rs` is above the 2,000-line trigger and contains large rule/native
-invocation functions. It nevertheless remains the cohesive owner because the
-alias must disappear at the existing package, Starlark-rule and native-rule
-ingress sites before any semantic value is built. Use small helpers and do not
-move unrelated declarations or create a second attribute-normalization module.
-The test file is also large; extend the existing package-metadata/direct-label
-test neighborhood rather than creating new harness or fixture machinery. No
-benchmark is required because retained representation and configured hot paths
-do not change.
+All three production files exceed the 2,000-line trigger. They remain the
+cohesive owners because this is one narrow handoff between the existing BZL
+context projector, repository invocation runtime state and authenticated
+effect caller. Do not move unrelated declarations or create another context
+module. Keep the imported-helper proof in one focused test and reuse existing
+test helpers where possible. No benchmark is required because retained state
+and the configured hot path do not change.
 
 ## Validation and stops
 
 Run serially:
 
-- focused package-default, native-rule, Starlark-rule, absent-schema and macro-
-  rejection tests;
-- `cargo test -p slug_loading_v2 --test build_file_loading -q`;
+- focused direct/imported repository Label context, mapping, idempotence and
+  fail-closed tests;
 - `cargo test -p slug_loading_v2 --lib -q` and every loading integration test;
 - `cargo test -p slug_bzlmod_v2 --lib -q`;
 - `cargo test -p slug_query_v2 --lib -q`;
@@ -230,42 +221,23 @@ Run serially:
 
 Return `REPLAN` before or during Rust if:
 
-- either alias survives in `PackageState`, `RuleAttributeSchema`,
-  `NativeRuleAttributes`, `LoadedPackage`, DICE identity or query output;
-- a second metadata field/slot, source-spelling bit, registry, cache, DICE key,
-  lock, fallback, parser, label converter or consumer special case appears;
-- REPO.bazel keyword retention, repeated-package-call enforcement,
-  rules_license self-edge suppression, macro alias acceptance, rule
-  initializers, materializers or configured license semantics become necessary;
-- alias handling changes canonical attribute ordering, dependency edges,
-  repository mapping, existing package defaults or unrelated `None` policy;
+- the defining identity or mapping is reconstructed from only the repository-
+  rule projection, call site, generated repository or current workspace;
+- any retained definition, call, certificate, manifest, key or effect shape
+  changes;
+- caller selection differs from the innermost executing Starlark function or
+  an imported helper cannot retain its own module mapping;
+- repository execution performs I/O, a DICE compute or a lock acquisition to
+  resolve Label;
+- a second evaluator-extra channel, source-name parser, label resolver, map,
+  cache, registry, interner, process global or special-case branch appears;
+- wider repository_ctx, repository-rule, Label, materialization, lockfile,
+  configured or ruleset behavior becomes necessary;
 - a new oracle fixture is necessary without a docs-first provenance decision;
   or
 - the file allowlist, growth caps or bounded large-file decision is exceeded.
 
-## Accepted implementation outcome
-
-Terminal rereview returns `ACCEPT`. Both BUILD package facades canonicalize the
-default alias before `PackageState`; native and Starlark rule calls canonicalize
-the rule alias before schema lookup and retain only the existing
-`package_metadata` slot. Explicit empty, omitted/`None`, last-non-`None`, absent
-native schema and symbolic-macro rejection behavior match the bounded contract.
-No alias spelling reaches package, target, DICE or query identity.
-
-The candidate closes at 66 gross added and 23 removed production Rust lines,
-214 proof lines and 280 gross additions total. No new function exceeds 100
-lines and no existing function grows beyond the packet cap. Focused proof
-passes 2/2; loading passes 512 active library units plus one ignored and every
-integration target (51/29/8/6/2/1/5/1). Bzlmod passes 596/596 and query-library
-passes 55/55. CLI rebuild, formatting, diff, process hygiene and archive checks
-pass with only the three unchanged accepted thoughts-path archive exceptions.
-
-The authenticated rules_rust 0.73.0 replay clears the Skylib package alias and
-advances through repository discovery to rules_cc toolchain registration row
-8. It stops while executing
-`@@rules_cc+//cc/private/toolchain:lib_cc_configure.bzl`, where a repository-rule
-implementation calls `Label(label)` and Slug reports that `Label()` may only be
-called in a `.bzl` module. Select docs-only
-`WP-4-7A-repository-rule-label-constructor-context-audit` next. Audit the
-complete Bazel 9.2 defining-module label/repository-mapping context for `Label()`
-during repository-rule execution; add no rules_cc or toolchain special case.
+Audit and architecture result: `ACCEPT`. The natural owner has the complete
+manifest at invocation time, the existing caller-aware resolver matches the
+Bazel stack rule, and runtime-only context composition is bounded. Rust may
+begin under this contract.
