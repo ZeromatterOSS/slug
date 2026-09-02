@@ -43,14 +43,26 @@ authentic rules_rust replay now reaches verbatim Bazel-tools `git.bzl` and
 rejects `build_file = attr.label(allow_single_file = True)` because the
 repository-rule boundary drops the already accepted general file-admissibility
 schema. Select
-`WP-4-5-7A-repository-rule-file-admissibility-category-implementation-r1`:
+`WP-4-5-7A-repository-rule-file-admissibility-category-implementation-r2`:
 retain the existing compact policy through all five label-bearing repository
 attribute constructors and frozen/DICE identity. Review the retained boundary
 before Rust; add no target/file resolution, private-attribute, ruleset, C++,
 parser or consumer special case.
 
 Independent retained-representation review returns `ACCEPT`; implementation is
-active only within the frozen file-policy packet.
+terminally accepted after focused proof-allowlist correction and implementation
+rereviews returned `ACCEPT`; integration commit is pending.
+The R2 correction adds only the existing cross-surface loading test whose two
+stale assertions still require repository rules to reject `allow_files`; it
+changes no semantic decision, production owner, cap or adjacent deferred
+boundary.
+
+The implementation carries the existing compact policy into frozen
+repository-definition/call/DICE identity, passes complete loading and query
+validation, and clears the authentic Bazel-tools `build_file` terminal. The
+replay next stops at rules_rust's generic apparent-repository label default
+`@rust_host_tools`; audit that complete label-normalization category after the
+integration commit, without a ruleset or C++ special case.
 
 Commit `20bbe8661` terminally accepts
 `WP-6-7A-default-exec-configured-label-dependency-implementation-r2`. The

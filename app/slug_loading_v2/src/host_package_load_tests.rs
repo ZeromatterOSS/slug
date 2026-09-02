@@ -32887,8 +32887,8 @@ rust_toolchain = rule(implementation = _impl, attrs = {
         owner.clone(),
     )
     .unwrap();
-    assert!(eval_bzl_with_identity("def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.label(allow_files = True)})", owner.clone()).is_err());
-    assert!(eval_bzl_with_identity("def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.label(allow_files = ['.rs'])})", owner.clone()).is_err());
+    eval_bzl_with_identity("def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.label(allow_files = True)})", owner.clone()).unwrap();
+    eval_bzl_with_identity("def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.label(allow_files = ['.rs'])})", owner.clone()).unwrap();
     assert!(eval_bzl_with_identity("def impl(target, ctx): return []\nX = aspect(implementation = impl, attrs = {'_x': attr.label(allow_files = ['.rs'])})", owner.clone()).is_err());
     assert!(
         eval_bzl_with_identity(

@@ -4252,6 +4252,17 @@ path/read/symlink use to later repository-context capability packets. Review
 the retained representation before implementation; no Bzlmod owner, RepoSpec,
 mapping, generated repository or materializer semantics move.
 
+The pre-Rust R2 correction changes no Bzlmod or repository owner. It adds only
+the existing cross-surface loading test file whose two stale assertions still
+require repository rules to reject `allow_files`; focused rereview must accept
+that proof-allowlist correction before Rust begins. Focused rereview returns
+`ACCEPT`; implementation may proceed without changing any Bzlmod owner.
+
+Implementation and terminal review return `ACCEPT` with no Bzlmod, RepoSpec,
+mapping, materializer or generated-repository change. The authentic replay
+advances to an ordinary apparent-repository label-default normalization error,
+which is a separate loading/parser-consumer audit rather than a Bzlmod repair.
+
 Independent review returns `ACCEPT`; implementation may retain only the
 existing file policy in frozen definition identity. Actual path/file semantics
 and every Bzlmod owner remain unchanged.

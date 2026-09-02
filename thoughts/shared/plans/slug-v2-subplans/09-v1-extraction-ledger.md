@@ -2463,7 +2463,7 @@ only, while Bazel 9.2 owns the exact namespace and sibling visibility behavior.
 
 ### Stage 4/5 repository-rule file-admissibility utility decision (2026-09-01)
 
-`WP-4-5-7A-repository-rule-file-admissibility-category-implementation-r1`
+`WP-4-5-7A-repository-rule-file-admissibility-category-implementation-r2`
 requires no V1 or Buck2 extraction. Reuse the already adopted V2
 `FileAdmissibility` value: a small enum containing NoFiles, AnyFile or one
 immutable ordered `Arc<[CompactString]>` suffix slice plus an independent
@@ -2480,3 +2480,13 @@ decision before Rust.
 Independent review returns `ACCEPT`; the no-extraction decision is final for
 this packet. Preserve Arc sharing within one frozen definition/call cohort, but
 do not assert pointer identity across separately evaluated declarations.
+
+R2 adds one existing cross-surface proof module solely to update two stale
+repository-rule `allow_files` rejection expectations. It adds no retained
+state, utility, extraction candidate or production owner; focused correction
+rereview returns `ACCEPT` before Rust begins.
+
+Implementation and terminal review return `ACCEPT`. The existing
+`FileAdmissibility`, `Arc<[RepositoryRuleAttribute]>`, `CompactString` and
+`Allocative` owners are sufficient; no V1/Buck2 extraction, copied suffix
+storage, collection, cache or interner was added.

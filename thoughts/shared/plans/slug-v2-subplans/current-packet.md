@@ -1,14 +1,16 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-5-7A-repository-rule-file-admissibility-category-implementation-r1
+Packet: WP-4-5-7A-repository-rule-file-admissibility-category-implementation-r2
 
 Milestone: M7A bootstrap-critical generic Starlark/repository loading. Preserve
 the complete Bazel 9.2 repository-rule file-admissibility declaration category
 through the existing frozen definition and invocation owners.
 
-Status: architecture accepted; implementation active. Independent review
-returned `ACCEPT` on 2026-09-01 for the retained owner, no-resolution phase,
-compact identity, proof matrix, bounds and deferred adjacent policies.
+Status: terminally accepted; integration commit pending. Independent R1 review returned `ACCEPT` on 2026-09-01
+for the retained owner, no-resolution phase, compact identity, proof matrix,
+bounds and deferred adjacent policies. Focused R2 rereview accepted the
+proof-only allowlist correction; R2 changes no semantic decision or production
+boundary.
 
 The immediate predecessor
 `WP-4-5-6-7A-root-repository-load-route-publication-replan-r1` is terminally
@@ -23,6 +25,14 @@ The unrelated dirty
 at SHA-256
 `36c937d49369ac57e51defe2b17d4a53636a815ec0b2d407f7bd1a664c4d816a`.
 Do not edit or stage it.
+
+A pre-Rust contract audit found one stale accepted cross-surface assertion in
+`host_package_load_tests.rs`: the complete integer/string/provider policy test
+still requires repository rules to reject `attr.label(allow_files = ...)`.
+That expectation must become success when this packet admits the same schema,
+but R1 omitted the file from its proof allowlist. R2 adds only that existing
+test module for the two mechanical expectation changes; it does not admit any
+host-package behavior, expand production, or change the proof/cap totals.
 
 ## Learned facts and source basis
 
@@ -188,7 +198,9 @@ Proof/mechanical constructor updates may change only:
 - `app/slug_loading_v2/src/module_extension.rs` for the existing DICE
   repository-declaration A/B/A owner;
 - `app/slug_loading_v2/src/module_extension_repository_instantiation.rs`; and
-- `app/slug_loading_v2/src/repository_rule_context.rs`.
+- `app/slug_loading_v2/src/repository_rule_context.rs`; and
+- only for the two stale repository-rule `allow_files` rejection expectations,
+  `app/slug_loading_v2/src/host_package_load_tests.rs`.
 
 Scheduling records may change only the canonical plan, owner plans 04/05,
 Stage 9 and this manifest. Caps are 180 gross added production Rust lines, 420
@@ -235,7 +247,7 @@ the frozen repository definition is the natural complete category, that Bazel
 does not require file resolution in this phase, and that every adjacent policy
 is honestly deferred before Rust begins.
 
-Independent review returns `ACCEPT`. The packet preserves Bazel 9.2's complete
+Independent R1 review returns `ACCEPT`. The packet preserves Bazel 9.2's complete
 file-policy schema at its natural frozen repository-definition owner across all
 five label-bearing constructors; `RepoRule.instantiate` needs no file
 resolution. Structural identity, DICE A/B/A invalidation, Arc-backed lifetime,
@@ -243,3 +255,22 @@ proof, caps, stops and adjacent deferrals are complete. Residual implementation
 risk is mechanical propagation through every test constructor and proving Arc
 reuse only within one frozen definition/call cohort, never across separately
 evaluated declarations.
+
+Focused R2 rereview returns `ACCEPT`: changing exactly the two stale
+cross-surface assertions from rejection to declaration success is required by
+the already accepted category, while neighboring aspect, tag, provider and
+allowed-value rejections remain unchanged. Residual correction risk is only
+mechanical weakening beyond those two assertions.
+
+Implementation and terminal review return `ACCEPT`. One existing
+`FileAdmissibility` field now survives the repository-rule filter and resides
+in frozen definition, call-record and DICE structural identity; the existing
+`SingleArtifact` property bit is admitted consistently. Focused repository
+definition (9), DICE A/B/A (1), stale cross-surface (1), complete loading
+(504 passed, 1 ignored), query (55) and CLI build gates pass. Formatting and
+diff hygiene pass, the parked proof hash is unchanged, and no daemon remains.
+The archive checker reports only its pre-existing committed-thoughts allowlist
+failure on three untouched files. The authentic rules_rust replay clears
+`build_file` and next stops at the independent generic apparent-label default
+`@rust_host_tools`. Residual risk is confined to later repository-context
+consumers applying the retained policy at first file use.

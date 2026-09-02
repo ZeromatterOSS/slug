@@ -3067,16 +3067,16 @@ mod tests {
     async fn repository_rule_declaration_metadata_reloads_and_restores_a_b_a() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
-        let source = |local: bool, configure: bool, environment: &str| {
+        let source = |local: bool, configure: bool, environment: &str, policy: &str| {
             format!(
-                "repo=repository_rule(lambda ctx: None, local={local}, configure={configure}, environ={environment})\n\
+                "repo=repository_rule(lambda ctx: None, attrs={{'build_file':attr.label({policy})}}, local={local}, configure={configure}, environ={environment})\n\
                  def impl(ctx):\n    repo(name='generated')\n\
                  ext=module_extension(implementation=impl)\n",
                 local = if local { "True" } else { "False" },
                 configure = if configure { "True" } else { "False" },
             )
         };
-        let a_source = source(true, true, "['B','A','B']");
+        let a_source = source(true, true, "['B','A','B']", "allow_single_file=True");
         let a = compute_repository_rule_case(&dice, module, &a_source, true, None).await;
         let warm = compute_repository_rule_case(&dice, module, &a_source, true, None).await;
         assert!(HostPureModuleExtensionInvocationsKey::equality(&a, &warm));
@@ -3087,6 +3087,12 @@ mod tests {
             &a_value.as_ref().as_ref().unwrap().invoked[0].repository_rule_calls[0].definition;
         assert!(definition.local);
         assert!(definition.configure);
+        assert!(definition.attributes[0].file_admissibility.is_any_file());
+        assert!(
+            definition.attributes[0]
+                .file_admissibility
+                .single_artifact()
+        );
         assert_eq!(
             definition
                 .environment
@@ -3097,9 +3103,12 @@ mod tests {
         );
 
         for changed_source in [
-            source(false, true, "['B','A']"),
-            source(true, false, "['B','A']"),
-            source(true, true, "['B','C']"),
+            source(false, true, "['B','A']", "allow_single_file=True"),
+            source(true, false, "['B','A']", "allow_single_file=True"),
+            source(true, true, "['B','C']", "allow_single_file=True"),
+            source(true, true, "['B','A']", "allow_single_file=False"),
+            source(true, true, "['B','A']", "allow_files=['.b','.a']"),
+            source(true, true, "['B','A']", "allow_files=['.a','.b']"),
         ] {
             let changed =
                 compute_repository_rule_case(&dice, module, &changed_source, true, None).await;

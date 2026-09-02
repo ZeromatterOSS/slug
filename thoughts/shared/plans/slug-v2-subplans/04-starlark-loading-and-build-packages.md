@@ -7694,7 +7694,7 @@ rejects `build_file = attr.label(allow_single_file = True)` after the general
 attr constructor has already produced the correct compact policy.
 
 Select
-`WP-4-5-7A-repository-rule-file-admissibility-category-implementation-r1`.
+`WP-4-5-7A-repository-rule-file-admissibility-category-implementation-r2`.
 Retain the existing `FileAdmissibility` value through the frozen repository
 definition for all five label-bearing constructors; do not add a second parser,
 target/file resolution, repository effect, private-attribute name semantics or
@@ -7705,3 +7705,15 @@ lesson. Independent retained-representation review is required before Rust.
 Independent review returns `ACCEPT`; the existing compact policy, frozen
 repository-definition owner, no-resolution phase and proof/cap boundary are
 accepted. Implementation is active only within the current packet.
+
+The pre-Rust R2 correction adds only
+`host_package_load_tests.rs` for two stale repository-rule `allow_files`
+rejection expectations discovered after R1 review. Focused correction rereview
+returns `ACCEPT`; the retained owner, no-resolution phase, production
+allowlist, caps and all neighboring rejection boundaries remain unchanged.
+
+Implementation and independent terminal review return `ACCEPT`. The existing
+compact policy now participates in frozen repository-definition, repeated-call
+and DICE identity across the complete admitted category; complete loading and
+query validation pass. The authentic replay clears Bazel-tools `build_file`
+and selects the separate generic `@rust_host_tools` label-default boundary.

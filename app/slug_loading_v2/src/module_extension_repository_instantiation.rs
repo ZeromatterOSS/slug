@@ -1054,6 +1054,7 @@ pub(crate) mod tests {
             kind,
             mandatory,
             default,
+            file_admissibility: crate::attrs::FileAdmissibility::default(),
         }
     }
 

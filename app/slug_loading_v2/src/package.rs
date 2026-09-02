@@ -8217,12 +8217,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 || definition.transition.is_some()
                 || definition.executable
                 || definition.exec_configuration
-                || !definition.file_admissibility.is_no_files()
-                || definition.file_admissibility.single_artifact()
                 || definition.flags.has_any_except(&[
                     AttributePropertyFlag::StarlarkDefined,
                     AttributePropertyFlag::StrictLabelChecking,
                     AttributePropertyFlag::Mandatory,
+                    AttributePropertyFlag::SingleArtifact,
                 ])
                 || definition.rule_class_admissibility.classes().is_some()
                 || !definition.required_providers.is_empty()
@@ -8239,6 +8238,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 kind: definition.kind,
                 mandatory: definition.mandatory,
                 default: definition.default.clone(),
+                file_admissibility: definition.file_admissibility.clone(),
             });
         }
         Ok(RepositoryRuleDefinition::new(

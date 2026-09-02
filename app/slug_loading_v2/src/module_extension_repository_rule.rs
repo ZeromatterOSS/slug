@@ -36,6 +36,7 @@ use starlark_map::small_set::SmallSet;
 
 use crate::attrs::AttributeKind;
 use crate::attrs::CoercedAttributeValue;
+use crate::attrs::FileAdmissibility;
 use crate::starlark_label::StarlarkLabel;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -44,6 +45,7 @@ pub(crate) struct RepositoryRuleAttribute {
     pub(crate) kind: AttributeKind,
     pub(crate) mandatory: bool,
     pub(crate) default: Option<CoercedAttributeValue>,
+    pub(crate) file_admissibility: FileAdmissibility,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -847,6 +849,101 @@ _repo = repository_rule(
     }
 
     #[test]
+    fn file_admissibility_category_survives_freeze_export_and_repeated_calls() {
+        let loaded = load(
+            r#"
+def impl(ctx): fail("repository implementation must stay inert")
+r = repository_rule(impl, attrs = {
+    "omitted": attr.label(),
+    "none": attr.label(allow_files = None),
+    "any": attr.label(allow_files = True),
+    "false": attr.label(allow_files = False),
+    "ordered": attr.label(allow_files = [".a", ".a", ""]),
+    "tuple": attr.label(allow_files = (".b", ".a")),
+    "empty": attr.label(allow_files = []),
+    "build_file": attr.label(allow_single_file = True),
+    "single_false": attr.label(allow_single_file = False),
+    "single_empty": attr.label(allow_single_file = ()),
+    "list": attr.label_list(allow_files = (".list",)),
+    "string_keyed": attr.string_keyed_label_dict(allow_files = True),
+    "label_keyed": attr.label_keyed_string_dict(allow_files = False),
+    "list_dict": attr.label_list_dict(allow_files = []),
+})
+def run():
+    r(name = "one", build_file = "//:BUILD")
+    r(name = "two")
+"#,
+        )
+        .unwrap();
+        let full_projection = projection(&loaded, "r");
+        let policy = |name: &str| {
+            full_projection
+                .attributes
+                .iter()
+                .find(|attribute| attribute.name == name)
+                .unwrap()
+                .file_admissibility
+                .clone()
+        };
+        assert!(policy("omitted").is_no_files());
+        assert!(policy("none").is_no_files());
+        assert!(policy("any").is_any_file());
+        assert!(policy("false").is_no_files());
+        assert_eq!(
+            policy("ordered")
+                .suffixes()
+                .unwrap()
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            [".a", ".a", ""]
+        );
+        assert_eq!(
+            policy("tuple")
+                .suffixes()
+                .unwrap()
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            [".b", ".a"]
+        );
+        assert_eq!(policy("empty").suffixes(), Some([].as_slice()));
+        assert!(policy("build_file").is_any_file());
+        assert!(policy("build_file").single_artifact());
+        assert!(policy("single_false").is_no_files());
+        assert!(policy("single_false").single_artifact());
+        assert_eq!(policy("single_empty").suffixes(), Some([].as_slice()));
+        assert!(policy("single_empty").single_artifact());
+        assert_eq!(policy("list").suffixes(), Some([".list".into()].as_slice()));
+        assert!(policy("string_keyed").is_any_file());
+        assert!(policy("label_keyed").is_no_files());
+        assert_eq!(policy("list_dict").suffixes(), Some([].as_slice()));
+
+        let (result, calls) = invoke(&loaded, "run", |_| Vec::new());
+        assert_eq!(result.unwrap(), "None");
+        assert_eq!(calls.len(), 2);
+        assert!(Arc::ptr_eq(
+            &calls[0].definition.attributes,
+            &calls[1].definition.attributes
+        ));
+        assert!(Arc::ptr_eq(
+            &full_projection.attributes,
+            &calls[0].definition.attributes
+        ));
+        assert!(matches!(
+            &calls[0].kwargs[1],
+            (name, RepositoryRuleCallValue::String(value))
+                if name == "build_file" && value == "//:BUILD"
+        ));
+
+        let reordered = projection(
+            &load("def impl(ctx): pass\nr=repository_rule(impl, attrs={'ordered':attr.label(allow_files=['', '.a', '.a'])})\n").unwrap(),
+            "r",
+        );
+        assert_ne!(full_projection.attributes, reordered.attributes);
+    }
+
+    #[test]
     fn definition_surface_accepts_metadata_and_rejects_deferred_families() {
         for source in [
             "def impl(ctx): pass\nr=repository_rule(impl)\n",
@@ -924,8 +1021,12 @@ _repo = repository_rule(
                 "unsupported repository_rule attribute schema",
             ),
             (
-                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'x':attr.label(allow_single_file=True)})\n",
-                "unsupported repository_rule attribute schema",
+                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'x':attr.label(allow_files=True, allow_single_file=[])})\n",
+                "allow_files and allow_single_file",
+            ),
+            (
+                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'x':attr.label_list(allow_files=1)})\n",
+                "allow_files",
             ),
         ] {
             let error = load(source).unwrap_err();
