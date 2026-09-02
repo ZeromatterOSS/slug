@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[Correct the complete package-context label-string category](./slug-v2-subplans/current-packet.md).
+[Route BUILD globs through repository-source directory owners](./slug-v2-subplans/current-packet.md).
 
 Commit `95b4f0da6` terminally accepts the complete repository-rule
 file-admissibility category. The existing compact policy now survives frozen
@@ -95,6 +95,20 @@ separate generic built-in-catalog `glob()` boundary in
 `@@bazel_tools//tools/res`. Audit that complete Host/catalog glob category next;
 do not add a `tools/res`, rules_rust, rules_cc, `cc_common` or `cc_internal`
 special case.
+
+Select docs-first
+`WP-4-5-7A-repository-source-glob-routing-category-implementation-r1`.
+Preserve the accepted single BUILD-glob parser, traversal and final projection;
+route built-in catalog segments through the existing canonical-repository
+directory-listing key and both external source kinds through the existing
+package-boundary key. Host path/symlink observations remain unchanged. Add no
+catalog copy, materialization, new DICE key, fallback scan, ruleset, toolchain,
+C++, `cc_common` or `cc_internal` branch. Independent DICE/ownership review
+must accept source-scope identity, platform behavior, proof and bounds before
+Rust begins.
+Initial review corrected integrated catalog-boundary proof, component lifting
+and one overbroad equivalence claim; focused rereview returns `ACCEPT`. Rust is
+authorized only within the corrected packet.
 
 Commit `20bbe8661` terminally accepts
 `WP-6-7A-default-exec-configured-label-dependency-implementation-r2`. The

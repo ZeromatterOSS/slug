@@ -22986,3 +22986,14 @@ rules layer, including `cc_internal`; `cc_common` is only a generic host-ABI
 consumer. Zabel `0795445f...` supplies composed-source ownership guidance, not
 behavior or code. Independent Sol review returns `ACCEPT`; implementation is
 active only within the frozen shared-route packet.
+
+### Repository-source glob route unblocks built-in registrations (2026-09-01)
+
+The accepted package-context label category reaches the next generic loading
+boundary at verbatim `@@bazel_tools//tools/res:BUILD`. The selected packet is
+not registration, toolchain, rules_rust, rules_cc, C++, `cc_common` or
+`cc_internal` work. It routes built-in catalog directory facts through the
+already-accepted BUILD glob traversal and package-boundary owners. A fresh
+authentic registration/rules_rust replay must clear this package and stop at
+the next honest generic boundary; configured registration and toolchain owners
+remain unchanged.

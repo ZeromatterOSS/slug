@@ -1,20 +1,17 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-5-7A-package-context-label-string-category-design-r4
+Packet: WP-4-5-7A-repository-source-glob-routing-category-implementation-r1
 
 Milestone: M7A bootstrap-critical generic Starlark/loading and repository
-closure. Converge every currently admitted package-context dependency-label
-string consumer on one Bazel 9.2 grammar and typed canonical projection.
+closure. Make every admitted repository package source kind feed the same
+Bazel 9.2 BUILD `glob()` evaluator through its natural directory-fact owner.
 
-Status: terminal R4 implementation review returns `ACCEPT`. The five ordinary
-repository dependency-label shapes use the extension evaluation package while
-repository outputs retain the definition package and pre-packet parser. R4
-closes R3's final output-context miss without changing the shared parser,
-retained identity or compatibility boundary. R1/R2/R3 already settled innate
-ownership, `@//`/`@@//`, collision projection, complete consumer inventory,
-BUILD/tag output non-widening and the BUILD proof allowlist. The predecessor
-repository-rule file-admissibility category remains terminally accepted in
-`95b4f0da6`.
+Status: initial DICE/ownership review returned `REVISE` on integrated catalog-
+boundary and fail-closed projection proof plus one overbroad equivalence claim.
+The corrected contract requires those discriminators and narrows the claim;
+focused rereview returns `ACCEPT`. Rust is authorized only within this packet.
+The predecessor complete package-context dependency-label category is
+terminally accepted in `5f9f9a98a`.
 
 The unrelated dirty
 `app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
@@ -22,305 +19,219 @@ at SHA-256
 `36c937d49369ac57e51defe2b17d4a53636a815ec0b2d407f7bd1a664c4d816a`.
 Do not edit or stage it.
 
-## Trigger and source basis
+## Trigger and learned facts
 
-The rebuilt authentic rules_rust 0.73 replay clears verbatim Bazel-tools
-`build_file = attr.label(allow_single_file = True)` and next stops in
-`crate_universe/extensions.bzl` at the ordinary descriptor default
-`attr.label(default = "@rust_host_tools")`: Slug reports that an apparent
-repository Label has no package separator. The authenticated archive integrity
-is `sha256-LQyLlnthnVcXvoIQ9SokxapiTjIpo43EBxcS2x3VIvI=`. The source later
-passes the typed value to `module_ctx.path`; this packet owns only label
-construction, not that later path capability.
+The fresh authenticated rules_rust 0.73 replay clears the package-context
+label category and stops while loading verbatim
+`@@bazel_tools//tools/res:BUILD`: both `glob(["**"])` and `glob(["*.bzl"])`
+reach `RepositoryPackageLoadErrorInner::GlobUnsupported`. This is not a
+rules_rust, rules_cc, C++, `cc_common`, `cc_internal` or `tools/res` semantic
+gap. `RepositoryPackageSourceAddress::Host` already enters the complete Host
+glob attempt driver; `BuiltinCatalog` evaluates once with an empty prepared
+request map and turns the first pending request into that unsupported error.
 
-Pinned Bazel 9.2 is the semantic authority:
+The complete recursive BUILD-glob category is already exact and accepted in
+`cfe83834d`. Reuse its pinned Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` and source/test basis:
 
-- `LabelParser.Parts.parse` owns one complete lexical table, including bare and
-  colon-prefixed same-package targets, colon-free absolute target inference,
-  apparent and canonical full forms, and repository-only `@repo`/`@@repo`
-  shorthand normalized as `@repo//:repo`/`@@repo//:repo`;
-- `Label.parseWithPackageContext` applies the current package and repository,
-  maps apparent names, bypasses mapping for canonical names, and keeps
-  unqualified absolute `//conditions` and `//visibility` in the main
-  repository;
-- `LabelConverter.forBzlEvaluatingThread`, `BuildType.LABEL.convert`,
-  `StarlarkAttrModule` and the `Label()` implementation use the innermost
-  executing `.bzl` package context; typed Label values pass through unchanged;
-- `StarlarkBazelModule`/`TypeCheckedTag` use the calling module's root package
-  and selected mapping for explicit module-extension tag values; and
-- `RepoRule.instantiate` receives a caller-specific converter while descriptor
-  defaults were already converted in the defining `.bzl` context: ordinary
-  module extensions use their evaluation base/full generated-repository
-  namespace, whereas `InnateRunnableExtension` uses the repository-rule `.bzl`
-  package plus the calling module's mapping; and
-- `BuildType.LabelKeyedDictType` rejects distinct raw dictionary keys that
-  convert to the same Label instead of silently overwriting or retaining both.
+- `StarlarkNativeModuleApi.java`, `StarlarkNativeModule.java`,
+  `GlobberUtils.java` and `BuildLanguageOptions.java` own the callable,
+  include/exclude and empty-result contract;
+- `GlobComputationProducer.java`, `FragmentProducer.java`,
+  `DirectoryDirentProducer.java`, `GlobFunctionWithMultipleRecursiveFunctions.java`,
+  `GlobValue.java`, `GlobsValue.java`, `GlobCache.java`, `UnixGlob.java`,
+  `PackageLookupFunction.java` and `IgnoredSubdirectoriesFunction.java` own
+  traversal, directory membership and package/ignore boundaries; and
+- `GlobTestBase`, `GlobCacheTest`, `GlobTest`, `PackageFunctionTest` and the
+  existing `glob-package-boundaries`, `glob-callable-contract`,
+  `glob-directory-invalidation` and `glob-raw-name-pattern-lazy` fixtures
+  discriminate the admitted behavior. No new oracle or fixture is needed.
 
-The existing Bazel `LabelParserTest`, `LabelTest`, strict-visibility Label tests
-and `@@repo` Args regression discriminate shorthand, target inference, apparent
-mapping, canonical bypass, special main packages and context ownership. Reuse
-those pinned-source regressions; add no Java helper or production artifact.
+Pinned Bazel packaging and Slug's verbatim catalog supply the source facts.
+`src/create_embedded_tools.py` defines embedded path selection; the catalog
+pins `tools/res/BUILD` at
+`bef477365d864eab46fcfe73c635bafd11a7300e4e47c158abe20d269e07e8ac`,
+its three `.bzl` children, and the recursive `src/tools/launcher` tree plus
+`util/BUILD` package boundary. `BuiltinBazelToolsDirectoryListingKey` validates
+the complete manifest before returning deterministic immediate file/directory
+entries. `HostRepositoryDirectoryListing{,Observation}Key` already routes a
+built-in repository identity to that catalog key with an empty Host
+observation epoch. `HostExternalPackageBoundary{,Observation}Key` already uses
+the same route to detect catalog BUILD boundaries.
 
-## Slug audit and natural owner
+## Decision and natural ownership
 
-Slug has one correct typed result, `CanonicalLabel`, but overlapping partial
-parsers:
+Retain one `GlobPattern`, `HostGlobLoadingRequest`, attempt/retry loop,
+traversal state machine and `PackageRecorder::host_glob` output projection.
+Extend the existing traversal scope with a distinct catalog-external variant:
 
-- `slug_identity_v2::ResolvedOptionLabel` already accepts the complete lexical
-  shorthand/full/relative table for its distinct command-option contexts;
-- `starlark_label::resolve_label` rejects every canonical spelling and both
-  repository-only shorthands, and rejects a bare `Label("target")`;
-- scalar `attr.label` defaults use that `.bzl` resolver, while aggregate
-  label-bearing defaults fall through `RawLabelContext::Root` and discard the
-  defining module's repository mapping;
-- ordinary BUILD values, module-extension tag values and repository-rule
-  supplied values each reconstruct a similar grammar around
-  `ApparentLabel::parse`, which itself intentionally accepts only unambiguous
-  absolute apparent labels; and
-- direct toolchain conversion contains a canonical-label fast path only
-  because the shared resolver rejects it.
+1. root and materialized/Host external scopes keep the current
+   `HostGlobSegmentCandidates{,Observation}Key` path resolution, raw-name and
+   symlink behavior unchanged;
+2. catalog-external scope filters each requested segment from
+   `HostRepositoryDirectoryListing{,Observation}Key` for the traversal state's
+   repository-relative `PackagePath`;
+3. both external variants use the same
+   `HostExternalPackageBoundary{,Observation}Key` and exact recursive traversal;
+4. `RepositoryPackageSourceAddress` selects Host versus catalog scope before
+   evaluation, and both sources use `evaluate_host_package_attempts_driver`;
+   and
+5. delete the now-unreachable `GlobUnsupported` branch rather than preserving
+   a fallback.
 
-The natural owner is a single pure, borrowed package-label spelling parser in
-`slug_identity_v2::label`, shared by `ResolvedOptionLabel` and a new
-`CanonicalLabel` package-context conversion entry point. It validates and
-normalizes syntax, but receives the base `PackageIdentifier` and a caller-owned
-apparent-name resolver. It performs no repository selection, DICE lookup,
-filesystem/package/target observation, caching or interning.
+The catalog listing key is the sole directory-membership producer. The
+external boundary key is the sole subpackage producer. The existing traversal
+key remains the sole pattern/operation/package/source-route result owner, and
+the loaded package remains the sole final glob consumer. Do not copy the
+catalog into another tree, synthesize a filesystem root, materialize built-in
+files, scan `CATALOG` from loading, or add a key, cache, interner, registry,
+lock, task or evaluator-retained value.
 
-Loading retains every context decision:
-
-1. `Label()` and descriptor defaults use `source_identity_for_call`, preserving
-   the innermost executing/defining `.bzl` package and mapping;
-2. ordinary BUILD dependency values use the loaded package and its complete
-   repository mapping;
-3. explicit module-extension tag values use the calling module's root package
-   and mapping, never the tag-class definition mapping;
-4. explicit ordinary extension repository-rule dependency values use the
-   selected extension evaluation `.bzl` package from the selected request plus
-   the full generated-repository namespace, even when the repository rule was
-   imported from another `.bzl` package;
-5. explicit innate `use_repo_rule` values use the repository-rule `.bzl`
-   package and the calling module's mapping, not the generated namespace;
-6. every pretyped Label remains unchanged rather than being parsed or mapped
-   again; and
-7. apparent-name ambiguity/missing visibility remains diagnosed by the
-   existing caller that owns that mapping.
-
-Repository `Output`/`OutputList` strings are the deliberate non-dependency
-exception: retain the repository-rule definition package, the existing
-namespace visibility map, rejection of canonical strings and repository
-shorthand, and the pre-packet treatment of unqualified `//conditions` and
-`//visibility` in the definition repository. Typed output policy is unchanged.
-
-Do not widen `ApparentLabel::parse` or `CanonicalLabel::parse`: those APIs own
-already-unambiguous absolute identity and are deliberately used by load,
-pattern and internal identity boundaries with different admissibility rules.
-
-## Complete category
-
-Admit the complete Bazel 9.2 package-context dependency-label string category:
-
-1. same-package `:target` and bare `target`/`path/to/target`;
-2. current-repository `//pkg:target` and colon-free `//pkg/sub`;
-3. apparent `@repo//pkg:target`, colon-free `@repo//pkg/sub`, and shorthand
-   `@repo` mapped through the active context;
-4. canonical `@@repo//pkg:target`, colon-free `@@repo//pkg/sub`, and shorthand
-   `@@repo`, bypassing mapping;
-5. empty apparent `@//pkg:target`, resolved through apparent mapping entry `""`,
-   versus empty canonical `@@//pkg:target`, which bypasses mapping to main;
-6. explicit root-package targets for unqualified, apparent and canonical
-   repository spellings;
-7. main-repository `//conditions` and `//visibility` special cases; and
-8. exact typed canonical `(repository, package, target)` identity after target
-   inference and terminal `/.` normalization.
-
-Route every currently admitted package-context dependency-label string
-position through that owner:
-
-- universal `Label()` and its Label passthrough;
-- rule/aspect/subrule/macro/repository-rule/tag-class descriptors for
-  `attr.label`, `attr.label_list`, `attr.string_keyed_label_dict`,
-  `attr.label_keyed_string_dict` and `attr.label_list_dict`, including every
-  scalar/list/dictionary key/value default position;
-- rule/aspect toolchain requirements and `config_common.toolchain_type`;
-- ordinary and symbolic-macro BUILD dependency values in the same five
-  constructors, including selector keys;
-- every existing direct `PackageRecorder` dependency-label consumer:
-  visibility/default visibility, package metadata, package-group includes,
-  `filegroup.srcs`, `test_suite.tests`, `alias.actual`, config-setting label
-  fields, and admitted constraint/platform/toolchain declarations;
-- aspect/subrule toolchains and admitted aspect execution-compatibility labels;
-- explicit module-extension tag values in the same five constructors; and
-- explicit ordinary and innate repository-rule values in the same five
-  constructors.
-
-For `attr.label_keyed_string_dict`, reject two distinct raw string/Label keys
-that normalize to the same canonical Label in descriptor defaults, BUILD or
-symbolic-macro values, explicit tags and explicit repository calls. Preserve
-the same collision invariant in already admitted label-keyed native fields such
-as `config_setting.flag_values`. Exact diagnostic wording remains deferred.
-
-This is a generic host conversion category. rules_rust is only the authentic
-consumer that exposed it. BCR Starlark remains the owner of rules_rust,
-rules_cc, `cc_common` and `cc_internal`; add no ruleset, toolchain, C++ or
-consumer branch.
+The traversal core becomes platform-independent for catalog scope. Host
+segment computation remains at its existing Unix gate and existing
+unsupported result elsewhere. Convert one catalog component exactly by first
+requiring a valid Rust-Unicode `OsStr`, then mapping each scalar U+0000..U+00FF
+to the equal single byte used by the existing Bazel-internal matcher; reject an
+invalid-Unicode OS name or any scalar above U+00FF. `PathDirectoryName` already
+forbids empty, dot, separator and multi-component names. A future catalog
+containing either rejected component form, a symlink or an unknown entry kind
+returns a typed traversal error before any match slice is published.
 
 ## Compatibility classification
 
 Admit as **exact** for the named Bazel 9.2 successful surface:
 
-- all eight grammar/normalization rows above;
-- apparent mapping versus canonical bypass;
-- innermost `.bzl`, loaded BUILD package, calling module, ordinary extension
-  evaluation and innate repository-call conversion contexts at the named
-  consumers;
-- typed Label passthrough without a second mapping lookup; and
-- canonicalized label-key collision rejection and typed repo/package/target
-  results through frozen descriptors, calls and existing loading/DICE results.
+- all already-accepted include/exclude, recursive `**`, files versus
+  files-and-directories, ordering, deduplication and empty-result behavior over
+  pinned built-in catalog entries;
+- immediate file/directory membership from the exact catalog manifest;
+- BUILD/BUILD.bazel package-boundary pruning through the existing external
+  package lookup; and
+- exact frozen target labels and filegroup membership for the named catalog
+  packages and patterns.
 
 Keep **Slug-native**:
 
-- the Rust borrowed parse scratch, existing owned `CanonicalLabel`, its retained
-  mapping provenance and structural equality/allocation accounting, and
-  caller-specific diagnostic wrapping; mapped and canonical spellings are not
-  claimed to have exact Bazel equality outside the named canonical projection;
-  and
-- fail-closed missing/ambiguous apparent mapping rather than retaining Bazel's
-  non-visible Label object where that exact invalid-value lifecycle is not yet
-  admitted.
+- the manifest-digest route identity, Rust DICE key/value layout, synthetic
+  logical path used only in internal diagnostics, immutable `Arc` scratch and
+  complete-only DICE equality cutoff; and
+- fail-closed catalog-name/entry-kind diagnostics rather than Bazel internal
+  Java error text for a state absent from the pinned manifest.
 
 Keep **unsupported/deferred**:
 
-- output/output-list same-package policy, computed/late/materialized defaults,
-  dormant labels and target/provider/file resolution;
-- `load()`'s `.bzl`-only/repository route, repo-context transition setting
-  syntax, command-line label/target-pattern contexts and exact invalid-label
-  diagnostic wording/precedence;
-- package existence, visibility, file admissibility application and
-  `repository_ctx`/`module_ctx.path` effects; and
-- exact Bazel configuration/output identity or any ruleset-specific behavior.
+- mutable or user-authored built-in catalogs, catalog symlinks/unknown entry
+  kinds/non-Latin-1 names, exact impossible-state diagnostic wording, and
+  catalog content not present in the pinned Bazel 9.2 manifest;
+- non-Unix Host filesystem glob traversal, whose existing boundary is not
+  widened by platform-independent catalog traversal; and
+- ruleset, toolchain, configured analysis, action/execution or
+  `cc_common`/`cc_internal` behavior beyond ordinary downstream consumption.
 
-## Identity, revision and memory
+## DICE identity, revision and memory
 
-No retained type changes. `CanonicalLabel` remains the only successful label
-identity in these consumers. The parser returns only construction scratch;
-mapping selection happens synchronously through an existing immutable slice or
-map and the result retains no mapping copy, raw spelling or evaluator value.
+The traversal key already hashes/equates workspace, scope, logical root,
+package, parsed pattern and operation. The new scope discriminant plus existing
+`HostRepositorySourceRoute` prevents Host/catalog or cross-route collisions;
+the route already contains the built-in snapshot and exact manifest digest.
+Every listing and boundary is computed through the caller's DICE context, so
+dependencies, Need propagation, cancellation and equality cutoff remain
+producer-owned. Hold no lock across a compute.
 
-Refactor the existing option-label grammar rather than adding a third parser.
-Prefer borrowed apparent-repository spelling so a visible lookup does not
-allocate a temporary repository `String`; allocate only the existing final
-typed components or already-required non-visible option state. Add no cache,
-interner, global registry, collection, DICE key, lock or filesystem input.
+The built-in snapshot is a closed single-variant input, so a fabricated
+catalog A/B/A mutation is inapplicable. Prove instead that Host and catalog
+scope keys are unequal, catalog traversal directly depends on the route-owned
+listing/boundary keys, repeated calculation reuses the complete result, and no
+Host path-observation or repository-materialization key activates. A later
+real snapshot variant must change `BuiltinBazelToolsRouteIdentity` and will
+therefore invalidate the existing dependency chain without this packet adding
+revision state.
 
-The defining `.bzl` source identity/mapping, BUILD package mapping, module tag
-input mapping, ordinary extension namespace and innate calling-module mapping
-already participate in their respective complete keys/results. Selection of
-the innate map is borrowed construction state, not another retained mapping.
-A source or mapping A/B/A change must alter the typed result and restoration
-must recover structural equality. Need remains carrierless; cancellation
-publishes no complete result and no lock is held across DICE compute.
+No retained collection is added. The scope adds one enum discriminant around
+the already-retained route. Catalog candidate vectors/arcs are traversal-phase
+scratch and are dropped after the existing compact sorted match slice is
+published. Existing catalog listings, glob patterns, routes and package values
+retain their current DICE lifetimes and release on invalidation/eviction or
+service shutdown. There is no command, transfer-owned async or service-cache
+memory.
 
 ## Buck2/starlark-rust and Zabel guidance
 
-The vendored/adopted starlark-rust parser supplies Starlark language syntax and
-the real `set`; Bazel Label semantics remain a host responsibility. Its
-`starlark_bin/bin/bazel/label.rs` example independently demonstrates one
-lexical label parser with repository-only shorthand, but is not a production
-library owner and is not copied as a retained type.
-
-No V1/Buck2 extraction is required. Refactor the existing V2 option-label
-spelling parser and reuse `PackagePath`, `TargetName`, `CanonicalRepoName` and
-`CanonicalLabel`. Record this no-extraction decision in Stage 9.
+No V1 or Buck2 extraction is required. Preserve the accepted Buck2-derived
+`Arc` slices, `Dupe`, `Allocative`, compact `SmallSet` traversal state and
+complete-only DICE equality. Do not replace them with owned graph `String`/
+`Vec`, `HashMap`, a second listing tree or an interner. Record this no-extraction
+decision in Stage 9.
 
 Clean Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only.
-Its `core.labels.parseSyntax` and generic Label host separate borrowed pure
-syntax from active module mapping resolution, preserve special main packages,
-and avoid DICE/I/O in construction. Adopt that ownership/optimization lesson;
-copy no Zig type, allocator, evaluator host, non-visible representation,
-cache, scheduler, diagnostic or behavior claim.
+Its `session_package_glob_computation.zig` keys one package glob by canonical
+package/source identity and visits source-owned directory facts; its
+`session_source_directory_key.zig` keeps a source root and relative directory
+in the directory key. Adopt only that one-producer/source-routed-listing
+lesson. Copy no Zig key, packed allocator, matcher, scheduler, cache, error,
+order, symlink limit or behavior claim. Bazel 9.2 remains sole authority.
 
 ## Evidence and proof
 
-Add focused proof for:
+Add focused proof that:
 
-- the complete lexical table, implicit targets, terminal `/.`, special main
-  packages, distinct `@//` mapping/`@@//` bypass, and invalid
-  relative-package/triple-dot/single-slash boundaries;
-- apparent shorthand/full mapping and canonical shorthand/full bypass, with
-  root/nonroot base packages and typed Label passthrough;
-- an imported function proving `Label()` uses its innermost defining `.bzl`
-  context rather than its caller;
-- string and pretyped Label defaults across all five dependency constructors,
-  including dictionary keys/nested values, frozen export and import/re-export;
-- the defining `.bzl` mapping for defaults, calling module mapping for explicit
-  tags, ordinary extension namespace for ordinary repository calls, and
-  repository-rule `.bzl` package plus calling-module mapping for innate calls;
-- an ordinary extension importing a repository rule from another `.bzl`
-  package, proving explicit dependency strings use the extension evaluation
-  package while descriptor defaults, `RepoRuleId`, relative output strings and
-  unqualified special-package output strings retain the repository-rule
-  definition package;
-- ordinary/symbolic-macro BUILD package conversion, selector keys, and
-  representative direct consumers covering visibility/package metadata,
-  alias/filegroup/test-suite/config-setting and platform/toolchain families;
-- converted-label dictionary-key collisions in defaults, BUILD/macro values,
-  tags and both repository-call kinds, including string-versus-pretyped and two
-  apparent names mapping to one canonical key;
-- the `//conditions`/`//visibility` exception without changing adjacent output
-  or `load()` policy;
-- existing missing/ambiguous mapping and adjacent output/load/transition
-  rejection boundaries remaining fail closed;
-- source/mapping/default DICE A/B/A and warm reuse through an existing loaded
-  descriptor or module-extension harness; and
-- authentic rules_rust replay clearing `@rust_host_tools` and stopping at the
-  next honest generic boundary.
+- otherwise-identical Host-external and catalog-external traversal scopes are
+  structurally unequal while restored catalog keys compare equal;
+- loading `@@bazel_tools//tools/res` evaluates both `glob(["**"])` and
+  `glob(["*.bzl"])` to the exact three catalog `.bzl` labels;
+- the observed load depends on built-in catalog directory-listing keys,
+  carries no Host observations, activates no path-listing/materialization key,
+  and reuses its warm complete value;
+- an integrated test-only catalog traversal over
+  `@@bazel_tools//src/tools/launcher:**` activates the external-boundary key for
+  `src/tools/launcher/util`, excludes `util/BUILD` and every path beneath that
+  subpackage, and uses no stub/copy of the catalog or BCR source;
+- pure catalog-listing projection rejects invalid-Unicode and above-U+00FF
+  components plus `Symlink` and `Unknown` entry kinds, with no partial matches;
+  and
+- Host root/external raw-name, symlink, recursive, Need, error-order and A/B/A
+  tests remain unchanged.
 
-No new fixture file or oracle artifact is authorized. Reuse pinned Bazel
-source/tests, existing in-memory loading fixtures and the authenticated BCR
-archive.
+The authentic rules_rust replay must clear `@@bazel_tools//tools/res` and stop
+at the next honest generic boundary. It is acceptance evidence, not authority
+for a ruleset-specific branch.
 
 ## Allowlist, caps and complexity
 
 Production Rust may change only:
 
-- `app/slug_identity_v2/src/label.rs`;
-- `app/slug_loading_v2/src/starlark_label.rs`;
-- `app/slug_loading_v2/src/package.rs`; and
-- `app/slug_loading_v2/src/module_extension_repository_instantiation.rs`.
+- `app/slug_loading_v2/src/bzl_module.rs`;
+- `app/slug_loading_v2/src/host_glob/mod.rs`; and
+- `app/slug_loading_v2/src/host_glob/traversal.rs`.
 
 Proof may change only those files' existing test modules plus:
 
-- `app/slug_identity_v2/tests/label_roundtrip.rs`;
-- `app/slug_loading_v2/src/host_package_inventory_tests.rs`;
-- `app/slug_loading_v2/src/host_package_load_tests.rs`; and
-- `app/slug_loading_v2/tests/build_file_loading.rs`, solely for ordinary BUILD
-  package-context success/collision coverage and stale expectations directly
-  contradicted by the admitted canonical-label surface; and
-- only if required for the existing repository-declaration DICE harness,
-  `app/slug_loading_v2/src/module_extension.rs`.
+- `app/slug_loading_v2/src/host_glob/traversal_tests.rs`; and
+- `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs`.
 
-Scheduling records may change only the canonical plan, owner plans 04/05,
-Stage 9 and this manifest. Caps are 320 gross added production Rust lines,
-1,050 proof lines and 1,370 total. No new function may exceed 150 lines.
+Scheduling records may change only the canonical plan, owner plans 04/05/06,
+Stage 9 and this manifest. Caps are 300 gross added production Rust lines, 420
+proof lines and 720 total. No new function may exceed 150 lines.
 
-`package.rs`, `host_package_load_tests.rs`,
-`module_extension_repository_instantiation.rs` and `module_extension.rs`
-exceed the 2,000-line trigger. `package.rs` may only converge existing label
-conversion call sites; repository instantiation may only replace its private
-parser and extend focused proof; `module_extension.rs` is test-only. Add no new
-semantic key, retained type or unrelated helper to these files.
+`bzl_module.rs` and `canonical_repository_load_route_tests.rs` exceed the
+2,000-line trigger. The production file may only replace its source-kind glob
+branch and remove the obsolete error; the test file already owns built-in route
+and listing proof. `host_glob/{mod,traversal}.rs` remain the cohesive segment
+and traversal owners; do not move unrelated loading behavior into them. No
+demonstrated hot-path or retained-memory growth warrants a benchmark: catalog
+membership is a fixed small manifest, every listing is already DICE-cached,
+and the packet adds no retained collection.
 
 ## Validation and stops
 
 Run serially:
 
-- `cargo test -p slug_identity_v2 --test label_roundtrip -q`;
-- focused loading parser/default/BUILD/tag/repository-call/DICE tests;
-- `cargo test -p slug_loading_v2 --lib -q`;
-- `cargo test -p slug_loading_v2 --test build_file_loading -q` if the ordinary
-  BUILD proof owner changes;
+- focused traversal identity and built-in catalog package-load tests;
+- `cargo test -p slug_loading_v2 --lib -q` and all loading integration tests;
+- `cargo test -p slug_bzlmod_v2 --lib -q` for the consumed listing/boundary
+  owners;
 - `cargo test -p slug_query_v2 --lib -q`;
+- `cargo check -p slug_loading_v2 --target x86_64-pc-windows-gnu -q`;
 - `cargo build -p slug_cli_v2 -q` before authentic replay;
 - authentic rules_rust configured-query replay with stale `slugd` cleanup
   before and after;
@@ -329,65 +240,25 @@ Run serially:
 
 Return `REPLAN` before or during Rust if:
 
-- a successful consumer needs a second label representation/parser, mapping
-  reconstruction, target/package/file lookup, new DICE key or I/O;
-- explicit module tags use the defining `.bzl` mapping, descriptor defaults use
-  the caller mapping, ordinary/innate repository-call mappings are conflated,
-  or pretyped Labels are remapped;
-- `@//` and `@@//` collapse to one repository choice or converted label-key
-  collisions are retained/overwritten;
-- dependency conversion rebases repository outputs or gives them special-main
-  package handling; output/load/transition/command semantics otherwise widen;
-  non-visible retained labels or
-  exact invalid-diagnostic parity become necessary;
-- any rule/ruleset/C++/`cc_common`/`cc_internal` specialization appears;
-- a cache/interner/global registry or retained raw spelling is introduced;
-- production/proof caps or file allowlists are exceeded; or
-- the authentic replay does not clear the exact `@rust_host_tools` boundary.
+- catalog matching needs a second glob parser/traversal, copied inventory,
+  materialized filesystem root, new DICE key, fallback scan or direct catalog
+  access from loading;
+- Host scope changes its path/symlink/observation behavior, or catalog scope
+  lacks its route/listing/boundary dependency in structural identity;
+- a catalog result can publish after Need, cancellation, listing/boundary
+  failure, either invalid component class or either unsupported entry kind;
+- exact behavior requires a new oracle/fixture or unpinned `@bazel_tools`
+  content;
+- any `tools/res`, rules_rust, rules_cc, toolchain, C++, `cc_common` or
+  `cc_internal` specialization appears;
+- cross-target catalog compilation fails without a bounded source-neutral
+  correction; or
+- production/proof caps or file allowlists are exceeded.
 
-Focused independent R2 architecture rereview returns `ACCEPT`. Ordinary and
-innate contexts are representable through existing borrowed inputs, the empty-
-repository and collision semantics are complete, the expanded consumer proof
-matrix is bounded, and the retained identity/no-extraction architecture stands.
-During implementation collision checks must compare canonical
-repository/package/target identity rather than optional Slug mapping provenance,
-and innate conversion must borrow `definition_parts().3`, never the generated
-namespace returned by `namespace_parts()`.
+Rust begins only after independent review accepts the source-scope identity,
+existing-key dependency graph, platform split, proof matrix and bounds.
 
-Focused terminal R2 implementation review returns `REPLAN`. R3 requires
-ordinary instantiation to pass `receipt.request.parts().0` as conversion base
-while retaining the full namespace mapping; the repository rule's defining
-label remains the `RepoRuleId` and default-conversion owner. Restore the
-pre-packet parser/policy for BUILD, module-tag and repository-call
-`Output`/`OutputList` positions; only the five dependency-label constructors
-use the shared package-context owner. Add the existing BUILD integration test
-file to the proof allowlist because the exact ordinary BUILD surface cannot be
-proved while preserving its now-stale canonical-external rejection. No other
-architecture, compatibility class, production allowlist, cap, retained owner,
-DICE boundary or authentic replay requirement changes. Rust may resume only
-after focused R3 rereview returns `ACCEPT`.
-
-Focused independent R3 architecture rereview returns `ACCEPT`. The ordinary
-evaluation-base owner, deferred output non-widening boundary, narrow BUILD proof
-allowlist, unchanged caps and unchanged retained-state architecture are accepted.
-
-Focused terminal R3 implementation review returns `REPLAN`. The implementation
-correctly separates ordinary dependency strings from definition-owned defaults
-and rule identity, but still feeds repository outputs through the ordinary
-evaluation base and dependency parser. R4 selects the conversion base by
-attribute kind: only the five dependency-label shapes use the extension
-evaluation base; `Output`/`OutputList` use the repository-rule definition base
-and preserve pre-packet `//conditions`/`//visibility` behavior. Add one imported-
-rule output discriminator. No compatibility class, owner, mapping, retained
-state, allowlist, cap, validation gate or replay boundary changes. Rust resumes
-only after focused independent R4 architecture rereview returns `ACCEPT`.
-
-Focused R4 architecture and terminal implementation rereviews return `ACCEPT`.
-The implementation is 312 production, 692 proof and 1,004 total gross added
-Rust lines. Identity passes 16/16; loading passes 506 active plus one ignored
-and every integration target; query passes 55/55; the CLI rebuild, formatting,
-diff and parked-proof gates pass. The archive checker reproduces only its three
-unchanged thoughts-path baseline failures. A fresh authenticated rules_rust
-0.73 replay clears `@rust_host_tools` and stops at the separate generic built-in
-catalog `glob()` boundary in `@@bazel_tools//tools/res`; no ruleset or C++
-special case is selected.
+Focused independent correction rereview returns `ACCEPT`. The integrated
+catalog-boundary proof, exact component lifting and four fail-closed negative
+rows, narrowed named-catalog output claim, existing-key ownership, platform
+split, allowlist, caps and stops are accepted.

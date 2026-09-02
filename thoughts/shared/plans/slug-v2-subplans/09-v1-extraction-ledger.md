@@ -2536,3 +2536,28 @@ Focused R4 architecture and terminal implementation rereviews return `ACCEPT`.
 The borrowed parser, existing `CanonicalLabel`, request-local collision probes
 and caller-owned mappings are sufficient; no V1/Buck2 extraction, copied donor
 type, mapping copy, retained syntax, collection, cache or interner was added.
+
+### Stage 4/5 repository-source glob routing utility decision (2026-09-01)
+
+`WP-4-5-7A-repository-source-glob-routing-category-implementation-r1`
+requires no V1 or Buck2 extraction. Extend only the existing traversal scope
+with the already-retained `HostRepositorySourceRoute`; consume the existing
+catalog directory-listing and external package-boundary keys directly. Keep
+the accepted `Arc` slices, `Dupe`, `Allocative`, compact `SmallSet`, parsed
+`GlobPattern` and complete-only DICE equality. Add no retained collection,
+owned graph `String`/`Vec`, copied tree, interner, cache, key, lock or task.
+
+Catalog candidate rows are traversal scratch and disappear after the existing
+compact sorted match slice is published. Clean Zabel `0795445f...`
+`session_package_glob_computation.zig` and
+`session_source_directory_key.zig` are concept-only guidance for one glob
+producer over source-owned directory facts. Copy no Zig representation,
+allocator, matcher, scheduler, cache, error, order, limit or behavior claim.
+Independent DICE/retained-identity review is required before Rust.
+
+Initial review changes no utility decision. The correction requires one
+integrated catalog-boundary dependency test and pure negative projection tests;
+all candidate rows remain traversal scratch, and no retained utility, key,
+collection or donor extraction is added. Focused rereview is required.
+Focused rereview returns `ACCEPT`; the no-extraction and scratch-lifetime
+decision is final for this packet.

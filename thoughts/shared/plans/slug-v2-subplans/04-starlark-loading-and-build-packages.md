@@ -7777,3 +7777,29 @@ consumer to the existing `CanonicalLabel` with caller-owned context; deferred
 outputs retain their old routes. Full loading/query validation and fresh
 rules_rust replay pass the label boundary and select the separate generic
 built-in-catalog `glob()` stop in `@@bazel_tools//tools/res`.
+
+### Repository-source glob routing selected (2026-09-01)
+
+The next bounded packet preserves the accepted `GlobPattern`, attempt retry,
+recursive traversal and final package projection. Host sources keep their
+existing raw-name, symlink and observed-path segment keys. Built-in catalog
+sources select a distinct traversal scope whose segment membership comes from
+the existing canonical-repository directory-listing key; both external source
+kinds share the existing package-boundary key. The catalog path is source-
+neutral across Rust targets while non-Unix Host traversal remains deferred.
+
+Bazel 9.2's already-accepted glob sources/tests and fixtures remain authority;
+no new oracle is needed. Clean Zabel `0795445f...` supplies only the peer lesson
+that one package-glob producer visits source-owned directory facts. Add no
+second parser/traversal, catalog copy, materialization, DICE key, cache,
+ruleset, toolchain, C++, `cc_common` or `cc_internal` branch. Independent
+DICE/ownership review is required before Rust.
+
+Initial review returns `REVISE` only on proof precision. The corrected packet
+requires an integrated catalog traversal that activates and obeys the
+`src/tools/launcher/util` package boundary, defines catalog-name lifting as
+valid Unicode scalars U+0000..U+00FF to equal bytes, rejects both invalid name
+classes plus symlink/unknown kinds before publication, and narrows exact output
+claims to named catalog packages. Focused correction rereview is required.
+Focused correction rereview returns `ACCEPT`; Rust may proceed only through the
+corrected source-routed traversal and proof boundary.

@@ -4361,6 +4361,32 @@ owner already supplies every required builtin; no MODULE/REPO/core overlay or
 additional builtin is selected. Zabel remains peer ownership guidance and
 Bazel 9.2 remains sole authority.
 
+### Built-in catalog glob directory ownership selected (2026-09-01)
+
+`BuiltinBazelToolsDirectoryListingKey(snapshot, directory)` remains the sole
+validated immediate-membership producer for the verbatim catalog.
+`HostRepositoryDirectoryListing{,Observation}Key` already routes the complete
+canonical source identity to it with no Host observation, while
+`HostExternalPackageBoundary{,Observation}Key` owns BUILD/BUILD.bazel boundary
+classification over the same route. Loading may consume those existing facts
+for catalog BUILD globs; it must not inspect `CATALOG`, copy a tree, invent a
+filesystem root, materialize content or add a repository key. The route's
+snapshot plus manifest digest remains the complete invalidation identity.
+
+This is exact membership for the pinned Bazel 9.2 catalog and Slug-native
+DICE/manifest representation. Impossible future symlink, unknown-kind or
+unrepresentable catalog entries fail closed. Zabel is peer source-routing
+guidance only; Bazel and the pinned verbatim manifest remain authority.
+
+Initial routing review requires the integrated consumer proof to activate the
+external boundary for catalog `src/tools/launcher/util`; independent listing
+and Host-boundary tests cannot substitute for that dependency edge. The
+corrected packet also requires typed fail-closed projection proof for invalid-
+Unicode/above-U+00FF names and symlink/unknown entry kinds. No owner or key
+changes.
+Focused correction rereview returns `ACCEPT`; the existing listing, route and
+boundary owners remain final for implementation.
+
 ### LTO-backends acceptance and Stage 4 continuation (2026-08-27)
 
 Commit `ccab93d4c` accepts complete LTO backends with no Stage 5 production or
