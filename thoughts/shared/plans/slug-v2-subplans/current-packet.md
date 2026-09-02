@@ -1,263 +1,287 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-5-7A-repository-source-glob-routing-category-implementation-r2
+Packet: WP-4-7A-native-builtin-label-like-parameter-category-design-r1
 
-Milestone: M7A bootstrap-critical generic Starlark/loading and repository
-closure. Make every admitted repository package source kind feed the same
-Bazel 9.2 BUILD `glob()` evaluator through its natural directory-fact owner.
+Milestone: M7A bootstrap-critical generic Starlark/loading closure. Audit and
+freeze the complete admitted native-builtin direct-parameter category in which
+Bazel 9.2 accepts either a string spelling or an already-constructed `Label`.
 
-Status: terminal implementation review returns `ACCEPT`. Initial DICE/ownership
-review returned `REVISE` on integrated catalog-boundary and fail-closed
-projection proof plus one overbroad equivalence claim; focused rereview
-accepted the correction. R1 then `REPLAN`ed only its overbroad successful-
-package proof, and focused R2 review accepted the narrowed contract. The
-predecessor complete package-context dependency-label category is terminally
-accepted in `5f9f9a98a`.
+Status: initial independent review returned `REVISE` on three bounded contract
+details. R1 now cites the actual pinned Alias/ToolchainType/PackageGroup owners,
+requires canonical duplicate rejection for `default_package_metadata`, and
+removes the Slug-only target-pattern-name rejection from ordinary label
+attributes. Focused correction rereview returns `ACCEPT`; Rust is authorized
+only within this corrected packet.
 
-Pre-implementation proof review corrects one expected-value typo without
-changing the accepted architecture: the verbatim `tools/res/BUILD` target
-`srcs = glob(["**"])` includes its `BUILD` file plus the three `.bzl` files,
-while `bzl_srcs = glob(["*.bzl"])` includes only the three `.bzl` files. The
-accepted Bazel 9.2 `glob-callable-contract` fixture already discriminates that
-BUILD files are ordinary glob candidates, so this needs no new oracle.
+Immediate predecessor `WP-4-5-7A-repository-source-glob-routing-category-
+implementation-r2` is terminally accepted in `bf509cd8b`. Its source-routed
+catalog traversal passes complete loading/Bzlmod/query/cross-target/replay
+gates. The authentic rules_rust replay clears `GlobUnsupported` and reaches
+this independent generic boundary when verbatim `@@bazel_tools//tools/res`
+passes a `Label` to native `toolchain(toolchain_type = ...)` while Slug's
+hand-written direct adapter requires `str`.
 
-R1 implementation proves the source-routed traversal but ends `REPLAN` on one
-overbroad proof contract. `@@bazel_tools//tools/res:BUILD` evaluates both globs
-successfully and then reaches the independent existing `toolchain()` schema
-error: Bazel supplies the `toolchain_type` argument as a `Label`, while Slug's
-current declaration expects `str`. This packet must not admit that later
-toolchain/declaration category. R2 proves the two exact raw glob match slices
-through the same request adapter, then requires package loading and authentic
-replay to reach that later error instead of claiming a successfully published
-package or frozen filegroup targets. Production architecture, compatibility of
-the glob result itself, owners, allowlists, caps and all other gates are
-unchanged. Focused R2 correction review is required before Rust resumes.
-
-The unrelated dirty
-`app/slug_loading_v2/src/registration_expansion_tests.rs` proof remains parked
-at SHA-256
-`36c937d49369ac57e51defe2b17d4a53636a815ec0b2d407f7bd1a664c4d816a`.
-Do not edit or stage it.
+The predecessor recorded an unrelated dirty edit to
+`app/slug_loading_v2/src/registration_expansion_tests.rs`; it is absent from
+this clean checkout. If that parked edit reappears, verify that its SHA-256 is
+`36c937d49369ac57e51defe2b17d4a53636a815ec0b2d407f7bd1a664c4d816a`;
+do not edit or stage it.
 
 ## Trigger and learned facts
 
-The fresh authenticated rules_rust 0.73 replay clears the package-context
-label category and stops while loading verbatim
-`@@bazel_tools//tools/res:BUILD`: both `glob(["**"])` and `glob(["*.bzl"])`
-reach `RepositoryPackageLoadErrorInner::GlobUnsupported`. This is not a
-rules_rust, rules_cc, C++, `cc_common`, `cc_internal` or `tools/res` semantic
-gap. `RepositoryPackageSourceAddress::Host` already enters the complete Host
-glob attempt driver; `BuiltinCatalog` evaluates once with an empty prepared
-request map and turns the first pending request into that unsupported error.
+Pinned Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` owns this category:
 
-The complete recursive BUILD-glob category is already exact and accepted in
-`cfe83834d`. Reuse its pinned Bazel 9.2.0 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` and source/test basis:
+- `BuildType.java` `LabelType.convert` returns an existing `Label` unchanged
+  and resolves only strings through the caller's `LabelConverter`;
+- the same file's `LABEL_LIST`, `NODEP_LABEL_LIST` and
+  `LABEL_KEYED_STRING_DICT` recursively use that scalar conversion and reject
+  distinct keys that canonicalize to the same label;
+- `PackageArgs.java` `processParam` converts `default_package_metadata` with
+  `LABEL_LIST` and rejects duplicate canonical labels before setting defaults;
+- `Attribute.java`, `RuleClass.java` and the generic native rule invocation
+  path apply those declared types before native target publication;
+- `StarlarkNativeModule.java` applies `BuildType.LABEL_LIST` independently to
+  `package_group.includes`, while `PackageGroup.java` retains the converted
+  labels; and
+- `BaseRuleClasses.java`, `Alias.java` (nested `AliasRule`),
+  `ConfigRuleClasses.java`,
+  `TestSuiteRule.java`, `ConstraintSettingRule.java`,
+  `ConstraintValueRule.java`, `PlatformRule.java`, `ToolchainType.java`
+  (nested `ToolchainTypeRule`) and `ToolchainRule.java` own the admitted native
+  attribute types.
 
-- `StarlarkNativeModuleApi.java`, `StarlarkNativeModule.java`,
-  `GlobberUtils.java` and `BuildLanguageOptions.java` own the callable,
-  include/exclude and empty-result contract;
-- `GlobComputationProducer.java`, `FragmentProducer.java`,
-  `DirectoryDirentProducer.java`, `GlobFunctionWithMultipleRecursiveFunctions.java`,
-  `GlobValue.java`, `GlobsValue.java`, `GlobCache.java`, `UnixGlob.java`,
-  `PackageLookupFunction.java` and `IgnoredSubdirectoriesFunction.java` own
-  traversal, directory membership and package/ignore boundaries; and
-- `GlobTestBase`, `GlobCacheTest`, `GlobTest`, `PackageFunctionTest` and the
-  existing `glob-package-boundaries`, `glob-callable-contract`,
-  `glob-directory-invalidation` and `glob-raw-name-pattern-lazy` fixtures
-  discriminate the admitted behavior. No new oracle or fixture is needed.
+Pinned `BuildTypeTest` covers an already-typed label in a label-keyed string
+dictionary, mixed strings/typed labels in nested label lists, package-relative
+string conversion and canonicalized-key collision rejection. The accepted
+package-context label work in `5f9f9a98a` already owns borrowed string syntax,
+mapping, `@//`/`@@//` separation and the single `CanonicalLabel` result. The
+accepted repository-source packet supplies a live discriminator for one typed
+scalar without making `tools/res` or rules_rust semantic authority.
 
-Pinned Bazel packaging and Slug's verbatim catalog supply the source facts.
-`src/create_embedded_tools.py` defines embedded path selection; the catalog
-pins `tools/res/BUILD` at
-`bef477365d864eab46fcfe73c635bafd11a7300e4e47c158abe20d269e07e8ac`,
-its three `.bzl` children, and the recursive `src/tools/launcher` tree plus
-`util/BUILD` package boundary. `BuiltinBazelToolsDirectoryListingKey` validates
-the complete manifest before returning deterministic immediate file/directory
-entries. `HostRepositoryDirectoryListing{,Observation}Key` already routes a
-built-in repository identity to that catalog key with an empty Host
-observation epoch. `HostExternalPackageBoundary{,Observation}Key` already uses
-the same route to detect catalog BUILD boundaries.
+Slug's generic raw attribute route already matches the upstream architecture.
+`RawAttributeValue::Label`, `RawLabelContext::Package::label` and
+`coerce_raw_value` preserve an existing `StarlarkLabel`, resolve strings through
+`PackageRecorder::dependency_label`, recurse through lists and dictionaries,
+and reject canonical label-key collisions. `UnpackVisibility`,
+`filegroup.srcs`, `target_settings`, and all label-typed native kwargs already
+use that behavior.
+
+The gap is the hand-written direct parameter layer in `package.rs`. The BUILD
+global and `native.*` facades duplicate string-only signatures before values
+reach the complete generic coercer. The complete changed inventory is:
+
+- `package.default_package_metadata` (`LABEL_LIST`);
+- `package_group.includes` (`LABEL_LIST`);
+- `alias.actual` (`LABEL`);
+- `test_suite.tests` (`LABEL_LIST`);
+- `config_setting.flag_values` keys (`LABEL_KEYED_STRING_DICT`) and
+  `config_setting.constraint_values` (`LABEL_LIST`);
+- `constraint_value.constraint_setting` (`LABEL`);
+- `platform.constraint_values` (`LABEL_LIST`); and
+- `toolchain.toolchain` (`NODEP_LABEL`), `toolchain.toolchain_type` (`LABEL`),
+  `toolchain.exec_compatible_with` (`LABEL_LIST`) and
+  `toolchain.target_compatible_with` (`LABEL_LIST`).
+
+`constraint_setting.default_constraint_value` is the positive scalar control:
+it already accepts `Label`, string or `None`. `filegroup.srcs`, visibility,
+`platform.parents`, `platform.required_settings`,
+`platform.allowed_toolchain_types`, `constraint_setting.refines_constraint_value`
+and common native label/list attributes are generic-coercer controls rather
+than new work. `exports_files.srcs`, `package_group.packages`, licenses, tags,
+glob patterns, names and output attributes have distinct path/string/output
+grammars and are not in this category.
 
 ## Decision and natural ownership
 
-Retain one `GlobPattern`, `HostGlobLoadingRequest`, attempt/retry loop,
-traversal state machine and `PackageRecorder::host_glob` output projection.
-Extend the existing traversal scope with a distinct catalog-external variant:
+Replace only the inventoried string-only direct adapters with one shared
+evaluator-local String-or-Label conversion route. Reuse the existing
+`RawAttributeValue`/`RawLabelContext::Package`/`coerce_raw_value` semantics or a
+thin private projection over them; do not create another label parser or
+mapping policy.
 
-1. root and materialized/Host external scopes keep the current
-   `HostGlobSegmentCandidates{,Observation}Key` path resolution, raw-name and
-   symlink behavior unchanged;
-2. catalog-external scope filters each requested segment from
-   `HostRepositoryDirectoryListing{,Observation}Key` for the traversal state's
-   repository-relative `PackagePath`;
-3. both external variants use the same
-   `HostExternalPackageBoundary{,Observation}Key` and exact recursive traversal;
-4. `RepositoryPackageSourceAddress` selects Host versus catalog scope before
-   evaluation, and both sources use `evaluate_host_package_attempts_driver`;
-   and
-5. delete the now-unreachable `GlobUnsupported` branch rather than preserving
-   a fallback.
+For each direct value:
 
-The catalog listing key is the sole directory-membership producer. The
-external boundary key is the sole subpackage producer. The existing traversal
-key remains the sole pattern/operation/package/source-route result owner, and
-the loaded package remains the sole final glob consumer. Do not copy the
-catalog into another tree, synthesize a filesystem root, materialize built-in
-files, scan `CATALOG` from loading, or add a key, cache, interner, registry,
-lock, task or evaluator-retained value.
+1. an already-constructed `StarlarkLabel` contributes its existing
+   `CanonicalLabel` without display-string conversion or caller-context
+   reinterpretation;
+2. a string is parsed by `PackageRecorder::dependency_label` in the current
+   BUILD package and repository mapping;
+3. lists preserve input order unless the already-declared native schema owns
+   order-independent canonicalization;
+4. label-keyed dictionaries preserve value association and reject different
+   raw keys that canonicalize to the same label; and
+5. package metadata rejects repeated canonical labels even when distinct raw
+   String/Label values produce the collision; and
+6. invalid scalar, container, nested element or dictionary-value kinds fail
+   before the target or package defaults are published.
 
-The traversal core becomes platform-independent for catalog scope. Host
-segment computation remains at its existing Unix gate and existing
-unsupported result elsewhere. Convert one catalog component exactly by first
-requiring a valid Rust-Unicode `OsStr`, then mapping each scalar U+0000..U+00FF
-to the equal single byte used by the existing Bazel-internal matcher; reject an
-invalid-Unicode OS name or any scalar above U+00FF. `PathDirectoryName` already
-forbids empty, dot, separator and multi-component names. A future catalog
-containing either rejected component form, a symlink or an unknown entry kind
-returns a typed traversal error before any match slice is published.
+All inventoried values use ordinary Bazel attribute-label grammar. Target
+names `all`, `all-targets`, `*`, `...` and `sub/...` are valid labels when the
+declared type is `LABEL`/`NODEP_LABEL`; remove the current
+`native_toolchain_label` lexical target-pattern rejection on these attribute
+paths. Preserve recursive and wildcard rejection only in APIs whose input is
+actually a target pattern, such as registration or command target-pattern
+parsing.
+
+The BUILD package's `PackageRecorder` remains the sole caller-context owner.
+The existing `CanonicalLabel` remains the sole semantic value. Existing
+`PackageState`, `PackageTargetKind`, `NativeToolchainTarget`,
+`ConfigSettingTarget`, native override slots and package defaults retain the
+converted values and therefore own package equality and downstream semantic
+references. The root/repository package-load DICE keys continue to own source,
+mapping, evaluation, equality cutoff and invalidation. Add no DICE key,
+projection, side registry, cache, interner, lock, filesystem read or fallback.
+
+Do not stringify a typed label and feed it back through the current BUILD
+package. A typed `Label(":typed")` created in a defining `.bzl` package and a
+raw `":raw"` string passed by the same macro intentionally retain different
+owners: the former stays in the defining package; the latter resolves in the
+calling BUILD package.
 
 ## Compatibility classification
 
-Admit as **exact** for the named Bazel 9.2 successful surface:
+Admit as **exact** for the named Bazel 9.2 loading surface:
 
-- all already-accepted include/exclude, recursive `**`, files versus
-  files-and-directories, ordering, deduplication and empty-result behavior over
-  pinned built-in catalog entries;
-- immediate file/directory membership from the exact catalog manifest;
-- BUILD/BUILD.bazel package-boundary pruning through the existing external
-  package lookup; and
-- exact raw match slices for the named catalog packages and patterns before
-  any independent later BUILD declaration error.
+- String and `Label` acceptance for every inventoried scalar, list element and
+  label-keyed dictionary key;
+- current-package/repository-mapping resolution of strings and identity
+  preservation of already-canonical labels;
+- ordinary attribute labels whose target names are `all`, `all-targets`, `*`,
+  `...` or `sub/...`, without importing command/registration target-pattern
+  semantics;
+- mixed String/Label collections, input ordering, declared
+  order-independent normalization, default/explicit provenance and duplicate
+  canonical-key/default-package-metadata rejection; and
+- final loading-time native target/package-default values and semantic
+  references for the already-admitted native rule classes.
 
 Keep **Slug-native**:
 
-- the manifest-digest route identity, Rust DICE key/value layout, synthetic
-  logical path used only in internal diagnostics, immutable `Arc` scratch and
-  complete-only DICE equality cutoff; and
-- fail-closed catalog-name/entry-kind diagnostics rather than Bazel internal
-  Java error text for a state absent from the pinned manifest.
+- Rust/starlark-rust type-error wording and source spans, DICE key/value
+  layout, compact collection choices and package equality cutoff; and
+- the already-accepted collision-safe canonical repository/mapping identity.
 
 Keep **unsupported/deferred**:
 
-- mutable or user-authored built-in catalogs, catalog symlinks/unknown entry
-  kinds/non-Latin-1 names, exact impossible-state diagnostic wording, and
-  catalog content not present in the pinned Bazel 9.2 manifest;
-- non-Unix Host filesystem glob traversal, whose existing boundary is not
-  widened by platform-independent catalog traversal; and
-- ruleset, toolchain, configured analysis, action/execution or
-  `cc_common`/`cc_internal` behavior beyond ordinary downstream consumption.
-- successful `@@bazel_tools//tools/res` package publication and its frozen
-  filegroup targets until the independent `toolchain_type = Label(...)`
-  declaration-schema category is admitted.
+- selectors or configurable-expression breadth not already accepted on a
+  named native attribute, and all configured matching/toolchain selection;
+- unrepresented native rule classes, rule implementation semantics, legacy
+  toolchain resolution, registration, execution platforms, actions and
+  execution;
+- output/path/file grammars, exact impossible-state Java diagnostics and Java
+  object identity; and
+- rules_rust, rules_cc, `@@bazel_tools//tools/res`, C++, `cc_common` and
+  `cc_internal` behavior beyond ordinary consumption of the generic loading
+  result.
 
-## DICE identity, revision and memory
+This packet does not claim that every future native parameter accepts a
+`Label`; only the inventoried Bazel `LABEL`, `NODEP_LABEL`, `LABEL_LIST`,
+`NODEP_LABEL_LIST` and label-keyed dictionary positions are admitted.
 
-The traversal key already hashes/equates workspace, scope, logical root,
-package, parsed pattern and operation. The new scope discriminant plus existing
-`HostRepositorySourceRoute` prevents Host/catalog or cross-route collisions;
-the route already contains the built-in snapshot and exact manifest digest.
-Every listing and boundary is computed through the caller's DICE context, so
-dependencies, Need propagation, cancellation and equality cutoff remain
-producer-owned. Hold no lock across a compute.
+## Revision, equality and memory
 
-The built-in snapshot is a closed single-variant input, so a fabricated
-catalog A/B/A mutation is inapplicable. Prove instead that Host and catalog
-scope keys are unequal, catalog traversal directly depends on the route-owned
-listing/boundary keys, repeated calculation reuses the complete result, and no
-Host path-observation or repository-materialization key activates. A later
-real snapshot variant must change `BuiltinBazelToolsRouteIdentity` and will
-therefore invalidate the existing dependency chain without this packet adding
-revision state.
+No request option or mutable Host observation is added. A package evaluation
+converts invocation values completely before publication. Its existing source
+and repository-mapping dependencies determine the immutable DICE request;
+overlapping requests share only complete package results through existing
+keys. Need, cancellation or conversion failure publishes no partial target.
 
-No retained collection is added. The scope adds one enum discriminant around
-the already-retained route. Catalog candidate vectors/arcs are traversal-phase
-scratch and are dropped after the existing compact sorted match slice is
-published. Existing catalog listings, glob patterns, routes and package values
-retain their current DICE lifetimes and release on invalidation/eviction or
-service shutdown. There is no command, transfer-owned async or service-cache
-memory.
+Equivalent string and typed-label inputs that resolve to the same
+`CanonicalLabel` may equality-cut off to the same complete `LoadedPackage`.
+Changing a raw mapping or typed canonical label must change the retained
+package value and downstream semantic references; restoring it must restore
+the prior value without stale representation state. No lock is held across a
+DICE computation.
 
-## Buck2/starlark-rust and Zabel guidance
-
-No V1 or Buck2 extraction is required. Preserve the accepted Buck2-derived
-`Arc` slices, `Dupe`, `Allocative`, compact `SmallSet` traversal state and
-complete-only DICE equality. Do not replace them with owned graph `String`/
-`Vec`, `HashMap`, a second listing tree or an interner. Record this no-extraction
-decision in Stage 9.
-
-Clean Zabel `0795445f3ab60f4e49070bdd0b94425c5610f73a` is peer guidance only.
-Its `session_package_glob_computation.zig` keys one package glob by canonical
-package/source identity and visits source-owned directory facts; its
-`session_source_directory_key.zig` keeps a source root and relative directory
-in the directory key. Adopt only that one-producer/source-routed-listing
-lesson. Copy no Zig key, packed allocator, matcher, scheduler, cache, error,
-order, symlink limit or behavior claim. Bazel 9.2 remains sole authority.
+Starlark `Value`, temporary raw lists/dictionaries and conversion vectors are
+evaluator/phase scratch and drop after invocation. Existing compact strings,
+`CanonicalLabel`s and `Arc` slices/maps remain DICE-retained package semantic
+memory and release on invalidation/eviction or service shutdown. No command,
+service-cache, transfer-owned async or task memory is added. There is no hot-
+path or retained-representation change requiring a benchmark or Stage 9/Buck2
+extraction update.
 
 ## Evidence and proof
 
+Use a pinned-source regression rather than a new persistent oracle fixture.
+`BuildType.java` supplies one generic conversion contract, and the accepted
+verbatim catalog replay already discriminates the motivating scalar. This
+avoids copying a matrix whose rows differ only by RuleClass declaration while
+still testing every Slug adapter that bypasses the shared conversion owner. No
+fixture-growth checkpoint is triggered.
+
 Add focused proof that:
 
-- otherwise-identical Host-external and catalog-external traversal scopes are
-  structurally unequal while restored catalog keys compare equal;
-- direct requests for `@@bazel_tools//tools/res` evaluate `glob(["**"])` to
-  raw `BUILD` plus the exact three catalog `.bzl` paths, and evaluate
-  `glob(["*.bzl"])` to exactly those three `.bzl` paths;
-- the observed traversal depends on built-in catalog directory-listing keys,
-  carries no Host observations, activates no path-listing/materialization key,
-  and reuses its warm complete value;
-- loading `@@bazel_tools//tools/res` clears `GlobUnsupported` and reaches the
-  independent existing `toolchain_type` Label-versus-string schema error;
-- an integrated test-only catalog traversal over
-  `@@bazel_tools//src/tools/launcher:**` activates the external-boundary key for
-  `src/tools/launcher/util`, excludes `util/BUILD` and every path beneath that
-  subpackage, and uses no stub/copy of the catalog or BCR source;
-- pure catalog-listing projection rejects invalid-Unicode and above-U+00FF
-  components plus `Symlink` and `Unknown` entry kinds, with no partial matches;
-  and
-- Host root/external raw-name, symlink, recursive, Need, error-order and A/B/A
-  tests remain unchanged.
+- direct BUILD globals and `.bzl` `native.*` calls both accept the complete
+  inventoried category;
+- scalar/list/dictionary rows mix strings and typed Labels and publish the
+  exact canonical values, semantic references, order and provenance;
+- one cross-package macro keeps a typed defining-package label while resolving
+  a raw string in the calling BUILD package;
+- typed and equivalent raw spellings compare as the same semantic package
+  value, while a different typed owner changes and restores the result;
+- canonicalized collisions in `config_setting.flag_values`, invalid scalar,
+  list element, dictionary key/value and `None` positions fail before target
+  or package-default publication;
+- global `package()` and `native.package()` reject equivalent String/Label
+  duplicates in `default_package_metadata` without retaining either default;
+- String and typed-Label values with target names `all`, `all-targets`, `*`,
+  `...` and `sub/...` succeed at the inventoried attribute positions, while
+  actual target-pattern APIs retain their existing wildcard/recursive
+  rejection;
+- generic kwargs, visibility, `constraint_setting.default_constraint_value`,
+  output/path/string grammars and ordinary valid string behavior remain
+  unchanged; and
+- the built-in `tools/res` package clears the typed-parameter stop, then either
+  publishes through ordinary loading or reaches a later independently
+  classified boundary without a catalog/toolchain/ruleset branch.
 
-The authentic rules_rust replay must clear the catalog `GlobUnsupported`
-boundary and stop at the later `toolchain_type` Label-versus-string schema
-error. It is acceptance evidence, not authority for a ruleset-specific branch.
+The rebuilt authentic rules_rust replay must clear the current
+`toolchain_type` Label-versus-string diagnostic and select only the next
+generic unsupported category, if any. It is downstream evidence, not
+authority for ruleset behavior.
 
 ## Allowlist, caps and complexity
 
 Production Rust may change only:
 
-- `app/slug_loading_v2/src/bzl_module.rs`;
-- `app/slug_loading_v2/src/host_glob/mod.rs`; and
-- `app/slug_loading_v2/src/host_glob/traversal.rs`.
+- `app/slug_loading_v2/src/package.rs`.
 
-Proof may change only those files' existing test modules plus:
+Proof Rust may change only:
 
-- `app/slug_loading_v2/src/host_glob/traversal_tests.rs`; and
-- `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs`.
+- `app/slug_loading_v2/src/host_package_load_tests.rs`;
+- `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs`;
+- `app/slug_loading_v2/tests/build_file_loading.rs`; and
+- `app/slug_loading_v2/tests/bzl_invalidation.rs`.
 
-Scheduling records may change only the canonical plan, owner plans 04/05/06,
-Stage 9 and this manifest. Caps are 300 gross added production Rust lines, 420
-proof lines and 720 total. No new function may exceed 150 lines.
+Scheduling records may change only the canonical plan, Stage 4 owner and this
+manifest. Caps are 240 gross added production Rust lines, 520 proof lines and
+760 total. No new function may exceed 120 lines.
 
-`bzl_module.rs` and `canonical_repository_load_route_tests.rs` exceed the
-2,000-line trigger. The production file may only replace its source-kind glob
-branch and remove the obsolete error; the test file already owns built-in route
-and listing proof. `host_glob/{mod,traversal}.rs` remain the cohesive segment
-and traversal owners; do not move unrelated loading behavior into them. No
-demonstrated hot-path or retained-memory growth warrants a benchmark: catalog
-membership is a fixed small manifest, every listing is already DICE-cached,
-and the packet adds no retained collection.
+`package.rs` is 10,784 lines and exceeds the 2,000-line trigger. It remains the
+cohesive owner because it contains `PackageRecorder`, evaluator-local raw
+attribute coercion and both mirrored native invocation facades. The patch may
+add one private converter beside the existing raw conversion and alter only
+the inventoried adapters; moving the converter away would split evaluator
+values from package/mapping ownership. Do not move unrelated declarations,
+schema storage, presentation, persistence or transport into this file.
+
+The proof files are large existing owner suites. Add only focused rows using
+their current scaffolding; do not create copied package trees or broad
+snapshot assertions. This category adds no retained collection and is not a
+demonstrated hot path, so no benchmark is required.
 
 ## Validation and stops
 
 Run serially:
 
-- focused traversal identity and built-in catalog package-load tests;
-- `cargo test -p slug_loading_v2 --lib -q` and all loading integration tests;
-- `cargo test -p slug_bzlmod_v2 --lib -q` for the consumed listing/boundary
-  owners;
+- focused package/raw-coercion, direct BUILD, `native.*`, mapping and A/B/A
+  tests;
+- focused built-in catalog repository-load proof;
+- `cargo test -p slug_loading_v2 --lib -q` and every loading integration test;
+- `cargo test -p slug_bzlmod_v2 --lib -q`;
 - `cargo test -p slug_query_v2 --lib -q`;
-- `cargo check -p slug_loading_v2 --target x86_64-pc-windows-gnu -q`;
 - `cargo build -p slug_cli_v2 -q` before authentic replay;
 - authentic rules_rust configured-query replay with stale `slugd` cleanup
   before and after;
@@ -266,58 +290,20 @@ Run serially:
 
 Return `REPLAN` before or during Rust if:
 
-- catalog matching needs a second glob parser/traversal, copied inventory,
-  materialized filesystem root, new DICE key, fallback scan or direct catalog
-  access from loading;
-- Host scope changes its path/symlink/observation behavior, or catalog scope
-  lacks its route/listing/boundary dependency in structural identity;
-- a catalog result can publish after Need, cancellation, listing/boundary
-  failure, either invalid component class or either unsupported entry kind;
-- exact behavior requires a new oracle/fixture or unpinned `@bazel_tools`
-  content;
-- any `tools/res`, rules_rust, rules_cc, toolchain, C++, `cc_common` or
-  `cc_internal` specialization appears;
-- cross-target catalog compilation fails without a bounded source-neutral
-  correction; or
-- production/proof caps or file allowlists are exceeded.
+- any inventoried value requires a second parser, stringification/reparse of a
+  typed label, direct mapping lookup outside `PackageRecorder`, new DICE owner,
+  registry, cache, interner, lock, I/O or fallback;
+- exact behavior requires selectors/configured evaluation, output/path/file
+  widening or a native rule class outside the declared category;
+- one facade cannot share the same semantic conversion without changing its
+  BUILD-versus-defining-package ownership;
+- a failure can publish a partial target/package default or canonicalized
+  dictionary collisions are accepted;
+- a `tools/res`, rules_rust, rules_cc, toolchain-selection, C++, `cc_common` or
+  `cc_internal` consumer special case appears;
+- a new oracle fixture becomes necessary without first resolving the current
+  fixture-growth checkpoint count; or
+- production/proof caps, file allowlists or the bounded `package.rs` cohesion
+  decision are exceeded.
 
-R2 Rust resumes only after independent review accepts the proof-only correction
-that separates exact glob match publication from deferred later package
-declaration publication.
-
-Focused independent correction rereview returns `ACCEPT`. The integrated
-catalog-boundary proof, exact component lifting and four fail-closed negative
-rows, narrowed named-catalog output claim, existing-key ownership, platform
-split, allowlist, caps and stops are accepted.
-
-## Implementation and WIP handoff
-
-The R2 candidate routes built-in catalog membership through the existing
-repository directory-listing owner and package boundaries through the existing
-external-boundary owner while retaining the shared glob request, traversal and
-package projection. It adds no DICE key, retained collection, materialization
-or consumer-specific branch. Gross additions are 228 production Rust lines,
-302 proof lines and 530 total, within the 300/420/720 caps.
-
-Serial validation passes: 509 loading library tests with one documented
-ignore, every loading integration suite, 596 Bzlmod tests, 55 query tests, the
-Windows cross-target check, the V2 CLI build, formatting and diff hygiene. An
-authentic fresh rules_rust 0.73 workspace replay through Slug's admitted
-`cquery --output=label` surface clears `GlobUnsupported` and stops at the
-deferred generic `toolchain_type` parameter mismatch (`Label` supplied where
-the current declaration expects `str`). The fixture's Bazel-only
-`--starlark:file` and `--noshow_progress` options remain outside Slug's admitted
-cquery CLI surface and were omitted from the product-path replay.
-
-The overall milestone remains WIP. Next, audit the complete generic builtin
-declaration/schema category exposed by the `toolchain_type = Label(...)` stop,
-including sibling builtins that accept label-like values, before authorizing
-Rust. Keep rules_rust, rules_cc, `cc_common`, `cc_internal` and
-`@@bazel_tools//tools/res` as ordinary consumers; do not patch this one call
-site or widen toolchain/configured-analysis semantics implicitly.
-
-Independent terminal implementation review returns `ACCEPT`: the source
-scopes are structurally distinct, existing listing/boundary dependencies own
-catalog facts, failures precede publication, Host/platform behavior remains
-bounded, the proof is discriminating, and the implementation stays within the
-allowlist and caps.
+Independent architecture review must return `ACCEPT` before Rust begins.

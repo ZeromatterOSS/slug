@@ -7819,3 +7819,32 @@ lines. Catalog glob routing is implemented; successful `tools/res` package
 publication remains deferred at the later generic `toolchain_type` Label-versus-
 string schema boundary. The next packet must audit that complete builtin
 parameter category rather than specialize this package or consumer.
+
+### Native builtin label-like direct parameters selected (2026-09-02)
+
+Commit `bf509cd8b` accepts repository-source glob routing, and its authentic
+replay selects the generic direct native parameter boundary when
+`toolchain_type` receives a preconstructed `Label`. Select docs-first
+`WP-4-7A-native-builtin-label-like-parameter-category-design-r1`.
+
+Pinned Bazel 9.2 `BuildType.LabelType` preserves an existing `Label` and sends
+only strings through the package converter; list, nodep-list and label-keyed
+dictionary shapes recurse through that same owner. Audit the complete admitted
+direct parameter inventory across package metadata, package groups, alias,
+test-suite, config-setting, constraint/platform and toolchain declarations.
+Reuse Slug's existing `RawAttributeValue`/`RawLabelContext::Package` conversion
+and sole `CanonicalLabel` result. Add no parser, mapping policy, DICE key,
+retained representation, selector/configured behavior, output/path grammar,
+ruleset, toolchain-selection, C++, `cc_common` or `cc_internal` special case.
+
+The pinned generic conversion source/tests plus the accepted verbatim catalog
+replay are the exact evidence basis; no new oracle fixture is selected.
+Independent architecture review must accept the inventory, defining-versus-
+calling-package ownership discriminator, collision/failure proof, allowlist,
+caps and stops before Rust begins.
+
+Initial review corrected the pinned Alias/ToolchainType/PackageGroup source
+filenames, required canonical duplicate rejection for
+`default_package_metadata`, and removed Slug's target-pattern-name filter from
+ordinary attribute labels. Focused correction rereview returns `ACCEPT`; Rust
+may proceed only within the corrected packet.
