@@ -6,12 +6,12 @@ Milestone: M7A bootstrap-critical generic Starlark/loading closure. Audit and
 freeze the complete admitted native-builtin direct-parameter category in which
 Bazel 9.2 accepts either a string spelling or an already-constructed `Label`.
 
-Status: initial independent review returned `REVISE` on three bounded contract
-details. R1 now cites the actual pinned Alias/ToolchainType/PackageGroup owners,
-requires canonical duplicate rejection for `default_package_metadata`, and
-removes the Slug-only target-pattern-name rejection from ordinary label
-attributes. Focused correction rereview returns `ACCEPT`; Rust is authorized
-only within this corrected packet.
+Status: terminally `ACCEPTED`. Initial architecture review returned `REVISE`
+on three bounded contract details; R1 corrected the source owners, package-
+metadata duplicate contract and ordinary-label grammar. Terminal implementation
+review returned one bounded proof-only `REVISE` for nested `None` and exact
+wildcard-like target-name assertions. The focused correction rereview returns
+`ACCEPT` with production/proof/total additions of 186/315/501 lines.
 
 Immediate predecessor `WP-4-5-7A-repository-source-glob-routing-category-
 implementation-r2` is terminally accepted in `bf509cd8b`. Its source-routed
@@ -241,6 +241,29 @@ The rebuilt authentic rules_rust replay must clear the current
 `toolchain_type` Label-versus-string diagnostic and select only the next
 generic unsupported category, if any. It is downstream evidence, not
 authority for ruleset behavior.
+
+## Terminal implementation outcome
+
+The implementation replaces every inventoried direct String-only adapter with
+a thin projection through the existing raw package-context coercer. Typed
+labels retain their defining identity, raw strings use the calling BUILD
+package, canonical collisions and invalid nested values fail before
+publication, and ordinary label target names remain distinct from target-
+pattern APIs. No parser, DICE owner, retained representation, I/O, fallback or
+consumer special case was added.
+
+Serial validation passes 508 loading library tests with one ignored, every
+loading integration binary, 596 Bzlmod tests, 55 query tests, the V2 CLI build,
+formatting and diff checks. The archive checker passes its refs and structural
+gates and reports only the three longstanding thoughts-path allowlist failures;
+the parked registration edit is absent. The isolated authenticated rules_rust
+configured-query replay clears the former `toolchain_type` Label-versus-string
+diagnostic and next stops at missing predeclared `analysis_test_transition` in
+`@@bazel_skylib+//lib:unittest.bzl`. No stale `slugd` remains.
+
+Next, audit the complete Bazel 9.2 predeclared `analysis_test_transition`
+category docs-first. Do not add a bazel_skylib/rules_rust consumer branch or
+silently widen configured-analysis test semantics.
 
 ## Allowlist, caps and complexity
 

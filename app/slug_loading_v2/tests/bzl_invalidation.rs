@@ -1838,6 +1838,41 @@ fn package_context_labels_have_same_dice_equality_and_definition_lifecycle() {
 }
 
 #[test]
+fn native_direct_labels_cut_off_equivalent_packages_and_restore_changed_owners() {
+    let workspace = scratch("native-direct-label-equality");
+    let package = workspace.join("pkg");
+    let build = package.join("BUILD.bazel");
+    let defs = package.join("defs.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    write(
+        &build,
+        "load(\":defs.bzl\", \"TYPED\")\nalias(name = \"subject\", actual = \":one\")\n",
+    );
+    write(&defs, "TYPED = Label(\":one\")\n");
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load = || load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+
+    let raw = load();
+    write(
+        &build,
+        "load(\":defs.bzl\", \"TYPED\")\nalias(name = \"subject\", actual = TYPED)\n",
+    );
+    let typed = load();
+    assert_eq!(raw, typed);
+
+    write(&defs, "TYPED = Label(\"//other:one\")\n");
+    let changed = load();
+    assert_ne!(raw, changed);
+
+    write(&defs, "TYPED = Label(\":one\")\n");
+    assert_eq!(raw, load());
+}
+
+#[test]
 fn toolchain_requirements_have_definition_lifecycle_and_semantic_equality() {
     let workspace = scratch("toolchain-requirement-lifecycle");
     let package = workspace.join("consumer");

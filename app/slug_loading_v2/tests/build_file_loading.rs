@@ -973,7 +973,7 @@ fn config_setting_retains_all_matching_fields_and_provenance() {
         .unwrap_err()
         .to_string();
     assert!(
-        error.contains("duplicate canonical label `@@//pkg:flag`"),
+        error.contains("duplicate canonical label dictionary key '@@//pkg:flag'"),
         "{error}"
     );
 }
@@ -1264,6 +1264,283 @@ toolchain(
 }
 
 #[test]
+fn native_direct_label_parameters_accept_loaded_labels_and_strings() {
+    let workspace = scratch("native-direct-label-parameters");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+TYPED = Label(":typed")
+def native_emit():
+    native.constraint_value(name = "native_value", constraint_setting = TYPED)
+    native.platform(name = "native_platform", constraint_values = [TYPED, ":raw"])
+    native.toolchain(name = "native_toolchain", toolchain = TYPED, toolchain_type = ":raw", exec_compatible_with = [TYPED])
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"
+load(":defs.bzl", "TYPED", "native_emit")
+package(default_testonly = True)
+native.package(default_package_metadata = [TYPED, ":metadata"])
+package_group(name = "group", includes = [TYPED, ":included"])
+alias(name = "alias", actual = TYPED)
+test_suite(name = "suite", tests = [TYPED, ":test"])
+config_setting(name = "config", flag_values = {TYPED: "typed", ":flag": "raw"}, constraint_values = [TYPED, ":constraint"])
+constraint_value(name = "value", constraint_setting = TYPED)
+platform(name = "platform", constraint_values = [TYPED, ":raw"])
+toolchain(name = "tool", toolchain = TYPED, toolchain_type = ":raw", exec_compatible_with = [TYPED], target_compatible_with = [":target"])
+native_emit()
+"#,
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let target = |name: &str| {
+        loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap()
+    };
+    assert!(matches!(
+        &target("alias").kind,
+        PackageTargetKind::Alias { actual } if actual == &CanonicalLabel::parse("@@//pkg:typed").unwrap()
+    ));
+    let PackageTargetKind::PackageGroup { includes, .. } = &target("group").kind else {
+        panic!("expected package group")
+    };
+    assert_eq!(
+        includes.as_ref(),
+        [
+            CanonicalLabel::parse("@@//pkg:typed").unwrap(),
+            CanonicalLabel::parse("@@//pkg:included").unwrap(),
+        ]
+    );
+    assert!(matches!(
+        &target("platform").kind,
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform { constraint_values })
+            if constraint_values.as_ref() == [
+                CanonicalLabel::parse("@@//pkg:typed").unwrap(),
+                CanonicalLabel::parse("@@//pkg:raw").unwrap(),
+            ]
+    ));
+    for name in ["value", "native_value"] {
+        assert!(matches!(
+            &target(name).kind,
+            PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintValue { constraint_setting })
+                if constraint_setting == &CanonicalLabel::parse("@@//pkg:typed").unwrap()
+        ));
+    }
+    for name in ["native_platform", "platform"] {
+        assert!(matches!(
+            &target(name).kind,
+            PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform { constraint_values })
+                if constraint_values.as_ref() == [
+                    CanonicalLabel::parse("@@//pkg:typed").unwrap(),
+                    CanonicalLabel::parse("@@//pkg:raw").unwrap(),
+                ]
+        ));
+    }
+    let PackageTargetKind::ConfigSetting { declaration } = &target("config").kind else {
+        panic!("expected config setting")
+    };
+    assert_eq!(
+        declaration.flag_values().value().as_ref(),
+        [
+            (CanonicalLabel::parse("@@//pkg:flag").unwrap(), "raw".into()),
+            (
+                CanonicalLabel::parse("@@//pkg:typed").unwrap(),
+                "typed".into()
+            ),
+        ]
+    );
+    assert_eq!(
+        declaration.constraint_values().value().as_ref(),
+        [
+            CanonicalLabel::parse("@@//pkg:typed").unwrap(),
+            CanonicalLabel::parse("@@//pkg:constraint").unwrap(),
+        ]
+    );
+
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"TYPED\")\npackage(default_package_metadata = [TYPED, \":typed\"])\n",
+    )
+    .unwrap();
+    assert!(
+        try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string()
+            .contains("duplicated")
+    );
+}
+
+#[test]
+fn native_direct_label_parameters_preserve_defining_label_identity() {
+    let workspace = scratch("native-direct-label-defining-owner");
+    let owner = workspace.join("owner");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&owner).unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(owner.join(BUILD_FILE_PRIMARY), "").unwrap();
+    fs::write(
+        owner.join("defs.bzl"),
+        r#"
+TYPED = Label(":typed")
+def emit():
+    native.toolchain(name = "tool", toolchain = TYPED, toolchain_type = ":raw")
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\"//owner:defs.bzl\", \"TYPED\", \"emit\")\nalias(name = \"alias\", actual = TYPED)\nemit()\n",
+    )
+    .unwrap();
+
+    let loaded =
+        try_load_package_with_extra_bzl(&workspace, &package, &[owner.join("defs.bzl")]).unwrap();
+    assert!(matches!(
+        &loaded.targets[0].kind,
+        PackageTargetKind::Alias { actual }
+            if actual == &CanonicalLabel::parse("@@//owner:typed").unwrap()
+    ));
+    assert!(matches!(
+        &loaded.targets[1].kind,
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+            implementation,
+            toolchain_type,
+            ..
+        }) if implementation == &CanonicalLabel::parse("@@//owner:typed").unwrap()
+            && toolchain_type == &CanonicalLabel::parse("@@//pkg:raw").unwrap()
+    ));
+}
+
+#[test]
+fn native_direct_label_parameters_fail_before_publication() {
+    let workspace = scratch("native-direct-label-failures");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(package.join("defs.bzl"), "TYPED = Label(\":typed\")\n").unwrap();
+    let cases = [
+        "alias(name = 'bad', actual = 1)",
+        "test_suite(name = 'bad', tests = [1])",
+        "test_suite(name = 'bad', tests = [None])",
+        "config_setting(name = 'bad', flag_values = {1: 'value'})",
+        "config_setting(name = 'bad', flag_values = {':key': 1})",
+        "config_setting(name = 'bad', flag_values = {None: 'value'})",
+        "config_setting(name = 'bad', flag_values = {':key': None})",
+        "platform(name = 'bad', constraint_values = None)",
+        "package(default_package_metadata = [':same', '//pkg:same'])",
+        "native.package(default_package_metadata = [':same', '//pkg:same'])",
+        "load(':defs.bzl', 'TYPED')\nconfig_setting(name = 'bad', flag_values = {TYPED: 'one', ':typed': 'two'})",
+    ];
+    for (index, source) in cases.into_iter().enumerate() {
+        fs::write(package.join(BUILD_FILE_PRIMARY), source).unwrap();
+        assert!(
+            try_load_package(&workspace, &package).is_err(),
+            "failure {index} published a package: {source}"
+        );
+    }
+}
+
+#[test]
+fn native_label_facades_retain_the_same_direct_values() {
+    let workspace = scratch("native-direct-label-facades");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "TYPED = Label(\":typed\")\nSPECIALS = [Label(\":all\"), Label(\":all-targets\"), Label(\":*\"), Label(\":...\"), Label(\":sub/...\")]\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"
+load(":defs.bzl", "TYPED", "SPECIALS")
+native.package(default_package_metadata = [TYPED, ":metadata"])
+native.package_group(name = "group", includes = [TYPED, ":included"])
+native.alias(name = "alias", actual = TYPED)
+native.test_suite(name = "suite", tests = [TYPED, ":test"])
+native.config_setting(name = "config", flag_values = {TYPED: "typed"}, constraint_values = [TYPED])
+platform(name = "raw_names", constraint_values = [":all", ":all-targets", ":*", ":...", ":sub/..."])
+platform(name = "typed_names", constraint_values = SPECIALS)
+toolchain(name = "direct_tool", toolchain = TYPED, toolchain_type = ":raw", exec_compatible_with = [TYPED, ":exec"], target_compatible_with = [":target"])
+native.toolchain(name = "native_tool", toolchain = TYPED, toolchain_type = ":raw", exec_compatible_with = [TYPED, ":exec"], target_compatible_with = [":target"])
+filegroup(name = "metadata")
+"#,
+    )
+    .unwrap();
+    let loaded = load_package(&workspace, &package);
+    let target = |name: &str| {
+        loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap()
+    };
+    assert!(
+        matches!(&target("alias").kind, PackageTargetKind::Alias { actual }
+        if actual == &CanonicalLabel::parse("@@//pkg:typed").unwrap())
+    );
+    assert!(
+        matches!(&target("suite").kind, PackageTargetKind::TestSuite { membership: TestSuiteMembership::Explicit { tests }, .. }
+        if tests.as_ref() == [CanonicalLabel::parse("@@//pkg:test").unwrap(), CanonicalLabel::parse("@@//pkg:typed").unwrap()])
+    );
+    assert!(
+        matches!(&target("group").kind, PackageTargetKind::PackageGroup { includes, .. }
+        if includes.as_ref() == [CanonicalLabel::parse("@@//pkg:typed").unwrap(), CanonicalLabel::parse("@@//pkg:included").unwrap()])
+    );
+    let PackageTargetKind::ConfigSetting { declaration } = &target("config").kind else {
+        panic!("config")
+    };
+    assert_eq!(
+        declaration.flag_values().value().as_ref(),
+        [(
+            CanonicalLabel::parse("@@//pkg:typed").unwrap(),
+            "typed".into()
+        )]
+    );
+    assert_eq!(
+        declaration.constraint_values().value().as_ref(),
+        [CanonicalLabel::parse("@@//pkg:typed").unwrap()]
+    );
+    assert!(matches!(
+        &loaded.native_attributes("metadata").unwrap().get("package_metadata").unwrap().1.value,
+        CoercedAttributeValue::LabelList(labels) if labels.as_ref() == [
+            CanonicalLabel::parse("@@//pkg:typed").unwrap(),
+            CanonicalLabel::parse("@@//pkg:metadata").unwrap(),
+        ]
+    ));
+    let special_labels = ["all", "all-targets", "*", "...", "sub/..."]
+        .map(|name| CanonicalLabel::parse(&format!("@@//pkg:{name}")).unwrap());
+    for name in ["raw_names", "typed_names"] {
+        assert!(matches!(
+            &target(name).kind,
+            PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform { constraint_values })
+                if constraint_values.as_ref() == special_labels
+        ));
+    }
+    for name in ["direct_tool", "native_tool"] {
+        assert!(matches!(
+            &target(name).kind,
+            PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain { toolchain_type, implementation, exec_compatible_with, target_compatible_with, .. })
+                if toolchain_type == &CanonicalLabel::parse("@@//pkg:raw").unwrap()
+                    && implementation == &CanonicalLabel::parse("@@//pkg:typed").unwrap()
+                    && exec_compatible_with.value().len() == 2
+                    && target_compatible_with.value().as_ref() == [CanonicalLabel::parse("@@//pkg:target").unwrap()]
+        ));
+    }
+}
+
+#[test]
 fn constraint_setting_retains_default_value_presence() {
     let workspace = scratch("constraint-setting-default");
     fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
@@ -1519,24 +1796,8 @@ fn native_toolchain_targets_fail_closed_for_wrong_shapes_and_name_collisions() {
             "constraint_values",
         ),
         (
-            "platform(name = 'bad', constraint_values = (':one',))",
-            "constraint_values",
-        ),
-        (
-            "platform(name = 'bad', constraint_values = ['//pkg/...'])",
-            "direct target labels",
-        ),
-        (
-            "toolchain(name = 'bad', exec_compatible_with = ['//pkg:*'], toolchain = ':impl', toolchain_type = ':type')",
-            "direct target labels",
-        ),
-        (
             "toolchain(name = 'bad', target_compatible_with = ':one', toolchain = ':impl', toolchain_type = ':type')",
             "target_compatible_with",
-        ),
-        (
-            "toolchain(name = 'bad', target_compatible_with = ['//pkg/...'], toolchain = ':impl', toolchain_type = ':type')",
-            "direct target labels",
         ),
         (
             "toolchain(name = 'bad', use_target_platform_constraints = 'yes', toolchain = ':impl', toolchain_type = ':type')",

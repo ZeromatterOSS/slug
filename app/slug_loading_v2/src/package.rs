@@ -63,7 +63,6 @@ use starlark::values::dict::AllocDict;
 use starlark::values::dict::DictRef;
 use starlark::values::list::AllocList;
 use starlark::values::list::ListRef;
-use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
@@ -1325,8 +1324,15 @@ impl PackageRecorder {
         visibility: Option<Vec<VisibilityArgument>>,
         deprecation: Option<String>,
         testonly: Option<bool>,
-        package_metadata: Option<Vec<String>>,
+        package_metadata: Option<Arc<[CanonicalLabel]>>,
     ) -> anyhow::Result<()> {
+        if let Some(package_metadata) = &package_metadata {
+            reject_duplicate_canonical_labels(
+                package_metadata,
+                "default_package_metadata",
+                "package",
+            )?;
+        }
         let mut state = self.state.borrow_mut();
         if let Some(visibility) = visibility {
             state.default_visibility = self.parse_visibility(visibility)?;
@@ -1338,11 +1344,7 @@ impl PackageRecorder {
             state.default_testonly = testonly;
         }
         if let Some(package_metadata) = package_metadata {
-            state.default_package_metadata = package_metadata
-                .iter()
-                .map(|label| self.dependency_label(label))
-                .collect::<anyhow::Result<Vec<_>>>()?
-                .into();
+            state.default_package_metadata = package_metadata;
         }
         Ok(())
     }
@@ -1423,16 +1425,12 @@ impl PackageRecorder {
     fn test_suite(
         &self,
         name: String,
-        tests: Option<Vec<String>>,
+        tests: Option<Arc<[CanonicalLabel]>>,
         mut tags: Vec<String>,
         visibility: Option<Vec<VisibilityArgument>>,
     ) -> anyhow::Result<()> {
         let tests_explicit = tests.is_some();
-        let mut tests = tests
-            .unwrap_or_default()
-            .iter()
-            .map(|test| self.dependency_label(test))
-            .collect::<anyhow::Result<Vec<_>>>()?;
+        let mut tests = tests.unwrap_or_default().to_vec();
         reject_duplicate_canonical_labels(&tests, "tests", &name)?;
         tests.sort_by(CanonicalLabel::bazel_natural_cmp);
         tags.sort_unstable();
@@ -1463,10 +1461,9 @@ impl PackageRecorder {
     fn alias(
         &self,
         name: String,
-        actual: String,
+        actual: CanonicalLabel,
         visibility: Option<Vec<VisibilityArgument>>,
     ) -> anyhow::Result<()> {
-        let actual = self.dependency_label(&actual)?;
         self.record_target(
             name,
             PackageTargetKind::Alias { actual },
@@ -1479,8 +1476,8 @@ impl PackageRecorder {
         name: String,
         values: Option<SmallMap<String, String>>,
         define_values: Option<SmallMap<String, String>>,
-        flag_values: Option<SmallMap<String, String>>,
-        constraint_values: Option<Vec<String>>,
+        flag_values: Option<Arc<[(CanonicalLabel, CompactString)]>>,
+        constraint_values: Option<Arc<[CanonicalLabel]>>,
         visibility: Option<Vec<VisibilityArgument>>,
     ) -> anyhow::Result<()> {
         let normalize_strings = |values: Option<SmallMap<String, String>>| {
@@ -1495,36 +1492,11 @@ impl PackageRecorder {
         };
         let values = normalize_strings(values);
         let define_values = normalize_strings(define_values);
-        let flag_values = flag_values
-            .map(|values| {
-                let mut result = Vec::with_capacity(values.len());
-                for (label, value) in values {
-                    let label = self.dependency_label(&label)?;
-                    if result
-                        .iter()
-                        .any(|(existing, _): &(CanonicalLabel, CompactString)| {
-                            existing.bazel_natural_cmp(&label).is_eq()
-                        })
-                    {
-                        anyhow::bail!("duplicate canonical label `{label}` in flag_values")
-                    }
-                    result.push((label, CompactString::from(value)));
-                }
-                result.sort_by(|(left, _), (right, _)| {
-                    CanonicalLabel::bazel_natural_cmp(left, right)
-                });
-                Ok::<Arc<[(CanonicalLabel, CompactString)]>, anyhow::Error>(result.into())
-            })
-            .transpose()?;
-        let constraint_values = constraint_values
-            .map(|values| {
-                values
-                    .iter()
-                    .map(|value| self.dependency_label(value))
-                    .collect::<anyhow::Result<Vec<_>>>()
-                    .map(Arc::from)
-            })
-            .transpose()?;
+        let flag_values = flag_values.map(|values| {
+            let mut values = values.to_vec();
+            values.sort_by(|(left, _), (right, _)| CanonicalLabel::bazel_natural_cmp(left, right));
+            Arc::from(values)
+        });
         self.record_target(
             name,
             PackageTargetKind::ConfigSetting {
@@ -1566,37 +1538,20 @@ impl PackageRecorder {
         )
     }
 
-    fn native_toolchain_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
-        let target = value.rsplit_once(':').map(|(_, target)| target);
-        let recursive = target.is_none() && (value == "..." || value.ends_with("/..."));
-        if recursive || matches!(target, Some("all" | "all-targets" | "*")) {
-            anyhow::bail!("native toolchain declarations require direct target labels")
-        }
-        self.dependency_label(value)
-    }
-
-    fn native_toolchain_labels(&self, values: &[&str]) -> anyhow::Result<Arc<[CanonicalLabel]>> {
-        values
-            .iter()
-            .map(|value| self.native_toolchain_label(value))
-            .collect::<anyhow::Result<Vec<_>>>()
-            .map(Arc::from)
-    }
-
     fn native_toolchain_declaration<'v>(
         &self,
-        toolchain: &str,
-        toolchain_type: &str,
-        exec_compatible_with: Option<UnpackList<&str>>,
-        target_compatible_with: Option<UnpackList<&str>>,
+        toolchain: Value<'v>,
+        toolchain_type: Value<'v>,
+        exec_compatible_with: Option<Value<'v>>,
+        target_compatible_with: Option<Value<'v>>,
         use_target_platform_constraints: Option<bool>,
         target_settings: Option<Value<'v>>,
     ) -> anyhow::Result<NativeToolchainTarget> {
         let exec_compatible_with = exec_compatible_with
-            .map(|values| self.native_toolchain_labels(&values.items))
+            .map(|values| coerce_native_direct_labels(self, "exec_compatible_with", values))
             .transpose()?;
         let target_compatible_with = target_compatible_with
-            .map(|values| self.native_toolchain_labels(&values.items))
+            .map(|values| coerce_native_direct_labels(self, "target_compatible_with", values))
             .transpose()?;
         let target_settings = target_settings
             .map(|value| {
@@ -1610,8 +1565,8 @@ impl PackageRecorder {
             })
             .transpose()?;
         Ok(NativeToolchainTarget::Toolchain {
-            toolchain_type: self.native_toolchain_label(toolchain_type)?,
-            implementation: self.native_toolchain_label(toolchain)?,
+            toolchain_type: coerce_native_direct_label(self, "toolchain_type", toolchain_type)?,
+            implementation: coerce_native_direct_label(self, "toolchain", toolchain)?,
             exec_compatible_with: NativeToolchainAttribute::from_optional(
                 exec_compatible_with,
                 Arc::from([]),
@@ -1635,19 +1590,12 @@ impl PackageRecorder {
         &self,
         name: String,
         packages: Vec<String>,
-        includes: Vec<String>,
+        includes: Arc<[CanonicalLabel]>,
     ) -> anyhow::Result<()> {
         let contents = Arc::new(PackageGroupContents::from_package_specs(&packages)?);
-        let includes = includes
-            .iter()
-            .map(|include| self.dependency_label(include))
-            .collect::<anyhow::Result<Vec<_>>>()?;
         self.record_target(
             name,
-            PackageTargetKind::PackageGroup {
-                contents,
-                includes: includes.into(),
-            },
+            PackageTargetKind::PackageGroup { contents, includes },
             VisibilitySource::AlwaysPublic,
         )
     }
@@ -2956,12 +2904,12 @@ fn aspect_exec_compatible_with(
         .map(Arc::from)
 }
 
-fn package_global(
+fn package_global<'v>(
     default_visibility: Option<UnpackVisibility>,
     default_deprecation: Option<&str>,
     default_testonly: Option<bool>,
-    default_package_metadata: Option<UnpackListOrTuple<&str>>,
-    eval: &mut Evaluator,
+    default_package_metadata: Option<Value<'v>>,
+    eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<NoneType> {
     let recorder = PackageRecorder::from_evaluator(eval)?;
     recorder.reject_macro_operation("package()")?;
@@ -2969,7 +2917,9 @@ fn package_global(
         default_visibility.map(|value| value.items),
         default_deprecation.map(ToOwned::to_owned),
         default_testonly,
-        default_package_metadata.map(list),
+        default_package_metadata
+            .map(|value| coerce_native_direct_labels(recorder, "default_package_metadata", value))
+            .transpose()?,
     )?;
     Ok(NoneType)
 }
@@ -3007,17 +2957,19 @@ fn filegroup_global<'v>(
     Ok(NoneType)
 }
 
-fn test_suite_global(
+fn test_suite_global<'v>(
     name: &str,
-    tests: Option<UnpackListOrTuple<&str>>,
+    tests: Option<Value<'v>>,
     tags: UnpackListOrTuple<&str>,
     visibility: Option<UnpackVisibility>,
-    eval: &mut Evaluator,
+    eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<NoneType> {
     let recorder = PackageRecorder::from_evaluator(eval)?;
     recorder.test_suite(
         name.to_owned(),
-        tests.map(list),
+        tests
+            .map(|value| coerce_native_direct_labels(recorder, "tests", value))
+            .transpose()?,
         list(tags),
         visibility.map(|value| value.items),
     )?;
@@ -3025,16 +2977,16 @@ fn test_suite_global(
     Ok(NoneType)
 }
 
-fn alias_global(
+fn alias_global<'v>(
     name: &str,
-    actual: &str,
+    actual: Value<'v>,
     visibility: Option<UnpackVisibility>,
-    eval: &mut Evaluator,
+    eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<NoneType> {
     let recorder = PackageRecorder::from_evaluator(eval)?;
     recorder.alias(
         name.to_owned(),
-        actual.to_owned(),
+        coerce_native_direct_label(recorder, "actual", actual)?,
         visibility.map(|value| value.items),
     )?;
     recorder.set_native_generator_from_evaluator(name, eval)?;
@@ -3634,6 +3586,45 @@ fn coerce_starlark_value(
         anyhow::anyhow!("attribute `{attribute_name}` must contain only string labels")
     })?;
     coerce_raw_value(RawLabelContext::Package(recorder), kind, &raw)
+}
+
+fn coerce_native_direct_label(
+    recorder: &PackageRecorder,
+    attribute: &str,
+    value: Value,
+) -> anyhow::Result<CanonicalLabel> {
+    match coerce_starlark_value(recorder, AttributeKind::Label, attribute, false, value)? {
+        CoercedAttributeValue::Label(label) => Ok(label),
+        _ => anyhow::bail!("attribute `{attribute}` must be a label"),
+    }
+}
+
+fn coerce_native_direct_labels(
+    recorder: &PackageRecorder,
+    attribute: &str,
+    value: Value,
+) -> anyhow::Result<Arc<[CanonicalLabel]>> {
+    match coerce_starlark_value(recorder, AttributeKind::LabelList, attribute, false, value)? {
+        CoercedAttributeValue::LabelList(labels) => Ok(labels),
+        _ => anyhow::bail!("attribute `{attribute}` must be a list of labels"),
+    }
+}
+
+fn coerce_native_direct_label_keyed_strings(
+    recorder: &PackageRecorder,
+    attribute: &str,
+    value: Value,
+) -> anyhow::Result<Arc<[(CanonicalLabel, CompactString)]>> {
+    match coerce_starlark_value(
+        recorder,
+        AttributeKind::LabelKeyedStringDict,
+        attribute,
+        false,
+        value,
+    )? {
+        CoercedAttributeValue::LabelKeyedStringDict(values) => Ok(values),
+        _ => anyhow::bail!("attribute `{attribute}` must be a label-keyed string dictionary"),
+    }
 }
 
 fn coerce_string_set_default<'v>(
@@ -8309,12 +8300,12 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         })
     }
 
-    fn package(
+    fn package<'v>(
         default_visibility: Option<UnpackVisibility>,
         default_deprecation: Option<&str>,
         default_testonly: Option<bool>,
-        default_package_metadata: Option<UnpackListOrTuple<&str>>,
-        eval: &mut Evaluator,
+        default_package_metadata: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         package_global(
             default_visibility,
@@ -8352,7 +8343,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn test_suite<'v>(
         name: &str,
-        tests: Option<UnpackListOrTuple<&str>>,
+        tests: Option<Value<'v>>,
         #[starlark(default=UnpackListOrTuple::default())] tags: UnpackListOrTuple<&str>,
         visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
@@ -8365,7 +8356,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn alias<'v>(
         name: &str,
-        actual: &str,
+        actual: Value<'v>,
         visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -8382,8 +8373,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         name: &str,
         #[starlark(require = named)] values: Option<SmallMap<String, String>>,
         #[starlark(require = named)] define_values: Option<SmallMap<String, String>>,
-        #[starlark(require = named)] flag_values: Option<SmallMap<String, String>>,
-        #[starlark(require = named)] constraint_values: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] flag_values: Option<Value<'v>>,
+        #[starlark(require = named)] constraint_values: Option<Value<'v>>,
         visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -8393,8 +8384,14 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             name.to_owned(),
             values,
             define_values,
-            flag_values,
-            constraint_values.map(list),
+            flag_values
+                .map(|value| {
+                    coerce_native_direct_label_keyed_strings(recorder, "flag_values", value)
+                })
+                .transpose()?,
+            constraint_values
+                .map(|value| coerce_native_direct_labels(recorder, "constraint_values", value))
+                .transpose()?,
             visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
@@ -8413,13 +8410,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let default_constraint_value = match default_constraint_value {
             None => None,
             Some(value) if value.is_none() => None,
-            Some(value) => Some(if let Some(label) = StarlarkLabel::from_value(value) {
-                label.canonical().clone()
-            } else if let Some(label) = value.unpack_str() {
-                recorder.native_toolchain_label(label)?
-            } else {
-                anyhow::bail!("default_constraint_value must be a Label, string, or None")
-            }),
+            Some(value) => Some(coerce_native_direct_label(
+                recorder,
+                "default_constraint_value",
+                value,
+            )?),
         };
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
@@ -8435,7 +8430,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn constraint_value<'v>(
         name: &str,
-        constraint_setting: &str,
+        constraint_setting: Value<'v>,
         visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -8444,7 +8439,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
             NativeToolchainTarget::ConstraintValue {
-                constraint_setting: recorder.native_toolchain_label(constraint_setting)?,
+                constraint_setting: coerce_native_direct_label(
+                    recorder,
+                    "constraint_setting",
+                    constraint_setting,
+                )?,
             },
             visibility.map(|value| value.items),
         )?;
@@ -8455,7 +8454,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn platform<'v>(
         name: &str,
-        #[starlark(default = UnpackList::default())] constraint_values: UnpackList<&str>,
+        constraint_values: Option<Value<'v>>,
         visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -8464,7 +8463,10 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
             NativeToolchainTarget::Platform {
-                constraint_values: recorder.native_toolchain_labels(&constraint_values.items)?,
+                constraint_values: constraint_values
+                    .map(|value| coerce_native_direct_labels(recorder, "constraint_values", value))
+                    .transpose()?
+                    .unwrap_or_default(),
             },
             visibility.map(|value| value.items),
         )?;
@@ -8492,10 +8494,10 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn toolchain<'v>(
         name: &str,
-        toolchain: &str,
-        toolchain_type: &str,
-        #[starlark(require = named)] exec_compatible_with: Option<UnpackList<&str>>,
-        #[starlark(require = named)] target_compatible_with: Option<UnpackList<&str>>,
+        toolchain: Value<'v>,
+        toolchain_type: Value<'v>,
+        #[starlark(require = named)] exec_compatible_with: Option<Value<'v>>,
+        #[starlark(require = named)] target_compatible_with: Option<Value<'v>>,
         #[starlark(require = named)] use_target_platform_constraints: Option<bool>,
         #[starlark(require = named)] target_settings: Option<Value<'v>>,
         visibility: Option<UnpackVisibility>,
@@ -8520,16 +8522,20 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
-    fn package_group(
+    fn package_group<'v>(
         name: &str,
         #[starlark(default=UnpackListOrTuple::default())] packages: UnpackListOrTuple<&str>,
-        #[starlark(default=UnpackListOrTuple::default())] includes: UnpackListOrTuple<&str>,
-        eval: &mut Evaluator,
+        includes: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        PackageRecorder::from_evaluator(eval)?.package_group(
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.package_group(
             name.to_owned(),
             list(packages),
-            list(includes),
+            includes
+                .map(|value| coerce_native_direct_labels(recorder, "includes", value))
+                .transpose()?
+                .unwrap_or_default(),
         )?;
         Ok(NoneType)
     }
@@ -8853,6 +8859,23 @@ static NATIVE_METHODS: MethodsStatic = MethodsStatic::new();
 
 #[starlark_module]
 fn native_methods(builder: &mut MethodsBuilder) {
+    fn package<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        default_visibility: Option<UnpackVisibility>,
+        default_deprecation: Option<&str>,
+        default_testonly: Option<bool>,
+        default_package_metadata: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        package_global(
+            default_visibility,
+            default_deprecation,
+            default_testonly,
+            default_package_metadata,
+            eval,
+        )
+    }
+
     fn existing_rule(
         #[starlark(this)] _native: Value,
         name: &str,
@@ -8905,7 +8928,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
     fn test_suite<'v>(
         #[starlark(this)] _native: Value<'v>,
         name: &str,
-        tests: Option<UnpackListOrTuple<&str>>,
+        tests: Option<Value<'v>>,
         #[starlark(default=UnpackListOrTuple::default())] tags: UnpackListOrTuple<&str>,
         visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
@@ -8919,7 +8942,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
     fn alias<'v>(
         #[starlark(this)] _native: Value<'v>,
         name: &str,
-        actual: &str,
+        actual: Value<'v>,
         visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -8934,8 +8957,8 @@ fn native_methods(builder: &mut MethodsBuilder) {
         name: &str,
         #[starlark(require = named)] values: Option<SmallMap<String, String>>,
         #[starlark(require = named)] define_values: Option<SmallMap<String, String>>,
-        #[starlark(require = named)] flag_values: Option<SmallMap<String, String>>,
-        #[starlark(require = named)] constraint_values: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] flag_values: Option<Value<'v>>,
+        #[starlark(require = named)] constraint_values: Option<Value<'v>>,
         visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -8945,8 +8968,14 @@ fn native_methods(builder: &mut MethodsBuilder) {
             name.to_owned(),
             values,
             define_values,
-            flag_values,
-            constraint_values.map(list),
+            flag_values
+                .map(|value| {
+                    coerce_native_direct_label_keyed_strings(recorder, "flag_values", value)
+                })
+                .transpose()?,
+            constraint_values
+                .map(|value| coerce_native_direct_labels(recorder, "constraint_values", value))
+                .transpose()?,
             visibility.map(|value| value.items),
         )?;
         recorder.set_native_generator_from_evaluator(name, eval)?;
@@ -8966,13 +8995,11 @@ fn native_methods(builder: &mut MethodsBuilder) {
         let default_constraint_value = match default_constraint_value {
             None => None,
             Some(value) if value.is_none() => None,
-            Some(value) => Some(if let Some(label) = StarlarkLabel::from_value(value) {
-                label.canonical().clone()
-            } else if let Some(label) = value.unpack_str() {
-                recorder.native_toolchain_label(label)?
-            } else {
-                anyhow::bail!("default_constraint_value must be a Label, string, or None")
-            }),
+            Some(value) => Some(coerce_native_direct_label(
+                recorder,
+                "default_constraint_value",
+                value,
+            )?),
         };
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
@@ -8989,7 +9016,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
     fn constraint_value<'v>(
         #[starlark(this)] _native: Value<'v>,
         name: &str,
-        constraint_setting: &str,
+        constraint_setting: Value<'v>,
         visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -8998,7 +9025,11 @@ fn native_methods(builder: &mut MethodsBuilder) {
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
             NativeToolchainTarget::ConstraintValue {
-                constraint_setting: recorder.native_toolchain_label(constraint_setting)?,
+                constraint_setting: coerce_native_direct_label(
+                    recorder,
+                    "constraint_setting",
+                    constraint_setting,
+                )?,
             },
             visibility.map(|value| value.items),
         )?;
@@ -9010,7 +9041,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
     fn platform<'v>(
         #[starlark(this)] _native: Value<'v>,
         name: &str,
-        #[starlark(default = UnpackList::default())] constraint_values: UnpackList<&str>,
+        constraint_values: Option<Value<'v>>,
         visibility: Option<UnpackVisibility>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -9019,7 +9050,10 @@ fn native_methods(builder: &mut MethodsBuilder) {
         recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
             NativeToolchainTarget::Platform {
-                constraint_values: recorder.native_toolchain_labels(&constraint_values.items)?,
+                constraint_values: constraint_values
+                    .map(|value| coerce_native_direct_labels(recorder, "constraint_values", value))
+                    .transpose()?
+                    .unwrap_or_default(),
             },
             visibility.map(|value| value.items),
         )?;
@@ -9049,10 +9083,10 @@ fn native_methods(builder: &mut MethodsBuilder) {
     fn toolchain<'v>(
         #[starlark(this)] _native: Value<'v>,
         name: &str,
-        toolchain: &str,
-        toolchain_type: &str,
-        #[starlark(require = named)] exec_compatible_with: Option<UnpackList<&str>>,
-        #[starlark(require = named)] target_compatible_with: Option<UnpackList<&str>>,
+        toolchain: Value<'v>,
+        toolchain_type: Value<'v>,
+        #[starlark(require = named)] exec_compatible_with: Option<Value<'v>>,
+        #[starlark(require = named)] target_compatible_with: Option<Value<'v>>,
         #[starlark(require = named)] use_target_platform_constraints: Option<bool>,
         #[starlark(require = named)] target_settings: Option<Value<'v>>,
         visibility: Option<UnpackVisibility>,
@@ -9077,17 +9111,21 @@ fn native_methods(builder: &mut MethodsBuilder) {
         Ok(NoneType)
     }
 
-    fn package_group(
+    fn package_group<'v>(
         #[starlark(this)] _native: Value,
         name: &str,
         #[starlark(default=UnpackListOrTuple::default())] packages: UnpackListOrTuple<&str>,
-        #[starlark(default=UnpackListOrTuple::default())] includes: UnpackListOrTuple<&str>,
-        eval: &mut Evaluator,
+        includes: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        PackageRecorder::from_evaluator(eval)?.package_group(
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.package_group(
             name.to_owned(),
             list(packages),
-            list(includes),
+            includes
+                .map(|value| coerce_native_direct_labels(recorder, "includes", value))
+                .transpose()?
+                .unwrap_or_default(),
         )?;
         Ok(NoneType)
     }
