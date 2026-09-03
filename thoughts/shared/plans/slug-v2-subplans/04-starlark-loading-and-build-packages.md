@@ -8156,10 +8156,29 @@ loads only
 glob, repository call, native rule, generated input or configured value.
 
 Loading therefore needs no evaluator builtin, package owner, label rule,
-repository method or C++ branch. After the exact source key supplies the file,
-the existing canonical external-source route owns the rules_cc load. That
-existing recursive external rules_cc loading is reused and must pass unchanged.
-Invocation of the re-exported function, any new loading/evaluation behavior and
-subsequent local C++ configuration remain independent later boundaries. The
-catalog audit returns `ACCEPT` and selects only the bounded one-file Stage 5
-implementation packet.
+repository method or C++ branch merely to admit the facade bytes. The existing
+canonical external-source and recursive loading owners are candidates after a
+public label has been mapped and routed, but built-in cross-repository routing
+was not yet admitted. Invocation of the re-exported function and subsequent
+local C++ configuration remain independent later boundaries. The catalog audit
+returns `ACCEPT` for only the bounded one-file Stage 5 implementation; replay
+must identify whether routing is the next separate owner.
+
+### Built-in facade accepted; public-label load routing audit selected (2026-09-02)
+
+The one-file Stage 5 implementation is terminally accepted. Exact upstream
+bytes, source mode, direct listing and manifest identity pass; Stage 4 gains no
+evaluator builtin, package rule, C++ branch or alternate source owner.
+
+The authentic replay now evaluates the facade and stops at the existing typed
+`ExternalLoadLabelError::Repository` for its sole dependency,
+`@rules_cc//cc/toolchains:toolchain_config_utils.bzl`. This is a generic
+public-label load from the built-in repository into a repository already
+selected by Bzlmod, not another catalog miss.
+
+Select docs-only `WP-4-5-7A-builtin-external-bzl-load-routing-audit`. Audit the
+smallest composition of the built-in caller's repository mapping, canonical
+selected-repository route and existing recursive external Bzl source/load
+owners. Preserve exact label and mapping semantics; do not add a rules_cc,
+apple_support, C++ or toolchain special case, and do not change Rust in the
+audit.

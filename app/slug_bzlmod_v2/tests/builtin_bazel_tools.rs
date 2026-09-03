@@ -184,6 +184,11 @@ const FILES: &[(&str, &str, bool)] = &[
         false,
     ),
     (
+        "tools/cpp/lib_cc_configure.bzl",
+        "da7e4ae162120582a7a703b5657286dffe61fdf37cc489a4fc7625608517370c",
+        false,
+    ),
+    (
         "tools/cpp/windows_cc_configure.bzl",
         "7d1b13bdc2b1f5b8cbfded820664fa7265087ac58909a7df33dad6878ace0bf3",
         false,
@@ -329,7 +334,7 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
     assert_eq!(identity.snapshot(), BuiltinBazelToolsSnapshot::Bazel9_2);
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
-        "de4c723127e85a58d4fc5331e16135cdc1448afc0edb3792a1515ee2266f198f"
+        "c313fad68f4e475d744dc6de7b658515b33c634905222e934a9d09129371f56f"
     );
 }
 

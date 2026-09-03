@@ -298,6 +298,12 @@ const CATALOG: &[CatalogEntry] = &[
         executable: false,
     },
     CatalogEntry {
+        path: "tools/cpp/lib_cc_configure.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/lib_cc_configure.bzl"),
+        expected_sha256: "da7e4ae162120582a7a703b5657286dffe61fdf37cc489a4fc7625608517370c",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/cpp/windows_cc_configure.bzl",
         bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/windows_cc_configure.bzl"),
         expected_sha256: "7d1b13bdc2b1f5b8cbfded820664fa7265087ac58909a7df33dad6878ace0bf3",
@@ -932,6 +938,10 @@ mod tests {
             [
                 ("cc_configure.bzl".to_owned(), PathDirectoryEntryKind::File,),
                 (
+                    "lib_cc_configure.bzl".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+                (
                     "windows_cc_configure.bzl".to_owned(),
                     PathDirectoryEntryKind::File,
                 ),
@@ -1105,7 +1115,7 @@ mod tests {
             evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &source).unwrap();
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
-            "de4c723127e85a58d4fc5331e16135cdc1448afc0edb3792a1515ee2266f198f"
+            "c313fad68f4e475d744dc6de7b658515b33c634905222e934a9d09129371f56f"
         );
         assert_eq!(value.module_sha256, source.sha256());
         assert_eq!(

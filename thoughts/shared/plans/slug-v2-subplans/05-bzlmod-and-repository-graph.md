@@ -4604,3 +4604,21 @@ needed. Select
 `WP-5-7A-bazel-tools-lib-cc-configure-catalog-implementation-r1` with the
 three-file allowlist and caps frozen in the active manifest. Broader catalog,
 rules_cc/C++/toolchain behavior and the next replay failure remain deferred.
+
+### Built-in lib_cc_configure catalog member accepted (2026-09-02)
+
+Independent terminal review returns `ACCEPT`. The exact 784-byte pinned facade
+is the only new asset; its source hash/mode, lexically ordered catalog row,
+direct `tools/cpp` listing and complete manifest digest are proved. Rust growth
+is 6 production and 11 proof lines, 17 total, and the asset remains 18 lines.
+No Stage 5 key, mapping, source route, installed-tree fallback or repository
+materialization owner changed.
+
+The rebuilt authentic rules_rust replay clears the catalog failure and reaches
+the facade's sole public-label dependency. It next stops at
+`@rules_cc//cc/toolchains:toolchain_config_utils.bzl` because the external Bzl
+loader explicitly defers repository-qualified loads. Select docs-only
+`WP-4-5-7A-builtin-external-bzl-load-routing-audit` to identify the smallest
+lawful composition of the built-in repository mapping with the already
+selected canonical rules_cc route. Do not copy rules_cc into the built-in
+catalog or add a consumer/ruleset/toolchain branch.
