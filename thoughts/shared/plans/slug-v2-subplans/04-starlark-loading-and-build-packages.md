@@ -8182,3 +8182,29 @@ selected-repository route and existing recursive external Bzl source/load
 owners. Preserve exact label and mapping semantics; do not add a rules_cc,
 apple_support, C++ or toolchain special case, and do not change Rust in the
 audit.
+
+### Built-in public-label external load routing audited (2026-09-02)
+
+The docs-only audit returns `ACCEPT`. Pinned Bazel 9.2 first accepts compiled
+source, then requests the importer's full repository mapping, resolves load
+labels in source order and retains that mapping with the load DAG. Its ordinary
+Bzlmod family is distinct from the bootstrap-only `@bazel_tools` self mapping.
+
+Slug's canonical built-in route already composes the graph-derived mapping,
+exact catalog source, canonical child routes, recursive external-Bzl keys,
+cycle handling and complete `BzlLoadManifest`. Preserve source/encoding/parse
+errors before mapping by promoting only an already-parsed root-shaped built-in
+module with exactly one nonempty apparent-repository load (`@name//...`, one
+leading `@`) to that canonical route as invocation scratch. Canonical `@@...`,
+explicit-main `@//...` and all other nonadmitted shapes keep their existing
+path or typed boundary. Multi-load public-label prevalidation remains deferred
+because canonical recursion does not yet validate every label before any child
+source. Within the admitted shape, mapping/label errors precede the sole child
+source and the unchanged resolver maps `rules_cc` to `rules_cc+`.
+
+Select
+`WP-4-5-7A-builtin-external-bzl-load-routing-implementation-r1`. Change only
+the external-Bzl driver and its canonical-route proof. Add no key, retained
+type, fixture, Stage 5 edit, root-route change, copied rules_cc content or
+consumer branch. Exact single-load, Slug-native and deferred surfaces plus
+lifecycle caps are frozen in the active packet.

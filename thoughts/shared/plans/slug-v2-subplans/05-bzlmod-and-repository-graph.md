@@ -4622,3 +4622,28 @@ loader explicitly defers repository-qualified loads. Select docs-only
 lawful composition of the built-in repository mapping with the already
 selected canonical rules_cc route. Do not copy rules_cc into the built-in
 catalog or add a consumer/ruleset/toolchain branch.
+
+### Built-in external-Bzl mapping composition audited (2026-09-02)
+
+The routing audit returns `ACCEPT` with no new Stage 5 owner. Exact built-in
+`MODULE.bazel` declares rules_cc 0.2.17, and the accepted
+`HostBuiltinBazelToolsRepositoryMapping*` already derives its complete selected
+mapping and fails closed on missing/wrong-kind built-in provenance. The
+canonical built-in route retains that mapping, snapshot identity and
+zero-materialization source disposition in legacy and observed forms.
+
+Stage 4 may import the existing canonical route only after it has decoded and
+parsed the original catalog source and only for the audited shape of exactly
+one nonempty apparent-repository load (`@name//...`, excluding canonical
+`@@...` and explicit-main `@//...`). This preserves Bazel's ordering for the
+admitted facade without changing any other built-in load shape; multi-load
+public-label prevalidation remains deferred. The effective route is invocation
+scratch; DICE dependency edges still invalidate mapping changes, and the
+existing manifest retains the successful mapping and recursive child closure.
+No mapping/key/route representation, selected graph, fixture or retained-memory
+change is authorized.
+
+Select the two-file Stage 4 implementation frozen in the active packet. It
+must prove mapping/frontier A/B/A, no speculative child source or built-in
+materialization, and the canonical rules_cc child. Return `REPLAN` on any Stage
+5 edit, new key, mapping duplication or ruleset/toolchain special case.
