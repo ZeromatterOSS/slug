@@ -8618,3 +8618,36 @@ lazy Java provider/configured/toolchain/action calls remain deferred; do not
 publish placeholders. No package schema, retained semantic identity, DICE fact
 or fallback changes. The two-file 72/160/232 successor and proof/stops are
 frozen in `current-packet.md`.
+
+### Java configuration-field declaration retention audit (2026-09-03)
+
+Commit `c8b4c9e86` accepts the rules_java `java_common` loading facade. Replay
+next selects rules_java 9.1.0 `java_toolchain.bzl:602,606`. The complete archive
+census is three `configuration_field` calls in two regular `0444` files: Java
+`java_toolchain_bytecode_optimizer`, Java
+`local_java_optimization_configuration`, and the already-admitted coverage
+`output_generator`. Hashes, sizes, archive coordinates and proxy load order are
+frozen in `current-packet.md`.
+
+Pinned Bazel 9.2 `BazelBuildApiGlobals:97-109`,
+`StarlarkLateBoundDefault:50-114,170-244`, `JavaConfiguration:236-339` and
+`StarlarkRuleImplementationFunctionsTest:3007-3229` establish the declaration
+category. Stage 4 may recognize only the selected Java pair in the existing
+Bzl-only ABI and retain each as a private `attr.label` default through
+freeze/import/re-export, initializer and final target recording. BUILD remains
+without the global; C++ and coverage remain unchanged.
+
+This loading behavior is exact. The two-field Java enum is private or
+`pub(super)` and flattened into the existing one-byte closed field; no public
+re-export is permitted. The field-plus-tools-repository identity and existing
+immutable late-bound rule slices remain the only owners. Ordinary rules gain no
+carrier or allocation, and source/recursive-manifest fingerprints retain
+invalidation. Add no schema, map, Arc, interner, cache, option, DICE key or
+fixture.
+
+The three other Bazel Java fields and all Java producer/configured semantics
+remain deferred. Proof must cover the full three-call census, selected pair,
+unselected fields, private label-only use, ABI, BUILD absence, lifetime, order,
+identity/hash/layout and source A/B/A. The frozen five-file 80/210/290
+successor awaits independent review. Any need to edit `package.rs`, `subrule.rs`
+or expose the Java sibling publicly is `REPLAN`.

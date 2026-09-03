@@ -1,33 +1,30 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-7A-java-common-private-loading-facade-audit-r1
+Packet: WP-4-6-7A-java-configuration-field-declaration-fail-closed-audit-r1
 
 Status: docs-only audit/design checkpoint complete. The bounded implementation
-successor below is frozen but awaits independent review; no Rust work is
+successor is frozen below but awaits independent review; no Rust work is
 authorized before `ACCEPT`.
 
-## Predecessor and selected replay stop
+## Predecessor and replay boundary
 
-Commit `60528af77` terminally accepts the provider declaration-identity closure
-at 16 production/139 proof/155 total gross Rust additions. It admits exported
-live initialized-provider identities and TemplateVariableInfo only in loading
-declarations, while configured Template use still fails closed. Its accepted
-focused and broad loading/query/CLI, formatting, diff, archive and daemon gates
-pass.
-
-The authenticated bounded-PATH rules_rust replay clears the selected
-rules_java declarations and stops while loading
-`@@rules_java+//java/private:native.bzl:19`:
+Commit `c8b4c9e86` terminally accepts the rules_java private `java_common`
+loading facade at 71 production/154 proof/225 total gross Rust additions. Its
+focused tests and formatting/diff/scope/archive gates pass. Authenticated
+bounded-PATH rules_rust replay clears that facade and stops during `.bzl`
+loading at selected rules_java 9.1.0
+`java/common/rules/java_toolchain.bzl:602`:
 
 ```text
-return java_common.internal_DO_NOT_USE()
-Variable `java_common` not found
+configuration_field(fragment = "java", name =
+    "java_toolchain_bytecode_optimizer")
+invalid configuration fragment name 'java'
 ```
 
-No Java provider initializer, configured rule implementation, toolchain
-operation or action executes before this loading-global failure.
+No target is invoked and no Java rule implementation, configured dependency,
+toolchain operation, provider constructor or action executes first.
 
-## Durable selected rules_java evidence and complete closure
+## Durable selected-source evidence and complete census
 
 The selected BCR coordinate is `rules_java` 9.1.0. Its durable descriptor is
 `https://bcr.bazel.build/modules/rules_java/9.1.0/source.json`, SHA-256
@@ -37,166 +34,162 @@ It selects
 a 114,566-byte/114-entry archive with SHA-256
 `4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f`
 and integrity `sha256-Thooolwu+lNQDJKNIs7/vFBd2VszWi0CWDaik7WSIS8=`.
-All six closure files below are regular `0444` with trailing LF:
+The relevant files are regular `0444` with trailing LF:
 
-| Source-relative path | SHA-256 | Bytes/lines | Selected role |
+| Source-relative path | SHA-256 | Bytes/lines | Role |
 |---|---|---:|---|
-| `java/private/native.bzl` | `81fd742661f632db4c6b36efa5acb76075e5d65d176ffa3372ed47b340bc9ae1` | 844/19 | lines 18-19 define the sole bridge and call `java_common.internal_DO_NOT_USE()` |
-| `java/private/java_common.bzl` | `f40732378d4e0ae55646958c9ff17313e5f98cd8af5751deaadaa2d8437ddfe5` | 11,126/323 | lines 296-323 construct/export the public struct; line 313 is the sole eager internal-member call |
-| `java/private/java_info.bzl` | `02438c92066a825629a47f6dd01d9ea2200dc90a666b68fb4ee1ebf09e6a3026` | 47,438/1,038 | four lazy member calls inside provider helpers/initializers |
-| `java/private/java_common_internal.bzl` | `a1c0222c084b2110fcec953b74e782f3287d8edba816b1efe3a7eb5275b0e652` | 19,260/467 | seven lazy provider/action/classpath calls |
-| `java/common/rules/java_toolchain.bzl` | `5ad6511cdef925246961c7e7a9039475c192371fedbf909c63cf92334779e875` | 24,304/612 | three lazy `expand_java_opts` calls |
-| `java/common/rules/java_package_configuration.bzl` | `d0b7fd1e91158b9605a15bec544fa2b574f088336f77f2b857ed9692c38bfacd` | 3,475/124 | one lazy `expand_java_opts` call |
+| `java/common/rules/java_toolchain.bzl` | `5ad6511cdef925246961c7e7a9039475c192371fedbf909c63cf92334779e875` | 24,304/612 | Java fields at lines 602 and 606; rule body consumes them at 112 and 133 |
+| `java/bazel/rules/bazel_java_test.bzl` | `33b1b5e205c6658c661be6b0cd1b30fe0339d78f0b4fbc061a350024a412f412` | 5,416/148 | already-admitted coverage field at lines 90-93 |
+| `java/rules_java_deps.bzl` | `40ce0f5b44b124f9fdc3986d542caa6b3a3213c2abbd4927cdea65ad42f31a23` | 8,257/224 | generated proxy load order |
+| `toolchains/default_java_toolchain.bzl` | `6f963992c933e6cbc48f0c64f3349484422ee06f01830473ea802731b874deea` | 9,335/219 | public toolchain wrapper entry |
+| `toolchains/BUILD` | `b23a9b08e5928120d2d3f3a559b9c54f8472cabf1a4b99baf7cc6f29886a9b73` | 15,306/430 | invokes nine `java_toolchain` targets |
+| `MODULE.bazel` | `ee63f27e36a3fada80342869361182f120a9819c74320e8e65b1e04ba0cd7a9d` | 4,218/136 | registers `//toolchains:all` |
 
-This is the complete matching closure: exactly 26 literal
-`get_internal_java_common` occurrences across six files. Five are load imports;
-the other 21 are definition/call-form occurrences comprising one bridge
-definition plus 20 returned-member call sites using ten distinct selected
-names. `java_common.bzl:293` is a legacy-only `check_provider_instances` call
-unreachable when the default legacy flag is false. The remaining 19 reachable
-member calls are one eager call at `java_common.bzl:313` and 18 lazy calls.
-Two lazy calls, `java_info.bzl:177,677`, are exact admitted
-`google_legacy_api_enabled() == False` queries; only the other 16 lazy calls
-invoke deferred members. Enclosing JavaInfo/provider behavior remains deferred.
-`google_legacy_api_enabled` therefore has exactly three syntactic calls.
+The complete archive census is exactly three `configuration_field` calls in
+two files: Java `java_toolchain_bytecode_optimizer` on private executable
+`_bytecode_optimizer` with `cfg="exec"`; Java
+`local_java_optimization_configuration` on private
+`_local_java_optimization_configuration` with `cfg="exec"` and
+`allow_files=True`; and the already-admitted coverage `output_generator`.
+There is no fourth selected call.
 
-The generated compatibility proxy is durably specified by
-`java/rules_java_deps.bzl:29-58`, SHA-256
-`40ce0f5b44b124f9fdc3986d542caa6b3a3213c2abbd4927cdea65ad42f31a23`,
-8,257 bytes/224 lines. It loads the private Java common producer after the
-runtime/toolchain modules. Public `java/common/java_common.bzl`, SHA-256
-`2848c3ac4f305d2b2d4c96dc2daa2828b1031ee0c0764515ecdebc8f125bdb71`,
-727 bytes/18 lines, re-exports that proxy value. `toolchains/BUILD` and
-`toolchains/java_toolchain_alias.bzl` are the selected entry route; they hash
-to `b23a9b08e5928120d2d3f3a559b9c54f8472cabf1a4b99baf7cc6f29886a9b73`
-and `56f84699c33ebd2e871615b30bcab4ae5a824cfab78e0dd80afc7e1fbf92e510`.
+Load order is `default_java_toolchain.bzl` -> public
+`java/toolchains:java_toolchain.bzl` -> generated compatibility proxy. The
+proxy loads `bazel_java_test.bzl` before `java_toolchain.bzl`, so coverage
+already succeeds before the first Java call stops. If declarations load,
+`toolchains/BUILD` creates the default, seven release-specific and prebuilt
+toolchains; their rule implementations do not run during package loading.
 
-## Bazel 9.2 authority and learned facts
+## Bazel 9.2 authority and producer gap
 
 Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a` is
-the sole compatibility authority:
+the compatibility authority:
 
-- `src/main/starlark/builtins_bzl/common/java/java_common.bzl:17-42`,
-  SHA-256
-  `2083873bdc74038b46f7773277d66eb3dd80b5e73af75d78791e006bc3922cfb`,
-  constructs an eleven-member private facade, checks its rules_java allowlist
-  and exports `internal_DO_NOT_USE`;
-- `src/main/java/com/google/devtools/build/lib/bazel/rules/JavaRules.java:63-65`,
-  SHA-256
+- `src/main/java/com/google/devtools/build/lib/analysis/starlark/BazelBuildApiGlobals.java:97-109`,
+  SHA-256 `a54b4657f61846171d0dcaf42e3565e98ee1624316d06f4a47e8c66800fcf897`,
+  validates the fragment and returns a Starlark late-bound label default;
+- `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkLateBoundDefault.java:50-114,170-244`,
+  SHA-256 `68f54ff5291c2a2f38739fb5fec40671350f52eb0f493533d48e1de4e37c5abe`,
+  owns fragment/field/tools-repository identity and configured reflection;
+- `src/main/java/com/google/devtools/build/lib/rules/java/JavaConfiguration.java:236-339`,
+  SHA-256 `23f67a5d8f447043fb9c834fb3a861c37a4d52bdcd77301c735f01a8d6a6de74`,
+  declares five Java fields, including the two selected fields at 318/332;
+- `src/main/java/com/google/devtools/build/lib/rules/java/JavaOptions.java`, SHA-256
+  `a7ff72302b77cd071dabe4907289edce5fe56b16b7757c538c085fd777abf6a8`,
+  owns the optimizer map, local-enable Boolean and optional local label;
+- `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/java/JavaConfigurationApi.java`, SHA-256
+  `3b4f85cc1c526af138fc5f56c1a32cbfd0c3774177c5235774f71bd45f7afcaf`,
+  names fragment `java`, while
+  `src/main/java/com/google/devtools/build/lib/bazel/rules/JavaRules.java:39`, SHA-256
   `2819dd07d95cc6afb57a997683f71e9e6cd7019b90f527c42f84e4a7397f928c`,
-  injects the Bzl top-level and native Java implementation;
-- `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/java/JavaCommonApi.java:645-690`,
-  SHA-256
-  `b701da2231e7f82080ee1991bd8d1f7c9a92bef0e3af272ad1a484a2e36eb824`,
-  declares the private member APIs;
-- `src/main/java/com/google/devtools/build/lib/rules/java/JavaStarlarkCommon.java:282-284,345-392`,
-  SHA-256
-  `a8bc7d5e1875978d60550088ab517a38430068730f680267054e8f0b847c2e92`,
-  repeats the caller check at member invocation and reads the semantics flag;
-- `src/main/java/com/google/devtools/build/lib/packages/semantics/BuildLanguageOptions.java:313-322,916`,
-  SHA-256
-  `b01e106ef0ff7af458766248bce7799b49c0f54fc14d023a8297aeb7dbfb44e5`,
-  establishes `experimental_google_legacy_api=false` by default; and
-- `src/main/java/com/google/devtools/build/lib/packages/BuiltinRestriction.java:34-91,124-149,169-216`,
-  SHA-256
-  `383c157100c35564c11ddcc270f7a2757c9f151f343ac0ce6253bffb5dfb5081`,
-  establishes innermost-Bzl caller provenance and rules_java allowlisting.
+  registers it; and
+- `src/test/java/com/google/devtools/build/lib/starlark/StarlarkRuleImplementationFunctionsTest.java:3007-3229`, SHA-256
+  `89e6caf0c6d234be610ccb597a015610568c27f8071d572e55a7378a106597d8`,
+  covers invalid fragment/field, private attribute and label-only behavior.
 
-`JavaStarlarkApiTest.java:1847-1886`, SHA-256
-`56518ceb51aeb7297fafe7bcc95cb4b72c11b1da894be1b4485b6c51da0039b8`,
-proves the internal Java members are private. Bazel's facade contains eleven
-members; selected rules_java references ten, and
-`incompatible_disable_non_executable_java_binary` is the sole unreferenced
-member.
+`JavaConfiguration` also exposes `launcher`, `proguard_top` and
+`bytecode_optimizer`; none occurs in the selected archive. Bazel's
+`src/test/java/com/google/devtools/build/lib/rules/java/JavaConfigurationTest.java`
+and `src/test/java/com/google/devtools/build/lib/analysis/AutoExecGroupsTest.java:1352-1420` hash to
+`3df5aba5e5411c5139655d2c77503c7b6b7d150536bc510f9b1afe3474465bbf`
+and `293bf5070e33ac5e165e3c1fba7e76c0ef9e21f7e9cf028e3c693b9fd62062f8`;
+they exercise producer validation and nondefault optimizer/action behavior,
+which this packet deliberately does not claim.
 
-## Decision and compatibility boundary
+Slug's native registry records defaults for `bytecode_optimizers`,
+`experimental_local_java_optimization_configuration` and
+`experimental_local_java_optimizations`, but `NativeCommandOption` exposes
+none. There is therefore no admitted command mutation path for any of the
+three producer facts. Resolving the selected fields to default `None` would be
+a partial configured-parity claim and could advance into deferred Java rule
+bodies; this packet must reject instead.
 
-Audit result: `ACCEPT`, pending independent review, for one bounded
-**java_common private loading facade**.
+## Decision, compatibility and ownership
 
-Classify as **exact** for the admitted default configuration: expose
-`java_common` only to ordinary/Bzlmod `.bzl` evaluation; admit zero-argument
-`internal_DO_NOT_USE()` and zero-argument `google_legacy_api_enabled()`; apply
-the same allocation-free package-local source-identity predicate at both
-method calls for a selected canonical/apparent rules_java caller in package
-`java` or a descendant; return `False`; survive freeze/import/re-export; and
-omit the global from direct BUILD evaluation.
+Audit result: `ACCEPT`, pending independent review, for declaration retention
+plus a configured fail-closed boundary.
 
-Classify as **Slug-native**: two zero-sized Rust Starlark values replace the
-eleven-field Bazel struct, expose only the selected eager member, and use
-Slug's canonical repository/source-manifest identity and standard missing-field
-diagnostic for the sparse deferred surface. The narrow predicate deliberately
-fails closed where Bazel is broader: `internal_DO_NOT_USE` calls from
-rules_java packages outside `java/**`, Bazel's two main-repository allowlist
-prefixes (`javatests/com/google/devtools/grok/kythe/analyzers/build/testdata/pkg`
-and `third_party/bazel_rules/rules_java`), and any stricter direct top-level/
-callerless case are unsupported Slug-native rejections, not exact parity claims.
+**Exact:** recognize fragment `java` only for the two selected field names in
+the existing Bzl-only `configuration_field` ABI; retain typed field plus tools
+repository through private `attr.label` defaults, freeze/import/re-export,
+rule initialization and final target recording; preserve source order, BUILD
+absence and existing C++/coverage behavior.
 
-Keep **unsupported/deferred**: `experimental_google_legacy_api=true`; the ten
-other Bazel facade members and their 16 selected lazy calls; enclosing JavaInfo
-and provider behavior even around the two admitted false queries; Java provider
-payloads or initialization, target membership/indexing, fragments, configured
-rule implementations, toolchain resolution, option expansion, classpath
-processing and Java compilation/actions. Do not add inert placeholders.
+**Slug-native:** both Java identities fail configured projection before
+dependency discovery, exec projection, toolchain lookup or rule invocation.
+Freeze the Slug-native diagnostic bytes as:
 
-## Ownership, lifetime and invalidation
+```text
+configuration_field(fragment = "java", name = "<selected-name>") configured resolution is unsupported
+```
 
-`app/slug_loading_v2/src/package.rs` owns loading-global registration, both
-stateless facade values and one allocation-free caller predicate. At both the
-bridge and returned-member call, use
-`BzlEvaluationContext::source_identity_for_call` and admit only a real Bzl
-caller whose canonical/apparent repository identity is `rules_java` and whose
-package is exactly `java` or its descendant. Reject direct top-level/callerless
-calls. Do not reuse the broader `builtin_restriction` default allowlist. This
-is exact for selected positive rules_java `java/**` callers and intentionally
-Slug-native fail-closed for the broader cases above; no direct filesystem
-lookup occurs.
+The closed Rust enum and structural identity replace Bazel reflection. The
+three Bazel-valid but unselected fields remain rejected rather than silently
+gaining parity.
 
-Both values are zero-field `starlark_simple_value!` carriers. They may live in
-the existing Globals/frozen-module heaps but retain no evaluator reference,
-source identity, collection, callable, semantic marker or dynamic allocation.
-Add no package/configured value, map, compact string, Arc slice, interner,
-registry, cache, DICE key/input/observation, lock, await, retry or fixture.
-Existing module source/recursive-manifest fingerprints provide invalidation;
-request overlays, overlapping requests, equality cutoffs, cancellation and
-shutdown behavior are unchanged. Buck2/V1 provides no implementation and no
-Stage 9 row is needed. The package file exceeds the size trigger, but remains
-the cohesive owner because this adds only two Bzl-global ZSTs beside existing
-`platform_common`; splitting would add registration/module plumbing without a
-new semantic owner.
+**Unsupported/deferred:** every Java command-option producer, default and
+nondefault field resolution, Java fragment facade, the other three fields,
+Java toolchain/provider/rule-body behavior, optimization and compilation
+actions. Add no inert label or default-`None` placeholder.
+
+`configuration_field.rs` remains the natural producer. Add a private or
+`pub(super)` `#[repr(u8)] JavaConfigurationField` with exactly two variants and
+flatten it into the existing one-byte `ConfigurationField`; do not publicly
+re-export the sibling enum. Existing `ConfigurationFieldIdentity` retains the
+field and `CanonicalRepoName`, and existing immutable late-bound slices retain
+rule state. `configuration.rs` owns the configured error. Loading/analysis
+owners otherwise stay unchanged.
+
+`configuration.rs` is currently 2,243 lines and triggers the >2,000-line review.
+It remains the sole cohesive configuration projection/error owner: splitting
+this two-field terminal would duplicate or expose its private projection
+boundary. The touched projection and diagnostic functions remain below 150
+lines; no split is authorized in this packet.
+
+This adds one-byte discriminants only: no map, interner, registry, cache,
+extra Arc, evaluator borrow, package/configuration field, command overlay,
+DICE key/input/observation, lock, await, retry or fixture. Existing source and
+recursive-manifest fingerprints own invalidation; configuration equality is
+unchanged because Java projection always errors. Ordinary no-field rules add
+no allocation. Request overlap, cutoff, cancellation and shutdown behavior do
+not change. Buck2/V1 supplies no code; the Stage 9 row records reuse of the
+existing compact enum/identity only.
 
 ## Frozen implementation successor
 
 After independent `ACCEPT`, activate
-`WP-4-7A-java-common-private-loading-facade-implementation-r1` and modify only:
+`WP-4-6-7A-java-configuration-field-declaration-fail-closed-implementation-r1`
+with exactly this allowlist:
 
-- `app/slug_loading_v2/src/package.rs`, production owner plus adjacent
-  zero-size proof; and
-- `app/slug_loading_v2/src/host_package_load_tests.rs`, proof only.
+- `app/slug_configuration_v2/src/native/configuration_field.rs`;
+- `app/slug_configuration_v2/src/native/configuration.rs`;
+- `app/slug_configuration_v2/src/native/tests.rs`;
+- `app/slug_loading_v2/tests/subrule_loading.rs`; and
+- `app/slug_analysis_v2/tests/subrule.rs`.
 
-Caps: 72 production Rust, 160 proof Rust, 232 aggregate gross additions.
+Caps are 80 production, 210 proof and 290 aggregate gross Rust additions.
 
-Proof must cover the exact 844-byte/19-line `native.bzl` hash/source; the
-selected `_make_java_common` eager call under ordinary and Bzlmod globals;
-default `False` and absent legacy additions; zero arguments and rejection of
-positional/named extras; caller rejection for direct top-level/callerless calls,
-root, unrelated repositories and rules_java outside the admitted `java`
-prefix; provenance recheck after freeze/import/re-export; BUILD absence;
-zero-sized transient/frozen facade state; standard failure/absence for all ten
-deferred members; both lazy false queries without executing enclosing provider
-behavior; unchanged ordinary globals and no Java callback, implementation or
-action execution. Treat the selected positive caller cases as exact and every
-required broader/callerless negative as Slug-native fail-closed proof.
+Proof must cover the exact three-call selected census and hashes; both Java
+names plus coverage success; all three other Bazel-valid Java fields and an
+unknown field rejecting; positional/named ABI and BUILD absence; private
+`attr.label`-only use; freeze/import/re-export, initializer/final-target
+retention without body execution; source order; same-field/tools-repository
+equality/hash and pair/repository discrimination; one-byte
+`ConfigurationField`, unchanged identity/late-bound carrier sizes and no
+ordinary-rule carrier; same-DICE source A/B/A restoration; and byte-exact
+frozen Slug-native configured errors before dependency, toolchain and
+implementation sentinels. Preserve
+C++/coverage configured projection tests.
 
-Run serial focused facade/recursive-load tests, then the full loading library
-and integration targets, query library, direct pinned-nightly CLI rebuild,
-exact authenticated bounded-PATH replay, stale-slugd, formatting, diff,
-archive, allowlist and cap gates. Reuse the accepted archive/source evidence;
-add no oracle fixture. Replay must clear line 313 and stop only at the next
-independent typed boundary.
+Run focused native-configuration, loading and analysis tests, then serial full
+configuration/loading/analysis/query suites, direct pinned-nightly CLI build,
+authenticated bounded-PATH replay, stale-slugd, formatting, diff, archive,
+allowlist and cap gates. Reuse source evidence; add no fixture. Replay must
+clear both Java declarations and all nine toolchain target declarations, then
+stop at the next independent typed boundary.
 
-Return `REPLAN` if another internal member executes during loading; either
-method cannot enforce caller provenance after import/re-export; configurable
-legacy semantics, Java provider/configured/action ownership, another production
-file, retained state, a new key/cache/fixture or more than the caps is required;
-or any deferred member becomes reflectively present or silently succeeds.
+Return `REPLAN` if rejection cannot precede dependency/toolchain/body work; a
+fourth selected Java field appears; implementation needs a command option,
+Java fragment, package/schema/DICE owner, retained store, public sibling-enum
+export, fixture or another production file; enum/identity size grows; a Java
+field returns a label/`None` or executes a body; or any cap is exceeded.

@@ -23169,3 +23169,36 @@ validation, option expansion, target inspection, classpath transformation,
 toolchain checks, compilation actions or configurable legacy semantics returns
 `REPLAN` for a separately reviewed complete analysis category. Stage 5 records
 only source provenance and replay handoff.
+
+### Java configuration fields stop before configured Java semantics (2026-09-03)
+
+The selected rules_java Java field declarations are loading facts, but Bazel's
+configured projection reads `JavaOptions`. Slug's registry contains the three
+relevant defaults while `NativeCommandOption` exposes none, so Stage 6 has no
+lawful command producer for either selected field. Default-`None` resolution is
+forbidden: it would silently enter deferred Java toolchain rule bodies.
+
+The frozen design adds only an explicit `SlugConfiguration` projection error;
+its byte-exact text is a Slug-native contract, not a Bazel diagnostic claim:
+
+```text
+configuration_field(fragment = "java", name = "<selected-name>") configured resolution is unsupported
+```
+
+`configured_dependency_rows` must surface it before dependency discovery, exec
+projection, toolchain resolution or implementation invocation. Tests use
+dependency/toolchain/body sentinels and preserve existing C++/coverage
+resolution. This fail-closed boundary is Slug-native; Java option mutation,
+default/nondefault resolution, fragment access, providers, toolchains,
+optimization and compilation actions remain unsupported/deferred.
+
+Stage 6 adds no configured field, equality/fingerprint input, DICE owner, cache
+or retained allocation. `configuration.rs` owns only the typed error and
+analysis tests prove ordering. Removing the guard requires a separately
+reviewed Java command-option/configured-resolution category. If rejection
+cannot occur before any downstream work, return `REPLAN`.
+
+At 2,243 lines, `configuration.rs` crosses the physical-size review trigger but
+remains the sole configuration projection/error owner. Splitting this small
+terminal would duplicate or expose its private projection boundary; both
+touched functions remain below 150 lines, so this packet authorizes no split.
