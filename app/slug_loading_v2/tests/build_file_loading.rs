@@ -1422,6 +1422,68 @@ def emit():
 }
 
 #[test]
+fn imported_bzl_defs_resolve_label_from_the_lexical_source() {
+    let workspace = scratch("imported-def-label-source");
+    let leaf = workspace.join("leaf");
+    let owner = workspace.join("wrapper");
+    let consumer = workspace.join("consumer");
+    fs::create_dir_all(&leaf).unwrap();
+    fs::create_dir_all(&owner).unwrap();
+    fs::create_dir_all(&consumer).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(leaf.join(BUILD_FILE_PRIMARY), "").unwrap();
+    fs::write(owner.join(BUILD_FILE_PRIMARY), "").unwrap();
+    fs::write(
+        leaf.join("defs.bzl"),
+        "def labels():\n    relative = Label(':runtime')\n    if Label(relative) != relative: fail('Label identity changed')\n    return [relative, Label('@@//canonical:runtime')]\n",
+    )
+    .unwrap();
+    fs::write(
+        owner.join("bridge.bzl"),
+        "load('//leaf:defs.bzl', 'labels')\ndef tiny(): return labels()\nREEXPORTED = tiny\n",
+    )
+    .unwrap();
+    fs::write(
+        owner.join("default_java_toolchain.bzl"),
+        "load(':bridge.bzl', 'REEXPORTED')\ndef java_runtime_files(name):\n    native.filegroup(name = name + '_pre')\n    native.filegroup(name = name, srcs = REEXPORTED())\n",
+    )
+    .unwrap();
+    fs::write(
+        consumer.join(BUILD_FILE_FALLBACK),
+        "load('//wrapper:default_java_toolchain.bzl', 'java_runtime_files')\njava_runtime_files(name = 'runtime')\n",
+    )
+    .unwrap();
+    let loaded = try_load_package_with_extra_bzl(
+        &workspace,
+        &consumer,
+        &[
+            leaf.join("defs.bzl"),
+            owner.join("bridge.bzl"),
+            owner.join("default_java_toolchain.bzl"),
+        ],
+    )
+    .unwrap();
+    assert_eq!(
+        loaded
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["runtime_pre", "runtime"]
+    );
+    let PackageTargetKind::Filegroup { srcs, .. } = &loaded.targets[1].kind else {
+        panic!("runtime should be a filegroup")
+    };
+    assert_eq!(
+        srcs.as_ref(),
+        [
+            CanonicalLabel::parse("@@//leaf:runtime").unwrap(),
+            CanonicalLabel::parse("@@//canonical:runtime").unwrap(),
+        ]
+    );
+}
+
+#[test]
 fn native_direct_label_parameters_fail_before_publication() {
     let workspace = scratch("native-direct-label-failures");
     let package = workspace.join("pkg");

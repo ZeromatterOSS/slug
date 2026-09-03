@@ -753,6 +753,7 @@ fn evaluate_host_package_attempt(
         input.package_identifier.clone(),
         repository_mapping,
     )
+    .with_bzl_call_sources(package_bzl_call_sources(input.loaded_modules))
     .with_print_capture(print_capture.clone());
     let module = Module::new();
     let loader = LocalBzlLoader {
@@ -7231,52 +7232,10 @@ impl Key for PackageLoadKey {
             .is_ok();
         let mut event_batch = None;
         let value = async {
-            let root_module_graph_value = match ctx
-                .compute(&RootModuleGraphKey {
-                    workspace: self.workspace.clone(),
-                })
-                .await
-            {
+            let (listing, build_file, source) = match legacy_package_preflight(self, ctx).await {
                 Ok(value) => value,
-                Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+                Err(error) => return Arc::new(Err(error)),
             };
-            let root_module_graph = match root_module_graph_value.as_ref() {
-                Ok(graph) => graph,
-                Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
-            };
-            let _repository_mapping = &root_module_graph.repository_mapping;
-            let listing = match ctx
-                .compute(&PackageListingKey {
-                    workspace: self.workspace.clone(),
-                    package: self.package.clone(),
-                })
-                .await
-            {
-                Ok(value) => match value.as_ref() {
-                    Ok(listing) => listing.dupe(),
-                    Err(error) => return Arc::new(Err(error.clone())),
-                },
-                Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
-            };
-            let primary_build = self.package.join("BUILD.bazel");
-            let fallback_build = self.package.join("BUILD");
-            let (build_file, source) =
-                match observed_file(ctx, &self.workspace, &primary_build).await {
-                    Ok(source) => (primary_build, source),
-                    Err(error) if error.is_absent() => {
-                        match observed_file(ctx, &self.workspace, &fallback_build).await {
-                            Ok(source) => (fallback_build, source),
-                            Err(error) if error.is_absent() => {
-                                return Arc::new(Err(LoadingError::new(format!(
-                                    "no BUILD.bazel or BUILD file in package {}",
-                                    self.package.display()
-                                ))));
-                            }
-                            Err(error) => return Arc::new(Err(error)),
-                        }
-                    }
-                    Err(error) => return Arc::new(Err(error)),
-                };
             let ast = match AstModule::parse(
                 &build_file.display().to_string(),
                 source.as_ref().clone(),
@@ -7352,6 +7311,7 @@ impl Key for PackageLoadKey {
                     .map_err(|error| LoadingError::new(error.to_string()))?;
                 let print_capture = capture_events.then(|| Rc::new(LoadingPrintCapture::default()));
                 let recorder = PackageRecorder::new(listing, package_label)
+                    .with_bzl_call_sources(package_bzl_call_sources(&loaded_modules))
                     .with_print_capture(print_capture.clone());
                 let module = Module::new();
                 let loader = LocalBzlLoader {
@@ -7407,6 +7367,47 @@ impl Key for PackageLoadKey {
     fn validity(value: &Self::Value) -> bool {
         value.is_ok()
     }
+}
+
+async fn legacy_package_preflight(
+    key: &PackageLoadKey,
+    ctx: &mut DiceComputations<'_>,
+) -> Result<(PackageListing, PathBuf, Arc<String>), LoadingError> {
+    ctx.compute(&RootModuleGraphKey {
+        workspace: key.workspace.clone(),
+    })
+    .await
+    .map_err(|error| LoadingError::new(error.to_string()))?
+    .as_ref()
+    .as_ref()
+    .map_err(|error| LoadingError::new(error.to_string()))?;
+    let listing = ctx
+        .compute(&PackageListingKey {
+            workspace: key.workspace.clone(),
+            package: key.package.clone(),
+        })
+        .await
+        .map_err(|error| LoadingError::new(error.to_string()))?;
+    let listing = listing.as_ref().as_ref().map_err(Clone::clone)?.dupe();
+    let primary = key.package.join("BUILD.bazel");
+    let fallback = key.package.join("BUILD");
+    let (build_file, source) = match observed_file(ctx, &key.workspace, &primary).await {
+        Ok(source) => (primary, source),
+        Err(error) if error.is_absent() => {
+            match observed_file(ctx, &key.workspace, &fallback).await {
+                Ok(source) => (fallback, source),
+                Err(error) if error.is_absent() => {
+                    return Err(LoadingError::new(format!(
+                        "no BUILD.bazel or BUILD file in package {}",
+                        key.package.display()
+                    )));
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        Err(error) => return Err(error),
+    };
+    Ok((listing, build_file, source))
 }
 
 struct LocalBzlLoader<'a> {
@@ -7604,6 +7605,23 @@ fn first_seen_direct_roots(loaded_modules: &[(String, FrozenBzlModule)]) -> Vec<
                 .then(|| module.manifest.root.clone())
         })
         .collect()
+}
+
+fn package_bzl_call_sources(
+    loaded_modules: &[(String, FrozenBzlModule)],
+) -> Option<Arc<[(CompactString, BzlModuleIdentity)]>> {
+    let mut seen_labels = SmallSet::new();
+    let sources = loaded_modules
+        .iter()
+        .flat_map(|(_, module)| module.manifest.reachable.iter())
+        .filter(|identity| seen_labels.insert(identity.label.clone()))
+        .map(|identity| {
+            let source = starlark_source_name(&identity.workspace_path)
+                .expect("manifest paths were accepted as Starlark source names");
+            (source.into(), identity.clone())
+        })
+        .collect::<Vec<_>>();
+    (!sources.is_empty()).then(|| sources.into())
 }
 
 fn retained_module_closure(

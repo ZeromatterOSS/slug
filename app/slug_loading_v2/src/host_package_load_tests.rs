@@ -938,7 +938,13 @@ fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservat
     epoch.materialized_file(
         instance,
         "/registry-dep/BUILD.bazel",
-        "filegroup(name = 'canonical_files')\n",
+        "load(':package_defs.bzl', 'emit')\nemit()\n",
+        901,
+    );
+    epoch.materialized_file(
+        instance,
+        "/registry-dep/package_defs.bzl",
+        "def emit(): native.filegroup(name='canonical_files', srcs=[Label('@rules_rust//mapped:apparent')])\n",
         901,
     );
     epoch.materialized_file(
@@ -3043,7 +3049,21 @@ async fn external_bzl_module_evaluates_recursive_bazel_keyword_only_structs() {
         .compute(&external_bzl_key(route, "", "root.bzl"))
         .await
         .unwrap();
-    let module = &external_terminal(&outcome).module;
+    let terminal = external_terminal(&outcome);
+    let sources = super::package_bzl_call_sources(&[
+        (":root.bzl".to_owned(), terminal.clone()),
+        (":duplicate.bzl".to_owned(), terminal.clone()),
+    ])
+    .unwrap();
+    assert_eq!(
+        sources
+            .iter()
+            .map(|(_, id)| id.label.target().as_str())
+            .collect::<Vec<_>>(),
+        ["root.bzl", "support.bzl"]
+    );
+    assert!(super::package_bzl_call_sources(&[]).is_none());
+    let module = &terminal.module;
     assert_eq!(module.get("CHECKED").unwrap().unpack_bool(), Some(true));
     let exported_value = module.get("EXPORTED").unwrap();
     let exported = StructRef::from_value(exported_value.value()).unwrap();
@@ -34989,30 +35009,165 @@ async fn repository_package_records_optional_toolchain_requirement() {
 
 #[tokio::test]
 async fn repository_package_rejects_reexported_label_builtin() {
-    let files: &[(&str, &[u8])] = &[
+    for (variant, build, expected) in [
         (
-            "BUILD.bazel",
-            b"load(\":defs.bzl\", \"LABEL_ALIAS\")\nBLOCKED = LABEL_ALIAS(\":target\")\n",
+            403,
+            b"BLOCKED=Label(':target')\n".as_slice(),
+            "Variable `Label` not found",
         ),
-        ("defs.bzl", b"LABEL_ALIAS = Label\n"),
-    ];
-    let dice = Dice::builder().build(DetectCycles::Enabled);
-    let mut transaction = transaction(
-        &dice,
-        EpochBuilder::external_sources(files, 403).build(),
-        false,
-        None,
+        (
+            404,
+            b"load(':defs.bzl','LABEL_ALIAS')\nnative.filegroup(name='transient')\nBLOCKED=LABEL_ALIAS(':target')\n".as_slice(),
+            "Label() can only be used during .bzl initialization (top-level evaluation)",
+        ),
+    ] {
+        let outcome = load_repository_package_fixture(
+            &[("BUILD.bazel", build), ("defs.bzl", b"LABEL_ALIAS=Label\n")],
+            variant,
+        )
+        .await;
+        let error = repository_package_error(&outcome);
+        assert!(error.contains(expected), "{error}");
+    }
+    let typed = load_repository_package_fixture(
+        &[
+            (
+                "BUILD.bazel",
+                b"load(':defs.bzl','LABEL_ALIAS','TYPED')\nnative.filegroup(name='typed_alias',srcs=[LABEL_ALIAS(TYPED)])\n",
+            ),
+            ("defs.bzl", b"LABEL_ALIAS=Label\nTYPED=Label(':typed')\n"),
+        ],
+        405,
     )
     .await;
-    let route = external_route(&mut transaction).await;
-    let outcome = transaction
-        .compute(&RepositoryPackageLoadKey::new(
-            route,
-            PackagePath::parse("").unwrap(),
-        ))
-        .await
+    assert!(matches!(
+        &repository_package_terminal(&typed).targets[0].kind,
+        PackageTargetKind::Filegroup { srcs, .. } if srcs[0].to_string() == "@@dep+//:typed"
+    ));
+}
+
+#[tokio::test]
+async fn repository_package_imported_defs_resolve_labels_and_restore_source() {
+    // rules_java 9.1.0 toolchains/BUILD b23a9b08e5928120d2d3f3a559b9c54f8472cabf1a4b99baf7cc6f29886a9b73
+    // loads at 9-15 and calls at 102; default_java_toolchain.bzl
+    // 6f963992c933e6cbc48f0c64f3349484422ee06f01830473ea802731b874deea defines it at 201-217,
+    // records the filegroup at 204-208, then evaluates its Labels at 212-213.
+    let sources = |leaf: &'static [u8]| -> Vec<(&'static str, &'static [u8])> {
+        vec![
+            (
+                "BUILD.bazel",
+                b"load(':default_java_toolchain.bzl','java_runtime_files')\njava_runtime_files(name='runtime')\n",
+            ),
+            (
+                "default_java_toolchain.bzl",
+                b"load(':bridge.bzl','REEXPORTED')\ndef java_runtime_files(name):\n native.filegroup(name=name+'_pre')\n native.filegroup(name=name,srcs=REEXPORTED())\n",
+            ),
+            (
+                "bridge.bzl",
+                b"load(':leaf.bzl','labels')\ndef tiny(): return labels()\nREEXPORTED=tiny\n",
+            ),
+            ("leaf.bzl", leaf),
+        ]
+    };
+    let valid = b"def labels():\n relative=Label(':local')\n if Label(relative)!=relative: fail('identity')\n return [relative,Label('@@dep+//mapped:canonical')]\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let a = load_repository_package_fixture_on(&dice, &sources(valid), 501).await;
+    assert_eq!(
+        repository_package_terminal(&a)
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["runtime_pre", "runtime"]
+    );
+    let PackageTargetKind::Filegroup { srcs, .. } =
+        &repository_package_terminal(&a).targets[1].kind
+    else {
+        panic!("runtime should be a filegroup")
+    };
+    assert_eq!(
+        srcs.as_ref(),
+        [
+            CanonicalLabel::parse("@@dep+//:local").unwrap(),
+            CanonicalLabel::parse("@@dep+//mapped:canonical").unwrap(),
+        ]
+    );
+    let failed = load_repository_package_fixture_on(
+        &dice,
+        &sources(b"def labels(): return [Label('@missing//:bad')]\n"),
+        502,
+    )
+    .await;
+    assert!(repository_package_error(&failed).contains("repository '@missing' is not visible"));
+    let restored = load_repository_package_fixture_on(&dice, &sources(valid), 503).await;
+    assert!(RepositoryPackageLoadKey::equality(&a, &restored));
+}
+
+#[test]
+fn package_label_call_source_lookup_is_sparse_and_fail_closed() {
+    let identity = |label: &str, path: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(label).unwrap(),
+        workspace_path: PathBuf::from(path),
+        repository_mapping: Arc::from([]),
+    };
+    let owner = identity("@@dep+//:defs.bzl", "/workspace/dep/defs.bzl");
+    let defs =
+        eval_bzl_with_identity("def invoke(): return Label(':target')\n", owner.clone()).unwrap();
+    let run = |sources: Option<Arc<[(compact_str::CompactString, BzlModuleIdentity)]>>| {
+        let ast = AstModule::parse(
+            "/workspace/dep/BUILD.bazel",
+            "load(':defs.bzl','invoke')\nX=invoke()\n".to_owned(),
+            &Dialect::Bazel,
+        )
         .unwrap();
-    assert!(repository_package_error(&outcome).contains("Label() may only be called in a .bzl"));
+        let module = Module::new();
+        let recorder =
+            PackageRecorder::new(PackageListing::new(vec![], vec![], vec![], vec![]), "")
+                .with_bzl_call_sources(sources);
+        let count = recorder.bzl_call_source_count_for_test();
+        let loader = LocalBzlLoader {
+            modules: vec![(":defs.bzl", defs.dupe())],
+        };
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&recorder);
+        evaluator.set_loader(&loader);
+        let result = evaluator
+            .eval_module(ast, &build_file_loading_globals())
+            .map(|_| {
+                StarlarkLabel::from_value(module.get("X").unwrap())
+                    .unwrap()
+                    .canonical()
+                    .to_string()
+            })
+            .map_err(|error| error.to_string());
+        (count, result)
+    };
+    assert_eq!(run(None).0, None);
+    let missing: Arc<[_]> = [("other.bzl".into(), owner.clone())].into();
+    let (count, missing) = run(Some(missing));
+    assert_eq!(count, Some(1));
+    assert!(
+        missing
+            .unwrap_err()
+            .contains("not present in the recursive Bzl manifest")
+    );
+    let ambiguous: Arc<[_]> = [
+        ("/workspace/dep/defs.bzl".into(), owner.clone()),
+        (
+            "/workspace/dep/defs.bzl".into(),
+            identity("@@other+//:defs.bzl", "/workspace/dep/defs.bzl"),
+        ),
+    ]
+    .into();
+    assert!(
+        run(Some(ambiguous))
+            .1
+            .unwrap_err()
+            .contains("ambiguous Starlark caller")
+    );
+    let exact: Arc<[_]> = [("/workspace/dep/defs.bzl".into(), owner.clone())].into();
+    assert_eq!(run(Some(exact)).1.unwrap(), "@@dep+//:target");
+    assert!(eval_bzl_with_identity("X=Label(':direct')\n", owner).is_ok());
 }
 
 #[tokio::test]
@@ -37559,6 +37714,11 @@ async fn canonical_package_policy_adapter_reuses_inventory_result_and_epoch_arcs
         inventory.result().as_ref().as_ref().unwrap().targets[0].name,
         "canonical_files"
     );
+    assert!(matches!(
+        &inventory.result().as_ref().as_ref().unwrap().targets[0].kind,
+        PackageTargetKind::Filegroup { srcs, .. }
+            if srcs[0].to_string() == "@@dep+//mapped:apparent"
+    ));
     assert!(!inventory.observations().observations().is_empty());
     assert_eq!(
         tracker.dependencies(&adapter_key.to_string()),

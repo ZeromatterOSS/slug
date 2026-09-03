@@ -1250,6 +1250,7 @@ pub(crate) struct PackageRecorder {
     package: CompactString,
     package_identifier: PackageIdentifier,
     repository_mapping: PackageRecorderRepositoryMapping,
+    bzl_call_sources: Option<Arc<[(CompactString, BzlModuleIdentity)]>>,
     print_capture: Option<Rc<LoadingPrintCapture>>,
     state: RefCell<PackageState>,
 }
@@ -1266,6 +1267,7 @@ impl PackageRecorder {
             ),
             package,
             repository_mapping: PackageRecorderRepositoryMapping::Legacy(Arc::from([])),
+            bzl_call_sources: None,
             print_capture: None,
             state: RefCell::new(PackageState::default()),
         }
@@ -1285,9 +1287,59 @@ impl PackageRecorder {
             package,
             package_identifier,
             repository_mapping: PackageRecorderRepositoryMapping::Complete(repository_mapping),
+            bzl_call_sources: None,
             print_capture: None,
             state: RefCell::new(PackageState::default()),
         }
+    }
+
+    pub(crate) fn with_bzl_call_sources(
+        mut self,
+        sources: Option<Arc<[(CompactString, BzlModuleIdentity)]>>,
+    ) -> Self {
+        debug_assert!(sources.as_ref().is_none_or(|sources| !sources.is_empty()));
+        self.bzl_call_sources = sources;
+        self
+    }
+
+    pub(crate) fn label_source_identity_for_call<'a>(
+        eval: &'a Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<&'a BzlModuleIdentity> {
+        const DIRECT_ALIAS_ERROR: &str =
+            "Label() can only be used during .bzl initialization (top-level evaluation)";
+        let recorder = eval
+            .extra
+            .and_then(|extra| extra.downcast_ref::<Self>())
+            .ok_or_else(|| anyhow::anyhow!(DIRECT_ALIAS_ERROR))?;
+        let filename = eval
+            .native_call_source_filename()
+            .or_else(|| eval.native_caller_function_filename())
+            .ok_or_else(|| anyhow::anyhow!(DIRECT_ALIAS_ERROR))?;
+        let sources = recorder
+            .bzl_call_sources
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!(DIRECT_ALIAS_ERROR))?;
+        let mut matches = sources
+            .iter()
+            .filter_map(|(source, identity)| (source.as_str() == filename).then_some(identity));
+        let identity = matches.next().ok_or_else(|| {
+            if filename.ends_with(".bzl") {
+                anyhow::anyhow!(
+                    "Starlark caller source is not present in the recursive Bzl manifest: {filename}"
+                )
+            } else {
+                anyhow::anyhow!(DIRECT_ALIAS_ERROR)
+            }
+        })?;
+        if matches.next().is_some() {
+            anyhow::bail!("ambiguous Starlark caller in the Bzl manifest: {filename}");
+        }
+        Ok(identity)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn bzl_call_source_count_for_test(&self) -> Option<usize> {
+        self.bzl_call_sources.as_ref().map(|sources| sources.len())
     }
 
     pub(crate) fn with_print_capture(

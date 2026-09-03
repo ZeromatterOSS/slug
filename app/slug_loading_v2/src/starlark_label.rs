@@ -28,6 +28,7 @@ use starlark::values::starlark_value;
 use starlark_map::StarlarkHasher;
 
 use crate::bzl_module::BzlModuleIdentity;
+use crate::package::PackageRecorder;
 use crate::provider::BzlEvaluationContext;
 
 /// One canonical Bazel Label value shared by loading and module-extension
@@ -141,9 +142,10 @@ pub(crate) fn label_globals(builder: &mut GlobalsBuilder) {
         let raw = input
             .unpack_str()
             .ok_or_else(|| anyhow::anyhow!("Label input must be a string or Label"))?;
-        let source = BzlEvaluationContext::from_evaluator(eval)
-            .map_err(|_| anyhow::anyhow!("Label() may only be called in a .bzl module"))?
-            .source_identity_for_call(eval)?;
+        let source = match BzlEvaluationContext::from_evaluator(eval) {
+            Ok(context) => context.source_identity_for_call(eval)?,
+            Err(_) => PackageRecorder::label_source_identity_for_call(eval)?,
+        };
         Ok(eval
             .heap()
             .alloc_simple(StarlarkLabel::new(resolve_label(raw, source)?)))
