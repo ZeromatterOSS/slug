@@ -4901,3 +4901,22 @@ rules_cc branch.
 
 Independent packet review returns `ACCEPT`; the active implementation preserves
 this provenance-only Stage 5 boundary.
+
+### Computed default accepted; execution-group replay handoff (2026-09-03)
+
+Commit `64a0f29f6` accepts computed-default declaration retention. The exact
+bounded-PATH replay through the existing selected rules_java/rules_cc
+materializations clears it and stops at missing `exec_group` in rules_cc 0.2.4
+`cc_binary.bzl` before target invocation.
+
+The durable BCR descriptor, 276,390-byte/400-entry archive hash, canonical
+route, source observations, recursive module load and manifest fingerprint
+remain the sole Stage 5 provenance/invalidation owners. Full-archive scanning
+finds four group constructors, two named exec transitions and one configured
+context consumer. The successor changes no Stage 5 semantics: add no
+materializer, route, mapping, request input, DICE key, observation, lockfile,
+cache, fixture or rules_cc branch. Stage 5 owns only this authenticated replay
+handoff for
+`WP-4-6-7A-exec-group-declaration-closure-fail-closed-implementation-r1`;
+independent review returns `ACCEPT`. Active implementation remains confined to
+the Stage 4 allowlist and this Stage 5 provenance-only boundary.

@@ -23093,3 +23093,41 @@ runtime/retained-identity review.
 
 Independent packet review returns `ACCEPT`; the active implementation remains
 strictly before Stage 6 state.
+
+### Accepted execution-group declaration design preserves the configured fail-closed boundary (2026-09-03)
+
+The selected rules_cc closure demonstrates that Bazel execution-group
+declaration is not loading-only metadata: named `config.exec` edges select a
+group platform, `ctx.exec_groups` exposes its resolved toolchains and named
+actions use its owner context. Slug already retains collision-safe
+`ConfiguredExecGroup::{Default, Named}` action identity and validates an
+action/context match, but current DICE preparation creates only the default
+resolved context. Analysis ctx exposes `ctx.toolchains`, not `ctx.exec_groups`,
+and named action selection fails explicitly.
+
+The accepted
+`WP-4-6-7A-exec-group-declaration-closure-fail-closed-implementation-r1` Stage 4
+carrier therefore never enters `StarlarkRuleImplementation`
+or a loaded target. Every rule bearing a declared group or named exec
+transition fails before package publication. Stage 6 owns no changed Rust,
+configured key, toolchain resolution, provider/context view, action or DICE
+value; its adjacent existing tests remain regression gates for default context
+and named-action rejection.
+
+All non-rule descriptor consumers must reject the named transition marker
+before their loading projections. In particular, aspect, subrule and both
+symbolic-macro paths may not erase the group name into their current boolean
+exec state, and repository-rule/tag-class rejection remains fixed. Thus no
+alternate path can publish a downgraded schema for Stage 6 to misinterpret.
+
+This guard is Slug-native and prevents silent fallback to the default execution
+platform. Configured named transitions, per-group constraint/toolchain
+resolution, `ctx.exec_groups`, exec properties and action routing remain
+unsupported/deferred. Removing the guard requires a separately reviewed
+cross-stage packet owning all of those semantics, their structural equality,
+failure ordering and DICE invalidation. Wiring the unused prototype
+`toolchains/exec_groups.rs` into live analysis without that review is a
+`REPLAN` condition.
+
+Independent architecture and retained-state review returns `ACCEPT`; active
+implementation adds no Stage 6 Rust or semantics.

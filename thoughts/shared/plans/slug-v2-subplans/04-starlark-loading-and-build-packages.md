@@ -8496,3 +8496,52 @@ representation review returns `ACCEPT`; implementation is active only within
 that frozen boundary. Return `REPLAN` for callback execution, a second
 production owner, per-schema pointer, final package/analysis state, new DICE/
 cache/fixture ownership or cap failure.
+
+### Computed default accepted; selected execution-group declaration closure audited (2026-09-03)
+
+Commit `64a0f29f6` accepts generic `attr.label` function-default declaration
+retention at 59/178/237 gross production/proof/total Rust additions. Full
+loading/query, rebuilt CLI and hygiene gates pass. The authenticated replay
+clears all four selected callback-bearing rule declarations and stops during
+Bzl evaluation at selected rules_cc 0.2.4 `cc_binary.bzl` line 905 (durable
+release line 848): `exec_group(toolchains = use_cc_toolchain())` is missing.
+
+Exact archive scanning identifies the complete selected closure: `cpp_link`
+groups on binary, test and library; the test rule's optional `test` group; two
+`config.exec(exec_group = "test")` label attributes in `semantics.bzl`; and
+configured `ctx.exec_groups["test"]` use in `cc_test.bzl`. There is no other
+constructor, nonempty group dictionary, named exec transition or configured
+context use in the 400-entry archive.
+
+Pinned Bazel 9.2 `StarlarkRuleFunctionsApi`,
+`StarlarkRuleClassFunctions` and `DeclaredExecGroup` establish the two-field
+constructor and rule dictionary. `StarlarkConfigApi`/`StarlarkConfig` retain
+the named attribute transition; `StarlarkExecGroupCollection` and
+`StarlarkActionFactory` prove that declaration controls configured toolchain
+views and action platforms. A loading token that is discarded at package
+lowering is therefore not admissible.
+
+Audit result: `ACCEPT`; independent architecture and retained-state review
+accepts active
+`WP-4-6-7A-exec-group-declaration-closure-fail-closed-implementation-r1`. Stage
+4 may expose `exec_group` only in ordinary/Bzlmod `.bzl`, accept the selected
+existing toolchain-list shapes with empty constraints, retain source-ordered
+rule groups, and retain named `config.exec` references in a schema-indexed
+sparse slice. A rule bearing either must fail exactly with
+`target invocation for named execution-group semantics is unsupported` before
+initializer/computed-default checks, recorder access, coercion or publication.
+Rules without either are unchanged.
+
+`rule()` is the only admitted consumer of the named marker. Aspect and subrule
+attribute conversion, symbolic-macro explicit attributes and macro
+`inherit_attrs` from a rule must reject it before projection; repository-rule
+and tag-class conversion must retain rejection. Proof must discriminate every
+path and show no marker name is discarded or downgraded to default exec. The
+target diagnostic and its precedence remain unchanged.
+
+The selected declaration shapes and freeze/import/re-export lifetime are
+exact. Compact Arc/`CompactString` slices and the early error are Slug-native.
+Nonempty constraints, automatic/aspect/subrule groups, configured transition
+application, group resolution/context/actions and C++ execution remain
+deferred. The two-file 170/220/390 implementation envelope and proof/stops are
+frozen in `current-packet.md`; implementation is active without scope change.

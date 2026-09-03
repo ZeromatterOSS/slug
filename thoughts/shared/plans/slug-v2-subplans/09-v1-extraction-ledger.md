@@ -2656,3 +2656,42 @@ Independent retained-representation review returns `ACCEPT`; this sparse
 no-extraction decision is final for the active packet. A per-schema pointer,
 copied callable, new owner/cache/interner or configured retention returns
 `REPLAN`.
+
+### Execution-group declaration-closure utility decision (2026-09-03)
+
+Adopted packet
+`WP-4-6-7A-exec-group-declaration-closure-fail-closed-implementation-r1`
+requires no
+V1/Buck2 extraction. Reuse `ToolchainTypeRequirement`, `CanonicalLabel`,
+starlark-rust simple values, `CompactString`, immutable `Arc<[T]>`, schema
+`u32` indexes, the existing frozen-module lifetime and `Allocative`.
+
+Represent one detached group by one Arc slice of toolchain requirements;
+validate and discard the unadmitted empty constraint input. Retain rule groups
+in one source-ordered Arc slice of compact name/value pairs. A named
+`config.exec` descriptor carries one compact
+name; only actual rule uses enter a schema-indexed sparse Arc slice. The
+existing boolean continues to represent default exec. Do not add a map, a
+string to every final attribute schema, an interner, cache, registry, raw
+pointer, callable or new heap owner. No-group/no-named-transition rules retain
+empty shared slices and their existing final representation.
+
+The optional descriptor marker is consumed only by `rule()`. Every aspect,
+subrule, symbolic-macro explicit/inherited, repository-rule and tag-class
+projection must inspect it first and reject; reusing their existing boolean
+projection without that check would erase retained identity and is forbidden.
+
+The pre-recorder invocation guard prevents both slices from entering final
+package/configured equality, actions or DICE. Existing source digests and
+recursive manifest fingerprints remain the only invalidation owners;
+overlapping requests share immutable frozen modules and no lock crosses a DICE
+compute. Proof must report exact owner sizes/Allocative accounting, insertion
+order, structural equality, constant-time Arc clone and zero second-map cost.
+No benchmark is required for this cold declaration boundary.
+
+Deletion requires a separately reviewed full configured execution-group
+packet. It must own named transition identity, per-group resolution,
+`ctx.exec_groups`, action routing and failure order before moving any carrier
+into configured state. Independent retained-state review returns `ACCEPT`; any
+second map, final-schema name, new key/cache or configured retention is
+`REPLAN`; so is any non-rule projection that accepts or drops the marker.
