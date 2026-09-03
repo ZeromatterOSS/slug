@@ -4519,3 +4519,18 @@ path reads, new source/materialization/DICE owners, root/built-in/self-template
 support and ruleset/toolchain branches are forbidden. The generated-file plan
 already owns transformed output bytes and executable mode; no Stage 5 retained
 representation changes.
+
+### Repository-context template routed source accepted (2026-09-02)
+
+Independent correction rereview returns `ACCEPT`. The file-effect driver reuses
+the existing canonical source-read legacy/observation keys after dropping the
+synchronous evaluator. Successful and terminal missing, wrong-kind and I/O
+results all retain the routed source epoch; no physical-path read, new DICE key,
+materialization owner or retained effect representation was added.
+
+The packet closes at 371 production and 484 proof additions, 855 total, within
+its 400/500/900 caps. Full loading and query gates, CLI rebuild, hygiene and the
+authentic replay pass. The replay clears the exact bounded template call and
+stops at generic `repository_ctx.which` in rules_shell. Select docs-only
+`WP-5-7A-repository-context-which-audit`; do not implement another repository
+API or add a ruleset/toolchain branch.

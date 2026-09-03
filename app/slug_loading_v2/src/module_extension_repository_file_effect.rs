@@ -24,6 +24,10 @@ use slug_bzlmod_v2::HostRepositoryLabelPathError;
 use slug_bzlmod_v2::HostRepositoryLabelPathKey;
 use slug_bzlmod_v2::HostRepositoryLabelPathObservationKey;
 use slug_bzlmod_v2::HostRepositoryLabelPathValue;
+use slug_bzlmod_v2::HostRepositorySourceFileValue;
+use slug_bzlmod_v2::HostRepositorySourceObservation;
+use slug_bzlmod_v2::HostRepositorySourceReadKey;
+use slug_bzlmod_v2::HostRepositorySourceReadObservationKey;
 use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::HostSelectedExtensionOwner;
 use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
@@ -36,6 +40,7 @@ use slug_bzlmod_v2::RepositoryPlatformKey;
 use slug_bzlmod_v2::RootPackageBzlTarget;
 use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_bzlmod_v2::host_repository_relative_path;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
@@ -65,6 +70,7 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationError;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationKey;
 use crate::repository_rule_context::PreparedRepositoryLabelPaths;
+use crate::repository_rule_context::PreparedRepositoryTemplateSources;
 use crate::repository_rule_context::RepositoryRuleHostObservation;
 use crate::repository_rule_context::RepositoryRuleInvocationError;
 use crate::repository_rule_context::RepositoryRuleInvocationInput;
@@ -865,6 +871,213 @@ async fn resolve_repository_label_path(
     }
 }
 
+fn template_source_error(
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    ordinal: usize,
+    message: impl Into<CompactString>,
+    observations: PathObservationEpoch,
+) -> EffectDriver {
+    complete_effect_error(
+        HostSelectedRepositoryFileEffectError::Invocation {
+            certificate: certificate.clone(),
+            ordinal,
+            message: message.into(),
+        },
+        observations,
+    )
+}
+
+fn template_relative_path(
+    address: &RepositoryLabelPathAddress,
+) -> Result<slug_bzlmod_v2::HostRepositoryRelativePath, CompactString> {
+    host_repository_relative_path(
+        std::path::PathBuf::from(address.package().as_str()).join(address.target().as_str()),
+    )
+    .map_err(|error| error.to_string().into())
+}
+
+fn template_source_bytes(
+    source: &HostRepositorySourceFileValue,
+) -> Result<Arc<[u8]>, CompactString> {
+    match source {
+        HostRepositorySourceFileValue::Present { bytes, .. } => Ok(bytes.dupe()),
+        HostRepositorySourceFileValue::Absent => {
+            Err("repository_ctx.template source is absent".into())
+        }
+    }
+}
+
+async fn read_legacy_template_source(
+    ctx: &mut DiceComputations<'_>,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    ordinal: usize,
+    observations: PathObservationEpoch,
+    route: HostRepositorySourceRoute,
+    relative: slug_bzlmod_v2::HostRepositoryRelativePath,
+) -> Result<Arc<[u8]>, EffectDriver> {
+    match route.source_read_key(relative) {
+        HostRepositorySourceReadKey::RootRequest(_) => {
+            unreachable!("template sources are canonical external routes")
+        }
+        HostRepositorySourceReadKey::Observation(source_key) => {
+            match ctx.compute(&source_key).await {
+                Ok(SourcePreparationOutcome::Need(need)) => {
+                    Err(SourcePreparationOutcome::Need(need))
+                }
+                Ok(SourcePreparationOutcome::Complete(result)) => match result.as_ref() {
+                    Ok(HostRepositorySourceObservation::Request(source)) => {
+                        template_source_bytes(source).map_err(|error| {
+                            template_source_error(certificate, ordinal, error, observations)
+                        })
+                    }
+                    Ok(HostRepositorySourceObservation::Builtin(_)) => Err(template_source_error(
+                        certificate,
+                        ordinal,
+                        "repository_ctx.template built-in source is unsupported",
+                        observations,
+                    )),
+                    Err(error) => Err(template_source_error(
+                        certificate,
+                        ordinal,
+                        error.to_string(),
+                        observations,
+                    )),
+                },
+                Err(error) => Err(template_source_error(
+                    certificate,
+                    ordinal,
+                    error.to_string(),
+                    observations,
+                )),
+            }
+        }
+    }
+}
+
+async fn read_observed_template_source(
+    ctx: &mut DiceComputations<'_>,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    ordinal: usize,
+    observations: PathObservationEpoch,
+    route: HostRepositorySourceRoute,
+    relative: slug_bzlmod_v2::HostRepositoryRelativePath,
+) -> Result<(Arc<[u8]>, PathObservationEpoch), EffectDriver> {
+    match route.source_read_observation_key(relative) {
+        HostRepositorySourceReadObservationKey::RootRequest(_) => {
+            unreachable!("template sources are canonical external routes")
+        }
+        HostRepositorySourceReadObservationKey::Observation(source_key) => match ctx
+            .compute(&source_key)
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                Err(SourcePreparationOutcome::Complete(Err(
+                    HostSelectedRepositoryFileEffectObservationError::Merge {
+                        certificate: certificate.clone(),
+                        ordinal,
+                        error,
+                    },
+                )))
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                let observations = merge_definition_observations(
+                    EffectMode::Observed,
+                    certificate,
+                    ordinal,
+                    observations,
+                    observed.observations(),
+                )?;
+                match observed.result().as_ref() {
+                    Ok(HostRepositorySourceObservation::Request(source)) => {
+                        template_source_bytes(source)
+                            .map(|bytes| (bytes, observations.dupe()))
+                            .map_err(|error| {
+                                template_source_error(certificate, ordinal, error, observations)
+                            })
+                    }
+                    Ok(HostRepositorySourceObservation::Builtin(_)) => Err(template_source_error(
+                        certificate,
+                        ordinal,
+                        "repository_ctx.template built-in source is unsupported",
+                        observations,
+                    )),
+                    Err(error) => Err(template_source_error(
+                        certificate,
+                        ordinal,
+                        error.to_string(),
+                        observations,
+                    )),
+                }
+            }
+            Err(error) => Err(template_source_error(
+                certificate,
+                ordinal,
+                error.to_string(),
+                observations,
+            )),
+        },
+    }
+}
+
+async fn resolve_template_source(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    address: &RepositoryLabelPathAddress,
+    mode: EffectMode,
+    observations: PathObservationEpoch,
+) -> Result<(Arc<[u8]>, PathObservationEpoch), EffectDriver> {
+    if address.repo().is_root() {
+        return Err(template_source_error(
+            certificate,
+            key.ordinal,
+            "repository_ctx.template root source is unsupported",
+            observations,
+        ));
+    }
+    let relative = template_relative_path(address).map_err(|error| {
+        template_source_error(certificate, key.ordinal, error, observations.dupe())
+    })?;
+    match mode {
+        EffectMode::Legacy => {
+            let route = legacy_repository_label_path_route(
+                ctx,
+                key,
+                certificate,
+                address,
+                observations.dupe(),
+            )
+            .await?;
+            read_legacy_template_source(
+                ctx,
+                certificate,
+                key.ordinal,
+                observations.clone(),
+                route,
+                relative,
+            )
+            .await
+            .map(|bytes| (bytes, observations))
+        }
+        EffectMode::Observed => {
+            let (route, observations) =
+                observed_repository_label_path_route(ctx, key, certificate, address, observations)
+                    .await?;
+            let (bytes, incoming) = read_observed_template_source(
+                ctx,
+                certificate,
+                key.ordinal,
+                observations.dupe(),
+                route,
+                relative,
+            )
+            .await?;
+            Ok((bytes, incoming))
+        }
+    }
+}
+
 fn terminal_repository_rule_invocation_error(
     certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
     ordinal: usize,
@@ -883,6 +1096,16 @@ fn terminal_repository_rule_invocation_error(
                 certificate: certificate.clone(),
                 ordinal,
                 message: "repository_ctx.path argument must be a Label".into(),
+            }
+        }
+        RepositoryRuleInvocationError::TemplateDestinationArgument
+        | RepositoryRuleInvocationError::TemplateSourceArgument
+        | RepositoryRuleInvocationError::TemplateSubstitutions
+        | RepositoryRuleInvocationError::TemplateLimit => {
+            HostSelectedRepositoryFileEffectError::Invocation {
+                certificate: certificate.clone(),
+                ordinal,
+                message: "repository_ctx.template invocation is unsupported".into(),
             }
         }
         RepositoryRuleInvocationError::Plan(error) => HostSelectedRepositoryFileEffectError::Path {
@@ -904,7 +1127,8 @@ fn terminal_repository_rule_invocation_error(
                 type_name,
             }
         }
-        RepositoryRuleInvocationError::LabelPathNeed(_) => unreachable!(),
+        RepositoryRuleInvocationError::LabelPathNeed(_)
+        | RepositoryRuleInvocationError::TemplateSourceNeed(_) => unreachable!(),
     }
 }
 
@@ -929,12 +1153,14 @@ async fn invoke_repository_rule_with_label_paths(
     EffectDriver,
 > {
     let mut prepared_paths = PreparedRepositoryLabelPaths::new();
+    let mut prepared_templates = PreparedRepositoryTemplateSources::new();
     loop {
         let capture = capture_enabled.then(InvocationPrintCapture::default);
         match invoke_repository_rule(
             implementation,
             &module.manifest,
             &prepared_paths,
+            &prepared_templates,
             input.clone(),
             platform.clone(),
             transaction.snapshot().dupe(),
@@ -973,6 +1199,23 @@ async fn invoke_repository_rule_with_label_paths(
                 .await?;
                 observations = next_observations;
                 prepared_paths.insert(address, value);
+            }
+            Err(RepositoryRuleInvocationError::TemplateSourceNeed(address)) => {
+                if prepared_templates.contains_key(&address)
+                    || prepared_templates.len() == MAX_REPOSITORY_LABEL_PATHS
+                {
+                    return Err(template_source_error(
+                        certificate,
+                        key.ordinal,
+                        "repository_ctx.template repeated or exceeded its source limit",
+                        observations,
+                    ));
+                }
+                let (bytes, next_observations) =
+                    resolve_template_source(ctx, key, certificate, &address, mode, observations)
+                        .await?;
+                observations = next_observations;
+                prepared_templates.insert(address, bytes);
             }
             Err(error) => {
                 if let Some(capture) = capture {
@@ -1329,11 +1572,13 @@ mod tests {
     use slug_workspace_v2::PathDirectoryEntry;
     use slug_workspace_v2::PathDirectoryEntryKind;
     use slug_workspace_v2::PathDirectoryName;
+    use slug_workspace_v2::PathIoErrorKind;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
     use slug_workspace_v2::PathObservationEpoch;
     use slug_workspace_v2::PathObservationEpochKey;
+    use slug_workspace_v2::PathObservationError;
     use slug_workspace_v2::PathObservationInstanceId;
     use slug_workspace_v2::PathObservationNamespace;
     use slug_workspace_v2::PathObservationOperation;
@@ -1487,6 +1732,16 @@ def find_vc_path(*args, **kwargs):
 def setup_vc_env_vars(*args, **kwargs):
     return {}
 "#;
+    const TEMPLATE_RULE_FIXTURE: &str = r#"def _cc_configure_impl(ctx):
+    source = ctx.path(Label("//cc/private/toolchain:BUILD.toolchains.tpl"))
+    print("before-template")
+    ctx.template("BUILD", source, {"%{name}": "%{cpu}", "%{cpu}": "k8"})
+    ctx.template("COPY", source, {"%{name}": "arm"}, executable = False)
+
+cc_configure = repository_rule(implementation = _cc_configure_impl)
+"#;
+    const TEMPLATE_PATH: &str = "cc/private/toolchain/BUILD.toolchains.tpl";
+    const TEMPLATE_A: &[u8] = b"toolchain=%{name}\nraw=\xff\n";
 
     #[derive(Default)]
     struct EffectTracker(Mutex<Vec<(String, ActivationKind, Option<EventBatch>)>>);
@@ -1677,6 +1932,202 @@ def setup_vc_env_vars(*args, **kwargs):
         }
     }
 
+    fn fixture_result_with_template(
+        demand: &PathObservationDemand,
+        instance: PathObservationInstanceId,
+        logical_root: &Path,
+        fixture_root: &Path,
+        template: &[u8],
+    ) -> PathObservationResult {
+        let relative = demand
+            .path()
+            .as_path()
+            .strip_prefix(logical_root)
+            .unwrap_or(Path::new(""));
+        if relative == Path::new(TEMPLATE_PATH) {
+            return match demand.operation() {
+                PathObservationOperation::Lstat => {
+                    PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                        PathNodeKind::RegularFile,
+                        999,
+                        template.len() as i64,
+                        1,
+                        1,
+                        0o644,
+                    )))
+                }
+                PathObservationOperation::FileBytes => PathObservationResult::FileBytes(
+                    PathOperationResult::Present(Arc::<[u8]>::from(template)),
+                ),
+                operation => panic!("unexpected template operation: {operation:?}"),
+            };
+        }
+        if relative == Path::new("cc/private/toolchain/cc_configure.bzl")
+            && demand.operation() == PathObservationOperation::FileBytes
+        {
+            return PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                TEMPLATE_RULE_FIXTURE.as_bytes(),
+            )));
+        }
+        fixture_result(demand, instance, logical_root, fixture_root)
+    }
+
+    fn replace_template_observations(
+        epoch: &PathObservationEpoch,
+        bytes: &[u8],
+    ) -> PathObservationEpoch {
+        PathObservationEpoch::from_shared(epoch.observations().iter().map(|(demand, result)| {
+            let replacement = if demand.path().as_path().ends_with(TEMPLATE_PATH) {
+                match demand.operation() {
+                    PathObservationOperation::Lstat => {
+                        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                            PathNodeKind::RegularFile,
+                            999,
+                            bytes.len() as i64,
+                            1,
+                            1,
+                            0o644,
+                        )))
+                    }
+                    PathObservationOperation::FileBytes => PathObservationResult::FileBytes(
+                        PathOperationResult::Present(Arc::<[u8]>::from(bytes)),
+                    ),
+                    operation => panic!("unexpected template operation: {operation:?}"),
+                }
+            } else {
+                return (demand.dupe(), result.dupe());
+            };
+            (demand.dupe(), Arc::new(replacement))
+        }))
+        .unwrap()
+    }
+
+    #[derive(Clone, Copy)]
+    enum TemplateSourceFailure {
+        Missing,
+        Directory,
+        Unreadable,
+    }
+
+    #[rustfmt::skip]
+    fn failing_template_observations(epoch: &PathObservationEpoch, failure: TemplateSourceFailure) -> PathObservationEpoch {
+        PathObservationEpoch::from_shared(epoch.observations().iter().map(|(demand, result)| {
+            let replacement = match (failure, demand.operation(), demand.path().as_path().ends_with(TEMPLATE_PATH)) {
+                (TemplateSourceFailure::Missing, PathObservationOperation::Lstat, true) => Some(PathObservationResult::Lstat(PathOperationResult::Missing)),
+                (TemplateSourceFailure::Directory, PathObservationOperation::Lstat, true) => Some(PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(PathNodeKind::Directory, 0, 1, 1, 999, 0o755)))),
+                (TemplateSourceFailure::Unreadable, PathObservationOperation::FileBytes, true) => Some(PathObservationResult::FileBytes(PathOperationResult::Error(PathObservationError::Io { kind: PathIoErrorKind::PermissionDenied, raw_os_error: None }))),
+                _ => None,
+            };
+            (demand.dupe(), replacement.map_or_else(|| result.dupe(), Arc::new))
+        }))
+        .unwrap()
+    }
+
+    async fn update_template_need(
+        transaction: dice::DiceTransaction,
+        workspace: &NormalizedAbsolutePath,
+        need: &SourcePreparationNeeds,
+        observations: &mut Vec<(PathObservationDemand, Arc<PathObservationResult>)>,
+        logical_root: &Path,
+        fixture_root: &Path,
+        instance: PathObservationInstanceId,
+    ) -> dice::DiceTransaction {
+        let mut updater = transaction.into_updater();
+        if let Some(request) = need.repository_materializations().values().next() {
+            assert_eq!(need.repository_materializations().len(), 1);
+            assert_eq!(request.id.canonical_repo.as_str(), "rules_cc+");
+            updater
+                .changed_to(vec![(
+                    RepositoryMaterializationResultEpochKey {
+                        workspace: workspace.dupe(),
+                    },
+                    RepositoryMaterializationResultEpoch::new(
+                        workspace.dupe(),
+                        [
+                            platform_materialization(workspace, "platforms+"),
+                            platform_materialization(workspace, "platforms"),
+                            RepositoryMaterializationEpochEntry {
+                                request: request.clone(),
+                                result: RepositoryMaterializationResult::Success(
+                                    RepositoryMaterializationSuccess::Immutable {
+                                        source_identity: Arc::from("template-rules-cc-fixture"),
+                                        generation_root: logical_root.to_owned(),
+                                        observation_instance: instance,
+                                    },
+                                ),
+                            },
+                        ],
+                    )
+                    .unwrap(),
+                )])
+                .unwrap();
+        } else {
+            for demand in need
+                .path_observations()
+                .expect("template path retry")
+                .demands()
+            {
+                observations.retain(|(current, _)| current != demand);
+                observations.push((
+                    demand.dupe(),
+                    Arc::new(fixture_result_with_template(
+                        demand,
+                        instance,
+                        logical_root,
+                        fixture_root,
+                        TEMPLATE_A,
+                    )),
+                ));
+            }
+            updater
+                .changed_to(vec![(
+                    PathObservationEpochKey,
+                    PathObservationEpoch::from_shared(observations.iter().cloned()).unwrap(),
+                )])
+                .unwrap();
+        }
+        updater.commit().await
+    }
+
+    async fn converge_observed_template(
+        mut transaction: dice::DiceTransaction,
+        key: &HostSelectedRepositoryFileEffectObservationKey,
+        workspace: &NormalizedAbsolutePath,
+        logical_root: &Path,
+        fixture_root: &Path,
+        instance: PathObservationInstanceId,
+    ) -> (
+        dice::DiceTransaction,
+        ObservedHostSelectedRepositoryFileEffect,
+    ) {
+        let global = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        let mut observations = global
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .collect::<Vec<_>>();
+        for _ in 0..24 {
+            match transaction.compute(key).await.unwrap() {
+                SourcePreparationOutcome::Complete(Ok(value)) => return (transaction, value),
+                SourcePreparationOutcome::Need(need) => {
+                    assert!(need.repository_environment().is_none(), "{need:?}");
+                    transaction = update_template_need(
+                        transaction,
+                        workspace,
+                        &need,
+                        &mut observations,
+                        logical_root,
+                        fixture_root,
+                        instance,
+                    )
+                    .await;
+                }
+                terminal => panic!("template effect failed: {terminal:?}"),
+            }
+        }
+        panic!("template effect did not converge")
+    }
+
     #[tokio::test]
     async fn repository_label_path_retries_without_publishing_partial_attempts() {
         const PATH_EXTENSION: &str = r#"
@@ -1806,6 +2257,172 @@ ext = module_extension(implementation = impl)
                 ));
             }
         }
+    }
+
+    struct TemplateEffectFixture {
+        transaction: dice::DiceTransaction,
+        first: ObservedHostSelectedRepositoryFileEffect,
+        key: HostSelectedRepositoryFileEffectObservationKey,
+        owner: Arc<HostSelectedExtensionOwner>,
+        workspace: NormalizedAbsolutePath,
+        tracker: Arc<EffectTracker>,
+        instance: PathObservationInstanceId,
+    }
+
+    async fn template_effect_fixture() -> TemplateEffectFixture {
+        use crate::canonical_repository_route_tests::tests::WORKSPACE as BUILTIN_WORKSPACE;
+        use crate::canonical_repository_route_tests::tests::builtin_graph_dice;
+        use crate::canonical_repository_route_tests::tests::builtin_graph_module;
+        use crate::canonical_repository_route_tests::tests::transaction as builtin_transaction;
+
+        let dice = builtin_graph_dice();
+        let workspace = NormalizedAbsolutePath::new(BUILTIN_WORKSPACE).unwrap();
+        let mut module = builtin_graph_module();
+        module.push_str("\nrepo=use_repo_rule('@rules_cc//cc/private/toolchain:cc_configure.bzl','cc_configure')\nrepo(name='out')\n");
+        let tracker = Arc::new(EffectTracker::default());
+        let transaction =
+            builtin_transaction(&dice, &module, "", false, Some(tracker.clone())).await;
+        let mut transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::empty(),
+        )
+        .await;
+        let owner = owner_named(&mut transaction, workspace.dupe(), "+cc_configure+out").await;
+        tracker.take();
+        let key =
+            HostSelectedRepositoryFileEffectObservationKey::new(workspace.dupe(), owner.clone(), 0);
+        let logical_root = PathBuf::from("/template-rules-cc");
+        let fixture_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+            "../../tests/v2_oracle/fixtures/nonroot-module-extension-semantics/workspace/registry/modules/rules_cc/0.2.17",
+        );
+        let instance = PathObservationInstanceId::new(952);
+        let (transaction, first) = converge_observed_template(
+            transaction,
+            &key,
+            &workspace,
+            &logical_root,
+            &fixture_root,
+            instance,
+        )
+        .await;
+        TemplateEffectFixture {
+            transaction,
+            first,
+            key,
+            owner,
+            workspace,
+            tracker,
+            instance,
+        }
+    }
+
+    fn assert_template_result(fixture: &TemplateEffectFixture) {
+        let plan = fixture.first.result().as_ref().as_ref().unwrap().plan();
+        assert_eq!(plan.effects()[0].content(), b"toolchain=k8\nraw=\xff\n");
+        assert!(plan.effects()[0].executable());
+        assert_eq!(plan.effects()[1].content(), b"toolchain=arm\nraw=\xff\n");
+        assert!(!plan.effects()[1].executable());
+        let template_demands = fixture
+            .first
+            .observations()
+            .observations()
+            .keys()
+            .filter(|demand| demand.path().as_path().ends_with(TEMPLATE_PATH))
+            .collect::<Vec<_>>();
+        assert_eq!(template_demands.len(), 2);
+        assert!(template_demands.iter().all(|demand| demand.namespace()
+            == PathObservationNamespace::Materialization(fixture.instance)));
+        let prints = fixture
+            .tracker
+            .take()
+            .into_iter()
+            .flat_map(|(_, _, batch)| {
+                batch.into_iter().flat_map(|batch| {
+                    batch
+                        .events()
+                        .iter()
+                        .filter_map(|event| match event {
+                            EvaluationEvent::StarlarkPrint { text, .. } => Some(text.clone()),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(prints, [CompactString::new("before-template")]);
+    }
+
+    #[rustfmt::skip]
+    async fn assert_template_reuse_and_a_b_a(mut fixture: TemplateEffectFixture) {
+        let SourcePreparationOutcome::Complete(Ok(warm)) =
+            fixture.transaction.compute(&fixture.key).await.unwrap()
+        else {
+            panic!("warm template must complete")
+        };
+        assert!(Arc::ptr_eq(fixture.first.result(), warm.result()));
+        let SourcePreparationOutcome::Complete(legacy) = fixture
+            .transaction
+            .compute(&HostSelectedRepositoryFileEffectKey::new(
+                fixture.workspace.dupe(),
+                fixture.owner,
+                0,
+            ))
+            .await
+            .unwrap()
+        else {
+            panic!("legacy template must complete")
+        };
+        assert_eq!(legacy.as_ref(), fixture.first.result().as_ref());
+        let baseline = fixture
+            .transaction
+            .compute(&PathObservationEpochKey)
+            .await
+            .unwrap();
+        let changed = replace_template_observations(&baseline, b"variant==%{name}\nraw=\xff\n");
+        let mut updater = fixture.transaction.into_updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, changed)])
+            .unwrap();
+        fixture.transaction = updater.commit().await;
+        let SourcePreparationOutcome::Complete(Ok(second)) =
+            fixture.transaction.compute(&fixture.key).await.unwrap()
+        else {
+            panic!("changed template must complete")
+        };
+        assert_eq!(
+            second.result().as_ref().as_ref().unwrap().plan().effects()[0].content(),
+            b"variant==k8\nraw=\xff\n"
+        );
+        for failure in [TemplateSourceFailure::Missing, TemplateSourceFailure::Directory, TemplateSourceFailure::Unreadable] {
+            let mut updater = fixture.transaction.into_updater();
+            updater.changed_to(vec![(PathObservationEpochKey, failing_template_observations(&baseline, failure))]).unwrap();
+            fixture.transaction = updater.commit().await;
+            let SourcePreparationOutcome::Complete(Ok(failed)) = fixture.transaction.compute(&fixture.key).await.unwrap() else { panic!("terminal template source failure must complete") };
+            assert!(failed.result().is_err(), "source failure published an effect");
+            assert!(failed.observations().observations().keys().any(|demand| demand.path().as_path().ends_with(TEMPLATE_PATH)));
+        }
+        let mut updater = fixture.transaction.into_updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, baseline)])
+            .unwrap();
+        fixture.transaction = updater.commit().await;
+        let SourcePreparationOutcome::Complete(Ok(restored)) =
+            fixture.transaction.compute(&fixture.key).await.unwrap()
+        else {
+            panic!("restored template must complete")
+        };
+        assert_eq!(fixture.first.result(), restored.result());
+    }
+
+    #[tokio::test]
+    async fn repository_template_routes_bytes_retries_and_restores_a_b_a() {
+        let fixture = template_effect_fixture().await;
+        assert_template_result(&fixture);
+        assert_template_reuse_and_a_b_a(fixture).await;
     }
 
     #[tokio::test]

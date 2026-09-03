@@ -8091,3 +8091,19 @@ path/content/mode/order identity. Root/self-generated/string/Label template
 sources, explicit watch modes, non-Latin-1 substitutions and every other
 repository method remain unsupported/deferred. Audit result: `ACCEPT`; no Rust
 is changed by the audit.
+
+### Repository-context template evaluator accepted (2026-09-02)
+
+Terminal correction rereview returns `ACCEPT`. The evaluator admits the exact
+bounded normalized-string destination plus canonical external `path(Label)`
+source shape. It performs insertion-ordered literal Latin-1 byte replacement,
+preserves unmatched raw bytes, defaults executable mode to true, and appends
+only the terminal attempt to the existing generated-file plan. Explicit
+`substitutions=None`, root/built-in/self/string/Label sources and explicit
+watch modes remain rejected or deferred.
+
+The retry scratch retains canonical routing provenance without changing visible
+path equality. Immutable routed-source, duplicate-source, speculative-print,
+failure, warm-reuse and A/B/A proof passes. The rebuilt authentic replay clears
+`repository_ctx.template` and stops at independent `repository_ctx.which` in
+rules_shell. Stage 5 owns the next docs-only API audit.
