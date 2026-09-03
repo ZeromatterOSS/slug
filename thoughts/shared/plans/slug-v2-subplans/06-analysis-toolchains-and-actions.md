@@ -23219,3 +23219,26 @@ touched functions remain below 150 lines, so this packet authorizes no split.
 The selected follow-up Label caller-provenance audit changes only loading-time
 attempt context. Stage 6 owns no new semantics, state, DICE input or proof for
 that successor.
+
+### Imported native genrule remains loading-only (2026-09-03)
+
+The selected rules_java helper needs six native genrule declarations to load,
+but Bazel's configured implementation owns target/exec dependencies,
+TemplateVariableInfo, Make/location expansion, command selection, environment,
+providers, Spawn construction and execution. None is admitted here.
+
+The frozen loading design adds one typed `PackageTargetKind::Genrule` and its
+generated outputs. The existing non-Starlark configured catch-all must reject
+the producer before computing its dependencies, toolchains, implementation or
+actions. Generated-output analysis may follow only the existing producer edge
+and must then surface the same producer rejection. Proof-only
+`app/slug_analysis_v2/tests/starlark_rule.rs` must exercise both entry points
+with existing Stage 6 sentinels, but no analysis production file, configured
+key, provider, action, DICE input or equality domain changes.
+
+This terminal is Slug-native. Removing it requires a separately reviewed
+complete configured genrule packet including source/tool execution
+transitions, toolchain/provider validation, command expansion, actions,
+ActionKey/REAPI identity and output materialization. If the authenticated replay
+selects or analyzes a genrule or generated output instead of merely loading the
+package, the loading successor returns `REPLAN`.

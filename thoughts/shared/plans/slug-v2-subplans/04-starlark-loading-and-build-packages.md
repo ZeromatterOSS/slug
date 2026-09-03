@@ -8712,3 +8712,37 @@ initializer, computed-default, configured callback and Java execution
 semantics remain deferred. The five-file 120/260/380 successor, full source
 hashes, ownership, proof, complexity waivers and stops are frozen in
 `current-packet.md`.
+
+### Imported native genrule declaration audit (2026-09-03)
+
+Commit `21a5279cf` accepts the caller-provenance implementation. Its rebuilt
+rules_rust replay reaches rules_java 9.1.0
+`toolchains/default_java_toolchain.bzl:210` and stops because `native` has no
+`genrule` member. That member lookup occurs before keyword-expression
+evaluation, so the failure itself proves neither Label argument.
+
+Positive evidence comes from pinned Bazel 9.2.0 queries. The authenticated
+rules_java package produces six genrule declarations from BUILD lines 102-127
+and helper lines 201-217. An isolated two-package imported-helper oracle proves
+that raw label strings use the BUILD package while typed Labels retain their
+lexical `.bzl` identities; a nested output belongs to the BUILD package and is
+published as a generated file owned by the genrule. Full hashes, commands and
+outputs are frozen in `current-packet.md`.
+
+Accept, pending independent review, only the generic selected form with named
+required `name`, `cmd`, and nonempty `outs`, optional `srcs`, `toolchains`, and
+`tags`, no other attributes, omitted `executable=false`, generator metadata
+and atomic rule/output publication. The early empty-output rejection is a
+Slug-native retained-invariant restriction; Bazel reports it during configured
+genrule creation.
+Retain one compact typed declaration in `PackageTargetKind`; use the existing
+package coercion, recorder, generated-file and source/DICE owners. Add no
+partial native-attribute sidecar, key, cache, map, interner, registry or
+fixture.
+
+Bare BUILD `genrule`, selectors, every other genrule attribute, complete query
+projection, configured dependency/toolchain/provider semantics, command/Make
+expansion, shell/environment selection, providers, actions, ActionKeys,
+execution and Java semantics remain unsupported/deferred. Query and configured
+analysis fail closed before inventing any of them. The exact six-file
+170/260/430 successor is frozen in `current-packet.md`.

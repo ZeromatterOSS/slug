@@ -2737,3 +2737,26 @@ mapping correctness without a second mapping A/B/A test.
 Allocative owner. No benchmark is needed for this cold loading seam. Any
 no-load allocation, post-attempt retention, source inference, new owner or
 nonconstant clone returns `REPLAN`.
+
+`WP-4-5-8-7A-native-genrule-imported-declaration-audit-r1` requires no V1 or
+Buck2 extraction. Reuse `CanonicalLabel`, `CompactString`, immutable Arc
+slices, `PackageTargetKind`, `PackageRecorder`, generated-file ownership,
+`RuleCapability` and existing `Allocative` coverage.
+
+Retain only one compact selected-shape declaration: optional Arc slices for
+explicit `srcs`, `toolchains`, and normalized tags, a nonempty Arc output
+slice, one compact command, and an optional compact generator
+name/function/location triple. Prevalidate the rule and all outputs before
+attempt-scratch insertion. It enters the existing `PackageEvaluation`
+structural equality and package-load DICE value; source and recursive-manifest
+observations remain the sole invalidation owners. Overlapping requests share
+only those immutable facts, while recorders remain attempt-local and failed or
+cancelled attempts publish no package. Constant-time Arc clones and the
+existing package lifecycle need no benchmark for this cold boundary.
+
+Add no native-attribute duplicate, map, interner, registry, cache, global
+state, DICE key/input/edge, filesystem/process observation or configured/action
+carrier. Query and configured consumers reject the new target kind before
+projection or child/action work. Any second retained representation or new
+incremental owner returns `REPLAN`. Independent utility review returns
+`ACCEPT`, pending packet review.
