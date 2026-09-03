@@ -7387,6 +7387,76 @@ impl<'v> StarlarkValue<'v> for PlatformCommonModule {
     }
 }
 
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct JavaCommonModule;
+starlark::starlark_simple_value!(JavaCommonModule);
+impl fmt::Display for JavaCommonModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("java_common")
+    }
+}
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct JavaCommonInternalModule;
+starlark::starlark_simple_value!(JavaCommonInternalModule);
+impl fmt::Display for JavaCommonInternalModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("java_common_internal")
+    }
+}
+fn check_rules_java_common_caller(eval: &Evaluator<'_, '_, '_>) -> anyhow::Result<()> {
+    if eval.native_caller_function_filename().is_none() {
+        anyhow::bail!("restricted private API requires a .bzl function caller");
+    }
+    let identity = BzlEvaluationContext::from_evaluator(eval)?.source_identity_for_call(eval)?;
+    let package = identity.label.package();
+    let repo = package.repo().as_str();
+    let path = package.package().as_str();
+    if (repo == "rules_java" || repo.starts_with("rules_java+"))
+        && (path == "java" || path.starts_with("java/"))
+    {
+        return Ok(());
+    }
+    anyhow::bail!("file '{}' cannot use private API", identity.label)
+}
+#[starlark_module]
+fn java_common_methods(builder: &mut MethodsBuilder) {
+    #[allow(non_snake_case)]
+    fn internal_DO_NOT_USE<'v>(
+        #[starlark(this)] _this: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<JavaCommonInternalModule> {
+        check_rules_java_common_caller(eval)?;
+        Ok(JavaCommonInternalModule)
+    }
+}
+
+#[starlark_value(type = "java_common")]
+impl<'v> StarlarkValue<'v> for JavaCommonModule {
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(java_common_methods)
+    }
+}
+
+#[starlark_module]
+fn java_common_internal_methods(builder: &mut MethodsBuilder) {
+    fn google_legacy_api_enabled<'v>(
+        #[starlark(this)] _this: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        check_rules_java_common_caller(eval)?;
+        Ok(false)
+    }
+}
+
+#[starlark_value(type = "java_common_internal")]
+impl<'v> StarlarkValue<'v> for JavaCommonInternalModule {
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(java_common_internal_methods)
+    }
+}
+
 #[starlark_value(type = "rule")]
 impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
     type Canonical = Self;
@@ -9622,6 +9692,7 @@ fn complete_loading_globals(bool_config: bool, bzlmod_native: bool) -> Globals {
         aspect_globals(&mut globals);
         apple_common_globals(&mut globals);
         cc_common_globals(&mut globals);
+        globals.set("java_common", JavaCommonModule);
         label_globals(&mut globals);
         testing_bootstrap_globals(&mut globals);
         globals.set("OutputGroupInfo", OutputGroupInfo);
@@ -9710,6 +9781,12 @@ mod module_extension_definition_tests {
             assert!(evaluate_with_globals(&call, globals()).is_err());
         }
         assert!(evaluate_with_globals(NATIVE_BZL, build_file_loading_globals()).is_err());
+    }
+
+    #[test]
+    fn java_common_facades_retain_no_state() {
+        assert_eq!(std::mem::size_of::<JavaCommonModule>(), 0);
+        assert_eq!(std::mem::size_of::<JavaCommonInternalModule>(), 0);
     }
 
     #[test]

@@ -33670,6 +33670,154 @@ fn assert_symmetric_equal_and_hash<'v>(
     );
 }
 
+const RULES_JAVA_NATIVE_BZL: &str = r#"# Copyright 2022 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Redirects for private native APIs"""
+
+# Used for some private native APIs that we can't replicate just yet in Starlark
+def get_internal_java_common():
+    return java_common.internal_DO_NOT_USE()  # buildifier: disable=native-java-common
+"#;
+const DEFERRED_JAVA_COMMON: [&str; 10] = [
+    "create_compilation_action",
+    "create_header_compilation_action",
+    "check_java_toolchain_is_declared_on_rule",
+    "check_provider_instances",
+    "collect_native_deps_dirs",
+    "expand_java_opts",
+    "get_runtime_classpath_for_archive",
+    "incompatible_disable_non_executable_java_binary",
+    "incompatible_java_info_merge_runtime_module_flags",
+    "target_kind",
+];
+
+fn java_common_owner(label: &str) -> BzlModuleIdentity {
+    BzlModuleIdentity {
+        label: CanonicalLabel::parse(label).unwrap(),
+        workspace_path: PathBuf::from(label),
+        repository_mapping: Arc::from([]),
+    }
+}
+
+#[test]
+fn rules_java_common_selected_loading_facade_is_sparse_and_default_false() {
+    assert_eq!(RULES_JAVA_NATIVE_BZL.len(), 844);
+    assert_eq!(RULES_JAVA_NATIVE_BZL.lines().count(), 19);
+    assert_eq!(
+        format!("{:x}", Sha256::digest(RULES_JAVA_NATIVE_BZL.as_bytes())),
+        "81fd742661f632db4c6b36efa5acb76075e5d65d176ffa3372ed47b340bc9ae1"
+    );
+    let selected = format!(
+        r#"{RULES_JAVA_NATIVE_BZL}
+def _make_java_common():
+    internal = get_internal_java_common()
+    return (internal.google_legacy_api_enabled(), True in [{}])
+def _java_info_one():
+    return get_internal_java_common().google_legacy_api_enabled()
+def _java_info_two():
+    return get_internal_java_common().google_legacy_api_enabled()
+RESULT = (_make_java_common(), _java_info_one(), _java_info_two())
+"#,
+        DEFERRED_JAVA_COMMON
+            .map(|name| format!("hasattr(internal, '{name}')"))
+            .join(", ")
+    );
+    for (label, globals) in [
+        (
+            "@@rules_java+//java/private:native.bzl",
+            loading_globals as fn() -> Globals,
+        ),
+        (
+            "@@rules_java//java/private:native.bzl",
+            bzlmod_loading_globals as fn() -> Globals,
+        ),
+    ] {
+        let owner = java_common_owner(label);
+        let module =
+            eval_bzl_with_identity_and_globals(&selected, owner.clone(), &globals()).unwrap();
+        let result = module.get("RESULT").unwrap().value().to_repr();
+        assert_eq!(result, "((False, False), False, False)");
+        for member in DEFERRED_JAVA_COMMON {
+            let source = format!(
+                "{RULES_JAVA_NATIVE_BZL}\ndef rejected():\n return get_internal_java_common().{member}\nX=rejected()\n"
+            );
+            assert!(
+                eval_bzl_with_identity_and_globals(&source, owner.clone(), &globals()).is_err()
+            );
+        }
+    }
+    assert!(eval_global("X = java_common", &build_file_loading_globals()).is_err());
+}
+
+#[test]
+fn rules_java_common_checks_each_call_site_and_rejects_wider_provenance() {
+    let selected = || java_common_owner("@@rules_java+//java/private:native.bzl");
+    for source in [
+        "X=java_common.internal_DO_NOT_USE()",
+        "def f(): return java_common.internal_DO_NOT_USE(1)\nX=f()",
+        "def f(): return java_common.internal_DO_NOT_USE(extra=True)\nX=f()",
+        "def f(): return java_common.internal_DO_NOT_USE().google_legacy_api_enabled(1)\nX=f()",
+        "def f(): return java_common.internal_DO_NOT_USE().google_legacy_api_enabled(extra=True)\nX=f()",
+    ] {
+        assert!(
+            eval_bzl_with_identity(source, selected()).is_err(),
+            "{source}"
+        );
+    }
+    let call = "def f(): return java_common.internal_DO_NOT_USE()\nX=f()";
+    for label in [
+        "@@//java/private:native.bzl",
+        "@@dep+//java/private:native.bzl",
+        "@@rules_java+//tools:native.bzl",
+        "@@rules_java+//javascript:native.bzl",
+        "@@rules_javaevil+//java/private:native.bzl",
+        "@@//javatests/com/google/devtools/grok/kythe/analyzers/build/testdata/pkg:native.bzl",
+        "@@//third_party/bazel_rules/rules_java/java/private:native.bzl",
+    ] {
+        assert!(
+            eval_bzl_with_identity(call, java_common_owner(label)).is_err(),
+            "{label}"
+        );
+    }
+
+    let native = eval_bzl_with_identity(RULES_JAVA_NATIVE_BZL, selected()).unwrap();
+    let facade_owner = java_common_owner("@@rules_java+//java/private:facade.bzl");
+    let facade = eval_bzl_with_loaded_children(
+        "load(':native.bzl','get_internal_java_common')\ndef bridge(): return get_internal_java_common()\nINTERNAL=bridge()\n",
+        facade_owner.clone(),
+        &[(":native.bzl", selected(), native)],
+    )
+    .unwrap();
+    let query = "load(':facade.bzl','INTERNAL')\ndef query(): return INTERNAL.google_legacy_api_enabled()\nRESULT=query()\n";
+    let allowed = eval_bzl_with_loaded_children(
+        query,
+        java_common_owner("@@rules_java+//java/common:consumer.bzl"),
+        &[(":facade.bzl", facade_owner.clone(), facade.dupe())],
+    )
+    .unwrap();
+    assert_eq!(allowed.get("RESULT").unwrap().unpack_bool(), Some(false));
+    assert!(
+        eval_bzl_with_loaded_children(
+            query,
+            java_common_owner("@@dep+//java/common:consumer.bzl"),
+            &[(":facade.bzl", facade_owner, facade)],
+        )
+        .is_err()
+    );
+}
+
 #[test]
 fn provider_struct_and_toolchain_classes_share_equality_and_hash_domains() {
     let owner = BzlModuleIdentity {
