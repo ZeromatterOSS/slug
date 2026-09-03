@@ -69,6 +69,7 @@ use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 use starlark::values::set::SetRef;
 use starlark::values::starlark_value;
+use starlark::values::structs::AllocStruct;
 use starlark::values::tuple::TupleRef;
 use starlark::values::typing::StarlarkCallable;
 use starlark_map::small_map::SmallMap;
@@ -9395,6 +9396,10 @@ fn complete_loading_globals(bool_config: bool, bzlmod_native: bool) -> Globals {
         LibraryExtension::StructType.add(&mut globals);
         bzl_only_globals(&mut globals);
         bzl_visibility_globals(&mut globals);
+        globals.set(
+            "proto_common_do_not_use",
+            AllocStruct([("INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION", true)]),
+        );
         globals.set("config", ConfigModule);
         globals.set("config_common", ConfigCommonModule);
         aspect_globals(&mut globals);
@@ -9430,6 +9435,8 @@ pub(crate) fn build_file_loading_globals() -> Globals {
 
 #[cfg(test)]
 mod module_extension_definition_tests {
+    use sha2::Digest;
+    use sha2::Sha256;
     use slug_bzlmod_v2::NonrootAttributeInt;
     use starlark::environment::Module;
     use starlark::syntax::AstModule;
@@ -9456,6 +9463,35 @@ mod module_extension_definition_tests {
 
     fn evaluate(source: &str) -> anyhow::Result<starlark::environment::FrozenModule> {
         evaluate_with_globals(source, loading_globals())
+    }
+
+    #[test]
+    fn proto_common_facade_matches_the_pinned_default_bzl_contract() {
+        const NATIVE_BZL: &str = concat!(
+            "\"\"\"Renames toplevel symbols so they can be exported in Starlark under the same name\"\"\"\n\n",
+            "native_proto_common = proto_common_do_not_use\n",
+        );
+        assert_eq!(NATIVE_BZL.len(), 134);
+        assert_eq!(
+            format!("{:x}", Sha256::digest(NATIVE_BZL.as_bytes())),
+            "941d6b139f4eb695a24688d565ace2aa4cecd67e8f12dd5cee1e65dad7397db6"
+        );
+        let reflection = format!(
+            "{NATIVE_BZL}captured = (type(native_proto_common), dir(native_proto_common), native_proto_common.INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION, hasattr(native_proto_common, 'ProtoLangToolchainInfo'), getattr(native_proto_common, 'ProtoLangToolchainInfo', 'fallback'), hasattr(native_proto_common, 'INCOMPATIBLE_PASS_TOOLCHAIN_TYPE'), getattr(native_proto_common, 'INCOMPATIBLE_PASS_TOOLCHAIN_TYPE', 'fallback'), hasattr(native_proto_common, 'compile'))\n"
+        );
+        let call = format!("{NATIVE_BZL}native_proto_common()\n");
+        for globals in [
+            loading_globals as fn() -> Globals,
+            bzlmod_loading_globals as fn() -> Globals,
+        ] {
+            let module = evaluate_with_globals(&reflection, globals()).unwrap();
+            assert_eq!(
+                module.get("captured").unwrap().value().to_repr(),
+                "(\"struct\", [\"INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION\"], True, False, \"fallback\", False, \"fallback\", False)"
+            );
+            assert!(evaluate_with_globals(&call, globals()).is_err());
+        }
+        assert!(evaluate_with_globals(NATIVE_BZL, build_file_loading_globals()).is_err());
     }
 
     #[test]
