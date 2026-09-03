@@ -103,11 +103,14 @@ proof so `tools` contains directory `osx` and `tools/osx` contains only
 `xcode_configure.bzl`.
 
 In the public catalog test, add the matching lexically ordered `FILES` row.
-Update both complete pinned-manifest expectations from
+Update the two catalog-owned complete-manifest expectations from
 `c313fad68f4e475d744dc6de7b658515b33c634905222e934a9d09129371f56f`
 to
 `3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc`.
-Do not change the manifest domain or version.
+Also update the downstream test-only host-route/capability expectation in
+`host_module.rs` from its already-stale `de4c723127e85a58d4fc5331e16135cdc1448afc0edb3792a1515ee2266f198f`
+to that same new digest. Do not change production host-module code, the
+manifest domain or its version.
 
 `BuiltinBazelToolsSnapshot`, the static `CATALOG`, `validated_file`,
 `BuiltinBazelToolsSourceFileKey` and the derived directory-listing key remain
@@ -128,12 +131,14 @@ Only these files may change:
 
 - `app/slug_bzlmod_v2/builtin/bazel_tools/tools/osx/xcode_configure.bzl`
 - `app/slug_bzlmod_v2/src/builtin_repository.rs`
+- `app/slug_bzlmod_v2/src/host_module.rs` (test-only digest expectation)
 - `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs`
 
 Gross Rust additions are capped at 12 production, 40 proof and 52 Rust total.
 The asset must be exactly 12,993 bytes/329 lines. Aggregate gross additions,
 including that exact asset, are capped at 400. Formatting or cleanup does not
-create headroom.
+create headroom. Expected accounting is 6 production, 16 proof and 22 total
+Rust additions plus the 329-line asset, or 351 aggregate additions.
 
 ## Required proof and validation
 
@@ -146,10 +151,11 @@ create headroom.
 - Prove sorted direct listings add only `osx` under `tools` and only
   `xcode_configure.bzl` under `tools/osx`.
 - Prove the public `FILES` manifest remains exactly the physical asset set and
-  both complete route-manifest expectations equal
+  all three catalog and downstream host-route/capability expectations equal
   `3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc`.
 - Run rustfmt and diff checks, serial focused built-in catalog unit/integration
-  tests, the complete `slug_bzlmod_v2` suite and a direct
+  tests, the named downstream `host_module` route test, the complete
+  600-test `slug_bzlmod_v2` suite and a direct
   `slug_loading_v2` consumer check. Rebuild `slug_cli_v2` before replay.
 - Clean `slugd` before and after the authenticated replay. The replay must
   clear this `UnsupportedCatalog`, load and freeze the exact source through
@@ -159,12 +165,13 @@ create headroom.
 ## Terminal stops
 
 Return `ACCEPT` only if exact bytes/mode/hash, one-file closure, listings,
-physical manifest, new route digest, focused/full tests, direct dependent,
-build and replay pass within all three files and caps.
+physical manifest, all three digest proofs, focused/full tests, direct
+dependent, build and replay pass within all four files and caps.
 
 Return `REPLAN` before adding `tools/osx/BUILD`, `xcode_locator.m`,
 `xcode_locator_stub.sh`, `xcode_version_flag.bzl` or any other asset; changing
 an evaluator, repository API, route, key, manifest version or materialization
 owner; adding install-tree/filesystem fallback; implementing Host/Darwin,
 generated BUILD, apple_support or toolchain behavior; or crossing an
-independent next replay boundary.
+independent next replay boundary. Any production change in `host_module.rs`
+also requires `REPLAN`.

@@ -4694,3 +4694,14 @@ Independent review agrees with `ACCEPT`. Select
 three-file allowlist and caps frozen in the active manifest. Broader
 `tools/osx`, repository runtime, Darwin discovery, generated BUILD,
 apple_support and C++ toolchain behavior remain unsupported/deferred.
+
+### Xcode catalog downstream digest-proof scope correction (2026-09-02)
+
+The focused catalog tests pass, but the required full Bzlmod gate exposes one
+already-stale test-only digest in `host_module.rs`: the reserved built-in route
+and `HostRepositorySourceCapability` proof still names the manifest predating
+`lib_cc_configure.bzl`. Correct the active allowlist to four files solely so
+that downstream expectation also freezes the new `3927ae2a...` identity. The
+accepted numeric caps already contain the corrected 6/16/22 Rust and 351-line
+aggregate accounting. No `host_module.rs` production change is authorized;
+another file or semantic change returns `REPLAN`.
