@@ -1,14 +1,22 @@
 # Current Slug V2 Packet
 
-Packet: WP-2-4-5-7A-repository-label-path-owner-design-r1
+Packet: WP-2-4-5-7A-repository-label-path-owner-implementation-r2
 
 Milestone: M7A bootstrap-critical loading/repository execution closure. Admit
 the bounded Bazel 9.2 `repository_ctx.path(Label)` slice with a lexical routed
 path owner and a lock-safe bridge between synchronous Starlark evaluation and
 asynchronous DICE prerequisites.
 
-Status: docs-only design and independent architecture review `ACCEPTED`;
-bounded Rust is selected under this frozen contract.
+Status: terminally `ACCEPTED` after independent implementation and focused
+correction rereview.
+
+The r1 design is terminally `REPLAN`: its 520-line combined production cap
+was invalidated as soon as the independently implemented Bzlmod owner measured
+512 lines before the required Starlark value and async retry bridge. The r2
+packet preserves the accepted compatibility boundary, owner, allowlist,
+256-address limit, size ceilings and per-function complexity cap. It changes
+only the measured aggregate growth envelope and records the implementation
+shape that proved necessary; it does not widen semantics.
 
 Immediate predecessor `WP-5-7A-repository-context-path-audit` is terminally
 `REPLAN` in `08af092a8`. It proves that Slug's existing
@@ -70,8 +78,8 @@ Keep **unsupported/deferred**:
 
 The path value is useful for dictionary storage, equality, hashing,
 stringification and later generic repository APIs. This packet does not claim
-that the current rules_cc replay completes: its next independent call is
-expected to be `repository_ctx.symlink`.
+that the current rules_cc replay completes: after the admitted path calls its
+next independent call is `repository_ctx.template`.
 
 ## Natural owner and retained identity
 
@@ -130,9 +138,10 @@ created inside `HostSelectedRepositoryFileEffectKey::compute`, never published,
 and capped at 256 distinct addresses. Exceeding the cap is a Slug-native
 terminal invocation error. The first rules_cc consumer requests nine.
 
-`RepositoryRuleInvocationState` borrows or clones that prepared map for one
-synchronous attempt and owns one `RefCell<Option<RepositoryLabelPathAddress>>`
-unresolved demand. The `path` method:
+`RepositoryRuleInvocationState` clones that prepared map for one synchronous
+attempt. Its existing typed `RefCell<Option<RepositoryRuleInvocationError>>`
+slot carries the first unresolved address as `LabelPathNeed`; the `path`
+method:
 
 1. validates the receiver and accepts only `StarlarkLabel`;
 2. projects its address without reparsing or retaining mapping provenance;
@@ -153,11 +162,13 @@ vector, invocation state and `RefCell` borrow from the failed attempt is
 dropped before any `ctx.compute(...).await`.
 
 Each attempt gets its own print capture; captures, partial file effects and
-dynamic environment observations from demand attempts are discarded. Only the
-terminal successful attempt publishes them. The prepared map and retry count
-are local scratch and never participate in effect identity. The DICE
-dependencies computed while filling it do participate normally in the outer
-effect key.
+dynamic environment observations from Label-path demand attempts are
+discarded. The terminal successful attempt publishes its capture and effects;
+a terminal evaluation failure preserves the pre-existing behavior of
+publishing that terminal attempt's capture while publishing no effect. The
+prepared map and retry count are local scratch and never participate in effect
+identity. The DICE dependencies computed while filling it do participate
+normally in the outer effect key.
 
 Legacy mode computes ordinary route/path keys. Observed mode computes their
 observation variants and unions route and package-marker epochs with the
@@ -242,7 +253,14 @@ and this manifest. Do not change Cargo metadata, fixtures, Bazel/rules_cc
 sources, repository-rule definition/call/certificate shapes, Label parsing,
 source-route/materialization shapes or generated file-effect shapes.
 
-Caps are 520 gross added production Rust lines, 650 proof lines and 1,170 total.
+Caps are 1,100 gross added production Rust lines, 750 proof lines and 1,850
+total. After correction review required the explicit external, negative,
+256/257 and A/B/A discriminators, the accepted implementation measures
+1,047/709/1,756. The larger
+production estimate is the minimum reviewed composition of paired
+legacy/observed package/materialization ownership, paired root/canonical route
+orchestration, typed terminal carriers and the synchronous retry boundary;
+the 9% remaining production margin is not authority to add semantics.
 No new function may exceed 90 lines; no existing function may grow by more
 than 25 lines. Prefer a new focused Bzlmod owner over adding the category to
 the 17,245-line `source_preparation.rs` or 5,616-line `host_package.rs`.
@@ -284,10 +302,18 @@ Return `REPLAN` before or during Rust if:
 - symlink/template/effect, ruleset/toolchain/repository/platform special cases
   or broader path semantics become necessary.
 
-Architecture result: `ACCEPT`. Independent review confirms the natural owner,
-no-target-observation boundary, mapping-provenance exclusion, 256-address
-compatibility cap, speculative-attempt event discard and lock-safe retry
-lifetime. The packet creates one lexical package-root path owner over existing
-DICE dependencies and one bounded invocation-local retry bridge; it neither
-weakens observation identity nor pretends the resolved source-read path is
-Bazel's path constructor. Rust may begin only under this contract.
+Architecture result: `ACCEPT`. Independent terminal review first returned
+`REVISE` for lost terminal-failure print capture and missing external,
+negative, 256/257 and A/B/A discriminators. The corrected implementation
+restores the existing terminal-attempt capture behavior, keeps speculative
+attempts private, and adds every required discriminator. Focused correction
+rereview returns `ACCEPT` against the integrated diff and measured caps.
+
+Focused and complete serial Bzlmod/loading tests pass, including 600 Bzlmod
+library units, 516 active loading library units plus one ignored unit, every
+loading integration target and 55 query library units. Final CLI rebuild,
+formatting, diff/process hygiene, the unchanged three-row archive baseline and
+parked-proof scope checks pass. The rebuilt authentic replay clears every
+admitted Label-path call and selects the independent
+`repository_ctx.template` boundary for a docs-only audit; no template or
+rules_cc special case belongs to this packet.

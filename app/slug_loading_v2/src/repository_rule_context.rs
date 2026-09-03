@@ -9,6 +9,7 @@
 
 use std::cell::RefCell;
 use std::fmt;
+use std::hash::Hash;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -17,9 +18,11 @@ use dupe::Dupe;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanBuilder;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanError;
+use slug_bzlmod_v2::HostRepositoryLabelPathValue;
 use slug_bzlmod_v2::OverrideAttributeKey;
 use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
+use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_bzlmod_v2::RepositoryPlatform;
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
@@ -37,6 +40,8 @@ use starlark::values::dict::AllocDict;
 use starlark::values::list::AllocList;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
+use starlark::values::string::StarlarkStr;
+use starlark_map::StarlarkHasher;
 use starlark_map::small_map::SmallMap;
 
 use crate::attrs::AttributeKind;
@@ -412,7 +417,7 @@ impl RepositoryRuleHostObservation {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RepositoryRuleInvocationError { PathArgument, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
+pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
 
 #[rustfmt::skip]
 pub(crate) struct RepositoryRuleInvocation { pub(crate) plan: GeneratedRepositoryFileEffectPlan, pub(crate) dynamic_environment: Arc<[CompactString]> }
@@ -436,24 +441,58 @@ struct RepositoryRuleAttributes {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct RepositoryOs { platform: RepositoryPlatform, snapshot: RepositoryEnvironmentSnapshot }
 
+pub(crate) type PreparedRepositoryLabelPaths =
+    SmallMap<RepositoryLabelPathAddress, HostRepositoryLabelPathValue>;
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct RepositoryStarlarkPath(HostRepositoryLabelPathValue);
+
 #[rustfmt::skip]
 #[derive(Debug, ProvidesStaticType)]
-pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, error: RefCell<Option<RepositoryRuleInvocationError>> }
+pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, prepared_paths: PreparedRepositoryLabelPaths, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, error: RefCell<Option<RepositoryRuleInvocationError>> }
 
 #[rustfmt::skip]
 impl RepositoryRuleInvocationState {
-    fn new(manifest: &BzlLoadManifest) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), error: RefCell::new(None) } }
+    fn new(manifest: &BzlLoadManifest, prepared_paths: &PreparedRepositoryLabelPaths) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), prepared_paths: prepared_paths.clone(), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), error: RefCell::new(None) } }
     fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> { eval.extra.and_then(|extra| extra.downcast_ref::<Self>()).ok_or_else(|| anyhow::anyhow!("repository_ctx is outside repository-rule execution")) }
     pub(crate) fn bzl(&self) -> &BzlEvaluationContext { &self.bzl }
     fn fail(&self, error: RepositoryRuleInvocationError) -> anyhow::Error {
         *self.error.borrow_mut() = Some(error);
-        anyhow::anyhow!("unsupported repository_ctx.file argument")
+        anyhow::anyhow!("repository_ctx invocation failed")
     }
     fn record_environment(&self, name: &str) { self.dynamic_environment.borrow_mut().push(name.into()); }
     fn finish(&self) -> RepositoryRuleInvocation {
         let mut dynamic_environment = self.dynamic_environment.borrow().clone();
         dynamic_environment.sort(); dynamic_environment.dedup();
         RepositoryRuleInvocation { plan: self.effects.borrow_mut().take().expect("repository context completes at most once").finish(), dynamic_environment: dynamic_environment.into() }
+    }
+}
+
+impl fmt::Display for RepositoryStarlarkPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0.path_str())
+    }
+}
+
+starlark::starlark_simple_value!(RepositoryStarlarkPath);
+
+#[starlark_value(type = "path")]
+impl<'v> StarlarkValue<'v> for RepositoryStarlarkPath {
+    fn collect_str(&self, collector: &mut String) {
+        collector.push_str(self.0.path_str());
+    }
+
+    fn collect_repr(&self, collector: &mut String) {
+        collector.push_str(&StarlarkStr::repr(self.0.path_str()));
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.0.path().hash(hasher);
+        Ok(())
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other).is_some_and(|other| self.0.path() == other.0.path()))
     }
 }
 
@@ -529,6 +568,25 @@ impl<'v> StarlarkValue<'v> for RepositoryOs {
 
 #[starlark_module]
 fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
+    fn path<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] path: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        RepositoryRuleContext::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
+        let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        let label = StarlarkLabel::from_value(path)
+            .ok_or_else(|| state.fail(RepositoryRuleInvocationError::LabelPathArgument))?;
+        let address = RepositoryLabelPathAddress::from_label(label.canonical());
+        let Some(path) = state.prepared_paths.get(&address) else {
+            return Err(state.fail(RepositoryRuleInvocationError::LabelPathNeed(address)));
+        };
+        Ok(eval
+            .heap()
+            .alloc_simple(RepositoryStarlarkPath(path.clone())))
+    }
+
     fn file<'v>(
         this: Value<'v>,
         #[starlark(require = pos)] path: Value<'v>,
@@ -582,6 +640,7 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
 pub(crate) fn invoke_repository_rule(
     implementation: starlark::values::FrozenValue,
     manifest: &BzlLoadManifest,
+    prepared_paths: &PreparedRepositoryLabelPaths,
     input: RepositoryRuleInvocationInput,
     platform: RepositoryPlatform,
     snapshot: RepositoryEnvironmentSnapshot,
@@ -589,7 +648,7 @@ pub(crate) fn invoke_repository_rule(
 ) -> Result<RepositoryRuleInvocation, RepositoryRuleInvocationError> {
     let invocation_module = Module::new();
     let context = invocation_module.heap().alloc_simple(RepositoryRuleContext { platform, snapshot, input });
-    let state = RepositoryRuleInvocationState::new(manifest);
+    let state = RepositoryRuleInvocationState::new(manifest, prepared_paths);
     let returned = {
         let mut evaluator = Evaluator::new(&invocation_module);
         if let Some(print_handler) = print_handler {
@@ -612,6 +671,8 @@ mod tests {
 
     use slug_bzlmod_v2::RepositoryEnvironmentEntry;
     use slug_identity_v2::CanonicalLabel;
+    use slug_workspace_v2::NormalizedAbsolutePath;
+    use slug_workspace_v2::PathObservationNamespace;
     use starlark::environment::Globals;
     use starlark::syntax::AstModule;
     use starlark::syntax::Dialect;
@@ -725,6 +786,7 @@ mod tests {
         invoke_repository_rule(
             implementation,
             &manifest,
+            &SmallMap::new(),
             input,
             RepositoryPlatform::new("linux", "x86_64"),
             RepositoryEnvironmentSnapshot::empty(),
@@ -869,7 +931,7 @@ mod tests {
         let invocation = invoke_input(r#"
 def implementation(ctx):
     if not (ctx.name == "canonical" and ctx.original_name == "canonical" and ctx.attr.name == ctx.name): fail("names")
-    if not (hasattr(ctx, "attr") and getattr(ctx, "name") == "canonical" and dir(ctx) == ["attr", "file", "getenv", "name", "original_name", "os"]): fail("context reflection")
+    if not (hasattr(ctx, "attr") and getattr(ctx, "name") == "canonical" and dir(ctx) == ["attr", "file", "getenv", "name", "original_name", "os", "path"]): fail("context reflection")
     if not (ctx.attr.s == "value" and ctx.attr.b and ctx.attr.i == 7 and type(ctx.attr.l) == "Label"): fail("scalars")
     if not (type(ctx.attr.ll[0]) == "Label" and type(ctx.attr.o) == "Label" and type(ctx.attr.ol[0]) == "Label"): fail("labels")
     if not (ctx.attr.sd == {"k": "v"} and ctx.attr.sld == {"k": ["v"]} and type(ctx.attr.skld["k"]) == "Label"): fail("maps")
@@ -1168,6 +1230,7 @@ def implementation(ctx):
         let invocation = invoke_repository_rule(
             implementation,
             &invocation_manifest(),
+            &SmallMap::new(),
             RepositoryRuleInvocationInput::new(
                 "repo".into(),
                 None,
@@ -1240,6 +1303,7 @@ def implementation(ctx):
             invoke_repository_rule(
                 implementation,
                 manifest,
+                &SmallMap::new(),
                 RepositoryRuleInvocationInput::new(
                     "repo".into(),
                     None,
@@ -1273,6 +1337,73 @@ def implementation(ctx):
             invoke(&ambiguous),
             Err(RepositoryRuleInvocationError::Evaluation(_))
         ));
+    }
+
+    #[test]
+    fn path_demands_then_projects_prepared_label_path_values() {
+        let manifest = invocation_manifest();
+        let owner = freeze_bzl(
+            &manifest,
+            r#"
+def implementation(ctx):
+    first = ctx.path(Label("@@dep+//pkg:sub/missing"))
+    again = ctx.path(Label("@@dep+//pkg:sub/missing"))
+    ctx.file("path", "%s|%r|%s|%s" % (first, first, first == again, {first: "ok"}[again]))
+"#,
+            None,
+        );
+        let implementation = unsafe {
+            owner
+                .get("implementation")
+                .unwrap()
+                .unchecked_frozen_value()
+        };
+        let address = RepositoryLabelPathAddress::from_label(
+            &CanonicalLabel::parse("@@dep+//pkg:sub/missing").unwrap(),
+        );
+        let invoke_with_paths = |prepared: &PreparedRepositoryLabelPaths| {
+            invoke_repository_rule(
+                implementation,
+                &manifest,
+                prepared,
+                RepositoryRuleInvocationInput::new(
+                    "repo".into(),
+                    None,
+                    Arc::new(SmallMap::new()),
+                    Arc::from([]),
+                )
+                .unwrap(),
+                RepositoryPlatform::new("linux", "x86_64"),
+                RepositoryEnvironmentSnapshot::empty(),
+                None,
+            )
+        };
+        assert!(matches!(
+            invoke_with_paths(&PreparedRepositoryLabelPaths::new()),
+            Err(RepositoryRuleInvocationError::LabelPathNeed(need)) if need == address
+        ));
+
+        let value = HostRepositoryLabelPathValue::new(
+            NormalizedAbsolutePath::new("/materialized/pkg/sub/missing").unwrap(),
+            PathObservationNamespace::Host,
+        )
+        .unwrap();
+        let invocation = invoke_with_paths(&SmallMap::from_iter([(address, value)])).unwrap();
+        assert_eq!(
+            invocation.plan.effects()[0].content(),
+            br#"/materialized/pkg/sub/missing|"/materialized/pkg/sub/missing"|True|ok"#
+        );
+
+        let error = match invoke(
+            r#"
+def implementation(ctx):
+    ctx.path("not-a-label")
+"#,
+        ) {
+            Err(error) => error,
+            Ok(_) => panic!("string path must fail"),
+        };
+        assert_eq!(error, RepositoryRuleInvocationError::LabelPathArgument);
     }
 
     #[test]

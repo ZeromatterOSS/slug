@@ -4483,3 +4483,20 @@ retains package-marker epochs, while target-present/missing/symlink spellings
 produce the same unobserved lexical path. A/B/A, needs, cancellation, equality
 and retained-size proof are mandatory. The active packet authorizes bounded
 Rust only inside its frozen allowlist and caps.
+
+### Lexical repository Label-path owner accepted (2026-09-02)
+
+Terminal correction rereview returns `ACCEPT`. The new Bzlmod owner composes
+the existing root/external package lookup and materialization owners, retains
+normalized lexical path plus observation namespace, and never resolves,
+reads, lists or observes the target. Root non-first selection, direct-local and
+immutable roots, built-in fail-closed behavior, route mismatch, invalid paths,
+package disposition errors, exact observed marker epochs, legacy parity,
+needs, retained sizes and A/B/A Arc restoration are discriminated.
+
+R2 closes at 1,047 production and 709 proof additions, 1,756 total, inside its
+1,100/750/1,850 caps. Complete Bzlmod and loading gates pass. The rebuilt
+authentic replay advances to `repository_ctx.template`; run only docs-first
+`WP-5-7A-repository-context-template-audit` next. String paths, built-in
+materialization, path filesystem methods, template/symlink and every other
+repository effect remain unsupported/deferred.

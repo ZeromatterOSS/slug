@@ -2589,3 +2589,10 @@ This is Slug-owned composition of existing semantic owners, so no extraction-
 ledger row is added. Address/key/value size assertions and the active packet's
 384/128-byte key/value ceilings are mandatory. Independent retained-
 representation review returns `ACCEPT`.
+
+Terminal correction rereview preserves that decision. The accepted owner and
+retry bridge reuse only the named compact identity/path values, `SmallMap`,
+`Dupe` and `Allocative`; the 256-entry map remains invocation scratch and warm
+reuse belongs to the natural DICE values. Size assertions pass. No V1, Buck2
+or Zabel code is extracted, and no ledger row, interner, cache, registry,
+global state or alternate path representation is added.

@@ -8055,3 +8055,20 @@ mapping provenance after canonical resolution. String/generated-root paths,
 built-in catalog paths, path fields/methods and symlink/template effects remain
 unsupported/deferred. The active packet freezes proof, caps and terminal stops;
 bounded Rust may begin with no ruleset or toolchain branch.
+
+### Repository Label-path evaluator bridge accepted (2026-09-02)
+
+Terminal correction rereview returns `ACCEPT`. The repository evaluator now
+admits only `path(Label)` through a typed unresolved-address demand and returns
+an immutable, hashable `path` value on a prepared hit. Physical normalized
+path bytes define Starlark equality, hash, `str` and `repr`; route namespace
+remains DICE-only identity. The 256-address invocation cap, repeated-hit reuse,
+multi-demand retry, final-only prints, terminal-failure prints and absence of
+target observations are discriminated.
+
+The accepted implementation changes no retained repository definition, call,
+certificate, BZL manifest or effect-plan shape. Complete loading gates pass and
+the rebuilt authentic rules_cc replay clears these Label-path calls before
+stopping at the independent `repository_ctx.template` method. Stage 5 owns the
+next docs-only audit; template behavior and ruleset special cases remain
+unsupported/deferred here.

@@ -6670,3 +6670,14 @@ environment names and print batches are discarded; only the terminal attempt
 publishes. No lock crosses compute, and needs/cancellation/A-B-A restoration
 remain normal DICE behavior. Independent architecture review returns
 `ACCEPT`; bounded Rust is authorized only by the active packet.
+
+### Repository Label-path DICE retry implementation accepted (2026-09-02)
+
+Terminal correction rereview returns `ACCEPT`. The implemented outer retry
+keeps its prepared `SmallMap` as bounded request scratch, drops the synchronous
+attempt before every DICE computation, and publishes only terminal-attempt
+state. Terminal evaluation failures retain their pre-existing print batch;
+Label-path demand attempts retain none. Observed and legacy keys preserve
+normal need propagation, cancellation, marker epochs, warm DICE reuse and
+A/B/A restoration without a lock or borrow across compute. No DICE ownership
+or framework primitive is widened.

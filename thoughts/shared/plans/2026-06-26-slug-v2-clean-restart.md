@@ -81,6 +81,26 @@ bytes while DICE retains observation namespace. Built-in catalog paths,
 string/generated-root paths, filesystem path methods and repository effects
 remain deferred. Implement only the frozen packet.
 
+Implementation terminally replans the r1 aggregate growth estimate: the
+paired Bzlmod owner alone measures 512 production lines, leaving no honest
+room under the 520-line combined cap for the required Starlark and retry
+bridge. R2 preserves the exact boundary and closes at 1,047/709/1,756 gross
+production/proof/total Rust additions within its measured 1,100/750/1,850
+caps. Independent terminal review's print-capture and proof-matrix corrections
+are resolved; focused correction rereview returns `ACCEPT`.
+
+The lexical owner uses package lookup and materialization without observing
+the target. Its invocation-local 256-address retry map drops each speculative
+evaluator before DICE, discards speculative events/effects/environment, and
+preserves the terminal attempt's prior print-capture behavior on both success
+and failure. Root, direct-local and immutable routes, negative dispositions,
+observed/legacy parity, no-target observation, 256/257, warm reuse and A/B/A
+restoration are discriminated. Complete serial gates and the rebuilt authentic
+replay pass; the replay clears all admitted `repository_ctx.path(Label)` calls
+and stops at `repository_ctx.template`. Run only docs-first
+`WP-5-7A-repository-context-template-audit` next. Add no template, rules_cc or
+toolchain special case.
+
 Commit `95b4f0da6` terminally accepts the complete repository-rule
 file-admissibility category. The existing compact policy now survives frozen
 repository-definition, call and DICE identity, and the authentic rules_rust

@@ -5198,8 +5198,8 @@ fn root_repository_materialization_request(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-struct RepositoryMaterializationResultKey {
-    request: Arc<RepositoryMaterializationRequest>,
+pub(crate) struct RepositoryMaterializationResultKey {
+    pub(crate) request: Arc<RepositoryMaterializationRequest>,
 }
 
 impl Hash for RepositoryMaterializationResultKey {

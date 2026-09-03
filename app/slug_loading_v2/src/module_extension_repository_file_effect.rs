@@ -20,11 +20,18 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanError;
+use slug_bzlmod_v2::HostRepositoryLabelPathError;
+use slug_bzlmod_v2::HostRepositoryLabelPathKey;
+use slug_bzlmod_v2::HostRepositoryLabelPathObservationKey;
+use slug_bzlmod_v2::HostRepositoryLabelPathValue;
+use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::HostSelectedExtensionOwner;
 use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
+use slug_bzlmod_v2::ObservedHostRepositoryLabelPath;
 use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
 use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
 use slug_bzlmod_v2::RepositoryHostInputTransaction;
+use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_bzlmod_v2::RepositoryPlatformKey;
 use slug_bzlmod_v2::RootPackageBzlTarget;
 use slug_bzlmod_v2::SourcePreparationNeeds;
@@ -40,6 +47,7 @@ use slug_workspace_v2::PathObservationEpoch;
 use starlark::PrintHandler;
 use starlark::PrintLocation;
 
+use crate::HostCanonicalRepositoryLoadRouteError;
 use crate::HostCanonicalRepositoryLoadRouteKey;
 use crate::HostCanonicalRepositoryLoadRouteObservationError;
 use crate::HostCanonicalRepositoryLoadRouteObservationKey;
@@ -56,10 +64,13 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateKey;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationError;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationKey;
+use crate::repository_rule_context::PreparedRepositoryLabelPaths;
 use crate::repository_rule_context::RepositoryRuleHostObservation;
 use crate::repository_rule_context::RepositoryRuleInvocationError;
 use crate::repository_rule_context::RepositoryRuleInvocationInput;
 use crate::repository_rule_context::invoke_repository_rule;
+
+const MAX_REPOSITORY_LABEL_PATHS: usize = 256;
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -123,6 +134,18 @@ pub enum HostSelectedRepositoryFileEffectError {
         certificate: Arc<HostSelectedExtensionOwnerCertificate>,
         ordinal: usize,
         error: GeneratedRepositoryFileEffectPlanError,
+    },
+    LabelPathRoute {
+        certificate: Arc<HostSelectedExtensionOwnerCertificate>,
+        ordinal: usize,
+        address: RepositoryLabelPathAddress,
+        error: Arc<HostCanonicalRepositoryLoadRouteError>,
+    },
+    LabelPath {
+        certificate: Arc<HostSelectedExtensionOwnerCertificate>,
+        ordinal: usize,
+        address: RepositoryLabelPathAddress,
+        error: HostRepositoryLabelPathError,
     },
     Invocation {
         certificate: Arc<HostSelectedExtensionOwnerCertificate>,
@@ -535,6 +558,436 @@ async fn load_definition_module(
     }
 }
 
+type RepositoryLabelPathOutcome = SourcePreparationOutcome<
+    Arc<Result<HostRepositoryLabelPathValue, HostRepositoryLabelPathError>>,
+>;
+type RepositoryLabelPathObservationOutcome =
+    SourcePreparationOutcome<Result<ObservedHostRepositoryLabelPath, ObservedPathFrontierError>>;
+
+async fn compute_repository_label_path(
+    ctx: &mut DiceComputations<'_>,
+    key: HostRepositoryLabelPathKey,
+) -> Result<RepositoryLabelPathOutcome, CompactString> {
+    ctx.compute(&key)
+        .await
+        .map_err(|error| error.to_string().into())
+}
+
+async fn compute_repository_label_path_observed(
+    ctx: &mut DiceComputations<'_>,
+    key: HostRepositoryLabelPathObservationKey,
+) -> Result<RepositoryLabelPathObservationOutcome, CompactString> {
+    ctx.compute(&key)
+        .await
+        .map_err(|error| error.to_string().into())
+}
+
+fn complete_label_path_error(
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    ordinal: usize,
+    address: RepositoryLabelPathAddress,
+    error: HostRepositoryLabelPathError,
+    observations: PathObservationEpoch,
+) -> EffectDriver {
+    complete_effect_error(
+        HostSelectedRepositoryFileEffectError::LabelPath {
+            certificate: certificate.clone(),
+            ordinal,
+            address,
+            error,
+        },
+        observations,
+    )
+}
+
+async fn legacy_repository_label_path_route(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    address: &RepositoryLabelPathAddress,
+    observations: PathObservationEpoch,
+) -> Result<HostRepositorySourceRoute, EffectDriver> {
+    let route = match ctx
+        .compute(&HostCanonicalRepositoryLoadRouteKey::new(
+            key.workspace.dupe(),
+            address.repo().clone(),
+        ))
+        .await
+    {
+        Ok(SourcePreparationOutcome::Need(need)) => {
+            return Err(SourcePreparationOutcome::Need(need));
+        }
+        Ok(SourcePreparationOutcome::Complete(route)) => route,
+        Err(error) => {
+            return Err(complete_effect_error(
+                HostSelectedRepositoryFileEffectError::Compute(error.to_string().into()),
+                observations,
+            ));
+        }
+    };
+    match route.as_ref() {
+        Ok(route) => Ok(HostRepositorySourceRoute::canonical(route.input().clone())),
+        Err(error) => Err(complete_effect_error(
+            HostSelectedRepositoryFileEffectError::LabelPathRoute {
+                certificate: certificate.clone(),
+                ordinal: key.ordinal,
+                address: address.clone(),
+                error: Arc::new(error.clone()),
+            },
+            observations,
+        )),
+    }
+}
+
+async fn observed_repository_label_path_route(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    address: &RepositoryLabelPathAddress,
+    mut observations: PathObservationEpoch,
+) -> Result<(HostRepositorySourceRoute, PathObservationEpoch), EffectDriver> {
+    let route = match ctx
+        .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+            key.workspace.dupe(),
+            address.repo().clone(),
+        ))
+        .await
+    {
+        Ok(SourcePreparationOutcome::Need(need)) => {
+            return Err(SourcePreparationOutcome::Need(need));
+        }
+        Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+            return Err(SourcePreparationOutcome::Complete(Err(
+                HostSelectedRepositoryFileEffectObservationError::CanonicalRoute {
+                    certificate: certificate.clone(),
+                    ordinal: key.ordinal,
+                    error: Arc::new(error),
+                },
+            )));
+        }
+        Ok(SourcePreparationOutcome::Complete(Ok(route))) => route,
+        Err(error) => {
+            return Err(complete_effect_error(
+                HostSelectedRepositoryFileEffectError::Compute(error.to_string().into()),
+                observations,
+            ));
+        }
+    };
+    observations = merge_definition_observations(
+        EffectMode::Observed,
+        certificate,
+        key.ordinal,
+        observations,
+        route.observations(),
+    )?;
+    match route.result().as_ref() {
+        Ok(route) => Ok((
+            HostRepositorySourceRoute::canonical(route.input().clone()),
+            observations,
+        )),
+        Err(error) => Err(complete_effect_error(
+            HostSelectedRepositoryFileEffectError::LabelPathRoute {
+                certificate: certificate.clone(),
+                ordinal: key.ordinal,
+                address: address.clone(),
+                error: Arc::new(error.clone()),
+            },
+            observations,
+        )),
+    }
+}
+
+async fn resolve_legacy_repository_label_path(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    address: RepositoryLabelPathAddress,
+    route: Option<HostRepositorySourceRoute>,
+    observations: PathObservationEpoch,
+) -> Result<(HostRepositoryLabelPathValue, PathObservationEpoch), EffectDriver> {
+    let path_key = match route {
+        None => HostRepositoryLabelPathKey::new_root(key.workspace.dupe(), address.clone()),
+        Some(route) => HostRepositoryLabelPathKey::new_external(route, address.clone()),
+    }
+    .map_err(|error| {
+        complete_label_path_error(
+            certificate,
+            key.ordinal,
+            address.clone(),
+            error,
+            observations.dupe(),
+        )
+    })?;
+    match compute_repository_label_path(ctx, path_key).await {
+        Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
+        Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+            Ok(value) => Ok((value.clone(), observations)),
+            Err(error) => Err(complete_label_path_error(
+                certificate,
+                key.ordinal,
+                address,
+                error.clone(),
+                observations,
+            )),
+        },
+        Err(message) => Err(complete_effect_error(
+            HostSelectedRepositoryFileEffectError::Compute(message),
+            observations,
+        )),
+    }
+}
+
+async fn resolve_observed_repository_label_path(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    address: RepositoryLabelPathAddress,
+    route: Option<HostRepositorySourceRoute>,
+    mut observations: PathObservationEpoch,
+) -> Result<(HostRepositoryLabelPathValue, PathObservationEpoch), EffectDriver> {
+    let path_key = match route {
+        None => {
+            HostRepositoryLabelPathObservationKey::new_root(key.workspace.dupe(), address.clone())
+        }
+        Some(route) => HostRepositoryLabelPathObservationKey::new_external(route, address.clone()),
+    }
+    .map_err(|error| {
+        complete_label_path_error(
+            certificate,
+            key.ordinal,
+            address.clone(),
+            error,
+            observations.dupe(),
+        )
+    })?;
+    let observed = match compute_repository_label_path_observed(ctx, path_key).await {
+        Ok(SourcePreparationOutcome::Need(need)) => {
+            return Err(SourcePreparationOutcome::Need(need));
+        }
+        Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+            return Err(SourcePreparationOutcome::Complete(Err(
+                HostSelectedRepositoryFileEffectObservationError::Merge {
+                    certificate: certificate.clone(),
+                    ordinal: key.ordinal,
+                    error,
+                },
+            )));
+        }
+        Ok(SourcePreparationOutcome::Complete(Ok(value))) => value,
+        Err(message) => {
+            return Err(complete_effect_error(
+                HostSelectedRepositoryFileEffectError::Compute(message),
+                observations,
+            ));
+        }
+    };
+    observations = merge_definition_observations(
+        EffectMode::Observed,
+        certificate,
+        key.ordinal,
+        observations,
+        observed.observations(),
+    )?;
+    match observed.result().as_ref() {
+        Ok(value) => Ok((value.clone(), observations)),
+        Err(error) => Err(complete_label_path_error(
+            certificate,
+            key.ordinal,
+            address,
+            error.clone(),
+            observations,
+        )),
+    }
+}
+
+async fn resolve_repository_label_path(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    address: RepositoryLabelPathAddress,
+    mode: EffectMode,
+    observations: PathObservationEpoch,
+) -> Result<(HostRepositoryLabelPathValue, PathObservationEpoch), EffectDriver> {
+    let (route, observations) = if address.repo().is_root() {
+        (None, observations)
+    } else {
+        match mode {
+            EffectMode::Legacy => (
+                Some(
+                    legacy_repository_label_path_route(
+                        ctx,
+                        key,
+                        certificate,
+                        &address,
+                        observations.dupe(),
+                    )
+                    .await?,
+                ),
+                observations,
+            ),
+            EffectMode::Observed => {
+                let (route, observations) = observed_repository_label_path_route(
+                    ctx,
+                    key,
+                    certificate,
+                    &address,
+                    observations,
+                )
+                .await?;
+                (Some(route), observations)
+            }
+        }
+    };
+
+    match mode {
+        EffectMode::Legacy => {
+            resolve_legacy_repository_label_path(
+                ctx,
+                key,
+                certificate,
+                address,
+                route,
+                observations,
+            )
+            .await
+        }
+        EffectMode::Observed => {
+            resolve_observed_repository_label_path(
+                ctx,
+                key,
+                certificate,
+                address,
+                route,
+                observations,
+            )
+            .await
+        }
+    }
+}
+
+fn terminal_repository_rule_invocation_error(
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    ordinal: usize,
+    error: RepositoryRuleInvocationError,
+) -> HostSelectedRepositoryFileEffectError {
+    match error {
+        RepositoryRuleInvocationError::PathArgument => {
+            HostSelectedRepositoryFileEffectError::Invocation {
+                certificate: certificate.clone(),
+                ordinal,
+                message: "repository_ctx.file path must be a string".into(),
+            }
+        }
+        RepositoryRuleInvocationError::LabelPathArgument => {
+            HostSelectedRepositoryFileEffectError::Invocation {
+                certificate: certificate.clone(),
+                ordinal,
+                message: "repository_ctx.path argument must be a Label".into(),
+            }
+        }
+        RepositoryRuleInvocationError::Plan(error) => HostSelectedRepositoryFileEffectError::Path {
+            certificate: certificate.clone(),
+            ordinal,
+            error,
+        },
+        RepositoryRuleInvocationError::Evaluation(message) => {
+            HostSelectedRepositoryFileEffectError::Invocation {
+                certificate: certificate.clone(),
+                ordinal,
+                message,
+            }
+        }
+        RepositoryRuleInvocationError::Result(type_name) => {
+            HostSelectedRepositoryFileEffectError::Result {
+                certificate: certificate.clone(),
+                ordinal,
+                type_name,
+            }
+        }
+        RepositoryRuleInvocationError::LabelPathNeed(_) => unreachable!(),
+    }
+}
+
+async fn invoke_repository_rule_with_label_paths(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    module: &crate::bzl_module::FrozenBzlModule,
+    implementation: starlark::values::FrozenValue,
+    input: &RepositoryRuleInvocationInput,
+    platform: &slug_bzlmod_v2::RepositoryPlatform,
+    transaction: &RepositoryHostInputTransaction,
+    mode: EffectMode,
+    mut observations: PathObservationEpoch,
+    capture_enabled: bool,
+) -> Result<
+    (
+        crate::repository_rule_context::RepositoryRuleInvocation,
+        Option<InvocationPrintCapture>,
+        PathObservationEpoch,
+    ),
+    EffectDriver,
+> {
+    let mut prepared_paths = PreparedRepositoryLabelPaths::new();
+    loop {
+        let capture = capture_enabled.then(InvocationPrintCapture::default);
+        match invoke_repository_rule(
+            implementation,
+            &module.manifest,
+            &prepared_paths,
+            input.clone(),
+            platform.clone(),
+            transaction.snapshot().dupe(),
+            capture.as_ref().map(|capture| capture as &dyn PrintHandler),
+        ) {
+            Ok(invocation) => return Ok((invocation, capture, observations)),
+            Err(RepositoryRuleInvocationError::LabelPathNeed(address)) => {
+                if prepared_paths.contains_key(&address)
+                    || prepared_paths.len() == MAX_REPOSITORY_LABEL_PATHS
+                {
+                    let message = if prepared_paths.contains_key(&address) {
+                        "repository_ctx.path repeated an already prepared Label path".into()
+                    } else {
+                        format!(
+                            "repository_ctx.path exceeds the per-invocation limit of {MAX_REPOSITORY_LABEL_PATHS} distinct Labels"
+                        )
+                        .into()
+                    };
+                    return Err(complete_effect_error(
+                        HostSelectedRepositoryFileEffectError::Invocation {
+                            certificate: certificate.clone(),
+                            ordinal: key.ordinal,
+                            message,
+                        },
+                        observations,
+                    ));
+                }
+                let (value, next_observations) = resolve_repository_label_path(
+                    ctx,
+                    key,
+                    certificate,
+                    address.clone(),
+                    mode,
+                    observations,
+                )
+                .await?;
+                observations = next_observations;
+                prepared_paths.insert(address, value);
+            }
+            Err(error) => {
+                if let Some(capture) = capture {
+                    ctx.store_evaluation_data(capture.into_batch())
+                        .expect("repository-file invocation stores one local Complete event batch");
+                }
+                return Err(complete_effect_error(
+                    terminal_repository_rule_invocation_error(certificate, key.ordinal, error),
+                    observations,
+                ));
+            }
+        }
+    }
+}
+
 async fn compute_effect(
     ctx: &mut DiceComputations<'_>,
     key: &HostSelectedRepositoryFileEffectKey,
@@ -711,59 +1164,28 @@ async fn compute_effect(
                 );
             }
         };
-    let capture = ctx
+    let capture_enabled = ctx
         .per_transaction_data()
         .data
         .get::<CaptureEvaluationEvents>()
-        .is_ok()
-        .then(InvocationPrintCapture::default);
-    let invocation_result = invoke_repository_rule(
+        .is_ok();
+    let (invocation, capture, observations) = match invoke_repository_rule_with_label_paths(
+        ctx,
+        key,
+        &certificate,
+        &module,
         implementation,
-        &module.manifest,
-        input,
-        platform.clone(),
-        transaction.snapshot().dupe(),
-        capture.as_ref().map(|capture| capture as &dyn PrintHandler),
-    );
-    let invocation = match invocation_result {
-        Ok(invocation) => invocation,
-        Err(error) => {
-            if let Some(capture) = capture {
-                ctx.store_evaluation_data(capture.into_batch())
-                    .expect("repository-file invocation stores one local Complete event batch");
-            }
-            let error = match error {
-                RepositoryRuleInvocationError::PathArgument => {
-                    HostSelectedRepositoryFileEffectError::Invocation {
-                        certificate,
-                        ordinal: key.ordinal,
-                        message: "repository_ctx.file path must be a string".into(),
-                    }
-                }
-                RepositoryRuleInvocationError::Plan(error) => {
-                    HostSelectedRepositoryFileEffectError::Path {
-                        certificate,
-                        ordinal: key.ordinal,
-                        error,
-                    }
-                }
-                RepositoryRuleInvocationError::Evaluation(message) => {
-                    HostSelectedRepositoryFileEffectError::Invocation {
-                        certificate,
-                        ordinal: key.ordinal,
-                        message,
-                    }
-                }
-                RepositoryRuleInvocationError::Result(type_name) => {
-                    HostSelectedRepositoryFileEffectError::Result {
-                        certificate,
-                        ordinal: key.ordinal,
-                        type_name,
-                    }
-                }
-            };
-            return complete_effect_error(error, observations);
-        }
+        &input,
+        &platform,
+        &transaction,
+        mode,
+        observations,
+        capture_enabled,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(terminal) => return terminal,
     };
     let unknown = invocation
         .dynamic_environment()
@@ -1252,6 +1674,137 @@ def setup_vc_env_vars(*args, **kwargs):
                     .map_or(PathOperationResult::Missing, PathOperationResult::Present),
             ),
             operation => panic!("unexpected fixture operation: {operation:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn repository_label_path_retries_without_publishing_partial_attempts() {
+        const PATH_EXTENSION: &str = r#"
+def write(ctx):
+    print("before-path")
+    first = ctx.path(Label("//:missing-first"))
+    print("between-paths")
+    second = ctx.path(Label("//:missing-second"))
+    print("after-path")
+    ctx.file("resolved", "%s|%s|%s" % (first, second, ctx.path(Label("//:missing-first"))), executable = False)
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let tracker = Arc::new(EffectTracker::default());
+        let mut transaction =
+            transaction_with_tracker(&dice, MODULE, PATH_EXTENSION, true, tracker.clone()).await;
+        let owner = owner(&mut transaction).await;
+        tracker.take();
+
+        let observed_key =
+            HostSelectedRepositoryFileEffectObservationKey::new(workspace.dupe(), owner.clone(), 0);
+        let SourcePreparationOutcome::Complete(Ok(observed)) =
+            transaction.compute(&observed_key).await.unwrap()
+        else {
+            panic!("observed Label path must complete")
+        };
+        let effect = observed.result().as_ref().as_ref().unwrap();
+        assert_eq!(
+            effect.plan().effects()[0].content(),
+            format!(
+                "{WORKSPACE}/missing-first|{WORKSPACE}/missing-second|{WORKSPACE}/missing-first"
+            )
+            .as_bytes()
+        );
+        assert!(
+            observed
+                .observations()
+                .observations()
+                .keys()
+                .all(|demand| !demand.path().as_path().ends_with("missing-first")
+                    && !demand.path().as_path().ends_with("missing-second"))
+        );
+        let events = tracker
+            .take()
+            .into_iter()
+            .find_map(|(name, _, batch)| {
+                (name == observed_key.to_string())
+                    .then_some(batch)
+                    .flatten()
+            })
+            .unwrap();
+        assert_eq!(
+            events
+                .events()
+                .iter()
+                .filter_map(|event| match event {
+                    EvaluationEvent::StarlarkPrint { text, .. } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>(),
+            ["before-path", "between-paths", "after-path"]
+        );
+        let warm = transaction.compute(&observed_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(warm)) = warm else {
+            panic!("warm observed Label path must complete")
+        };
+        assert!(Arc::ptr_eq(observed.result(), warm.result()));
+        assert!(tracker.take().iter().any(|(name, kind, batch)| {
+            name == &observed_key.to_string() && *kind == ActivationKind::Reused && batch.is_none()
+        }));
+
+        let SourcePreparationOutcome::Complete(legacy) = transaction
+            .compute(&HostSelectedRepositoryFileEffectKey::new(
+                workspace, owner, 0,
+            ))
+            .await
+            .unwrap()
+        else {
+            panic!("legacy Label path must complete")
+        };
+        assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    }
+
+    #[tokio::test]
+    async fn repository_label_path_enforces_distinct_address_cap() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        for count in [MAX_REPOSITORY_LABEL_PATHS, MAX_REPOSITORY_LABEL_PATHS + 1] {
+            let extension = format!(
+                r#"
+def write(ctx):
+    paths = [ctx.path(Label("//:missing-%s" % i)) for i in range({count})]
+    ctx.file("resolved", str(len(paths)), executable = False)
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#
+            );
+            let mut transaction = transaction_untracked(&dice, MODULE, &extension, true).await;
+            let owner = owner(&mut transaction).await;
+            let SourcePreparationOutcome::Complete(result) = transaction
+                .compute(&HostSelectedRepositoryFileEffectKey::new(
+                    workspace.dupe(),
+                    owner,
+                    0,
+                ))
+                .await
+                .unwrap()
+            else {
+                panic!("cap outcome must be terminal")
+            };
+            if count == MAX_REPOSITORY_LABEL_PATHS {
+                assert_eq!(
+                    result.as_ref().as_ref().unwrap().plan().effects()[0].content(),
+                    MAX_REPOSITORY_LABEL_PATHS.to_string().as_bytes()
+                );
+            } else {
+                assert!(matches!(
+                    result.as_ref(),
+                    Err(HostSelectedRepositoryFileEffectError::Invocation { message, .. })
+                        if message.contains("per-invocation limit")
+                ));
+            }
         }
     }
 
@@ -2382,6 +2935,9 @@ ext=module_extension(implementation=impl)
             "RepositoryPlatformKey::new(",
             "invoke_repository_rule(",
             "HostCanonicalRepositoryLoadRouteKey::new(",
+            "HostRepositoryLabelPathObservationKey::new_",
+            "PreparedRepositoryLabelPaths::new()",
+            "MAX_REPOSITORY_LABEL_PATHS",
             "ExternalBzlModuleEvalKey::new_canonical_bzlmod(",
             "HostSelectedRepositoryFileEffectObservationError::CanonicalRoute {",
             "HostSelectedRepositoryFileEffectObservationError::Certificate(error)",
@@ -2399,6 +2955,8 @@ ext=module_extension(implementation=impl)
             "#[starlark_value(type = \"repository_ctx\")]",
             "#[starlark_value(type = \"repository_os\")]",
             "fn getenv<'v>(",
+            "fn path<'v>(",
+            "RepositoryStarlarkPath",
             "AllocDict(self.snapshot.iter()",
         ] {
             assert!(context.contains(shape), "missing context shape: {shape}");
