@@ -4705,3 +4705,46 @@ that downstream expectation also freezes the new `3927ae2a...` identity. The
 accepted numeric caps already contain the corrected 6/16/22 Rust and 351-line
 aggregate accounting. No `host_module.rs` production change is authorized;
 another file or semantic change returns `REPLAN`.
+
+### Built-in Xcode catalog member accepted (2026-09-02)
+
+Commit `3592fbfd1` accepts the exact 12,993-byte/329-line
+`tools/osx/xcode_configure.bzl` member at 6 production and 16 proof gross Rust
+additions, 22 Rust total and 351 aggregate additions. Source/archive mode,
+lexical catalog/listing membership, physical assets and all three
+`3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc`
+manifest consumers pass. The authenticated replay clears the catalog boundary
+and reaches a repository-rule read in selected apple_support 1.24.2.
+
+### Direct external Label read ownership audited (2026-09-02)
+
+The exact consumer is
+`repository_ctx.read(Label("@build_bazel_apple_support//crosstool:BUILD.toolchains"))`
+with omitted/default auto-watch. Its apparent repository resolves through the
+already accepted mapping to canonical `apple_support+`; its package and source
+are already owned by the selected canonical route and immutable
+materialization. The source is an exact ASCII 734-byte regular file.
+
+No Stage 5 key or retained representation is needed. Preserve Bazel's
+package-before-file ordering by reusing `HostRepositoryLabelPathKey` and its
+observation sibling first. Then reuse the template-admitted
+`HostRepositorySourceRoute::source_read_key`/observation-key composition and
+`HostRepositorySourceFileValue`; the observed driver must merge the full source
+epoch before retry. Existing keys own request identity, materialization, bytes,
+symlink/file invalidation, DICE equality and concurrent deduplication.
+
+The only new memory is the already-bounded invocation source-byte map shared
+with template and the evaluator's returned ASCII string. It is scratch,
+publishes only through a terminal generated-file plan, crosses no await and is
+released on completion/cancellation. No direct filesystem read, historical
+snapshot guess, side cache, fallback, donor, lock or task is authorized.
+
+The audit returns `ACCEPT` for the direct canonical-external Label, omitted
+watch, present ASCII <=2 MiB category. Regular-file success is exact. Because
+`HostRepositorySourceFileValue::Present` intentionally retains bytes and
+logical path but not whether its accepted producer observed a regular or
+special file, special-source success through this existing owner is explicitly
+Slug-native. Root/built-in/String/path, explicit-watch, non-ASCII,
+current-generated-repository and broader repository effects remain
+unsupported/deferred. Select the active two-file implementation packet; return
+`REPLAN` if a new Stage 5 owner or materialization/source shape is required.

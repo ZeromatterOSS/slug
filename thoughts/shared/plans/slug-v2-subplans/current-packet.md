@@ -1,177 +1,278 @@
 # Current Slug V2 Packet
 
-Packet: WP-5-7A-bazel-tools-xcode-configure-catalog-implementation-r1
+Packet: WP-4-5-7A-repository-context-read-implementation-r1
 
-Milestone: M7A bootstrap-critical loading/repository execution closure. Add
-the exact pinned Bazel 9.2 `tools/osx/xcode_configure.bzl` source as the sole
-new built-in `@bazel_tools` catalog member and advance the authentic replay to
-its next independently owned boundary.
+Milestone: M7A bootstrap-critical loading/repository execution closure. Admit
+the bounded Bazel 9.2 direct-external-Label `repository_ctx.read` shape reached
+by the authentic apple_support replay through existing Label-path and routed
+source owners.
 
-Status: ready for one bounded implementation. The predecessor, docs-only
-audit, exact bytes, existing owner, three-file allowlist, caps, proof and stops
-are accepted and frozen with independent reviewer agreement.
+Status: ready for bounded implementation after the docs-only audit returned
+`ACCEPT`. Independent terminal review is required before acceptance.
 
-## Accepted predecessor and replay evidence
+## Immediate predecessor and replay boundary
 
-`WP-4-5-7A-builtin-external-bzl-load-routing-implementation-r1` is accepted in
-commit `5d5991634` at 80 production and 360 proof gross Rust additions, 440
-total. It preserves the original external-module DICE key and current-node
-cycle identity while importing the already-owned canonical built-in route only
-as invocation scratch after source decode, parse and the exact one-load gate.
+Commit `3592fbfd1` accepts the exact one-file
+`tools/osx/xcode_configure.bzl` catalog member at 6 production and 16 proof
+gross Rust additions, 22 Rust total, plus the exact 329-line asset (351
+aggregate additions). Source hash, mode, direct listings, physical manifest,
+all three manifest-digest consumers, focused/full Bzlmod proof and the direct
+loading consumer pass.
 
-The complete `slug_loading_v2` gate passes 526 unit tests plus every
-integration target. `slug_query_v2` passes its 55-test focused gate and retains
-the established 55/56 diagnostic baseline; `slug_cli_v2` builds. The
-authenticated replay clears `lib_cc_configure.bzl`, maps `rules_cc` to
-`rules_cc+`, freezes its recursive utility and re-export, then stops while
-loading:
-
-`@@bazel_tools//tools/osx:xcode_configure.bzl`
-
-for generated repository
+The rebuilt authenticated replay clears that catalog miss, loads and freezes
+the exact source, invokes the selected apple_support extension and begins
+materializing
 `apple_support++apple_cc_configure_extension+local_config_apple_cc_toolchains`.
-This is an exact built-in source catalog miss, not another mapping or routing
-failure.
+It stops at the next independent generic boundary:
 
-## Accepted catalog audit
+`Object of type repository_ctx has no attribute read`
 
-`WP-5-7A-bazel-tools-xcode-configure-catalog-audit-r1` returns `ACCEPT`.
-Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-provides
-`/tmp/bazel-9.2-source-audit-fhUrtf/tools/osx/xcode_configure.bzl` with:
+at
+`@@apple_support+//crosstool:setup_internal.bzl:27`.
 
-- SHA-256
-  `26d758318e481f8971dabd43e24d0b4e85c30eb074da39d3b63c778f39ebd942`;
-- exactly 12,993 bytes and 329 lines with one trailing LF; and
-- source/archive mode `0644`, represented as catalog `executable: false`.
+The apple_support 1.24.2 rule calls only:
 
-The installed Bazel 9.2 copy at
-`/tmp/slug-bazel92-install-audit/install/3e6f3b7d6fdac67aed908160850e082b/embedded_tools/tools/osx/xcode_configure.bzl`
-is byte-identical but mode `0755`. That is the same systematic extraction
-artifact already recorded for other built-in sources and is not source or
-catalog authority.
+`repository_ctx.read(Label("@build_bazel_apple_support//crosstool:BUILD.toolchains"))`
 
-The complete smallest source closure is this one file. It has zero syntactic
-Starlark loads. Text beginning with `load("@apple_support...")` occurs only
-inside strings used to generate a later BUILD file, and `xcode_locator.m` is
-referenced only from deferred runtime code. Its public bindings are
-`OSX_EXECUTE_TIMEOUT`, `VERSION_CONFIG_STUB`, `run_xcode_locator`,
-`xcode_autoconf`, `xcode_configure` and `xcode_configure_extension`.
+with the default `watch = "auto"`, then passes the returned string to the
+already accepted `repository_ctx.file("BUILD", content = ...)`. The apparent
+repository resolves through the already accepted repository mapping to the
+selected canonical `apple_support+` source. This consumer is a discriminator,
+never an activation branch.
 
-Existing Bzlmod loading globals already own its declaration-time needs:
-`repository_rule` with `configure`, `environ` and `attr.string` schemas, and
-`module_extension`. Existing module-extension execution owns repository-call
-recording and `module_ctx.extension_metadata(reproducible=True)`. This packet
-does not claim or add the Host/Darwin operations appearing in deferred
-function bodies.
+## Audit evidence and decision
 
-`tools/osx/BUILD` is not part of this source-only closure. It would load
-`xcode_version_flag.bzl`; the authenticated loader has already crossed label
-and package routing and failed directly on the exact source lookup. Likewise
-`xcode_locator.m`, `xcode_locator_stub.sh` and every other `tools/osx` asset are
-not admitted. Bazel's `src/test/shell/bazel/apple/bazel_apple_test.sh` exercises
-Darwin repository runtime and is deliberately skipped as an unsupported phase;
-the pinned-source regression and live catalog miss discriminate this packet.
+Pinned authority remains Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`:
 
-## Compatibility classification
+- `src/main/java/com/google/devtools/build/lib/bazel/repository/RepositoryUtils.java`,
+  `getRootedPathFromLabel` lines 54-72, first requests package lookup, rejects
+  an absent package and only then derives the Label path;
+- `src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java`,
+  `getPath` lines 1570-1577, routes a Label through `getPathFromLabel`;
+  `readFile` lines 1580-1624 freezes the direct
+  String/Label/path signature, default `watch = "auto"`, read-event-before-watch
+  ordering, directory rejection and ISO-8859-1 read;
+- `getPathFromLabel`, lines 2354-2379, freezes package/materialization lookup and
+  implicit Label-watch behavior, while `toRepoCacheFriendlyPath`/`maybeWatch`,
+  lines 1626-1708, records external-repository file input for auto-watch; and
+- `src/test/shell/bazel/starlark_repository_test.sh`, lines 2352-2399,
+  distinguishes auto-watch from forced watch inside the generated working
+  directory. The broader String, path, explicit-watch and arbitrary
+  external-path tests cover deferred shapes and are not implementation gates.
 
-- Exact: the pinned source bytes, trailing LF, SHA-256, source/archive
-  non-executable mode, path, public bindings, zero syntactic-load closure,
-  direct catalog lookup and sorted directory membership match Bazel 9.2.
-- Slug-native: the existing immutable DICE source key/value and
-  domain-separated manifest digest represent source and route identity.
-  Adding the file invalidates users through the complete manifest without a
-  Bazel install-tree identity claim.
-- Unsupported/deferred: installed extraction mode; `tools/osx/BUILD`, locator,
-  stub, `xcode_version_flag.bzl` and all sibling assets; repository-rule body
-  execution introduced by this file; Darwin Xcode discovery and subprocesses;
-  Host OS/environment/path/file behavior not already admitted; generated BUILD
-  and apple_support loads; consumer-specific Apple/C++ toolchain semantics;
-  broader built-in catalog growth; and the next replay failure.
+Those three pinned files have SHA-256
+`37af907998dd2b3fecb43254bfa6a0df51ec457a0c0b0d66bd4700e5077aca43`,
+`69c1ed32510486148b5b84cb37000ddcabc6278df5cd9f5494a61cf4a2981d03`
+and
+`5d7f65a7f1dedc9509399a1d3dc41e152b376911649f5d539758ba14168e62a5`,
+respectively.
 
-## Required implementation and ownership
+Exact apple_support 1.24.2 tag evidence is:
 
-Add the exact upstream file verbatim at
-`app/slug_bzlmod_v2/builtin/bazel_tools/tools/osx/xcode_configure.bzl`.
-Do not normalize bytes, rewrite Starlark, copy from an installed tree or change
-its executable mode.
+- `crosstool/setup_internal.bzl`, SHA-256
+  `620a2b434e2ad6d3882775fe46660f01aca45362b23a859058afb49077ea78e0`,
+  3,139 bytes/73 lines, mode `0644`, one trailing LF; lines 25-30 are the live
+  nested `file(read(Label(...)))` call; and
+- `crosstool/BUILD.toolchains`, SHA-256
+  `d634b84b9448ec60b60df1cece5107dc488be4800fd6133c6858496d765acf2e`,
+  734 bytes/23 lines, mode `0644`, one trailing LF, entirely ASCII.
 
-In `builtin_repository.rs`, add one lexically ordered static `CATALOG` entry
-after `tools/launcher/empty.sh` and before `tools/res/BUILD`, with the exact
-path, hash and `executable: false`. Extend the existing sorted direct-listing
-proof so `tools` contains directory `osx` and `tools/osx` contains only
-`xcode_configure.bzl`.
+The cached BCR 1.24.2 source descriptor has SHA-256
+`2c22c9827093250406c5568da6c54e6fdf0ef06238def3d99c71b12feb057a8d`
+and archive integrity
+`sha256-hiXMe3spUuOBAeF7Sp58BDs6efVdJuR3KBmJGZhyXhY=`. Its sole patch changes
+the module-version declaration, not either crosstool file.
 
-In the public catalog test, add the matching lexically ordered `FILES` row.
-Update the two catalog-owned complete-manifest expectations from
-`c313fad68f4e475d744dc6de7b658515b33c634905222e934a9d09129371f56f`
-to
-`3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc`.
-Also update the downstream test-only host-route/capability expectation in
-`host_module.rs` from its already-stale `de4c723127e85a58d4fc5331e16135cdc1448afc0edb3792a1515ee2266f198f`
-to that same new digest. Do not change production host-module code, the
-manifest domain or its version.
+Audit result: `ACCEPT`. The smallest lawful category is one generic direct
+canonical-external Label read with omitted/default auto-watch, a present ASCII
+source and bounded size. Exact success is claimed for regular files. The
+existing source owner also collapses an accepted special file into the same
+byte-only `Present` value, so that source-kind success is an explicit
+Slug-native behavior rather than a rejection claim. Bazel's required package
+lookup and Slug's
+already accepted source observation compose without a new key, byte owner,
+filesystem read, lock or materialization path.
 
-`BuiltinBazelToolsSnapshot`, the static `CATALOG`, `validated_file`,
-`BuiltinBazelToolsSourceFileKey` and the derived directory-listing key remain
-the sole owners. No request/session input, filesystem observation,
-materialization, mutable cache or fallback participates. Concurrent and warm
-DICE reads retain existing deduplication, equality and permanent validity.
+## Frozen compatibility boundary
 
-The exact 12,993 bytes are static program/catalog memory and are exposed
-through the existing `Arc<[u8]>` value; no new retained type or duplicate
-runtime copy is authorized. `builtin_repository.rs` remains below the 2,000
-line complexity trigger, and the change is one cohesive catalog row plus its
-existing proofs. No hot-path measurement, Buck2 utility review, donor code,
-new oracle fixture or fallback ledger applies.
+Implement this common path, with **exactness limited to regular-file inputs**:
 
-## Implementation allowlist and caps
+1. `repository_ctx.read(path)` accepts only a Starlark `Label` already resolved
+   by the invocation's accepted repository mapping to a non-root, non-built-in
+   canonical external repository. No `watch` argument is accepted, so omission
+   selects Bazel's default `"auto"`.
+2. Before requesting bytes, require the existing `LabelPathNeed`/prepared-path
+   flow for that address. This preserves package lookup, selected repository
+   route, materialization and failure ordering even though no path value is
+   exposed to Starlark by `read`.
+3. Then request the exact repository-relative file through the existing routed
+   source need. Admit a `Present` source of at most 2 MiB whose bytes are all
+   ASCII, including the empty file. Return the byte-identical Starlark string.
+   ASCII regular files are the exact intersection of Bazel's internal
+   ISO-8859-1 byte string and Slug's native valid-Unicode representation. The
+   method cannot and must not reconstruct a regular/special kind distinction
+   absent from the existing source value.
+4. Repeated reads and template/read reuse of the same address use one prepared
+   source value per invocation. At most 256 distinct Label/source addresses are
+   admitted across path, template and read retry scratch.
+5. When nested in `repository_ctx.file`, the terminal invocation appends the
+   exact ASCII bytes to the existing generated-file plan. A need, missing
+   package/file, directory, unreadable source, route/observation error, size or
+   encoding rejection publishes no partial generated effect, print or dynamic
+   environment from a speculative attempt.
 
-Only these files may change:
+Keep **Slug-native** the 2 MiB/256-address bounds, valid-Unicode representation,
+diagnostic text, retry/sentinel transport, DICE equality cutoff and observation
+carrier. This classification also includes successful reads when the existing
+source producer accepted a special file, because `HostRepositorySourceFileValue`
+retains the same bytes/logical-path `Present` variant for regular and special
+files. Existing observation-backed invalidation may be stronger than Bazel's
+untracked internal metadata checks, but external default-auto file edits,
+deletion, kind and symlink changes must invalidate correctly.
 
-- `app/slug_bzlmod_v2/builtin/bazel_tools/tools/osx/xcode_configure.bzl`
-- `app/slug_bzlmod_v2/src/builtin_repository.rs`
-- `app/slug_bzlmod_v2/src/host_module.rs` (test-only digest expectation)
-- `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs`
+Keep **unsupported/deferred**:
 
-Gross Rust additions are capped at 12 production, 40 proof and 52 Rust total.
-The asset must be exactly 12,993 bytes/329 lines. Aggregate gross additions,
-including that exact asset, are capped at 400. Formatting or cleanup does not
-create headroom. Expected accounting is 6 production, 16 proof and 22 total
-Rust additions plus the 329-line asset, or 351 aggregate additions.
+- String and `path` arguments, root/built-in labels, current generated-working-
+  directory reads and arbitrary absolute or host paths;
+- explicit `watch = "yes"`, `"no"` or `"auto"`, the `watch` method and exact
+  workspace-rule read-event/log bytes;
+- non-ASCII source bytes, files above 2 MiB, directory/absent/unreadable source
+  success, exact Bazel diagnostics and Java raw-byte string behavior outside
+  ASCII;
+- write-after-read/self-generated behavior, Label forms not already accepted,
+  package lookup widening, remote repository execution and mutable historical
+  filesystem snapshots;
+- any apple_support, Xcode, C++, toolchain, repository-name, OS or consumer
+  special case; and
+- every other repository method, generated BUILD evaluation, configured
+  analysis/actions and the next authenticated replay boundary.
 
-## Required proof and validation
+## Existing owners and implementation seam
 
-- Recompute and compare the source and checked-in SHA-256; prove exactly one
-  trailing LF, 12,993 bytes, 329 lines and non-executable source mode. Compare
-  pinned source and checked-in bytes directly; installed bytes are
-  corroboration only.
-- Prove source lookup returns the exact path/hash/bytes/mode and that unknown
-  neighboring paths remain `UnsupportedCatalog`.
-- Prove sorted direct listings add only `osx` under `tools` and only
-  `xcode_configure.bzl` under `tools/osx`.
-- Prove the public `FILES` manifest remains exactly the physical asset set and
-  all three catalog and downstream host-route/capability expectations equal
-  `3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc`.
-- Run rustfmt and diff checks, serial focused built-in catalog unit/integration
-  tests, the named downstream `host_module` route test, the complete
-  600-test `slug_bzlmod_v2` suite and a direct
-  `slug_loading_v2` consumer check. Rebuild `slug_cli_v2` before replay.
-- Clean `slugd` before and after the authenticated replay. The replay must
-  clear this `UnsupportedCatalog`, load and freeze the exact source through
-  the existing route, and record the next typed boundary without implementing
-  it. Run archive and artifact hygiene gates.
+Change only the synchronous repository context and its existing asynchronous
+effect retry driver. Generalize the invocation-only prepared template-source
+map/name into a bounded prepared canonical Label-source byte map shared by
+`template` and `read`; do not add a second map. Add typed read argument,
+source-need and size/ASCII failures to the invocation error algebra.
 
-## Terminal stops
+The `read` method must:
 
-Return `ACCEPT` only if exact bytes/mode/hash, one-file closure, listings,
-physical manifest, all three digest proofs, focused/full tests, direct
-dependent, build and replay pass within all four files and caps.
+1. accept a direct `StarlarkLabel`, retain its typed
+   `RepositoryLabelPathAddress`, and reject root before any source read;
+2. issue the existing Label-path need until package/route/materialization state
+   is prepared;
+3. issue the shared source-byte need until exact routed bytes are prepared;
+4. enforce the byte bound and ASCII subset, allocate a Starlark string, and
+   return it without adding an effect.
 
-Return `REPLAN` before adding `tools/osx/BUILD`, `xcode_locator.m`,
-`xcode_locator_stub.sh`, `xcode_version_flag.bzl` or any other asset; changing
-an evaluator, repository API, route, key, manifest version or materialization
-owner; adding install-tree/filesystem fallback; implementing Host/Darwin,
-generated BUILD, apple_support or toolchain behavior; or crossing an
-independent next replay boundary. Any production change in `host_module.rs`
-also requires `REPLAN`.
+After the evaluator, heap, `RefCell` borrows, builder and capture are dropped,
+the outer loop resolves only the typed source need. Reuse and, if helpful,
+generically rename the existing template source helpers. In legacy mode call
+`HostRepositorySourceRoute::source_read_key`; in observed mode call
+`source_read_observation_key` and merge the complete incoming epoch before
+retry. Preserve `HostCanonicalRepositoryLoadRouteKey` and its observation
+sibling, `HostRepositoryLabelPathKey` and its observation sibling,
+`HostRepositorySourceObservationKey`/epoch key and
+`HostRepositorySourceFileValue` as the sole semantic owners.
+
+Do not reconstruct Labels from display strings, read the prepared physical
+path, call `std::fs`, add a DICE key, change a route/materialization/source
+value, or let invocation scratch enter retained effect identity. The existing
+source key owns bytes and invalidation; the invocation map and returned string
+are evaluator scratch; the terminal `GeneratedRepositoryFileEffectPlan` alone
+owns any later destination/content/mode/order.
+
+Overlapping requests continue to use immutable request projections and DICE
+deduplication for the existing route/path/source keys. Observed requests merge
+their own injected epochs; legacy and observed results must agree. No lock is
+added or held across evaluation/compute, no task is detached, cancellation
+remains with the current DICE computation, and all evaluator/prepared scratch
+is released at completion or cancellation. There is no fallback or donor.
+
+## Required proof
+
+Add adjacent tests that discriminate:
+
+- context reflection, direct-Label-only signature and string result;
+- Label-path need before source need, exact repository-relative address,
+  repeated-hit and template/read shared-source reuse without a second source
+  observation;
+- empty and representative ASCII bytes and byte-identical nested
+  `file(read(...))` output/mode; the authenticated replay verifies the exact
+  734-byte apple-support consumer source without adding a fixture;
+- String, path, root, built-in, explicit-watch, non-ASCII and over-limit
+  rejection without effects, plus explicit proof that an existing-owner
+  special-file `Present` source follows the documented Slug-native success
+  path rather than pretending to recover an unavailable kind bit;
+- package absent/deleted/ignored before file access, then source absent,
+  directory, unreadable and symlink/source changes;
+- direct-local and immutable canonical routes, exact legacy/observed result
+  parity, complete epoch merge, needs/cancellation, warm reuse and A/B/A
+  restoration; and
+- speculative print/effect/environment discard with only the terminal attempt
+  published.
+
+Reuse the existing repository-template route/observation harness and inline
+test source bytes; add no fixture. The authentic apple_support replay is the
+end-to-end provenance. Broader upstream read/watch shell tests are skipped
+because they exercise explicitly deferred inputs and generated-working-
+directory behavior. No benchmark is required: there is no new retained type,
+key or demonstrated hot-path change, and the existing byte map remains bounded
+invocation scratch.
+
+## Allowlist, caps and complexity
+
+Only these files may change in implementation:
+
+- `app/slug_loading_v2/src/repository_rule_context.rs`; and
+- `app/slug_loading_v2/src/module_extension_repository_file_effect.rs`.
+
+Proof may change only adjacent `#[cfg(test)]` modules in those files. Do not
+change Bzlmod/workspace owners, Cargo metadata, fixtures, source-route or
+materialization types, repository definition/call/certificate shapes,
+generated-plan representation, Label parsing or planning docs during the
+implementation packet.
+
+Gross additions are capped at 180 production Rust, 360 proof Rust and 540 Rust
+total. Formatting and renames do not create headroom. No new helper may exceed
+60 lines; the nested `read` method may not exceed 35 lines; no existing helper
+other than the Starlark methods container may grow by more than 25 lines.
+
+`module_extension_repository_file_effect.rs` is already above the 2,000-line
+complexity trigger, and `repository_rule_context.rs` will approach/cross it.
+They remain the bounded owners because splitting this one method would separate
+the synchronous invocation error/prepared state from its evaluator or the
+existing route/source retry from its effect key. Keep byte projection in one
+small pure helper, reuse/generalize the existing mode-specific source helpers,
+and add no third production responsibility.
+
+## Validation and terminal stops
+
+Run serially:
+
+- focused repository-context read and repository-file-effect source tests;
+- `cargo test -p slug_loading_v2 --lib -q` and every loading integration target
+  touched by the private invocation signature;
+- `cargo test -p slug_query_v2 --lib -q`;
+- `cargo build -p slug_cli_v2 -q` before authentic replay;
+- stale `slugd` cleanup before and after replay;
+- `cargo fmt --check`, `git diff --check`, archive checker and exact
+  allowlist/cap verification.
+
+The authenticated replay must clear only this generic read call, create the
+expected byte-identical generated `BUILD`, and stop at the next independently
+owned boundary. Do not implement generated BUILD loading or that boundary.
+
+Return `REPLAN` before or during Rust if package lookup cannot precede bytes;
+the source requires a new key/direct filesystem access/new materialization
+owner; legacy/observed epochs cannot be merged; a root/built-in/String/path or
+explicit-watch input is needed; exact success requires non-ASCII raw-string
+semantics; speculative state escapes; a retained route/source/effect type or
+lock changes; the allowlist/caps/complexity bounds fail; or any consumer,
+apple_support, Xcode, C++ or toolchain branch is required.
+
+Architecture result: `ACCEPT`. Independent review should focus on the
+two-stage package-then-source ordering, ASCII exactness boundary, shared
+invocation scratch and the absence of a new semantic owner before implementation
+begins.

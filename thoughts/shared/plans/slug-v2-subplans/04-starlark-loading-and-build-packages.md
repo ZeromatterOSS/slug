@@ -8242,3 +8242,46 @@ Therefore Stage 4 requires no evaluator, route, source, cycle or manifest
 change to admit this source. Runtime execution, Darwin discovery, locator
 source access and generated BUILD loading remain separate typed boundaries.
 The docs-only audit returns `ACCEPT` for a one-file Stage 5 catalog packet.
+
+### Built-in xcode_configure source accepted; repository read selected (2026-09-02)
+
+Commit `3592fbfd1` terminally accepts the exact Xcode configure catalog source
+at 6/16/22 gross production/proof/total Rust additions plus the 329-line asset.
+Its catalog, direct-listing, physical-manifest and downstream route/capability
+proofs pass. The authenticated replay now freezes the source and executes its
+selected apple_support extension; no Darwin-only function body is activated.
+
+Materializing
+`apple_support++apple_cc_configure_extension+local_config_apple_cc_toolchains`
+stops at the generic missing method
+`repository_ctx.read(Label("@build_bazel_apple_support//crosstool:BUILD.toolchains"))`
+in `@@apple_support+//crosstool:setup_internal.bzl:27`. The exact 1.24.2 source
+uses one direct external Label, omitted/default auto-watch and passes the
+returned string to the already accepted `file` method.
+
+### Direct external Label repository read audited (2026-09-02)
+
+Pinned Bazel 9.2 `RepositoryUtils.getRootedPathFromLabel` requires package
+lookup before deriving a Label path. `StarlarkBaseExternalContext.getPath`,
+`readFile`, `getPathFromLabel` and `maybeWatch` then establish Label routing,
+default auto-watch, external-file input recording, directory rejection and
+ISO-8859-1 bytes. The live `BUILD.toolchains` is an exact 734-byte/23-line
+ASCII file with SHA-256
+`d634b84b9448ec60b60df1cece5107dc488be4800fd6133c6858496d765acf2e`.
+
+The audit returns `ACCEPT` only for a direct non-root/non-built-in canonical
+external Label, omitted watch and a present ASCII source <=2 MiB. Regular-file
+success is exact. The existing Stage 5 source owner also publishes special
+files as the same byte-only `Present` value, so success for that source kind is
+an explicit Slug-native surface rather than a rejection claim. Stage 4
+must first reuse the existing Label-path need so package/route/materialization
+ordering is preserved, then request the existing prepared routed-source bytes.
+The synchronous method returns a Starlark string and never directly owns bytes
+or effects. String/path/explicit-watch/non-ASCII/self-generated reads, exact
+read-event logs and all apple_support/Xcode/C++ special cases remain deferred.
+
+Select `WP-4-5-7A-repository-context-read-implementation-r1` under the active
+two-file allowlist. Invocation error/prepared scratch and evaluator method stay
+in `repository_rule_context.rs`; the async retry stays in the existing
+repository-file effect driver. No new key, lock, fixture or retained value is
+authorized.
