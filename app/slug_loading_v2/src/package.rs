@@ -766,6 +766,37 @@ pub struct ToolchainTypeRequirement {
     mandatory: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct DeclaredExecGroup {
+    toolchains: Arc<[ToolchainTypeRequirement]>,
+}
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct StarlarkDeclaredExecGroup(DeclaredExecGroup);
+starlark::starlark_simple_value!(StarlarkDeclaredExecGroup);
+
+impl fmt::Display for StarlarkDeclaredExecGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("exec_group")
+    }
+}
+
+#[starlark_value(type = "exec_group")]
+impl<'v> StarlarkValue<'v> for StarlarkDeclaredExecGroup {}
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct StarlarkExecTransition(Option<CompactString>);
+starlark::starlark_simple_value!(StarlarkExecTransition);
+
+impl fmt::Display for StarlarkExecTransition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<execution transition>")
+    }
+}
+
+#[starlark_value(type = "transition")]
+impl<'v> StarlarkValue<'v> for StarlarkExecTransition {}
+
 impl ToolchainTypeRequirement {
     pub fn new(label: CanonicalLabel, mandatory: bool) -> Self {
         Self { label, mandatory }
@@ -2821,6 +2852,31 @@ fn toolchain_requirements(
     Ok(requirements.into())
 }
 
+fn declared_exec_groups(
+    value: Option<Value<'_>>,
+) -> anyhow::Result<Option<Arc<[(CompactString, DeclaredExecGroup)]>>> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(None);
+    };
+    let groups = DictRef::from_value(value)
+        .ok_or_else(|| anyhow::anyhow!("rule exec_groups must be a dict or None"))?;
+    groups
+        .iter()
+        .map(|(name, value)| {
+            let name = name
+                .unpack_str()
+                .ok_or_else(|| anyhow::anyhow!("execution group names must be strings"))?;
+            if !is_starlark_identifier(name) {
+                anyhow::bail!("invalid execution group name '{name}'");
+            }
+            let group = StarlarkDeclaredExecGroup::from_value(value)
+                .ok_or_else(|| anyhow::anyhow!("execution group '{name}' must use exec_group()"))?;
+            Ok((name.into(), group.0.clone()))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()
+        .map(|groups| (!groups.is_empty()).then(|| groups.into()))
+}
+
 pub(crate) fn subrule_toolchain_requirements(
     value: Option<Value>,
     eval: &Evaluator<'_, '_, '_>,
@@ -3699,6 +3755,10 @@ struct RuleDefinitionGen<V> {
     initializer: Option<V>,
     computed_default_attributes: Vec<ComputedDefaultRuleAttributeGen<V>>,
     #[trace(unsafe_ignore)]
+    declared_exec_groups: Option<Arc<[(CompactString, DeclaredExecGroup)]>>,
+    #[trace(unsafe_ignore)]
+    named_exec_transition_attributes: Option<Arc<[(u32, CompactString)]>>,
+    #[trace(unsafe_ignore)]
     definition_source: Arc<BzlModuleIdentity>,
     #[trace(unsafe_ignore)]
     source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
@@ -3732,6 +3792,8 @@ pub(crate) struct FrozenRuleDefinition {
     implementation: FrozenValue,
     initializer: Option<FrozenValue>,
     computed_default_attributes: Arc<[ComputedDefaultRuleAttributeGen<FrozenValue>]>,
+    declared_exec_groups: Option<Arc<[(CompactString, DeclaredExecGroup)]>>,
+    named_exec_transition_attributes: Option<Arc<[(u32, CompactString)]>>,
     definition_source: Arc<BzlModuleIdentity>,
     source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
@@ -3755,6 +3817,25 @@ struct ComputedDefaultRuleAttributeGen<V> {
     callback: V,
 }
 
+fn reject_named_exec(name: &str, group: Option<&str>, consumer: &str) -> anyhow::Result<()> {
+    if let Some(group) = group {
+        anyhow::bail!(
+            "{consumer} attribute '{name}' does not support named execution group '{group}'"
+        );
+    }
+    Ok(())
+}
+
+fn reject_inherited_named_exec(
+    attributes: &Option<Arc<[(u32, CompactString)]>>,
+) -> anyhow::Result<()> {
+    let group = attributes
+        .as_ref()
+        .and_then(|values| values.first())
+        .map(|value| value.1.as_str());
+    reject_named_exec("inherit_attrs", group, "macro")
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct MacroAttributeSchema {
     name: CompactString,
@@ -3772,6 +3853,7 @@ struct MacroAttributeSchema {
 
 impl MacroAttributeSchema {
     fn from_definition(name: &str, definition: &AttributeDefinition<'_>) -> anyhow::Result<Self> {
+        reject_named_exec(name, definition.named_exec_group.as_deref(), "macro")?;
         if definition.late_bound_default.is_some()
             || definition.computed_default.is_some()
             || definition.attached_aspect.is_some()
@@ -4066,6 +4148,8 @@ impl<'v> Freeze for RuleDefinition<'v> {
                 })
                 .collect::<FreezeResult<Vec<_>>>()?
                 .into(),
+            declared_exec_groups: self.declared_exec_groups,
+            named_exec_transition_attributes: self.named_exec_transition_attributes,
             definition_source: self.definition_source,
             source_identities_by_filename: self.source_identities_by_filename,
             required_toolchains: self.required_toolchains,
@@ -4690,6 +4774,7 @@ fn aspect_attributes<'v>(
         }
         let definition = attribute_definition_from_value(value)?
             .ok_or_else(|| anyhow::anyhow!("aspect attribute `{name}` must use attr.*()"))?;
+        reject_named_exec(&name, definition.named_exec_group.as_deref(), "aspect")?;
         if definition.analysis_test_transition.is_some() {
             anyhow::bail!("analysis-test transitions are unsupported in aspect attributes");
         }
@@ -5464,6 +5549,8 @@ struct AttributeDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     exec_configuration: bool,
     #[trace(unsafe_ignore)]
+    named_exec_group: Option<CompactString>,
+    #[trace(unsafe_ignore)]
     required_providers: Arc<[Arc<[ProviderIdentity]>]>,
     attached_aspect: Option<V>,
     transition: Option<TransitionDefinitionGen<V>>,
@@ -5496,6 +5583,7 @@ fn attribute_definition_from_value<'v>(
             computed_default: value.computed_default.map(|value| value.to_value()),
             executable: value.executable,
             exec_configuration: value.exec_configuration,
+            named_exec_group: value.named_exec_group.clone(),
             required_providers: value.required_providers.clone(),
             attached_aspect: value.attached_aspect.as_ref().map(|value| value.to_value()),
             transition: value
@@ -5551,6 +5639,7 @@ pub(crate) fn subrule_attribute_from_value<'v>(
         if name.len() > 128 {
             anyhow::bail!("attribute {name}: name is too long ({} > 128)", name.len());
         }
+        reject_named_exec(&name, definition.named_exec_group.as_deref(), "subrule")?;
         if definition.transition.is_some() || definition.analysis_test_transition.is_some() {
             anyhow::bail!(
                 "bad cfg for attribute '{name}': subrules may only have target/exec attributes."
@@ -5637,6 +5726,7 @@ impl<'v> Freeze for AttributeDefinition<'v> {
                 .transpose()?,
             executable: self.executable,
             exec_configuration: self.exec_configuration,
+            named_exec_group: self.named_exec_group,
             required_providers: self.required_providers,
             attached_aspect: self
                 .attached_aspect
@@ -6382,6 +6472,7 @@ fn attribute_definition_before_later_properties<'v>(
         computed_default,
         executable,
         exec_configuration: false,
+        named_exec_group: None,
         required_providers: Arc::from([]),
         attached_aspect: None,
         transition: None,
@@ -6403,21 +6494,26 @@ fn set_attribute_cfg<'v>(
     definition: &mut AttributeDefinition<'v>,
     cfg: Option<Value<'v>>,
 ) -> anyhow::Result<()> {
-    let (exec_configuration, transition, analysis_test_transition) = match cfg {
-        None => (false, None, None),
+    let (exec_configuration, named_exec_group, transition, analysis_test_transition) = match cfg {
+        None => (false, None, None, None),
         Some(value) if value.is_none() || value.unpack_str() == Some("target") => {
-            (false, None, None)
+            (false, None, None, None)
         }
-        Some(value) if value.unpack_str() == Some("exec") => (true, None, None),
-        Some(value) => match transition_definition_from_value(value) {
-            Some(transition) => (false, Some(transition), None),
-            None => match analysis_test_transition_from_value(value) {
-                Some(transition) => (false, None, Some(transition)),
-                None => anyhow::bail!("attribute cfg must be 'target', 'exec', or a transition"),
-            },
-        },
+        Some(value) if value.unpack_str() == Some("exec") => (true, None, None, None),
+        Some(value) => {
+            if let Some(exec) = StarlarkExecTransition::from_value(value) {
+                (exec.0.is_none(), exec.0.clone(), None, None)
+            } else if let Some(transition) = transition_definition_from_value(value) {
+                (false, None, Some(transition), None)
+            } else if let Some(transition) = analysis_test_transition_from_value(value) {
+                (false, None, None, Some(transition))
+            } else {
+                anyhow::bail!("attribute cfg must be 'target', 'exec', or a transition")
+            }
+        }
     };
     definition.exec_configuration = exec_configuration;
+    definition.named_exec_group = named_exec_group;
     definition.transition = transition;
     definition.analysis_test_transition = analysis_test_transition;
     Ok(())
@@ -7183,6 +7279,17 @@ fn root_string_build_setting(flag: bool) -> anyhow::Result<RootStringBuildSettin
 
 #[starlark_module]
 fn config_methods(builder: &mut MethodsBuilder) {
+    fn exec<'v>(
+        #[starlark(this)] _config: Value<'v>,
+        #[starlark(require = named)] exec_group: Option<NoneOr<&'v str>>,
+    ) -> anyhow::Result<StarlarkExecTransition> {
+        Ok(StarlarkExecTransition(
+            exec_group
+                .and_then(NoneOr::into_option)
+                .map(CompactString::new),
+        ))
+    }
+
     fn int(
         #[starlark(this)] _config: Value,
         #[starlark(require = named, default = false)] flag: bool,
@@ -7302,6 +7409,11 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 "a target declared by rule() requires a string `name`"
             ))
         })?;
+        if self.declared_exec_groups.is_some() || self.named_exec_transition_attributes.is_some() {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "target invocation for named execution-group semantics is unsupported"
+            )));
+        }
         if self.initializer.is_some() {
             return Err(starlark::Error::new_other(anyhow::anyhow!(
                 "target invocation for rule initializer is unsupported"
@@ -8203,16 +8315,19 @@ fn symbolic_macro_global<'v>(
                     if rule.rule_class.get().is_none() {
                         anyhow::bail!("inherit_attrs rule must be exported");
                     }
+                    reject_inherited_named_exec(&rule.named_exec_transition_attributes)?;
                     rule.schema
                         .iter()
                         .filter_map(MacroAttributeSchema::inherited_transient)
                         .collect()
                 }
-                starlark::__macro_refs::Either::Right(rule) => rule
-                    .schema
-                    .iter()
-                    .filter_map(MacroAttributeSchema::inherited)
-                    .collect(),
+                starlark::__macro_refs::Either::Right(rule) => {
+                    reject_inherited_named_exec(&rule.named_exec_transition_attributes)?;
+                    rule.schema
+                        .iter()
+                        .filter_map(MacroAttributeSchema::inherited)
+                        .collect()
+                }
             }
         } else if let Some(symbolic_macro) = SymbolicMacroDefinition::from_value(inherit) {
             match symbolic_macro {
@@ -8326,6 +8441,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             let definition = attribute_definition_from_value(value)?.ok_or_else(|| {
                 anyhow::anyhow!("repository attribute '{name}' must use attr.*()")
             })?;
+            reject_named_exec(
+                &name,
+                definition.named_exec_group.as_deref(),
+                "repository_rule",
+            )?;
             if definition.configurable_set
                 || definition.late_bound_default.is_some()
                 || definition.computed_default.is_some()
@@ -8376,6 +8496,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         for (name, value) in attrs.unwrap_or_default() {
             let definition = attribute_definition_from_value(value)?
                 .ok_or_else(|| anyhow::anyhow!("tag attribute `{name}` must use attr.*()"))?;
+            reject_named_exec(&name, definition.named_exec_group.as_deref(), "tag_class")?;
             if definition.transition.is_some()
                 || definition.analysis_test_transition.is_some()
                 || definition.executable
@@ -8728,6 +8849,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         build_setting: Option<Value<'v>>,
         toolchains: Option<Value<'v>>,
         fragments: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] exec_groups: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         #[starlark(require = named)] subrules: Option<Value<'v>>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
@@ -8771,6 +8893,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let mut user_schema = Vec::new();
         let mut late_bound_attributes = Vec::new();
         let mut computed_default_attributes = Vec::new();
+        let mut named_exec_transition_attributes = Vec::new();
         if let Some(attrs) = attrs {
             for (name, value) in attrs {
                 if declared_builtin_names
@@ -8814,6 +8937,12 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                         definition.required_providers.clone(),
                     ));
                 }
+                if let Some(group) = definition.named_exec_group.clone() {
+                    named_exec_transition_attributes.push((
+                        u32::try_from(user_schema.len()).expect("rule attribute count fits in u32"),
+                        group,
+                    ));
+                }
                 user_schema.push(declared_attribute_schema(name, &definition));
             }
         }
@@ -8844,6 +8973,13 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 callback,
             })
             .collect();
+        for (index, _) in &mut named_exec_transition_attributes {
+            *index = builtin_count
+                .checked_add(*index)
+                .expect("rule attribute count fits u32");
+        }
+        let named_exec_transition_attributes = (!named_exec_transition_attributes.is_empty())
+            .then(|| named_exec_transition_attributes.into());
         let (attached_subrules, subrule_callables) = attached_subrules(subrules)?;
         let outputs = rule_outputs_definition(outputs)?;
         let context = BzlEvaluationContext::from_evaluator(eval)?;
@@ -8851,6 +8987,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             implementation,
             initializer,
             computed_default_attributes,
+            declared_exec_groups: declared_exec_groups(exec_groups)?,
+            named_exec_transition_attributes,
             definition_source: Arc::new(context.source_identity_for_call(eval)?.clone()),
             source_identities_by_filename: context.source_identities_by_filename(),
             required_toolchains: toolchain_requirements(toolchains, eval)?,
@@ -9384,6 +9522,19 @@ impl AllocFrozenValue for BzlmodNativeModule {
 
 #[starlark_module]
 fn bzl_only_globals(builder: &mut GlobalsBuilder) {
+    fn exec_group<'v>(
+        #[starlark(require = named)] toolchains: Option<Value<'v>>,
+        #[starlark(require = named)] exec_compatible_with: Option<UnpackListOrTuple<&str>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<StarlarkDeclaredExecGroup> {
+        if exec_compatible_with.is_some_and(|constraints| !constraints.items.is_empty()) {
+            anyhow::bail!("nonempty exec_compatible_with is unsupported");
+        }
+        Ok(StarlarkDeclaredExecGroup(DeclaredExecGroup {
+            toolchains: toolchain_requirements(toolchains, eval)?,
+        }))
+    }
+
     fn analysis_test_transition<'v>(
         #[starlark(require = named)] settings: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -9764,6 +9915,132 @@ mod module_extension_definition_tests {
         }
         for invalid in ["1", "len", "rule"] {
             assert!(evaluate(&format!("X = attr.label(default = {invalid})\n")).is_err());
+        }
+    }
+
+    #[test]
+    fn exec_group_declarations_are_sparse_bzl_only_and_fail_closed() {
+        assert_eq!(
+            (
+                std::mem::size_of::<StarlarkExecTransition>(),
+                std::mem::size_of::<DeclaredExecGroup>(),
+                std::mem::size_of::<Option<Arc<[(CompactString, DeclaredExecGroup)]>>>(),
+                std::mem::size_of::<Option<Arc<[(u32, CompactString)]>>>(),
+                std::mem::size_of::<RuleDefinition<'static>>(),
+                std::mem::size_of::<FrozenRuleDefinition>(),
+            ),
+            (24, 16, 16, 16, 376, 344)
+        );
+        let source = concat!(
+            "def impl(ctx): fail('implementation stayed lazy')\n",
+            "named = attr.label(cfg = config.exec(exec_group = 'test'))\n",
+            "default_exec = attr.label(cfg = config.exec())\n",
+            "default_none = attr.label(cfg = config.exec(exec_group = None))\n",
+            "cpp = exec_group(toolchains = [config_common.toolchain_type('//:one', mandatory = False), '//:two'])\n",
+            "test_group = exec_group(exec_compatible_with = [])\n",
+            "binary = rule(implementation = impl, attrs = {'dep': named}, exec_groups = {'cpp_link': cpp} | {})\n",
+            "test_rule = rule(implementation = impl, attrs = {'dep': named}, exec_groups = {'cpp_link': cpp, 'default': test_group, 'test': test_group})\n",
+            "library = rule(implementation = impl, exec_groups = {'cpp_link': cpp})\n",
+            "plain = rule(implementation = impl, exec_groups = None)\n",
+            "empty = rule(implementation = impl, exec_groups = {})\n",
+        );
+        for globals in [loading_globals(), bzlmod_loading_globals()] {
+            let module = evaluate_with_globals(source, globals).unwrap();
+            for name in ["default_exec", "default_none"] {
+                let default_exec = module
+                    .get(name)
+                    .unwrap()
+                    .downcast::<FrozenAttributeDefinition>()
+                    .unwrap();
+                assert!(default_exec.exec_configuration);
+                assert!(default_exec.named_exec_group.is_none());
+            }
+            let rule = module
+                .get("test_rule")
+                .unwrap()
+                .downcast::<FrozenRuleDefinition>()
+                .unwrap();
+            let groups = rule.declared_exec_groups.as_deref().unwrap();
+            assert_eq!(
+                groups
+                    .iter()
+                    .map(|(name, group)| (name.as_str(), group.toolchains.len()))
+                    .collect::<Vec<_>>(),
+                [("cpp_link", 2), ("default", 0), ("test", 0)]
+            );
+            assert!(!groups[0].1.toolchains[0].mandatory());
+            assert_eq!(groups[0].1.toolchains[1].label().target().as_str(), "two");
+            let [(index, group)] = rule.named_exec_transition_attributes.as_deref().unwrap() else {
+                panic!("named transition was not retained sparsely")
+            };
+            assert_eq!(rule.schema[*index as usize].name, "dep");
+            assert_eq!(group, "test");
+            let cloned = rule.declared_exec_groups.clone();
+            assert!(Arc::ptr_eq(
+                cloned.as_ref().unwrap(),
+                rule.declared_exec_groups.as_ref().unwrap()
+            ));
+            assert_eq!(
+                module
+                    .get("library")
+                    .unwrap()
+                    .downcast::<FrozenRuleDefinition>()
+                    .unwrap()
+                    .declared_exec_groups
+                    .as_deref()
+                    .unwrap()
+                    .len(),
+                1
+            );
+            let mut graph = allocative::FlameGraphBuilder::default();
+            graph.visit_root(&rule);
+            let graph = graph.finish_and_write_flame_graph();
+            assert!(graph.contains("declared_exec_groups"));
+            assert!(graph.contains("named_exec_transition_attributes"));
+            for name in ["plain", "empty"] {
+                let plain = module
+                    .get(name)
+                    .unwrap()
+                    .downcast::<FrozenRuleDefinition>()
+                    .unwrap();
+                assert!(plain.declared_exec_groups.is_none());
+                assert!(plain.named_exec_transition_attributes.is_none());
+            }
+        }
+        for source in ["X = exec_group()\n", "X = config.exec(exec_group = 'x')\n"] {
+            assert!(evaluate_with_globals(source, build_file_loading_globals()).is_err());
+        }
+        let prelude = concat!("def impl(ctx): pass\n", "G = exec_group()\n",);
+        for invalid in [
+            "X = exec_group(exec_compatible_with = ['//:constraint'])\n",
+            "X = exec_group(toolchains = [1])\n",
+            "X = config.exec(exec_group = 1)\n",
+            "X = rule(implementation = impl, exec_groups = [])\n",
+            "X = rule(implementation = impl, exec_groups = {1: G})\n",
+            "X = rule(implementation = impl, exec_groups = {'bad-name': G})\n",
+            "X = rule(implementation = impl, exec_groups = {'default-exec-group': G})\n",
+            "X = rule(implementation = impl, exec_groups = {'group': 1})\n",
+        ] {
+            assert!(
+                evaluate(&format!("{prelude}{invalid}")).is_err(),
+                "{invalid}"
+            );
+        }
+        let consumers = [
+            "X = aspect(implementation = aspect_impl, attrs = {'dep': D})\n",
+            "X = subrule(implementation = impl, attrs = {'_dep': D})\n",
+            "X = macro(implementation = macro_impl, attrs = {'dep': D})\n",
+            "R = rule(implementation = impl, attrs = {'dep': D})\nX = macro(implementation = macro_impl, inherit_attrs = R)\n",
+            "X = repository_rule(implementation = impl, attrs = {'dep': D})\n",
+            "X = tag_class(attrs = {'dep': D})\n",
+        ];
+        for consumer in consumers {
+            let error = evaluate(&format!(
+                "def impl(ctx): pass\ndef aspect_impl(target, ctx): pass\ndef macro_impl(name, visibility, **kwargs): pass\nD = attr.label(cfg = config.exec(exec_group = 'test'))\n{consumer}"
+            ))
+            .unwrap_err()
+            .to_string();
+            assert!(error.contains("named execution group 'test'"), "{error}");
         }
     }
 

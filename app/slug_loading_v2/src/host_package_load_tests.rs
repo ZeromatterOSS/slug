@@ -1871,6 +1871,87 @@ async fn rule_computed_default_reexport_rejects_before_recording_and_restores() 
 }
 
 #[tokio::test]
+async fn exec_group_reexports_reject_before_recording_and_restore() {
+    const A: &str = concat!(
+        "def _impl(ctx): fail('implementation stayed lazy')\n",
+        "def _computed(name, tags): fail('computed default stayed lazy')\n",
+        "def _init(name, **kwargs): fail('initializer stayed lazy')\n",
+        "_cpp = exec_group(toolchains = ['//:one'])\n",
+        "_test = exec_group()\n",
+        "probe = rule(implementation = _impl, attrs = {'dep': attr.label(cfg = config.exec(exec_group = 'test')), 'out': attr.output()}, exec_groups = {'cpp_link': _cpp, 'test': _test})\n",
+        "both = rule(implementation = _impl, initializer = _init, attrs = {'dep': attr.label(default = _computed)}, exec_groups = {'cpp_link': _cpp})\n",
+    );
+    const B: &str = concat!(
+        "def _impl(ctx): fail('implementation stayed lazy')\n",
+        "probe = rule(implementation = _impl, attrs = {'dep': attr.label()})\n",
+    );
+    const C: &str = concat!(
+        "def _impl(ctx): fail('implementation stayed lazy')\n",
+        "probe = rule(implementation = _impl, attrs = {'dep': attr.label(cfg = config.exec(exec_group = 'other'))})\n",
+    );
+    const REEXPORT: &str = "load(':defs.bzl', _probe = 'probe')\nprobe = _probe\n";
+    const BAD_BUILD: &str = concat!(
+        "load(':reexport.bzl', 'probe')\n",
+        "probe(name = 'bad', out = ['not an output'], unknown = 1)\n",
+        "filegroup(name = 'must_not_publish')\n",
+    );
+    const ERROR: &str = "target invocation for named execution-group semantics is unsupported";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for (source, build, variant, error) in [
+        (A, BAD_BUILD, 301, Some(ERROR)),
+        (
+            B,
+            "load(':defs.bzl', 'probe')\nprobe(name = 'clean')\n",
+            302,
+            None,
+        ),
+        (C, BAD_BUILD, 303, Some(ERROR)),
+        (A, BAD_BUILD, 304, Some(ERROR)),
+    ] {
+        let outcome = compute_package(
+            &dice,
+            EpochBuilder::workspace_sources(
+                "print('ROOT')\n",
+                build,
+                &[("defs.bzl", source), ("reexport.bzl", REEXPORT)],
+                variant,
+            )
+            .build(),
+            package_policy(),
+        )
+        .await;
+        if let Some(error) = error {
+            assert!(terminal_error(&outcome).contains(error));
+        } else {
+            assert_eq!(target_names(&outcome), ["clean"]);
+        }
+    }
+    let precedence = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources(
+            "print('ROOT')\n",
+            "load(':defs.bzl', 'both')\nboth(name = 'bad')\n",
+            &[("defs.bzl", A)],
+            305,
+        )
+        .build(),
+        package_policy(),
+    )
+    .await;
+    assert!(terminal_error(&precedence).contains(ERROR));
+    let external = load_repository_package_fixture(
+        &[
+            ("BUILD.bazel", BAD_BUILD.as_bytes()),
+            ("defs.bzl", A.as_bytes()),
+            ("reexport.bzl", REEXPORT.as_bytes()),
+        ],
+        306,
+    )
+    .await;
+    assert!(repository_package_error(&external).contains(ERROR));
+}
+
+#[tokio::test]
 async fn host_native_toolchain_targets_preserve_root_load_lifecycle_and_ownership() {
     let build = |event: &str, constraint: &str| {
         format!(
