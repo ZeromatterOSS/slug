@@ -291,12 +291,14 @@ my_rule = rule(implementation = _rule_impl, subrules = [my_subrule])
 }
 
 #[test]
-fn coverage_and_custom_malloc_fields_freeze_for_ordinary_and_subrule_private_labels() {
+fn coverage_cpp_and_selected_java_fields_freeze_for_private_labels() {
     let workspace = scratch("coverage-field");
     let package = workspace.join("pkg");
     write(
         &package.join("defs.bzl"),
         r#"
+# rules_java 9.1.0 java/bazel/rules/bazel_java_test.bzl SHA-256:
+# 33b1b5e205c6658c661be6b0cd1b30fe0339d78f0b4fbc061a350024a412f412
 COVERAGE = configuration_field(fragment = "coverage", name = "output_generator")
 def _check():
     if COVERAGE != configuration_field(fragment = "coverage", name = "output_generator"):
@@ -328,14 +330,40 @@ malloc_rule = rule(
     attrs = {"_malloc": attr.label(default = CUSTOM_MALLOC)},
     subrules = [malloc_sub],
 )
+
+# rules_java 9.1.0 java/common/rules/java_toolchain.bzl SHA-256:
+# 5ad6511cdef925246961c7e7a9039475c192371fedbf909c63cf92334779e875
+JAVA_BYTECODE = configuration_field(fragment = "java", name = "java_toolchain_bytecode_optimizer")
+JAVA_LOCAL = configuration_field("java", "local_java_optimization_configuration")
+def _check_java():
+    if JAVA_BYTECODE == JAVA_LOCAL: fail("selected Java fields collapsed")
+_check_java()
+def _java_impl(ctx): fail("Java toolchain implementation ran during loading")
+def _java_initializer(**kwargs): fail("selected Java initializer ran during declaration")
+JAVA_ATTRS = {
+    "_bytecode_optimizer": attr.label(default = JAVA_BYTECODE, cfg = "exec", executable = True),
+    "_local_java_optimization_configuration": attr.label(default = JAVA_LOCAL, cfg = "exec", allow_files = True),
+}
+java_toolchain = rule(implementation = _java_impl, initializer = _java_initializer, attrs = JAVA_ATTRS)
+java_no_initializer_rule = rule(implementation = _java_impl, attrs = JAVA_ATTRS)
 "#,
     );
     write(
+        &package.join("java_export.bzl"),
+        "load(':defs.bzl', 'java_no_initializer_rule', 'java_toolchain')\nexported_java_no_initializer_rule = java_no_initializer_rule\nexported_java_toolchain = java_toolchain\n",
+    );
+    write(
         &package.join("BUILD.bazel"),
-        "load(':defs.bzl', 'coverage_rule', 'malloc_rule')\ncoverage_rule(name = 'subject')\nmalloc_rule(name = 'malloc')\n",
+        "load(':defs.bzl', 'coverage_rule', 'malloc_rule')\nload(':java_export.bzl', 'exported_java_no_initializer_rule', 'exported_java_toolchain')\ncoverage_rule(name = 'subject')\nmalloc_rule(name = 'malloc')\nexported_java_no_initializer_rule(name = 'java_no_initializer')\n",
     );
 
     let loaded = load_package(&workspace, &package);
+    assert!(
+        loaded
+            .targets
+            .iter()
+            .all(|target| target.name != "java_toolchain")
+    );
     let rule = starlark_rule(&loaded, "subject");
     let configured = rule.configured_dependency_attributes().collect::<Vec<_>>();
     assert_eq!(configured.len(), 2);
@@ -364,6 +392,30 @@ malloc_rule = rule(
         };
         assert_eq!(identity.field().fragment_name(), "cpp");
         assert_eq!(identity.field().field_name(), "custom_malloc");
+    }
+
+    let java = starlark_rule(&loaded, "java_no_initializer");
+    assert_eq!(
+        java.late_bound_rule_attributes().collect::<Vec<_>>(),
+        [
+            ("_bytecode_optimizer", "java_toolchain_bytecode_optimizer"),
+            (
+                "_local_java_optimization_configuration",
+                "local_java_optimization_configuration",
+            ),
+        ]
+    );
+    let java = java.configured_dependency_attributes().collect::<Vec<_>>();
+    assert_eq!(java.len(), 2);
+    assert!(java[0].exec_configuration() && java[0].executable());
+    assert!(java[1].exec_configuration());
+    assert!(java[1].file_admissibility().is_any_file());
+    for attribute in java {
+        let ConfiguredDependencyDefault::ConfigurationField(identity) = attribute.default() else {
+            panic!("selected Java dependency lost typed field identity")
+        };
+        assert_eq!(identity.field().fragment_name(), "java");
+        assert_eq!(identity.tools_repository().as_str(), "bazel_tools");
     }
 
     for (name, source, expected) in [
@@ -395,6 +447,24 @@ malloc_rule = rule(
             .unwrap_err()
             .to_string();
         assert!(error.contains(expected), "{name}: {error}");
+    }
+
+    for field in ["launcher", "proguard_top", "bytecode_optimizer", "missing"] {
+        let package = workspace.join(field);
+        write(
+            &package.join("defs.bzl"),
+            &format!("X = configuration_field(fragment = 'java', name = '{field}')\n"),
+        );
+        write(&package.join("BUILD.bazel"), "load(':defs.bzl', 'X')\n");
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains(&format!(
+                "invalid configuration field name '{field}' on fragment 'java'"
+            )),
+            "{error}"
+        );
     }
 
     let build_only = workspace.join("build-field");

@@ -878,6 +878,32 @@ fragment_exec_parent = rule(implementation = _exec_parent, subrules = [exec_prob
     epoch
 }
 
+fn java_field_epoch(name: &str) -> Epoch {
+    let mut epoch = Epoch::fixture();
+    epoch.package("rules", "");
+    epoch.file(
+        "/workspace/rules/java.bzl",
+        &format!(
+            r#"FIELD = configuration_field(fragment = "java", name = "{name}")
+def _impl(ctx): fail("Java implementation ran")
+java_rule = rule(
+    implementation = _impl,
+    attrs = {{
+        "_dependency": attr.label(default = "//deps:must_not_activate"),
+        "_java": attr.label(default = FIELD, cfg = "exec"),
+    }},
+    toolchains = ["//toolchains:must_not_activate"],
+)
+"#,
+        ),
+    );
+    epoch.package(
+        "subject",
+        "load('//rules:java.bzl', 'java_rule')\njava_rule(name = 'java')\n",
+    );
+    epoch
+}
+
 fn high_count_invocation_epoch(count: usize) -> Epoch {
     let mut defs = String::from("def _call(ctx, value): return value\n");
     for index in 0..count {
@@ -1582,6 +1608,49 @@ async fn ordinary_configuration_fields_use_the_same_dependency_owner() {
                     && configuration.kind() == slug_analysis_v2::ConfigurationKind::Target
             })
     );
+}
+
+#[tokio::test]
+async fn java_configuration_fields_fail_before_dependency_toolchain_or_implementation() {
+    let names = [
+        "java_toolchain_bytecode_optimizer",
+        "local_java_optimization_configuration",
+        "java_toolchain_bytecode_optimizer",
+    ];
+    for route in [AnalysisRoute::Legacy, AnalysisRoute::Observed] {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut errors = Vec::new();
+        for name in names {
+            let tracker = Arc::new(Tracker::default());
+            let error = analyze(
+                &dice,
+                java_field_epoch(name).build(),
+                "@@//subject:java",
+                configuration(None),
+                tracker.clone(),
+                route,
+            )
+            .await;
+            assert!(
+                error.contains(&format!(
+                    "configuration_field(fragment = \"java\", name = \"{name}\") configured resolution is unsupported"
+                )),
+                "{route:?}: {error}"
+            );
+            assert!(!error.contains("Java implementation ran"), "{error}");
+            assert!(
+                tracker.0.lock().unwrap().iter().all(|(label, _, _)| {
+                    !label.contains("must_not_activate")
+                        && !label.starts_with("@@//deps:")
+                        && !label.starts_with("@@//toolchains:")
+                }),
+                "{route:?}: downstream configured analysis activated"
+            );
+            errors.push(error);
+        }
+        assert_eq!(errors[0], errors[2], "{route:?}: A/B/A did not restore");
+        assert_ne!(errors[0], errors[1], "{route:?}: Java fields collapsed");
+    }
 }
 
 #[tokio::test]

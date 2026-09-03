@@ -21,6 +21,7 @@ use slug_identity_v2::ResolvedOptionLabel;
 use slug_identity_v2::serialization::StableSerialize;
 use strong_hash::StrongHash;
 
+use super::configuration_field::ConfigurationField;
 use super::configuration_field::ConfigurationFieldIdentity;
 use super::configuration_field::CoverageConfigurationField;
 use super::configuration_field::CppConfigurationField;
@@ -324,6 +325,7 @@ pub enum SlugConfigurationError {
     UnexpectedNativeLabel { option: &'static str },
     NonVisibleNativeLabel { option: &'static str },
     InvalidCppConfiguration { reason: &'static str },
+    UnsupportedJavaConfigurationField { field: ConfigurationField },
     ActionEnvironment { reason: &'static str },
 }
 
@@ -398,6 +400,11 @@ impl fmt::Display for SlugConfigurationError {
             Self::InvalidCppConfiguration { reason } => {
                 write!(formatter, "invalid C++ configuration: {reason}")
             }
+            Self::UnsupportedJavaConfigurationField { field } => write!(
+                formatter,
+                "configuration_field(fragment = \"java\", name = \"{}\") configured resolution is unsupported",
+                field.field_name()
+            ),
             Self::ActionEnvironment { reason } => {
                 write!(formatter, "invalid action environment: {reason}")
             }
@@ -959,6 +966,11 @@ impl SlugConfiguration {
         &self,
         identity: &ConfigurationFieldIdentity,
     ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
+        if identity.field().java_field().is_some() {
+            return Err(SlugConfigurationError::UnsupportedJavaConfigurationField {
+                field: identity.field(),
+            });
+        }
         let Some(field) = identity.field().cpp_field() else {
             return match identity.field().coverage_field() {
                 Some(CoverageConfigurationField::OutputGenerator) => {

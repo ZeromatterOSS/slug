@@ -35,6 +35,7 @@ mod command_configuration_tests {
 
     use super::super::configuration::OptionValue;
     use super::super::configuration::SlugConfiguration;
+    use super::super::configuration_field::JavaConfigurationField;
     use super::super::host::AutoCpuToken;
     use super::super::host::HostConversionInputs;
     use super::super::host::HostPathFlavor;
@@ -806,6 +807,69 @@ mod command_configuration_tests {
         assert_eq!(disabled.coverage_output_generator_label().unwrap(), None);
         assert_eq!(disabled, base);
         assert_ne!(enabled, base);
+    }
+
+    #[test]
+    fn selected_java_fields_are_typed_compact_and_fail_closed() {
+        let selected = [
+            (
+                "java_toolchain_bytecode_optimizer",
+                JavaConfigurationField::JavaToolchainBytecodeOptimizer,
+            ),
+            (
+                "local_java_optimization_configuration",
+                JavaConfigurationField::LocalJavaOptimizationConfiguration,
+            ),
+        ];
+        for (name, java) in selected {
+            let field = ConfigurationField::from_starlark_names("java", name).unwrap();
+            assert_eq!(field.fragment_name(), "java");
+            assert_eq!(field.field_name(), name);
+            assert_eq!(field.java_field(), Some(java));
+            assert_eq!(field.cpp_field(), None);
+            assert_eq!(field.coverage_field(), None);
+            let identity = ConfigurationFieldIdentity::new(
+                field,
+                CanonicalRepoName::new("bazel_tools+").unwrap(),
+            );
+            assert_eq!(
+                configuration()
+                    .configuration_field_label(&identity)
+                    .unwrap_err()
+                    .to_string(),
+                format!(
+                    "configuration_field(fragment = \"java\", name = \"{name}\") configured resolution is unsupported"
+                )
+            );
+        }
+        for name in ["launcher", "proguard_top", "bytecode_optimizer", "missing"] {
+            assert_eq!(ConfigurationField::from_starlark_names("java", name), None);
+        }
+        assert!(ConfigurationField::is_fragment_name("java"));
+        assert_eq!(size_of::<JavaConfigurationField>(), 1);
+        assert_eq!(size_of::<ConfigurationField>(), 1);
+        #[cfg(target_pointer_width = "64")]
+        assert_eq!(size_of::<ConfigurationFieldIdentity>(), 32);
+
+        let identity = |name, tools| {
+            ConfigurationFieldIdentity::new(
+                ConfigurationField::from_starlark_names("java", name).unwrap(),
+                CanonicalRepoName::new(tools).unwrap(),
+            )
+        };
+        let hash = |value: &ConfigurationFieldIdentity| {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        };
+        let first = identity(selected[0].0, "bazel_tools+");
+        let changed_field = identity(selected[1].0, "bazel_tools+");
+        let changed_tools = identity(selected[0].0, "bazel_tools+next");
+        let restored = identity(selected[0].0, "bazel_tools+");
+        assert_eq!(first, restored);
+        assert_eq!(hash(&first), hash(&restored));
+        assert_ne!(first, changed_field);
+        assert_ne!(first, changed_tools);
     }
 
     #[test]

@@ -76,6 +76,33 @@ impl CoverageConfigurationField {
     }
 }
 
+/// The selected Bazel 9.2 `java` fields retained for declaration only.
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub(super) enum JavaConfigurationField {
+    JavaToolchainBytecodeOptimizer,
+    LocalJavaOptimizationConfiguration,
+}
+
+impl JavaConfigurationField {
+    fn from_starlark_name(name: &str) -> Option<Self> {
+        match name {
+            "java_toolchain_bytecode_optimizer" => Some(Self::JavaToolchainBytecodeOptimizer),
+            "local_java_optimization_configuration" => {
+                Some(Self::LocalJavaOptimizationConfiguration)
+            }
+            _ => None,
+        }
+    }
+
+    pub(super) const fn starlark_name(self) -> &'static str {
+        match self {
+            Self::JavaToolchainBytecodeOptimizer => "java_toolchain_bytecode_optimizer",
+            Self::LocalJavaOptimizationConfiguration => "local_java_optimization_configuration",
+        }
+    }
+}
+
 /// Typed producer identity for one admitted Starlark `configuration_field`.
 ///
 /// The payload is flattened into the discriminant so the retained field stays
@@ -95,6 +122,8 @@ pub enum ConfigurationField {
     CppLibcTop,
     CppZipper,
     CoverageOutputGenerator,
+    JavaToolchainBytecodeOptimizer,
+    JavaLocalOptimizationConfiguration,
 }
 
 impl ConfigurationField {
@@ -120,26 +149,44 @@ impl ConfigurationField {
         }
     }
 
+    const fn java(field: JavaConfigurationField) -> Self {
+        match field {
+            JavaConfigurationField::JavaToolchainBytecodeOptimizer => {
+                Self::JavaToolchainBytecodeOptimizer
+            }
+            JavaConfigurationField::LocalJavaOptimizationConfiguration => {
+                Self::JavaLocalOptimizationConfiguration
+            }
+        }
+    }
+
     pub fn from_starlark_names(fragment: &str, name: &str) -> Option<Self> {
         match fragment {
             "cpp" => CppConfigurationField::from_starlark_name(name).map(Self::cpp),
             "coverage" => CoverageConfigurationField::from_starlark_name(name).map(Self::coverage),
+            "java" => JavaConfigurationField::from_starlark_name(name).map(Self::java),
             _ => None,
         }
     }
 
     pub fn is_fragment_name(fragment: &str) -> bool {
-        matches!(fragment, "cpp" | "coverage")
+        matches!(fragment, "cpp" | "coverage" | "java")
     }
 
     pub const fn fragment_name(self) -> &'static str {
         match self {
             Self::CoverageOutputGenerator => "coverage",
+            Self::JavaToolchainBytecodeOptimizer | Self::JavaLocalOptimizationConfiguration => {
+                "java"
+            }
             _ => "cpp",
         }
     }
 
     pub const fn field_name(self) -> &'static str {
+        if let Some(field) = self.java_field() {
+            return field.starlark_name();
+        }
         match (self.cpp_field(), self.coverage_field()) {
             (Some(field), None) => field.starlark_name(),
             (None, Some(field)) => field.starlark_name(),
@@ -160,13 +207,27 @@ impl ConfigurationField {
             Self::CppProtoProfilePath => CppConfigurationField::ProtoProfilePath,
             Self::CppLibcTop => CppConfigurationField::LibcTop,
             Self::CppZipper => CppConfigurationField::Zipper,
-            Self::CoverageOutputGenerator => return None,
+            Self::CoverageOutputGenerator
+            | Self::JavaToolchainBytecodeOptimizer
+            | Self::JavaLocalOptimizationConfiguration => return None,
         })
     }
 
     pub const fn coverage_field(self) -> Option<CoverageConfigurationField> {
         match self {
             Self::CoverageOutputGenerator => Some(CoverageConfigurationField::OutputGenerator),
+            _ => None,
+        }
+    }
+
+    pub(super) const fn java_field(self) -> Option<JavaConfigurationField> {
+        match self {
+            Self::JavaToolchainBytecodeOptimizer => {
+                Some(JavaConfigurationField::JavaToolchainBytecodeOptimizer)
+            }
+            Self::JavaLocalOptimizationConfiguration => {
+                Some(JavaConfigurationField::LocalJavaOptimizationConfiguration)
+            }
             _ => None,
         }
     }
