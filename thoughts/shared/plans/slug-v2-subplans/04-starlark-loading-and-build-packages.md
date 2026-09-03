@@ -8208,3 +8208,37 @@ the external-Bzl driver and its canonical-route proof. Add no key, retained
 type, fixture, Stage 5 edit, root-route change, copied rules_cc content or
 consumer branch. Exact single-load, Slug-native and deferred surfaces plus
 lifecycle caps are frozen in the active packet.
+
+### Built-in public-label external load routing accepted (2026-09-02)
+
+Commit `5d5991634` terminally accepts the bounded built-in route promotion at
+80 production and 360 proof gross Rust additions, 440 total. The original
+root DICE key and current-node cycle identity remain unchanged; only an
+invocation-local effective canonical route is threaded after source decode,
+parse and the exact one-load structural gate. Existing mapping, selected-source,
+recursive manifest, observation and frozen-module owners retain the result.
+
+The full loading gate passes 526 unit tests plus every integration target.
+`slug_query_v2` passes its 55-test focused gate and retains the established
+55/56 diagnostic baseline; `slug_cli_v2` builds. The authenticated replay
+clears `lib_cc_configure.bzl`, canonical rules_cc routing and its recursive
+utility, then stops on the independent missing built-in source
+`@@bazel_tools//tools/osx:xcode_configure.bzl` while producing
+`apple_support++apple_cc_configure_extension+local_config_apple_cc_toolchains`.
+Stage 5 owns the next exact catalog audit; no apple_support, Xcode, repository
+runtime or toolchain special case is authorized here.
+
+### Built-in xcode_configure source loading audited (2026-09-02)
+
+The pinned `tools/osx/xcode_configure.bzl` has no syntactic Starlark load. Its
+apparent `load("@apple_support...")` lines are bytes inside generated BUILD
+strings, while the locator label and all Host Xcode operations occur only in
+deferred function bodies. The load-time declarations use already-accepted
+`repository_rule`, `attr.string` and `module_extension` globals, and its live
+extension result uses the accepted repository-call and
+`module_ctx.extension_metadata(reproducible=True)` boundaries.
+
+Therefore Stage 4 requires no evaluator, route, source, cycle or manifest
+change to admit this source. Runtime execution, Darwin discovery, locator
+source access and generated BUILD loading remain separate typed boundaries.
+The docs-only audit returns `ACCEPT` for a one-file Stage 5 catalog packet.

@@ -4647,3 +4647,50 @@ Select the two-file Stage 4 implementation frozen in the active packet. It
 must prove mapping/frontier A/B/A, no speculative child source or built-in
 materialization, and the canonical rules_cc child. Return `REPLAN` on any Stage
 5 edit, new key, mapping duplication or ruleset/toolchain special case.
+
+### Built-in public-label route accepted; Xcode catalog audit selected (2026-09-02)
+
+Commit `5d5991634` accepts the exact single-apparent-load route at
+80/360/440 gross production/proof/total Rust additions. Loading passes 526
+unit tests and all integrations; query passes 55 focused tests while preserving
+the established 55/56 diagnostic baseline, and the CLI builds. The authentic
+replay clears the rules_cc facade and recursive utility, then reaches
+`UnsupportedCatalog` for
+`tools/osx/xcode_configure.bzl` from the selected apple_support-generated
+repository. Select docs-only
+`WP-5-7A-bazel-tools-xcode-configure-catalog-audit-r1`; do not widen the route
+or implement apple/Xcode runtime behavior.
+
+### Built-in xcode_configure catalog audit accepted (2026-09-02)
+
+Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`
+and installed Bazel 9.2 contain byte-identical
+`tools/osx/xcode_configure.bzl`: SHA-256
+`26d758318e481f8971dabd43e24d0b4e85c30eb074da39d3b63c778f39ebd942`,
+12,993 bytes, 329 lines with one trailing LF. Preserve source/archive mode
+`0644` as catalog `executable: false`; installed mode `0755` is the systematic
+embedded-tools extraction artifact, not source authority.
+
+The complete smallest source closure is this one file. It has zero syntactic
+loads and publishes `OSX_EXECUTE_TIMEOUT`, `VERSION_CONFIG_STUB`,
+`run_xcode_locator`, `xcode_autoconf`, `xcode_configure` and
+`xcode_configure_extension`. The `@apple_support` loads are generated BUILD
+text, and `xcode_locator.m` is referenced only by deferred runtime code.
+`tools/osx/BUILD` would load `xcode_version_flag.bzl`, but the authenticated
+route already reached the exact source lookup; neither file nor the locator or
+stub belongs to this source-only addition.
+
+Reuse `BuiltinBazelToolsSnapshot`, the lexically ordered static `CATALOG`,
+validated immutable `BuiltinBazelToolsSourceFileKey`, derived direct-directory
+listing and domain-separated manifest. The 48-entry manifest digest
+`c313fad68f4e475d744dc6de7b658515b33c634905222e934a9d09129371f56f`
+becomes
+`3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc`.
+No key, manifest version, request input, fallback, materialization or retained
+representation changes.
+
+Independent review agrees with `ACCEPT`. Select
+`WP-5-7A-bazel-tools-xcode-configure-catalog-implementation-r1` under the
+three-file allowlist and caps frozen in the active manifest. Broader
+`tools/osx`, repository runtime, Darwin discovery, generated BUILD,
+apple_support and C++ toolchain behavior remain unsupported/deferred.

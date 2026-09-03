@@ -1,166 +1,170 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-5-7A-builtin-external-bzl-load-routing-implementation-r1
+Packet: WP-5-7A-bazel-tools-xcode-configure-catalog-implementation-r1
 
-Milestone: M7A bootstrap-critical loading/repository execution closure. Admit
-the bounded exact shape of one nonempty apparent-repository child load
-(`@name//...`) from a parsed built-in `@bazel_tools` Bzl module through the
-already-owned canonical mapping and recursive source graph.
+Milestone: M7A bootstrap-critical loading/repository execution closure. Add
+the exact pinned Bazel 9.2 `tools/osx/xcode_configure.bzl` source as the sole
+new built-in `@bazel_tools` catalog member and advance the authentic replay to
+its next independently owned boundary.
 
-Status: ready for one bounded implementation. The owner composition,
-compatibility classification, two-file allowlist, proof and stops are frozen.
+Status: ready for one bounded implementation. The predecessor, docs-only
+audit, exact bytes, existing owner, three-file allowlist, caps, proof and stops
+are accepted and frozen with independent reviewer agreement.
 
-## Accepted predecessor and audit result
+## Accepted predecessor and replay evidence
 
-`WP-5-7A-bazel-tools-lib-cc-configure-catalog-implementation-r1` is accepted at
-6 production and 11 proof gross Rust additions plus the exact 784-byte asset.
-The bounded replay evaluates the facade and stops at its sole load:
+`WP-4-5-7A-builtin-external-bzl-load-routing-implementation-r1` is accepted in
+commit `5d5991634` at 80 production and 360 proof gross Rust additions, 440
+total. It preserves the original external-module DICE key and current-node
+cycle identity while importing the already-owned canonical built-in route only
+as invocation scratch after source decode, parse and the exact one-load gate.
 
-`repository-qualified external load is deferred:
-@rules_cc//cc/toolchains:toolchain_config_utils.bzl`
+The complete `slug_loading_v2` gate passes 526 unit tests plus every
+integration target. `slug_query_v2` passes its 55-test focused gate and retains
+the established 55/56 diagnostic baseline; `slug_cli_v2` builds. The
+authenticated replay clears `lib_cc_configure.bzl`, maps `rules_cc` to
+`rules_cc+`, freezes its recursive utility and re-export, then stops while
+loading:
 
-`WP-4-5-7A-builtin-external-bzl-load-routing-audit` returns `ACCEPT`. Pinned
-Bazel 9.2 `BzlLoadFunction.java:780-831` establishes source compilation before
-repository-mapping lookup, followed by source-ordered load resolution.
-Lines 881-897 retain the mapping and load DAG in the module context; lines
-935-954 use the importer's full `RepositoryMappingFunction` result for ordinary
-BUILD/Bzlmod loads; and lines 1071-1125 parse every load with that mapping.
-`RepositoryMappingFunction.java:75-158` obtains a module repository's complete
-Bazel dependency mapping. `BzlLoadFunctionTest.testLoadBzlFileFromBzlmod`
-proves apparent-to-canonical child resolution. The bootstrap-only self mapping
-at `BzlLoadFunction.java:939-945` is not this ordinary Bzlmod load family.
+`@@bazel_tools//tools/osx:xcode_configure.bzl`
 
-Slug already owns the corresponding graph. Exact built-in
-`MODULE.bazel:37` declares `rules_cc` 0.2.17. The existing
-`HostBuiltinBazelToolsRepositoryMapping*` derives the complete selected mapping
-and owns `rules_cc -> rules_cc+`. `HostCanonicalRepositoryLoadRoute*` projects
-that mapping plus immutable built-in source identity. Canonical external Bzl
-resolution, source observation, cycle handling, recursive manifest and frozen
-module lifetime are already accepted. Only the older root-shaped built-in
-entry fails to import that route before resolving its public child load.
+for generated repository
+`apple_support++apple_cc_configure_extension+local_config_apple_cc_toolchains`.
+This is an exact built-in source catalog miss, not another mapping or routing
+failure.
+
+## Accepted catalog audit
+
+`WP-5-7A-bazel-tools-xcode-configure-catalog-audit-r1` returns `ACCEPT`.
+Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`
+provides
+`/tmp/bazel-9.2-source-audit-fhUrtf/tools/osx/xcode_configure.bzl` with:
+
+- SHA-256
+  `26d758318e481f8971dabd43e24d0b4e85c30eb074da39d3b63c778f39ebd942`;
+- exactly 12,993 bytes and 329 lines with one trailing LF; and
+- source/archive mode `0644`, represented as catalog `executable: false`.
+
+The installed Bazel 9.2 copy at
+`/tmp/slug-bazel92-install-audit/install/3e6f3b7d6fdac67aed908160850e082b/embedded_tools/tools/osx/xcode_configure.bzl`
+is byte-identical but mode `0755`. That is the same systematic extraction
+artifact already recorded for other built-in sources and is not source or
+catalog authority.
+
+The complete smallest source closure is this one file. It has zero syntactic
+Starlark loads. Text beginning with `load("@apple_support...")` occurs only
+inside strings used to generate a later BUILD file, and `xcode_locator.m` is
+referenced only from deferred runtime code. Its public bindings are
+`OSX_EXECUTE_TIMEOUT`, `VERSION_CONFIG_STUB`, `run_xcode_locator`,
+`xcode_autoconf`, `xcode_configure` and `xcode_configure_extension`.
+
+Existing Bzlmod loading globals already own its declaration-time needs:
+`repository_rule` with `configure`, `environ` and `attr.string` schemas, and
+`module_extension`. Existing module-extension execution owns repository-call
+recording and `module_ctx.extension_metadata(reproducible=True)`. This packet
+does not claim or add the Host/Darwin operations appearing in deferred
+function bodies.
+
+`tools/osx/BUILD` is not part of this source-only closure. It would load
+`xcode_version_flag.bzl`; the authenticated loader has already crossed label
+and package routing and failed directly on the exact source lookup. Likewise
+`xcode_locator.m`, `xcode_locator_stub.sh` and every other `tools/osx` asset are
+not admitted. Bazel's `src/test/shell/bazel/apple/bazel_apple_test.sh` exercises
+Darwin repository runtime and is deliberately skipped as an unsupported phase;
+the pinned-source regression and live catalog miss discriminate this packet.
 
 ## Compatibility classification
 
-- Exact: for a parsed built-in module with exactly one load spelled with one
-  `@`, a nonempty apparent repository name and `//`, source/UTF-8/parse errors
-  precede mapping and label errors; the importer's complete mapping resolves
-  apparent `rules_cc` to canonical `rules_cc+`; the child label, observable
-  Bzlmod load-context selection, re-exported `escape_string` identity and
-  successful recursive source order match Bazel 9.2.
-- Slug-native: existing DICE keys, legacy/observed path frontiers, canonical
-  source inputs, manifest equality/fingerprint, cycle detector and retained
-  frozen-module closure represent those semantics. Observation conflicts and
-  unmodeled mapping/source state fail closed.
-- Unsupported/deferred: canonical `@@repo//...`, explicit-main `@//...`, and
-  built-in modules with two or more loads when any is repository-qualified,
-  including Bazel's all-labels-before-any-child failure ordering; Bzlmod-
-  bootstrap-only mapping behavior; arbitrary new root-route semantics;
-  rules_cc contents or evaluator features not already admitted; later C++
-  configuration logic; apple_support/C++ or toolchain branches; and the next
-  replay failure. Empty and every nonadmitted built-in load shape retain their
-  accepted root-shaped path or typed unsupported boundary unchanged.
+- Exact: the pinned source bytes, trailing LF, SHA-256, source/archive
+  non-executable mode, path, public bindings, zero syntactic-load closure,
+  direct catalog lookup and sorted directory membership match Bazel 9.2.
+- Slug-native: the existing immutable DICE source key/value and
+  domain-separated manifest digest represent source and route identity.
+  Adding the file invalidates users through the complete manifest without a
+  Bazel install-tree identity claim.
+- Unsupported/deferred: installed extraction mode; `tools/osx/BUILD`, locator,
+  stub, `xcode_version_flag.bzl` and all sibling assets; repository-rule body
+  execution introduced by this file; Darwin Xcode discovery and subprocesses;
+  Host OS/environment/path/file behavior not already admitted; generated BUILD
+  and apple_support loads; consumer-specific Apple/C++ toolchain semantics;
+  broader built-in catalog growth; and the next replay failure.
 
-## Required implementation
+## Required implementation and ownership
 
-In `compute_external_bzl_module`, keep source lookup, UTF-8 decoding and parse
-on the original built-in root source route. After collecting raw loads and
-before label resolution, activate promotion only when the route is
-`Root(route) if route.is_builtin_bazel_tools()`, the load count is exactly one,
-and the raw string has exactly the apparent form `@name//...`: one leading `@`
-and a nonempty repository segment. Empty, relative, canonical `@@...`,
-explicit-main `@//...` and other nonadmitted shapes continue through their
-existing root route and typed boundary. Multi-load modules containing a
-repository-qualified load remain fail-closed/deferred; do not partially
-resolve or activate a child.
+Add the exact upstream file verbatim at
+`app/slug_bzlmod_v2/builtin/bazel_tools/tools/osx/xcode_configure.bzl`.
+Do not normalize bytes, rewrite Starlark, copy from an installed tree or change
+its executable mode.
 
-For the admitted single-load shape, compute the existing canonical
-`bazel_tools` load-route key: legacy uses
-`HostCanonicalRepositoryLoadRouteKey`; observed uses its observation sibling
-and merges that complete frontier after the catalog-source frontier.
+In `builtin_repository.rs`, add one lexically ordered static `CATALOG` entry
+after `tools/launcher/empty.sh` and before `tools/res/BUILD`, with the exact
+path, hash and `executable: false`. Extend the existing sorted direct-listing
+proof so `tools` contains directory `osx` and `tools/osx` contains only
+`xcode_configure.bzl`.
 
-Construct an invocation-local effective
-`HostRepositorySourceRoute::Canonical` from the returned
-`HostCanonicalRepositorySourceInput`, preserving the original
-`RepositoryBzlLabel` and `BzlModuleContext`. Use that effective route for the
-unchanged canonical label resolver, child route/source recursion, manifest,
-evaluation and freeze. Reuse or narrowly generalize the existing canonical
-route-input helper and existing `ExternalBzlModuleError::Route`; add no public
-error family.
+In the public catalog test, add the matching lexically ordered `FILES` row.
+Update both complete pinned-manifest expectations from
+`c313fad68f4e475d744dc6de7b658515b33c634905222e934a9d09129371f56f`
+to
+`3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc`.
+Do not change the manifest domain or version.
 
-Do not change `HostRootRepositoryLoadRouteKey`, put mapping state into
-`RootRepositoryRoute`, generalize mapping-free `resolve_external_load_label`,
-add a DICE key/loader/cache, or hard-code `rules_cc`. Compute the canonical
-route before evaluator creation; no evaluator, module mutation, lock or frozen
-borrow may cross the new await.
+`BuiltinBazelToolsSnapshot`, the static `CATALOG`, `validated_file`,
+`BuiltinBazelToolsSourceFileKey` and the derived directory-listing key remain
+the sole owners. No request/session input, filesystem observation,
+materialization, mutable cache or fallback participates. Concurrent and warm
+DICE reads retain existing deduplication, equality and permanent validity.
 
-## Ownership and lifecycle
-
-- Requests/overlap: same external-module keys remain DICE-deduplicated;
-  concurrent keys reuse the canonical-route dependency, while transactions
-  retain their own observation epochs. No shared mutable or process-global
-  state is added.
-- Observed order: merge catalog source, canonical built-in mapping/route, then
-  selected child routes and sources in load order. `Need`, cancellation and
-  merge conflicts publish no parent result or event batch; mapping and source
-  A/B/A must restore semantic equality and warm reuse.
-- Retained memory: no new key field, retained type or cache. The effective
-  route is invocation scratch. Successful modules retain mapping and recursive
-  children only through the existing `BzlLoadManifest` and frozen closure.
-- Cycles: retain existing external child cycle guards. Promotion must not
-  introduce a DICE wait cycle or a second identity for recursive children.
-- Fixtures/provenance: add no fixture. Reuse exact checked-in built-in bytes,
-  inline synthetic registry/materialization proof, and the authenticated
-  rules_rust/rules_cc replay. Inspection of materialized rules_cc is
-  corroboration only, not a source or fixture.
-- Complexity/cohesion: one driver seam and its direct proof are one cohesive
-  slice. No Buck2 hot-path utility, compact representation or Stage 9 identity
-  review is triggered. Return `REPLAN` before adding another production owner.
+The exact 12,993 bytes are static program/catalog memory and are exposed
+through the existing `Arc<[u8]>` value; no new retained type or duplicate
+runtime copy is authorized. `builtin_repository.rs` remains below the 2,000
+line complexity trigger, and the change is one cohesive catalog row plus its
+existing proofs. No hot-path measurement, Buck2 utility review, donor code,
+new oracle fixture or fallback ledger applies.
 
 ## Implementation allowlist and caps
 
 Only these files may change:
 
-- `app/slug_loading_v2/src/bzl_module.rs`
-- `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs`
+- `app/slug_bzlmod_v2/builtin/bazel_tools/tools/osx/xcode_configure.bzl`
+- `app/slug_bzlmod_v2/src/builtin_repository.rs`
+- `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs`
 
-Gross Rust additions are capped at 180 production, 360 proof and 540 total.
-Formatting or unrelated cleanup does not create headroom. No Cargo, fixture,
-catalog, Stage 5 or external-source edit is permitted.
+Gross Rust additions are capped at 12 production, 40 proof and 52 Rust total.
+The asset must be exactly 12,993 bytes/329 lines. Aggregate gross additions,
+including that exact asset, are capped at 400. Formatting or cleanup does not
+create headroom.
 
 ## Required proof and validation
 
-- Prove exact `rules_cc -> rules_cc+` importer mapping, the facade's direct
-  `@@rules_cc+//cc/toolchains:toolchain_config_utils.bzl` child, recursive
-  same-repository child identity, and the re-exported `escape_string`.
-- Prove the exact structural gate: empty and nonadmitted built-in modules do
-  not request a mapping or change child-key identity; exactly one nonempty
-  apparent `@name//...` load promotes; canonical `@@...`, explicit-main
-  `@//...` and multi-load public-label modules keep their typed unsupported
-  boundary and activate no child. Broader all-label prevalidation is not
-  claimed.
-- Prove legacy/observed parity and complete frontier order for the admitted
-  shape; source/encoding/parse errors precede mapping, mapping and label errors
-  precede the sole child source, missing mapping and child fail closed without
-  speculative activation, and no `bazel_tools` materialization request occurs.
-- Prove `Need`, cancellation/recovery, cycle handling, warm reuse, mapping and
-  source A/B/A restoration, equality/validity, and retained size bounds.
-- Use the pinned Bazel source/test anchors above; no new oracle or fixture is
-  justified because the exact ordering/mapping rule and live consumer are
-  already discriminating.
-- Run rustfmt/diff checks, serial focused built-in/canonical external-Bzl tests,
-  full `slug_loading_v2`, a direct `slug_query_v2` dependent, and rebuild
-  `slug_cli_v2`. Clean `slugd` before and after the bounded authentic replay.
-- The replay must clear the repository-qualified-load error, freeze the
-  rules_cc utility and built-in re-export, then record the next typed boundary
-  without implementing it. Run archive and artifact hygiene gates.
+- Recompute and compare the source and checked-in SHA-256; prove exactly one
+  trailing LF, 12,993 bytes, 329 lines and non-executable source mode. Compare
+  pinned source and checked-in bytes directly; installed bytes are
+  corroboration only.
+- Prove source lookup returns the exact path/hash/bytes/mode and that unknown
+  neighboring paths remain `UnsupportedCatalog`.
+- Prove sorted direct listings add only `osx` under `tools` and only
+  `xcode_configure.bzl` under `tools/osx`.
+- Prove the public `FILES` manifest remains exactly the physical asset set and
+  both complete route-manifest expectations equal
+  `3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc`.
+- Run rustfmt and diff checks, serial focused built-in catalog unit/integration
+  tests, the complete `slug_bzlmod_v2` suite and a direct
+  `slug_loading_v2` consumer check. Rebuild `slug_cli_v2` before replay.
+- Clean `slugd` before and after the authenticated replay. The replay must
+  clear this `UnsupportedCatalog`, load and freeze the exact source through
+  the existing route, and record the next typed boundary without implementing
+  it. Run archive and artifact hygiene gates.
 
 ## Terminal stops
 
-Return `ACCEPT` only if the bounded single-load ordering, complete importer
-mapping, unchanged nonadmitted paths, canonical child identity, recursive
-manifest/frontier, lifecycle proofs, tests, rebuild and replay pass within both
-files and all caps. Return `REPLAN` if the change requires multi-load
-prevalidation, Stage 5 ownership, a shared root-load-route change, another
-crate/file, a new DICE key or retained representation, direct filesystem
-access, copied rules_cc content, an evaluator held across DICE, or any
-consumer/ruleset/toolchain special case.
+Return `ACCEPT` only if exact bytes/mode/hash, one-file closure, listings,
+physical manifest, new route digest, focused/full tests, direct dependent,
+build and replay pass within all three files and caps.
+
+Return `REPLAN` before adding `tools/osx/BUILD`, `xcode_locator.m`,
+`xcode_locator_stub.sh`, `xcode_version_flag.bzl` or any other asset; changing
+an evaluator, repository API, route, key, manifest version or materialization
+owner; adding install-tree/filesystem fallback; implementing Host/Darwin,
+generated BUILD, apple_support or toolchain behavior; or crossing an
+independent next replay boundary.
