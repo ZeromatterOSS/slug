@@ -67,7 +67,7 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateKey;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationError;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationKey;
-#[rustfmt::skip] use crate::repository_rule_context::{PreparedRepositoryLabelPaths, PreparedRepositoryTemplateSources, PreparedRepositoryWhichCandidates, RepositoryRuleHostObservation, RepositoryRuleInvocationError, RepositoryRuleInvocationInput, RepositoryWhichCandidate};
+#[rustfmt::skip] use crate::repository_rule_context::{PreparedRepositoryLabelPaths, PreparedRepositoryLabelSources, PreparedRepositoryWhichCandidates, RepositoryRuleHostObservation, RepositoryRuleInvocationError, RepositoryRuleInvocationInput, RepositoryWhichCandidate};
 use crate::repository_rule_context::invoke_repository_rule;
 
 struct RepositoryEffectLimits;
@@ -873,7 +873,7 @@ async fn resolve_repository_label_path(
     }
 }
 
-fn template_source_error(
+fn repository_source_error(
     certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
     ordinal: usize,
     message: impl Into<CompactString>,
@@ -889,7 +889,7 @@ fn template_source_error(
     )
 }
 
-fn template_relative_path(
+fn repository_source_relative_path(
     address: &RepositoryLabelPathAddress,
 ) -> Result<slug_bzlmod_v2::HostRepositoryRelativePath, CompactString> {
     host_repository_relative_path(
@@ -898,18 +898,18 @@ fn template_relative_path(
     .map_err(|error| error.to_string().into())
 }
 
-fn template_source_bytes(
+fn repository_source_bytes(
     source: &HostRepositorySourceFileValue,
 ) -> Result<Arc<[u8]>, CompactString> {
     match source {
         HostRepositorySourceFileValue::Present { bytes, .. } => Ok(bytes.dupe()),
         HostRepositorySourceFileValue::Absent => {
-            Err("repository_ctx.template source is absent".into())
+            Err("repository_ctx Label source is absent".into())
         }
     }
 }
 
-async fn read_legacy_template_source(
+async fn read_legacy_repository_source(
     ctx: &mut DiceComputations<'_>,
     certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
     ordinal: usize,
@@ -919,7 +919,7 @@ async fn read_legacy_template_source(
 ) -> Result<Arc<[u8]>, EffectDriver> {
     match route.source_read_key(relative) {
         HostRepositorySourceReadKey::RootRequest(_) => {
-            unreachable!("template sources are canonical external routes")
+            unreachable!("repository Label sources are canonical external routes")
         }
         HostRepositorySourceReadKey::Observation(source_key) => {
             match ctx.compute(&source_key).await {
@@ -928,24 +928,26 @@ async fn read_legacy_template_source(
                 }
                 Ok(SourcePreparationOutcome::Complete(result)) => match result.as_ref() {
                     Ok(HostRepositorySourceObservation::Request(source)) => {
-                        template_source_bytes(source).map_err(|error| {
-                            template_source_error(certificate, ordinal, error, observations)
+                        repository_source_bytes(source).map_err(|error| {
+                            repository_source_error(certificate, ordinal, error, observations)
                         })
                     }
-                    Ok(HostRepositorySourceObservation::Builtin(_)) => Err(template_source_error(
-                        certificate,
-                        ordinal,
-                        "repository_ctx.template built-in source is unsupported",
-                        observations,
-                    )),
-                    Err(error) => Err(template_source_error(
+                    Ok(HostRepositorySourceObservation::Builtin(_)) => {
+                        Err(repository_source_error(
+                            certificate,
+                            ordinal,
+                            "repository_ctx built-in Label source is unsupported",
+                            observations,
+                        ))
+                    }
+                    Err(error) => Err(repository_source_error(
                         certificate,
                         ordinal,
                         error.to_string(),
                         observations,
                     )),
                 },
-                Err(error) => Err(template_source_error(
+                Err(error) => Err(repository_source_error(
                     certificate,
                     ordinal,
                     error.to_string(),
@@ -956,7 +958,7 @@ async fn read_legacy_template_source(
     }
 }
 
-async fn read_observed_template_source(
+async fn read_observed_repository_source(
     ctx: &mut DiceComputations<'_>,
     certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
     ordinal: usize,
@@ -966,7 +968,7 @@ async fn read_observed_template_source(
 ) -> Result<(Arc<[u8]>, PathObservationEpoch), EffectDriver> {
     match route.source_read_observation_key(relative) {
         HostRepositorySourceReadObservationKey::RootRequest(_) => {
-            unreachable!("template sources are canonical external routes")
+            unreachable!("repository Label sources are canonical external routes")
         }
         HostRepositorySourceReadObservationKey::Observation(source_key) => match ctx
             .compute(&source_key)
@@ -992,19 +994,21 @@ async fn read_observed_template_source(
                 )?;
                 match observed.result().as_ref() {
                     Ok(HostRepositorySourceObservation::Request(source)) => {
-                        template_source_bytes(source)
+                        repository_source_bytes(source)
                             .map(|bytes| (bytes, observations.dupe()))
                             .map_err(|error| {
-                                template_source_error(certificate, ordinal, error, observations)
+                                repository_source_error(certificate, ordinal, error, observations)
                             })
                     }
-                    Ok(HostRepositorySourceObservation::Builtin(_)) => Err(template_source_error(
-                        certificate,
-                        ordinal,
-                        "repository_ctx.template built-in source is unsupported",
-                        observations,
-                    )),
-                    Err(error) => Err(template_source_error(
+                    Ok(HostRepositorySourceObservation::Builtin(_)) => {
+                        Err(repository_source_error(
+                            certificate,
+                            ordinal,
+                            "repository_ctx built-in Label source is unsupported",
+                            observations,
+                        ))
+                    }
+                    Err(error) => Err(repository_source_error(
                         certificate,
                         ordinal,
                         error.to_string(),
@@ -1012,7 +1016,7 @@ async fn read_observed_template_source(
                     )),
                 }
             }
-            Err(error) => Err(template_source_error(
+            Err(error) => Err(repository_source_error(
                 certificate,
                 ordinal,
                 error.to_string(),
@@ -1022,7 +1026,7 @@ async fn read_observed_template_source(
     }
 }
 
-async fn resolve_template_source(
+async fn resolve_repository_source(
     ctx: &mut DiceComputations<'_>,
     key: &HostSelectedRepositoryFileEffectKey,
     certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
@@ -1031,15 +1035,15 @@ async fn resolve_template_source(
     observations: PathObservationEpoch,
 ) -> Result<(Arc<[u8]>, PathObservationEpoch), EffectDriver> {
     if address.repo().is_root() {
-        return Err(template_source_error(
+        return Err(repository_source_error(
             certificate,
             key.ordinal,
-            "repository_ctx.template root source is unsupported",
+            "repository_ctx root Label source is unsupported",
             observations,
         ));
     }
-    let relative = template_relative_path(address).map_err(|error| {
-        template_source_error(certificate, key.ordinal, error, observations.dupe())
+    let relative = repository_source_relative_path(address).map_err(|error| {
+        repository_source_error(certificate, key.ordinal, error, observations.dupe())
     })?;
     match mode {
         EffectMode::Legacy => {
@@ -1051,7 +1055,7 @@ async fn resolve_template_source(
                 observations.dupe(),
             )
             .await?;
-            read_legacy_template_source(
+            read_legacy_repository_source(
                 ctx,
                 certificate,
                 key.ordinal,
@@ -1066,7 +1070,7 @@ async fn resolve_template_source(
             let (route, observations) =
                 observed_repository_label_path_route(ctx, key, certificate, address, observations)
                     .await?;
-            let (bytes, incoming) = read_observed_template_source(
+            let (bytes, incoming) = read_observed_repository_source(
                 ctx,
                 certificate,
                 key.ordinal,
@@ -1179,6 +1183,14 @@ fn terminal_repository_rule_invocation_error(
                 message: "repository_ctx.path argument must be a Label".into(),
             }
         }
+        RepositoryRuleInvocationError::ReadArgument
+        | RepositoryRuleInvocationError::ReadLimit => {
+            HostSelectedRepositoryFileEffectError::Invocation {
+                certificate: certificate.clone(),
+                ordinal,
+                message: "repository_ctx.read invocation is unsupported".into(),
+            }
+        }
         RepositoryRuleInvocationError::TemplateDestinationArgument
         | RepositoryRuleInvocationError::TemplateSourceArgument
         | RepositoryRuleInvocationError::TemplateSubstitutions
@@ -1211,7 +1223,7 @@ fn terminal_repository_rule_invocation_error(
             }
         }
         RepositoryRuleInvocationError::LabelPathNeed(_)
-        | RepositoryRuleInvocationError::TemplateSourceNeed(_)
+        | RepositoryRuleInvocationError::RepositorySourceNeed(_)
         | RepositoryRuleInvocationError::WhichNeed(_) => unreachable!(),
     }
 }
@@ -1237,7 +1249,7 @@ async fn invoke_repository_rule_with_label_paths(
     EffectDriver,
 > {
     let mut prepared_paths = PreparedRepositoryLabelPaths::new();
-    let mut prepared_templates = PreparedRepositoryTemplateSources::new();
+    let mut prepared_sources = PreparedRepositoryLabelSources::new();
     let mut prepared_which = PreparedRepositoryWhichCandidates::new();
     loop {
         let capture = capture_enabled.then(InvocationPrintCapture::default);
@@ -1245,7 +1257,7 @@ async fn invoke_repository_rule_with_label_paths(
             implementation,
             &module.manifest,
             &prepared_paths,
-            &prepared_templates,
+            &prepared_sources,
             &prepared_which,
             input.clone(),
             platform.clone(),
@@ -1286,22 +1298,22 @@ async fn invoke_repository_rule_with_label_paths(
                 observations = next_observations;
                 prepared_paths.insert(address, value);
             }
-            Err(RepositoryRuleInvocationError::TemplateSourceNeed(address)) => {
-                if prepared_templates.contains_key(&address)
-                    || prepared_templates.len() == RepositoryEffectLimits::LABEL_PATHS
+            Err(RepositoryRuleInvocationError::RepositorySourceNeed(address)) => {
+                if prepared_sources.contains_key(&address)
+                    || prepared_sources.len() == RepositoryEffectLimits::LABEL_PATHS
                 {
-                    return Err(template_source_error(
+                    return Err(repository_source_error(
                         certificate,
                         key.ordinal,
-                        "repository_ctx.template repeated or exceeded its source limit",
+                        "repository_ctx repeated or exceeded its Label source limit",
                         observations,
                     ));
                 }
                 let (bytes, next_observations) =
-                    resolve_template_source(ctx, key, certificate, &address, mode, observations)
+                    resolve_repository_source(ctx, key, certificate, &address, mode, observations)
                         .await?;
                 observations = next_observations;
-                prepared_templates.insert(address, bytes);
+                prepared_sources.insert(address, bytes);
             }
             Err(RepositoryRuleInvocationError::WhichNeed(candidate)) => {
                 if prepared_which.contains_key(&candidate)
@@ -1851,15 +1863,21 @@ def setup_vc_env_vars(*args, **kwargs):
     return {}
 "#;
     const TEMPLATE_RULE_FIXTURE: &str = r#"def _cc_configure_impl(ctx):
+    ctx.file("before", "terminal", executable = False)
     source = ctx.path(Label("//cc/private/toolchain:BUILD.toolchains.tpl"))
     print("before-template")
     ctx.template("BUILD", source, {"%{name}": "%{cpu}", "%{cpu}": "k8"})
     ctx.template("COPY", source, {"%{name}": "arm"}, executable = False)
+    read = ctx.read(Label("//cc/private/toolchain:READ.source"))
+    ctx.file("READ", read + ctx.read(Label("//cc/private/toolchain:READ.source")), executable = False)
+    ctx.template("READ_COPY", ctx.path(Label("//cc/private/toolchain:READ.source")), executable = False)
 
 cc_configure = repository_rule(implementation = _cc_configure_impl)
 "#;
     const TEMPLATE_PATH: &str = "cc/private/toolchain/BUILD.toolchains.tpl";
     const TEMPLATE_A: &[u8] = b"toolchain=%{name}\nraw=\xff\n";
+    const READ_PATH: &str = "cc/private/toolchain/READ.source";
+    const READ_A: &[u8] = b"read=alpha\n";
 
     #[derive(Default)]
     struct EffectTracker(Mutex<Vec<(String, ActivationKind, Option<EventBatch>)>>);
@@ -2080,6 +2098,24 @@ cc_configure = repository_rule(implementation = _cc_configure_impl)
                 operation => panic!("unexpected template operation: {operation:?}"),
             };
         }
+        if relative == Path::new(READ_PATH) {
+            return match demand.operation() {
+                PathObservationOperation::Lstat => {
+                    PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                        PathNodeKind::RegularFile,
+                        1000,
+                        READ_A.len() as i64,
+                        1,
+                        1,
+                        0o644,
+                    )))
+                }
+                PathObservationOperation::FileBytes => PathObservationResult::FileBytes(
+                    PathOperationResult::Present(Arc::<[u8]>::from(READ_A)),
+                ),
+                operation => panic!("unexpected read-source operation: {operation:?}"),
+            };
+        }
         if relative == Path::new("cc/private/toolchain/cc_configure.bzl")
             && demand.operation() == PathObservationOperation::FileBytes
         {
@@ -2094,12 +2130,21 @@ cc_configure = repository_rule(implementation = _cc_configure_impl)
         epoch: &PathObservationEpoch,
         bytes: &[u8],
     ) -> PathObservationEpoch {
+        replace_source_observations(epoch, TEMPLATE_PATH, bytes, PathNodeKind::RegularFile)
+    }
+
+    fn replace_source_observations(
+        epoch: &PathObservationEpoch,
+        path: &str,
+        bytes: &[u8],
+        kind: PathNodeKind,
+    ) -> PathObservationEpoch {
         PathObservationEpoch::from_shared(epoch.observations().iter().map(|(demand, result)| {
-            let replacement = if demand.path().as_path().ends_with(TEMPLATE_PATH) {
+            let replacement = if demand.path().as_path().ends_with(path) {
                 match demand.operation() {
                     PathObservationOperation::Lstat => {
                         PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
-                            PathNodeKind::RegularFile,
+                            kind,
                             999,
                             bytes.len() as i64,
                             1,
@@ -2121,19 +2166,19 @@ cc_configure = repository_rule(implementation = _cc_configure_impl)
     }
 
     #[derive(Clone, Copy)]
-    enum TemplateSourceFailure {
+    enum RepositorySourceFailure {
         Missing,
         Directory,
         Unreadable,
     }
 
     #[rustfmt::skip]
-    fn failing_template_observations(epoch: &PathObservationEpoch, failure: TemplateSourceFailure) -> PathObservationEpoch {
+    fn failing_source_observations(epoch: &PathObservationEpoch, path: &str, failure: RepositorySourceFailure) -> PathObservationEpoch {
         PathObservationEpoch::from_shared(epoch.observations().iter().map(|(demand, result)| {
-            let replacement = match (failure, demand.operation(), demand.path().as_path().ends_with(TEMPLATE_PATH)) {
-                (TemplateSourceFailure::Missing, PathObservationOperation::Lstat, true) => Some(PathObservationResult::Lstat(PathOperationResult::Missing)),
-                (TemplateSourceFailure::Directory, PathObservationOperation::Lstat, true) => Some(PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(PathNodeKind::Directory, 0, 1, 1, 999, 0o755)))),
-                (TemplateSourceFailure::Unreadable, PathObservationOperation::FileBytes, true) => Some(PathObservationResult::FileBytes(PathOperationResult::Error(PathObservationError::Io { kind: PathIoErrorKind::PermissionDenied, raw_os_error: None }))),
+            let replacement = match (failure, demand.operation(), demand.path().as_path().ends_with(path)) {
+                (RepositorySourceFailure::Missing, PathObservationOperation::Lstat, true) => Some(PathObservationResult::Lstat(PathOperationResult::Missing)),
+                (RepositorySourceFailure::Directory, PathObservationOperation::Lstat, true) => Some(PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(PathNodeKind::Directory, 0, 1, 1, 999, 0o755)))),
+                (RepositorySourceFailure::Unreadable, PathObservationOperation::FileBytes, true) => Some(PathObservationResult::FileBytes(PathOperationResult::Error(PathObservationError::Io { kind: PathIoErrorKind::PermissionDenied, raw_os_error: None }))),
                 _ => None,
             };
             (demand.dupe(), replacement.map_or_else(|| result.dupe(), Arc::new))
@@ -2772,10 +2817,22 @@ ext = module_extension(implementation = impl)
 
     fn assert_template_result(fixture: &TemplateEffectFixture) {
         let plan = fixture.first.result().as_ref().as_ref().unwrap().plan();
-        assert_eq!(plan.effects()[0].content(), b"toolchain=k8\nraw=\xff\n");
-        assert!(plan.effects()[0].executable());
-        assert_eq!(plan.effects()[1].content(), b"toolchain=arm\nraw=\xff\n");
-        assert!(!plan.effects()[1].executable());
+        assert_eq!(
+            (plan.effects()[0].content(), plan.effects()[0].executable()),
+            (b"terminal".as_slice(), false)
+        );
+        assert_eq!(plan.effects()[1].content(), b"toolchain=k8\nraw=\xff\n");
+        assert!(plan.effects()[1].executable());
+        assert_eq!(plan.effects()[2].content(), b"toolchain=arm\nraw=\xff\n");
+        assert!(!plan.effects()[2].executable());
+        assert_eq!(
+            (plan.effects()[3].content(), plan.effects()[3].executable()),
+            (b"read=alpha\nread=alpha\n".as_slice(), false)
+        );
+        assert_eq!(
+            (plan.effects()[4].content(), plan.effects()[4].executable()),
+            (READ_A, false)
+        );
         let template_demands = fixture
             .first
             .observations()
@@ -2785,6 +2842,20 @@ ext = module_extension(implementation = impl)
             .collect::<Vec<_>>();
         assert_eq!(template_demands.len(), 2);
         assert!(template_demands.iter().all(|demand| demand.namespace()
+            == PathObservationNamespace::Materialization(fixture.instance)));
+        let read_demands = fixture
+            .first
+            .observations()
+            .observations()
+            .keys()
+            .filter(|demand| demand.path().as_path().ends_with(READ_PATH))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            read_demands.len(),
+            2,
+            "read/template did not share one source observation"
+        );
+        assert!(read_demands.iter().all(|demand| demand.namespace()
             == PathObservationNamespace::Materialization(fixture.instance)));
         let prints = fixture
             .tracker
@@ -2844,12 +2915,12 @@ ext = module_extension(implementation = impl)
             panic!("changed template must complete")
         };
         assert_eq!(
-            second.result().as_ref().as_ref().unwrap().plan().effects()[0].content(),
+            second.result().as_ref().as_ref().unwrap().plan().effects()[1].content(),
             b"variant==k8\nraw=\xff\n"
         );
-        for failure in [TemplateSourceFailure::Missing, TemplateSourceFailure::Directory, TemplateSourceFailure::Unreadable] {
+        for failure in [RepositorySourceFailure::Missing, RepositorySourceFailure::Directory, RepositorySourceFailure::Unreadable] {
             let mut updater = fixture.transaction.into_updater();
-            updater.changed_to(vec![(PathObservationEpochKey, failing_template_observations(&baseline, failure))]).unwrap();
+            updater.changed_to(vec![(PathObservationEpochKey, failing_source_observations(&baseline, TEMPLATE_PATH, failure))]).unwrap();
             fixture.transaction = updater.commit().await;
             let SourcePreparationOutcome::Complete(Ok(failed)) = fixture.transaction.compute(&fixture.key).await.unwrap() else { panic!("terminal template source failure must complete") };
             assert!(failed.result().is_err(), "source failure published an effect");
@@ -2857,7 +2928,7 @@ ext = module_extension(implementation = impl)
         }
         let mut updater = fixture.transaction.into_updater();
         updater
-            .changed_to(vec![(PathObservationEpochKey, baseline)])
+            .changed_to(vec![(PathObservationEpochKey, baseline.dupe())])
             .unwrap();
         fixture.transaction = updater.commit().await;
         let SourcePreparationOutcome::Complete(Ok(restored)) =
@@ -2866,13 +2937,97 @@ ext = module_extension(implementation = impl)
             panic!("restored template must complete")
         };
         assert_eq!(fixture.first.result(), restored.result());
+
+        for (bytes, kind, expected) in [
+            (b"read=beta\n".as_slice(), PathNodeKind::RegularFile, Some(b"read=beta\nread=beta\n".as_slice())),
+            (b"special\n".as_slice(), PathNodeKind::SpecialFile, Some(b"special\nspecial\n".as_slice())),
+            (b"\xff".as_slice(), PathNodeKind::RegularFile, None),
+        ] {
+            let changed = replace_source_observations(&baseline, READ_PATH, bytes, kind);
+            let mut updater = fixture.transaction.into_updater();
+            updater.changed_to(vec![(PathObservationEpochKey, changed)]).unwrap();
+            fixture.transaction = updater.commit().await;
+            let SourcePreparationOutcome::Complete(Ok(value)) = fixture.transaction.compute(&fixture.key).await.unwrap() else { panic!("read source mutation must complete") };
+            match expected {
+                Some(expected) => assert_eq!(value.result().as_ref().as_ref().unwrap().plan().effects()[3].content(), expected),
+                None => assert!(value.result().is_err(), "non-ASCII read source published an effect"),
+            }
+        }
+        for failure in [RepositorySourceFailure::Missing, RepositorySourceFailure::Directory, RepositorySourceFailure::Unreadable] {
+            let mut updater = fixture.transaction.into_updater();
+            updater.changed_to(vec![(PathObservationEpochKey, failing_source_observations(&baseline, READ_PATH, failure))]).unwrap();
+            fixture.transaction = updater.commit().await;
+            let SourcePreparationOutcome::Complete(Ok(failed)) = fixture.transaction.compute(&fixture.key).await.unwrap() else { panic!("terminal read source failure must complete") };
+            assert!(failed.result().is_err(), "read source failure published an effect");
+            assert!(failed.observations().observations().keys().any(|demand| demand.path().as_path().ends_with(READ_PATH)));
+        }
+        let mut updater = fixture.transaction.into_updater();
+        updater.changed_to(vec![(PathObservationEpochKey, baseline)]).unwrap();
+        fixture.transaction = updater.commit().await;
+        let SourcePreparationOutcome::Complete(Ok(restored)) = fixture.transaction.compute(&fixture.key).await.unwrap() else { panic!("restored read must complete") };
+        assert_eq!(fixture.first.result(), restored.result());
     }
 
     #[tokio::test]
-    async fn repository_template_routes_bytes_retries_and_restores_a_b_a() {
+    async fn repository_read_and_template_route_bytes_retries_and_restore_a_b_a() {
         let fixture = template_effect_fixture().await;
         assert_template_result(&fixture);
         assert_template_reuse_and_a_b_a(fixture).await;
+    }
+
+    #[tokio::test]
+    async fn repository_read_rejects_present_builtin_label_at_path_boundary() {
+        use crate::canonical_repository_route_tests::tests::WORKSPACE as BUILTIN_WORKSPACE;
+        use crate::canonical_repository_route_tests::tests::builtin_graph_dice;
+        use crate::canonical_repository_route_tests::tests::builtin_graph_module;
+        use crate::canonical_repository_route_tests::tests::transaction as builtin_transaction;
+
+        const EXTENSION: &str = r#"
+def write(ctx):
+    ctx.file("before", "discarded")
+    ctx.file("BUILD", ctx.read(Label("@@bazel_tools//tools:BUILD")))
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = builtin_graph_dice();
+        let workspace = NormalizedAbsolutePath::new(BUILTIN_WORKSPACE).unwrap();
+        let mut module = builtin_graph_module();
+        module.push_str(
+            "\nread_probe=use_extension('//:ext.bzl','ext')\nuse_repo(read_probe, read_out='first')\n",
+        );
+        let transaction = builtin_transaction(&dice, &module, EXTENSION, true, None).await;
+        let mut transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::empty(),
+        )
+        .await;
+        let owner = owner_named(&mut transaction, workspace.dupe(), "+ext+first").await;
+        let SourcePreparationOutcome::Complete(result) = transaction
+            .compute(&HostSelectedRepositoryFileEffectKey::new(
+                workspace, owner, 0,
+            ))
+            .await
+            .unwrap()
+        else {
+            panic!("built-in read rejection must be terminal")
+        };
+        assert!(
+            matches!(
+                result.as_ref(),
+                Err(HostSelectedRepositoryFileEffectError::LabelPath {
+                    address,
+                    error: HostRepositoryLabelPathError::BuiltinCatalog,
+                    ..
+                }) if address.repo().as_str() == "bazel_tools" && address.package().as_str() == "tools" && address.target().as_str() == "BUILD"
+            ),
+            "unexpected present built-in read result: {result:?}"
+        );
     }
 
     #[tokio::test]

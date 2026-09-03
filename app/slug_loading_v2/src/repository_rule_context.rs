@@ -418,7 +418,7 @@ impl RepositoryRuleHostObservation {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), TemplateDestinationArgument, TemplateSourceArgument, TemplateSourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
+pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), ReadArgument, ReadLimit, TemplateDestinationArgument, TemplateSourceArgument, RepositorySourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
 
 #[rustfmt::skip]
 pub(crate) struct RepositoryRuleInvocation { pub(crate) plan: GeneratedRepositoryFileEffectPlan, pub(crate) dynamic_environment: Arc<[CompactString]> }
@@ -444,7 +444,7 @@ struct RepositoryOs { platform: RepositoryPlatform, snapshot: RepositoryEnvironm
 
 pub(crate) type PreparedRepositoryLabelPaths =
     SmallMap<RepositoryLabelPathAddress, HostRepositoryLabelPathValue>;
-pub(crate) type PreparedRepositoryTemplateSources = SmallMap<RepositoryLabelPathAddress, Arc<[u8]>>;
+pub(crate) type PreparedRepositoryLabelSources = SmallMap<RepositoryLabelPathAddress, Arc<[u8]>>;
 #[rustfmt::skip] pub(crate) type PreparedRepositoryWhichCandidates = SmallMap<NormalizedAbsolutePath, RepositoryWhichCandidate>;
 
 #[rustfmt::skip] #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -462,11 +462,11 @@ struct RepositoryStarlarkPath {
 
 #[rustfmt::skip]
 #[derive(Debug, ProvidesStaticType)]
-pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, prepared_paths: PreparedRepositoryLabelPaths, prepared_templates: PreparedRepositoryTemplateSources, prepared_which: PreparedRepositoryWhichCandidates, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, error: RefCell<Option<RepositoryRuleInvocationError>> }
+pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, prepared_paths: PreparedRepositoryLabelPaths, prepared_sources: PreparedRepositoryLabelSources, prepared_which: PreparedRepositoryWhichCandidates, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, error: RefCell<Option<RepositoryRuleInvocationError>> }
 
 #[rustfmt::skip]
 impl RepositoryRuleInvocationState {
-    fn new(manifest: &BzlLoadManifest, prepared_paths: &PreparedRepositoryLabelPaths, prepared_templates: &PreparedRepositoryTemplateSources, prepared_which: &PreparedRepositoryWhichCandidates) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), prepared_paths: prepared_paths.clone(), prepared_templates: prepared_templates.clone(), prepared_which: prepared_which.clone(), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), error: RefCell::new(None) } }
+    fn new(manifest: &BzlLoadManifest, prepared_paths: &PreparedRepositoryLabelPaths, prepared_sources: &PreparedRepositoryLabelSources, prepared_which: &PreparedRepositoryWhichCandidates) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), prepared_paths: prepared_paths.clone(), prepared_sources: prepared_sources.clone(), prepared_which: prepared_which.clone(), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), error: RefCell::new(None) } }
     fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> { eval.extra.and_then(|extra| extra.downcast_ref::<Self>()).ok_or_else(|| anyhow::anyhow!("repository_ctx is outside repository-rule execution")) }
     pub(crate) fn bzl(&self) -> &BzlEvaluationContext { &self.bzl }
     fn fail(&self, error: RepositoryRuleInvocationError) -> anyhow::Error {
@@ -568,6 +568,7 @@ fn allocate_repository_attribute_value<'v>(value: RepositoryAttributeValueRef<'_
 }
 
 const MAX_TEMPLATE_BYTES: usize = 2 * 1024 * 1024;
+const MAX_READ_BYTES: usize = 2 * 1024 * 1024;
 const MAX_TEMPLATE_OUTPUT_BYTES: usize = 8 * 1024 * 1024;
 const MAX_TEMPLATE_SUBSTITUTIONS: usize = 64;
 const MAX_TEMPLATE_SUBSTITUTION_BYTES: usize = 64 * 1024;
@@ -673,6 +674,13 @@ fn replace_template_bytes(
     Ok(bytes)
 }
 
+fn ascii_read(bytes: &[u8]) -> Result<&str, RepositoryRuleInvocationError> {
+    if bytes.len() > MAX_READ_BYTES || !bytes.is_ascii() {
+        return Err(RepositoryRuleInvocationError::ReadLimit);
+    }
+    Ok(std::str::from_utf8(bytes).expect("ASCII bytes are valid UTF-8"))
+}
+
 #[starlark_value(type = "repository_os")]
 #[rustfmt::skip]
 impl<'v> StarlarkValue<'v> for RepositoryOs {
@@ -708,6 +716,30 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         }))
     }
 
+    fn read<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] path: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        RepositoryRuleContext::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
+        let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        let label = StarlarkLabel::from_value(path)
+            .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ReadArgument))?;
+        let address = RepositoryLabelPathAddress::from_label(label.canonical());
+        if address.repo().is_root() {
+            return Err(state.fail(RepositoryRuleInvocationError::ReadArgument));
+        }
+        if !state.prepared_paths.contains_key(&address) {
+            return Err(state.fail(RepositoryRuleInvocationError::LabelPathNeed(address)));
+        }
+        let Some(source) = state.prepared_sources.get(&address) else {
+            return Err(state.fail(RepositoryRuleInvocationError::RepositorySourceNeed(address)));
+        };
+        let source = ascii_read(source).map_err(|error| state.fail(error))?;
+        Ok(eval.heap().alloc_str(source).to_value())
+    }
+
     fn template<'v>(
         this: Value<'v>,
         #[starlark(require = pos)] path: Value<'v>,
@@ -733,9 +765,9 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         }
         let substitutions =
             latin1_substitutions(&substitutions).map_err(|error| state.fail(error))?;
-        let Some(source) = state.prepared_templates.get(address) else {
+        let Some(source) = state.prepared_sources.get(address) else {
             return Err(
-                state.fail(RepositoryRuleInvocationError::TemplateSourceNeed(
+                state.fail(RepositoryRuleInvocationError::RepositorySourceNeed(
                     address.clone(),
                 )),
             );
@@ -853,7 +885,7 @@ pub(crate) fn invoke_repository_rule(
     implementation: starlark::values::FrozenValue,
     manifest: &BzlLoadManifest,
     prepared_paths: &PreparedRepositoryLabelPaths,
-    prepared_templates: &PreparedRepositoryTemplateSources,
+    prepared_sources: &PreparedRepositoryLabelSources,
     prepared_which: &PreparedRepositoryWhichCandidates,
     input: RepositoryRuleInvocationInput,
     platform: RepositoryPlatform,
@@ -862,7 +894,7 @@ pub(crate) fn invoke_repository_rule(
 ) -> Result<RepositoryRuleInvocation, RepositoryRuleInvocationError> {
     let invocation_module = Module::new();
     let context = invocation_module.heap().alloc_simple(RepositoryRuleContext { platform, snapshot, input });
-    let state = RepositoryRuleInvocationState::new(manifest, prepared_paths, prepared_templates, prepared_which);
+    let state = RepositoryRuleInvocationState::new(manifest, prepared_paths, prepared_sources, prepared_which);
     let returned = {
         let mut evaluator = Evaluator::new(&invocation_module);
         if let Some(print_handler) = print_handler {
@@ -1013,7 +1045,7 @@ mod tests {
     fn invoke_prepared(
         source: &str,
         paths: &PreparedRepositoryLabelPaths,
-        templates: &PreparedRepositoryTemplateSources,
+        sources: &PreparedRepositoryLabelSources,
     ) -> Result<RepositoryRuleInvocation, RepositoryRuleInvocationError> {
         let manifest = invocation_manifest();
         let owner = freeze_bzl(&manifest, source, None);
@@ -1027,7 +1059,7 @@ mod tests {
             implementation,
             &manifest,
             paths,
-            templates,
+            sources,
             &SmallMap::new(),
             RepositoryRuleInvocationInput::new(
                 "repo".into(),
@@ -1217,7 +1249,7 @@ mod tests {
         let invocation = invoke_input(r#"
 def implementation(ctx):
     if not (ctx.name == "canonical" and ctx.original_name == "canonical" and ctx.attr.name == ctx.name): fail("names")
-    if not (hasattr(ctx, "attr") and getattr(ctx, "name") == "canonical" and dir(ctx) == ["attr", "file", "getenv", "name", "original_name", "os", "path", "template", "which"]): fail("context reflection")
+    if not (hasattr(ctx, "attr") and getattr(ctx, "name") == "canonical" and dir(ctx) == ["attr", "file", "getenv", "name", "original_name", "os", "path", "read", "template", "which"]): fail("context reflection")
     if not (ctx.attr.s == "value" and ctx.attr.b and ctx.attr.i == 7 and type(ctx.attr.l) == "Label"): fail("scalars")
     if not (type(ctx.attr.ll[0]) == "Label" and type(ctx.attr.o) == "Label" and type(ctx.attr.ol[0]) == "Label"): fail("labels")
     if not (ctx.attr.sd == {"k": "v"} and ctx.attr.sld == {"k": ["v"]} and type(ctx.attr.skld["k"]) == "Label"): fail("maps")
@@ -1699,6 +1731,107 @@ def implementation(ctx):
     }
 
     #[test]
+    fn read_demands_label_path_then_shares_prepared_source_with_template() {
+        let label = CanonicalLabel::parse("@@dep+//pkg:source").unwrap();
+        let address = RepositoryLabelPathAddress::from_label(&label);
+        let source = r#"
+def implementation(ctx):
+    ctx.file("before", "terminal")
+    first = ctx.read(Label("@@dep+//pkg:source"))
+    second = ctx.read(Label("@@dep+//pkg:source"))
+    ctx.template("COPY", ctx.path(Label("@@dep+//pkg:source")), executable = False)
+    ctx.file("BUILD", first + second, executable = False)
+"#;
+        assert!(matches!(
+            invoke_prepared(source, &SmallMap::new(), &SmallMap::new()),
+            Err(RepositoryRuleInvocationError::LabelPathNeed(need)) if need == address
+        ));
+        let path = HostRepositoryLabelPathValue::new(
+            NormalizedAbsolutePath::new("/materialized/pkg/source").unwrap(),
+            PathObservationNamespace::Host,
+        )
+        .unwrap();
+        let paths = SmallMap::from_iter([(address.clone(), path)]);
+        assert!(matches!(
+            invoke_prepared(source, &paths, &SmallMap::new()),
+            Err(RepositoryRuleInvocationError::RepositorySourceNeed(need)) if need == address
+        ));
+        let sources = SmallMap::from_iter([(address, Arc::from(&b"ascii\n"[..]))]);
+        let invocation = invoke_prepared(source, &paths, &sources).unwrap();
+        let effects = invocation.plan.effects();
+        assert_eq!(effects.len(), 3);
+        assert_eq!(effects[0].content(), b"terminal");
+        assert_eq!(
+            (effects[1].content(), effects[1].executable()),
+            (b"ascii\n".as_slice(), false)
+        );
+        assert_eq!(
+            (effects[2].content(), effects[2].executable()),
+            (b"ascii\nascii\n".as_slice(), false)
+        );
+    }
+
+    #[test]
+    fn read_rejects_non_label_root_explicit_watch_non_ascii_and_limit() {
+        assert!(matches!(
+            invoke("def implementation(ctx):\n    ctx.read('source')\n"),
+            Err(RepositoryRuleInvocationError::ReadArgument)
+        ));
+        assert!(matches!(
+            invoke_prepared(
+                "def implementation(ctx):\n    ctx.read(Label('@@//:source'))\n",
+                &SmallMap::new(),
+                &SmallMap::new()
+            ),
+            Err(RepositoryRuleInvocationError::ReadArgument)
+        ));
+        let label = CanonicalLabel::parse("@@dep+//pkg:source").unwrap();
+        let address = RepositoryLabelPathAddress::from_label(&label);
+        let path = HostRepositoryLabelPathValue::new(
+            NormalizedAbsolutePath::new("/materialized/pkg/source").unwrap(),
+            PathObservationNamespace::Host,
+        )
+        .unwrap();
+        let paths = SmallMap::from_iter([(address.clone(), path)]);
+        let invoke_bytes = |bytes: Arc<[u8]>| {
+            invoke_prepared(
+                "def implementation(ctx):\n    ctx.file('x', ctx.read(Label('@@dep+//pkg:source')))\n",
+                &paths,
+                &SmallMap::from_iter([(address.clone(), bytes)]),
+            )
+        };
+        assert_eq!(
+            invoke_bytes(Arc::from(&b""[..])).unwrap().plan.effects()[0].content(),
+            b""
+        );
+        assert!(matches!(
+            invoke_bytes(Arc::from(&b"\xff"[..])),
+            Err(RepositoryRuleInvocationError::ReadLimit)
+        ));
+        assert!(matches!(
+            invoke_bytes(vec![b'x'; MAX_READ_BYTES + 1].into()),
+            Err(RepositoryRuleInvocationError::ReadLimit)
+        ));
+        let ascii = SmallMap::from_iter([(address, Arc::from(&b"ok"[..]))]);
+        assert!(matches!(
+            invoke_prepared(
+                "def implementation(ctx):\n    ctx.read(ctx.path(Label('@@dep+//pkg:source')))\n",
+                &paths,
+                &ascii
+            ),
+            Err(RepositoryRuleInvocationError::ReadArgument)
+        ));
+        assert!(matches!(
+            invoke_prepared(
+                "def implementation(ctx):\n    ctx.read(Label('@@dep+//pkg:source'), watch='auto')\n",
+                &paths,
+                &ascii
+            ),
+            Err(RepositoryRuleInvocationError::Evaluation(_))
+        ));
+    }
+
+    #[test]
     fn which_demands_ordered_candidates_and_preserves_path_value_semantics() {
         let source = r#"
 def implementation(ctx):
@@ -1836,7 +1969,7 @@ def implementation(ctx):
         .unwrap();
         let paths = SmallMap::from_iter([(address.clone(), path)]);
         assert!(
-            matches!(invoke_prepared(source, &paths, &SmallMap::new()), Err(RepositoryRuleInvocationError::TemplateSourceNeed(need)) if need == address)
+            matches!(invoke_prepared(source, &paths, &SmallMap::new()), Err(RepositoryRuleInvocationError::RepositorySourceNeed(need)) if need == address)
         );
         let templates = SmallMap::from_iter([(address, Arc::from(&b"a %{x} %{xy} \xff"[..]))]);
         let invocation = invoke_prepared(source, &paths, &templates).unwrap();
