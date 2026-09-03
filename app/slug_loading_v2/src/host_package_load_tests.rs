@@ -29720,6 +29720,120 @@ MULTI_ASPECT = aspect(implementation = aspect_impl, provides = [P, Q, P])
     }
 }
 
+#[test]
+fn rules_java_live_initialized_and_template_declaration_identities_are_complete() {
+    let source = r#"
+events = []
+def init(**kwargs):
+    events.append("called")
+    return kwargs
+JavaRuntimeInfo, _new_javaruntimeinfo = provider("runtime", fields = {"version": "version"}, init = init)
+def rule_impl(ctx): fail("must stay lazy")
+def aspect_impl(target, ctx): fail("must stay lazy")
+java_runtime = rule(
+    implementation = rule_impl,
+    attrs = {"runtime": attr.label(providers = [JavaRuntimeInfo, platform_common.TemplateVariableInfo])},
+    provides = [JavaRuntimeInfo, platform_common.TemplateVariableInfo],
+)
+runtime_aspect = aspect(
+    implementation = aspect_impl,
+    provides = [JavaRuntimeInfo, platform_common.TemplateVariableInfo],
+)
+"#;
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_java+//java/common/rules:java_runtime.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_java/java/common/rules/java_runtime.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let advertised = [
+        "@@rules_java+//java/common/rules:java_runtime.bzl%JavaRuntimeInfo",
+        "TemplateVariableInfo",
+    ];
+    for globals in [loading_globals(), bzlmod_loading_globals()] {
+        let module = eval_bzl_with_identity_and_globals(source, owner.clone(), &globals).unwrap();
+        assert!(
+            FrozenListRef::from_value(module.get("events").unwrap().value())
+                .unwrap()
+                .is_empty()
+        );
+        let rule = module
+            .get("java_runtime")
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        assert_eq!(
+            rule.advertised_providers()
+                .iter()
+                .map(provider_identity_text)
+                .collect::<Vec<_>>(),
+            advertised
+        );
+        let aspect = module
+            .get("runtime_aspect")
+            .unwrap()
+            .downcast::<FrozenAspectDefinition>()
+            .unwrap();
+        assert_eq!(&*aspect.advertised_providers, rule.advertised_providers());
+        let required = &rule
+            .schema
+            .iter()
+            .find(|attr| attr.name == "runtime")
+            .unwrap()
+            .required_providers[0];
+        assert_eq!(
+            required
+                .iter()
+                .map(provider_identity_text)
+                .collect::<Vec<_>>(),
+            ["TemplateVariableInfo", advertised[0]]
+        );
+    }
+
+    for invalid in [
+        "def init(**kwargs): return kwargs\nHIDDEN=[provider('hidden', fields=[], init=init)[0]]\ndef impl(ctx): return []\nR=rule(implementation=impl, provides=HIDDEN)",
+        "def init(**kwargs): return kwargs\nP,raw=provider('raw', fields=[], init=init)\ndef impl(ctx): return []\nR=rule(implementation=impl, provides=[raw])",
+    ] {
+        assert!(eval_bzl_with_identity(invalid, owner.clone()).is_err());
+    }
+}
+
+#[test]
+fn rules_java_imported_frozen_initialized_advertiser_remains_supported() {
+    let child_owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_java+//java/private:java_info.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_java/java/private/java_info.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let child = eval_bzl_with_identity(
+        "def init(**kwargs): return kwargs\nJavaInfo, _new_javainfo = provider('java', fields=[], init=init)",
+        child_owner.clone(),
+    )
+    .unwrap();
+    let parent = eval_bzl_with_loaded_children(
+        "load('//java/private:java_info.bzl', 'JavaInfo')\ndef impl(ctx): return []\njava_library=rule(implementation=impl, provides=[JavaInfo])",
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_java+//java/bazel/rules:bazel_java_library.bzl")
+                .unwrap(),
+            workspace_path: PathBuf::from("/rules_java/java/bazel/rules/bazel_java_library.bzl"),
+            repository_mapping: Arc::from([]),
+        },
+        &[("//java/private:java_info.bzl", child_owner, child)],
+    )
+    .unwrap();
+    let rule = parent
+        .get("java_library")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert_eq!(
+        rule.advertised_providers()[0]
+            .user_id()
+            .unwrap()
+            .to_string(),
+        "@@rules_java+//java/private:java_info.bzl%JavaInfo"
+    );
+}
+
 #[tokio::test]
 async fn advertised_rule_providers_participate_in_loaded_target_equality() {
     let build = b"load(':defs.bzl','r')\nr(name='probe',visibility=['//visibility:public'])\n";

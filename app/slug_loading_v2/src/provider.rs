@@ -1562,10 +1562,19 @@ pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> 
     if let Some(callable) = FrozenUserProviderCallable::from_value(value) {
         return Some(ProviderIdentity::user(callable.id().dupe()));
     }
+    if let Some(callable) = value.downcast_ref::<InitializedUserProviderCallable>() {
+        return callable
+            .id
+            .get()
+            .map(|id| ProviderIdentity::user(id.dupe()));
+    }
     if let Some(callable) = FrozenInitializedUserProviderCallable::from_value(value) {
         return Some(ProviderIdentity::user(callable.id.dupe()));
     }
     if let Some(callable) = AnalysisBuiltinCallable::from_value(value) {
+        if callable.name == "TemplateVariableInfo" {
+            return Some(ProviderIdentity::builtin(callable.name));
+        }
         return matches!(callable.name, "DefaultInfo" | "ToolchainInfo")
             .then(|| ProviderIdentity::builtin(callable.name));
     }
@@ -1584,6 +1593,13 @@ pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> 
 pub fn configured_target_provider_identity(
     value: Value<'_>,
 ) -> starlark::Result<Option<ProviderIdentity>> {
+    if AnalysisBuiltinCallable::from_value(value)
+        .is_some_and(|callable| callable.name == "TemplateVariableInfo")
+    {
+        return Err(starlark::Error::new_other(anyhow::anyhow!(
+            "platform_common.TemplateVariableInfo configured-target membership and indexing are unsupported"
+        )));
+    }
     if let Some(key) = DeclarationOnlyAppleProviderKey::from_value(value) {
         return Err(starlark::Error::new_other(anyhow::anyhow!(
             "apple_common.{} is declaration-only; configured-target membership and indexing are unsupported",
@@ -1839,10 +1855,13 @@ mod tests {
     use starlark::syntax::AstModule;
     use starlark::syntax::Dialect;
 
+    use super::AnalysisBuiltinCallable;
     use super::BuiltinProviderKey;
     use super::DeclarationOnlyAppleProviderKey;
     use super::DeclarationOnlyAppleProviderKind;
     use super::StarlarkDefaultInfo;
+    use super::configured_target_provider_identity;
+    use super::starlark_provider_identity;
     use crate::package::loading_globals;
 
     fn evaluate(source: &str) -> Result<[bool; 5], String> {
@@ -1896,6 +1915,28 @@ mod tests {
         let hash = |value: starlark::values::Value<'_>| value.get_hashed().unwrap().hash();
         assert_ne!(hash(objc.to_value()), hash(xcode.to_value()));
         assert_ne!(hash(objc.to_value()), hash(ordinary.to_value()));
+    }
+
+    #[test]
+    fn template_variable_info_has_declaration_identity_but_configured_use_stays_closed() {
+        let heap = starlark::values::FrozenHeap::new();
+        let template = heap.alloc(AnalysisBuiltinCallable::new("TemplateVariableInfo"));
+        let identity = starlark_provider_identity(template.to_value()).unwrap();
+        assert!(identity.is_builtin("TemplateVariableInfo"));
+        let error = configured_target_provider_identity(template.to_value()).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "platform_common.TemplateVariableInfo configured-target membership and indexing are unsupported"
+        );
+        for name in ["DefaultInfo", "ToolchainInfo"] {
+            let value = heap.alloc(AnalysisBuiltinCallable::new(name));
+            assert_eq!(
+                starlark_provider_identity(value.to_value()).unwrap().name(),
+                name
+            );
+        }
+        let error = evaluate_module("X=platform_common.TemplateVariableInfo({})").unwrap_err();
+        assert!(error.contains("unsupported analysis builtin TemplateVariableInfo"));
     }
 
     #[test]
