@@ -135,7 +135,7 @@ fn selected_bcr_realizes_streamed_files_gnu_name_modes_mtime_and_module() {
     let mut long_payload = long.as_bytes().to_vec();
     long_payload.push(0);
     append(&mut raw, b"././@LongLink", b'L', 0o644, 0, &long_payload);
-    append(&mut raw, b"placeholder", b'0', 0o644, 456, b"long bytes");
+    append(&mut raw, b"placeholder", b'0', 0o444, 456, b"long bytes");
     append(
         &mut raw,
         b"./MODULE.bazel",
@@ -192,7 +192,7 @@ fn selected_bcr_realizes_streamed_files_gnu_name_modes_mtime_and_module() {
                 .permissions()
                 .mode()
                 & 0o777,
-            0o644
+            0o444
         );
         assert_eq!(
             std::fs::metadata(root.path().join("MODULE.bazel"))
@@ -212,6 +212,16 @@ fn selected_bcr_realizes_streamed_files_gnu_name_modes_mtime_and_module() {
             .unwrap()
             .as_secs(),
         123
+    );
+    assert_eq!(
+        std::fs::metadata(root.path().join(&long))
+            .unwrap()
+            .modified()
+            .unwrap()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        456
     );
     assert!(!archive_path.exists());
     assert!(!module_path.exists());
