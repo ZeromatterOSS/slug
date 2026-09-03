@@ -1725,6 +1725,73 @@ async fn host_package_loads_bzl_and_owns_only_local_complete_events() {
 }
 
 #[tokio::test]
+async fn rule_initializer_reexport_rejects_before_recording_and_recovers() {
+    const DEFS: &str = concat!(
+        "def _impl(ctx): fail('implementation stayed lazy')\n",
+        "def _init(name, **kwargs): fail('initializer stayed lazy')\n",
+        "probe = rule(implementation = _impl, initializer = _init, ",
+        "attrs = {'out': attr.output()})\n",
+        "plain = rule(implementation = _impl)\n",
+    );
+    const REEXPORT: &str =
+        "load(':defs.bzl', _plain = 'plain', _probe = 'probe')\nplain = _plain\nprobe = _probe\n";
+    let sources = [("defs.bzl", DEFS), ("reexport.bzl", REEXPORT)];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let rejected = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources(
+            "print('ROOT')\n",
+            concat!(
+                "load(':reexport.bzl', 'probe')\n",
+                "probe(name = 'bad', out = ['not an output'], unknown = 1)\n",
+                "filegroup(name = 'must_not_publish')\n",
+            ),
+            &sources,
+            101,
+        )
+        .build(),
+        package_policy(),
+    )
+    .await;
+    let error = terminal_error(&rejected);
+    assert!(
+        error.contains("target invocation for rule initializer is unsupported"),
+        "{error}"
+    );
+
+    let recovered = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources(
+            "print('ROOT')\n",
+            "load(':reexport.bzl', 'plain')\nplain(name = 'clean')\n",
+            &sources,
+            102,
+        )
+        .build(),
+        package_policy(),
+    )
+    .await;
+    assert_eq!(target_names(&recovered), ["clean"]);
+
+    let external = load_repository_package_fixture(
+        &[
+            (
+                "BUILD.bazel",
+                b"load(':reexport.bzl', 'probe')\nprobe(name = 'bad', unknown = 1)\n",
+            ),
+            ("defs.bzl", DEFS.as_bytes()),
+            ("reexport.bzl", REEXPORT.as_bytes()),
+        ],
+        103,
+    )
+    .await;
+    assert!(
+        repository_package_error(&external)
+            .contains("target invocation for rule initializer is unsupported")
+    );
+}
+
+#[tokio::test]
 async fn host_native_toolchain_targets_preserve_root_load_lifecycle_and_ownership() {
     let build = |event: &str, constraint: &str| {
         format!(

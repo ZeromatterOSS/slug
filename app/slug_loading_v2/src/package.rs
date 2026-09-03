@@ -3696,6 +3696,7 @@ fn coerce_string_set_default<'v>(
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 struct RuleDefinitionGen<V> {
     implementation: V,
+    initializer: Option<V>,
     #[trace(unsafe_ignore)]
     definition_source: Arc<BzlModuleIdentity>,
     #[trace(unsafe_ignore)]
@@ -3728,6 +3729,7 @@ struct RuleDefinitionGen<V> {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct FrozenRuleDefinition {
     implementation: FrozenValue,
+    initializer: Option<FrozenValue>,
     definition_source: Arc<BzlModuleIdentity>,
     source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
@@ -4041,6 +4043,10 @@ impl<'v> Freeze for RuleDefinition<'v> {
             .into();
         Ok(FrozenRuleDefinition {
             implementation,
+            initializer: self
+                .initializer
+                .map(|value| value.freeze(freezer))
+                .transpose()?,
             definition_source: self.definition_source,
             source_identities_by_filename: self.source_identities_by_filename,
             required_toolchains: self.required_toolchains,
@@ -7275,6 +7281,11 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 "a target declared by rule() requires a string `name`"
             ))
         })?;
+        if self.initializer.is_some() {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "target invocation for rule initializer is unsupported"
+            )));
+        }
         self.reject_deferred_attribute_invocation()
             .map_err(starlark::Error::new_other)?;
         for attribute in names.keys() {
@@ -8695,6 +8706,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] provides: Option<Value<'v>>,
         #[starlark(require = named)] outputs: Option<Value<'v>>,
+        #[starlark(require = named)] initializer: Option<Value<'v>>,
         #[starlark(require = named, default = false)] output_to_genfiles: bool,
         #[starlark(default = false)] executable: bool,
         #[starlark(default = false)] test: bool,
@@ -8703,6 +8715,14 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         if doc.is_some_and(|value| !value.is_none() && value.unpack_str().is_none()) {
             anyhow::bail!("rule doc must be a string or None");
         }
+        let initializer = initializer
+            .filter(|value| !value.is_none())
+            .map(|value| {
+                value.parameters_spec().map(|_| value).ok_or_else(|| {
+                    anyhow::anyhow!("rule initializer must be a Starlark function or None")
+                })
+            })
+            .transpose()?;
         let cfg = cfg.filter(|value| !value.is_none());
         let build_setting_definition = rule_build_setting(build_setting)?;
         if build_setting_definition.is_some() && cfg.is_some() {
@@ -8786,6 +8806,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let context = BzlEvaluationContext::from_evaluator(eval)?;
         Ok(RuleDefinition {
             implementation,
+            initializer,
             definition_source: Arc::new(context.source_identity_for_call(eval)?.clone()),
             source_identities_by_filename: context.source_identities_by_filename(),
             required_toolchains: toolchain_requirements(toolchains, eval)?,
@@ -9539,6 +9560,70 @@ mod module_extension_definition_tests {
         assert!(error.contains(
             "Only rule definitions with analysis_test=True may have attributes with analysis_test_transition transitions"
         ));
+    }
+
+    #[test]
+    fn rule_initializer_declaration_is_lazy_frozen_and_function_only() {
+        assert_eq!(
+            std::mem::size_of::<Option<Value<'static>>>(),
+            std::mem::size_of::<Value<'static>>()
+        );
+        assert_eq!(
+            std::mem::size_of::<Option<FrozenValue>>(),
+            std::mem::size_of::<FrozenValue>()
+        );
+        let source = concat!(
+            "def impl(ctx): fail('implementation stayed lazy')\n",
+            "def shared_init(name, **kwargs): fail('shared initializer stayed lazy')\n",
+            "def test_init(name, **kwargs): fail('test initializer stayed lazy')\n",
+            "cc_shared_library = rule(implementation = impl, initializer = shared_init)\n",
+            "cc_binary = rule(implementation = impl, initializer = shared_init)\n",
+            "cc_test = rule(implementation = impl, initializer = test_init, test = True)\n",
+            "plain = rule(implementation = impl)\n",
+            "plain_none = rule(implementation = impl, initializer = None)\n",
+        );
+        for globals in [loading_globals(), bzlmod_loading_globals()] {
+            let module = evaluate_with_globals(source, globals).unwrap();
+            for name in ["cc_shared_library", "cc_binary", "cc_test"] {
+                let definition = module
+                    .get(name)
+                    .unwrap()
+                    .downcast::<FrozenRuleDefinition>()
+                    .unwrap();
+                assert!(definition.initializer.is_some(), "{name}");
+            }
+            for name in ["plain", "plain_none"] {
+                assert!(
+                    module
+                        .get(name)
+                        .unwrap()
+                        .downcast::<FrozenRuleDefinition>()
+                        .unwrap()
+                        .initializer
+                        .is_none(),
+                    "{name}"
+                );
+            }
+            let definition = module
+                .get("cc_shared_library")
+                .unwrap()
+                .downcast::<FrozenRuleDefinition>()
+                .unwrap();
+            let mut graph = allocative::FlameGraphBuilder::default();
+            graph.visit_root(&definition);
+            assert!(graph.finish_and_write_flame_graph().contains("initializer"));
+        }
+        for invalid in ["1", "len", "rule"] {
+            let error = evaluate(&format!(
+                "def impl(ctx): pass\nR = rule(implementation = impl, initializer = {invalid})\n"
+            ))
+            .unwrap_err()
+            .to_string();
+            assert!(
+                error.contains("rule initializer must be a Starlark function or None"),
+                "{invalid}: {error}"
+            );
+        }
     }
 
     fn projection(source: &str) -> ModuleExtensionDefinitionProjection {
