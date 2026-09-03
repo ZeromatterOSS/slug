@@ -204,6 +204,11 @@ const FILES: &[(&str, &str, bool)] = &[
         true,
     ),
     (
+        "tools/osx/xcode_configure.bzl",
+        "26d758318e481f8971dabd43e24d0b4e85c30eb074da39d3b63c778f39ebd942",
+        false,
+    ),
+    (
         "tools/res/BUILD",
         "bef477365d864eab46fcfe73c635bafd11a7300e4e47c158abe20d269e07e8ac",
         false,
@@ -334,7 +339,7 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
     assert_eq!(identity.snapshot(), BuiltinBazelToolsSnapshot::Bazel9_2);
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
-        "c313fad68f4e475d744dc6de7b658515b33c634905222e934a9d09129371f56f"
+        "3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc"
     );
 }
 

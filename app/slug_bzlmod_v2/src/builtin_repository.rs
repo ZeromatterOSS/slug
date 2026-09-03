@@ -322,6 +322,12 @@ const CATALOG: &[CatalogEntry] = &[
         executable: true,
     },
     CatalogEntry {
+        path: "tools/osx/xcode_configure.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/osx/xcode_configure.bzl"),
+        expected_sha256: "26d758318e481f8971dabd43e24d0b4e85c30eb074da39d3b63c778f39ebd942",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/res/BUILD",
         bytes: include_bytes!("../builtin/bazel_tools/tools/res/BUILD"),
         expected_sha256: "bef477365d864eab46fcfe73c635bafd11a7300e4e47c158abe20d269e07e8ac",
@@ -907,6 +913,7 @@ mod tests {
                 ("build_defs.bzl".to_owned(), PathDirectoryEntryKind::File),
                 ("cpp".to_owned(), PathDirectoryEntryKind::Directory),
                 ("launcher".to_owned(), PathDirectoryEntryKind::Directory),
+                ("osx".to_owned(), PathDirectoryEntryKind::Directory),
                 ("res".to_owned(), PathDirectoryEntryKind::Directory),
                 ("test".to_owned(), PathDirectoryEntryKind::Directory),
             ]
@@ -953,6 +960,13 @@ mod tests {
                 ("BUILD".to_owned(), PathDirectoryEntryKind::File),
                 ("empty.sh".to_owned(), PathDirectoryEntryKind::File),
             ]
+        );
+        assert_eq!(
+            listing_rows("tools/osx"),
+            [(
+                "xcode_configure.bzl".to_owned(),
+                PathDirectoryEntryKind::File
+            )]
         );
         assert_eq!(
             listing_rows("tools/res"),
@@ -1115,7 +1129,7 @@ mod tests {
             evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &source).unwrap();
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
-            "c313fad68f4e475d744dc6de7b658515b33c634905222e934a9d09129371f56f"
+            "3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc"
         );
         assert_eq!(value.module_sha256, source.sha256());
         assert_eq!(
