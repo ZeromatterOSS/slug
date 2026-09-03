@@ -1,178 +1,86 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-5-7A-repository-context-which-implementation-r1
+Packet: WP-5-7A-bazel-tools-lib-cc-configure-catalog-audit
 
-Milestone: M7A bootstrap-critical loading/repository execution closure. Add
-the bounded generic Unix `repository_ctx.which` composition selected by the
-accepted docs-only audit.
+Milestone: M7A bootstrap-critical loading/repository execution closure. Audit
+the exact built-in Bazel 9.2 source slice beginning at
+`@bazel_tools//tools/cpp:lib_cc_configure.bzl`, the first honest boundary after
+the accepted generic Unix repository executable lookup.
 
-Status: ready for one bounded Rust implementation and independent terminal
-review. The audit returns `ACCEPT`; only the allowlist and behavior below are
-authorized.
+Status: ready for one bounded docs-only audit. No Rust or catalog-content edit
+is authorized by this packet.
 
 ## Accepted predecessor
 
-`WP-5-7A-repository-context-which-audit` returns `ACCEPT` without a new DICE,
-Host-input, path-observation or materialization owner. Pinned Bazel 9.2 source,
-focused upstream tests and an isolated installed-Bazel 9.2 oracle agree on the
-bounded Unix behavior. Authentic rules_shell 0.6.1 declares `PATH` and performs
-the generic sequence `which("bash")`, then `which("sh")` when `BAZEL_SH` is
-absent.
+`WP-4-5-7A-repository-context-which-implementation-r1` returns `ACCEPT` after
+one correction rereview at 240 production, 498 proof and 738 total gross Rust
+additions. It adds no DICE key, direct filesystem or process-environment read,
+retained candidate cache, materialization owner, rules_shell branch, shell-name
+branch or toolchain special case.
 
-The predecessor template packet remains terminally accepted at 371 production
-and 484 proof Rust additions. Do not revisit its source routing, byte
-replacement or generated-file effect ownership.
+The full loading suite passes and `slug_cli_v2` rebuilds. The authentic
+rules_rust 0.73 replay, with `/bin:/usr/bin:/usr/local/bin` as its bounded
+declared PATH, clears rules_shell 0.6.1's generic Unix `which` probes. The next
+failure is the built-in catalog's typed `UnsupportedCatalog` result for
+`tools/cpp/lib_cc_configure.bzl`, reached while apple_support configures its
+generated local C++ repositories.
 
-## Audit evidence and compatibility decision
+## Audit question
 
-At Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
-`StarlarkBaseExternalContext.which` and `findCommandOnPath` establish that:
+At pinned Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`, determine the complete smallest
+verbatim `@bazel_tools` source/package/listing closure required to admit
+`//tools/cpp:lib_cc_configure.bzl` through Slug's existing in-memory built-in
+repository. The audit must distinguish:
 
-1. `program` is a string; empty input and either path separator are errors;
-2. Unix lookup splits `PATH` on `:`, ignores non-absolute entries, preserves
-   source order and appends the Java-trimmed program basename (leading and
-   trailing code points at or below U+0020 only);
-3. each candidate follows symlinks and must resolve to Bazel's Unix `isFile`
-   category (regular or special file) with owner-executable `0100` set;
-4. the first match returns a Starlark `path` preserving the candidate spelling,
-   and stable exhaustion returns `None`; and
-5. Windows additionally retries with Bazel's executable extension.
+1. exact upstream file bytes, executable modes, package membership and direct
+   or recursive load dependencies that belong to this slice;
+2. existing catalog entries and routing/listing/integrity owners that can be
+   reused without changing their semantic identity;
+3. any generated, configured, native-rule, platform or repository behavior
+   referenced by the source but not required merely to load the admitted
+   facade; and
+4. the next independent replay boundary after an exact source-only addition,
+   or `REPLAN` if the closure cannot be bounded without crossing another owner.
 
-The isolated Bazel 9.2.0 oracle used two absolute directories plus one relative
-entry. It discriminated first-match order; a non-executable first candidate and
-executable second candidate; directory, missing and relative-only misses; a
-symlink hit whose returned string remained the symlink path; surrounding
-ASCII program whitespace; and the exact empty/slash errors. Pinned source
-anchors are `StarlarkBaseExternalContext.which`/`findCommandOnPath`,
-`StarlarkRepositoryContextTest.testWhich`, `UnixFileSystem.statNullable` and
-`isExecutable`, `UnixFileStatus.isFile`, and `StarlarkPath.equals`/`hashCode`.
-Authentic rules_shell is pinned at
-`shell/private/repositories/sh_config.bzl`; its repository rule declares PATH
-and its Unix helper tries `bash`, then `sh`.
+The authentic apple_support consumer is a discriminator only. It cannot select
+alternate bytes, a reduced facade, a Rust implementation of Starlark behavior,
+or an apple_support/C++/toolchain branch.
 
-The implementation admits **exact** Bazel 9.2 behavior for valid-Unicode,
-lexically normalized absolute Unix `PATH` entries, a nonempty basename of at
-most 255 UTF-8 bytes, at most 4 KiB of `PATH`, at most 64 components and at most
-64 distinct candidate paths. Missing `PATH`, empty components, relative
-components, wrong kinds, missing files, regular/special files, symlinks,
-owner-executable mode, first-match order, candidate spelling, and `path`/`None`
-are in the exact
-stable fresh-evaluation slice. Slug's valid-Unicode environment/path
-representation, fail-closed resource caps, and exact tracked invalidation for
-PATH/candidate metadata and symlinks are **Slug-native** integrity behavior;
-Bazel's `which` performs untracked host metadata checks. Whitespace-only-after-
-Java-trim basenames, non-normalized or non-Unicode absolute entries, concurrent
-metadata races/resolver observation failures, Windows separator/extension
-behavior and wider inputs are **unsupported/deferred**. No Bazel-wide parity is
-claimed outside this slice.
+## Required evidence
 
-## Existing-owner composition
+- Inspect the pinned Bazel 9.2 source tree and record exact paths, SHA-256
+  digests, modes, byte counts, loads and exported symbols for every proposed
+  catalog member.
+- Compare the installed Bazel 9.2 `@bazel_tools` repository when source-tree
+  packaging or generated repository layout could differ.
+- Trace the existing `BuiltinBazelToolsSnapshot`, manifest, source-file and
+  directory-listing owners, including their exact integrity tests and update
+  workflow.
+- Reuse accepted catalog evidence where it already proves a byte-identical
+  member. Add no new oracle unless a demonstrated source-versus-installed-tree
+  ambiguity remains.
+- Classify every result as exact, Slug-native or unsupported/deferred. Catalog
+  content itself may be admitted only as exact verbatim Bazel 9.2 bytes.
 
-- `RepositoryEnvironmentCellKey`, `RepositoryPlatformKey` and
-  `RepositoryHostInputTransaction` remain the sole Host environment/platform
-  owners. `which` records `PATH` as a dynamic environment input. On a typed
-  lookup demand the outer driver must first request a missing environment
-  frontier or verify the authorized `PATH` cell; it must not observe a
-  candidate against an unverified snapshot.
-- `ResolvedPathKey` and `ResolvedPathObservationKey` remain the sole candidate
-  resolution owners in `PathObservationNamespace::Host`. Their existing
-  `PathObservationKey` demands and injected `PathObservationEpochKey` own
-  missing-to-present, metadata, symlink and terminal-path invalidation. This is
-  deliberately stronger Slug-native integrity than Bazel's untracked metadata
-  checks. The requested logical path supplies the returned spelling; the
-  resolved terminal `PathLstat` supplies regular-or-special kind and the exact
-  Unix `0100` test.
-- Add only invocation-local typed `WhichNeed`/prepared-candidate scratch. A
-  demand escapes the synchronous invocation as an error, which drops the
-  evaluator, heap, builder, captures and borrows before the outer effect key
-  awaits either environment verification or path resolution and retries.
-- Generalize `RepositoryStarlarkPath` provenance only enough to distinguish a
-  canonical Label path from a `which` result. Visible equality, hashing,
-  stringification and representation remain normalized physical path bytes.
-  `repository_ctx.template` must continue to require canonical external Label
-  provenance, so a `which` path cannot silently widen the accepted template
-  source surface.
-- Only the terminal invocation may publish prints, dynamic environment names
-  or generated-file effects. Prepared candidates and observations are bounded
-  attempt scratch and do not enter retained repository definition, call,
-  certificate, manifest or effect-plan identity.
+## Audit allowlist and bounds
 
-No new DICE key, injected state, retained cache, process environment read,
-direct filesystem access, lock, source/materialization owner, rules_shell
-branch, shell-name branch or toolchain branch is permitted.
+Documentation changes are limited to the canonical plan, Stages 4 and 5, and
+this manifest. The audit is capped at 80 canonical-plan lines, 260 Stage 4
+lines, 320 Stage 5 lines and 360 manifest lines. Prefer a much smaller record
+when the exact closure is a single facade plus already-admitted dependencies.
 
-## Frozen implementation
+Do not edit Rust, Cargo metadata, tests, fixtures, generated repositories,
+catalog bytes or hashes during this audit. Do not run or embed a JVM helper.
+Pinned Bazel may run externally only as an oracle when installed-tree evidence
+is genuinely needed.
 
-1. Add the `which(program)` repository-context method with exact string typing,
-   empty/slash/backslash diagnostics and Java-compatible trimming of only
-   leading/trailing code points at or below U+0020. Parse only the admitted
-   `PATH` slice and preserve its order; do not use Rust Unicode `str::trim`.
-2. Represent one unresolved logical candidate as a typed invocation error and
-   one prepared outcome as executable hit or ordinary miss. Dangling symlinks,
-   `PathResolutionError::Cycle` and `PathResolutionError::InfiniteExpansion`
-   map to a miss and continue. Fail closed on resolver observation or
-   inconsistent-state errors: the existing resolver cannot distinguish
-   Bazel's nonthrowing metadata checks from the later throwable executable
-   check during a concurrent race.
-3. Before resolving the first candidate, demand and verify dynamic `PATH`
-   through the existing transaction frontier. Resolve candidates one at a time
-   through the legacy/observed `ResolvedPath` siblings after invocation state
-   has been dropped; merge every observed frontier, including missing,
-   wrong-kind, mode and symlink results.
-4. Return the requested candidate path for an owner-executable regular or
-   special terminal result, `None` for absence/exhaustion, and a generic Starlark
-   `path` whose provenance cannot be consumed as an admitted template Label
-   source.
-5. Fail closed on any resource cap or unsupported platform/input shape before
-   effect publication. Preserve the existing repository-rule Windows stop.
+## Terminal result
 
-## Allowlist and size bounds
-
-Production and adjacent proof edits are limited to:
-
-- `app/slug_loading_v2/src/repository_rule_context.rs`
-- `app/slug_loading_v2/src/module_extension_repository_file_effect.rs`
-
-Gross additions are capped at 250 production Rust lines, 500 proof Rust lines
-and 750 total Rust lines. Every new helper is at most 80 logical lines and at
-most eight control-flow branches; existing helpers may grow by at most 40
-logical lines. Both allowlisted files are already large, but the context method
-and the repository-file-effect retry belong to their sole existing semantic
-owners; splitting either would create a second invocation or retry owner.
-
-## Required proof
-
-- Context tests: exact value type and string/repr/hash/equality behavior; wrong
-  type, empty, slash and backslash errors; Java U+0020/control trimming versus
-  nonbreaking/Unicode whitespace; missing `PATH`; relative and empty
-  components; normalized absolute order; all four resource caps; and Label-
-  versus-which provenance isolation for template.
-- Effect tests in legacy and observed modes: first and later hit, miss,
-  non-executable first candidate, owner-versus-group/other execute bits,
-  directory, executable special file, symlink-to-file, dangling/cyclic symlink,
-  descendant symlink expansion, fail-closed observation/inconsistent-state
-  errors, exact returned logical spelling and full observation-frontier merge.
-- Retry tests: environment demand precedes every candidate observation,
-  evaluator/heap/captures are dropped before DICE, multiple candidates make
-  bounded progress, terminal success/failure alone publishes prints/effects,
-  repeated candidates reuse scratch, and 64/65 boundaries fail closed.
-- Incremental tests: same-daemon warm reuse plus A/B/A restoration for PATH
-  order/value, missing-to-present, executable mode, kind and symlink target,
-  with no stale `path`/`None` result.
-- Run focused loading tests, `cargo test -p slug_loading_v2`,
-  `cargo test -p slug_query_v2`, rebuild `slug_cli_v2`, then rerun the authentic
-  rules_rust/rules_shell replay. The replay must clear both generic Unix
-  `which` calls without a ruleset or shell special case.
-- Run formatting, clippy where the workspace permits it, changed-test listing,
-  diff/allowlist/cap checks, hygiene scans, archive-reference checks and an
-  independent terminal review.
-
-## Terminal stops
-
-Return `REPLAN` if implementation needs a new Host/DICE/path owner, direct
-filesystem or process-environment access, an evaluator/borrow/lock across
-DICE, unverified `PATH` before candidate observation, a retained candidate
-cache, widened template provenance, unresolved race/error equivalence, Windows
-support, a rules_shell/toolchain special case, a third production file, a cap
-violation, or more than one material correction cycle. Otherwise terminal
-review may return `ACCEPT` and select the next authentic replay boundary.
+Return `ACCEPT` only with a bounded exact-content implementation packet naming
+the full file allowlist, integrity/update workflow, proof, replay gate and hard
+size caps. Return `REPLAN` if the installed source differs from the pinned tree,
+the direct load expands into an unbounded catalog subtree, existing manifest or
+listing identity cannot safely own the addition, or loading the file inherently
+requires a new semantic owner. Any later implementation must port upstream
+content verbatim and must not synthesize, abbreviate or reinterpret it.

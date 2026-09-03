@@ -8126,3 +8126,22 @@ still reject non-Label provenance. All evaluator state, captures and effect
 builders drop before the outer driver awaits DICE; only the terminal invocation
 publishes. Exact behavior, Slug-native caps and the proof matrix are frozen in
 the active packet. Audit result: `ACCEPT`; the audit itself changes no Rust.
+
+### Repository-context Unix which evaluator accepted (2026-09-02)
+
+Terminal correction rereview returns `ACCEPT`. The synchronous repository
+context admits the bounded exact Unix basename/PATH slice and uses typed
+invocation-local candidate needs. The outer driver verifies the declared PATH
+cell before observing candidates, drops all evaluator state before DICE, and
+reuses the existing legacy/observed Host resolved-path owners. Returned path
+spelling remains the logical PATH candidate even when resolution follows a
+symlink; template routing continues to reject this non-Label provenance.
+
+The implementation closes at 240/498/738 production/proof/total gross Rust
+additions. Loading proof passes, including ordered hits/misses, regular and
+special files, owner-execute mode, symlink and descendant expansion, complete
+observed frontiers, limits, speculative-attempt suppression and A/B/A
+restoration. The bounded authenticated replay clears the rules_shell lookup and
+stops at missing exact `@@bazel_tools//tools/cpp:lib_cc_configure.bzl` content.
+Stage 5 owns the next docs-only catalog audit; no C++, apple_support or ruleset
+special case is authorized here.

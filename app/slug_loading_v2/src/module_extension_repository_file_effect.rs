@@ -46,9 +46,7 @@ use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
 use slug_identity_v2::CanonicalLabel;
-use slug_workspace_v2::NormalizedAbsolutePath;
-use slug_workspace_v2::ObservedPathFrontierError;
-use slug_workspace_v2::PathObservationEpoch;
+#[rustfmt::skip] use slug_workspace_v2::{NormalizedAbsolutePath, ObservedPathFrontierError, PathNodeKind, PathObservationEpoch, PathObservationNamespace, PathOutcome, PathResolutionError, ResolvedPath, ResolvedPathKey, ResolvedPathObservationKey, ResolvedPathState};
 use starlark::PrintHandler;
 use starlark::PrintLocation;
 
@@ -69,14 +67,11 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateKey;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationError;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationKey;
-use crate::repository_rule_context::PreparedRepositoryLabelPaths;
-use crate::repository_rule_context::PreparedRepositoryTemplateSources;
-use crate::repository_rule_context::RepositoryRuleHostObservation;
-use crate::repository_rule_context::RepositoryRuleInvocationError;
-use crate::repository_rule_context::RepositoryRuleInvocationInput;
+#[rustfmt::skip] use crate::repository_rule_context::{PreparedRepositoryLabelPaths, PreparedRepositoryTemplateSources, PreparedRepositoryWhichCandidates, RepositoryRuleHostObservation, RepositoryRuleInvocationError, RepositoryRuleInvocationInput, RepositoryWhichCandidate};
 use crate::repository_rule_context::invoke_repository_rule;
 
-const MAX_REPOSITORY_LABEL_PATHS: usize = 256;
+struct RepositoryEffectLimits;
+#[rustfmt::skip] impl RepositoryEffectLimits { const LABEL_PATHS: usize = 256; const WHICH_CANDIDATES: usize = 64; }
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -492,6 +487,13 @@ async fn verified_environment(
         observed.push((name, expected));
     }
     Ok(observed)
+}
+
+#[rustfmt::skip]
+async fn verify_which_environment(ctx: &mut DiceComputations<'_>, key: &HostSelectedRepositoryFileEffectKey, certificate: &Arc<HostSelectedExtensionOwnerCertificate>, transaction: &RepositoryHostInputTransaction, observations: &PathObservationEpoch) -> Result<(), EffectDriver> {
+    if !transaction.frontier().contains("PATH") { return Err(SourcePreparationOutcome::Need(environment_need(key.workspace.dupe(), [CompactString::new("PATH")]))); }
+    if let Err(message) = verified_environment(ctx, &key.workspace, transaction, [CompactString::new("PATH")]).await { return Err(complete_effect_error(host_input_error(certificate, key.ordinal, message), observations.dupe())); }
+    Ok(())
 }
 
 type DefinitionModuleResult =
@@ -1078,6 +1080,85 @@ async fn resolve_template_source(
     }
 }
 
+#[rustfmt::skip]
+fn classify_which_candidate(
+    result: &Result<ResolvedPath, PathResolutionError>,
+) -> Result<RepositoryWhichCandidate, CompactString> {
+    match result {
+        Ok(path) => Ok(match path.state() {
+            ResolvedPathState::Present(metadata) if matches!(metadata.kind(), PathNodeKind::RegularFile | PathNodeKind::SpecialFile) && metadata.permissions() & 0o100 != 0 => RepositoryWhichCandidate::Executable,
+            ResolvedPathState::Present(_) | ResolvedPathState::Missing => RepositoryWhichCandidate::Miss,
+        }),
+        Err(PathResolutionError::Cycle { .. } | PathResolutionError::InfiniteExpansion { .. }) => Ok(RepositoryWhichCandidate::Miss),
+        Err(error @ (PathResolutionError::Observation { .. } | PathResolutionError::InconsistentState { .. })) => Err(format!("repository_ctx.which path resolution failed: {error:?}").into()),
+    }
+}
+
+async fn resolve_which_candidate(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    candidate: NormalizedAbsolutePath,
+    mode: EffectMode,
+    mut observations: PathObservationEpoch,
+) -> Result<(RepositoryWhichCandidate, PathObservationEpoch), EffectDriver> {
+    let fail = |message, observations| {
+        complete_effect_error(
+            host_input_error(certificate, key.ordinal, message),
+            observations,
+        )
+    };
+    match mode {
+        EffectMode::Legacy => match ctx
+            .compute(&ResolvedPathKey::new(
+                PathObservationNamespace::Host,
+                candidate,
+            ))
+            .await
+        {
+            Ok(PathOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(
+                SourcePreparationNeeds::path(need),
+            )),
+            Ok(PathOutcome::Complete(result)) => classify_which_candidate(&result)
+                .map(|value| (value, observations.dupe()))
+                .map_err(|message| fail(message, observations)),
+            Err(error) => Err(fail(error.to_string().into(), observations)),
+        },
+        EffectMode::Observed => match ctx
+            .compute(&ResolvedPathObservationKey::new(
+                PathObservationNamespace::Host,
+                candidate,
+            ))
+            .await
+        {
+            Ok(PathOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(
+                SourcePreparationNeeds::path(need),
+            )),
+            Ok(PathOutcome::Complete(Err(error))) => Err(SourcePreparationOutcome::Complete(Err(
+                HostSelectedRepositoryFileEffectObservationError::Merge {
+                    certificate: certificate.clone(),
+                    ordinal: key.ordinal,
+                    error,
+                },
+            ))),
+            Ok(PathOutcome::Complete(Ok(observed))) => {
+                observations = merge_definition_observations(
+                    mode,
+                    certificate,
+                    key.ordinal,
+                    observations,
+                    observed.observations(),
+                )?;
+                classify_which_candidate(observed.result())
+                    .map(|value| (value, observations.dupe()))
+                    .map_err(|message| fail(message, observations))
+            }
+            Err(error) => Err(fail(error.to_string().into(), observations)),
+        },
+    }
+}
+
+#[rustfmt::skip]
 fn terminal_repository_rule_invocation_error(
     certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
     ordinal: usize,
@@ -1108,6 +1189,8 @@ fn terminal_repository_rule_invocation_error(
                 message: "repository_ctx.template invocation is unsupported".into(),
             }
         }
+        RepositoryRuleInvocationError::WhichArgument(message) => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message },
+        RepositoryRuleInvocationError::WhichLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.which invocation exceeds the admitted Unix limits".into() },
         RepositoryRuleInvocationError::Plan(error) => HostSelectedRepositoryFileEffectError::Path {
             certificate: certificate.clone(),
             ordinal,
@@ -1128,7 +1211,8 @@ fn terminal_repository_rule_invocation_error(
             }
         }
         RepositoryRuleInvocationError::LabelPathNeed(_)
-        | RepositoryRuleInvocationError::TemplateSourceNeed(_) => unreachable!(),
+        | RepositoryRuleInvocationError::TemplateSourceNeed(_)
+        | RepositoryRuleInvocationError::WhichNeed(_) => unreachable!(),
     }
 }
 
@@ -1154,6 +1238,7 @@ async fn invoke_repository_rule_with_label_paths(
 > {
     let mut prepared_paths = PreparedRepositoryLabelPaths::new();
     let mut prepared_templates = PreparedRepositoryTemplateSources::new();
+    let mut prepared_which = PreparedRepositoryWhichCandidates::new();
     loop {
         let capture = capture_enabled.then(InvocationPrintCapture::default);
         match invoke_repository_rule(
@@ -1161,6 +1246,7 @@ async fn invoke_repository_rule_with_label_paths(
             &module.manifest,
             &prepared_paths,
             &prepared_templates,
+            &prepared_which,
             input.clone(),
             platform.clone(),
             transaction.snapshot().dupe(),
@@ -1169,13 +1255,13 @@ async fn invoke_repository_rule_with_label_paths(
             Ok(invocation) => return Ok((invocation, capture, observations)),
             Err(RepositoryRuleInvocationError::LabelPathNeed(address)) => {
                 if prepared_paths.contains_key(&address)
-                    || prepared_paths.len() == MAX_REPOSITORY_LABEL_PATHS
+                    || prepared_paths.len() == RepositoryEffectLimits::LABEL_PATHS
                 {
                     let message = if prepared_paths.contains_key(&address) {
                         "repository_ctx.path repeated an already prepared Label path".into()
                     } else {
                         format!(
-                            "repository_ctx.path exceeds the per-invocation limit of {MAX_REPOSITORY_LABEL_PATHS} distinct Labels"
+                            "repository_ctx.path exceeds the per-invocation limit of {} distinct Labels", RepositoryEffectLimits::LABEL_PATHS
                         )
                         .into()
                     };
@@ -1202,7 +1288,7 @@ async fn invoke_repository_rule_with_label_paths(
             }
             Err(RepositoryRuleInvocationError::TemplateSourceNeed(address)) => {
                 if prepared_templates.contains_key(&address)
-                    || prepared_templates.len() == MAX_REPOSITORY_LABEL_PATHS
+                    || prepared_templates.len() == RepositoryEffectLimits::LABEL_PATHS
                 {
                     return Err(template_source_error(
                         certificate,
@@ -1217,7 +1303,39 @@ async fn invoke_repository_rule_with_label_paths(
                 observations = next_observations;
                 prepared_templates.insert(address, bytes);
             }
+            Err(RepositoryRuleInvocationError::WhichNeed(candidate)) => {
+                if prepared_which.contains_key(&candidate)
+                    || prepared_which.len() == RepositoryEffectLimits::WHICH_CANDIDATES
+                {
+                    return Err(complete_effect_error(
+                        HostSelectedRepositoryFileEffectError::Invocation {
+                            certificate: certificate.clone(),
+                            ordinal: key.ordinal,
+                            message:
+                                "repository_ctx.which repeated or exceeded its candidate limit"
+                                    .into(),
+                        },
+                        observations,
+                    ));
+                }
+                verify_which_environment(ctx, key, certificate, transaction, &observations).await?;
+                let (value, next_observations) = resolve_which_candidate(
+                    ctx,
+                    key,
+                    certificate,
+                    candidate.clone(),
+                    mode,
+                    observations,
+                )
+                .await?;
+                observations = next_observations;
+                prepared_which.insert(candidate, value);
+            }
             Err(error) => {
+                if matches!(error, RepositoryRuleInvocationError::WhichLimit) {
+                    verify_which_environment(ctx, key, certificate, transaction, &observations)
+                        .await?;
+                }
                 if let Some(capture) = capture {
                     ctx.store_evaluation_data(capture.into_batch())
                         .expect("repository-file invocation stores one local Complete event batch");
@@ -2215,11 +2333,343 @@ ext = module_extension(implementation = impl)
         assert_eq!(legacy.as_ref(), observed.result().as_ref());
     }
 
+    fn which_observation(demand: &PathObservationDemand) -> PathObservationResult {
+        assert_eq!(demand.namespace(), PathObservationNamespace::Host);
+        let path = demand.path().as_path();
+        match demand.operation() {
+            PathObservationOperation::Lstat => {
+                let (kind, permissions) = if path == Path::new("/which/link") {
+                    (PathNodeKind::Symlink, 0o777)
+                } else if path == Path::new("/which/target/tool") {
+                    (PathNodeKind::RegularFile, 0o100)
+                } else if path == Path::new("/which/first/tool") {
+                    (PathNodeKind::RegularFile, 0o010)
+                } else if path == Path::new("/which/second/tool") {
+                    (PathNodeKind::SpecialFile, 0o100)
+                } else if [
+                    "/",
+                    "/which",
+                    "/which/first",
+                    "/which/second",
+                    "/which/target",
+                ]
+                .iter()
+                .any(|candidate| path == Path::new(candidate))
+                {
+                    (PathNodeKind::Directory, 0o755)
+                } else {
+                    return PathObservationResult::Lstat(PathOperationResult::Missing);
+                };
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    kind,
+                    1,
+                    2,
+                    3,
+                    4,
+                    permissions,
+                )))
+            }
+            PathObservationOperation::ReadLink if path == Path::new("/which/link") => {
+                PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(
+                    PathBuf::from("/which/target"),
+                )))
+            }
+            operation => panic!("unexpected which observation: {operation:?}"),
+        }
+    }
+
+    async fn update_which_need(
+        mut transaction: dice::DiceTransaction,
+        need: &SourcePreparationNeeds,
+    ) -> dice::DiceTransaction {
+        let global = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        let mut observations = global
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .collect::<Vec<_>>();
+        for demand in need.path_observations().unwrap().demands() {
+            observations.retain(|(current, _)| current != demand);
+            observations.push((demand.dupe(), Arc::new(which_observation(demand))));
+        }
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::from_shared(observations).unwrap(),
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+
+    fn replace_which_lstat(
+        epoch: &PathObservationEpoch,
+        path: &str,
+        kind: PathNodeKind,
+        permissions: i32,
+    ) -> PathObservationEpoch {
+        PathObservationEpoch::from_shared(epoch.observations().iter().map(|(demand, result)| {
+            if demand.operation() == PathObservationOperation::Lstat
+                && demand.path().as_path() == Path::new(path)
+            {
+                (
+                    demand.dupe(),
+                    Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                        PathLstat::new(kind, 1, 2, 3, 4, permissions),
+                    ))),
+                )
+            } else {
+                (demand.dupe(), result.dupe())
+            }
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn repository_which_fails_closed_on_unstable_resolution_errors() {
+        let path = NormalizedAbsolutePath::new("/which/tool").unwrap();
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            path.clone(),
+            PathObservationOperation::Lstat,
+        );
+        let observation = PathResolutionError::Observation {
+            namespace: PathObservationNamespace::Host,
+            requested_path: path.clone(),
+            demand: demand.clone(),
+            error: PathObservationError::Io {
+                kind: PathIoErrorKind::PermissionDenied,
+                raw_os_error: None,
+            },
+        };
+        let inconsistent = PathResolutionError::InconsistentState {
+            namespace: PathObservationNamespace::Host,
+            requested_path: path,
+            demand,
+            before: None,
+            after: None,
+        };
+        assert!(classify_which_candidate(&Err(observation)).is_err());
+        assert!(classify_which_candidate(&Err(inconsistent)).is_err());
+    }
+
+    #[tokio::test]
+    async fn repository_which_verifies_path_then_tracks_order_kind_mode_and_frontier() {
+        const WHICH_EXTENSION: &str = r#"
+def write(ctx):
+    print("before-which")
+    found = ctx.which("tool")
+    print("after-which")
+    ctx.file("resolved", str(found), executable = False)
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let tracker = Arc::new(EffectTracker::default());
+        let base =
+            base_transaction_with_tracker(&dice, MODULE, WHICH_EXTENSION, true, tracker.clone())
+                .await;
+        let snapshot_a = environment_snapshot(&[("PATH", "/which/first:/which/second")]);
+        let oversized = environment_snapshot(&[("PATH", &"x".repeat(4097))]);
+        let mut transaction = with_host_inputs_for(
+            base,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            oversized,
+            RepositoryEnvironmentNameFrontier::empty(),
+        )
+        .await;
+        let owner = owner(&mut transaction).await;
+        tracker.take();
+        let key =
+            HostSelectedRepositoryFileEffectObservationKey::new(workspace.dupe(), owner.clone(), 0);
+        let SourcePreparationOutcome::Need(environment) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("PATH must be authorized before a candidate observation")
+        };
+        assert!(environment.path_observations().is_none());
+        assert_eq!(
+            environment
+                .repository_environment()
+                .unwrap()
+                .names()
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            ["PATH"]
+        );
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot_a.clone(),
+            environment_frontier(&["PATH"]),
+        )
+        .await;
+        let observed = loop {
+            match transaction.compute(&key).await.unwrap() {
+                SourcePreparationOutcome::Need(need) => {
+                    assert!(need.repository_environment().is_none());
+                    transaction = update_which_need(transaction, &need).await;
+                }
+                SourcePreparationOutcome::Complete(Ok(value)) => break value,
+                terminal => panic!("which must converge: {terminal:?}"),
+            }
+        };
+        let effect = observed.result().as_ref().as_ref().unwrap();
+        assert_eq!(effect.plan().effects()[0].content(), b"/which/second/tool");
+        assert_eq!(
+            effect
+                .host()
+                .environment()
+                .map(|(name, value)| (name, value.map(|value| value.as_ref())))
+                .collect::<Vec<_>>(),
+            [("PATH", Some("/which/first:/which/second"))]
+        );
+        for candidate in ["/which/first/tool", "/which/second/tool"] {
+            assert!(
+                observed
+                    .observations()
+                    .observations()
+                    .keys()
+                    .any(|demand| demand.path().as_path() == Path::new(candidate))
+            );
+        }
+        let prints = tracker
+            .take()
+            .into_iter()
+            .flat_map(|(_, _, batch)| batch.into_iter())
+            .flat_map(|batch| batch.events().to_vec())
+            .filter_map(|event| match event {
+                EvaluationEvent::StarlarkPrint { text, .. } => Some(text),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(prints, ["before-which", "after-which"]);
+
+        let baseline = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        let both_executable = replace_which_lstat(
+            &baseline,
+            "/which/first/tool",
+            PathNodeKind::RegularFile,
+            0o100,
+        );
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, both_executable.clone())])
+            .unwrap();
+        transaction = updater.commit().await;
+        let SourcePreparationOutcome::Complete(Ok(first)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("executable-mode change must recompute")
+        };
+        assert_eq!(
+            first.result().as_ref().as_ref().unwrap().plan().effects()[0].content(),
+            b"/which/first/tool"
+        );
+        let snapshot_b = environment_snapshot(&[("PATH", "/which/second:/which/first")]);
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot_b,
+            environment_frontier(&["PATH"]),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(reordered)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("PATH reorder must recompute")
+        };
+        assert_eq!(
+            reordered
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .plan()
+                .effects()[0]
+                .content(),
+            b"/which/second/tool"
+        );
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot_a,
+            environment_frontier(&["PATH"]),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(restored)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("PATH A/B/A restore must complete")
+        };
+        assert_eq!(first.result(), restored.result());
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, baseline)])
+            .unwrap();
+        transaction = updater.commit().await;
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            environment_snapshot(&[("PATH", "/which/link")]),
+            environment_frontier(&["PATH"]),
+        )
+        .await;
+        let linked = loop {
+            match transaction.compute(&key).await.unwrap() {
+                SourcePreparationOutcome::Need(need) => {
+                    transaction = update_which_need(transaction, &need).await;
+                }
+                SourcePreparationOutcome::Complete(Ok(value)) => break value,
+                terminal => panic!("symlink which must converge: {terminal:?}"),
+            }
+        };
+        assert_eq!(
+            linked.result().as_ref().as_ref().unwrap().plan().effects()[0].content(),
+            b"/which/link/tool"
+        );
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            environment_snapshot(&[("PATH", "/which/first:/which/second")]),
+            environment_frontier(&["PATH"]),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(legacy) = transaction
+            .compute(&HostSelectedRepositoryFileEffectKey::new(
+                workspace, owner, 0,
+            ))
+            .await
+            .unwrap()
+        else {
+            panic!("prepared legacy which must complete")
+        };
+        assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    }
+
     #[tokio::test]
     async fn repository_label_path_enforces_distinct_address_cap() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        for count in [MAX_REPOSITORY_LABEL_PATHS, MAX_REPOSITORY_LABEL_PATHS + 1] {
+        for count in [
+            RepositoryEffectLimits::LABEL_PATHS,
+            RepositoryEffectLimits::LABEL_PATHS + 1,
+        ] {
             let extension = format!(
                 r#"
 def write(ctx):
@@ -2244,10 +2694,10 @@ ext = module_extension(implementation = impl)
             else {
                 panic!("cap outcome must be terminal")
             };
-            if count == MAX_REPOSITORY_LABEL_PATHS {
+            if count == RepositoryEffectLimits::LABEL_PATHS {
                 assert_eq!(
                     result.as_ref().as_ref().unwrap().plan().effects()[0].content(),
-                    MAX_REPOSITORY_LABEL_PATHS.to_string().as_bytes()
+                    RepositoryEffectLimits::LABEL_PATHS.to_string().as_bytes()
                 );
             } else {
                 assert!(matches!(
@@ -3554,7 +4004,7 @@ ext=module_extension(implementation=impl)
             "HostCanonicalRepositoryLoadRouteKey::new(",
             "HostRepositoryLabelPathObservationKey::new_",
             "PreparedRepositoryLabelPaths::new()",
-            "MAX_REPOSITORY_LABEL_PATHS",
+            "RepositoryEffectLimits::LABEL_PATHS",
             "ExternalBzlModuleEvalKey::new_canonical_bzlmod(",
             "HostSelectedRepositoryFileEffectObservationError::CanonicalRoute {",
             "HostSelectedRepositoryFileEffectObservationError::Certificate(error)",

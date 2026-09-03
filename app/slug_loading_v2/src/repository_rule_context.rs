@@ -24,6 +24,7 @@ use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
 use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_bzlmod_v2::RepositoryPlatform;
+#[rustfmt::skip] use slug_workspace_v2::{NormalizedAbsolutePath, PathObservationNamespace};
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
@@ -417,7 +418,7 @@ impl RepositoryRuleHostObservation {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), TemplateDestinationArgument, TemplateSourceArgument, TemplateSourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
+pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), TemplateDestinationArgument, TemplateSourceArgument, TemplateSourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
 
 #[rustfmt::skip]
 pub(crate) struct RepositoryRuleInvocation { pub(crate) plan: GeneratedRepositoryFileEffectPlan, pub(crate) dynamic_environment: Arc<[CompactString]> }
@@ -444,20 +445,28 @@ struct RepositoryOs { platform: RepositoryPlatform, snapshot: RepositoryEnvironm
 pub(crate) type PreparedRepositoryLabelPaths =
     SmallMap<RepositoryLabelPathAddress, HostRepositoryLabelPathValue>;
 pub(crate) type PreparedRepositoryTemplateSources = SmallMap<RepositoryLabelPathAddress, Arc<[u8]>>;
+#[rustfmt::skip] pub(crate) type PreparedRepositoryWhichCandidates = SmallMap<NormalizedAbsolutePath, RepositoryWhichCandidate>;
+
+#[rustfmt::skip] #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RepositoryWhichCandidate { Executable, Miss }
+
+#[rustfmt::skip]
+#[derive(Debug, Clone, Allocative)]
+enum RepositoryStarlarkPathProvenance { Label(RepositoryLabelPathAddress), Which }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct RepositoryStarlarkPath {
     path: HostRepositoryLabelPathValue,
-    address: RepositoryLabelPathAddress,
+    provenance: RepositoryStarlarkPathProvenance,
 }
 
 #[rustfmt::skip]
 #[derive(Debug, ProvidesStaticType)]
-pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, prepared_paths: PreparedRepositoryLabelPaths, prepared_templates: PreparedRepositoryTemplateSources, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, error: RefCell<Option<RepositoryRuleInvocationError>> }
+pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, prepared_paths: PreparedRepositoryLabelPaths, prepared_templates: PreparedRepositoryTemplateSources, prepared_which: PreparedRepositoryWhichCandidates, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, error: RefCell<Option<RepositoryRuleInvocationError>> }
 
 #[rustfmt::skip]
 impl RepositoryRuleInvocationState {
-    fn new(manifest: &BzlLoadManifest, prepared_paths: &PreparedRepositoryLabelPaths, prepared_templates: &PreparedRepositoryTemplateSources) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), prepared_paths: prepared_paths.clone(), prepared_templates: prepared_templates.clone(), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), error: RefCell::new(None) } }
+    fn new(manifest: &BzlLoadManifest, prepared_paths: &PreparedRepositoryLabelPaths, prepared_templates: &PreparedRepositoryTemplateSources, prepared_which: &PreparedRepositoryWhichCandidates) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), prepared_paths: prepared_paths.clone(), prepared_templates: prepared_templates.clone(), prepared_which: prepared_which.clone(), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), error: RefCell::new(None) } }
     fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> { eval.extra.and_then(|extra| extra.downcast_ref::<Self>()).ok_or_else(|| anyhow::anyhow!("repository_ctx is outside repository-rule execution")) }
     pub(crate) fn bzl(&self) -> &BzlEvaluationContext { &self.bzl }
     fn fail(&self, error: RepositoryRuleInvocationError) -> anyhow::Error {
@@ -562,6 +571,49 @@ const MAX_TEMPLATE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_TEMPLATE_OUTPUT_BYTES: usize = 8 * 1024 * 1024;
 const MAX_TEMPLATE_SUBSTITUTIONS: usize = 64;
 const MAX_TEMPLATE_SUBSTITUTION_BYTES: usize = 64 * 1024;
+struct WhichLimits;
+#[rustfmt::skip] impl WhichLimits { const PROGRAM_BYTES: usize = 255; const PATH_BYTES: usize = 4 * 1024; const COMPONENTS: usize = 64; const CANDIDATES: usize = 64; }
+
+#[rustfmt::skip] fn java_trim(value: &str) -> &str {
+    let start = value.char_indices().find_map(|(index, character)| (character > '\u{20}').then_some(index)).unwrap_or(value.len());
+    let end = value[start..].char_indices().rev().find_map(|(index, character)| (character > '\u{20}').then_some(start + index + character.len_utf8())).unwrap_or(start);
+    &value[start..end]
+}
+
+#[rustfmt::skip] fn normalized_which_component(component: &str, program: &str) -> Result<Option<NormalizedAbsolutePath>, RepositoryRuleInvocationError> {
+    let raw = std::path::Path::new(component);
+    if !raw.is_absolute() { return Ok(None); }
+    let normalized = NormalizedAbsolutePath::new(raw).map_err(|_| RepositoryRuleInvocationError::WhichLimit)?;
+    if normalized.as_path() != raw { return Err(RepositoryRuleInvocationError::WhichLimit); }
+    NormalizedAbsolutePath::new(raw.join(program)).map(Some).map_err(|_| RepositoryRuleInvocationError::WhichLimit)
+}
+
+#[rustfmt::skip] fn admit_which_candidate(candidates: &mut Vec<NormalizedAbsolutePath>, candidate: NormalizedAbsolutePath) -> Result<(), RepositoryRuleInvocationError> {
+    if candidates.contains(&candidate) { return Ok(()); }
+    if candidates.len() == WhichLimits::CANDIDATES { return Err(RepositoryRuleInvocationError::WhichLimit); }
+    candidates.push(candidate); Ok(())
+}
+
+#[rustfmt::skip] fn which_candidates(
+    path: Option<&str>,
+    program: &str,
+) -> Result<Vec<NormalizedAbsolutePath>, RepositoryRuleInvocationError> {
+    let program = java_trim(program); if program.len() > WhichLimits::PROGRAM_BYTES { return Err(RepositoryRuleInvocationError::WhichLimit); }
+    if program.is_empty() || matches!(program, "." | "..") { return Err(RepositoryRuleInvocationError::WhichLimit); } let Some(path) = path else { return Ok(Vec::new()) };
+    if path.len() > WhichLimits::PATH_BYTES {
+        return Err(RepositoryRuleInvocationError::WhichLimit);
+    }
+    let mut components = path.split(':').collect::<Vec<_>>();
+    while components.last() == Some(&"") { components.pop(); }
+    if components.len() > WhichLimits::COMPONENTS {
+        return Err(RepositoryRuleInvocationError::WhichLimit);
+    }
+    let mut candidates = Vec::new();
+    for component in components {
+        if let Some(candidate) = normalized_which_component(component, program)? { admit_which_candidate(&mut candidates, candidate)?; }
+    }
+    Ok(candidates)
+}
 
 fn latin1_substitutions(
     values: &SmallMap<String, String>,
@@ -652,7 +704,7 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         };
         Ok(eval.heap().alloc_simple(RepositoryStarlarkPath {
             path: path.clone(),
-            address,
+            provenance: RepositoryStarlarkPathProvenance::Label(address),
         }))
     }
 
@@ -673,15 +725,18 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         let Some(template) = RepositoryStarlarkPath::from_value(template) else {
             return Err(state.fail(RepositoryRuleInvocationError::TemplateSourceArgument));
         };
-        if template.address.repo().is_root() {
+        let RepositoryStarlarkPathProvenance::Label(address) = &template.provenance else {
+            return Err(state.fail(RepositoryRuleInvocationError::TemplateSourceArgument));
+        };
+        if address.repo().is_root() {
             return Err(state.fail(RepositoryRuleInvocationError::TemplateSourceArgument));
         }
         let substitutions =
             latin1_substitutions(&substitutions).map_err(|error| state.fail(error))?;
-        let Some(source) = state.prepared_templates.get(&template.address) else {
+        let Some(source) = state.prepared_templates.get(address) else {
             return Err(
                 state.fail(RepositoryRuleInvocationError::TemplateSourceNeed(
-                    template.address.clone(),
+                    address.clone(),
                 )),
             );
         };
@@ -747,6 +802,50 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
             .or_else(|| default.map(|value| eval.heap().alloc(value)))
             .unwrap_or_else(Value::new_none))
     }
+
+    fn which<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] program: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let this = RepositoryRuleContext::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
+        let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        if program.contains('/') || program.contains('\\') {
+            return Err(state.fail(RepositoryRuleInvocationError::WhichArgument(
+                format!(
+                    "Program argument of which() may not contain a / or a \\ ('{program}' given)"
+                )
+                .into(),
+            )));
+        }
+        if program.is_empty() {
+            return Err(state.fail(RepositoryRuleInvocationError::WhichArgument(
+                "Program argument of which() may not be empty".into(),
+            )));
+        }
+        state.record_environment("PATH");
+        for candidate in which_candidates(this.snapshot.get("PATH").map(AsRef::as_ref), program)
+            .map_err(|error| state.fail(error))?
+        {
+            match state.prepared_which.get(&candidate) {
+                None => return Err(state.fail(RepositoryRuleInvocationError::WhichNeed(candidate))),
+                Some(RepositoryWhichCandidate::Miss) => {}
+                Some(RepositoryWhichCandidate::Executable) => {
+                    let path = HostRepositoryLabelPathValue::new(
+                        candidate,
+                        PathObservationNamespace::Host,
+                    )
+                    .map_err(|_| state.fail(RepositoryRuleInvocationError::WhichLimit))?;
+                    return Ok(eval.heap().alloc_simple(RepositoryStarlarkPath {
+                        path,
+                        provenance: RepositoryStarlarkPathProvenance::Which,
+                    }));
+                }
+            }
+        }
+        Ok(Value::new_none())
+    }
 }
 
 #[rustfmt::skip]
@@ -755,6 +854,7 @@ pub(crate) fn invoke_repository_rule(
     manifest: &BzlLoadManifest,
     prepared_paths: &PreparedRepositoryLabelPaths,
     prepared_templates: &PreparedRepositoryTemplateSources,
+    prepared_which: &PreparedRepositoryWhichCandidates,
     input: RepositoryRuleInvocationInput,
     platform: RepositoryPlatform,
     snapshot: RepositoryEnvironmentSnapshot,
@@ -762,7 +862,7 @@ pub(crate) fn invoke_repository_rule(
 ) -> Result<RepositoryRuleInvocation, RepositoryRuleInvocationError> {
     let invocation_module = Module::new();
     let context = invocation_module.heap().alloc_simple(RepositoryRuleContext { platform, snapshot, input });
-    let state = RepositoryRuleInvocationState::new(manifest, prepared_paths, prepared_templates);
+    let state = RepositoryRuleInvocationState::new(manifest, prepared_paths, prepared_templates, prepared_which);
     let returned = {
         let mut evaluator = Evaluator::new(&invocation_module);
         if let Some(print_handler) = print_handler {
@@ -902,6 +1002,7 @@ mod tests {
             &manifest,
             &SmallMap::new(),
             &SmallMap::new(),
+            &SmallMap::new(),
             input,
             RepositoryPlatform::new("linux", "x86_64"),
             RepositoryEnvironmentSnapshot::empty(),
@@ -927,6 +1028,7 @@ mod tests {
             &manifest,
             paths,
             templates,
+            &SmallMap::new(),
             RepositoryRuleInvocationInput::new(
                 "repo".into(),
                 None,
@@ -936,6 +1038,44 @@ mod tests {
             .unwrap(),
             RepositoryPlatform::new("linux", "x86_64"),
             RepositoryEnvironmentSnapshot::empty(),
+            None,
+        )
+    }
+
+    fn invoke_which(
+        source: &str,
+        path: Option<&str>,
+        prepared: &PreparedRepositoryWhichCandidates,
+    ) -> Result<RepositoryRuleInvocation, RepositoryRuleInvocationError> {
+        let manifest = invocation_manifest();
+        let owner = freeze_bzl(&manifest, source, None);
+        let implementation = unsafe {
+            owner
+                .get("implementation")
+                .unwrap()
+                .unchecked_frozen_value()
+        };
+        let snapshot = path.map_or_else(RepositoryEnvironmentSnapshot::empty, |path| {
+            RepositoryEnvironmentSnapshot::from_canonical([RepositoryEnvironmentEntry::new(
+                "PATH", path,
+            )])
+            .unwrap()
+        });
+        invoke_repository_rule(
+            implementation,
+            &manifest,
+            &SmallMap::new(),
+            &SmallMap::new(),
+            prepared,
+            RepositoryRuleInvocationInput::new(
+                "repo".into(),
+                None,
+                Arc::new(SmallMap::new()),
+                Arc::from([]),
+            )
+            .unwrap(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot,
             None,
         )
     }
@@ -1077,7 +1217,7 @@ mod tests {
         let invocation = invoke_input(r#"
 def implementation(ctx):
     if not (ctx.name == "canonical" and ctx.original_name == "canonical" and ctx.attr.name == ctx.name): fail("names")
-    if not (hasattr(ctx, "attr") and getattr(ctx, "name") == "canonical" and dir(ctx) == ["attr", "file", "getenv", "name", "original_name", "os", "path", "template"]): fail("context reflection")
+    if not (hasattr(ctx, "attr") and getattr(ctx, "name") == "canonical" and dir(ctx) == ["attr", "file", "getenv", "name", "original_name", "os", "path", "template", "which"]): fail("context reflection")
     if not (ctx.attr.s == "value" and ctx.attr.b and ctx.attr.i == 7 and type(ctx.attr.l) == "Label"): fail("scalars")
     if not (type(ctx.attr.ll[0]) == "Label" and type(ctx.attr.o) == "Label" and type(ctx.attr.ol[0]) == "Label"): fail("labels")
     if not (ctx.attr.sd == {"k": "v"} and ctx.attr.sld == {"k": ["v"]} and type(ctx.attr.skld["k"]) == "Label"): fail("maps")
@@ -1378,6 +1518,7 @@ def implementation(ctx):
             &invocation_manifest(),
             &SmallMap::new(),
             &SmallMap::new(),
+            &SmallMap::new(),
             RepositoryRuleInvocationInput::new(
                 "repo".into(),
                 None,
@@ -1452,6 +1593,7 @@ def implementation(ctx):
                 manifest,
                 &SmallMap::new(),
                 &SmallMap::new(),
+                &SmallMap::new(),
                 RepositoryRuleInvocationInput::new(
                     "repo".into(),
                     None,
@@ -1515,6 +1657,7 @@ def implementation(ctx):
                 &manifest,
                 prepared,
                 &SmallMap::new(),
+                &SmallMap::new(),
                 RepositoryRuleInvocationInput::new(
                     "repo".into(),
                     None,
@@ -1553,6 +1696,124 @@ def implementation(ctx):
             Ok(_) => panic!("string path must fail"),
         };
         assert_eq!(error, RepositoryRuleInvocationError::LabelPathArgument);
+    }
+
+    #[test]
+    fn which_demands_ordered_candidates_and_preserves_path_value_semantics() {
+        let source = r#"
+def implementation(ctx):
+    first = ctx.which(" \x01tool\t")
+    again = ctx.which(" \x01tool\t")
+    ctx.file("which", "%s|%r|%s|%s" % (first, first, first == again, {first: "ok"}[again]), executable = False)
+"#;
+        let one = NormalizedAbsolutePath::new("/one/tool").unwrap();
+        let two = NormalizedAbsolutePath::new("/two/tool").unwrap();
+        assert!(matches!(
+            invoke_which(source, Some("/one:relative::/two:"), &SmallMap::new()),
+            Err(RepositoryRuleInvocationError::WhichNeed(path)) if path == one
+        ));
+        let misses = SmallMap::from_iter([(one, RepositoryWhichCandidate::Miss)]);
+        assert!(matches!(
+            invoke_which(source, Some("/one:relative::/two:"), &misses),
+            Err(RepositoryRuleInvocationError::WhichNeed(path)) if path == two
+        ));
+        let prepared = SmallMap::from_iter([
+            (
+                NormalizedAbsolutePath::new("/one/tool").unwrap(),
+                RepositoryWhichCandidate::Miss,
+            ),
+            (two, RepositoryWhichCandidate::Executable),
+        ]);
+        let invocation = invoke_which(source, Some("/one:relative::/two:"), &prepared).unwrap();
+        assert_eq!(invocation.dynamic_environment(), ["PATH"]);
+        assert_eq!(
+            invocation.plan.effects()[0].content(),
+            br#"/two/tool|"/two/tool"|True|ok"#
+        );
+    }
+
+    #[test]
+    fn which_validates_inputs_trimming_and_bounded_path_shape() {
+        let invoke_program = |program: &str| {
+            invoke_which(
+                &format!("def implementation(ctx):\n    ctx.which({program:?})\n"),
+                Some("/bin"),
+                &SmallMap::new(),
+            )
+        };
+        assert!(matches!(
+            invoke_program(""),
+            Err(RepositoryRuleInvocationError::WhichArgument(message))
+                if message == "Program argument of which() may not be empty"
+        ));
+        for program in ["a/b", "a\\b"] {
+            assert!(
+                matches!(invoke_program(program), Err(RepositoryRuleInvocationError::WhichArgument(message)) if message == format!("Program argument of which() may not contain a / or a \\ ('{program}' given)"))
+            );
+        }
+        assert!(matches!(
+            invoke_which(
+                "def implementation(ctx):\n    ctx.which(1)\n",
+                Some("/bin"),
+                &SmallMap::new()
+            ),
+            Err(RepositoryRuleInvocationError::Evaluation(_))
+        ));
+        assert!(matches!(
+            which_candidates(Some("/bin"), " \t\x01 "),
+            Err(RepositoryRuleInvocationError::WhichLimit)
+        ));
+        assert!(matches!(
+            invoke_program(&"x".repeat(WhichLimits::PROGRAM_BYTES + 1)),
+            Err(RepositoryRuleInvocationError::WhichLimit)
+        ));
+        assert!(matches!(
+            which_candidates(Some("/bin"), &format!(" {}", "x".repeat(WhichLimits::PROGRAM_BYTES))),
+            Ok(candidates) if candidates.len() == 1
+        ));
+        assert!(matches!(
+            which_candidates(Some(&"x".repeat(WhichLimits::PATH_BYTES + 1)), "x"),
+            Err(RepositoryRuleInvocationError::WhichLimit)
+        ));
+        let too_many = (0..=WhichLimits::COMPONENTS)
+            .map(|index| format!("/p{index}"))
+            .collect::<Vec<_>>()
+            .join(":");
+        assert!(matches!(
+            which_candidates(Some(&too_many), "x"),
+            Err(RepositoryRuleInvocationError::WhichLimit)
+        ));
+        let maximum = (0..WhichLimits::CANDIDATES)
+            .map(|index| format!("/p{index}"))
+            .collect::<Vec<_>>()
+            .join(":");
+        assert_eq!(
+            which_candidates(Some(&maximum), "x").unwrap().len(),
+            WhichLimits::CANDIDATES
+        );
+        assert_eq!(
+            which_candidates(Some("/bin"), "\u{a0}x\u{a0}").unwrap()[0]
+                .as_path()
+                .to_str(),
+            Some("/bin/\u{a0}x\u{a0}")
+        );
+        let missing = invoke_which("def implementation(ctx):\n    ctx.file('x', str(ctx.which('tool')), executable=False)\n", None, &SmallMap::new()).unwrap();
+        assert_eq!(missing.plan.effects()[0].content(), b"None");
+        assert_eq!(missing.dynamic_environment(), ["PATH"]);
+    }
+
+    #[test]
+    fn which_path_cannot_supply_a_template_label_source() {
+        let path = NormalizedAbsolutePath::new("/bin/tool").unwrap();
+        let prepared = SmallMap::from_iter([(path, RepositoryWhichCandidate::Executable)]);
+        assert!(matches!(
+            invoke_which(
+                "def implementation(ctx):\n    ctx.template('x', ctx.which('tool'))\n",
+                Some("/bin"),
+                &prepared,
+            ),
+            Err(RepositoryRuleInvocationError::TemplateSourceArgument)
+        ));
     }
 
     #[test]

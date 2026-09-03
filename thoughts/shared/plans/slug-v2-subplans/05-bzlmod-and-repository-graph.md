@@ -4555,3 +4555,24 @@ not its resolved symlink target, and merge every observed frontier. No new DICE
 key, direct filesystem/process environment read, materialization owner,
 retained candidate cache, Windows behavior, rules_shell/shell-name branch or
 toolchain special case is authorized.
+
+### Repository-context Unix which path ownership accepted (2026-09-02)
+
+Independent terminal correction review returns `ACCEPT`. The repository-file
+effect retry keeps `RepositoryEnvironmentCellKey` and its transaction frontier
+as the sole PATH owner, then resolves one typed logical candidate at a time
+through existing Host `ResolvedPathKey`/`ResolvedPathObservationKey` siblings.
+Every missing, kind, mode and symlink result participates in the observed
+frontier; stable misses continue in source order and resolver observation or
+inconsistent-state errors fail closed. Candidate scratch is invocation-local
+and does not enter repository definition, call, certificate, manifest or effect
+identity.
+
+The packet closes at 240 production and 498 proof additions, 738 total, within
+its 250/500/750 caps. The full loading suite and CLI rebuild pass. With the
+replay PATH held inside the admitted 64-component boundary, authentic
+rules_rust/rules_shell evaluation clears both generic Unix executable probes
+and advances to an `UnsupportedCatalog` for
+`tools/cpp/lib_cc_configure.bzl`. Select docs-only
+`WP-5-7A-bazel-tools-lib-cc-configure-catalog-audit`; pinned Bazel 9.2 bytes are
+the sole content authority.
