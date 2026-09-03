@@ -4829,3 +4829,36 @@ two-file allowlist and 6/40/46 production/proof/total gross Rust caps frozen in
 existing `0600` regular and `0700` directory rejections. The authenticated
 replay must clear materialization and stop at the next independently owned
 boundary; another mode/type or owner requirement returns `REPLAN`.
+
+### Read-only materialization accepted; apple provider design selected (2026-09-02)
+
+Commit `96fe2d6cb` accepts generic regular `0444` selected-BCR entries at
+2/12/14 gross production/proof/total Rust additions. The authenticated replay
+now clears rules_java 9.1.0 materialization and reaches selected rules_cc 0.2.4
+recursive loading.
+
+The rules_cc descriptor at
+`https://bcr.bazel.build/modules/rules_cc/0.2.4/source.json` has SHA-256
+`2bd87ef9b41d4753eadf65175745737135cba0e70b479bdc204ef0c67404d0c4`;
+its exact 276,390-byte release archive has SHA-256
+`8dcd63392f0bb48adf74f413a9f39ba0fedcb8f99bf085a3b450f06d171dbb6d`
+and matching integrity
+`sha256-jc1jOS8LtIrfdPQTqfOboP7cuPmb8IWjtFDwbRcdu20=`. Existing selected
+repository materialization, canonical routing, source observation, recursive
+loading and manifest owners already authenticate the consumer closure.
+
+The missing fact is a Stage 4 loading-global facade, but the first design is
+rejected because an ordinary provider key would lose its declaration-only tag
+before configured-target membership/indexing. The corrected cross-stage design
+keeps Stage 5 routing and materialization unchanged, lowers a closed sibling
+token normally into loading schemas, and rejects it at the configured target
+Starlark boundary before provider-map lookup.
+
+Stage 5 owns only the authenticated BCR provenance, canonical routing,
+recursive-loading evidence and replay handoff for this design. It owns no
+changed provider, loading-global or configured-analysis semantics.
+
+Stage 5 authorizes no source copy, catalog row, mapping, route, materializer,
+DICE key, observation, lockfile or repository-specific branch. Review only
+`WP-4-6-7A-apple-common-declaration-provider-fail-closed-design-r1`; no Rust
+implementation or replay is authorized until that design is accepted.

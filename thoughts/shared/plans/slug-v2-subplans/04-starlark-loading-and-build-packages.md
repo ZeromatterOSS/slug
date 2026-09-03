@@ -8343,3 +8343,55 @@ That is owned by the Stage 2 runtime/Stage 5 repository-source seam. Stage 4
 adds no rules_shell/rules_java branch, load global, repository method or source
 capability. The active implementation packet is frozen in
 `current-packet.md` and must stop before any new loading boundary.
+
+### Apple-common declaration-provider boundary redesigned (2026-09-02)
+
+Commit `96fe2d6cb` accepts regular selected-BCR `0444` materialization at
+2/12/14 gross production/proof/total Rust additions. Authentic replay clears
+rules_java and stops at missing `apple_common` in selected rules_cc 0.2.4.
+
+Pinned Bazel 9.2 `bazel/exports.bzl` supplies `apple_common_bazel` to
+ordinary and MODULE-loaded `.bzl` environments, not direct BUILD files, while
+`AppleBootstrap` guards the legacy name by repository/flag and admits
+`rules_cc`. Its full struct has ten members. Exact selected-source scanning finds only
+`Objc`, zero-argument `apple_toolchain()`, and `XcodeVersionConfig` at
+declaration time; every use of those providers or the returned toolchain and
+every other `apple_common` reference lies under a configured function.
+
+The first facade design is rejected. An ordinary `BuiltinProviderKey` is
+immediately lowered to `ProviderIdentity`, erasing declaration-only
+provenance. Configured target membership would then return false and indexing
+would return an ordinary missing-provider error instead of rejecting an
+unimplemented configured Apple category.
+
+The corrected design adds a provider-owned sibling token backed by a closed
+one-byte `ObjcInfo`/`XcodeVersionInfo` enum. Ordinary loading identity lowering
+continues into existing provider schemas, ordering and deduplication. A
+configured-target-specific conversion rejects the sibling before lowering or
+map lookup, even if a coincidentally named provider exists.
+
+Exact behavior is limited to name availability for the selected `rules_cc`
+consumer, the three source-level operations and acceptance/identity consistency
+of both aliases in loading schemas; direct BUILD omission is exact for this
+selected exposure boundary. The restricted module, static `.bzl`
+availability, sibling and `ProviderIdentity::Builtin` projection, canonical
+retention, opaque toolchain token and configured-use rejection are Slug-native.
+The seven other Bazel members, full struct reflection, provider construction,
+all nested Apple-toolchain behavior, flags/autoloads and configured Apple/Xcode
+semantics remain deferred and fail closed.
+
+`provider.rs` owns token equality/hash, loading lowering and the configured-use
+guard; `slug_analysis_v2::analysis_value` owns only the membership/indexing
+call sites. The build-API `ProviderIdentity`, provider collection and package
+schema representations do not change. Add no request projection, DICE key,
+observation, map, interner, cache, lock, fallback, fixture or donor.
+
+The sibling's deletion condition is a separately reviewed Stage 6 packet that
+admits complete configured `ObjcInfo` and `XcodeVersionInfo` values and replaces
+the explicit rejection proofs with Bazel's absent/present target behavior.
+
+Select docs-only
+`WP-4-6-7A-apple-common-declaration-provider-fail-closed-design-r1` for
+independent review. It authorizes no Rust. The prospective five-file
+180/180/360 implementation envelope and explicit stops are frozen in
+`current-packet.md`.

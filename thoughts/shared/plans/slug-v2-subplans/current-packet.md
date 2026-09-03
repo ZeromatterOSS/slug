@@ -1,176 +1,241 @@
 # Current Slug V2 Packet
 
-Packet: WP-5-7A-selected-bcr-regular-0444-mode-implementation-r1
+Packet: WP-4-6-7A-apple-common-declaration-provider-fail-closed-design-r1
 
-Milestone: M7A bootstrap-critical repository materialization. Admit generic
-regular tar entries whose exact mode is `0444` through the existing selected
-BCR archive materializer; preserve every other fail-closed archive boundary.
+Milestone: M7A bootstrap-critical loading/ruleset closure. Design a bounded
+`apple_common` declaration facade whose provider keys remain valid in loading
+schemas but cannot silently participate in configured-target lookup before
+configured Apple providers exist.
 
-Status: docs-only audit returns `ACCEPT`. Independent architecture review is
-required before implementation.
+Status: docs-only correction returns design `ACCEPT`. Independent architecture
+review is required. This packet authorizes no Rust implementation.
 
-## Accepted predecessor and reproducible replay boundary
+## Accepted predecessor, replay boundary and rejected design
 
-Commit `06ddf8252` terminally accepts
-`WP-4-7A-proto-common-predeclared-facade-implementation-r1` at 5 production
-and 31 proof gross Rust additions, 36 total. Its focused test passes 1/1;
-`slug_loading_v2` passes 530 unit tests with one ignored plus integration
-targets of 51/29/8/6/2/1/5/1; `slug_query_v2 --lib` passes 55/55; the CLI
-build, formatting, diff and daemon-hygiene gates pass. Only the longstanding
-three thought-path archive failures remain.
+Commit `96fe2d6cb` accepts generic selected-BCR regular mode `0444` at 2
+production and 12 proof gross Rust additions, 14 total. Authenticated
+bounded-PATH replay clears rules_java 9.1.0 materialization, then stops while
+recursively loading selected rules_cc 0.2.4 at
+`@@rules_cc+//cc/private/rules_impl:objc_common.bzl:22` because
+`apple_common` is not predeclared.
 
-The authenticated rules_rust replay clears the protobuf predeclared facade.
-A first run reported `repository_ctx.which invocation exceeds the admitted
-Unix limits` in rules_shell 0.6.1. That stop is excluded: the exact
-`repository_ctx.which("bash")` call, with `"sh"` only on miss, now
-reproducibly succeeds with both `PATH=/bin:/usr/bin:/usr/local/bin` and
-`PATH=/usr/bin:/usr/local/bin`. Both are within the accepted byte/component
-caps. No `which` cap, symlink or resolver change is authorized.
+The first `WP-4-7A` audit correctly found the three declaration operations but
+is rejected. Reusing an ordinary `BuiltinProviderKey` would let
+`starlark_provider_identity` erase declaration-only provenance into a normal
+`ProviderIdentity`. `AnalysisConfiguredTargetValue::is_in` would then return
+`false`, and `at` would report only that the target does not provide the key.
+Both outcomes falsely imply configured Apple provider lookup is implemented.
 
-The exact consumer is rules_shell BCR module version 0.6.1, source-relative
-`shell/private/repositories/sh_config.bzl`, SHA-256
-`795d028cf310d65265ad3d64cbf896567512dcb31b1d4cafa2f8c92eb65ec1a2`,
-4,401 bytes/138 lines. Lines 125-136 contain that two-step lookup.
+## Exact selected-source closure
 
-Both replays reach toolchain-registration row 14, `rules_java+//toolchains`,
-and stop while materializing selected rules_java 9.1.0 to probe
-`REPO.bazel`:
+The durable BCR descriptor
+`https://bcr.bazel.build/modules/rules_cc/0.2.4/source.json`, SHA-256
+`2bd87ef9b41d4753eadf65175745737135cba0e70b479bdc204ef0c67404d0c4`,
+selects the 276,390-byte release archive at
+`https://github.com/bazelbuild/rules_cc/releases/download/0.2.4/rules_cc-0.2.4.tar.gz`,
+SHA-256
+`8dcd63392f0bb48adf74f413a9f39ba0fedcb8f99bf085a3b450f06d171dbb6d`,
+matching integrity
+`sha256-jc1jOS8LtIrfdPQTqfOboP7cuPmb8IWjtFDwbRcdu20=`. The descriptor uses
+`strip_prefix = "rules_cc-0.2.4"`, its authenticated MODULE-version patch and
+`patch_strip = 1`.
 
-`selected BCR unsupported entry mode`
+A complete scan of the 400-entry release finds five code references across
+three ordinary `0644`, trailing-LF sources:
 
-This is the reproducible boundary. The archive contains no `REPO.bazel`;
-materialization must complete before the normal absent probe can proceed.
+| Source-relative path | SHA-256 | Bytes/lines | Observation |
+|---|---|---:|---|
+| `cc/private/rules_impl/objc_common.bzl` | `bb508b0e6d973b5953fcdc90df0ac0570de45bb6b07e5d35c7f16e2b3218994e` | 9,107/242 | top-level `Objc` lookup and zero-argument `apple_toolchain()` |
+| `cc/private/rules_impl/objc_compilation_support.bzl` | `1f078126197ea03e8201a2e6d4187c042b8da27eb5bca1c81d79f786d360356d` | 37,216/1,016 | top-level `XcodeVersionConfig` lookup; configured `get_apple_config` use |
+| `cc/private/toolchain/unix_cc_toolchain_config.bzl` | `6094987775711ee7016ce79781da6a87f6cf07c37296632ddf3e7239736d9fcc` | 70,236/1,981 | configured `XcodeVersionConfig` use only |
 
-## Exact archive and Bazel 9.2 evidence
+The complete declaration category is therefore `Objc`,
+`XcodeVersionConfig`, and zero-argument `apple_toolchain()`. Every provider
+value, returned-toolchain member, configuration, environment, rule and action
+use lies below a configured function boundary.
 
-The durable BCR descriptor coordinate is
-`https://bcr.bazel.build/modules/rules_java/9.1.0/source.json`, SHA-256
-`da589573c1dee2c9ac4a568b301269a2e8191110ff0345c1a959fa7ea6c4dfd6`.
-It selects the literal release URL
-`https://github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz`
-with empty `strip_prefix` and integrity
-`sha256-Thooolwu+lNQDJKNIs7/vFBd2VszWi0CWDaik7WSIS8=`. The exact release
-archive is 114,566 bytes with SHA-256
-`4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f`,
-which matches that integrity.
+## Bazel 9.2 and live Slug boundary evidence
 
-A complete tar listing has exactly 114 logical entries: 94 regular files at
-mode `0444` and 20 directories at mode `0755`; there are no other types or
-modes. The first entry is `./AUTHORS`, a 305-byte regular `0444` file, so
-the current failure is deterministic before extraction can progress.
-`MODULE.bazel` is a 4,218-byte regular `0444` file. No selected archive
-asset is copied into this repository.
+Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`
+establishes:
 
-Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-owns the compatibility behavior.
-The repo-relative
-`src/main/java/com/google/devtools/build/lib/bazel/repository/decompressor/CompressedTarFunction.java`
-has SHA-256
-`28dd9b8ace7d64b432b4bf566b1d1325cffea81df338ace428dfff7c756ae333`;
-lines 141-151 stream every regular entry and apply
-`entry.getMode() | 0400`. Thus Bazel accepts `0444` and retains it exactly.
-The repo-relative
-`src/test/java/com/google/devtools/build/lib/bazel/repository/decompressor/CompressedTarFunctionTest.java`
-has SHA-256
-`3a2865acca41f7ebe484886a978aeef2eeb9aba2aa9d3337f0b81a6576c925c2`
-and confirms the normal compressed-tar owner.
+- `src/main/starlark/builtins_bzl/bazel/exports.bzl`, SHA-256
+  `7404fc0e7cb8f6c5c4a0bd82bf3e0e87512a594256624f6360f06f80934439e2`,
+  exports the `apple_common` top-level;
+- `src/main/starlark/builtins_bzl/common/objc/apple_common.bzl`, SHA-256
+  `dcbf8f2cbb1c87e711c44800737b2611a42116fdb9f0acbe25b35af668a75c86`,
+  aliases `ObjcInfo` and `XcodeVersionInfo` and exposes the toolchain factory;
+- `src/main/java/com/google/devtools/build/lib/analysis/configuredtargets/AbstractConfiguredTarget.java`,
+  SHA-256
+  `6ec77df09263c0e18d3443dd5911180156c43df4a5df2c2fc42aab01307fbbfc`,
+  selects an exported provider for both indexing and membership, returning a
+  value/error for indexing and a Boolean for membership; and
+- `src/test/java/com/google/devtools/build/lib/rules/objc/ObjcStarlarkTest.java`,
+  SHA-256
+  `2ed4e579e72fcb3161bd7949ef50acdb2eb4b49382d855da54e844123e495103`,
+  proves exact `ObjcInfo` absent/present membership and absent indexing once
+  configured ObjC providers exist.
 
-Slug's `repository_archive_realize.rs::extract` already applies the same
-owner-readable projection, but its fail-closed allowlist admits regular
-`0644`, `0664`, `0755` and `0775` only. Generic regular `0444` is
-therefore the exact missing mode; directory `0755` is already admitted.
+Slug's `provider.rs::BuiltinProviderKey` hashes and compares by its static
+name. `starlark_provider_identity` converts it immediately to the shared
+`ProviderIdentity::Builtin(CompactString)`. `package.rs` intentionally uses
+that conversion for rule/aspect advertised providers and attribute/subrule
+provider constraints, normalizing with existing `SmallSet` and immutable
+`Arc` slices. `slug_analysis_v2::analysis_value` uses the same conversion in
+`AnalysisConfiguredTargetValue::at` and `is_in`, then consults its existing
+`SmallMap<ProviderIdentity, FrozenValue>`.
+An exhaustive live call-site search finds these are the only configured-target
+operations that convert a raw Starlark provider key; all other uses are loading
+schema conversion or tests.
 
-## Audit decision and compatibility boundary
+The retained build-API `ProviderIdentity`, provider collections and configured
+target values are not changed by this design.
 
-Audit result: `ACCEPT`. The smallest complete category is a generic regular
-selected-BCR tar entry whose header mode is exactly `0444`. Add `0444` to
-the existing regular-mode allowlist. Do not key behavior to rules_java, a path,
-a module name or the BCR probe.
+## Corrected design and compatibility classification
 
-Classify as **exact** under Bazel 9.2 the acceptance of a regular `0444`
-entry, its bytes and mtime, and its retained `0444` Unix permission after the
-existing owner-readable projection. Existing exact archive integrity, path,
-namespace, payload, transform order and source association remain unchanged.
+Design result: `ACCEPT`. Add a provider-owned sibling Starlark token backed by
+a closed `#[repr(u8)]` two-variant kind: `ObjcInfo` and `XcodeVersionInfo`.
+The token is immutable, `Allocative`, structurally hashes/compares by variant,
+with a token-domain hash discriminator, and is not equal to an ordinary
+`BuiltinProviderKey`. It contains no dynamic name, collection, pointer graph
+or interner.
 
-Classify as **Slug-native** the deliberately bounded mode/type allowlist, Rust
-temporary-directory extraction, cancellation checks and typed diagnostics.
-This packet does not claim Bazel's broader arbitrary tar-mode behavior.
+The ordinary `starlark_provider_identity` recognizes the sibling and lowers it
+to the existing `ProviderIdentity::builtin(kind.name())`. This preserves its
+use in loading-time `provides` and provider-constraint schemas, including
+existing order, deduplication, freeze/import and final package identity. It
+does not add a second retained schema representation.
 
-Keep **unsupported/deferred** every other newly unadmitted regular or directory
-mode; symlinks, hardlinks and other tar entry types; broader PAX/GNU metadata;
-Windows permission equivalence; other archive formats; and changes to
-strip-prefix, overlays, patches, MODULE replacement, locator/probe semantics,
-repository selection or `repository_ctx.which`.
+Add one configured-target-specific provider-key conversion in `provider.rs`.
+It detects the sibling before ordinary identity lowering and returns this
+stable Slug-native diagnostic for either variant:
 
-## Owner, lifecycle, invalidation and memory
+`apple_common.<field> is declaration-only; configured-target membership and indexing are unsupported`
 
-`SelectedBcrArchive` remains the verified URL/integrity/transform plan.
-`realize_selected_bcr` and its single bounded `extract` pass remain the sole
-archive materialization and mode owners. The completed root remains an
-`AssociatedImmutable` materialization with the existing domain-separated
-source association.
+Here `<field>` is replaced only by exact `Objc` or `XcodeVersionConfig`.
 
-Archive header modes are bytes covered by the selected archive integrity and
-existing request/source identity. Add no DICE key, request projection,
-observation, equality rule, cache, interner, retained collection, lock, task or
-fallback. The verified capture and temporary root remain scratch owned by the
-existing active repository session; cancellation and every failure drop them,
-while success transfers only the immutable root. Concurrent requests retain
-the existing content-addressed fetch and session ownership; overlapping
-attempts never share a temporary root, and an inactive attempt cannot publish
-its root or contaminate a later A/B/A request.
+`AnalysisConfiguredTargetValue::at` and `is_in` must use that conversion.
+Both operations error even if a configured target contains a coincidentally
+named `ProviderIdentity`; there is no false `false`, no ordinary missing-
+provider error and no lookup. Every existing provider token preserves its
+current success, false and error behavior. Attribute/subrule constraint
+matching continues over actual retained `ProviderIdentity` values; a missing
+Apple provider is an ordinary constraint mismatch, not configured Starlark
+membership/indexing.
 
-No benchmark is required: one membership alternative is added to the existing
-streaming branch, with no retained representation or asymptotic change.
-`extract` exceeds the 150-line function trigger but stays cohesive because it
-is the one stateful bounded tar pass owning header order, byte limits,
-namespace, payload, mode, mtime and cancellation. Splitting one admitted mode
-would duplicate that state and error ordering. Both allowlisted files remain
-below 2,000 lines.
+Classify as **exact** for the selected rules_cc consumer the three declaration
+operations, acceptance of both aliases as provider keys in loading schemas,
+consistent alias/constraint identity through freeze and import, and omission
+of `apple_common` from direct BUILD globals for this selected exposure boundary.
 
-## Required proof
+Classify as **Slug-native** the restricted three-member facade, static Slug
+`.bzl` availability rather than Bazel's repository/flag guard, closed sibling
+token plus its collision-safe `ProviderIdentity::Builtin` loading projection,
+canonical constraint retention, opaque Apple-toolchain token, and explicit
+configured-target rejection while the configured provider category is absent.
 
-Extend only adjacent selected-BCR archive tests to prove:
+Keep **unsupported/deferred** Bazel's other seven `apple_common` members; full
+struct reflection; provider construction, values and fields; configured
+`ObjcInfo` and `XcodeVersionInfo`; all returned-toolchain members; Apple/Xcode
+fragments, environments, selection, rules, actions and outputs; repository/
+flag/autoload exposure parity beyond the selected boundary.
 
-- a synthetic regular `0444` entry materializes with exact bytes, mtime and,
-  on Unix, retained mode `0444`;
-- existing admitted executable and writable modes remain unchanged;
-- existing regular `0600`, directory `0700`, malformed, namespace, limit,
-  cancellation, transform and source-association rejections remain green;
-- inactive/failed overlap remains unpublished and existing source-association
-  A/B distinctions remain exact; and
-- the pinned archive hash/listing plus the authenticated replay remain the
-  full consumer/provenance evidence. Do not add the archive or a fixture.
+## Owners, lifetime and utility review
 
-The replay must use an explicitly bounded PATH, clear rules_shell and this
-mode error, finish selected rules_java materialization, and stop only at the
-next independently owned boundary. If it instead exposes another archive mode
-or type, return `REPLAN`; do not broaden the matcher in implementation.
+- New private `apple_common.rs` owns the facade, exact three-name reflection,
+  zero-argument factory and opaque toolchain token.
+- `provider.rs` solely owns the closed declaration-only key kind, Starlark
+  equality/hash/display, loading identity lowering and configured-use guard.
+- `package.rs::complete_loading_globals` remains the sole environment owner;
+  it registers the facade only in the existing `.bzl` branch. `lib.rs` only
+  declares the private module.
+- `slug_analysis_v2::analysis_value` remains the configured target Starlark
+  view owner and changes only its two key-entry operations.
 
-## Allowlist, caps and validation
+The two key values are immutable globals retained by the loading environment;
+the factory result is evaluation scratch until normal module freeze. Existing
+`ProviderIdentity` values in frozen schemas and configured graphs retain their
+current compact representation, equality and invalidation. No request input,
+DICE key, observation, cache, lock, fallback, mutable state or asynchronous
+owner is added. Failure/cancellation publishes no module or configured result;
+overlapping requests share only immutable globals and frozen values.
 
-Only these files may change:
+Buck2/V1 review selects existing V2/Starlark `Allocative`, closed enums,
+`SmallSet`, `SmallMap` and immutable `Arc` storage as retained dependencies,
+not copied code. Add no map, set, string allocation, interner or cache for the
+two static token variants. A compile-time size assertion must keep the kind one
+byte. No benchmark is required for two static globals and two constant-time
+type checks. `package.rs` is over 11,000 lines, so all substantive behavior
+stays in the dedicated/provider/analysis owners. `provider.rs` and
+`analysis_value.rs` remain below 2,000 lines under the caps.
 
-- `app/slug_core_v2/src/runtime/repository_archive_realize.rs`;
-- `app/slug_core_v2/src/runtime/tests/repository_archive_realize_tests.rs`.
+No fixture is added. The pinned sources and authenticated replay are the
+provenance evidence; the configured Bazel ObjC test is not ported because its
+Apple provider/rule semantics remain deferred.
 
-Gross additions are capped at 6 production Rust, 40 proof Rust and 46 total.
-No docs, fixture, Cargo metadata or other source may change during
-implementation.
+The sibling is an explicit temporary boundary, not a configured-provider
+fallback. Its invariant is that declaration-only tokens never reach configured
+membership/index lookup. A future separately reviewed Stage 6 configured-Apple
+provider packet may delete it only after admitting complete `ObjcInfo` and
+`XcodeVersionInfo` construction, retained values, materialization and target
+lookup. That packet must replace the rejection proofs with Bazel's absent/
+present membership and indexing cases while preserving loading-schema identity.
+
+## Required discriminating proof
+
+A later implementation packet must prove:
+
+- both sibling variants have distinct structural equality/hash, exact display
+  names, one-byte kind size and `Allocative`; neither equals an ordinary
+  built-in key;
+- ordinary and Bzlmod `.bzl` evaluation supports exactly the three selected
+  operations, freezes/re-exports both keys, and direct BUILD globals omit the
+  facade;
+- rule/aspect `provides` and attribute/subrule provider constraints accept the
+  keys and retain ordinary `ObjcInfo`/`XcodeVersionInfo` identities with
+  existing ordering/deduplication;
+- for each key, both `key in target` and `target[key]` produce the exact
+  declaration-only diagnostic, including when the target map contains the
+  same normal identity;
+- normal built-in and user providers preserve present/absent membership,
+  indexing, invalid-key diagnostics and hash/equality behavior;
+- every deferred facade name and every nested toolchain access fails closed;
+  failed evaluation freezes/publishes no module; and
+- authenticated replay clears all three declarations and stops at the next
+  independent boundary before configured Apple behavior executes.
+
+## Proposed implementation allowlist, caps and validation
+
+After independent design acceptance, freeze a separate implementation packet
+allowing only:
+
+- `app/slug_loading_v2/src/apple_common.rs` (new, with adjacent tests);
+- `app/slug_loading_v2/src/provider.rs` (sibling token/conversions and tests);
+- `app/slug_loading_v2/src/lib.rs` (one private module declaration);
+- `app/slug_loading_v2/src/package.rs` (import/registration only); and
+- `app/slug_analysis_v2/src/analysis_value.rs` (two configured key operations
+  and adjacent tests).
+
+Caps: 180 production Rust, 180 proof Rust and 360 aggregate gross additions.
+`package.rs` is capped at four production lines; `provider.rs` at 80 aggregate
+lines; `analysis_value.rs` at 75 aggregate lines. No build-API, DICE, fixture,
+asset, Cargo or documentation file may change during implementation.
 
 Run serially:
 
-- `cargo test -p slug_core_v2
-  selected_bcr_realizes_streamed_files_gnu_name_modes_mtime_and_module
-  --quiet`;
-- `cargo test -p slug_core_v2 selected_bcr --quiet`;
-- `cargo test -p slug_core_v2 --lib --quiet`;
+- focused `slug_loading_v2` apple/provider tests;
+- focused `slug_analysis_v2` declaration-only target-key tests;
+- `cargo test -p slug_loading_v2 --lib --quiet` plus its integration targets;
+- `cargo test -p slug_analysis_v2 --lib --quiet`;
+- `cargo test -p slug_query_v2 --lib --quiet`;
 - `cargo build -p slug_cli_v2 --quiet`, stale-`slugd` cleanup and one
-  authenticated bounded-PATH replay;
-- `cargo fmt --check`, `git diff --check`,
-  `bash scripts/v2_archive_status.sh` and exact allowlist/cap verification.
+  authenticated bounded-PATH replay; and
+- `cargo fmt --check`, `git diff --check`, archive hygiene and exact
+  allowlist/cap checks.
 
-Return `REPLAN` if exact `0444` retention requires a second production
-owner, a new key/input/cache/lock, platform-wide permission policy, another
-mode/type, archive fixture, probe or consumer branch, altered source identity,
-or the allowlist/caps fail.
+Return `REPLAN` if configured-target provenance cannot be rejected before
+ordinary identity lowering; provider constraints require retaining a second
+tagged identity; `ProviderIdentity` or `ProviderCollection` must change; an
+Apple provider value/member executes during declaration; another facade member
+is required; a map/interner/cache/key/fixture is proposed; either large file
+crosses 2,000 lines; or the allowlist/caps fail.

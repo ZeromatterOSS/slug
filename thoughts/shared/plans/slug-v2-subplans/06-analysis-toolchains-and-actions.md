@@ -23000,3 +23000,49 @@ rules_rust replay stops at that later generic error. Terminal review returns
 `ACCEPT`; configured registration and toolchain owners remain unchanged, and
 the next packet must audit the complete generic builtin parameter category
 before any toolchain-analysis widening.
+
+### Apple declaration-provider configured-use guard designed (2026-09-02)
+
+Commit `96fe2d6cb` and the authenticated rules_rust replay reach selected
+rules_cc 0.2.4 loading at missing `apple_common`. The complete source closure
+needs declaration-time `Objc`, `XcodeVersionConfig` and
+`apple_toolchain()` only. Stage 6 owns neither the loading facade nor repository
+provenance, but it owns the configured `Target` Starlark view where provider
+membership and indexing become semantic operations.
+
+The rejected first design reused `BuiltinProviderKey`. Live
+`starlark_provider_identity` would erase that token to a normal
+`ProviderIdentity`, after which `AnalysisConfiguredTargetValue::is_in` could
+return false and `at` could report an ordinary missing provider. The corrected
+design adds a provider-owned closed one-byte declaration-only sibling and a
+configured-target raw-key guard. `is_in` and `at` call that guard before normal
+identity lowering or `SmallMap` lookup and return the frozen declaration-only
+diagnostic for either Apple key, including when the target contains a
+coincidentally named normal provider.
+
+All existing built-in/user provider keys retain their exact present/absent
+membership, indexing, invalid-key, equality and hash behavior. Loading-time
+provider constraints continue to lower the sibling into the existing retained
+identity; Stage 6 adds no tagged graph identity, provider collection, map,
+interner, cache, DICE key or fallback lookup.
+
+Exact behavior covers the selected rules_cc declaration operations, loading-
+schema acceptance/alias consistency and direct BUILD omission for this selected
+exposure boundary. The sibling representation, static Slug `.bzl` exposure,
+opaque toolchain token and configured-use error are Slug-native. Configured
+Apple provider construction/values/fields, normal Bazel target membership and
+indexing for those providers, Apple fragments/toolchains/actions and broader
+repository/flag/autoload exposure parity remain deferred.
+
+Adjacent Stage 6 proof must exercise both `key in target` and `target[key]` for
+both declaration keys, assert the exact error before lookup even with matching
+normal identities, and preserve ordinary built-in/user present, absent and
+invalid-key behavior. The sibling may be deleted only by a separately reviewed
+Stage 6 packet admitting complete configured `ObjcInfo` and
+`XcodeVersionInfo` construction, retained values, materialization and target
+lookup; that packet replaces rejection proofs with Bazel's absent/present
+membership and indexing cases while retaining loading-schema identity.
+
+Review only
+`WP-4-6-7A-apple-common-declaration-provider-fail-closed-design-r1`.
+No Rust implementation is authorized until independent acceptance.
