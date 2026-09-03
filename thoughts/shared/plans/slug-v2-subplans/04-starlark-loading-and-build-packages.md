@@ -8344,7 +8344,7 @@ adds no rules_shell/rules_java branch, load global, repository method or source
 capability. The active implementation packet is frozen in
 `current-packet.md` and must stop before any new loading boundary.
 
-### Apple-common declaration-provider boundary redesigned (2026-09-02)
+### Apple-common declaration-provider implementation selected (2026-09-02)
 
 Commit `96fe2d6cb` accepts regular selected-BCR `0444` materialization at
 2/12/14 gross production/proof/total Rust additions. Authentic replay clears
@@ -8390,8 +8390,7 @@ The sibling's deletion condition is a separately reviewed Stage 6 packet that
 admits complete configured `ObjcInfo` and `XcodeVersionInfo` values and replaces
 the explicit rejection proofs with Bazel's absent/present target behavior.
 
-Select docs-only
-`WP-4-6-7A-apple-common-declaration-provider-fail-closed-design-r1` for
-independent review. It authorizes no Rust. The prospective five-file
-180/180/360 implementation envelope and explicit stops are frozen in
-`current-packet.md`.
+Commit `94738a9a2` accepts the design. Implement only
+`WP-4-6-7A-apple-common-declaration-provider-fail-closed-implementation-r1`
+under the five-file 180/180/360 production/proof/total envelope and tighter
+per-file caps frozen in `current-packet.md`.

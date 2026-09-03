@@ -1,14 +1,14 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-6-7A-apple-common-declaration-provider-fail-closed-design-r1
+Packet: WP-4-6-7A-apple-common-declaration-provider-fail-closed-implementation-r1
 
-Milestone: M7A bootstrap-critical loading/ruleset closure. Design a bounded
+Milestone: M7A bootstrap-critical loading/ruleset closure. Implement the bounded
 `apple_common` declaration facade whose provider keys remain valid in loading
 schemas but cannot silently participate in configured-target lookup before
 configured Apple providers exist.
 
-Status: docs-only correction returns design `ACCEPT`. Independent architecture
-review is required. This packet authorizes no Rust implementation.
+Status: design checkpoint `94738a9a2` is accepted. Implementation is active
+only under the frozen allowlist, caps, proof, validation and stops below.
 
 ## Accepted predecessor, replay boundary and rejected design
 
@@ -89,11 +89,11 @@ operations that convert a raw Starlark provider key; all other uses are loading
 schema conversion or tests.
 
 The retained build-API `ProviderIdentity`, provider collections and configured
-target values are not changed by this design.
+target values must not change in this implementation.
 
 ## Corrected design and compatibility classification
 
-Design result: `ACCEPT`. Add a provider-owned sibling Starlark token backed by
+Accepted design: add a provider-owned sibling Starlark token backed by
 a closed `#[repr(u8)]` two-variant kind: `ObjcInfo` and `XcodeVersionInfo`.
 The token is immutable, `Allocative`, structurally hashes/compares by variant,
 with a token-domain hash discriminator, and is not equal to an ordinary
@@ -183,7 +183,7 @@ present membership and indexing cases while preserving loading-schema identity.
 
 ## Required discriminating proof
 
-A later implementation packet must prove:
+Implementation must prove:
 
 - both sibling variants have distinct structural equality/hash, exact display
   names, one-byte kind size and `Allocative`; neither equals an ordinary
@@ -204,10 +204,9 @@ A later implementation packet must prove:
 - authenticated replay clears all three declarations and stops at the next
   independent boundary before configured Apple behavior executes.
 
-## Proposed implementation allowlist, caps and validation
+## Implementation allowlist, caps and validation
 
-After independent design acceptance, freeze a separate implementation packet
-allowing only:
+Only these files may change:
 
 - `app/slug_loading_v2/src/apple_common.rs` (new, with adjacent tests);
 - `app/slug_loading_v2/src/provider.rs` (sibling token/conversions and tests);

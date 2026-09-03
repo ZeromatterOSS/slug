@@ -4859,6 +4859,7 @@ recursive-loading evidence and replay handoff for this design. It owns no
 changed provider, loading-global or configured-analysis semantics.
 
 Stage 5 authorizes no source copy, catalog row, mapping, route, materializer,
-DICE key, observation, lockfile or repository-specific branch. Review only
-`WP-4-6-7A-apple-common-declaration-provider-fail-closed-design-r1`; no Rust
-implementation or replay is authorized until that design is accepted.
+DICE key, observation, lockfile or repository-specific branch. Commit
+`94738a9a2` accepts the cross-stage design; its active implementation may reuse
+only Stage 5's existing provenance/replay handoff and owns no Stage 5 semantic
+change.

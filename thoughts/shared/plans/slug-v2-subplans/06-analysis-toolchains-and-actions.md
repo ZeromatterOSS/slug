@@ -23001,7 +23001,7 @@ rules_rust replay stops at that later generic error. Terminal review returns
 the next packet must audit the complete generic builtin parameter category
 before any toolchain-analysis widening.
 
-### Apple declaration-provider configured-use guard designed (2026-09-02)
+### Apple declaration-provider configured-use implementation selected (2026-09-02)
 
 Commit `96fe2d6cb` and the authenticated rules_rust replay reach selected
 rules_cc 0.2.4 loading at missing `apple_common`. The complete source closure
@@ -23043,6 +23043,7 @@ Stage 6 packet admitting complete configured `ObjcInfo` and
 lookup; that packet replaces rejection proofs with Bazel's absent/present
 membership and indexing cases while retaining loading-schema identity.
 
-Review only
-`WP-4-6-7A-apple-common-declaration-provider-fail-closed-design-r1`.
-No Rust implementation is authorized until independent acceptance.
+Commit `94738a9a2` accepts the design. Implement only
+`WP-4-6-7A-apple-common-declaration-provider-fail-closed-implementation-r1`
+under the configured-target owner, proofs and stops frozen in
+`current-packet.md`.
