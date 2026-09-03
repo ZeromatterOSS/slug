@@ -75,6 +75,7 @@ use starlark::values::typing::StarlarkCallable;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::apple_common::apple_common_globals;
 use crate::attrs::AllowedAttributeValues;
 use crate::attrs::AttributeDependencyConfiguration;
 use crate::attrs::AttributeKind;
@@ -9403,6 +9404,7 @@ fn complete_loading_globals(bool_config: bool, bzlmod_native: bool) -> Globals {
         globals.set("config", ConfigModule);
         globals.set("config_common", ConfigCommonModule);
         aspect_globals(&mut globals);
+        apple_common_globals(&mut globals);
         cc_common_globals(&mut globals);
         label_globals(&mut globals);
         testing_bootstrap_globals(&mut globals);

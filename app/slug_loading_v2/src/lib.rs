@@ -10,6 +10,7 @@
 
 #[doc(hidden)]
 pub mod analysis_fragments;
+mod apple_common;
 pub mod attrs;
 mod builtin_restriction;
 pub mod bzl_module;

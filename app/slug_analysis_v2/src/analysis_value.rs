@@ -46,8 +46,8 @@ use slug_loading_v2::provider::alloc_frozen_starlark_label;
 use slug_loading_v2::provider::alloc_starlark_depset;
 use slug_loading_v2::provider::alloc_starlark_depset_parts;
 use slug_loading_v2::provider::alloc_starlark_user_provider;
+use slug_loading_v2::provider::configured_target_provider_identity;
 use slug_loading_v2::provider::starlark_label;
-use slug_loading_v2::provider::starlark_provider_identity;
 use slug_loading_v2::provider::starlark_user_provider_fields;
 use slug_loading_v2::subrule_invocation::AnalysisArtifactValue;
 use starlark::any::ProvidesStaticType;
@@ -423,7 +423,7 @@ impl<'v> StarlarkValue<'v> for AnalysisConfiguredTargetValue {
     }
 
     fn at(&self, index: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let identity = starlark_provider_identity(index).ok_or_else(|| {
+        let identity = configured_target_provider_identity(index)?.ok_or_else(|| {
             starlark::Error::new_other(anyhow::anyhow!(
                 "provider lookup requires an exported provider constructor"
             ))
@@ -440,7 +440,7 @@ impl<'v> StarlarkValue<'v> for AnalysisConfiguredTargetValue {
     }
 
     fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
-        Ok(starlark_provider_identity(other)
+        Ok(configured_target_provider_identity(other)?
             .is_some_and(|identity| self.providers.contains_key(&identity)))
     }
 
@@ -1116,7 +1116,10 @@ mod tests {
     use slug_build_api_v2::PlatformInfo;
     use slug_build_api_v2::ProviderId;
     use slug_build_api_v2::RunEnvironmentInfo;
+    use slug_loading_v2::provider::DeclarationOnlyAppleProviderKey;
+    use slug_loading_v2::provider::DeclarationOnlyAppleProviderKind;
     use slug_loading_v2::provider::alloc_starlark_provider_callable;
+    use slug_loading_v2::provider::starlark_provider_identity;
     use starlark::values::list::ListRef;
 
     use super::*;
@@ -1439,6 +1442,61 @@ mod tests {
                 );
             });
         }
+    }
+
+    #[test]
+    fn declaration_only_apple_keys_reject_target_operations_before_lookup() {
+        let occurrence = |name| {
+            ProviderValue::Occurrence(ProviderOccurrence::empty(ProviderIdentity::builtin(name)))
+        };
+        let providers = ProviderCollection::new(vec![
+            ProviderValue::DefaultInfo(DefaultInfo::empty()),
+            occurrence("ObjcInfo"),
+            occurrence("XcodeVersionInfo"),
+        ])
+        .unwrap();
+        let retained = ConfiguredTargetValue::new(
+            AnalysisConfiguredTargetKey::new(
+                slug_identity_v2::CanonicalLabel::parse("@@//:apple").unwrap(),
+                [4, 5, 6],
+            ),
+            providers,
+        );
+        let heap = FrozenHeap::new();
+        let value = AnalysisValueMaterializer::new(&heap)
+            .target(&retained)
+            .unwrap();
+        let target = AnalysisConfiguredTargetValue::from_value(value.to_value()).unwrap();
+        for kind in [
+            DeclarationOnlyAppleProviderKind::ObjcInfo,
+            DeclarationOnlyAppleProviderKind::XcodeVersionInfo,
+        ] {
+            let key = heap.alloc(DeclarationOnlyAppleProviderKey(kind));
+            let expected = format!(
+                "apple_common.{} is declaration-only; configured-target membership and indexing are unsupported",
+                kind.names().1
+            );
+            assert_eq!(
+                target.is_in(key.to_value()).unwrap_err().to_string(),
+                expected
+            );
+            Heap::temp(|scratch| {
+                assert_eq!(
+                    target.at(key.to_value(), scratch).unwrap_err().to_string(),
+                    expected
+                )
+            });
+        }
+        let present = alloc_starlark_provider_callable(&heap, "DefaultInfo").unwrap();
+        let absent = alloc_starlark_provider_callable(&heap, "ToolchainInfo").unwrap();
+        assert!(target.is_in(present.to_value()).unwrap());
+        assert!(!target.is_in(absent.to_value()).unwrap());
+        assert!(!target.is_in(Value::new_none()).unwrap());
+        Heap::temp(|scratch| {
+            assert!(target.at(present.to_value(), scratch).is_ok());
+            assert!(target.at(absent.to_value(), scratch).is_err());
+            assert!(target.at(Value::new_none(), scratch).is_err());
+        });
     }
 
     #[test]

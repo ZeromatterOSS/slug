@@ -121,6 +121,41 @@ impl<'v> StarlarkValue<'v> for BuiltinProviderKey {
     }
 }
 
+#[repr(u8)]
+#[derive(Debug, Copy, Clone, Hash, Allocative)]
+pub enum DeclarationOnlyAppleProviderKind {
+    ObjcInfo,
+    XcodeVersionInfo,
+}
+impl DeclarationOnlyAppleProviderKind {
+    pub const fn names(self) -> (&'static str, &'static str) {
+        match self {
+            Self::ObjcInfo => ("ObjcInfo", "Objc"),
+            Self::XcodeVersionInfo => ("XcodeVersionInfo", "XcodeVersionConfig"),
+        }
+    }
+}
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct DeclarationOnlyAppleProviderKey(pub DeclarationOnlyAppleProviderKind);
+impl fmt::Display for DeclarationOnlyAppleProviderKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<function {}>", self.0.names().0)
+    }
+}
+starlark::starlark_simple_value!(DeclarationOnlyAppleProviderKey);
+#[starlark_value(type = "Provider")]
+impl<'v> StarlarkValue<'v> for DeclarationOnlyAppleProviderKey {
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "slug.apple-common.declaration-provider".hash(hasher);
+        self.0.hash(hasher);
+        Ok(())
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other).is_some_and(|other| self.0 as u8 == other.0 as u8))
+    }
+}
+
 /// Fixed `.bzl` declaration token; configured output-group values are deferred.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct OutputGroupInfo;
@@ -1518,6 +1553,9 @@ fn empty_evaluator_depset<'v>(order: DepsetOrder, eval: &mut Evaluator<'v, '_, '
 }
 
 pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> {
+    if let Some(key) = DeclarationOnlyAppleProviderKey::from_value(value) {
+        return Some(ProviderIdentity::builtin(key.0.names().0));
+    }
     if let Some(key) = BuiltinProviderKey::from_value(value) {
         return Some(ProviderIdentity::builtin(key.name));
     }
@@ -1541,6 +1579,18 @@ pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> 
         return Some(ProviderIdentity::builtin(name));
     }
     None
+}
+
+pub fn configured_target_provider_identity(
+    value: Value<'_>,
+) -> starlark::Result<Option<ProviderIdentity>> {
+    if let Some(key) = DeclarationOnlyAppleProviderKey::from_value(value) {
+        return Err(starlark::Error::new_other(anyhow::anyhow!(
+            "apple_common.{} is declaration-only; configured-target membership and indexing are unsupported",
+            key.0.names().1
+        )));
+    }
+    Ok(starlark_provider_identity(value))
 }
 
 /// Allocates the existing loading-owned callable token for an admitted
@@ -1789,6 +1839,9 @@ mod tests {
     use starlark::syntax::AstModule;
     use starlark::syntax::Dialect;
 
+    use super::BuiltinProviderKey;
+    use super::DeclarationOnlyAppleProviderKey;
+    use super::DeclarationOnlyAppleProviderKind;
     use super::StarlarkDefaultInfo;
     use crate::package::loading_globals;
 
@@ -1821,6 +1874,28 @@ mod tests {
             .eval_module(ast, &loading_globals())
             .map_err(|error| error.to_string())?;
         module.freeze().map_err(|error| format!("{error:?}"))
+    }
+
+    #[test]
+    fn declaration_only_apple_keys_are_compact_distinct_and_domain_separated() {
+        const _: [(); 1] = [(); std::mem::size_of::<DeclarationOnlyAppleProviderKind>()];
+        fn assert_allocative<T: allocative::Allocative>() {}
+        assert_allocative::<DeclarationOnlyAppleProviderKind>();
+        let heap = starlark::values::FrozenHeap::new();
+        let objc = heap.alloc(DeclarationOnlyAppleProviderKey(
+            DeclarationOnlyAppleProviderKind::ObjcInfo,
+        ));
+        let xcode = heap.alloc(DeclarationOnlyAppleProviderKey(
+            DeclarationOnlyAppleProviderKind::XcodeVersionInfo,
+        ));
+        let ordinary = heap.alloc(BuiltinProviderKey::new("ObjcInfo"));
+        assert_eq!(objc.to_string(), "<function ObjcInfo>");
+        assert_eq!(xcode.to_string(), "<function XcodeVersionInfo>");
+        assert!(!objc.to_value().equals(xcode.to_value()).unwrap());
+        assert!(!objc.to_value().equals(ordinary.to_value()).unwrap());
+        let hash = |value: starlark::values::Value<'_>| value.get_hashed().unwrap().hash();
+        assert_ne!(hash(objc.to_value()), hash(xcode.to_value()));
+        assert_ne!(hash(objc.to_value()), hash(ordinary.to_value()));
     }
 
     #[test]
