@@ -1,12 +1,13 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-6-7A-java-configuration-field-declaration-fail-closed-audit-r2
+Packet: WP-4-6-7A-java-configuration-field-declaration-fail-closed-audit-r3
 
-Status: R1 implementation review returned `REPLAN` because its exact/proof and
-replay claims crossed the already-admitted initializer guard. This corrected
-docs-only R2 freezes the bounded successor below and awaits independent review.
-The existing five-file Rust diff is preserved untouched; no further Rust work
-is authorized before `ACCEPT`.
+Status: R2 was accepted at commit `6542169e8`, and its parked five-file Rust
+candidate clears both selected Java declarations. Authenticated replay then
+disproved only the predicted next stop: BUILD invokes an earlier imported
+`.bzl` helper before the Java toolchain initializer call. This docs-only R3
+corrects source order and replay claims without changing the implementation
+scope or Rust candidate, and awaits independent review.
 
 ## Predecessor and replay boundary
 
@@ -43,8 +44,8 @@ The relevant files are regular `0444` with trailing LF:
 | `java/common/rules/java_toolchain.bzl` | `5ad6511cdef925246961c7e7a9039475c192371fedbf909c63cf92334779e875` | 24,304/612 | initializer returns at 262 and is bound at 266; Java fields at 602/606; body uses at 112/133 |
 | `java/bazel/rules/bazel_java_test.bzl` | `33b1b5e205c6658c661be6b0cd1b30fe0339d78f0b4fbc061a350024a412f412` | 5,416/148 | already-admitted coverage field at lines 90-93 |
 | `java/rules_java_deps.bzl` | `40ce0f5b44b124f9fdc3986d542caa6b3a3213c2abbd4927cdea65ad42f31a23` | 8,257/224 | generated proxy load order |
-| `toolchains/default_java_toolchain.bzl` | `6f963992c933e6cbc48f0c64f3349484422ee06f01830473ea802731b874deea` | 9,335/219 | public toolchain wrapper entry |
-| `toolchains/BUILD` | `b23a9b08e5928120d2d3f3a559b9c54f8472cabf1a4b99baf7cc6f29886a9b73` | 15,306/430 | first of nine `java_toolchain` invocations is line 365 |
+| `toolchains/default_java_toolchain.bzl` | `6f963992c933e6cbc48f0c64f3349484422ee06f01830473ea802731b874deea` | 9,335/219 | defines `java_runtime_files` at 201-217; transient `native.filegroup` at 204-208; first/second `Label` at 212/213 |
+| `toolchains/BUILD` | `b23a9b08e5928120d2d3f3a559b9c54f8472cabf1a4b99baf7cc6f29886a9b73` | 15,306/430 | loads `java_runtime_files` at 9-15, first calls it at 102; later first `default_java_toolchain` call at 365 |
 | `MODULE.bazel` | `ee63f27e36a3fada80342869361182f120a9819c74320e8e65b1e04ba0cd7a9d` | 4,218/136 | registers `//toolchains:all` |
 
 The complete archive census is exactly three `configuration_field` calls in
@@ -62,9 +63,12 @@ already succeeds before the first Java call stops. The authentic
 `_java_toolchain_initializer` returns `kwargs` at
 `java_toolchain.bzl:254-262`, is bound by `rule(initializer=...)` at 264-266,
 and the surrounding durable anchor continues through the example at 282.
-After `.bzl` declarations load, `toolchains/BUILD:365` attempts the first of
-nine toolchain targets. Slug's existing initializer guard rejects that call
-before recorder access, coercion, target/output insertion or implementation.
+That later boundary is not reached. `toolchains/BUILD` first loads
+`java_runtime_files` from `default_java_toolchain.bzl` at lines 9-15 and calls
+it at line 102. The helper at lines 201-217 invokes `native.filegroup` at
+204-208, mutating the package recorder transiently, before its first Label
+string at line 212 fails; the second Label at line 213 is unreached. Package
+failure is atomic, so none of that transient recorder state is published.
 
 ## Bazel 9.2 authority and producer gap
 
@@ -112,7 +116,7 @@ bodies; this packet must reject instead.
 
 ## Decision, compatibility and ownership
 
-Audit result: `ACCEPT`, pending independent review, for declaration retention
+Audit result: `ACCEPT`, pending independent R3 review, for declaration retention
 plus a configured fail-closed boundary.
 
 **Exact:** recognize fragment `java` only for the two selected field names in
@@ -134,11 +138,12 @@ The closed Rust enum and structural identity replace Bazel reflection. The
 three Bazel-valid but unselected fields remain rejected rather than silently
 gaining parity.
 
-**Unsupported/deferred:** initializer execution and authentic Java toolchain
-final-target recording; every Java command-option producer, default and
-nondefault field resolution, Java fragment facade, the other three fields,
-Java toolchain/provider/rule-body behavior, optimization and compilation
-actions. Add no inert label or default-`None` placeholder.
+**Unsupported/deferred:** BUILD-to-imported-`.bzl` Label definition/caller
+provenance; initializer execution and authentic Java toolchain final-target
+recording; every Java command-option producer, default and nondefault field
+resolution, Java fragment facade, the other three fields, Java
+toolchain/provider/rule-body behavior, optimization and compilation actions.
+Add no inert label or default-`None` placeholder.
 
 `configuration_field.rs` remains the natural producer. Add a private or
 `pub(super)` `#[repr(u8)] JavaConfigurationField` with exactly two variants and
@@ -165,8 +170,8 @@ existing compact enum/identity only.
 
 ## Frozen implementation successor
 
-After independent `ACCEPT`, activate
-`WP-4-6-7A-java-configuration-field-declaration-fail-closed-implementation-r2`
+After independent R3 `ACCEPT`, activate
+`WP-4-6-7A-java-configuration-field-declaration-fail-closed-implementation-r3`
 with exactly this allowlist:
 
 - `app/slug_configuration_v2/src/native/configuration_field.rs`;
@@ -182,9 +187,9 @@ names plus coverage success; all three other Bazel-valid Java fields and an
 unknown field rejecting; positional/named ABI and BUILD absence; private
 `attr.label`-only use; freeze/import/re-export without initializer execution;
 the unknown-field loading diagnostic
-`invalid configuration field name 'missing' on fragment 'java'`; a separately identified generic
-no-initializer target-recording control; the selected initializer declaration
-and exact pre-recorder target-invocation guard; source order;
+`invalid configuration field name 'missing' on fragment 'java'`; a separately
+identified generic no-initializer target-recording control; selected
+initializer declaration without authentic invocation; source order;
 same-field/tools-repository equality/hash and pair/repository discrimination; one-byte
 `ConfigurationField`, unchanged identity/late-bound carrier sizes and no
 ordinary-rule carrier; same-DICE source A/B/A restoration; and byte-exact
@@ -196,13 +201,28 @@ Run focused native-configuration, loading and analysis tests, then serial full
 configuration/loading/analysis/query suites, direct pinned-nightly CLI build,
 authenticated bounded-PATH replay, stale-slugd, formatting, diff, archive,
 allowlist and cap gates. Reuse source evidence; add no fixture. Replay must
-clear both Java `.bzl` declarations, enter `toolchains/BUILD:365`, and stop at
-`target invocation for rule initializer is unsupported` on the first toolchain
-target; it must not claim any authentic target was recorded.
+clear both Java `.bzl` declarations and reproduce the current next stop at
+`@@rules_java+//toolchains:default_java_toolchain.bzl:212`:
+
+```text
+Label() may only be called in a .bzl module
+```
+
+The failed package must publish no targets, but proof must not claim
+pre-recorder rejection: the imported helper's `native.filegroup` has already
+mutated only the doomed recorder transiently. Line 213 and the later
+initializer-bearing `default_java_toolchain` call at `toolchains/BUILD:365`
+remain unreached.
+
+After this implementation, audit
+`WP-4-7A-build-imported-bzl-label-caller-provenance-audit-r1` as the bounded
+generic BUILD-calls-imported-`.bzl` Label definition/caller-provenance category;
+do not special-case rules_java or this helper.
 
 Return `REPLAN` if rejection cannot precede dependency/toolchain/body work; a
 fourth selected Java field appears; implementation needs a command option,
 Java fragment, package/schema/DICE owner, retained store, public sibling-enum
 export, fixture or another production file; enum/identity size grows; a Java
-field returns a label/`None`, the initializer guard is bypassed, an authentic
-Java target is recorded or a body executes; or any cap is exceeded.
+field returns a label/`None`, an authentic Java initializer/target/body
+executes, the failed BUILD package publishes transient recorder state, or any
+cap is exceeded.

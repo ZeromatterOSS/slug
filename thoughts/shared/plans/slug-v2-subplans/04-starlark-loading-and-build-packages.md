@@ -8638,13 +8638,21 @@ rule declaration and freeze/import/re-export. BUILD remains without the global;
 C++ and coverage remain unchanged. Generic no-initializer target recording is
 a separate unchanged exact control.
 
-R1 review returns `REPLAN` for crossing the runtime boundary. The authentic
-`_java_toolchain_initializer` returns at `java_toolchain.bzl:262`, is bound at
-266 (surrounding anchor 262-282), and `toolchains/BUILD:365` invokes the first
-toolchain target. Slug's existing initializer guard precedes recorder access,
-coercion and target/output insertion, so initializer execution and authentic
-final-target recording remain deferred. Corrected R2 replay must stop exactly
-at `target invocation for rule initializer is unsupported` on that first call.
+R1 review returned `REPLAN` for crossing the runtime boundary and R2 was
+accepted at `6542169e8`. The parked candidate clears both selected
+declarations. Replay instead reaches an earlier generic caller-provenance
+boundary. `toolchains/BUILD` (SHA-256
+`b23a9b08e5928120d2d3f3a559b9c54f8472cabf1a4b99baf7cc6f29886a9b73`)
+loads `java_runtime_files` at 9-15 and first calls it at 102. The imported
+helper in `default_java_toolchain.bzl:201-217` (SHA-256
+`6f963992c933e6cbc48f0c64f3349484422ee06f01830473ea802731b874deea`)
+records a transient `native.filegroup` at 204-208 before its first Label string
+at 212 fails with `Label() may only be called in a .bzl module`; its second
+Label at 213 is unreached. Package failure atomically prevents publication,
+but this is not pre-recorder rejection and authentic transient mutation did
+occur. The initializer-bearing call at BUILD line 365 is later and unreached;
+initializer execution and authentic Java final-target recording remain
+deferred.
 
 This loading behavior is exact. The two-field Java enum is private or
 `pub(super)` and flattened into the existing one-byte closed field; no public
@@ -8657,7 +8665,9 @@ fixture.
 The three other Bazel Java fields and all Java producer/configured semantics
 remain deferred. Proof must cover the full three-call census, selected pair,
 unselected fields, private label-only use, ABI, BUILD absence, lifetime, order,
-identity/hash/layout, source A/B/A, exact unknown-`missing` loading failure and
-the initializer-before-recorder stop. The frozen five-file 80/210/290 R2
-successor awaits independent review. Any need to edit `package.rs`, `subrule.rs`
-or expose the Java sibling publicly is `REPLAN`.
+identity/hash/layout, source A/B/A and exact unknown-`missing` loading failure,
+without invoking the selected initializer-bearing rule. The unchanged
+five-file 80/210/290 R3 successor awaits independent review. After it, audit
+`WP-4-7A-build-imported-bzl-label-caller-provenance-audit-r1` as a bounded
+generic category; do not special-case rules_java. Any need to edit
+`package.rs`, `subrule.rs` or expose the Java sibling publicly is `REPLAN`.

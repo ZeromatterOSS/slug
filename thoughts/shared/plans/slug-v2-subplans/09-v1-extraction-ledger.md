@@ -2696,15 +2696,17 @@ into configured state. Independent retained-state review returns `ACCEPT`; any
 second map, final-schema name, new key/cache or configured retention is
 `REPLAN`; so is any non-rule projection that accepts or drops the marker.
 
-`WP-4-6-7A-java-configuration-field-declaration-fail-closed-audit-r2` reuses
+`WP-4-6-7A-java-configuration-field-declaration-fail-closed-audit-r3` reuses
 the adopted Stage 6 configuration-field representation; no V1/Buck2 code is
 imported. Add exactly two private/`pub(super)` Java discriminants to the
 existing flattened `#[repr(u8)] ConfigurationField`. The public field remains
 one byte, and the existing `ConfigurationFieldIdentity` continues to own only
 that field plus `CanonicalRepoName`; existing frozen rule-definition ownership
-and immutable late-bound slices remain the sole declaration owners. Authentic
-initializer-bearing targets do not publish this state because the pre-recorder
-guard rejects their invocation.
+and immutable late-bound slices remain the sole declaration owners. The next
+replay stop is outside this representation: an imported `.bzl` helper records
+a transient filegroup before Label caller-provenance rejection, while atomic
+package failure prevents publication. Its later initializer-bearing target is
+not reached.
 
 Do not add a public sibling-enum export, per-field string, map, interner,
 registry, cache, extra Arc, evaluator borrow, DICE value or configured

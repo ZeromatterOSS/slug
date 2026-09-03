@@ -23192,11 +23192,17 @@ resolution. This fail-closed boundary is Slug-native; Java option mutation,
 default/nondefault resolution, fragment access, providers, toolchains,
 optimization and compilation actions remain unsupported/deferred.
 
-The authentic replay does not reach this configured guard: the selected
-`java_toolchain` rule has an initializer, and Stage 4 rejects its first
-`toolchains/BUILD:365` invocation before recording. Configured Java rejection
-therefore remains a focused fail-closed proof, while initializer execution and
-authentic Java final-target/analysis semantics remain deferred.
+The authentic replay does not reach this configured guard or the selected
+initializer. The R2 candidate clears both Java field declarations, then
+`toolchains/BUILD:102` calls imported `java_runtime_files`; its transient
+`native.filegroup` records before `default_java_toolchain.bzl:212` fails with
+`Label() may only be called in a .bzl module`. Atomic package failure publishes
+none of that recorder state. The second Label at 213 and initializer-bearing
+call at BUILD line 365 are unreached. Configured Java rejection therefore
+remains a focused fail-closed proof, while BUILD/imported-`.bzl` caller
+provenance, initializer execution and authentic Java final-target/analysis
+semantics remain deferred. The Java-field production and proof are not
+implicated by this next stop.
 
 Stage 6 adds no configured field, equality/fingerprint input, DICE owner, cache
 or retained allocation. `configuration.rs` owns only the typed error and
