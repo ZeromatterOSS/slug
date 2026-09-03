@@ -1,28 +1,29 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-7A-rule-initializer-declaration-retention-implementation-r1
+Packet: WP-4-7A-rule-label-computed-default-declaration-retention-implementation-r1
 
-Milestone: M7A bootstrap-critical loading/ruleset closure. Admit Bazel 9.2's
-generic optional `rule(initializer = ...)` declaration and frozen/imported
-callable lifetime while keeping every initializer-bearing target invocation
-fail closed before package mutation.
+Milestone: M7A bootstrap-critical loading/ruleset closure. Admit the complete
+selected Bazel 9.2 `attr.label(default = <Starlark function>)` declaration and
+frozen/imported callable lifetime while keeping every target invocation that
+could consume such a default fail closed before package mutation.
 
-Status: the docs-only audit and independent packet review return `ACCEPT`.
-Implementation is active and authorized only within this manifest's frozen
-allowlist, caps and stops.
+Status: the docs-only audit and independent packet/retained-representation
+review return `ACCEPT`. Implementation is active and authorized only within
+this manifest's exact allowlist, caps, proofs and stops.
 
 ## Accepted predecessor and authenticated replay
 
-Commit `10aaed332` terminally accepts
-`WP-4-6-7A-apple-common-declaration-provider-fail-closed-implementation-r1`
-at 141 production and 180 proof gross Rust additions, 321 total. Focused
-loading/provider/analysis proofs pass. Serial validation passes:
+Commit `db9e693e7` terminally accepts
+`WP-4-7A-rule-initializer-declaration-retention-implementation-r1` at 21
+production and 131 proof gross Rust additions, 152 total. The terminal reviewer
+accepted the pinned-source-shaped three-declaration proof. Serial validation
+passes:
 
-- `slug_loading_v2 --lib`: 533 passed, 1 ignored;
+- `slug_loading_v2 --lib`: 535 passed, 1 ignored;
 - loading integration targets: 51/29/8/6/2/1/5/1, all passed;
-- `slug_analysis_v2 --lib`: 19/19;
 - `slug_query_v2 --lib`: 55/55;
-- `slug_cli_v2` build, formatting, diff, archive and daemon-hygiene gates.
+- direct pinned-nightly `slug_cli_v2` rebuild, formatting, diff, archive and
+  daemon-hygiene gates.
 
 The rebuilt bounded-PATH replay
 
@@ -32,44 +33,11 @@ env PATH=/usr/bin:/usr/local/bin /home/wgray/slug/target/debug/slug cquery \
   --lockfile_mode=off
 ```
 
-clears the former `apple_common` stop. At toolchain-registration row 14 it
-loads `@@rules_java+//toolchains/BUILD` -> selected rules_cc 0.2.4
-`cc_binary.bzl` -> `attrs.bzl` -> `cc_shared_library.bzl`, then fails before
-any configured Apple operation with
-`Found initializer extra named parameter(s) for call to rule`. The rendered
-trace calls the rule at line 857 and shows `initializer` at line 859; the
-durable release source has the same expression at lines 863-865.
-
-## Bazel 9.2 authority
-
-Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-establishes the category:
-
-- `src/main/starlark/builtins_bzl/common/cc/cc_shared_library.bzl` is the
-  bundled analogue of the selected first consumer;
-- `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkRuleFunctionsApi.java`
-  (SHA-256
-  `be73dbda0b5a3e8285a05bb732a0a01441f99e8d20dc29b83759ef972c0392ea`,
-  lines 698-723) defines named optional `initializer`, default `None`;
-- `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java`
-  (SHA-256
-  `a1f706cfbbc67aa3cd2521df2091dd5ed9af96eb4568049f8eee966d06c622f7`,
-  lines 1765-1881) proves invocation is a distinct later category: copy/lift
-  explicit public Starlark attributes plus `name`, omit `None`, isolate
-  load-time state, invoke child-to-parent, accept `None`/string-keyed dict,
-  merge returned values, preserve `name`, and guard private/base attributes;
-- the same file lines 842-855 and installed
-  `tools/allowlists/initializer_allowlist/BUILD.tools` (SHA-256
-  `79e67fd466f4a6b5be2ffdf925f784374de51dd9584e45f09355c1933c9d4bcb`,
-  145 bytes/7 lines) establish configured allowlist behavior; and
-- `src/test/java/com/google/devtools/build/lib/starlark/StarlarkRuleClassFunctionsTest.java`
-  (SHA-256
-  `e09c93616e096d639ec69b6b0c6a397a8a36bc8a95fa21b986cb5fc7f8f010aa`,
-  lines 3703-4700) discriminates allowlisting, exact argument selection,
-  defaults/`None`, selectors, label dictionaries, return types, unchanged
-  name, and private/base-attribute rejection.
-
-Those runtime behaviors are evidence for the stop, not implementation scope.
+clears all selected initializer declarations, then stops while declaring
+selected rules_cc 0.2.4 `cc_shared_library` with
+`rule attribute _def_parser uses a default form deferred outside this packet`.
+The rendered call is line 857 and `_def_parser` line 1081; the durable release
+source has the same expressions at lines 863 and 1087.
 
 ## Exact selected rules_cc closure
 
@@ -78,145 +46,201 @@ The durable BCR descriptor
 `2bd87ef9b41d4753eadf65175745737135cba0e70b479bdc204ef0c67404d0c4`,
 selects
 `https://github.com/bazelbuild/rules_cc/releases/download/0.2.4/rules_cc-0.2.4.tar.gz`,
-a 276,390-byte release archive with SHA-256
+a 276,390-byte, 400-entry release archive with SHA-256
 `8dcd63392f0bb48adf74f413a9f39ba0fedcb8f99bf085a3b450f06d171dbb6d`
 and integrity `sha256-jc1jOS8LtIrfdPQTqfOboP7cuPmb8IWjtFDwbRcdu20=`.
-An exact scan of all 400 archive entries finds only three initializer-bearing
-rules, all ordinary `0644` trailing-LF files:
+An exact full-archive scan finds one Starlark computed-default callback, three
+descriptor construction sites and four rule consumers:
 
-| Source-relative path | SHA-256 | Bytes/lines | Declaration |
+| Source-relative path | SHA-256 | Bytes/lines; mode | Selected role |
 |---|---|---:|---|
-| `cc/private/rules_impl/cc_shared_library.bzl` | `b188922d966110b8f7bd68385f896652488acb7bd669275ef3de0dc6757ca1c7` | 52,876/1,150 | initializer definition 841-861; rule 863-865 |
-| `cc/private/rules_impl/cc_binary.bzl` | `d9d0f68e028ee64ef9beb73a2b51f308be5b60545b79ce27daa532b430fbc69f` | 41,488/854 | rule 818-820; imports shared initializer |
-| `cc/private/rules_impl/cc_test.bzl` | `6787e5a152ce2e0ec7744a885086ad9977a0ede1da4bb3abd7f69331947ee28f` | 6,206/165 | initializer 99-113; rule 115-117 |
+| `cc/common/semantics.bzl` | `6eb89858e52eb3c50dcd1575f734585083752dd4121dcf09f709ed395dee0f4a` | 7,003/216; 0664 | `_def_parser_computed_default(name, tags)` returns `None` or the Bazel-tools label; `_get_def_parser()` constructs `attr.label(default = callback, allow_single_file = True, cfg = "exec")` |
+| `cc/private/rules_impl/attrs.bzl` | `c368203a345cb0d74d461c77e53d1b468ecd23e07fb0fae083e64b34d65eda42` | 18,749/417; 0664 | `_def_parser` in `cc_binary_attrs` |
+| `cc/private/rules_impl/cc_binary.bzl` | `d9d0f68e028ee64ef9beb73a2b51f308be5b60545b79ce27daa532b430fbc69f` | 41,488/854; 0664 | consumes `cc_binary_attrs` |
+| `cc/private/rules_impl/cc_test.bzl` | `6787e5a152ce2e0ec7744a885086ad9977a0ede1da4bb3abd7f69331947ee28f` | 6,206/165; 0664 | clones `cc_binary_attrs` |
+| `cc/private/rules_impl/cc_library.bzl` | `79af1daa5d12f07b3dd6a489e781bfa2c973b520e883b9ab8c024ee6d0c1925b` | 38,773/962; 0775 | direct `_def_parser` descriptor |
+| `cc/private/rules_impl/cc_shared_library.bzl` | `b188922d966110b8f7bd68385f896652488acb7bd669275ef3de0dc6757ca1c7` | 52,876/1,150; 0664 | direct `_def_parser` descriptor and first replay stop |
 
-All three operands are ordinary Starlark functions. Their bodies are lazy at
-module declaration. The first replay stop occurs while freezing the shared
-library declaration, so no initializer call, target mutation or configured C++
-behavior is required to clear this boundary.
+All files have a trailing LF. No other archive expression passes a Starlark
+function as an attribute default. Other defaults are literals or already-owned
+label/configuration categories. Thus this one generic constructor category
+closes all three selected construction sites and all four declarations without
+special-casing `_def_parser`, rules_cc or C++.
+
+## Bazel 9.2 authority
+
+Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`
+establishes the category:
+
+- `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkAttrModuleApi.java`
+  (SHA-256
+  `af70c851882fa049034184dbb6f6580731cfa738d79dfb8abcf61af176257670`,
+  lines 315-348) admits a Starlark function as `attr.label`'s default;
+- `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkAttrModule.java`
+  (SHA-256
+  `388421c44c623c1c6625fd9f2b059d2a7d1e13b8d45e7c96173f24866a917967`,
+  lines 315-370) distinguishes a `StarlarkFunction`, retains a callback helper
+  and records its parameter names in a computed-default template;
+- `src/main/java/com/google/devtools/build/lib/packages/Attribute.java`
+  (SHA-256
+  `fbe208c37ad4ed88030f874fa6cd8bd5cf2f4aac63f9a01a4ff24ca499c9a6a4`,
+  lines 1367-1515) owns dependency-name ordering, callback invocation,
+  `None` fallback and result type validation;
+- `src/main/java/com/google/devtools/build/lib/packages/AttributeProvider.java`
+  (SHA-256
+  `995e75ea72f98dfe3e69f3a2b4a95808f064dd66273f6ff15a49a9391c00b046`,
+  lines 330-435) evaluates ordinary defaults before computed defaults and
+  precomputes configurable combinations; and
+- `src/test/java/com/google/devtools/build/lib/starlark/StarlarkIntegrationTest.java`
+  (SHA-256
+  `ced8fc27cbe35bf30174678800d29b73012f800bff00bcdff6a5cf8c78fef836`,
+  lines 1450-1510) discriminates label callback inputs and outputs.
+- `src/test/java/com/google/devtools/build/lib/starlark/StarlarkRuleClassFunctionsTest.java`
+  (SHA-256
+  `e09c93616e096d639ec69b6b0c6a397a8a36bc8a95fa21b986cb5fc7f8f010aa`,
+  lines 7169-7190) proves callback result validation for the separately
+  deferred `label_list` category; and
+- `src/test/java/com/google/devtools/build/lib/analysis/ConfigurableAttributesTest.java`
+  (SHA-256
+  `d0d7186241fdedd054a133146830a9f49fc943d2a8eb45b683400d8b8a92abe6`,
+  around line 1502) proves the separately deferred configurable-dependency
+  behavior.
+
+The analogous callback categories on `label_list`,
+`string_keyed_label_dict` and `label_keyed_string_dict`, configurable
+precomputation, and callback execution are evidence for the explicit stop, not
+implementation scope.
 
 ## Audit verdict and compatibility classification
 
-Audit result: `ACCEPT` for one complete **declaration-retention** category.
+Audit result: `ACCEPT` for one complete generic **`attr.label` function-default
+declaration-retention** category.
 
-Implement the optional `initializer` slot generically in the existing transient
-and frozen rule definitions. Omitted and explicit `None` mean no initializer;
-a present value must pass the existing Starlark-function validation used by
-callable definition APIs. Freeze it with the rule and retain
-that one frozen pointer through ordinary and Bzlmod module load, import,
-re-export and package BUILD evaluation. Declaration and freeze must not
-execute the callable.
+Classify as **exact**: recognize only an ordinary Starlark function/lambda in
+`attr.label(default = ...)`; retain that callable and its exact parameter
+metadata through descriptor and rule freeze, import and re-export; admit the
+selected `name, tags` shape and all three construction/four consumer sites;
+keep declaration lazy; and preserve literal, `None`, late-bound label defaults
+and rules without computed defaults unchanged. Existing aspect, subrule,
+symbolic-macro, repository-rule and tag-class rejection remains unchanged.
 
-For a valid named target call on a rule with an initializer, return the stable
-Slug-native diagnostic
+Classify as **Slug-native**: the compact sparse retained representation below
+and this stable target-invocation diagnostic:
 
-`target invocation for rule initializer is unsupported`
+`target invocation for computed-default attribute '<name>' is unsupported`
 
-before `PackageRecorder` access, attribute coercion, target/output insertion or
-other package mutation. Existing positional/name call-shape errors may retain
-their current precedence. A rule with omitted/`None` initializer remains on the
-unchanged package-lowering path.
+Reject a valid named target invocation before `PackageRecorder`, unknown-
+attribute checks, coercion, output or target publication. Explicitly supplying
+the attribute does not bypass the rejection. If a rule also has an initializer,
+the already-accepted initializer diagnostic retains precedence.
 
-Classify as **exact** for the selected consumer: the named optional declaration
-shape, `None` default, acceptance of the three selected Starlark functions,
-lazy declaration, freeze/export/import/re-export availability, and unchanged
-rules without an initializer.
+Keep **unsupported/deferred**: callback invocation and label context; parameter
+dependency semantics and ordering; `name`/`tags` argument values; `None` to
+intrinsic-default conversion; result coercion/type checks; selectors and
+Cartesian precomputation/limits; explicit-value bypass; dependency loading,
+query and configured semantics; every other callback-supporting attribute
+constructor; output computed defaults/materializers; and C++ behavior. Never
+silently substitute `None`/empty or discard the callback.
 
-Classify as **Slug-native**: one frozen-pointer representation and the explicit
-invocation rejection while runtime semantics are unadmitted.
+## Ownership, representation and incremental safety
 
-Keep **unsupported/deferred**: initializer execution; argument copy/lift and
-label context; omission/default/selector semantics; return-dict validation and
-merge; mutation isolation; `native.package_relative_label`; name/private/base
-attribute rules; experimental/configured allowlisting; parent rules and
-child-to-ancestor chaining; configured rule behavior, C++ semantics and any
-consumer-specific bypass. Never silently ignore an initializer.
+`app/slug_loading_v2/src/package.rs` is the sole production owner. Change
+`AttributeDefinitionGen<V>::computed_default: bool` to `Option<V>` so the
+descriptor owns one existing-heap callable pointer. Preserve existing
+`.is_some()` rejection in all unadmitted consumers.
 
-## Ownership, retained memory and incremental safety
+Live anchors are `RuleDefinitionGen`/`FrozenRuleDefinition` at lines 3697/3730,
+`RuleAttributeSchemaGen` at 4775, `AttributeDefinitionGen` and its conversion/
+freeze at 5419-5616, default discrimination at 6289, frozen invocation at 7263,
+and the current typed rule-level rejection at 8768. starlark-rust
+`Value::parameters_spec()` is deliberately present only for `def`/lambda and
+the frozen equivalents, and the retained function itself owns those parameter
+names; no parallel metadata collection is required.
 
-`app/slug_loading_v2/src/package.rs` already solely owns `rule()`, transient
-`RuleDefinitionGen<Value>`, `Freeze`, `FrozenRuleDefinition::invoke`, package
-recording and adjacent unit tests. It is the only production owner.
-`app/slug_loading_v2/src/host_package_load_tests.rs` is the existing proof-only
-owner for recursive ordinary/Bzlmod imported-module package loading.
+Add a private sparse `ComputedDefaultRuleAttributeGen<V>` containing only a
+`u32` schema index and callback `V`. The transient rule definition owns a
+schema-ordered `Vec` and the frozen rule definition owns an immutable `Arc`
+slice. Adjust indexes by the existing builtin count as late-bound attributes
+already do. Do not add a pointer to every `RuleAttributeSchemaGen`: sparse
+storage avoids permanent per-attribute overhead and preserves association.
 
-Retain only `Option<Value>` transiently and `Option<FrozenValue>` after freeze,
-using starlark-rust's existing pointer-sized/niche representation and
-`Allocative` treatment. The pointer belongs to the same frozen module heap as
-the rule. Existing `FrozenBzlModule` and `FrozenBzlLifetimeEntry` ownership
-keeps that heap alive through imports and BUILD evaluation. Add no owned heap,
-raw pointer, map, set, vector, string, interner, registry, cache or copied
-callable.
+Reuse starlark-rust `Value`/`FrozenValue`, `Vec` construction scratch, the
+existing frozen-module lifetime closure, `Arc<[T]>`, `u32` and `Allocative`.
+Freeze/import/re-export clone pointers or the Arc in constant time. Add no map,
+set, interner, string, raw pointer, cache, registry or new heap owner. The
+callback never enters `StarlarkRuleImplementation`, final `PackageEvaluation`,
+analysis, provider/action state or semantic equality because target invocation
+stops before lowering.
 
-The initializer never reaches `StarlarkRuleImplementation`, configured target
-state or `PackageEvaluation` semantic equality because every initializer-
-bearing target call stops before lowering. Existing module source digest,
-recursive manifest fingerprint and DICE key/value equality own source change
-and invalidation. Identical failed calls publish no package. No request input,
-DICE key, observation, lock, await, task, retry or fallback changes; overlapping
-requests share only existing immutable frozen modules and cannot publish
-partial initializer state.
+Existing source digest, recursive load-manifest fingerprint and DICE equality
+own add/remove/change invalidation. There is no new key, input, observation,
+lock, await, task, retry or fallback. Overlapping requests share only existing
+immutable frozen modules. The large `package.rs` remains cohesive here because
+it already exclusively owns descriptor creation/freezing, rule freezing and
+the pre-recorder invocation boundary; splitting that lifecycle would add a
+second owner without reducing retained complexity.
 
-Buck2/V1 review selects no extraction. Reuse starlark-rust `Value`/
-`FrozenValue`, Slug's existing frozen-module lifetime closure and `Allocative`.
-The pointer is constant-time to freeze/clone. No benchmark is required.
+No benchmark is required for this cold declaration boundary, but proof must
+report exact sizes and allocation accounting. Stage 9 records this retained-
+representation choice. Independent retained-representation review returns
+`ACCEPT`; implementation may use only this frozen sparse design.
 
-Deletion condition: a separately reviewed packet may remove the invocation
-guard only when it admits the complete Bazel runtime category above, proves
-heap-safe copied inputs and returned values, models exact label contexts and
-allowlisting, and preserves structural package equality/invalidation. It must
-not carry the initializer pointer into configured state unless a new reviewed
-semantic need proves that necessary.
+Deletion condition: a separately reviewed complete runtime packet replaces the
+guard and declaration-only carrier only after admitting the constructor's
+callback arguments/results, label context, configurable combinations, package
+mutation, query/configured identity and invalidation. It must not move the
+callable into configured state without a new retained-state review.
 
 ## Required proof
 
 Adjacent tests must prove:
 
-- omitted and explicit `None` preserve current rule declaration/invocation;
-- a function initializer declares, exports and freezes without executing;
-- `Option<Value>` and `Option<FrozenValue>` remain pointer-sized and the frozen
-  field participates in the existing `Allocative` rule-definition owner;
-- all three selected rules_cc declaration shapes coexist and remain lazy;
-- imported/re-exported frozen rules retain the initializer marker under
-  ordinary and Bzlmod loading;
-- non-function initializer values, including other callable value kinds, fail
-  at declaration and publish no module;
-- valid target invocation returns the exact diagnostic before attribute
-  coercion or package/target/output publication;
-- failed initializer-bearing invocation followed by a clean evaluation has no
-  leaked package state; and
-- rules without an initializer retain existing package values, equality and
-  loading behavior.
+- ordinary def and lambda defaults are accepted only by `attr.label`; native
+  callables/nonfunctions retain their current noncomputed/invalid behavior;
+- transient and frozen descriptors retain callback identity and exact parameter
+  names across freeze/import/re-export;
+- all three selected construction patterns and four rule declarations coexist
+  lazily without callback execution;
+- sparse entries are schema ordered with correct `u32` index/name, including
+  multiple distinct computed attributes and builtin-index adjustment;
+- `Option<Value>`/`Option<FrozenValue>` are pointer-sized; the sparse entry is
+  at most two machine words; exact final owner sizes are reported; and
+  `Allocative` accounts for the immutable sparse slice;
+- non-label function defaults retain the current rule-level deferred error and
+  unadmitted macro/aspect/subrule/repository/tag consumers remain fail closed;
+- computed-bearing target invocation returns the exact diagnostic before
+  unknown-attribute/coercion/recorder/output/target effects, including with an
+  explicit value; initializer plus computed default reports initializer first;
+- a failed invocation followed by a clean evaluation on the same DICE has no
+  leaked state, while no-computed rule loading/equality is unchanged; and
+- source A/B/A plus callback add/remove/change proves existing recursive-
+  manifest invalidation and marker restoration without new state.
 
-The authenticated replay must clear all three selected declarations and stop
-at the next independent typed boundary without executing an initializer body.
+The authenticated replay must clear all four selected declarations and stop at
+the next independent typed boundary without invoking the callback.
 
 ## Allowlist, caps, validation and stops
 
-Only these files may change:
+Only these files may change during implementation:
 
-- `app/slug_loading_v2/src/package.rs`, for the sole production change and
-  adjacent unit proof; and
+- `app/slug_loading_v2/src/package.rs`, sole production owner and adjacent unit
+  proof; and
 - `app/slug_loading_v2/src/host_package_load_tests.rs`, proof only for frozen
-  import/re-export and authenticated package loading.
+  ordinary/Bzlmod import/re-export and package loading.
 
-Caps: 32 production Rust, 160 proof Rust and 192 aggregate gross additions.
-No documentation, fixture, asset, Cargo manifest or other Rust file may change
-during implementation.
+Caps: 80 production Rust, 180 proof Rust and 260 aggregate gross additions;
+within them, `package.rs` is capped at 80 production plus 100 proof and the host
+test at 80 proof. No docs, fixture, asset, Cargo manifest or other Rust file may
+change during implementation.
 
-Run serially with the pinned direct nightly toolchain:
+Run serial focused declaration/freeze/import/rejection/invalidation tests,
+then the full loading library/integrations, query library, CLI rebuild and exact
+bounded-PATH replay above; finish with stale-`slugd`, formatting, diff, archive,
+allowlist and cap gates.
 
-- focused rule-initializer declaration/retention/rejection tests;
-- `cargo test -p slug_loading_v2 --lib --quiet` and loading integrations;
-- `cargo test -p slug_query_v2 --lib --quiet`;
-- `cargo build -p slug_cli_v2 --quiet`, stale-`slugd` cleanup, and the exact
-  bounded-PATH replay above; and
-- `cargo fmt --all --check`, `git diff --check`, archive hygiene, exact
-  allowlist and cap checks.
-
-Return `REPLAN` if clearing the selected declaration requires executing an
-initializer; a callable outlives the existing frozen-module lifetime closure;
-the marker must enter `StarlarkRuleImplementation` or another retained graph;
-package mutation occurs before rejection; a new key/lock/cache/context/fixture
-or consumer branch is proposed; an additional production owner is required;
-or the allowlist/caps fail.
+Return `REPLAN` if clearing replay requires callback execution; another
+constructor/runtime behavior enters scope; the callable outlives the existing
+frozen-module closure; the marker enters final package/analysis/configured
+state; package mutation precedes rejection; a per-schema pointer, new key,
+cache, map, interner, fixture or consumer branch is proposed; another production
+owner is required; or the allowlist/caps fail.

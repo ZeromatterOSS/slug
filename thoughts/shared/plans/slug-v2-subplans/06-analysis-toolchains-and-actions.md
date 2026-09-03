@@ -23074,3 +23074,22 @@ receives only the already-normalized ordinary package schema/values unless a
 separate reviewed semantic need proves otherwise.
 Independent packet review returns `ACCEPT`; the active implementation is
 authorized with no Stage 6 change.
+
+### Computed-default declaration audit retains the analysis stop (2026-09-03)
+
+Commit `db9e693e7` accepts rule-initializer declaration retention; replay next
+selects rules_cc's `_def_parser` `attr.label` function default. The successor
+retains only declaration-time callback identity in Stage 4 and rejects every
+target invocation that could consume it before package lowering. Consequently
+no callback, marker, default value or dependency enters
+`StarlarkRuleImplementation`, `PackageEvaluation`, configured targets, query,
+provider/toolchain/action state or Stage 6 equality/fingerprints.
+
+Stage 6 owns no changed semantics or proof file. Callback invocation, computed
+dependency resolution, explicit-value bypass and configured C++ behavior remain
+unsupported/deferred. Any proposal to analyze such a target or move the sparse
+marker into configured state returns `REPLAN` and requires a separate complete
+runtime/retained-identity review.
+
+Independent packet review returns `ACCEPT`; the active implementation remains
+strictly before Stage 6 state.

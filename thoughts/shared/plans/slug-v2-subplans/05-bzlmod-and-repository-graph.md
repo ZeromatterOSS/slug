@@ -4882,3 +4882,22 @@ observation, materializer, lockfile, route, cache, lock, fixture or repository-
 specific branch. Stage 5 owns only the authenticated replay handoff.
 Independent packet review returns `ACCEPT`; the active implementation retains
 this no-Stage-5-change boundary.
+
+### Initializer accepted; rules_cc computed-default replay handoff (2026-09-03)
+
+Commit `db9e693e7` accepts generic initializer declaration retention. The exact
+bounded-PATH replay through the existing selected rules_java/rules_cc
+materializations clears all selected initializer declarations and stops at the
+selected rules_cc 0.2.4 `_def_parser` `attr.label` function default.
+
+The BCR descriptor/archive integrity, canonical route, source observations,
+recursive module load and manifest fingerprint remain the sole Stage 5
+provenance and invalidation owners. A complete 400-entry archive scan finds one
+callback, three descriptor sites and four rule consumers, all handled by the
+Stage 4 generic declaration category. Stage 5 owns only this authenticated
+provenance/replay handoff and no changed semantics: add no materializer, route,
+mapping, request input, DICE key, observation, lockfile, cache, fixture or
+rules_cc branch.
+
+Independent packet review returns `ACCEPT`; the active implementation preserves
+this provenance-only Stage 5 boundary.

@@ -2625,3 +2625,34 @@ it must not retain a second configured identity without a new utility review.
 No benchmark is required. Independent retained-representation review returns
 `ACCEPT`; any new retained graph, copied callable or lifetime owner returns
 `REPLAN`.
+
+### Rule `attr.label` computed-default retention utility decision (2026-09-03)
+
+Adopted packet
+`WP-4-7A-rule-label-computed-default-declaration-retention-implementation-r1`
+requires no V1 or Buck2 extraction. Reuse starlark-rust `Value`/`FrozenValue`,
+the existing frozen-module lifetime closure, transient `Vec` construction,
+immutable `Arc<[T]>`, `u32` schema indexes and `Allocative`.
+
+Replace the descriptor's boolean marker with `Option<V>`, one pointer only when
+a callback exists. Keep actual rule uses in a sparse schema-ordered slice of
+`{ schema_index: u32, callback: V }`; do not add a pointer to every attribute
+schema. Freeze/import/re-export clones pointers or the Arc in constant time.
+Add no string, map/set, interner, cache, registry, raw pointer or heap owner.
+
+Every consuming target call stops before package lowering, so this carrier
+does not enter final package/configured state, semantic equality or another
+DICE value. Existing source digests and recursive manifest fingerprints own
+invalidation; overlapping requests share only immutable frozen modules. Proof
+must report exact owner sizes, keep `Option<Value>`/`Option<FrozenValue>`
+pointer-sized, bound the sparse entry to two machine words and confirm
+`Allocative` includes the slice. No benchmark is required for this cold,
+sparsely populated declaration boundary.
+
+The carrier's deletion condition is a separately reviewed complete computed-
+default runtime that owns callback arguments/results, label context,
+configurable combinations, package mutation and configured/query identity.
+Independent retained-representation review returns `ACCEPT`; this sparse
+no-extraction decision is final for the active packet. A per-schema pointer,
+copied callable, new owner/cache/interner or configured retention returns
+`REPLAN`.

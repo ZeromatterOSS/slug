@@ -8452,3 +8452,47 @@ ordinary/Bzlmod coverage under 32/160/192 gross production/proof/total Rust
 caps. Add no DICE key, request input, lock, context, fixture, heap, cache,
 collection or final-package identity. Independent packet review returns
 `ACCEPT`; implementation is authorized only within the frozen packet.
+
+### Rule initializer accepted; `attr.label` computed-default retention audited (2026-09-03)
+
+Commit `db9e693e7` terminally accepts rule-initializer declaration retention at
+21/131/152 gross production/proof/total Rust additions. Loading passes 535
+tests with one ignored plus every integration target, query passes 55/55 and
+the CLI/fmt/diff/archive/daemon gates pass. Bounded-PATH replay clears all three
+selected initializer declarations and next reports
+`rule attribute _def_parser uses a default form deferred outside this packet`
+while declaring selected rules_cc 0.2.4 `cc_shared_library`.
+
+The exact 400-entry release scan finds one callback in
+`cc/common/semantics.bzl` (SHA-256 `6eb89858...`), three `attr.label` descriptor
+sites and four rules: binary, test, library and shared library. No consumer-
+specific branch is needed. Pinned Bazel 9.2's `StarlarkAttrModule` retains a
+Starlark callback plus parameter names at declaration, while `Attribute` and
+`AttributeProvider` own the materially larger package-time invocation,
+configurable-combination, `None` fallback and type-checking category.
+
+Audit result: `ACCEPT` only generic `attr.label(default = <ordinary Starlark
+function>)` declaration retention. In `package.rs`, retain the existing-heap
+callable in the descriptor and project only actual uses into a schema-ordered
+`u32`-indexed sparse slice in the transient/frozen rule definition. Preserve
+it through ordinary/Bzlmod freeze/import/re-export without execution. A valid
+target call that could consume it must return
+`target invocation for computed-default attribute '<name>' is unsupported`
+before recorder, unknown-attribute checks, coercion or publication; an existing
+initializer stop retains precedence.
+
+This selected declaration shape, parameter metadata, lazy lifetime and
+unchanged literal/None/late-bound/no-computed paths are exact. The sparse
+representation and fixed early rejection are Slug-native. Invocation, label
+context, parameter dependencies, configurable precomputation, return coercion,
+explicit-value bypass, other attribute constructors and all configured C++
+behavior remain deferred. Existing computed-default rejection for aspects,
+subrules, macros, repository rules and tag classes does not widen.
+
+Implementation may change only `package.rs` and proof-only
+`host_package_load_tests.rs` under 80/180/260 gross production/proof/total caps
+and their 80+100/80 tighter file caps. Independent packet and retained-
+representation review returns `ACCEPT`; implementation is active only within
+that frozen boundary. Return `REPLAN` for callback execution, a second
+production owner, per-schema pointer, final package/analysis state, new DICE/
+cache/fixture ownership or cap failure.
