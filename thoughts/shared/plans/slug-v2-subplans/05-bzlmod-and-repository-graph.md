@@ -4920,3 +4920,24 @@ handoff for
 `WP-4-6-7A-exec-group-declaration-closure-fail-closed-implementation-r1`;
 independent review returns `ACCEPT`. Active implementation remains confined to
 the Stage 4 allowlist and this Stage 5 provenance-only boundary.
+
+### Execution-group acceptance; rules_java provider-identity replay handoff (2026-09-03)
+
+Commit `2945accbe` clears the selected rules_cc declaration boundary. The
+authenticated replay reuses the existing selected rules_java 9.1.0 repository
+and stops at its `java_runtime.bzl` advertised-provider list.
+
+The durable BCR `source.json` SHA-256 is
+`da589573c1dee2c9ac4a568b301269a2e8191110ff0345c1a959fa7ea6c4dfd6`;
+the selected 114,566-byte archive SHA-256 is
+`4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f`.
+`java_runtime.bzl` hashes to
+`d908d3836e5796195596a1d7b4d36d7ca5c674db76acd5c4555b40204a602c08`;
+the complete provider-declaration
+closure and exact hashes are frozen in `current-packet.md`.
+
+Stage 5 owns only this authenticated provenance, canonical route, recursive
+source observation/manifest invalidation and replay handoff. The successor
+adds no repository branch, source, materializer, mapping, request input, DICE
+key, observation, lockfile, cache or fixture. Its semantics remain wholly in
+the existing Stage 4 provider classifier with a Stage 6 fail-closed guard.

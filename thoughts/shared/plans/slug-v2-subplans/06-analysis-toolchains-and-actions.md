@@ -23131,3 +23131,25 @@ failure ordering and DICE invalidation. Wiring the unused prototype
 
 Independent architecture and retained-state review returns `ACCEPT`; active
 implementation adds no Stage 6 Rust or semantics.
+
+### Provider declaration identity audit preserves Template analysis rejection (2026-09-03)
+
+Commit `2945accbe` is accepted; replay next selects JavaRuntimeInfo plus
+TemplateVariableInfo declaration keys in rules_java. The accepted audit design
+does not admit TemplateVariableInfo configured semantics.
+
+`AnalysisConfiguredTargetValue::at` and `is_in` already call
+`configured_target_provider_identity` before provider-map lookup. The frozen
+successor therefore rejects the existing TemplateVariableInfo callable in that
+shared function before delegating to the broadened declaration classifier.
+Both indexing and membership return
+`platform_common.TemplateVariableInfo configured-target membership and indexing are unsupported`.
+Do not add TemplateVariableInfo to the analysis callable allocator; its current
+invocation failure remains unchanged.
+
+Stage 6 owns no changed Rust, provider occurrence, configured key, equality,
+fingerprint, DICE value, toolchain context or action. The existing configured
+call sites are regression anchors only. Construction, provider payloads,
+membership/indexing, make variables, Java rule analysis and actions remain
+unsupported/deferred. Removing this guard requires a separately reviewed
+complete TemplateVariableInfo configured-provider packet.

@@ -8545,3 +8545,34 @@ Nonempty constraints, automatic/aspect/subrule groups, configured transition
 application, group resolution/context/actions and C++ execution remain
 deferred. The two-file 170/220/390 implementation envelope and proof/stops are
 frozen in `current-packet.md`; implementation is active without scope change.
+
+### Execution-group declarations accepted; provider identity closure audited (2026-09-03)
+
+Commit `2945accbe` accepts execution-group declaration retention and its early
+configured guard. Replay next reaches rules_java 9.1.0
+`java/common/rules/java_runtime.bzl:256-259` and rejects the advertised
+`JavaRuntimeInfo` then `platform_common.TemplateVariableInfo` sequence.
+
+The first miss is generic: initialized providers receive their producer-owned
+ID at live top-level export, but Slug's shared classifier recognizes only the
+frozen initialized callable. The second is the existing TemplateVariableInfo
+analysis-builtin token, omitted from the builtin provider identity match.
+Pinned Bazel 9.2 `StarlarkRuleClassFunctions:1153-1155`,
+`StarlarkAttrModule:597-610`, `StarlarkProvider:415-484`, `BuiltinProvider:39-80`
+and `PlatformCommon:43-50` require both exported keys.
+
+Audit result: `ACCEPT`, pending independent review, for the generic declaration
+identity category. Extend only the shared classifier in `provider.rs`; accept
+an initialized live callable only after export and admit exactly
+TemplateVariableInfo as a builtin identity. Existing
+`declaration_provider_identity` and `declaration_required_providers::is_provider`
+then cover rule/aspect advertisements and required-provider lists unchanged.
+Preserve order, deduplication, freeze/import/re-export and raw/unexported
+rejection.
+
+No package owner or retained schema changes. Exact declaration keys are the
+only admitted behavior. Existing compact identity/storage and the configured
+error are Slug-native; Template construction/instances, configured lookup,
+make-variable behavior and Java execution stay deferred. The frozen successor
+changes only `provider.rs` and proof-only `host_package_load_tests.rs` under
+16/140/156 caps. Full hashes, proof matrix and stops are in `current-packet.md`.

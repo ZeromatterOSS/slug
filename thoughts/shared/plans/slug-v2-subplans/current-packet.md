@@ -1,253 +1,197 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-6-7A-exec-group-declaration-closure-fail-closed-implementation-r1
+Packet: WP-4-6-7A-provider-declaration-identity-closure-audit-r1
 
-Status: independent architecture and retained-state review `ACCEPT`; active
-implementation authorized only within this frozen packet.
+Status: docs-only audit/design checkpoint complete; implementation is frozen
+but awaits independent review. No Rust work is authorized before `ACCEPT`.
 
 ## Predecessor checkpoint and selected stop
 
-Commit `64a0f29f6` terminally accepts generic `attr.label` computed-default
-declaration retention at 59 production, 178 proof and 237 total gross Rust
-additions. Loading passes 537 unit tests with one ignored and integration
-targets 51/29/8/6/2/1/5/1; query passes 55/55. The direct pinned-nightly CLI
-rebuild, formatting, diff and daemon-hygiene gates pass; the archive checker
-reports only its three longstanding thought paths.
+Commit `2945accbe` terminally accepts the execution-group declaration closure
+within its 170/220/390 caps. It preserves nonallocating ordinary-rule state,
+the compact retained group/transition representation, exact declaration
+validation and the configured fail-closed boundary. Its focused and broad
+loading/query/CLI, formatting, diff, archive and daemon-hygiene gates pass.
 
-From `/tmp/slug-rules-rust-replay-D4VrVd`, the authenticated replay was:
-
-```text
-env PATH=/usr/bin:/usr/local/bin /home/wgray/slug/target/debug/slug cquery \
-  //pkg:probe --@rules_rust//rust/toolchain/channel=nightly \
-  --lockfile_mode=off
-```
-
-It clears every selected computed-default declaration and stops during Bzl
-evaluation at toolchain-registration row 14, before callback execution or
-target invocation:
+The authenticated bounded-PATH rules_rust replay clears the selected rules_cc
+execution-group declarations and reaches selected rules_java 9.1.0
+`java/common/rules/java_runtime.bzl:256-259`:
 
 ```text
-error: Variable `exec_group` not found
-@@rules_cc+//cc/private/rules_impl:cc_binary.bzl:905:21
-    "cpp_link": exec_group(toolchains = use_cc_toolchain()),
+java_runtime = rule(
+    ...
+    provides = [
+        JavaRuntimeInfo,
+        platform_common.TemplateVariableInfo,
+    ],
+)
+error: rule provides must contain exported provider constructors
 ```
 
-The renderer's line 905 corresponds to the byte-authenticated release
-expression at line 848.
+No Java rule implementation, initialized-provider callback or configured
+provider operation executes before this declaration error.
 
-## Exact selected rules_cc closure
+## Durable selected rules_java closure
 
-The durable BCR descriptor
-`https://bcr.bazel.build/modules/rules_cc/0.2.4/source.json`, SHA-256
-`2bd87ef9b41d4753eadf65175745737135cba0e70b479bdc204ef0c67404d0c4`,
-selects
-`https://github.com/bazelbuild/rules_cc/releases/download/0.2.4/rules_cc-0.2.4.tar.gz`,
-a 276,390-byte, 400-entry archive with SHA-256
-`8dcd63392f0bb48adf74f413a9f39ba0fedcb8f99bf085a3b450f06d171dbb6d`
-and integrity `sha256-jc1jOS8LtIrfdPQTqfOboP7cuPmb8IWjtFDwbRcdu20=`.
-An exact full-archive scan finds four constructor calls in exactly three rule
-declarations and one configured consumer:
+The BCR coordinate is `rules_java` 9.1.0. Its durable source descriptor is
+`https://bcr.bazel.build/modules/rules_java/9.1.0/source.json`, SHA-256
+`da589573c1dee2c9ac4a568b301269a2e8191110ff0345c1a959fa7ea6c4dfd6`.
+It selects
+`https://github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz`,
+a 114,566-byte/114-entry archive with SHA-256
+`4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f`
+and integrity `sha256-Thooolwu+lNQDJKNIs7/vFBd2VszWi0CWDaik7WSIS8=`.
+Its 94 regular entries are mode `0444`; its 20 directories are `0755`.
 
-| Source-relative path | SHA-256 | Bytes/lines; mode | Complete selected role |
+The immediate source is regular `0444`
+`java/common/rules/java_runtime.bzl`, SHA-256
+`d908d3836e5796195596a1d7b4d36d7ca5c674db76acd5c4555b40204a602c08`,
+9,847 bytes/260 lines with trailing LF. Lines 31-54 export initialized
+`JavaRuntimeInfo`; lines 256-259 advertise it followed by
+`platform_common.TemplateVariableInfo`.
+
+The complete matching selected archive closure is:
+
+| Source-relative path | SHA-256 | Bytes/lines | Declaration role |
 |---|---|---:|---|
-| `cc/find_cc_toolchain.bzl` | `5784eeb7ce1e597380b4393bd28d0822f51c23a5d7d7313c65732a2cf38ad979` | 4,808/131; 0664 | `use_cc_toolchain()` returns existing `config_common.toolchain_type` declarations |
-| `cc/private/rules_impl/cc_binary.bzl` | `d9d0f68e028ee64ef9beb73a2b51f308be5b60545b79ce27daa532b430fbc69f` | 41,488/854; 0664 | `cpp_link` at 847-849 |
-| `cc/private/rules_impl/cc_test.bzl` | `6787e5a152ce2e0ec7744a885086ad9977a0ede1da4bb3abd7f69331947ee28f` | 6,206/165; 0664 | configured `ctx.exec_groups["test"]` at 59; `cpp_link` and optional `test` declarations at 155-159 |
-| `cc/private/rules_impl/cc_library.bzl` | `79af1daa5d12f07b3dd6a489e781bfa2c973b520e883b9ab8c024ee6d0c1925b` | 38,773/962; 0775 | `cpp_link` at 959-961 |
-| `cc/common/semantics.bzl` | `6eb89858e52eb3c50dcd1575f734585083752dd4121dcf09f709ed395dee0f4a` | 7,003/216; 0664 | two `config.exec(exec_group = "test")` attribute declarations at 75/80; `extra_exec_groups = {}` at 202 |
+| `toolchains/java_toolchain_alias.bzl` | `56f84699c33ebd2e871615b30bcab4ae5a824cfab78e0dd80afc7e1fbf92e510` | 3,937/110 | lines 60-65 constrain on JavaRuntimeInfo plus TemplateVariableInfo; lines 69-73 advertise both plus already-supported ToolchainInfo |
+| `java/private/java_info.bzl` | `02438c92066a825629a47f6dd01d9ea2200dc90a666b68fb4ee1ebf09e6a3026` | 47,438/1,038 | lines 825-886 and 1014-1038 export initialized JavaInfo and JavaPluginInfo |
+| `java/bazel/rules/bazel_java_import.bzl` | `c8a4747c72ec57e64cbf6cda8da0e5a0f3320583db58c57321e126391b0c62a1` | 1,962/66 | advertises imported frozen JavaInfo; already passes |
+| `java/bazel/rules/bazel_java_library.bzl` | `97f87b1bc3c6a5faa186e26d325578e2aca274a8131755a7805976b7ee5fb2f7` | 2,117/65 | advertises imported frozen JavaInfo; already passes |
+| `java/bazel/rules/bazel_java_plugin.bzl` | `9e03f44ac8d32bb4f20f8dc83c80ed079e6c1dfe28c20ea0d7d133fe361b44bc` | 5,726/154 | advertises imported frozen JavaPluginInfo; already passes |
+| `java/bazel/rules/bazel_java_binary.bzl` | `7788ed4c824a57be330f692f4e9ac4dab378bc70fa461b0ded4f046f444b8ab8` | 19,305/476 | advertises imported frozen JavaInfo; already passes |
 
-Every file has a trailing LF. There are no other `exec_group(...)`, nonempty
-`exec_groups`, `ctx.exec_groups`, or named `config.exec` expressions in the
-selected 400-entry archive. The three rule dictionaries preserve source order;
-all four constructors use only the admitted toolchain-list shape and omit
-`exec_compatible_with`.
+All are regular `0444` with trailing LF. There are no other selected
+`rule(provides=...)` sites. Only same-module JavaRuntimeInfo is a live
+initialized callable at its advertiser; the JavaInfo and JavaPluginInfo
+advertisers import already-supported frozen initialized callables and are
+regression-preserved, not newly closed.
 
-## Bazel 9.2 authority
+TemplateVariableInfo has exactly three declaration occurrences across two
+files: `java_runtime.bzl:258`, alias required-provider `:64`, and alias
+advertisement `:71`. Its three nondeclaration uses remain deferred:
+`java_runtime.bzl:152` and alias `:26` construct instances, while alias `:48`
+performs configured Target indexing.
+
+## Bazel 9.2 authority and learned facts
 
 Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-establishes that declaration is coupled to configured semantics:
+is the sole compatibility authority:
 
-- `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkRuleFunctionsApi.java`
-  (SHA-256 `be73dbda0b5a3e8285a05bb732a0a01441f99e8d20dc29b83759ef972c0392ea`,
-  lines 1057-1084) exposes `exec_group(toolchains=[],
-  exec_compatible_with=[])`, and lines 684-699 expose `rule(exec_groups=...)`;
-- `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java`
-  (SHA-256 `a1f706cfbbc67aa3cd2521df2091dd5ed9af96eb4568049f8eee966d06c622f7`,
-  lines 1058-1080 and 2144-2159) validates names, resolves labels and retains
-  `DeclaredExecGroup` values;
-- `src/main/java/com/google/devtools/build/lib/packages/DeclaredExecGroup.java`
-  (SHA-256 `791a3141fbfe7675dc82c490a78fc753fce94cdab9fb3368bd2c89339615efce`,
-  lines 35-133) owns toolchain requirements, execution constraints, default
-  copying and automatic-group processing;
-- `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/config/StarlarkConfigApi.java`
-  and `analysis/starlark/StarlarkConfig.java` (SHA-256
-  `2679bc99e2cc35dc72ed38aee1934a64b3cf2f6715b11b32a1f2b6e67db63f25`
-  and `6af787d37fdc7499ce3766751a632aa045a9f8fe38c3b38baee91f1737bfbd65`,
-  lines 174-190 and 68-72) retain the named execution transition;
-- `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkExecGroupCollection.java`
-  (SHA-256 `4ec1835fad1899341acfd3747318a95c6133b0321f8ff5d1be427051437cc5f5`,
-  lines 54-159) exposes per-group toolchains and typed missing-name behavior;
-- `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkActionFactory.java`
-  (SHA-256 `bee52fa85442fe668c8573bbd2218dd454485ac8d4451ecf3553201fba6169a2`,
-  lines 861-895) chooses and validates each action's execution group; and
-- `src/test/java/com/google/devtools/build/lib/analysis/StarlarkExecGroupTest.java`
-  and `src/test/java/com/google/devtools/build/lib/starlark/StarlarkRuleContextTest.java`
-  (SHA-256 `5f99076670edcd8570d124aeb03430a7b2f8f41f48b41b31e6d19a90b6391fe2`
-  and `d195e5d49aae52a92bd3abebfc8de7942aacb252b522cea315985d41277f082d`)
-  discriminate named dependency transitions, action platforms, validation and
-  `ctx.exec_groups` toolchain projection.
+- `analysis/starlark/StarlarkRuleClassFunctions.java:1153-1155`, SHA-256
+  `a1f706cfbbc67aa3cd2521df2091dd5ed9af96eb4568049f8eee966d06c622f7`,
+  routes `provides` through one provider-key converter;
+- `analysis/starlark/StarlarkAttrModule.java:597-610`, SHA-256
+  `388421c44c623c1c6625fd9f2b059d2a7d1e13b8d45e7c96173f24866a917967`,
+  accepts Provider values, rejects unexported values and uses exact keys;
+- `packages/StarlarkProvider.java:211-218,415-427,470-484`, SHA-256
+  `cac43a3a9ab1d8653e05ae8b4304ffa6b573bad66bbfb207641d1a652d10cdc1`,
+  gives initialized and ordinary user providers the same export/key contract;
+- `packages/BuiltinProvider.java:39-80`, SHA-256
+  `4551cf08d71dd305a14546f88f184dcef30f3c5882242899a83f865b531ecd93`,
+  makes builtin providers always exported with stable keys;
+- `rules/platform/PlatformCommon.java:43-50` and
+  `starlarkbuildapi/platform/PlatformCommonApi.java:29-43`, SHA-256
+  `010d4bb681cf44d6ed913ddd05d24eef1c4e214c6543f38f69e780a7e9d64d36`
+  and `ef93f7b95a54069ba9fdba9ce978cec938db5b4f4a64471fb78c3b2b2f6c611b`,
+  expose TemplateVariableInfo as its builtin provider constructor/key; and
+- `analysis/TemplateVariableInfo.java:31-65`, SHA-256
+  `21847cc2e32e271ea5a7c44f17f51ffe3baacd163652ad5f99fa270b8f94b8da`,
+  owns the singleton provider and materially broader instance constructor.
 
-## Audit verdict and compatibility classification
+`StarlarkRuleClassFunctionsTest.java:2498-2535` (SHA-256
+`e09c93616e096d639ec69b6b0c6a397a8a36bc8a95fa21b986cb5fc7f8f010aa`)
+proves initialized-provider export identity. `TemplateVariableInfoTest.java`
+(SHA-256
+`e3762b88d8871e7c77538a6e57e0dc420f8225080e4a124face71c99acc3298e`)
+proves configured construction/indexing and is deferred, not copied into this
+declaration packet.
 
-Audit result: `ACCEPT` for one generic **selected-shape execution-group
-declaration closure with fail-closed invocation** design. The
-closure includes both the group declarations and their named attribute
-execution-transition references; accepting only the constructor would merely
-move the replay to `config.exec(exec_group = "test")`. Independent architecture
-and retained-state review returns `ACCEPT`; implementation is active without
-scope change.
+Slug's immediate first failure is `JavaRuntimeInfo`: live
+`InitializedUserProviderCallable` receives its `ProviderId` in `export_as`, but
+`starlark_provider_identity` recognizes only its frozen sibling. After that
+fix, TemplateVariableInfo would fail because the existing analysis-builtin
+identity allowlist names only DefaultInfo and ToolchainInfo. Existing
+`ProviderIdentity`, compact strings, Arc advertised-provider slice,
+deduplication, freeze and equality already represent both values.
 
-Classify as **exact**: expose `exec_group` only in ordinary and Bzlmod `.bzl`
-globals; accept omitted/list `toolchains` entries already admitted by
-`toolchain_requirements`; accept only omitted/empty `exec_compatible_with`;
-accept `rule(exec_groups = None|{})` and nonempty string-keyed dictionaries of
-those values; validate legal non-default identifiers; admit
-`config.exec(exec_group = None|<string>)` as an immutable transition descriptor
-and retain the selected `test` references; preserve dictionary/toolchain order;
-freeze/import/re-export without execution; and preserve rules without named
-groups/transitions unchanged. These shapes close all four selected
-constructors, both selected named transitions and all three selected rule
-declarations without a rules_cc, C++ or name special case. Direct BUILD
-omission is exact for this exposure boundary. `rule()` is the sole admitted
-descriptor consumer: aspect attributes, subrule attributes, symbolic-macro
-explicit attributes and macro `inherit_attrs` from a rule must detect and
-reject a named marker before their existing projections can discard its name
-or reduce it to default exec. Repository-rule and tag-class descriptors retain
-their existing rejection.
+## Decision and compatibility boundary
 
-Classify as **Slug-native**: the compact detached representation below and the
-stable diagnostic
+Audit result: `ACCEPT` for one generic **provider declaration-identity
+closure**, pending independent review.
 
-`target invocation for named execution-group semantics is unsupported`
+Classify as **exact**: recognize an exported live initialized user-provider
+constructor by the same producer-owned `ProviderId` as its frozen form;
+recognize exactly the existing TemplateVariableInfo callable as builtin
+`ProviderIdentity::Builtin("TemplateVariableInfo")`; accept both through the
+shared rule/aspect `provides` and required-provider declaration paths; preserve
+order/deduplication, freeze/import/re-export, and reject raw constructors,
+unexported initialized providers, unrelated callables and non-providers.
 
-for every valid invocation of a rule bearing a declared group or named
-transition. Reject before initializer/computed-default checks, recorder access,
-unknown-attribute validation, coercion, output or target publication so no
-group semantics can be silently lost. Declaration validation still precedes
-this invocation boundary.
+Classify as **Slug-native**: the existing compact string/user-ID
+representation and this configured diagnostic:
 
-Keep **unsupported/deferred**: nonempty `exec_compatible_with`; duplicate
-toolchain normalization beyond the already-admitted parser; parent/aspect/
-subrule groups; automatic groups and `_use_auto_exec_groups`; configured
-application of named `config.exec`; `exec_group_compatible_with`;
-per-group platform/toolchain resolution; `ctx.exec_groups`; named action
-selection and exec properties; test-runner defaults; all configured C++
-behavior. Non-rule descriptor consumption remains explicit error behavior,
-never empty/default substitution or marker loss.
+`platform_common.TemplateVariableInfo configured-target membership and indexing are unsupported`
 
-## Ownership, representation and incremental safety
+Keep **unsupported/deferred**: TemplateVariableInfo invocation, instance
+construction, target membership/indexing and make-variable semantics; Java
+provider payloads, rule implementations, fragments, toolchain resolution and
+actions; other platform_common provider breadth. Direct BUILD exposure is
+unchanged.
 
-`app/slug_loading_v2/src/package.rs` is the sole production owner. Add one
-detached immutable `DeclaredExecGroup` containing only
-`Arc<[ToolchainTypeRequirement]>`, wrapped by a Starlark simple value, plus one
-immutable `config.exec` descriptor carrying `Option<CompactString>`. Empty
-constraints are validated and discarded; no permanent field represents a
-category this packet does not admit. The
-attribute descriptor retains only a sparse optional named group; the existing
-boolean continues to represent default exec. At `rule()` construction, project
-only actual named references into an immutable schema-indexed
-`Arc<[(u32, CompactString)]>` and groups into source-ordered
-`Arc<[(CompactString, DeclaredExecGroup)]>`. Do not add a group string to every
-final attribute schema or any map. Freeze/import/re-export clones only existing
-Arc/compact immutable data. `Allocative`, structural `Clone`/`Eq`, exact size
-assertions and no raw pointer complete the retained-state contract.
+## Ownership, retained data and fail-closed analysis seam
 
-Live anchors are `ToolchainTypeRequirement`/`toolchain_requirements` at
-`package.rs:762-791`/`2784-2822`, `RuleDefinitionGen` and
-`FrozenRuleDefinition` at 3697/3731, freeze at 4026, the pre-recorder invocation
-boundary at 7295-7320, `ConfigModule`/attribute cfg binding at 7094-7257/
-6400-6425, Bzl-only globals at 9386, and `rule()` at 8725. Existing source
-digest, frozen-module closure and recursive load-manifest fingerprint own
-add/remove/change invalidation. Add no DICE key, request input, observation,
-lock, await, retry, cache, interner, registry, second map or fixture.
+`app/slug_loading_v2/src/provider.rs` remains the sole production owner. In
+`starlark_provider_identity`, project a live `InitializedUserProviderCallable`
+only when its existing `OnceCell<ProviderId>` is populated, and add only
+TemplateVariableInfo to the existing analysis-builtin identity match. In
+`configured_target_provider_identity`, reject TemplateVariableInfo before the
+shared projection. Do not add it to `alloc_starlark_provider_callable`.
 
-Stage 6 already has `ConfiguredExecGroup::{Default, Named}`, action-owner group
-identity and context matching (`exec_group.rs`, `result.rs:434-543,985-1020`),
-but `dice.rs:3679-3691` prepares only the default resolved context;
-`starlark_rule.rs:1380-1390` rejects named action selection; and analysis ctx
-does not expose `ctx.exec_groups`. The invocation guard keeps every new token
-out of `StarlarkRuleImplementation`, package equality, configured keys, DICE,
-toolchain resolution and actions. Stage 6 therefore owns proof of the existing
-boundary, not a code change.
+No `package.rs` edit is needed: `declaration_provider_identity` and
+`declaration_required_providers::is_provider` already use the shared classifier,
+so both `provides` and `attr.label(providers=...)` receive the exact identities.
+No analysis production edit is needed: configured Target indexing and
+membership already call the configured classifier before map lookup. The
+existing unsupported callable invocation remains the construction boundary.
 
-Deletion condition: a separately reviewed cross-stage packet may remove the
-guard only after it owns application of named `config.exec`, per-group
-platform/toolchain resolution, configured dependency identity,
-`ctx.exec_groups`, action routing, exec properties, equality/invalidation and
-all failure ordering. The existing
-prototype `toolchains/exec_groups.rs` is not an accepted semantic owner and
-must not be wired in without that review.
+Add no retained field, owner, representation, map, interner, registry, cache,
+DICE key/input/observation, lock, await, retry or fixture. The projection clones
+the existing compact ProviderId once into the already-owned Arc slice. Existing
+structural equality/invalidation and module/source fingerprints remain
+unchanged. Buck2/V1 supplies no implementation; no Stage 9 row is required.
 
-## Required proof
+## Frozen successor implementation and proof
 
-Adjacent tests must prove:
+After independent `ACCEPT`, activate
+`WP-4-6-7A-provider-declaration-identity-closure-implementation-r1` and change
+only:
 
-- `exec_group` and `config.exec` exist in ordinary/Bzlmod `.bzl` globals and
-  remain absent from direct BUILD; `config.exec()` preserves default-exec
-  behavior and a string group freezes/imports/re-exports with exact identity;
-- for `exec_group`, omitted and explicit admitted toolchain lists preserve
-  label, mandatory bit and order; nonempty constraints and invalid entries
-  fail;
-- `rule(exec_groups=None|{})` is unchanged; three selected dictionary shapes
-  retain `cpp_link`, `test`, optional toolchains and union with an empty dict;
-- non-dict, nonstring keys, non-`exec_group` values, invalid/default names and
-  unadmitted fields fail at declaration, without fallback;
-- aspect attrs, subrule attrs, symbolic-macro explicit attrs and macro
-  `inherit_attrs` from a rule reject a named `config.exec` marker before
-  projection; repository-rule and tag-class attrs reject it as regression
-  controls; none silently becomes target/default exec or loses the name;
-- transient/frozen groups and sparse named-transition rows retain structural
-  equality, schema index (including builtin-count adjustment) and source order
-  through ordinary/Bzlmod freeze/import/re-export; Arc clone is constant-time;
-- exact sizes and `Allocative` accounting are reported for transition
-  descriptor, group and both sparse slices; no map or per-rule allocation
-  occurs for rules with neither groups nor named transitions;
-- target invocation for a rule bearing a group or named transition returns the
-  exact diagnostic before every recorder/coercion/publication effect, including
-  a rule also bearing an initializer or computed default; a clean evaluation
-  after failure has no leaked state;
-- source A/B/A and group add/remove/change restore the existing recursive
-  manifest marker without new DICE state; and
-- current Stage 6 named action rejection/default action context and ordinary
-  no-group target analysis remain unchanged.
+- `app/slug_loading_v2/src/provider.rs`, sole production owner plus adjacent
+  classifier/configured-rejection proof; and
+- `app/slug_loading_v2/src/host_package_load_tests.rs`, proof only.
 
-The authenticated replay must clear the three selected declarations and stop
-at the next independent typed boundary before any group-bearing target or
-configured group behavior executes.
+Caps: 16 production Rust, 140 proof Rust, 156 aggregate gross additions.
 
-## Implementation allowlist, caps, validation and stops
+Required proof must cover selected-source-shaped JavaRuntimeInfo plus
+TemplateVariableInfo advertisement in exact order; the alias-shaped required
+provider list; ordinary/Bzlmod rule and aspect declaration; same-module live
+export plus freeze/import/re-export; regression-preserved imported frozen
+JavaInfo/JavaPluginInfo identities;
+raw/unexported/non-provider rejection; exact TemplateVariableInfo builtin
+identity; configured pre-rejection before lookup; unchanged unsupported
+Template invocation; unchanged DefaultInfo, ToolchainInfo, ordinary/frozen
+providers and rules without these identities. No initialized callback or Java
+implementation may execute.
 
-Implementation may change only:
+Run serial focused provider/declaration tests first, then full loading library
+and integration targets, query library, direct pinned-nightly CLI rebuild, the
+exact authenticated bounded-PATH replay, stale-slugd, formatting, diff,
+archive, allowlist and cap gates. Replay must clear the selected declarations
+and stop only at the next independent typed boundary.
 
-- `app/slug_loading_v2/src/package.rs`, sole production owner plus adjacent
-  unit proof; and
-- `app/slug_loading_v2/src/host_package_load_tests.rs`, proof only for exact
-  selected-source ordinary/Bzlmod freeze/import/re-export and invalidation.
-
-Caps: 170 production Rust, 220 proof Rust and 390 aggregate gross additions;
-within them, `package.rs` is capped at 170 production plus 130 proof and the
-host test at 90 proof. No docs, fixture, asset, Cargo manifest or Stage 6 Rust
-file may change during implementation.
-
-Run serial focused global/constructor/rule/freeze/import/rejection/invalidation
-tests, then full loading library/integrations, query library, CLI rebuild and
-the exact bounded-PATH replay; finish with stale-`slugd`, formatting, diff,
-archive, allowlist and cap gates.
-
-Return `REPLAN` if any selected declaration requires nonempty constraints,
-target invocation or configured behavior; any non-rule descriptor consumer
-accepts, downgrades or discards a named marker; a group/transition token
-enters final package/analysis/action/DICE state; the invocation guard is not
-strictly before package mutation; another production owner or second map is
-needed; a callable/dynamic object is retained; a new key/cache/lock/fixture is
-proposed; or the allowlist/caps fail.
+Return `REPLAN` if the live initialized identity is unavailable after export;
+TemplateVariableInfo cannot be rejected before configured lookup; another
+production owner, retained marker or new key/cache/fixture is needed; invocation
+or configured Java/Template semantics are required; ordinary provider behavior
+changes; or the two-file allowlist/caps fail.
