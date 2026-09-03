@@ -8107,3 +8107,22 @@ path equality. Immutable routed-source, duplicate-source, speculative-print,
 failure, warm-reuse and A/B/A proof passes. The rebuilt authentic replay clears
 `repository_ctx.template` and stops at independent `repository_ctx.which` in
 rules_shell. Stage 5 owns the next docs-only API audit.
+
+### Repository-context Unix which composition audited (2026-09-02)
+
+Pinned Bazel 9.2 and an isolated 9.2.0 oracle establish the bounded Unix
+surface: string basename input; exact empty/slash/backslash errors; Java
+U+0020/control trimming against ordered absolute `PATH` entries; symlink-
+following regular-or-special-file and owner-executable `0100` checks; the first
+logical candidate as a `path`; and `None` on stable exhaustion. Relative and
+empty PATH components are ignored. Tracked invalidation is Slug-native;
+concurrent resolver races and Windows extension behavior remain deferred.
+
+Select `WP-4-5-7A-repository-context-which-implementation-r1`. The synchronous
+context may add only a typed candidate demand, bounded prepared outcomes and a
+path-provenance discriminator. `PATH` must be dynamically recorded, authorized
+and verified before candidate observation. The accepted template method must
+still reject non-Label provenance. All evaluator state, captures and effect
+builders drop before the outer driver awaits DICE; only the terminal invocation
+publishes. Exact behavior, Slug-native caps and the proof matrix are frozen in
+the active packet. Audit result: `ACCEPT`; the audit itself changes no Rust.

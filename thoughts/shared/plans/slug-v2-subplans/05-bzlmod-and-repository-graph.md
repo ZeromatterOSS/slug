@@ -4534,3 +4534,24 @@ authentic replay pass. The replay clears the exact bounded template call and
 stops at generic `repository_ctx.which` in rules_shell. Select docs-only
 `WP-5-7A-repository-context-which-audit`; do not implement another repository
 API or add a ruleset/toolchain branch.
+
+### Repository-context Unix which ownership audited (2026-09-02)
+
+The which audit returns `ACCEPT` without a new Stage 5 key or retained owner.
+`RepositoryEnvironmentCellKey` and the existing transaction frontier own the
+dynamic `PATH` value. Existing legacy/observed resolved-path keys over
+`PathObservationNamespace::Host` own ordered candidate absence, metadata and
+symlink resolution; their injected path epoch already provides exact
+missing-to-present and A/B/A invalidation. Bazel's Unix executable predicate is
+the terminal regular or special file's owner `0100` permission bit. Bazel's
+candidate metadata checks are untracked; Slug's exact observation-backed
+invalidation is an explicit Slug-native integrity strengthening.
+
+Select the bounded Stage 4/5 implementation. Add invocation-local candidate
+need/prepared-result scratch only. A candidate demand must first establish and
+verify `PATH`, then reach an existing resolver only after the synchronous
+evaluator and its borrows have dropped. Return the requested logical candidate,
+not its resolved symlink target, and merge every observed frontier. No new DICE
+key, direct filesystem/process environment read, materialization owner,
+retained candidate cache, Windows behavior, rules_shell/shell-name branch or
+toolchain special case is authorized.
