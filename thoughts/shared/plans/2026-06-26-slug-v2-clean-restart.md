@@ -30,32 +30,35 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, multi-platform choice, and the exact FileWrite ActionKey projection remain later breadth | preserve the admitted FileWrite boundary; pair each newly admitted action family with its exact projection |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration, selected-toolchain context, configured hidden/default-exec dependencies, direct subrule calls, generic fragment projection, the coverage and complete C++ configuration-field categories, cross-module attribute-descriptor identity, complete transition declaration-setting identity and rule attachment/execution, complete rule predeclared outputs, generic aspect declarations, provider-constrained dependencies, dense retained depsets, configured action environments, scalar/vector Args, param-file/write, common non-callback Spawn, typed FilesToRun/runfiles/complete DefaultInfo, symlink declaration, complete runfiles-package ownership, four runfiles-support actions, FilesToRun Spawn expansion, Bzlmod declaration selection, attribute documentation signatures, direct-compile-input attribute flags, label file-admissibility, recursive BUILD glob loading, ordinary module-extension tag schemas, generated-repository root-load publication, repository-rule file admissibility, package-context dependency-label strings, repository-source glob routing, native direct String-or-Label parameters, the BZL-only analysis-test transition declaration, the applicable-license loading aliases, repository-rule Label runtime context, lexical repository Label paths, bounded repository templates/reads, bounded Unix repository executable lookup, exact built-in C++/Xcode configure sources, and bounded built-in public-label routing accepted** | accepted M7A loading/repository closure through `f7c365234`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; configured hidden dependencies in `2bf86bfa8`; direct invocation/value materialization in `da6865a3b`; real starlark-rust `set` in `cb71a302d`; generic fragment projection in `683538254`; dense depset/action-input owner in `7b0db03e1`; configured-action-environment owner in `71d34affa`; scalar generic actions in `78b94789c`; vector Args and parameter files in `a01a23fe7`; complete default-context non-callback Spawn envelope in `bfe6f2690`; terminally accepted typed FilesToRun provider core in `8e7234b82`; typed runfiles and complete DefaultInfo in `f346c209a`; complete loading/package metadata in `80a6bfd3a`; configured transitive-package closure in `2483dd7e2`; four support actions in `f46a009a0`; complete FilesToRun Spawn expansion in `21db5d7b8`; exact Bzlmod declaration-call signatures in `817d017b6`; exact assigned-global selector/producer identity in `18b2549bd`; exact documentation binding/validation in `1e583e9d0`; compact flag ownership/direct-compile-input binding, complete file-admissibility, coverage, the eleven-member C++ field catalog, imported descriptor identity, transition declaration-setting identity, generic rule transition attachment and complete generic rule predeclared outputs terminally accepted through `2799030dc`; generic aspect declarations, complete provider-constrained dependencies and generic rule-level transition execution through `96ffe8ef3`; terminally accepted default-exec configured dependencies in `20bbe8661`, repository declaration documentation binding in `6b1a27c29`, recursive BUILD glob loading in `cfe83834d`, the complete ordinary tag-schema category in `3c5603a3c`, the shared root repository load route in `75fad534c`, repository-rule file admissibility in `95b4f0da6`, package-context dependency-label strings in `5f9f9a98a`, repository-source glob routing in `bf509cd8b`, native direct-label parameters in `36ee4f124`, the loading-only analysis-test transition declaration in `3f90b41b5`, lexical Label paths in `8d093e8b0`, and bounded repository templates in `93cdf1d2c`; bounded applicable-license aliases, repository-rule Label context, bounded Unix `which`, the exact `lib_cc_configure.bzl` member, bounded built-in public-label routing in `5d5991634`, exact `xcode_configure.bzl` source in `3592fbfd1`, and bounded repository read in `f7c365234` are terminally accepted | module-extension lifecycle completion, remaining public attribute-policy categories, analysis-test rule/configured semantics, named/automatic exec groups, other standard-provider breadth, configured aspects, built-in `@bazel_tools` source breadth, repository-rule declaration schemas beyond the admitted surface, and execution projection remain | implement the exact default one-member `proto_common_do_not_use` `.bzl` facade |
+| M7: command/ruleset breadth | **partial; repository context, symbolic-macro lifecycle, subrule loading, FDO command configuration, selected-toolchain context, configured hidden/default-exec dependencies, direct subrule calls, generic fragment projection, the coverage and complete C++ configuration-field categories, cross-module attribute-descriptor identity, complete transition declaration-setting identity and rule attachment/execution, complete rule predeclared outputs, generic aspect declarations, provider-constrained dependencies, dense retained depsets, configured action environments, scalar/vector Args, param-file/write, common non-callback Spawn, typed FilesToRun/runfiles/complete DefaultInfo, symlink declaration, complete runfiles-package ownership, four runfiles-support actions, FilesToRun Spawn expansion, Bzlmod declaration selection, attribute documentation signatures, direct-compile-input attribute flags, label file-admissibility, recursive BUILD glob loading, ordinary module-extension tag schemas, generated-repository root-load publication, repository-rule file admissibility, package-context dependency-label strings, repository-source glob routing, native direct String-or-Label parameters, the BZL-only analysis-test transition declaration, the applicable-license loading aliases, repository-rule Label runtime context, lexical repository Label paths, bounded repository templates/reads, bounded Unix repository executable lookup, exact built-in C++/Xcode configure sources, and bounded built-in public-label routing accepted** | accepted M7A loading/repository closure through `06ddf8252`; symbolic macros/providers and configured namespaces in `e34cfdc7a`/`541fcfaf2`; corrected subrule architecture/loading in `4900ce46b`/`965cfde5e`; lawful FDO command/DICE producer in `4425d3bfb`; generic selected-toolchain context in `ebd19e3b1`; configured hidden dependencies in `2bf86bfa8`; direct invocation/value materialization in `da6865a3b`; real starlark-rust `set` in `cb71a302d`; generic fragment projection in `683538254`; dense depset/action-input owner in `7b0db03e1`; configured-action-environment owner in `71d34affa`; scalar generic actions in `78b94789c`; vector Args and parameter files in `a01a23fe7`; complete default-context non-callback Spawn envelope in `bfe6f2690`; terminally accepted typed FilesToRun provider core in `8e7234b82`; typed runfiles and complete DefaultInfo in `f346c209a`; complete loading/package metadata in `80a6bfd3a`; configured transitive-package closure in `2483dd7e2`; four support actions in `f46a009a0`; complete FilesToRun Spawn expansion in `21db5d7b8`; exact Bzlmod declaration-call signatures in `817d017b6`; exact assigned-global selector/producer identity in `18b2549bd`; exact documentation binding/validation in `1e583e9d0`; compact flag ownership/direct-compile-input binding, complete file-admissibility, coverage, the eleven-member C++ field catalog, imported descriptor identity, transition declaration-setting identity, generic rule transition attachment and complete generic rule predeclared outputs terminally accepted through `2799030dc`; generic aspect declarations, complete provider-constrained dependencies and generic rule-level transition execution through `96ffe8ef3`; terminally accepted default-exec configured dependencies in `20bbe8661`, repository declaration documentation binding in `6b1a27c29`, recursive BUILD glob loading in `cfe83834d`, the complete ordinary tag-schema category in `3c5603a3c`, the shared root repository load route in `75fad534c`, repository-rule file admissibility in `95b4f0da6`, package-context dependency-label strings in `5f9f9a98a`, repository-source glob routing in `bf509cd8b`, native direct-label parameters in `36ee4f124`, the loading-only analysis-test transition declaration in `3f90b41b5`, lexical Label paths in `8d093e8b0`, and bounded repository templates in `93cdf1d2c`; bounded applicable-license aliases, repository-rule Label context, bounded Unix `which`, the exact `lib_cc_configure.bzl` member, bounded built-in public-label routing in `5d5991634`, exact `xcode_configure.bzl` source in `3592fbfd1`, bounded repository read in `f7c365234`, and the exact default proto-common facade in `06ddf8252` are terminally accepted | module-extension lifecycle completion, remaining public attribute-policy categories, analysis-test rule/configured semantics, named/automatic exec groups, other standard-provider breadth, configured aspects, built-in `@bazel_tools` source breadth, repository-rule declaration schemas beyond the admitted surface, and execution projection remain | implement selected-BCR regular `0444` mode admission |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel configuration/output identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum and output-directory identity; only residual unadmitted ActionKey families remain here | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[Private proto-common declaration facade audited; one-owner implementation
+[Selected-BCR regular `0444` mode audited; bounded implementation
 selected](./slug-v2-subplans/current-packet.md).
 
-Commit `f7c365234` terminally accepts bounded direct-external-Label
-`repository_ctx.read` at 98/265/363 gross production/proof/total Rust
-additions. Full loading and query gates and the CLI build pass. The
-authenticated replay clears the read and generated apple repository, then
-stops while recursively loading protobuf 33.4 at
-`@@protobuf+//bazel/private:native.bzl:3` because
-`proto_common_do_not_use` is not predeclared.
+Commit `06ddf8252` terminally accepts the exact default one-member
+`proto_common_do_not_use` facade at 5/31/36 gross production/proof/total Rust
+additions. Full loading/query gates and the CLI build pass. The earlier
+rules_shell `which` limit stop is excluded as non-reproducible: both explicit
+bounded PATH variants now clear the accepted resolver without a cap or symlink
+change.
 
-The docs-only audit returns `ACCEPT` for exactly Bazel 9.2's default injected
-one-field `struct`: the private top-level exists in ordinary and Bzlmod `.bzl`
-environments, exposes only
-`INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION = True`, and remains absent
-from direct BUILD globals. Add it only in the existing loading-globals owner.
-Native proto methods/providers, nondefault flags and all configured proto,
-toolchain and authenticity semantics remain deferred. Run only
-`WP-4-7A-proto-common-predeclared-facade-implementation-r1` under its one-file
-allowlist and caps.
+The reproducible replay reaches rules_java 9.1.0 selected-BCR materialization
+and rejects the first regular `0444` archive entry. The exact 114,566-byte
+archive has 94 regular `0444` entries and 20 `0755` directories only.
+Pinned Bazel 9.2 streams regular tar entries and applies
+`entry.getMode() | 0400`, retaining `0444` exactly.
+
+The docs-only audit returns `ACCEPT` for adding generic regular `0444` to
+the existing fail-closed selected-BCR mode allowlist. Keep all other modes,
+entry types and archive semantics unsupported/deferred. Add no DICE key,
+materialization owner, fixture, probe, consumer branch or `which` change.
+Run only
+`WP-5-7A-selected-bcr-regular-0444-mode-implementation-r1` under its
+two-file allowlist and caps.
 
 The bounded repository template implementation returns `ACCEPT` after one
 correction rereview at 371/484/855 gross production/proof/total Rust additions.
@@ -7636,3 +7639,26 @@ Independent Sol replan review returns `ACCEPT`. Implementation may resume only
 inside the superseding namespace-demand, shared-route and bounded fixture
 contract; delimiter-prefix collision and typed missing behavior are required
 terminal proof.
+
+### Proto facade accepted; selected-BCR read-only mode audited (2026-09-02)
+
+Commit `06ddf8252` accepts the exact default one-member proto-common facade at
+5/31/36 gross production/proof/total Rust additions. The focused proof passes
+1/1; loading passes 530 unit tests with one ignored and all integration
+targets, query passes 55/55, and the CLI build, formatting, diff and daemon
+hygiene gates pass. Only three longstanding thought-path failures remain.
+
+Authenticated replay now reproducibly clears rules_shell with both explicit
+bounded PATH variants. The earlier `which` limit result is transient evidence,
+not a compatibility gap; no resolver or cap change is selected. Both replays
+reach rules_java 9.1.0 archive materialization and stop on its first regular
+`0444` entry. The exact archive has 94 regular `0444` entries and 20 `0755`
+directories only. Bazel 9.2 accepts and retains `0444` by applying
+`entry.getMode() | 0400`.
+
+Audit result: `ACCEPT`. Select
+`WP-5-7A-selected-bcr-regular-0444-mode-implementation-r1`: add only generic
+regular `0444` to the existing selected-BCR materializer's fail-closed mode
+allowlist and prove exact retained permissions adjacent to that owner. Do not
+add another mode/type, fixture, DICE key, materializer, repository probe,
+rules_java/rules_shell branch or broader tar-parity claim.

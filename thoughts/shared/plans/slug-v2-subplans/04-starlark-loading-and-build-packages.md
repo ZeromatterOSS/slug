@@ -8319,3 +8319,27 @@ autoload configuration, proto fragments/toolchains/rules/actions and consumer
 special cases remain deferred. No DICE key, request input, fixture, source,
 catalog or second production owner is authorized. Select the one-file packet
 frozen in `current-packet.md`.
+
+### Proto facade accepted; rules_shell transient excluded (2026-09-02)
+
+Commit `06ddf8252` accepts the exact default proto-common declaration facade at
+5/31/36 gross production/proof/total Rust additions. The focused test passes
+1/1; full loading and query gates and the CLI build pass. The authenticated
+replay clears the protobuf declaration chain.
+
+The subsequent rules_shell BCR 0.6.1
+`shell/private/repositories/sh_config.bzl` (SHA-256
+`795d028cf310d65265ad3d64cbf896567512dcb31b1d4cafa2f8c92eb65ec1a2`)
+invokes exactly `repository_ctx.which("bash")`, with `which("sh")` only after
+a miss. A first run reported the admitted-limit diagnostic despite the explicit
+`PATH=/bin:/usr/bin:/usr/local/bin`. Replays with that exact PATH and with
+`PATH=/usr/bin:/usr/local/bin` now both clear the existing exact resolver and
+reach the same later boundary. Both values are within the accepted caps.
+Treat the first result as transient replay evidence: Stage 4 authorizes no cap,
+symlink, context-method, evaluator, environment-owner or proof change.
+
+The stable stop is selected-BCR archive materialization for rules_java 9.1.0.
+That is owned by the Stage 2 runtime/Stage 5 repository-source seam. Stage 4
+adds no rules_shell/rules_java branch, load global, repository method or source
+capability. The active implementation packet is frozen in
+`current-packet.md` and must stop before any new loading boundary.

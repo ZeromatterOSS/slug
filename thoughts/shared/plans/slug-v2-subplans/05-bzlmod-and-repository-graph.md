@@ -4772,3 +4772,60 @@ nondefault semantics and all proto providers, rules, toolchains and actions
 remain deferred. Select
 `WP-4-7A-proto-common-predeclared-facade-implementation-r1` under the active
 one-file allowlist and stop at the next independently owned replay boundary.
+
+### Selected-BCR regular `0444` archive mode audited (2026-09-02)
+
+Commit `06ddf8252` accepts the predecessor proto-common facade at 5/31/36
+gross production/proof/total Rust additions. Loading passes 530 unit tests
+with one ignored plus all integration targets; query passes 55/55; the CLI
+build and formatting/diff/hygiene gates pass. Replay clears that declaration
+boundary. A one-off rules_shell `which` limit result is excluded because both
+explicit bounded PATH variants now reproducibly clear it without any resolver
+change.
+
+The stable stop is toolchain-registration row 14, `rules_java+//toolchains`,
+while selected rules_java 9.1.0 is materialized to probe `REPO.bazel`. The
+durable descriptor
+`https://bcr.bazel.build/modules/rules_java/9.1.0/source.json` has SHA-256
+`da589573c1dee2c9ac4a568b301269a2e8191110ff0345c1a959fa7ea6c4dfd6`
+and selects
+`https://github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz`
+with integrity
+`sha256-Thooolwu+lNQDJKNIs7/vFBd2VszWi0CWDaik7WSIS8=`. That exact
+114,566-byte archive has SHA-256
+`4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f`,
+matching its BCR integrity. Its complete 114-entry listing contains exactly 94
+regular files at `0444` and 20 directories at `0755`; `./AUTHORS` is the
+first regular entry, so current mode rejection is deterministic. The archive
+has no `REPO.bazel` and materialization must finish before the normal absent
+probe.
+
+Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
+`src/main/java/com/google/devtools/build/lib/bazel/repository/decompressor/CompressedTarFunction.java`
+(SHA-256
+`28dd9b8ace7d64b432b4bf566b1d1325cffea81df338ace428dfff7c756ae333`)
+streams regular bytes and applies `entry.getMode() | 0400`, accepting and
+retaining `0444`. Its repo-relative
+`src/test/java/com/google/devtools/build/lib/bazel/repository/decompressor/CompressedTarFunctionTest.java`
+has SHA-256
+`3a2865acca41f7ebe484886a978aeef2eeb9aba2aa9d3337f0b81a6576c925c2`.
+Slug already uses that projection but omits `0444` from its bounded
+regular-mode allowlist. The audit therefore returns `ACCEPT` for the generic
+exact `0444` category only.
+The bounded Rust extractor, cancellation diagnostics and continued rejection
+of unadmitted modes/types are Slug-native; broad arbitrary-mode parity remains
+deferred.
+
+Reuse `SelectedBcrArchive`, `realize_selected_bcr`, its single `extract` pass,
+and the existing `AssociatedImmutable` root/source association. Archive mode
+bytes are already covered by verified archive integrity and request identity.
+Add no DICE key/input, observation, cache, retained representation, lock,
+task, fallback, fixture, locator/probe behavior or consumer special case.
+
+Select
+`WP-5-7A-selected-bcr-regular-0444-mode-implementation-r1` under the exact
+two-file allowlist and 6/40/46 production/proof/total gross Rust caps frozen in
+`current-packet.md`. Adjacent proof must preserve `0444` on Unix and keep the
+existing `0600` regular and `0700` directory rejections. The authenticated
+replay must clear materialization and stop at the next independently owned
+boundary; another mode/type or owner requirement returns `REPLAN`.

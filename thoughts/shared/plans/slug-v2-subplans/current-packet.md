@@ -1,195 +1,176 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-7A-proto-common-predeclared-facade-implementation-r1
+Packet: WP-5-7A-selected-bcr-regular-0444-mode-implementation-r1
 
-Milestone: M7A bootstrap-critical loading/ruleset closure. Admit the exact
-Bazel 9.2 default declaration-time shape of the private
-`proto_common_do_not_use` predeclared `.bzl` symbol without admitting native
-proto methods, providers, configured semantics or actions.
+Milestone: M7A bootstrap-critical repository materialization. Admit generic
+regular tar entries whose exact mode is `0444` through the existing selected
+BCR archive materializer; preserve every other fail-closed archive boundary.
 
-Status: ready for bounded implementation after the docs-only audit returned
-`ACCEPT`. Independent terminal review is required before acceptance.
+Status: docs-only audit returns `ACCEPT`. Independent architecture review is
+required before implementation.
 
-## Immediate predecessor and replay boundary
+## Accepted predecessor and reproducible replay boundary
 
-Commit `f7c365234` terminally accepts bounded direct-external-Label
-`repository_ctx.read` at 98 production and 265 proof gross Rust additions,
-363 total. The focused read gate passes 5/5; `slug_loading_v2` passes 529 unit
-tests with one ignored plus integration targets of 51/29/8/6/2/1/5/1 tests;
-`slug_query_v2` passes 55/55; the CLI builds; formatting/diff and daemon
-hygiene pass. Only the longstanding three thought-path archive failures remain.
+Commit `06ddf8252` terminally accepts
+`WP-4-7A-proto-common-predeclared-facade-implementation-r1` at 5 production
+and 31 proof gross Rust additions, 36 total. Its focused test passes 1/1;
+`slug_loading_v2` passes 530 unit tests with one ignored plus integration
+targets of 51/29/8/6/2/1/5/1; `slug_query_v2 --lib` passes 55/55; the CLI
+build, formatting, diff and daemon-hygiene gates pass. Only the longstanding
+three thought-path archive failures remain.
 
-The authenticated rules_rust replay clears the read, creates the selected
-apple generated repository and reaches toolchain-registration row 12. Loading
-`@@protobuf+//bazel/private/toolchains/prebuilt/BUILD.bazel` recursively enters
-`:protoc_authenticity.bzl`, `//bazel/common:proto_common.bzl`,
-`//bazel/common:proto_lang_toolchain_info.bzl` and finally
-`//bazel/private:native.bzl:3`, where it stops with:
+The authenticated rules_rust replay clears the protobuf predeclared facade.
+A first run reported `repository_ctx.which invocation exceeds the admitted
+Unix limits` in rules_shell 0.6.1. That stop is excluded: the exact
+`repository_ctx.which("bash")` call, with `"sh"` only on miss, now
+reproducibly succeeds with both `PATH=/bin:/usr/bin:/usr/local/bin` and
+`PATH=/usr/bin:/usr/local/bin`. Both are within the accepted byte/component
+caps. No `which` cap, symlink or resolver change is authorized.
 
-`Variable proto_common_do_not_use not found`
+The exact consumer is rules_shell BCR module version 0.6.1, source-relative
+`shell/private/repositories/sh_config.bzl`, SHA-256
+`795d028cf310d65265ad3d64cbf896567512dcb31b1d4cafa2f8c92eb65ec1a2`,
+4,401 bytes/138 lines. Lines 125-136 contain that two-step lookup.
 
-This is a generic predeclared-global loading boundary. The protobuf consumer is
-the discriminator, never an activation branch.
+Both replays reach toolchain-registration row 14, `rules_java+//toolchains`,
+and stop while materializing selected rules_java 9.1.0 to probe
+`REPO.bazel`:
 
-## Pinned Bazel and protobuf evidence
+`selected BCR unsupported entry mode`
+
+This is the reproducible boundary. The archive contains no `REPO.bazel`;
+materialization must complete before the normal absent probe can proceed.
+
+## Exact archive and Bazel 9.2 evidence
+
+The durable BCR descriptor coordinate is
+`https://bcr.bazel.build/modules/rules_java/9.1.0/source.json`, SHA-256
+`da589573c1dee2c9ac4a568b301269a2e8191110ff0345c1a959fa7ea6c4dfd6`.
+It selects the literal release URL
+`https://github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz`
+with empty `strip_prefix` and integrity
+`sha256-Thooolwu+lNQDJKNIs7/vFBd2VszWi0CWDaik7WSIS8=`. The exact release
+archive is 114,566 bytes with SHA-256
+`4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f`,
+which matches that integrity.
+
+A complete tar listing has exactly 114 logical entries: 94 regular files at
+mode `0444` and 20 directories at mode `0755`; there are no other types or
+modes. The first entry is `./AUTHORS`, a 305-byte regular `0444` file, so
+the current failure is deterministic before extraction can progress.
+`MODULE.bazel` is a 4,218-byte regular `0444` file. No selected archive
+asset is copied into this repository.
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-establishes the exact default contract:
+owns the compatibility behavior.
+The repo-relative
+`src/main/java/com/google/devtools/build/lib/bazel/repository/decompressor/CompressedTarFunction.java`
+has SHA-256
+`28dd9b8ace7d64b432b4bf566b1d1325cffea81df338ace428dfff7c756ae333`;
+lines 141-151 stream every regular entry and apply
+`entry.getMode() | 0400`. Thus Bazel accepts `0444` and retains it exactly.
+The repo-relative
+`src/test/java/com/google/devtools/build/lib/bazel/repository/decompressor/CompressedTarFunctionTest.java`
+has SHA-256
+`3a2865acca41f7ebe484886a978aeef2eeb9aba2aa9d3337f0b81a6576c925c2`
+and confirms the normal compressed-tar owner.
 
-- `BazelRuleClassProvider.java`, lines 253-264, registers the private Java
-  `BazelProtoCommon` object as a `.bzl` top-level;
-- `src/main/starlark/builtins_bzl/common/exports.bzl`, lines 17-26, replaces it
-  with a Starlark `struct` having exactly one member,
-  `INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION`, whose default value is
-  `True` (`FlagConstants.java`, lines 48-50);
-- `StarlarkBuiltinsFunction.java`, lines 271-300, installs exported top-levels
-  in both BUILD-loaded and MODULE-loaded `.bzl` environments but not directly
-  in BUILD files; the unprefixed export cannot be disabled by the ordinary
-  injection override;
-- `AutoloadSymbols.java`, lines 315-337, preserves the same one-member struct
-  when the private symbol is selected for removal because protobuf still reads
-  the flag; and
-- `incompatible_autoload_externally_test.sh`, lines 223-239, proves that the
-  retained reflection inventory contains the uppercase flag and not native
-  `compile` breadth.
-
-SHA-256 is
-`a7de1ba5a700468ead269865f2563378ea0851d3430844ee6491591e52fd3d91`
-for `BazelRuleClassProvider.java`,
-`946df798515c772d8b562c5ebb1dcc13a61a5846bcb25addad2bc72e813b1097`
-for `exports.bzl`,
-`1a7e9423c7087e3528271f2a678b675961697729c7b191454c6521b386508589`
-for `StarlarkBuiltinsFunction.java`,
-`a24ab0e0c6cb6e306b1d54d4caf642bb0069df3753fc362d3f0f2ee7cbc31ae4`
-for `AutoloadSymbols.java`,
-`3bfe8a047697b704cdf81f8a46f1d9722b826a04ed6d7ea9d6bcfee2f151d130`
-for `FlagConstants.java` and
-`470abf02e4f8efbc23024dcd04ccd0f5c6fa5c993f93ae28475375d987201238`
-for the shell test.
-
-The selected module is protobuf 33.4. Its BCR `source.json` has SHA-256
-`555f8686b4c7d6b5ba731fbea13bf656b4bfd9a7ff629c1d9d3f6e1d6155de79`
-and archive integrity
-`sha256-aH6YpHGXO1xf1xF1DEC4uCwK3jP2Sdtl4AspDyk0Wis=`. Exact release sources are
-ordinary non-executable files with one trailing LF:
-
-| Path | SHA-256 | Bytes/lines | Facade role |
-|------|---------|-------------|-------------|
-| `bazel/private/toolchains/prebuilt/BUILD.bazel` | `c221fadf2be3cfe23f2290c025a463ff68ba2add2a80f20bffd64e13bb8234b6` | 1,409/32 | loads and calls the authenticity rule |
-| `bazel/private/toolchains/prebuilt/protoc_authenticity.bzl` | `0bb4726ccba19f521f584f88a92a016df5db6430901e283c06dedbed333325f7` | 3,228/69 | reads the derived public flag only in its rule implementation; declaration calls the toolchain helpers |
-| `bazel/common/proto_common.bzl` | `e5813cf2ccdf81ded47ef001177ecb06b55a841e1aa5adf8f834cf39eae6924b` | 15,523/358 | loads the alias and derives fallback members |
-| `bazel/common/proto_lang_toolchain_info.bzl` | `78de1d121cf7aab377acb7a4e1d70b5bab70c6aa57b46511f9a4015350d23ac6` | 1,571/26 | observes absent `ProtoLangToolchainInfo` and selects its Starlark provider fallback |
-| `bazel/private/toolchain_helpers.bzl` | `2ad0b58e67563cebc843886e07dce69eceddd90ab162fbde5b8098df63de67dc` | 1,774/49 | reads the one Boolean at declaration time |
-| `bazel/private/native.bzl` | `941d6b139f4eb695a24688d565ace2aa4cecd67e8f12dd5cee1e65dad7397db6` | 134/3 | aliases `proto_common_do_not_use` to `native_proto_common` |
-
-This is the complete relevant consumer closure, not an asset-admission list.
-All source bytes, recursive load routing, mapping, manifests, provider
-declarations, `rule`, `config_common.toolchain_type`, `Label` and attribute
-schemas are already owned. No protobuf source is copied by this packet.
+Slug's `repository_archive_realize.rs::extract` already applies the same
+owner-readable projection, but its fail-closed allowlist admits regular
+`0644`, `0664`, `0755` and `0775` only. Generic regular `0444` is
+therefore the exact missing mode; directory `0755` is already admitted.
 
 ## Audit decision and compatibility boundary
 
-Audit result: `ACCEPT`. The smallest complete category is one immutable
-predeclared `.bzl` value equivalent to:
+Audit result: `ACCEPT`. The smallest complete category is a generic regular
+selected-BCR tar entry whose header mode is exactly `0444`. Add `0444` to
+the existing regular-mode allowlist. Do not key behavior to rules_java, a path,
+a module name or the BCR probe.
 
-`proto_common_do_not_use = struct(INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION = True)`
+Classify as **exact** under Bazel 9.2 the acceptance of a regular `0444`
+entry, its bytes and mtime, and its retained `0444` Unix permission after the
+existing owner-readable projection. Existing exact archive integrity, path,
+namespace, payload, transform order and source association remain unchanged.
 
-Implement it in both ordinary loading and Bzlmod `.bzl` globals and keep it
-absent from direct BUILD-file globals. The struct must have exactly that one
-member. Consequently `ProtoLangToolchainInfo` and
-`INCOMPATIBLE_PASS_TOOLCHAIN_TYPE` remain absent, so protobuf's pinned
-`getattr`/`hasattr` fallbacks take their Bazel 9.2 default paths.
+Classify as **Slug-native** the deliberately bounded mode/type allowlist, Rust
+temporary-directory extraction, cancellation checks and typed diagnostics.
+This packet does not claim Bazel's broader arbitrary tar-mode behavior.
 
-Classify as **exact** the symbol name, top-level `.bzl` availability, value
-type `struct`, single-member `dir`, Boolean `True`, missing-member behavior for
-the two pinned fallback probes, exact `native.bzl` alias, and absence from the
-direct BUILD environment under Bazel 9.2 defaults.
+Keep **unsupported/deferred** every other newly unadmitted regular or directory
+mode; symlinks, hardlinks and other tar entry types; broader PAX/GNU metadata;
+Windows permission equivalence; other archive formats; and changes to
+strip-prefix, overlays, patches, MODULE replacement, locator/probe semantics,
+repository selection or `repository_ctx.which`.
 
-Classify as **Slug-native** the Rust/starlark-rust allocation and diagnostics,
-and pinning the default Boolean in the binary's loading-global definition
-rather than reproducing Bazel's Java option/builtins-injection machinery. The
-fixed value has no mutable request or host input.
+## Owner, lifecycle, invalidation and memory
 
-Keep **unsupported/deferred**:
+`SelectedBcrArchive` remains the verified URL/integrity/transform plan.
+`realize_selected_bcr` and its single bounded `extract` pass remain the sole
+archive materialization and mode owners. The completed root remains an
+`AssociatedImmutable` materialization with the existing domain-separated
+source association.
 
-- `BazelProtoCommon` methods, `external_proto_infos`, native `ProtoInfo` keys,
-  `ProtoLangToolchainInfo` or `INCOMPATIBLE_PASS_TOOLCHAIN_TYPE` members;
-- false/nondefault `--incompatible_enable_proto_toolchain_resolution`,
-  `--incompatible_autoload_externally`, custom builtins paths, injection
-  overrides, `native.legacy_globals` and arbitrary builtins replacement;
-- proto configuration fragments, providers, rule implementations, toolchain
-  selection, authenticity validation, actions, output groups and generated
-  BUILD/configured semantics;
-- any protobuf/rules_rust consumer branch, copied source, new catalog member,
-  repository mapping/source change or anticipation of the next replay stop.
+Archive header modes are bytes covered by the selected archive integrity and
+existing request/source identity. Add no DICE key, request projection,
+observation, equality rule, cache, interner, retained collection, lock, task or
+fallback. The verified capture and temporary root remain scratch owned by the
+existing active repository session; cancellation and every failure drop them,
+while success transfers only the immutable root. Concurrent requests retain
+the existing content-addressed fetch and session ownership; overlapping
+attempts never share a temporary root, and an inactive attempt cannot publish
+its root or contaminate a later A/B/A request.
 
-## Existing owner, lifecycle and implementation seam
-
-`app/slug_loading_v2/src/package.rs::complete_loading_globals` is already the
-sole constructor for ordinary, Bzlmod and direct BUILD loading environments.
-Use starlark-rust's standard frozen `AllocStruct` there, inside the existing
-`.bzl`-only branch. Do not add a custom Starlark type: its type/reflection would
-not be the exact Bazel struct contract.
-
-The value is immutable loading-environment data fixed by the Slug binary's
-named Bazel 9 compatibility target. It adds no request projection, DICE key,
-observed input, equality policy, retained side cache, lock, task or async
-ownership. Each evaluation receives the same semantic constant through the
-existing globals path; frozen modules and recursive manifests remain the only
-retained results. Concurrent requests cannot vary this admitted default. A
-future Bazel target or supported command override must re-audit and structurally
-own the changed semantics rather than mutate this value.
-
-No fallback or donor exists. The normal missing-global error remains for every
-unadmitted symbol/member and direct BUILD access.
+No benchmark is required: one membership alternative is added to the existing
+streaming branch, with no retained representation or asymptotic change.
+`extract` exceeds the 150-line function trigger but stays cohesive because it
+is the one stateful bounded tar pass owning header order, byte limits,
+namespace, payload, mode, mtime and cancellation. Splitting one admitted mode
+would duplicate that state and error ordering. Both allowlisted files remain
+below 2,000 lines.
 
 ## Required proof
 
-Add an adjacent focused test in `package.rs` that:
+Extend only adjacent selected-BCR archive tests to prove:
 
-- evaluates the exact 134-byte/3-line protobuf `native.bzl` source under both
-  ordinary and Bzlmod loading globals and proves the exported alias is a
-  `struct` with exactly the uppercase member set to `True`;
-- proves `dir`, `hasattr` and `getattr(default)` for the two intentionally
-  absent native members, and proves the value is not callable and exposes no
-  native proto methods;
-- proves direct BUILD globals do not predeclare the top-level; and
-- freezes the pinned source hash while adding no fixture.
+- a synthetic regular `0444` entry materializes with exact bytes, mtime and,
+  on Unix, retained mode `0444`;
+- existing admitted executable and writable modes remain unchanged;
+- existing regular `0600`, directory `0700`, malformed, namespace, limit,
+  cancellation, transform and source-association rejections remain green;
+- inactive/failed overlap remains unpublished and existing source-association
+  A/B distinctions remain exact; and
+- the pinned archive hash/listing plus the authenticated replay remain the
+  full consumer/provenance evidence. Do not add the archive or a fixture.
 
-The authenticated replay is the full recursive consumer/provenance proof. It
-must clear only the missing global and the declaration-time chain, then stop at
-the next independently owned boundary. The broad Bazel proto tests are skipped
-because they exercise explicitly deferred configured providers, toolchains and
-actions. No benchmark is required: this is one immutable field with no new key,
-collection, graph edge or demonstrated hot path.
+The replay must use an explicitly bounded PATH, clear rules_shell and this
+mode error, finish selected rules_java materialization, and stop only at the
+next independently owned boundary. If it instead exposes another archive mode
+or type, return `REPLAN`; do not broaden the matcher in implementation.
 
 ## Allowlist, caps and validation
 
-Only `app/slug_loading_v2/src/package.rs`, including its adjacent `#[cfg(test)]`
-module, may change. No other Rust, protobuf source, fixture, catalog, Cargo or
-documentation file may change during implementation.
+Only these files may change:
 
-Gross additions are capped at 8 production Rust, 45 proof Rust and 53 total.
-`package.rs` exceeds the 2,000-line complexity trigger but remains cohesive for
-this packet because it already exclusively constructs all three loading-global
-variants; a new module for one standard struct would split that ownership. The
-existing constructor may grow by at most five lines and no new helper is
-authorized.
+- `app/slug_core_v2/src/runtime/repository_archive_realize.rs`;
+- `app/slug_core_v2/src/runtime/tests/repository_archive_realize_tests.rs`.
+
+Gross additions are capped at 6 production Rust, 40 proof Rust and 46 total.
+No docs, fixture, Cargo metadata or other source may change during
+implementation.
 
 Run serially:
 
-- the focused `proto_common_do_not_use`/loading-globals unit test;
-- `cargo test -p slug_loading_v2 --lib --quiet` and every loading integration
-  target;
-- `cargo test -p slug_query_v2 --lib --quiet`;
-- `cargo build -p slug_cli_v2 --quiet`, followed by stale-`slugd` cleanup and
-  one authenticated replay;
-- `cargo fmt --check`, `git diff --check`, archive checker and exact
-  allowlist/cap verification.
+- `cargo test -p slug_core_v2
+  selected_bcr_realizes_streamed_files_gnu_name_modes_mtime_and_module
+  --quiet`;
+- `cargo test -p slug_core_v2 selected_bcr --quiet`;
+- `cargo test -p slug_core_v2 --lib --quiet`;
+- `cargo build -p slug_cli_v2 --quiet`, stale-`slugd` cleanup and one
+  authenticated bounded-PATH replay;
+- `cargo fmt --check`, `git diff --check`,
+  `bash scripts/v2_archive_status.sh` and exact allowlist/cap verification.
 
-Return `REPLAN` if exact reflection requires a custom value, Java method or
-dynamic flag owner; a second production file, DICE key, source/catalog change,
-consumer branch or proto provider/analysis behavior is required; the symbol
-must enter BUILD globals; the pinned consumer observes another native member;
-the replay needs a false flag; speculative broader semantics are needed; or the
-allowlist/caps fail.
+Return `REPLAN` if exact `0444` retention requires a second production
+owner, a new key/input/cache/lock, platform-wide permission policy, another
+mode/type, archive fixture, probe or consumer branch, altered source identity,
+or the allowlist/caps fail.
