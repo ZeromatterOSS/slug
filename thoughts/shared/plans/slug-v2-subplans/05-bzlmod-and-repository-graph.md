@@ -4500,3 +4500,22 @@ authentic replay advances to `repository_ctx.template`; run only docs-first
 `WP-5-7A-repository-context-template-audit` next. String paths, built-in
 materialization, path filesystem methods, template/symlink and every other
 repository effect remain unsupported/deferred.
+
+### Repository-context template source ownership audited (2026-09-02)
+
+The template audit returns `ACCEPT` without a new Bzlmod key. For the admitted
+canonical external `path(Label)` source, the existing
+`HostRepositorySourceRoute::source_read_key` and
+`source_read_observation_key` already select direct-local, immutable or
+completed generated materialization, resolve/read exact source bytes and expose
+the observed file/symlink epoch. The outer repository-file effect owner can
+route a typed template demand only after dropping the synchronous evaluator,
+then merge that existing epoch before retrying.
+
+Select the bounded Stage 4/5 implementation. It may retain the canonical
+Label-path address only as invocation routing provenance and must derive the
+repository-relative source from its typed package/target components. Physical-
+path reads, new source/materialization/DICE owners, root/built-in/self-template
+support and ruleset/toolchain branches are forbidden. The generated-file plan
+already owns transformed output bytes and executable mode; no Stage 5 retained
+representation changes.

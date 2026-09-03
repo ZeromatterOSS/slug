@@ -8072,3 +8072,22 @@ the rebuilt authentic rules_cc replay clears these Label-path calls before
 stopping at the independent `repository_ctx.template` method. Stage 5 owns the
 next docs-only audit; template behavior and ruleset special cases remain
 unsupported/deferred here.
+
+### Repository-context template composition audited (2026-09-02)
+
+Pinned Bazel 9.2 `createFileFromTemplate`, `getPath`, `maybeWatch` and
+`replaceAllLiteral` establish a bounded existing-owner composition. The
+authentic call has a normalized string destination, a `path(Label)` value from
+a canonical external repository, one string substitution, default executable
+mode and default auto-watch. Bazel reads/writes ISO-8859-1 bytes and applies
+literal replacements sequentially in dictionary insertion order.
+
+Select `WP-4-5-7A-repository-context-template-implementation-r1`. Extend only
+invocation scratch and the existing retry driver: a typed template-source need
+reuses the canonical route's legacy/observed source-read keys, then the
+synchronous evaluator performs bounded Latin-1 byte substitution and appends an
+ordinary generated-file effect. The existing plan remains the sole output
+path/content/mode/order identity. Root/self-generated/string/Label template
+sources, explicit watch modes, non-Latin-1 substitutions and every other
+repository method remain unsupported/deferred. Audit result: `ACCEPT`; no Rust
+is changed by the audit.
