@@ -1792,6 +1792,85 @@ async fn rule_initializer_reexport_rejects_before_recording_and_recovers() {
 }
 
 #[tokio::test]
+async fn rule_computed_default_reexport_rejects_before_recording_and_restores() {
+    const A: &str = concat!(
+        "def _impl(ctx): fail('implementation stayed lazy')\n",
+        "def _computed(name, tags): fail('computed default stayed lazy')\n",
+        "def _init(name, **kwargs): fail('initializer stayed lazy')\n",
+        "probe = rule(implementation = _impl, attrs = {'_def_parser': attr.label(default = _computed), 'out': attr.output()})\n",
+        "both = rule(implementation = _impl, initializer = _init, attrs = {'_def_parser': attr.label(default = _computed)})\n",
+    );
+    const B: &str = concat!(
+        "def _impl(ctx): fail('implementation stayed lazy')\n",
+        "probe = rule(implementation = _impl, attrs = {'_def_parser': attr.label()})\n",
+    );
+    const C: &str = concat!(
+        "def _impl(ctx): fail('implementation stayed lazy')\n",
+        "probe = rule(implementation = _impl, attrs = {'_def_parser': attr.label(default = lambda name, tags: fail('lambda stayed lazy'))})\n",
+    );
+    const REEXPORT: &str = "load(':defs.bzl', _probe = 'probe')\nprobe = _probe\n";
+    const BAD_BUILD: &str = concat!(
+        "load(':reexport.bzl', 'probe')\n",
+        "probe(name = 'bad', _def_parser = 1, unknown = 1)\n",
+        "filegroup(name = 'must_not_publish')\n",
+    );
+    const CLEAN_BUILD: &str = "load(':defs.bzl', 'probe')\nprobe(name = 'clean')\n";
+    const ERROR: &str =
+        "target invocation for computed-default attribute '_def_parser' is unsupported";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for (source, build, variant, error) in [
+        (A, BAD_BUILD, 201, Some(ERROR)),
+        (B, CLEAN_BUILD, 202, None),
+        (C, BAD_BUILD, 203, Some(ERROR)),
+        (A, BAD_BUILD, 204, Some(ERROR)),
+    ] {
+        let outcome = compute_package(
+            &dice,
+            EpochBuilder::workspace_sources(
+                "print('ROOT')\n",
+                build,
+                &[("defs.bzl", source), ("reexport.bzl", REEXPORT)],
+                variant,
+            )
+            .build(),
+            package_policy(),
+        )
+        .await;
+        if let Some(error) = error {
+            assert!(terminal_error(&outcome).contains(error));
+        } else {
+            assert_eq!(target_names(&outcome), ["clean"]);
+        }
+    }
+    let initializer = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources(
+            "print('ROOT')\n",
+            "load(':defs.bzl', 'both')\nboth(name = 'bad')\n",
+            &[("defs.bzl", A), ("reexport.bzl", REEXPORT)],
+            205,
+        )
+        .build(),
+        package_policy(),
+    )
+    .await;
+    assert!(
+        terminal_error(&initializer)
+            .contains("target invocation for rule initializer is unsupported")
+    );
+    let external = load_repository_package_fixture(
+        &[
+            ("BUILD.bazel", BAD_BUILD.as_bytes()),
+            ("defs.bzl", C.as_bytes()),
+            ("reexport.bzl", REEXPORT.as_bytes()),
+        ],
+        206,
+    )
+    .await;
+    assert!(repository_package_error(&external).contains(ERROR));
+}
+
+#[tokio::test]
 async fn host_native_toolchain_targets_preserve_root_load_lifecycle_and_ownership() {
     let build = |event: &str, constraint: &str| {
         format!(
@@ -31409,7 +31488,7 @@ PRIVATE = attr.label(default = Label("//owned:dep"))
 PROVIDER = attr.label(providers = [P])
 ASPECTED = attr.label_list(default = [], aspects = [DEP_ASPECT])
 TRANSITIONED = attr.label(default = Label("//owned:dep"), cfg = USER_TRANSITION)
-COMPUTED = attr.label(default = computed)
+COMPUTED = attr.label_list(default = computed)
 LATE = attr.label(default = configuration_field(fragment = "coverage", name = "output_generator"))
 CONFIGURABLE = attr.string(configurable = False)
 BAD = 1

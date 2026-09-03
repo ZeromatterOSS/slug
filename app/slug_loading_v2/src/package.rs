@@ -3697,6 +3697,7 @@ fn coerce_string_set_default<'v>(
 struct RuleDefinitionGen<V> {
     implementation: V,
     initializer: Option<V>,
+    computed_default_attributes: Vec<ComputedDefaultRuleAttributeGen<V>>,
     #[trace(unsafe_ignore)]
     definition_source: Arc<BzlModuleIdentity>,
     #[trace(unsafe_ignore)]
@@ -3730,6 +3731,7 @@ struct RuleDefinitionGen<V> {
 pub(crate) struct FrozenRuleDefinition {
     implementation: FrozenValue,
     initializer: Option<FrozenValue>,
+    computed_default_attributes: Arc<[ComputedDefaultRuleAttributeGen<FrozenValue>]>,
     definition_source: Arc<BzlModuleIdentity>,
     source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
@@ -3745,6 +3747,12 @@ pub(crate) struct FrozenRuleDefinition {
     incoming_transition: Option<FrozenTransitionDefinition>,
     outputs: RuleOutputsDefinitionGen<FrozenValue>,
     output_to_genfiles: bool,
+}
+
+#[derive(Debug, Trace, Allocative)]
+struct ComputedDefaultRuleAttributeGen<V> {
+    schema_index: u32,
+    callback: V,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -3765,7 +3773,7 @@ struct MacroAttributeSchema {
 impl MacroAttributeSchema {
     fn from_definition(name: &str, definition: &AttributeDefinition<'_>) -> anyhow::Result<Self> {
         if definition.late_bound_default.is_some()
-            || definition.computed_default
+            || definition.computed_default.is_some()
             || definition.attached_aspect.is_some()
             || definition.transition.is_some()
             || definition.analysis_test_transition.is_some()
@@ -4047,6 +4055,17 @@ impl<'v> Freeze for RuleDefinition<'v> {
                 .initializer
                 .map(|value| value.freeze(freezer))
                 .transpose()?,
+            computed_default_attributes: self
+                .computed_default_attributes
+                .into_iter()
+                .map(|attribute| {
+                    Ok(ComputedDefaultRuleAttributeGen {
+                        schema_index: attribute.schema_index,
+                        callback: attribute.callback.freeze(freezer)?,
+                    })
+                })
+                .collect::<FreezeResult<Vec<_>>>()?
+                .into(),
             definition_source: self.definition_source,
             source_identities_by_filename: self.source_identities_by_filename,
             required_toolchains: self.required_toolchains,
@@ -4679,7 +4698,7 @@ fn aspect_attributes<'v>(
                 "attribute '{name}' has the 'configurable' argument set, which is not allowed in aspect definitions"
             );
         }
-        if definition.computed_default {
+        if definition.computed_default.is_some() {
             anyhow::bail!("Aspect attribute '{name}' with computed default value is unsupported.");
         }
         if name.starts_with('_') {
@@ -5439,8 +5458,7 @@ struct AttributeDefinitionGen<V> {
     default: Option<CoercedAttributeValue>,
     #[trace(unsafe_ignore)]
     late_bound_default: Option<slug_configuration_v2::ConfigurationFieldIdentity>,
-    #[trace(unsafe_ignore)]
-    computed_default: bool,
+    computed_default: Option<V>,
     #[trace(unsafe_ignore)]
     executable: bool,
     #[trace(unsafe_ignore)]
@@ -5475,7 +5493,7 @@ fn attribute_definition_from_value<'v>(
             allow_empty: value.allow_empty,
             default: value.default.clone(),
             late_bound_default: value.late_bound_default.clone(),
-            computed_default: value.computed_default,
+            computed_default: value.computed_default.map(|value| value.to_value()),
             executable: value.executable,
             exec_configuration: value.exec_configuration,
             required_providers: value.required_providers.clone(),
@@ -5543,7 +5561,7 @@ pub(crate) fn subrule_attribute_from_value<'v>(
                 "illegal attribute name '{name}': subrules may only define private attributes (whose names begin with '_')."
             );
         }
-        if definition.computed_default {
+        if definition.computed_default.is_some() {
             anyhow::bail!(
                 "illegal default value for attribute '{name}': subrules cannot define computed defaults."
             );
@@ -5613,7 +5631,10 @@ impl<'v> Freeze for AttributeDefinition<'v> {
             allow_empty: self.allow_empty,
             default: self.default,
             late_bound_default: self.late_bound_default,
-            computed_default: self.computed_default,
+            computed_default: self
+                .computed_default
+                .map(|value| value.freeze(freezer))
+                .transpose()?,
             executable: self.executable,
             exec_configuration: self.exec_configuration,
             required_providers: self.required_providers,
@@ -6295,7 +6316,7 @@ fn attribute_definition_before_later_properties<'v>(
     eval: &Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<AttributeDefinition<'v>> {
     let mut late_bound_default = None;
-    let mut computed_default = false;
+    let mut computed_default = None;
     let default = default
         .map(|value| {
             if let Some(value) = ConfigurationFieldValue::from_value(value) {
@@ -6306,7 +6327,7 @@ fn attribute_definition_before_later_properties<'v>(
                 return Ok(None);
             }
             if value.parameters_spec().is_some() {
-                computed_default = true;
+                computed_default = Some(value);
                 return Ok(None);
             }
             if value.is_none() && kind == AttributeKind::Label {
@@ -7284,6 +7305,12 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         if self.initializer.is_some() {
             return Err(starlark::Error::new_other(anyhow::anyhow!(
                 "target invocation for rule initializer is unsupported"
+            )));
+        }
+        if let Some(attribute) = self.computed_default_attributes.first() {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "target invocation for computed-default attribute '{}' is unsupported",
+                self.schema[attribute.schema_index as usize].name
             )));
         }
         self.reject_deferred_attribute_invocation()
@@ -8301,7 +8328,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             })?;
             if definition.configurable_set
                 || definition.late_bound_default.is_some()
-                || definition.computed_default
+                || definition.computed_default.is_some()
                 || definition.transition.is_some()
                 || definition.analysis_test_transition.is_some()
                 || definition.executable
@@ -8361,7 +8388,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                     "tag attribute `{name}` does not support explicit configurable policy"
                 );
             }
-            if definition.late_bound_default.is_some() || definition.computed_default {
+            if definition.late_bound_default.is_some() || definition.computed_default.is_some() {
                 anyhow::bail!("tag attribute `{name}` does not support deferred defaults");
             }
             if !definition.file_admissibility.is_no_files()
@@ -8743,6 +8770,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             starlark_builtin_schema::<Value<'v>>(executable, test, build_setting_definition, true);
         let mut user_schema = Vec::new();
         let mut late_bound_attributes = Vec::new();
+        let mut computed_default_attributes = Vec::new();
         if let Some(attrs) = attrs {
             for (name, value) in attrs {
                 if declared_builtin_names
@@ -8763,10 +8791,16 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                         "attribute '{name}' has the 'configurable' argument set, which is not allowed in rule definitions"
                     );
                 }
-                if definition.computed_default {
-                    anyhow::bail!(
-                        "rule attribute `{name}` uses a default form deferred outside this packet"
-                    );
+                if let Some(callback) = definition.computed_default {
+                    if definition.kind != AttributeKind::Label {
+                        anyhow::bail!(
+                            "rule attribute `{name}` uses a default form deferred outside this packet"
+                        );
+                    }
+                    computed_default_attributes.push((
+                        u32::try_from(user_schema.len()).expect("rule attribute count fits in u32"),
+                        callback,
+                    ));
                 }
                 if definition.late_bound_default.is_some() && !name.starts_with('_') {
                     anyhow::bail!(
@@ -8801,12 +8835,22 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 },
             )
             .collect::<Vec<_>>();
+        let computed_default_attributes = computed_default_attributes
+            .into_iter()
+            .map(|(user_index, callback)| ComputedDefaultRuleAttributeGen {
+                schema_index: builtin_count
+                    .checked_add(user_index)
+                    .expect("rule attribute count fits u32"),
+                callback,
+            })
+            .collect();
         let (attached_subrules, subrule_callables) = attached_subrules(subrules)?;
         let outputs = rule_outputs_definition(outputs)?;
         let context = BzlEvaluationContext::from_evaluator(eval)?;
         Ok(RuleDefinition {
             implementation,
             initializer,
+            computed_default_attributes,
             definition_source: Arc::new(context.source_identity_for_call(eval)?.clone()),
             source_identities_by_filename: context.source_identities_by_filename(),
             required_toolchains: toolchain_requirements(toolchains, eval)?,
@@ -9626,6 +9670,103 @@ mod module_extension_definition_tests {
         }
     }
 
+    #[test]
+    fn rule_label_computed_defaults_are_sparse_frozen_and_bounded() {
+        assert_eq!(
+            std::mem::size_of::<ComputedDefaultRuleAttributeGen<Value<'static>>>(),
+            2 * std::mem::size_of::<usize>()
+        );
+        assert_eq!(
+            std::mem::size_of::<ComputedDefaultRuleAttributeGen<FrozenValue>>(),
+            2 * std::mem::size_of::<usize>()
+        );
+        let source = concat!(
+            "def impl(ctx): fail('implementation stayed lazy')\n",
+            "def computed(name, tags): fail('computed default stayed lazy')\n",
+            "D = attr.label(default = computed, allow_single_file = True, cfg = 'exec')\n",
+            "L = attr.label(default = lambda name, tags: fail('lambda stayed lazy'))\n",
+            "cc_binary = rule(implementation = impl, attrs = {'_def_parser': D})\n",
+            "cc_test = rule(implementation = impl, attrs = {'_def_parser': D}, test = True)\n",
+            "cc_library = rule(implementation = impl, attrs = {'_def_parser': attr.label(default = computed)})\n",
+            "cc_shared_library = rule(implementation = impl, attrs = {'_def_parser': attr.label(default = computed)})\n",
+            "multi = rule(implementation = impl, attrs = {'_first': D, '_second': L})\n",
+        );
+        for globals in [loading_globals(), bzlmod_loading_globals()] {
+            let module = evaluate_with_globals(source, globals).unwrap();
+            for (descriptor, parameters) in [("D", "name, tags"), ("L", "name, tags")] {
+                let callback = module
+                    .get(descriptor)
+                    .unwrap()
+                    .downcast::<FrozenAttributeDefinition>()
+                    .unwrap()
+                    .computed_default
+                    .unwrap();
+                assert_eq!(
+                    callback
+                        .to_value()
+                        .parameters_spec()
+                        .unwrap()
+                        .parameters_str(),
+                    parameters
+                );
+            }
+            for name in ["cc_binary", "cc_test", "cc_library", "cc_shared_library"] {
+                let rule = module
+                    .get(name)
+                    .unwrap()
+                    .downcast::<FrozenRuleDefinition>()
+                    .unwrap();
+                let [computed] = rule.computed_default_attributes.as_ref() else {
+                    panic!("{name} did not retain exactly one computed default");
+                };
+                assert_eq!(
+                    rule.schema[computed.schema_index as usize].name,
+                    "_def_parser"
+                );
+            }
+            let rule = module
+                .get("multi")
+                .unwrap()
+                .downcast::<FrozenRuleDefinition>()
+                .unwrap();
+            assert_eq!(
+                rule.computed_default_attributes
+                    .iter()
+                    .map(|entry| rule.schema[entry.schema_index as usize].name.as_str())
+                    .collect::<Vec<_>>(),
+                ["_first", "_second"]
+            );
+            assert!(rule.computed_default_attributes[0].schema_index >= 5);
+            let mut graph = allocative::FlameGraphBuilder::default();
+            graph.visit_root(&rule);
+            assert!(
+                graph
+                    .finish_and_write_flame_graph()
+                    .contains("computed_default_attributes")
+            );
+        }
+        for constructor in [
+            "label_list",
+            "string_keyed_label_dict",
+            "label_keyed_string_dict",
+        ] {
+            let error = evaluate(&format!(
+                "def impl(ctx): pass\ndef computed(name): pass\nR = rule(implementation = impl, attrs = {{'_x': attr.{constructor}(default = computed)}})\n"
+            ))
+            .unwrap_err()
+            .to_string();
+            assert!(
+                error.contains(
+                    "rule attribute `_x` uses a default form deferred outside this packet"
+                ),
+                "{constructor}: {error}"
+            );
+        }
+        for invalid in ["1", "len", "rule"] {
+            assert!(evaluate(&format!("X = attr.label(default = {invalid})\n")).is_err());
+        }
+    }
+
     fn projection(source: &str) -> ModuleExtensionDefinitionProjection {
         evaluate(source)
             .unwrap()
@@ -9841,7 +9982,7 @@ mod module_extension_definition_tests {
                 allowed_values: definition.allowed_values.clone(),
                 default: definition.default.clone(),
                 late_bound_default: definition.late_bound_default.is_some(),
-                computed_default: definition.computed_default,
+                computed_default: definition.computed_default.is_some(),
                 executable: definition.executable,
                 exec_configuration: definition.exec_configuration,
                 required_providers: definition.required_providers.clone(),
