@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-4-6-7A-java-configuration-field-declaration-fail-closed-audit-r1`
+[`WP-4-6-7A-java-configuration-field-declaration-fail-closed-audit-r2`
 awaiting independent review](./slug-v2-subplans/current-packet.md).
 
 Commit `64a0f29f6` terminally accepts generic `attr.label` function-default
@@ -7832,24 +7832,30 @@ Java fragment rejects `java_toolchain_bytecode_optimizer`.
 The selected 114-entry archive contains exactly three `configuration_field`
 calls across two files: that field, `local_java_optimization_configuration` at
 line 606, and the already-admitted coverage output generator. The Java pair is
-retained by private exec-configured label attributes; after those `.bzl`
-declarations load, BUILD package loading declares nine toolchain targets.
-Bazel 9.2 `BazelBuildApiGlobals`,
+retained by private exec-configured label attributes. The same source defines
+and binds `_java_toolchain_initializer` at lines 254-266 (durable surrounding
+anchor 262-282). After those `.bzl` declarations load, `toolchains/BUILD:365`
+attempts the first of nine targets; Slug rejects it before recording because
+the rule has an initializer. Bazel 9.2 `BazelBuildApiGlobals`,
 `StarlarkLateBoundDefault`, `JavaConfiguration` and its tests establish typed
 fragment/field/tools-repository identity and configured reflection.
 
-Audit result: `ACCEPT`, pending independent review, for exact declaration
-retention of only the selected Java pair plus a Slug-native configured stop.
+R1 implementation review returns `REPLAN`: it incorrectly claimed authentic
+initializer/final-target completion. Corrected R2 is `ACCEPT`, pending
+independent review, for exact rule-declaration/freeze/import/re-export retention
+of only the selected Java pair plus a Slug-native configured stop. Generic
+no-initializer target recording remains separately exact and unchanged.
 Slug's registry knows their three underlying Java option defaults, but
 `NativeCommandOption` exposes none; returning default `None` would claim a
 configured producer Slug does not own. Both fields must therefore error before
 dependency discovery, toolchain work or rule invocation. All option mutation,
 resolution, Java fragments/providers/toolchains/bodies/actions and the other
-three Bazel Java fields remain deferred.
+three Bazel Java fields remain deferred. Authentic initializer execution and
+Java toolchain final-target recording are also deferred.
 
 Extend the existing one-byte closed field enum with a private/`pub(super)`
 two-variant Java sibling, retaining the existing field-plus-tools-repository
 identity and immutable rule slices. Add no public enum export, map, Arc, cache,
 DICE fact, option, package field or fixture. The frozen five-file
-80-production/210-proof/290-total successor, frozen Slug-native diagnostic,
-proofs and `REPLAN` stops are authoritative in `current-packet.md`.
+80-production/210-proof/290-total R2 successor, frozen Slug-native diagnostic,
+initializer stop, proofs and `REPLAN` conditions are in `current-packet.md`.

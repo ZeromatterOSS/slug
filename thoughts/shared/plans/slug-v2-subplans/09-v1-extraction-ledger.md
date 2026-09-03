@@ -2696,13 +2696,15 @@ into configured state. Independent retained-state review returns `ACCEPT`; any
 second map, final-schema name, new key/cache or configured retention is
 `REPLAN`; so is any non-rule projection that accepts or drops the marker.
 
-`WP-4-6-7A-java-configuration-field-declaration-fail-closed-audit-r1` reuses
+`WP-4-6-7A-java-configuration-field-declaration-fail-closed-audit-r2` reuses
 the adopted Stage 6 configuration-field representation; no V1/Buck2 code is
 imported. Add exactly two private/`pub(super)` Java discriminants to the
 existing flattened `#[repr(u8)] ConfigurationField`. The public field remains
 one byte, and the existing `ConfigurationFieldIdentity` continues to own only
-that field plus `CanonicalRepoName`; the existing immutable late-bound slices
-remain the sole rule owners.
+that field plus `CanonicalRepoName`; existing frozen rule-definition ownership
+and immutable late-bound slices remain the sole declaration owners. Authentic
+initializer-bearing targets do not publish this state because the pre-recorder
+guard rejects their invocation.
 
 Do not add a public sibling-enum export, per-field string, map, interner,
 registry, cache, extra Arc, evaluator borrow, DICE value or configured

@@ -23192,6 +23192,12 @@ resolution. This fail-closed boundary is Slug-native; Java option mutation,
 default/nondefault resolution, fragment access, providers, toolchains,
 optimization and compilation actions remain unsupported/deferred.
 
+The authentic replay does not reach this configured guard: the selected
+`java_toolchain` rule has an initializer, and Stage 4 rejects its first
+`toolchains/BUILD:365` invocation before recording. Configured Java rejection
+therefore remains a focused fail-closed proof, while initializer execution and
+authentic Java final-target/analysis semantics remain deferred.
+
 Stage 6 adds no configured field, equality/fingerprint input, DICE owner, cache
 or retained allocation. `configuration.rs` owns only the typed error and
 analysis tests prove ordering. Removing the guard requires a separately

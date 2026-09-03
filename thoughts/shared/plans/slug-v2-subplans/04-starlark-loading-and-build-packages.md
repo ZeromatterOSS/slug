@@ -8634,8 +8634,17 @@ Pinned Bazel 9.2 `BazelBuildApiGlobals:97-109`,
 `StarlarkRuleImplementationFunctionsTest:3007-3229` establish the declaration
 category. Stage 4 may recognize only the selected Java pair in the existing
 Bzl-only ABI and retain each as a private `attr.label` default through
-freeze/import/re-export, initializer and final target recording. BUILD remains
-without the global; C++ and coverage remain unchanged.
+rule declaration and freeze/import/re-export. BUILD remains without the global;
+C++ and coverage remain unchanged. Generic no-initializer target recording is
+a separate unchanged exact control.
+
+R1 review returns `REPLAN` for crossing the runtime boundary. The authentic
+`_java_toolchain_initializer` returns at `java_toolchain.bzl:262`, is bound at
+266 (surrounding anchor 262-282), and `toolchains/BUILD:365` invokes the first
+toolchain target. Slug's existing initializer guard precedes recorder access,
+coercion and target/output insertion, so initializer execution and authentic
+final-target recording remain deferred. Corrected R2 replay must stop exactly
+at `target invocation for rule initializer is unsupported` on that first call.
 
 This loading behavior is exact. The two-field Java enum is private or
 `pub(super)` and flattened into the existing one-byte closed field; no public
@@ -8648,6 +8657,7 @@ fixture.
 The three other Bazel Java fields and all Java producer/configured semantics
 remain deferred. Proof must cover the full three-call census, selected pair,
 unselected fields, private label-only use, ABI, BUILD absence, lifetime, order,
-identity/hash/layout and source A/B/A. The frozen five-file 80/210/290
+identity/hash/layout, source A/B/A, exact unknown-`missing` loading failure and
+the initializer-before-recorder stop. The frozen five-file 80/210/290 R2
 successor awaits independent review. Any need to edit `package.rs`, `subrule.rs`
 or expose the Java sibling publicly is `REPLAN`.

@@ -1,10 +1,12 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-6-7A-java-configuration-field-declaration-fail-closed-audit-r1
+Packet: WP-4-6-7A-java-configuration-field-declaration-fail-closed-audit-r2
 
-Status: docs-only audit/design checkpoint complete. The bounded implementation
-successor is frozen below but awaits independent review; no Rust work is
-authorized before `ACCEPT`.
+Status: R1 implementation review returned `REPLAN` because its exact/proof and
+replay claims crossed the already-admitted initializer guard. This corrected
+docs-only R2 freezes the bounded successor below and awaits independent review.
+The existing five-file Rust diff is preserved untouched; no further Rust work
+is authorized before `ACCEPT`.
 
 ## Predecessor and replay boundary
 
@@ -38,11 +40,11 @@ The relevant files are regular `0444` with trailing LF:
 
 | Source-relative path | SHA-256 | Bytes/lines | Role |
 |---|---|---:|---|
-| `java/common/rules/java_toolchain.bzl` | `5ad6511cdef925246961c7e7a9039475c192371fedbf909c63cf92334779e875` | 24,304/612 | Java fields at lines 602 and 606; rule body consumes them at 112 and 133 |
+| `java/common/rules/java_toolchain.bzl` | `5ad6511cdef925246961c7e7a9039475c192371fedbf909c63cf92334779e875` | 24,304/612 | initializer returns at 262 and is bound at 266; Java fields at 602/606; body uses at 112/133 |
 | `java/bazel/rules/bazel_java_test.bzl` | `33b1b5e205c6658c661be6b0cd1b30fe0339d78f0b4fbc061a350024a412f412` | 5,416/148 | already-admitted coverage field at lines 90-93 |
 | `java/rules_java_deps.bzl` | `40ce0f5b44b124f9fdc3986d542caa6b3a3213c2abbd4927cdea65ad42f31a23` | 8,257/224 | generated proxy load order |
 | `toolchains/default_java_toolchain.bzl` | `6f963992c933e6cbc48f0c64f3349484422ee06f01830473ea802731b874deea` | 9,335/219 | public toolchain wrapper entry |
-| `toolchains/BUILD` | `b23a9b08e5928120d2d3f3a559b9c54f8472cabf1a4b99baf7cc6f29886a9b73` | 15,306/430 | invokes nine `java_toolchain` targets |
+| `toolchains/BUILD` | `b23a9b08e5928120d2d3f3a559b9c54f8472cabf1a4b99baf7cc6f29886a9b73` | 15,306/430 | first of nine `java_toolchain` invocations is line 365 |
 | `MODULE.bazel` | `ee63f27e36a3fada80342869361182f120a9819c74320e8e65b1e04ba0cd7a9d` | 4,218/136 | registers `//toolchains:all` |
 
 The complete archive census is exactly three `configuration_field` calls in
@@ -56,9 +58,13 @@ There is no fourth selected call.
 Load order is `default_java_toolchain.bzl` -> public
 `java/toolchains:java_toolchain.bzl` -> generated compatibility proxy. The
 proxy loads `bazel_java_test.bzl` before `java_toolchain.bzl`, so coverage
-already succeeds before the first Java call stops. If declarations load,
-`toolchains/BUILD` creates the default, seven release-specific and prebuilt
-toolchains; their rule implementations do not run during package loading.
+already succeeds before the first Java call stops. The authentic
+`_java_toolchain_initializer` returns `kwargs` at
+`java_toolchain.bzl:254-262`, is bound by `rule(initializer=...)` at 264-266,
+and the surrounding durable anchor continues through the example at 282.
+After `.bzl` declarations load, `toolchains/BUILD:365` attempts the first of
+nine toolchain targets. Slug's existing initializer guard rejects that call
+before recorder access, coercion, target/output insertion or implementation.
 
 ## Bazel 9.2 authority and producer gap
 
@@ -111,9 +117,10 @@ plus a configured fail-closed boundary.
 
 **Exact:** recognize fragment `java` only for the two selected field names in
 the existing Bzl-only `configuration_field` ABI; retain typed field plus tools
-repository through private `attr.label` defaults, freeze/import/re-export,
-rule initialization and final target recording; preserve source order, BUILD
-absence and existing C++/coverage behavior.
+repository through rule declaration and freeze/import/re-export; preserve
+source order, BUILD absence and existing C++/coverage behavior. Generic
+no-initializer targets using the same declarations remain separately exact and
+unchanged.
 
 **Slug-native:** both Java identities fail configured projection before
 dependency discovery, exec projection, toolchain lookup or rule invocation.
@@ -127,7 +134,8 @@ The closed Rust enum and structural identity replace Bazel reflection. The
 three Bazel-valid but unselected fields remain rejected rather than silently
 gaining parity.
 
-**Unsupported/deferred:** every Java command-option producer, default and
+**Unsupported/deferred:** initializer execution and authentic Java toolchain
+final-target recording; every Java command-option producer, default and
 nondefault field resolution, Java fragment facade, the other three fields,
 Java toolchain/provider/rule-body behavior, optimization and compilation
 actions. Add no inert label or default-`None` placeholder.
@@ -158,7 +166,7 @@ existing compact enum/identity only.
 ## Frozen implementation successor
 
 After independent `ACCEPT`, activate
-`WP-4-6-7A-java-configuration-field-declaration-fail-closed-implementation-r1`
+`WP-4-6-7A-java-configuration-field-declaration-fail-closed-implementation-r2`
 with exactly this allowlist:
 
 - `app/slug_configuration_v2/src/native/configuration_field.rs`;
@@ -172,9 +180,12 @@ Caps are 80 production, 210 proof and 290 aggregate gross Rust additions.
 Proof must cover the exact three-call selected census and hashes; both Java
 names plus coverage success; all three other Bazel-valid Java fields and an
 unknown field rejecting; positional/named ABI and BUILD absence; private
-`attr.label`-only use; freeze/import/re-export, initializer/final-target
-retention without body execution; source order; same-field/tools-repository
-equality/hash and pair/repository discrimination; one-byte
+`attr.label`-only use; freeze/import/re-export without initializer execution;
+the unknown-field loading diagnostic
+`invalid configuration field name 'missing' on fragment 'java'`; a separately identified generic
+no-initializer target-recording control; the selected initializer declaration
+and exact pre-recorder target-invocation guard; source order;
+same-field/tools-repository equality/hash and pair/repository discrimination; one-byte
 `ConfigurationField`, unchanged identity/late-bound carrier sizes and no
 ordinary-rule carrier; same-DICE source A/B/A restoration; and byte-exact
 frozen Slug-native configured errors before dependency, toolchain and
@@ -185,11 +196,13 @@ Run focused native-configuration, loading and analysis tests, then serial full
 configuration/loading/analysis/query suites, direct pinned-nightly CLI build,
 authenticated bounded-PATH replay, stale-slugd, formatting, diff, archive,
 allowlist and cap gates. Reuse source evidence; add no fixture. Replay must
-clear both Java declarations and all nine toolchain target declarations, then
-stop at the next independent typed boundary.
+clear both Java `.bzl` declarations, enter `toolchains/BUILD:365`, and stop at
+`target invocation for rule initializer is unsupported` on the first toolchain
+target; it must not claim any authentic target was recorded.
 
 Return `REPLAN` if rejection cannot precede dependency/toolchain/body work; a
 fourth selected Java field appears; implementation needs a command option,
 Java fragment, package/schema/DICE owner, retained store, public sibling-enum
 export, fixture or another production file; enum/identity size grows; a Java
-field returns a label/`None` or executes a body; or any cap is exceeded.
+field returns a label/`None`, the initializer guard is bypassed, an authentic
+Java target is recorded or a body executes; or any cap is exceeded.
