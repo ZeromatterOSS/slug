@@ -689,6 +689,58 @@ compatibility=module_extension(implementation=impl)
         PathObservationEpoch::new(observations).unwrap()
     }
 
+    fn builtin_rules_cc_source_epoch(
+        instance: PathObservationInstanceId,
+        utility: &'static [u8],
+    ) -> PathObservationEpoch {
+        let namespace = PathObservationNamespace::Materialization(instance);
+        let demand = |path: &str| {
+            PathObservationDemand::new(
+                namespace,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                PathObservationOperation::Lstat,
+            )
+        };
+        let directories = PathObservationEpoch::from_shared(
+            [
+                "/registry-rules-cc/cc",
+                "/registry-rules-cc/cc/toolchains",
+                "/registry-rules-cc/cc/private",
+                "/registry-rules-cc/cc/private/toolchain",
+            ]
+            .into_iter()
+            .enumerate()
+            .map(|(index, path)| {
+                (
+                    demand(path),
+                    Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                        PathLstat::new(PathNodeKind::Directory, index as i64 + 20, 1, 1, 1, 0o755),
+                    ))),
+                )
+            }),
+        )
+        .unwrap();
+        merge_observations(
+            &directories,
+            &bzl_source_epoch(
+                namespace,
+                "/registry-rules-cc",
+                &[
+                    (
+                        "cc/toolchains/toolchain_config_utils.bzl",
+                        Some(utility),
+                    ),
+                    (
+                        "cc/private/toolchain/escape.bzl",
+                        Some(
+                            b"CONTEXT = native.bazel_version\ndef escape_string(value): return str(value).replace('%', '%%')\n",
+                        ),
+                    ),
+                ],
+            ),
+        )
+    }
+
     async fn prove_root_adapter_parity(
         tx: &mut dice::DiceTransaction,
         input: &HostCanonicalRepositorySourceInput,
@@ -1237,61 +1289,298 @@ compatibility=module_extension(implementation=impl)
     }
 
     #[tokio::test]
-    async fn root_builtin_external_bzl_uses_only_catalog_source_children() {
-        let tracker = Arc::new(DependencyTrace::default());
+    async fn root_builtin_external_bzl_promotes_one_public_load_without_changing_its_key() {
         let dice = builtin_graph_dice();
         let module = builtin_graph_module();
-        let mut tx = transaction(&dice, &module, EXTENSION_A, true, Some(tracker.clone())).await;
-        let route = admitted_root_route(&mut tx, "bazel_tools").await;
-        let label = external_label("tools", "build_defs.bzl");
-        let canonical = "@@bazel_tools//tools:build_defs.bzl";
-        let legacy_key = ExternalBzlModuleEvalKey::new(route.clone(), label.clone());
-        let observed_key = ExternalBzlModuleObservationKey::new(route, label);
-
-        let SourcePreparationOutcome::Complete(legacy) = tx.compute(&legacy_key).await.unwrap()
+        let mut seed = transaction(&dice, &module, EXTENSION_A, true, None).await;
+        let route = admitted_root_route(&mut seed, "bazel_tools").await;
+        let rules_cc = CanonicalRepoName::new("rules_cc+").unwrap();
+        let SourcePreparationOutcome::Complete(rules_route) = seed
+            .compute(&HostCanonicalRepositoryLoadRouteKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                rules_cc.clone(),
+            ))
+            .await
+            .unwrap()
         else {
-            panic!("root built-in legacy module must complete")
+            panic!("rules_cc route must complete")
         };
-        let legacy_error = legacy.as_ref().as_ref().unwrap_err();
-        assert!(matches!(
-            legacy_error,
-            ExternalBzlModuleError::LoadLabel { source, .. }
-                if source.to_string() == canonical
-        ));
-        let SourcePreparationOutcome::Complete(Ok(observed)) =
-            tx.compute(&observed_key).await.unwrap()
+        let rules_input = rules_route.as_ref().as_ref().unwrap().input().clone();
+        let HostRepositorySourceInputDispositionView::Request(request) =
+            rules_input.view().disposition()
         else {
+            panic!("rules_cc must retain its source request")
+        };
+        let label = external_label("tools/cpp", "lib_cc_configure.bzl");
+        let legacy_key = ExternalBzlModuleEvalKey::new_bzlmod(route.clone(), label.clone());
+        let observed_key = ExternalBzlModuleObservationKey::new_bzlmod(route, label);
+        let pending = seed.compute(&observed_key).await.unwrap();
+        let SourcePreparationOutcome::Need(need) = pending else {
+            panic!("built-in load must request the selected rules_cc source")
+        };
+        assert_eq!(
+            need.repository_materializations().get(&request.id),
+            Some(request)
+        );
+        let host = seed.compute(&PathObservationEpochKey).await.unwrap();
+        let instance = PathObservationInstanceId::new(87);
+        let utility = b"load('//cc/private/toolchain:escape.bzl', _escape_string = 'escape_string')\nescape_string = _escape_string\n";
+        let sources = builtin_rules_cc_source_epoch(instance, utility);
+        let materialization = || RepositoryMaterializationSuccess::Immutable {
+            source_identity: Arc::from("builtin-public-load-rules-cc"),
+            generation_root: PathBuf::from("/registry-rules-cc"),
+            observation_instance: instance,
+        };
+        let mut platform_pending = request_transaction_with_observations(
+            &dice,
+            request.clone(),
+            Arc::new(DependencyTrace::default()),
+            materialization(),
+            merge_observations(&host, &sources),
+        )
+        .await;
+        let pending = platform_pending.compute(&observed_key).await.unwrap();
+        let SourcePreparationOutcome::Need(need) = pending else {
+            panic!("built-in mapping must request the unresolved platform source")
+        };
+        let platform_request = need
+            .repository_materializations()
+            .iter()
+            .find(|(id, _)| id.canonical_repo.as_str() == "platforms+")
+            .map(|(_, request)| request.clone())
+            .unwrap_or_else(|| panic!("built-in mapping needs: {need:?}"));
+        let tracker = Arc::new(DependencyTrace::default());
+        let mut tx = requests_transaction_with_observations(
+            &dice,
+            [
+                (
+                    platform_request.clone(),
+                    RepositoryMaterializationSuccess::Local,
+                ),
+                (
+                    request.clone(),
+                    RepositoryMaterializationSuccess::Immutable {
+                        source_identity: Arc::from("builtin-public-load-rules-cc"),
+                        generation_root: PathBuf::from("/registry-rules-cc"),
+                        observation_instance: instance,
+                    },
+                ),
+            ],
+            tracker.clone(),
+            merge_observations(&host, &sources),
+        )
+        .await;
+
+        let legacy_outcome = tx.compute(&legacy_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(legacy) = legacy_outcome else {
+            panic!("root built-in legacy module must complete: {legacy_outcome:?}")
+        };
+        let legacy = legacy.as_ref().as_ref().unwrap();
+        let observed_value = tx.compute(&observed_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = &observed_value else {
             panic!("root built-in observed module must complete")
         };
-        let observed_error = observed.result().as_ref().as_ref().unwrap_err();
-        assert_eq!(observed_error, legacy_error);
-        assert!(observed.observations().observations().is_empty());
+        let observed_module = observed.result().as_ref().as_ref().unwrap();
+        assert_eq!(observed_module.manifest, legacy.manifest);
+        assert!(
+            observed_module
+                .manifest
+                .root
+                .repository_mapping
+                .iter()
+                .any(|(apparent, canonical)| apparent.as_str() == "rules_cc"
+                    && canonical == &rules_cc)
+        );
+        assert_eq!(
+            observed_module.manifest.direct_children[0]
+                .label
+                .to_string(),
+            "@@rules_cc+//cc/toolchains:toolchain_config_utils.bzl"
+        );
+        assert_eq!(
+            observed_module.manifest.reachable[2].label.to_string(),
+            "@@rules_cc+//cc/private/toolchain:escape.bzl"
+        );
 
-        let source_key = "host-repository-source-observation:@@bazel_tools:tools/build_defs.bzl";
-        let observed_source_key =
-            "observed-host-repository-source-observation:@@bazel_tools:tools/build_defs.bzl";
+        let target = external_label("cc/toolchains", "toolchain_config_utils.bzl");
+        let child = external_label("cc/private/toolchain", "escape.bzl");
+        let legacy_target = tx
+            .compute(&ExternalBzlModuleEvalKey::new_canonical_bzlmod(
+                rules_input.clone(),
+                target.clone(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(legacy_target) = legacy_target else {
+            panic!("legacy target must complete")
+        };
+        let legacy_target = legacy_target.as_ref().as_ref().unwrap();
+        let observed_target = tx
+            .compute(&ExternalBzlModuleObservationKey::new_canonical_bzlmod(
+                rules_input.clone(),
+                target,
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed_target)) = observed_target else {
+            panic!("observed target must complete")
+        };
+        let observed_child = tx
+            .compute(&ExternalBzlModuleObservationKey::new_canonical_bzlmod(
+                rules_input.clone(),
+                child,
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed_child)) = observed_child else {
+            panic!("observed recursive child must complete")
+        };
+        let observed_child = observed_child.result().as_ref().as_ref().unwrap();
         assert_eq!(
-            tracker.dependencies(&legacy_key.to_string()),
-            [source_key.to_owned()]
+            observed_child
+                .module
+                .get("CONTEXT")
+                .unwrap()
+                .value()
+                .unpack_str(),
+            Some("9.2.0")
         );
-        assert_eq!(
-            tracker.dependencies(&observed_key.to_string()),
-            [observed_source_key.to_owned()]
+        assert!(
+            legacy
+                .module
+                .get("escape_string")
+                .unwrap()
+                .value()
+                .ptr_eq(legacy_target.module.get("escape_string").unwrap().value())
         );
-        assert_eq!(
-            tracker.dependencies(source_key),
-            ["builtin-bazel-tools-source-file:tools/build_defs.bzl".to_owned()]
+        assert!(
+            observed_module
+                .module
+                .get("escape_string")
+                .unwrap()
+                .value()
+                .ptr_eq(observed_child.module.get("escape_string").unwrap().value())
         );
-        assert_eq!(
-            tracker.dependencies(observed_source_key),
-            ["builtin-bazel-tools-source-file:tools/build_defs.bzl".to_owned()]
+
+        let builtin_route = tx
+            .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                CanonicalRepoName::new("bazel_tools").unwrap(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(builtin_route)) = builtin_route else {
+            panic!("observed built-in route must complete")
+        };
+        let selected_route = tx
+            .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                rules_cc,
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(selected_route)) = selected_route else {
+            panic!("observed selected route must complete")
+        };
+        let expected = merge_observations(
+            builtin_route.observations(),
+            &merge_observations(
+                selected_route.observations(),
+                observed_target.observations(),
+            ),
         );
+        assert_eq!(observed.observations(), &expected);
+        let warm = tx.compute(&observed_key).await.unwrap();
+        assert!(ExternalBzlModuleObservationKey::equality(
+            &observed_value,
+            &warm
+        ));
+        assert!(ExternalBzlModuleObservationKey::validity(&warm));
+
+        let changed_sources = builtin_rules_cc_source_epoch(
+            instance,
+            b"load('//cc/private/toolchain:escape.bzl', _escape_string = 'escape_string')\nescape_string = _escape_string\nVARIANT = 'changed'\n",
+        );
+        let mut changed = requests_transaction_with_observations(
+            &dice,
+            [
+                (
+                    platform_request.clone(),
+                    RepositoryMaterializationSuccess::Local,
+                ),
+                (request.clone(), materialization()),
+            ],
+            Arc::new(DependencyTrace::default()),
+            merge_observations(&host, &changed_sources),
+        )
+        .await;
+        let changed = changed.compute(&observed_key).await.unwrap();
+        assert!(!ExternalBzlModuleObservationKey::equality(
+            &observed_value,
+            &changed
+        ));
+        let mut source_restored = requests_transaction_with_observations(
+            &dice,
+            [
+                (
+                    platform_request.clone(),
+                    RepositoryMaterializationSuccess::Local,
+                ),
+                (request.clone(), materialization()),
+            ],
+            Arc::new(DependencyTrace::default()),
+            merge_observations(&host, &sources),
+        )
+        .await;
+        let source_restored = source_restored.compute(&observed_key).await.unwrap();
+        assert!(ExternalBzlModuleObservationKey::equality(
+            &observed_value,
+            &source_restored
+        ));
+
         assert!(tracker.all_keys().iter().all(|key| {
             !(key.starts_with("host-repository-source-file:") && key.contains("bazel_tools"))
                 && !(key.starts_with("observed-host-repository-source-file:")
                     && key.contains("bazel_tools"))
                 && !key.contains("repository-materialization-result:@@bazel_tools")
         }));
+    }
+
+    #[tokio::test]
+    async fn root_builtin_external_bzl_keeps_excluded_shapes_and_missing_mapping_fail_closed() {
+        let tracker = Arc::new(DependencyTrace::default());
+        let dice = builtin_graph_dice();
+        let module = builtin_graph_module();
+        let mut tx = transaction(&dice, &module, EXTENSION_A, true, Some(tracker.clone())).await;
+        let route = admitted_root_route(&mut tx, "bazel_tools").await;
+        let multi = ExternalBzlModuleObservationKey::new_bzlmod(
+            route.clone(),
+            external_label("tools/cpp", "cc_configure.bzl"),
+        );
+        let SourcePreparationOutcome::Complete(Ok(multi)) = tx.compute(&multi).await.unwrap()
+        else {
+            panic!("excluded multi-load module must complete with its typed boundary")
+        };
+        assert!(matches!(
+            multi.result().as_ref().as_ref().unwrap_err(),
+            ExternalBzlModuleError::LoadLabel { source, .. }
+                if source.to_string() == "@@bazel_tools//tools/cpp:cc_configure.bzl"
+        ));
+        let missing = ExternalBzlModuleObservationKey::new_bzlmod(
+            route,
+            external_label("tools/cpp", "missing-before-mapping.bzl"),
+        );
+        let SourcePreparationOutcome::Complete(Ok(missing)) = tx.compute(&missing).await.unwrap()
+        else {
+            panic!("missing built-in source must complete before mapping")
+        };
+        assert!(
+            matches!(
+                missing.result().as_ref().as_ref().unwrap_err(),
+                ExternalBzlModuleError::SourceObservation { .. }
+            ),
+            "missing source outcome: {missing:?}"
+        );
         assert_no_activation(&tracker, "host-canonical-repository-load-route:");
         assert_no_activation(&tracker, "observed-host-canonical-repository-load-route:");
     }
@@ -1928,8 +2217,16 @@ ext=module_extension(implementation=impl)
     }
 
     #[tokio::test]
-    async fn complete_canonical_mapping_resolves_label_without_a_load_statement() {
+    async fn complete_canonical_mapping_resolves_and_rejects_missing_apparent_repo() {
         let (_, input) = selected_input(LEAF_MAPPING_A, SOURCE_A).await;
+        assert!(matches!(
+            crate::bzl_module::resolve_canonical_external_bzl_load_label(
+                &input,
+                &PackagePath::root(),
+                "@missing//:child.bzl"
+            ),
+            Err(crate::bzl_module::ExternalLoadLabelError::Repository { .. })
+        ));
         let route = input.view().route();
         let mapping = route.bzl_repository_mapping();
         assert!(mapping.iter().any(|(apparent, canonical)| {

@@ -1280,7 +1280,7 @@ fn resolve_external_bzl_load_label(
     .map(|label| (child_route, label))
 }
 
-fn resolve_canonical_external_bzl_load_label(
+pub(crate) fn resolve_canonical_external_bzl_load_label(
     route: &slug_bzlmod_v2::HostCanonicalRepositorySourceInput,
     package: &PackagePath,
     load: &str,
@@ -4570,6 +4570,52 @@ async fn compute_canonical_external_child_input(
     }
 }
 
+fn admitted_builtin_external_repository_load(loads: &[String]) -> Option<&str> {
+    let [load] = loads else {
+        return None;
+    };
+    let apparent = load.strip_prefix('@')?;
+    if apparent.starts_with('@') {
+        return None;
+    }
+    let (repository, _) = apparent.split_once("//")?;
+    (!repository.is_empty() && ApparentRepoName::new(repository).is_ok()).then_some(load.as_str())
+}
+
+async fn compute_external_bzl_effective_route(
+    ctx: &mut DiceComputations<'_>,
+    key: &ExternalBzlModuleEvalKey,
+    loads: &[String],
+    source: CanonicalLabel,
+    mode: ExternalBzlModuleMode,
+    observations: PathObservationEpoch,
+) -> ControlFlow<ExternalBzlDriverOutcome, (HostRepositorySourceRoute, PathObservationEpoch)> {
+    let HostRepositorySourceRoute::Root(route) = &key.route else {
+        return ControlFlow::Continue((key.route.clone(), observations));
+    };
+    if !route.is_builtin_bazel_tools() {
+        return ControlFlow::Continue((key.route.clone(), observations));
+    }
+    let Some(load) = admitted_builtin_external_repository_load(loads) else {
+        return ControlFlow::Continue((key.route.clone(), observations));
+    };
+    let (input, observations) = match compute_canonical_external_child_input(
+        ctx,
+        route.workspace().dupe(),
+        route.canonical_repo().clone(),
+        source,
+        load,
+        mode,
+        observations,
+    )
+    .await
+    {
+        ControlFlow::Continue(value) => value,
+        ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+    };
+    ControlFlow::Continue((HostRepositorySourceRoute::canonical(input), observations))
+}
+
 async fn resolve_external_bzl_child_route(
     ctx: &mut DiceComputations<'_>,
     route: &HostRepositorySourceRoute,
@@ -4670,6 +4716,7 @@ async fn resolve_external_bzl_child_route(
 async fn compute_external_bzl_children(
     ctx: &mut DiceComputations<'_>,
     key: &ExternalBzlModuleEvalKey,
+    route: &HostRepositorySourceRoute,
     mode: ExternalBzlModuleMode,
     loads: Vec<ExternalBzlChildLoad>,
     mut observations: PathObservationEpoch,
@@ -4683,7 +4730,7 @@ async fn compute_external_bzl_children(
             ExternalBzlChildLoad::Canonical(raw_load) => {
                 let (resolved, incoming) = match resolve_external_bzl_child_route(
                     ctx,
-                    &key.route,
+                    route,
                     &key.label.package,
                     key.canonical_label(),
                     mode,
@@ -4786,11 +4833,12 @@ async fn compute_external_bzl_children(
 
 fn prepare_external_bzl_child_loads(
     key: &ExternalBzlModuleEvalKey,
+    effective_route: &HostRepositorySourceRoute,
     loads: &[String],
     source: CanonicalLabel,
     observations: &PathObservationEpoch,
 ) -> Result<Vec<ExternalBzlChildLoad>, ExternalBzlDriverOutcome> {
-    let HostRepositorySourceRoute::Root(route) = &key.route else {
+    let HostRepositorySourceRoute::Root(route) = effective_route else {
         return Ok(loads
             .iter()
             .cloned()
@@ -4968,24 +5016,45 @@ async fn compute_external_bzl_module(
         .into_iter()
         .map(|load| load.module_id.to_owned())
         .collect::<Vec<_>>();
-    let child_loads = match prepare_external_bzl_child_loads(
+    let (effective_route, observations) = match compute_external_bzl_effective_route(
+        ctx,
         key,
         &loads,
         canonical_label.clone(),
-        &source.observations,
+        mode,
+        source.observations,
+    )
+    .await
+    {
+        ControlFlow::Continue(value) => value,
+        ControlFlow::Break(outcome) => return outcome,
+    };
+    let child_loads = match prepare_external_bzl_child_loads(
+        key,
+        &effective_route,
+        &loads,
+        canonical_label.clone(),
+        &observations,
     ) {
         Ok(child_loads) => child_loads,
         Err(outcome) => return outcome,
     };
-    let (loaded_modules, observations) =
-        match compute_external_bzl_children(ctx, key, mode, child_loads, source.observations).await
-        {
-            ControlFlow::Continue(value) => value,
-            ControlFlow::Break(value) => return value,
-        };
+    let (loaded_modules, observations) = match compute_external_bzl_children(
+        ctx,
+        key,
+        &effective_route,
+        mode,
+        child_loads,
+        observations,
+    )
+    .await
+    {
+        ControlFlow::Continue(value) => value,
+        ControlFlow::Break(value) => return value,
+    };
 
     evaluate_external_bzl_module(
-        &key.route,
+        &effective_route,
         key.context,
         canonical_label,
         source.presentation_path,
@@ -7622,6 +7691,30 @@ mod module_extension_definition_loading_tests {
     use crate::module_extension::test_support::InvokePreparedKey;
 
     const WORKSPACE: &str = "/extension-definition-loading";
+
+    #[test]
+    fn builtin_external_repository_promotion_gate_is_exactly_one_apparent_load() {
+        let loads = |values: &[&str]| {
+            values
+                .iter()
+                .map(|value| (*value).to_owned())
+                .collect::<Vec<_>>()
+        };
+        for excluded in [
+            loads(&[]),
+            loads(&[":local.bzl"]),
+            loads(&["@@rules_cc+//:defs.bzl"]),
+            loads(&["@//:defs.bzl"]),
+            loads(&["@rules_cc//:defs.bzl", ":other.bzl"]),
+        ] {
+            assert_eq!(admitted_builtin_external_repository_load(&excluded), None);
+        }
+        let admitted = loads(&["@rules_cc//cc/toolchains:toolchain_config_utils.bzl"]);
+        assert_eq!(
+            admitted_builtin_external_repository_load(&admitted),
+            Some("@rules_cc//cc/toolchains:toolchain_config_utils.bzl")
+        );
+    }
 
     #[test]
     fn pre_host_package_key_cannot_publish_complete_metadata() {
@@ -11303,6 +11396,9 @@ mod module_extension_definition_loading_tests {
         let children = &production[production
             .find("async fn compute_external_bzl_children")
             .unwrap()..];
+        let parse = children.find("parse_with_string_encoding").unwrap();
+        let promote = children.find("compute_external_bzl_effective").unwrap();
+        assert!(parse < promote);
         assert!(children.contains("resolved.label.canonical_label(&resolved.route)"));
         assert!(children.contains("compute_external_bzl_child("));
         assert!(children.contains("key.context"));
