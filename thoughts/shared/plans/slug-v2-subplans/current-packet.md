@@ -1,86 +1,128 @@
 # Current Slug V2 Packet
 
-Packet: WP-5-7A-bazel-tools-lib-cc-configure-catalog-audit
+Packet: WP-5-7A-bazel-tools-lib-cc-configure-catalog-implementation-r1
 
-Milestone: M7A bootstrap-critical loading/repository execution closure. Audit
-the exact built-in Bazel 9.2 source slice beginning at
-`@bazel_tools//tools/cpp:lib_cc_configure.bzl`, the first honest boundary after
-the accepted generic Unix repository executable lookup.
+Milestone: M7A bootstrap-critical loading/repository execution closure. Admit
+the one-file exact built-in Bazel 9.2 catalog slice selected by the accepted
+`lib_cc_configure.bzl` audit, then replay to the next honest boundary.
 
-Status: ready for one bounded docs-only audit. No Rust or catalog-content edit
-is authorized by this packet.
+Status: ready for one bounded implementation. The source bytes, catalog owner,
+classification, allowlist, proof and replay gate below are frozen.
 
-## Accepted predecessor
+## Accepted predecessor and audit result
 
-`WP-4-5-7A-repository-context-which-implementation-r1` returns `ACCEPT` after
-one correction rereview at 240 production, 498 proof and 738 total gross Rust
-additions. It adds no DICE key, direct filesystem or process-environment read,
-retained candidate cache, materialization owner, rules_shell branch, shell-name
-branch or toolchain special case.
+`WP-4-5-7A-repository-context-which-implementation-r1` is accepted at
+240/498/738 production/proof/total gross Rust additions. Its bounded
+authenticated replay clears rules_shell's Unix executable lookups and stops at
+the built-in catalog's typed `UnsupportedCatalog` result for
+`tools/cpp/lib_cc_configure.bzl` while apple_support configures generated local
+C++ repositories.
 
-The full loading suite passes and `slug_cli_v2` rebuilds. The authentic
-rules_rust 0.73 replay, with `/bin:/usr/bin:/usr/local/bin` as its bounded
-declared PATH, clears rules_shell 0.6.1's generic Unix `which` probes. The next
-failure is the built-in catalog's typed `UnsupportedCatalog` result for
-`tools/cpp/lib_cc_configure.bzl`, reached while apple_support configures its
-generated local C++ repositories.
+`WP-5-7A-bazel-tools-lib-cc-configure-catalog-audit` returns `ACCEPT`. The
+complete smallest built-in closure is exactly one file:
 
-## Audit question
+| Catalog path | Pinned source | SHA-256 | Bytes / lines | Catalog mode |
+|---|---|---|---|---|
+| `tools/cpp/lib_cc_configure.bzl` | Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`, same path | `da7e4ae162120582a7a703b5657286dffe61fdf37cc489a4fc7625608517370c` | 784 / 18 | `0644`, `executable: false` |
 
-At pinned Bazel 9.2 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a`, determine the complete smallest
-verbatim `@bazel_tools` source/package/listing closure required to admit
-`//tools/cpp:lib_cc_configure.bzl` through Slug's existing in-memory built-in
-repository. The audit must distinguish:
+The file has one direct load,
+`@rules_cc//cc/toolchains:toolchain_config_utils.bzl`, importing
+`escape_string` as `_escape_string`; its sole public binding is
+`escape_string = _escape_string`. This is an external selected rules_cc source,
+not another `@bazel_tools` catalog member. The facade has no recursive built-in
+load, glob, repository call, native rule, generated input or configured value.
 
-1. exact upstream file bytes, executable modes, package membership and direct
-   or recursive load dependencies that belong to this slice;
-2. existing catalog entries and routing/listing/integrity owners that can be
-   reused without changing their semantic identity;
-3. any generated, configured, native-rule, platform or repository behavior
-   referenced by the source but not required merely to load the admitted
-   facade; and
-4. the next independent replay boundary after an exact source-only addition,
-   or `REPLAN` if the closure cannot be bounded without crossing another owner.
+Installed Bazel 9.2 has byte-identical content and the same SHA-256. Its install
+base reports mode `0755`, the same extraction artifact observed for the already
+accepted `tools/cpp/cc_configure.bzl`: pinned source and Slug use `0644` while
+installed bytes are identical and extraction reports `0755`. Preserve the
+established source/archive catalog convention; do not copy install-base mode.
+Installed `tools/cpp/BUILD` is byte-identical to pinned `tools/cpp/BUILD.tools`
+(`0e3fdd3293d39a64f3fbda755d8a3c0bbd3b6ffd5fb0717ab594bc1f1e29a535`,
+4,102 bytes/128 lines, source `0644`, extracted `0755`), not the source-tree
+`BUILD`, but it is outside this
+source-only closure: existing loading already crossed the package and failed
+directly on the missing facade. Do not add either BUILD file.
 
-The authentic apple_support consumer is a discriminator only. It cannot select
-alternate bytes, a reduced facade, a Rust implementation of Starlark behavior,
-or an apple_support/C++/toolchain branch.
+## Compatibility classification
 
-## Required evidence
+- Exact: all 784 facade bytes, its path, non-executable catalog polarity,
+  immediate `tools/cpp` membership, direct load label/import alias and exported
+  `escape_string` binding.
+- Slug-native: the existing versioned `BuiltinBazelToolsSnapshot`,
+  domain-separated manifest digest, DICE source/listing values and their
+  equality/integrity representation. Adding the member changes that existing
+  manifest identity; with the frozen ordering its expected digest is
+  `c313fad68f4e475d744dc6de7b658515b33c634905222e934a9d09129371f56f`.
+- Unsupported/deferred: new or changed rules_cc loading/evaluation behavior,
+  invocation semantics of the re-exported function, local C++ repository
+  configuration, native/configured/toolchain behavior, install-base
+  materialization and mode, broader `@bazel_tools` content, and any later replay
+  failure. Existing recursive external rules_cc loading is reused and must pass
+  unchanged. The consumer does not authorize an apple_support, rules_cc, C++ or
+  toolchain special case.
 
-- Inspect the pinned Bazel 9.2 source tree and record exact paths, SHA-256
-  digests, modes, byte counts, loads and exported symbols for every proposed
-  catalog member.
-- Compare the installed Bazel 9.2 `@bazel_tools` repository when source-tree
-  packaging or generated repository layout could differ.
-- Trace the existing `BuiltinBazelToolsSnapshot`, manifest, source-file and
-  directory-listing owners, including their exact integrity tests and update
-  workflow.
-- Reuse accepted catalog evidence where it already proves a byte-identical
-  member. Add no new oracle unless a demonstrated source-versus-installed-tree
-  ambiguity remains.
-- Classify every result as exact, Slug-native or unsupported/deferred. Catalog
-  content itself may be admitted only as exact verbatim Bazel 9.2 bytes.
+## Required implementation
 
-## Audit allowlist and bounds
+1. Copy the pinned source file verbatim to
+   `app/slug_bzlmod_v2/builtin/bazel_tools/tools/cpp/lib_cc_configure.bzl`.
+   Preserve 784 bytes, trailing newline and non-executable source mode.
+2. Insert one lexically ordered `CatalogEntry` between `cc_configure.bzl` and
+   `windows_cc_configure.bzl`, using `include_bytes!`, the frozen SHA-256 and
+   `executable: false`.
+3. Update the existing `tools/cpp` direct-listing expectation with
+   `lib_cc_configure.bzl`, add its exact path/hash/mode row to the existing
+   public catalog table, and update both existing complete-manifest digest
+   expectations. Reuse the table-driven exact-source, generic byte/mode
+   manifest and integrity tests; do not duplicate them.
+4. Rebuild and replay. Record the first independent failure after the facade;
+   it becomes a docs-first packet, never an opportunistic widening here.
 
-Documentation changes are limited to the canonical plan, Stages 4 and 5, and
-this manifest. The audit is capped at 80 canonical-plan lines, 260 Stage 4
-lines, 320 Stage 5 lines and 360 manifest lines. Prefer a much smaller record
-when the exact closure is a single facade plus already-admitted dependencies.
+Do not add a DICE key, manifest version, catalog copy, filesystem/install-base
+fallback, runtime source choice, materialization path, package marker, rules_cc
+source, evaluator builtin, repository method or consumer dispatch.
 
-Do not edit Rust, Cargo metadata, tests, fixtures, generated repositories,
-catalog bytes or hashes during this audit. Do not run or embed a JVM helper.
-Pinned Bazel may run externally only as an oracle when installed-tree evidence
-is genuinely needed.
+## Implementation allowlist and caps
 
-## Terminal result
+Only these files may change:
 
-Return `ACCEPT` only with a bounded exact-content implementation packet naming
-the full file allowlist, integrity/update workflow, proof, replay gate and hard
-size caps. Return `REPLAN` if the installed source differs from the pinned tree,
-the direct load expands into an unbounded catalog subtree, existing manifest or
-listing identity cannot safely own the addition, or loading the file inherently
-requires a new semantic owner. Any later implementation must port upstream
-content verbatim and must not synthesize, abbreviate or reinterpret it.
+- `app/slug_bzlmod_v2/builtin/bazel_tools/tools/cpp/lib_cc_configure.bzl`
+- `app/slug_bzlmod_v2/src/builtin_repository.rs`
+- `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs`
+
+The catalog asset is fixed at exactly 784 bytes and 18 lines. Rust changes are
+capped at 12 production, 30 proof and 42 total gross added lines; total gross
+additions across all three files are capped at 60. Reformatting, comment churn
+or unrelated cleanup does not create headroom. If proof or implementation
+exceeds any cap, return `REPLAN` before widening the allowlist.
+
+## Required proof and validation
+
+- Compare the checked-in asset byte-for-byte with pinned
+  `/tools/cpp/lib_cc_configure.bzl`; verify the frozen SHA-256, 784-byte size,
+  18 lines and non-executable mode.
+- Prove source lookup returns the exact hash/bytes and `executable == false`;
+  `listing_rows("tools/cpp")` remains sorted, unique and direct with the new
+  member; missing/file/wrong-kind and catalog integrity tests remain green.
+- Prove the complete built-in manifest changes to the frozen digest and that
+  existing byte/mode discrimination remains green.
+- Run formatting and serial focused `slug_bzlmod_v2` built-in repository tests,
+  followed by the loading direct-dependent suite. Use the explicit nightly
+  Cargo executable from the active environment and one shared target directory;
+  do not run Cargo commands in parallel.
+- Rebuild `slug_cli_v2`, clean stale `slugd` processes before and after, and run
+  the authentic rules_rust 0.73 replay with the already admitted bounded PATH.
+  The replay must clear `UnsupportedCatalog(lib_cc_configure.bzl)` and report
+  its next first failure without implementing it.
+- Run diff/check-whitespace, archive-baseline and generated/artifact hygiene
+  gates. Verify only the three allowlisted files changed and no JVM/helper,
+  installed-tree copy, credential or temporary oracle artifact entered Git.
+
+## Terminal stops
+
+Return `ACCEPT` only if exact byte/hash/mode, sorted listing, manifest identity,
+focused tests, loading gates, CLI rebuild and authentic replay all pass within
+the caps. Return `REPLAN` on pinned/checked-in byte mismatch, source-mode drift,
+an unexpected additional built-in load/package dependency, a required new
+semantic owner, allowlist/cap pressure, or inability to clear the typed catalog
+failure. Do not fix the replay's next independent boundary in this packet.

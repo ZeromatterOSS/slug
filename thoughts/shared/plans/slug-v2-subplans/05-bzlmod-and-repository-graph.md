@@ -4576,3 +4576,31 @@ and advances to an `UnsupportedCatalog` for
 `tools/cpp/lib_cc_configure.bzl`. Select docs-only
 `WP-5-7A-bazel-tools-lib-cc-configure-catalog-audit`; pinned Bazel 9.2 bytes are
 the sole content authority.
+
+### Built-in lib_cc_configure catalog audit accepted (2026-09-02)
+
+Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`
+and installed Bazel 9.2 contain byte-identical
+`tools/cpp/lib_cc_configure.bzl`: SHA-256
+`da7e4ae162120582a7a703b5657286dffe61fdf37cc489a4fc7625608517370c`,
+784 bytes/18 lines. Preserve the source/archive mode `0644` as catalog
+`executable: false`. The install base's `0755` is a systematic extraction
+artifact also present on the already accepted byte-identical
+`cc_configure.bzl`, not a runtime source choice.
+
+The smallest built-in closure is this one file. Its only load is external
+rules_cc and adds no catalog member. Installed `tools/cpp/BUILD` is the
+byte-identical packaged `BUILD.tools` (`0e3fdd3293d39a64f3fbda755d8a3c0bbd3b6ffd5fb0717ab594bc1f1e29a535`,
+4,102 bytes), but existing loading already crossed the package and failed
+directly on the facade, so neither BUILD spelling belongs to this source-only
+addition.
+
+Reuse `BuiltinBazelToolsSnapshot`, the existing static `CATALOG`, validated
+source lookup, direct sorted directory listing and domain-separated manifest.
+The added exact member changes the existing manifest digest to
+`c313fad68f4e475d744dc6de7b658515b33c634905222e934a9d09129371f56f`;
+no manifest version, DICE key, materialization or install-tree fallback is
+needed. Select
+`WP-5-7A-bazel-tools-lib-cc-configure-catalog-implementation-r1` with the
+three-file allowlist and caps frozen in the active manifest. Broader catalog,
+rules_cc/C++/toolchain behavior and the next replay failure remain deferred.

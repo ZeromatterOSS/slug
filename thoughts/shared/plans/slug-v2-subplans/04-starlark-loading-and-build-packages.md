@@ -8145,3 +8145,21 @@ restoration. The bounded authenticated replay clears the rules_shell lookup and
 stops at missing exact `@@bazel_tools//tools/cpp:lib_cc_configure.bzl` content.
 Stage 5 owns the next docs-only catalog audit; no C++, apple_support or ruleset
 special case is authorized here.
+
+### Built-in C++ configure facade loading audited (2026-09-02)
+
+The pinned Bazel 9.2 facade is a complete 784-byte/18-line Starlark source. It
+loads only
+`@rules_cc//cc/toolchains:toolchain_config_utils.bzl`, aliases imported
+`escape_string` to `_escape_string`, and publishes only
+`escape_string = _escape_string`. There is no recursive `@bazel_tools` load,
+glob, repository call, native rule, generated input or configured value.
+
+Loading therefore needs no evaluator builtin, package owner, label rule,
+repository method or C++ branch. After the exact source key supplies the file,
+the existing canonical external-source route owns the rules_cc load. That
+existing recursive external rules_cc loading is reused and must pass unchanged.
+Invocation of the re-exported function, any new loading/evaluation behavior and
+subsequent local C++ configuration remain independent later boundaries. The
+catalog audit returns `ACCEPT` and selects only the bounded one-file Stage 5
+implementation packet.
