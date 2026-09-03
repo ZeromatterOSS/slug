@@ -8394,3 +8394,61 @@ Commit `94738a9a2` accepts the design. Implement only
 `WP-4-6-7A-apple-common-declaration-provider-fail-closed-implementation-r1`
 under the five-file 180/180/360 production/proof/total envelope and tighter
 per-file caps frozen in `current-packet.md`.
+
+### Apple facade accepted; rule-initializer declaration retention audited (2026-09-03)
+
+Commit `10aaed332` terminally accepts the Apple facade/provider guard at
+141/180/321 gross production/proof/total Rust additions. Loading passes 533
+unit tests with one ignored and all integration targets, analysis 19/19 and
+query 55/55; CLI build, formatting, diff, archive and daemon hygiene pass.
+Replay clears `apple_common` and reaches selected rules_cc 0.2.4
+`cc_shared_library.bzl` at missing named `rule(initializer = ...)`, before an
+initializer body or configured Apple behavior executes.
+
+Pinned Bazel 9.2
+`StarlarkRuleFunctionsApi.java:698-723` defines the optional named callable and
+`StarlarkRuleClassFunctions.java:1765-1881` establishes that invocation is a
+separate, complete protocol: copy/lift only explicit public Starlark attributes
+plus `name`, omit `None`, remove load-time context, invoke child-to-parent,
+accept `None` or a string-keyed dict, merge returned attributes, preserve name,
+and guard private/native attributes. Its tests at lines 3703-4700 cover the
+allowlist, defaults, selectors, label dictionaries, return types and errors.
+
+The exact rules_cc archive scan finds only three declaration sites:
+
+- `cc_shared_library.bzl` SHA-256 `b188922d...`, 52,876 bytes/1,150 lines,
+  definition 841-861 and rule 863-865;
+- `cc_binary.bzl` SHA-256 `d9d0f68e...`, 41,488 bytes/854 lines, rule 818-820;
+- `cc_test.bzl` SHA-256 `6787e5a1...`, 6,206 bytes/165 lines, definition
+  99-113 and rule 115-117.
+
+All three operands are ordinary Starlark functions and remain lazy during
+declaration. The replay renderer reports the first call at line 857 and
+`initializer` at 859; the durable release bytes place that expression at
+863-865. This location discrepancy does not change the byte-authenticated
+consumer.
+
+The audit returns `ACCEPT` for a declaration-retention category only. Extend
+the existing transient/frozen rule definition with one optional callable,
+validate omitted/explicit `None` versus a Starlark function using the existing
+callable-definition validation, freeze it in the same module
+heap and preserve it through ordinary/Bzlmod import and re-export. Declaration
+and freeze do not invoke it. A valid named target call on any initializer-
+bearing rule returns exactly
+`target invocation for rule initializer is unsupported` before recorder access,
+attribute coercion or target/output insertion. Rules without initializers keep
+their existing package-lowering path.
+
+This is exact for the selected declaration shapes, lazy freeze/export/import
+and unaffected no-initializer rules. The pointer representation and explicit
+invocation stop are Slug-native. Argument lifting, evaluator isolation, result
+merge, label context, `native.package_relative_label`, private/base/name rules,
+allowlisting, parent chaining, configured behavior and consumer branches remain
+unsupported/deferred.
+
+`package.rs` is the sole production owner; its adjacent unit tests and the
+existing proof-only `host_package_load_tests.rs` own direct and recursive
+ordinary/Bzlmod coverage under 32/160/192 gross production/proof/total Rust
+caps. Add no DICE key, request input, lock, context, fixture, heap, cache,
+collection or final-package identity. Independent packet review returns
+`ACCEPT`; implementation is authorized only within the frozen packet.

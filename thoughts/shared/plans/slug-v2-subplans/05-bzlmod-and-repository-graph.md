@@ -4863,3 +4863,22 @@ DICE key, observation, lockfile or repository-specific branch. Commit
 `94738a9a2` accepts the cross-stage design; its active implementation may reuse
 only Stage 5's existing provenance/replay handoff and owns no Stage 5 semantic
 change.
+
+### Apple replay accepted; rule-initializer handoff selected (2026-09-03)
+
+Commit `10aaed332` accepts the Apple declaration-provider implementation and
+its configured fail-closed guard. Authenticated bounded-PATH replay uses the
+already-selected rules_java 9.1.0 and rules_cc 0.2.4 materializations, clears
+the Apple stop, and reaches the generic missing `rule(initializer = ...)`
+parameter while recursively loading `cc_shared_library.bzl` from
+`@@rules_java+//toolchains/BUILD`.
+
+The rules_cc 0.2.4 descriptor/archive integrity, canonical route, source
+observations, recursive module load and manifest fingerprint remain the sole
+Stage 5 provenance owners. Exact archive scanning finds three lazy initializer
+declarations and no repository-source gap. The successor is a Stage 4
+declaration-retention packet; it adds no Stage 5 semantics, key, request input,
+observation, materializer, lockfile, route, cache, lock, fixture or repository-
+specific branch. Stage 5 owns only the authenticated replay handoff.
+Independent packet review returns `ACCEPT`; the active implementation retains
+this no-Stage-5-change boundary.

@@ -2597,3 +2597,31 @@ retry bridge reuse only the named compact identity/path values, `SmallMap`,
 reuse belongs to the natural DICE values. Size assertions pass. No V1, Buck2
 or Zabel code is extracted, and no ledger row, interner, cache, registry,
 global state or alternate path representation is added.
+
+### Rule-initializer declaration-retention utility decision (2026-09-03)
+
+`WP-4-7A-rule-initializer-declaration-retention-implementation-r1` requires no
+V1 or Buck2 extraction. Reuse starlark-rust's existing `Value`/`FrozenValue`,
+Slug's `RuleDefinitionGen`, `Freeze`, `FrozenBzlModule`, flattened
+`FrozenBzlLifetimeEntry` closure and `Allocative`. Add exactly one optional
+callable pointer to the transient/frozen rule definition; no owned heap, raw
+pointer, collection, string, map, set, interner, registry or cache is needed.
+
+The callable is frozen once with its defining module and remains valid because
+the existing lifetime-only module closure already accompanies imported rule
+values through BUILD evaluation. Compile-time/test assertions must keep the
+optional transient and frozen slots pointer-sized; pointer freeze/clone is
+constant-time. Every initializer-bearing target call fails before package
+lowering, so the pointer
+does not enter `StarlarkRuleImplementation`, `PackageEvaluation` equality,
+configured analysis or any DICE value beyond the already-owned frozen module.
+Existing source digest and recursive load-manifest fingerprint remain the sole
+semantic invalidation owners.
+
+The pointer is temporary declaration state. A future complete initializer-
+runtime packet may remove the invocation guard, consume the callable into
+ordinary package values and then let the pointer die with the loading module;
+it must not retain a second configured identity without a new utility review.
+No benchmark is required. Independent retained-representation review returns
+`ACCEPT`; any new retained graph, copied callable or lifetime owner returns
+`REPLAN`.

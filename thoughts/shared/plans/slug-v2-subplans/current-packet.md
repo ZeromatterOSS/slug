@@ -1,240 +1,222 @@
 # Current Slug V2 Packet
 
-Packet: WP-4-6-7A-apple-common-declaration-provider-fail-closed-implementation-r1
+Packet: WP-4-7A-rule-initializer-declaration-retention-implementation-r1
 
-Milestone: M7A bootstrap-critical loading/ruleset closure. Implement the bounded
-`apple_common` declaration facade whose provider keys remain valid in loading
-schemas but cannot silently participate in configured-target lookup before
-configured Apple providers exist.
+Milestone: M7A bootstrap-critical loading/ruleset closure. Admit Bazel 9.2's
+generic optional `rule(initializer = ...)` declaration and frozen/imported
+callable lifetime while keeping every initializer-bearing target invocation
+fail closed before package mutation.
 
-Status: design checkpoint `94738a9a2` is accepted. Implementation is active
-only under the frozen allowlist, caps, proof, validation and stops below.
+Status: the docs-only audit and independent packet review return `ACCEPT`.
+Implementation is active and authorized only within this manifest's frozen
+allowlist, caps and stops.
 
-## Accepted predecessor, replay boundary and rejected design
+## Accepted predecessor and authenticated replay
 
-Commit `96fe2d6cb` accepts generic selected-BCR regular mode `0444` at 2
-production and 12 proof gross Rust additions, 14 total. Authenticated
-bounded-PATH replay clears rules_java 9.1.0 materialization, then stops while
-recursively loading selected rules_cc 0.2.4 at
-`@@rules_cc+//cc/private/rules_impl:objc_common.bzl:22` because
-`apple_common` is not predeclared.
+Commit `10aaed332` terminally accepts
+`WP-4-6-7A-apple-common-declaration-provider-fail-closed-implementation-r1`
+at 141 production and 180 proof gross Rust additions, 321 total. Focused
+loading/provider/analysis proofs pass. Serial validation passes:
 
-The first `WP-4-7A` audit correctly found the three declaration operations but
-is rejected. Reusing an ordinary `BuiltinProviderKey` would let
-`starlark_provider_identity` erase declaration-only provenance into a normal
-`ProviderIdentity`. `AnalysisConfiguredTargetValue::is_in` would then return
-`false`, and `at` would report only that the target does not provide the key.
-Both outcomes falsely imply configured Apple provider lookup is implemented.
+- `slug_loading_v2 --lib`: 533 passed, 1 ignored;
+- loading integration targets: 51/29/8/6/2/1/5/1, all passed;
+- `slug_analysis_v2 --lib`: 19/19;
+- `slug_query_v2 --lib`: 55/55;
+- `slug_cli_v2` build, formatting, diff, archive and daemon-hygiene gates.
 
-## Exact selected-source closure
+The rebuilt bounded-PATH replay
+
+```text
+env PATH=/usr/bin:/usr/local/bin /home/wgray/slug/target/debug/slug cquery \
+  //pkg:probe --@rules_rust//rust/toolchain/channel=nightly \
+  --lockfile_mode=off
+```
+
+clears the former `apple_common` stop. At toolchain-registration row 14 it
+loads `@@rules_java+//toolchains/BUILD` -> selected rules_cc 0.2.4
+`cc_binary.bzl` -> `attrs.bzl` -> `cc_shared_library.bzl`, then fails before
+any configured Apple operation with
+`Found initializer extra named parameter(s) for call to rule`. The rendered
+trace calls the rule at line 857 and shows `initializer` at line 859; the
+durable release source has the same expression at lines 863-865.
+
+## Bazel 9.2 authority
+
+Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`
+establishes the category:
+
+- `src/main/starlark/builtins_bzl/common/cc/cc_shared_library.bzl` is the
+  bundled analogue of the selected first consumer;
+- `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkRuleFunctionsApi.java`
+  (SHA-256
+  `be73dbda0b5a3e8285a05bb732a0a01441f99e8d20dc29b83759ef972c0392ea`,
+  lines 698-723) defines named optional `initializer`, default `None`;
+- `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java`
+  (SHA-256
+  `a1f706cfbbc67aa3cd2521df2091dd5ed9af96eb4568049f8eee966d06c622f7`,
+  lines 1765-1881) proves invocation is a distinct later category: copy/lift
+  explicit public Starlark attributes plus `name`, omit `None`, isolate
+  load-time state, invoke child-to-parent, accept `None`/string-keyed dict,
+  merge returned values, preserve `name`, and guard private/base attributes;
+- the same file lines 842-855 and installed
+  `tools/allowlists/initializer_allowlist/BUILD.tools` (SHA-256
+  `79e67fd466f4a6b5be2ffdf925f784374de51dd9584e45f09355c1933c9d4bcb`,
+  145 bytes/7 lines) establish configured allowlist behavior; and
+- `src/test/java/com/google/devtools/build/lib/starlark/StarlarkRuleClassFunctionsTest.java`
+  (SHA-256
+  `e09c93616e096d639ec69b6b0c6a397a8a36bc8a95fa21b986cb5fc7f8f010aa`,
+  lines 3703-4700) discriminates allowlisting, exact argument selection,
+  defaults/`None`, selectors, label dictionaries, return types, unchanged
+  name, and private/base-attribute rejection.
+
+Those runtime behaviors are evidence for the stop, not implementation scope.
+
+## Exact selected rules_cc closure
 
 The durable BCR descriptor
 `https://bcr.bazel.build/modules/rules_cc/0.2.4/source.json`, SHA-256
 `2bd87ef9b41d4753eadf65175745737135cba0e70b479bdc204ef0c67404d0c4`,
-selects the 276,390-byte release archive at
+selects
 `https://github.com/bazelbuild/rules_cc/releases/download/0.2.4/rules_cc-0.2.4.tar.gz`,
-SHA-256
-`8dcd63392f0bb48adf74f413a9f39ba0fedcb8f99bf085a3b450f06d171dbb6d`,
-matching integrity
-`sha256-jc1jOS8LtIrfdPQTqfOboP7cuPmb8IWjtFDwbRcdu20=`. The descriptor uses
-`strip_prefix = "rules_cc-0.2.4"`, its authenticated MODULE-version patch and
-`patch_strip = 1`.
+a 276,390-byte release archive with SHA-256
+`8dcd63392f0bb48adf74f413a9f39ba0fedcb8f99bf085a3b450f06d171dbb6d`
+and integrity `sha256-jc1jOS8LtIrfdPQTqfOboP7cuPmb8IWjtFDwbRcdu20=`.
+An exact scan of all 400 archive entries finds only three initializer-bearing
+rules, all ordinary `0644` trailing-LF files:
 
-A complete scan of the 400-entry release finds five code references across
-three ordinary `0644`, trailing-LF sources:
-
-| Source-relative path | SHA-256 | Bytes/lines | Observation |
+| Source-relative path | SHA-256 | Bytes/lines | Declaration |
 |---|---|---:|---|
-| `cc/private/rules_impl/objc_common.bzl` | `bb508b0e6d973b5953fcdc90df0ac0570de45bb6b07e5d35c7f16e2b3218994e` | 9,107/242 | top-level `Objc` lookup and zero-argument `apple_toolchain()` |
-| `cc/private/rules_impl/objc_compilation_support.bzl` | `1f078126197ea03e8201a2e6d4187c042b8da27eb5bca1c81d79f786d360356d` | 37,216/1,016 | top-level `XcodeVersionConfig` lookup; configured `get_apple_config` use |
-| `cc/private/toolchain/unix_cc_toolchain_config.bzl` | `6094987775711ee7016ce79781da6a87f6cf07c37296632ddf3e7239736d9fcc` | 70,236/1,981 | configured `XcodeVersionConfig` use only |
+| `cc/private/rules_impl/cc_shared_library.bzl` | `b188922d966110b8f7bd68385f896652488acb7bd669275ef3de0dc6757ca1c7` | 52,876/1,150 | initializer definition 841-861; rule 863-865 |
+| `cc/private/rules_impl/cc_binary.bzl` | `d9d0f68e028ee64ef9beb73a2b51f308be5b60545b79ce27daa532b430fbc69f` | 41,488/854 | rule 818-820; imports shared initializer |
+| `cc/private/rules_impl/cc_test.bzl` | `6787e5a152ce2e0ec7744a885086ad9977a0ede1da4bb3abd7f69331947ee28f` | 6,206/165 | initializer 99-113; rule 115-117 |
 
-The complete declaration category is therefore `Objc`,
-`XcodeVersionConfig`, and zero-argument `apple_toolchain()`. Every provider
-value, returned-toolchain member, configuration, environment, rule and action
-use lies below a configured function boundary.
+All three operands are ordinary Starlark functions. Their bodies are lazy at
+module declaration. The first replay stop occurs while freezing the shared
+library declaration, so no initializer call, target mutation or configured C++
+behavior is required to clear this boundary.
 
-## Bazel 9.2 and live Slug boundary evidence
+## Audit verdict and compatibility classification
 
-Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-establishes:
+Audit result: `ACCEPT` for one complete **declaration-retention** category.
 
-- `src/main/starlark/builtins_bzl/bazel/exports.bzl`, SHA-256
-  `7404fc0e7cb8f6c5c4a0bd82bf3e0e87512a594256624f6360f06f80934439e2`,
-  exports the `apple_common` top-level;
-- `src/main/starlark/builtins_bzl/common/objc/apple_common.bzl`, SHA-256
-  `dcbf8f2cbb1c87e711c44800737b2611a42116fdb9f0acbe25b35af668a75c86`,
-  aliases `ObjcInfo` and `XcodeVersionInfo` and exposes the toolchain factory;
-- `src/main/java/com/google/devtools/build/lib/analysis/configuredtargets/AbstractConfiguredTarget.java`,
-  SHA-256
-  `6ec77df09263c0e18d3443dd5911180156c43df4a5df2c2fc42aab01307fbbfc`,
-  selects an exported provider for both indexing and membership, returning a
-  value/error for indexing and a Boolean for membership; and
-- `src/test/java/com/google/devtools/build/lib/rules/objc/ObjcStarlarkTest.java`,
-  SHA-256
-  `2ed4e579e72fcb3161bd7949ef50acdb2eb4b49382d855da54e844123e495103`,
-  proves exact `ObjcInfo` absent/present membership and absent indexing once
-  configured ObjC providers exist.
+Implement the optional `initializer` slot generically in the existing transient
+and frozen rule definitions. Omitted and explicit `None` mean no initializer;
+a present value must pass the existing Starlark-function validation used by
+callable definition APIs. Freeze it with the rule and retain
+that one frozen pointer through ordinary and Bzlmod module load, import,
+re-export and package BUILD evaluation. Declaration and freeze must not
+execute the callable.
 
-Slug's `provider.rs::BuiltinProviderKey` hashes and compares by its static
-name. `starlark_provider_identity` converts it immediately to the shared
-`ProviderIdentity::Builtin(CompactString)`. `package.rs` intentionally uses
-that conversion for rule/aspect advertised providers and attribute/subrule
-provider constraints, normalizing with existing `SmallSet` and immutable
-`Arc` slices. `slug_analysis_v2::analysis_value` uses the same conversion in
-`AnalysisConfiguredTargetValue::at` and `is_in`, then consults its existing
-`SmallMap<ProviderIdentity, FrozenValue>`.
-An exhaustive live call-site search finds these are the only configured-target
-operations that convert a raw Starlark provider key; all other uses are loading
-schema conversion or tests.
+For a valid named target call on a rule with an initializer, return the stable
+Slug-native diagnostic
 
-The retained build-API `ProviderIdentity`, provider collections and configured
-target values must not change in this implementation.
+`target invocation for rule initializer is unsupported`
 
-## Corrected design and compatibility classification
+before `PackageRecorder` access, attribute coercion, target/output insertion or
+other package mutation. Existing positional/name call-shape errors may retain
+their current precedence. A rule with omitted/`None` initializer remains on the
+unchanged package-lowering path.
 
-Accepted design: add a provider-owned sibling Starlark token backed by
-a closed `#[repr(u8)]` two-variant kind: `ObjcInfo` and `XcodeVersionInfo`.
-The token is immutable, `Allocative`, structurally hashes/compares by variant,
-with a token-domain hash discriminator, and is not equal to an ordinary
-`BuiltinProviderKey`. It contains no dynamic name, collection, pointer graph
-or interner.
+Classify as **exact** for the selected consumer: the named optional declaration
+shape, `None` default, acceptance of the three selected Starlark functions,
+lazy declaration, freeze/export/import/re-export availability, and unchanged
+rules without an initializer.
 
-The ordinary `starlark_provider_identity` recognizes the sibling and lowers it
-to the existing `ProviderIdentity::builtin(kind.name())`. This preserves its
-use in loading-time `provides` and provider-constraint schemas, including
-existing order, deduplication, freeze/import and final package identity. It
-does not add a second retained schema representation.
+Classify as **Slug-native**: one frozen-pointer representation and the explicit
+invocation rejection while runtime semantics are unadmitted.
 
-Add one configured-target-specific provider-key conversion in `provider.rs`.
-It detects the sibling before ordinary identity lowering and returns this
-stable Slug-native diagnostic for either variant:
+Keep **unsupported/deferred**: initializer execution; argument copy/lift and
+label context; omission/default/selector semantics; return-dict validation and
+merge; mutation isolation; `native.package_relative_label`; name/private/base
+attribute rules; experimental/configured allowlisting; parent rules and
+child-to-ancestor chaining; configured rule behavior, C++ semantics and any
+consumer-specific bypass. Never silently ignore an initializer.
 
-`apple_common.<field> is declaration-only; configured-target membership and indexing are unsupported`
+## Ownership, retained memory and incremental safety
 
-Here `<field>` is replaced only by exact `Objc` or `XcodeVersionConfig`.
+`app/slug_loading_v2/src/package.rs` already solely owns `rule()`, transient
+`RuleDefinitionGen<Value>`, `Freeze`, `FrozenRuleDefinition::invoke`, package
+recording and adjacent unit tests. It is the only production owner.
+`app/slug_loading_v2/src/host_package_load_tests.rs` is the existing proof-only
+owner for recursive ordinary/Bzlmod imported-module package loading.
 
-`AnalysisConfiguredTargetValue::at` and `is_in` must use that conversion.
-Both operations error even if a configured target contains a coincidentally
-named `ProviderIdentity`; there is no false `false`, no ordinary missing-
-provider error and no lookup. Every existing provider token preserves its
-current success, false and error behavior. Attribute/subrule constraint
-matching continues over actual retained `ProviderIdentity` values; a missing
-Apple provider is an ordinary constraint mismatch, not configured Starlark
-membership/indexing.
+Retain only `Option<Value>` transiently and `Option<FrozenValue>` after freeze,
+using starlark-rust's existing pointer-sized/niche representation and
+`Allocative` treatment. The pointer belongs to the same frozen module heap as
+the rule. Existing `FrozenBzlModule` and `FrozenBzlLifetimeEntry` ownership
+keeps that heap alive through imports and BUILD evaluation. Add no owned heap,
+raw pointer, map, set, vector, string, interner, registry, cache or copied
+callable.
 
-Classify as **exact** for the selected rules_cc consumer the three declaration
-operations, acceptance of both aliases as provider keys in loading schemas,
-consistent alias/constraint identity through freeze and import, and omission
-of `apple_common` from direct BUILD globals for this selected exposure boundary.
+The initializer never reaches `StarlarkRuleImplementation`, configured target
+state or `PackageEvaluation` semantic equality because every initializer-
+bearing target call stops before lowering. Existing module source digest,
+recursive manifest fingerprint and DICE key/value equality own source change
+and invalidation. Identical failed calls publish no package. No request input,
+DICE key, observation, lock, await, task, retry or fallback changes; overlapping
+requests share only existing immutable frozen modules and cannot publish
+partial initializer state.
 
-Classify as **Slug-native** the restricted three-member facade, static Slug
-`.bzl` availability rather than Bazel's repository/flag guard, closed sibling
-token plus its collision-safe `ProviderIdentity::Builtin` loading projection,
-canonical constraint retention, opaque Apple-toolchain token, and explicit
-configured-target rejection while the configured provider category is absent.
+Buck2/V1 review selects no extraction. Reuse starlark-rust `Value`/
+`FrozenValue`, Slug's existing frozen-module lifetime closure and `Allocative`.
+The pointer is constant-time to freeze/clone. No benchmark is required.
 
-Keep **unsupported/deferred** Bazel's other seven `apple_common` members; full
-struct reflection; provider construction, values and fields; configured
-`ObjcInfo` and `XcodeVersionInfo`; all returned-toolchain members; Apple/Xcode
-fragments, environments, selection, rules, actions and outputs; repository/
-flag/autoload exposure parity beyond the selected boundary.
+Deletion condition: a separately reviewed packet may remove the invocation
+guard only when it admits the complete Bazel runtime category above, proves
+heap-safe copied inputs and returned values, models exact label contexts and
+allowlisting, and preserves structural package equality/invalidation. It must
+not carry the initializer pointer into configured state unless a new reviewed
+semantic need proves that necessary.
 
-## Owners, lifetime and utility review
+## Required proof
 
-- New private `apple_common.rs` owns the facade, exact three-name reflection,
-  zero-argument factory and opaque toolchain token.
-- `provider.rs` solely owns the closed declaration-only key kind, Starlark
-  equality/hash/display, loading identity lowering and configured-use guard.
-- `package.rs::complete_loading_globals` remains the sole environment owner;
-  it registers the facade only in the existing `.bzl` branch. `lib.rs` only
-  declares the private module.
-- `slug_analysis_v2::analysis_value` remains the configured target Starlark
-  view owner and changes only its two key-entry operations.
+Adjacent tests must prove:
 
-The two key values are immutable globals retained by the loading environment;
-the factory result is evaluation scratch until normal module freeze. Existing
-`ProviderIdentity` values in frozen schemas and configured graphs retain their
-current compact representation, equality and invalidation. No request input,
-DICE key, observation, cache, lock, fallback, mutable state or asynchronous
-owner is added. Failure/cancellation publishes no module or configured result;
-overlapping requests share only immutable globals and frozen values.
+- omitted and explicit `None` preserve current rule declaration/invocation;
+- a function initializer declares, exports and freezes without executing;
+- `Option<Value>` and `Option<FrozenValue>` remain pointer-sized and the frozen
+  field participates in the existing `Allocative` rule-definition owner;
+- all three selected rules_cc declaration shapes coexist and remain lazy;
+- imported/re-exported frozen rules retain the initializer marker under
+  ordinary and Bzlmod loading;
+- non-function initializer values, including other callable value kinds, fail
+  at declaration and publish no module;
+- valid target invocation returns the exact diagnostic before attribute
+  coercion or package/target/output publication;
+- failed initializer-bearing invocation followed by a clean evaluation has no
+  leaked package state; and
+- rules without an initializer retain existing package values, equality and
+  loading behavior.
 
-Buck2/V1 review selects existing V2/Starlark `Allocative`, closed enums,
-`SmallSet`, `SmallMap` and immutable `Arc` storage as retained dependencies,
-not copied code. Add no map, set, string allocation, interner or cache for the
-two static token variants. A compile-time size assertion must keep the kind one
-byte. No benchmark is required for two static globals and two constant-time
-type checks. `package.rs` is over 11,000 lines, so all substantive behavior
-stays in the dedicated/provider/analysis owners. `provider.rs` and
-`analysis_value.rs` remain below 2,000 lines under the caps.
+The authenticated replay must clear all three selected declarations and stop
+at the next independent typed boundary without executing an initializer body.
 
-No fixture is added. The pinned sources and authenticated replay are the
-provenance evidence; the configured Bazel ObjC test is not ported because its
-Apple provider/rule semantics remain deferred.
-
-The sibling is an explicit temporary boundary, not a configured-provider
-fallback. Its invariant is that declaration-only tokens never reach configured
-membership/index lookup. A future separately reviewed Stage 6 configured-Apple
-provider packet may delete it only after admitting complete `ObjcInfo` and
-`XcodeVersionInfo` construction, retained values, materialization and target
-lookup. That packet must replace the rejection proofs with Bazel's absent/
-present membership and indexing cases while preserving loading-schema identity.
-
-## Required discriminating proof
-
-Implementation must prove:
-
-- both sibling variants have distinct structural equality/hash, exact display
-  names, one-byte kind size and `Allocative`; neither equals an ordinary
-  built-in key;
-- ordinary and Bzlmod `.bzl` evaluation supports exactly the three selected
-  operations, freezes/re-exports both keys, and direct BUILD globals omit the
-  facade;
-- rule/aspect `provides` and attribute/subrule provider constraints accept the
-  keys and retain ordinary `ObjcInfo`/`XcodeVersionInfo` identities with
-  existing ordering/deduplication;
-- for each key, both `key in target` and `target[key]` produce the exact
-  declaration-only diagnostic, including when the target map contains the
-  same normal identity;
-- normal built-in and user providers preserve present/absent membership,
-  indexing, invalid-key diagnostics and hash/equality behavior;
-- every deferred facade name and every nested toolchain access fails closed;
-  failed evaluation freezes/publishes no module; and
-- authenticated replay clears all three declarations and stops at the next
-  independent boundary before configured Apple behavior executes.
-
-## Implementation allowlist, caps and validation
+## Allowlist, caps, validation and stops
 
 Only these files may change:
 
-- `app/slug_loading_v2/src/apple_common.rs` (new, with adjacent tests);
-- `app/slug_loading_v2/src/provider.rs` (sibling token/conversions and tests);
-- `app/slug_loading_v2/src/lib.rs` (one private module declaration);
-- `app/slug_loading_v2/src/package.rs` (import/registration only); and
-- `app/slug_analysis_v2/src/analysis_value.rs` (two configured key operations
-  and adjacent tests).
+- `app/slug_loading_v2/src/package.rs`, for the sole production change and
+  adjacent unit proof; and
+- `app/slug_loading_v2/src/host_package_load_tests.rs`, proof only for frozen
+  import/re-export and authenticated package loading.
 
-Caps: 180 production Rust, 180 proof Rust and 360 aggregate gross additions.
-`package.rs` is capped at four production lines; `provider.rs` at 80 aggregate
-lines; `analysis_value.rs` at 75 aggregate lines. No build-API, DICE, fixture,
-asset, Cargo or documentation file may change during implementation.
+Caps: 32 production Rust, 160 proof Rust and 192 aggregate gross additions.
+No documentation, fixture, asset, Cargo manifest or other Rust file may change
+during implementation.
 
-Run serially:
+Run serially with the pinned direct nightly toolchain:
 
-- focused `slug_loading_v2` apple/provider tests;
-- focused `slug_analysis_v2` declaration-only target-key tests;
-- `cargo test -p slug_loading_v2 --lib --quiet` plus its integration targets;
-- `cargo test -p slug_analysis_v2 --lib --quiet`;
+- focused rule-initializer declaration/retention/rejection tests;
+- `cargo test -p slug_loading_v2 --lib --quiet` and loading integrations;
 - `cargo test -p slug_query_v2 --lib --quiet`;
-- `cargo build -p slug_cli_v2 --quiet`, stale-`slugd` cleanup and one
-  authenticated bounded-PATH replay; and
-- `cargo fmt --check`, `git diff --check`, archive hygiene and exact
-  allowlist/cap checks.
+- `cargo build -p slug_cli_v2 --quiet`, stale-`slugd` cleanup, and the exact
+  bounded-PATH replay above; and
+- `cargo fmt --all --check`, `git diff --check`, archive hygiene, exact
+  allowlist and cap checks.
 
-Return `REPLAN` if configured-target provenance cannot be rejected before
-ordinary identity lowering; provider constraints require retaining a second
-tagged identity; `ProviderIdentity` or `ProviderCollection` must change; an
-Apple provider value/member executes during declaration; another facade member
-is required; a map/interner/cache/key/fixture is proposed; either large file
-crosses 2,000 lines; or the allowlist/caps fail.
+Return `REPLAN` if clearing the selected declaration requires executing an
+initializer; a callable outlives the existing frozen-module lifetime closure;
+the marker must enter `StarlarkRuleImplementation` or another retained graph;
+package mutation occurs before rejection; a new key/lock/cache/context/fixture
+or consumer branch is proposed; an additional production owner is required;
+or the allowlist/caps fail.

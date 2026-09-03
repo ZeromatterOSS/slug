@@ -23047,3 +23047,30 @@ Commit `94738a9a2` accepts the design. Implement only
 `WP-4-6-7A-apple-common-declaration-provider-fail-closed-implementation-r1`
 under the configured-target owner, proofs and stops frozen in
 `current-packet.md`.
+
+### Apple configured guard accepted; initializer analysis remains deferred (2026-09-03)
+
+Commit `10aaed332` terminally accepts the closed Apple declaration-key tokens
+and configured raw-key rejection at 141/180/321 gross production/proof/total
+Rust additions. The complete loading and analysis gates pass, including exact
+rejection before configured provider lookup and unchanged ordinary provider
+behavior. Replay clears the Apple declaration boundary and stops earlier in
+loading at generic `rule(initializer = ...)` declaration.
+
+The successor audit adds no Stage 6 behavior or owner. An initializer is kept
+only in `package.rs::FrozenRuleDefinition` long enough to preserve lazy module
+declaration/import. Every initializer-bearing target invocation fails before
+package lowering, so the callable cannot enter `StarlarkRuleImplementation`,
+`PackageEvaluation`, configured targets, provider collections, transition or
+action state. Existing Stage 6 structural equality, fingerprints, invalidation
+and clone behavior are unchanged.
+
+Bazel's configured initializer allowlist and all initialized target analysis
+remain unsupported/deferred. Any implementation proposal that carries the
+callable or a new marker into Stage 6, or that analyzes an initializer-bearing
+target, returns `REPLAN`. A future runtime-initializer packet must first own the
+complete loading-time transformation and allowlist semantics; Stage 6 then
+receives only the already-normalized ordinary package schema/values unless a
+separate reviewed semantic need proves otherwise.
+Independent packet review returns `ACCEPT`; the active implementation is
+authorized with no Stage 6 change.
