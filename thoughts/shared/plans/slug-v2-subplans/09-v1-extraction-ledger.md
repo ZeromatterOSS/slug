@@ -2715,4 +2715,25 @@ remain structural and unchanged; ordinary no-field rules allocate nothing new.
 Proof must pin the one-byte enum and unchanged identity/late-bound carrier
 sizes. The configured error is scratch, not retained state. Any layout growth,
 second owner or default-`None` carrier is `REPLAN`; deletion requires a complete
-reviewed Java option producer and configured-resolution packet.
+reviewed Java option producer and configured-resolution packet. Commit
+`4d59d7451` terminally accepts this no-extraction representation.
+
+`WP-4-7A-build-imported-bzl-label-caller-provenance-audit-r1` also requires no
+V1/Buck2 extraction. Reuse `CompactString`, `BzlModuleIdentity`, immutable
+`Arc<[T]>`, constant-time Arc clone and the identity's existing `Allocative`
+coverage. `PackageRecorder` gains one attempt-only
+`Option<Arc<[(CompactString, BzlModuleIdentity)]>>`: `None`
+for no loaded Bzl sources performs no allocation, while `Some` is nonempty and
+shares the already loaded first-seen recursive manifest projection.
+
+Do not add a map, interner, cache, global context, raw pointer, DICE owner or
+second retained copy. The slice never enters package results or semantic
+equality and is dropped on success, failure, retry or cancellation. Existing
+source/manifest fingerprints own invalidation. Proof must pin the None/nonempty
+Some invariant, source order, attempt isolation and same-DICE loaded-source
+A/B/A restoration; the external lexical mapping discriminator owns repository-
+mapping correctness without a second mapping A/B/A test.
+`PackageRecorder` remains attempt scratch rather than a new retained
+Allocative owner. No benchmark is needed for this cold loading seam. Any
+no-load allocation, post-attempt retention, source inference, new owner or
+nonconstant clone returns `REPLAN`.

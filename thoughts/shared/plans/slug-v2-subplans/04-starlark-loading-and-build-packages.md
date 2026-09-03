@@ -8666,8 +8666,49 @@ The three other Bazel Java fields and all Java producer/configured semantics
 remain deferred. Proof must cover the full three-call census, selected pair,
 unselected fields, private label-only use, ABI, BUILD absence, lifetime, order,
 identity/hash/layout, source A/B/A and exact unknown-`missing` loading failure,
-without invoking the selected initializer-bearing rule. The unchanged
-five-file 80/210/290 R3 successor awaits independent review. After it, audit
-`WP-4-7A-build-imported-bzl-label-caller-provenance-audit-r1` as a bounded
-generic category; do not special-case rules_java. Any need to edit
-`package.rs`, `subrule.rs` or expose the Java sibling publicly is `REPLAN`.
+without invoking the selected initializer-bearing rule. Commit `4d59d7451`
+terminally accepts the unchanged five-file implementation at 75/205/280 gross
+production/proof/total additions.
+
+### BUILD calls into imported-Bzl Label provenance audit (2026-09-03)
+
+Replay of `4d59d7451` clears both Java declarations, then
+`toolchains/BUILD:102` calls imported `java_runtime_files`. The helper at
+`default_java_toolchain.bzl:201-217` records a transient filegroup and stops at
+its first `Label()` on line 212. Rules_java source hashes are
+`b23a9b08e5928120d2d3f3a559b9c54f8472cabf1a4b99baf7cc6f29886a9b73`
+for BUILD and
+`6f963992c933e6cbc48f0c64f3349484422ee06f01830473ea802731b874deea`
+for the helper. Atomic package failure publishes nothing; line 213 and the
+later initializer call at BUILD line 365 are unreached.
+
+Pinned Bazel 9.2 `StarlarkRuleFunctionsApi:1031-1057`,
+`StarlarkRuleClassFunctions:2122-2143` and
+`BazelModuleContext:140-190` establish that Label strings use the innermost
+executing `.bzl` module, not BUILD or the export site. Accept, pending
+independent review, one generic category: an ordinary or Bzlmod BUILD call may
+enter an imported/re-exported frozen def and resolve Label against the lexical
+source containing the native call. Direct BUILD and a merely re-exported
+Label builtin remain rejected. Bazel
+`StarlarkIntegrationTest.java:4338-4356`, SHA-256
+`ced8fc27cbe35bf30174678800d29b73012f800bff00bcdff6a5cf8c78fef836`,
+is the direct alias authority; freeze its exact diagnostic
+`Label() can only be used during .bzl initialization (top-level evaluation)`.
+
+`starlark_label.rs` stays the resolution owner. `bzl_module.rs` composes the
+already loaded recursive identities and `PackageRecorder` carries them only
+for the current attempt as `Option<Arc<[(CompactString,
+BzlModuleIdentity)]>>`, with `None` allocating nothing and `Some` nonempty.
+Select the filename with
+`native_call_source_filename().or_else(native_caller_function_filename)` to
+preserve identity through compiler inlining. Do not widen
+`BzlEvaluationContext::from_evaluator`, edit `provider.rs`, infer a source, or
+add a DICE key/map/cache/interner. Existing manifests and package-load
+dependencies own invalidation; failure/retry/cancellation drop the carrier.
+
+The selected lexical behavior is exact. The sparse attempt-only Arc slice and
+missing/ambiguous-source diagnostics are Slug-native. Symbolic-macro,
+initializer, computed-default, configured callback and Java execution
+semantics remain deferred. The five-file 120/260/380 successor, full source
+hashes, ownership, proof, complexity waivers and stops are frozen in
+`current-packet.md`.

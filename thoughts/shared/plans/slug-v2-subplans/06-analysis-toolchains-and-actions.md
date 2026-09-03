@@ -23192,8 +23192,9 @@ resolution. This fail-closed boundary is Slug-native; Java option mutation,
 default/nondefault resolution, fragment access, providers, toolchains,
 optimization and compilation actions remain unsupported/deferred.
 
-The authentic replay does not reach this configured guard or the selected
-initializer. The R2 candidate clears both Java field declarations, then
+Commit `4d59d7451` accepts this configured guard and declaration surface. Its
+authentic replay does not reach the guard or selected initializer: it clears
+both Java field declarations, then
 `toolchains/BUILD:102` calls imported `java_runtime_files`; its transient
 `native.filegroup` records before `default_java_toolchain.bzl:212` fails with
 `Label() may only be called in a .bzl module`. Atomic package failure publishes
@@ -23214,3 +23215,7 @@ At 2,243 lines, `configuration.rs` crosses the physical-size review trigger but
 remains the sole configuration projection/error owner. Splitting this small
 terminal would duplicate or expose its private projection boundary; both
 touched functions remain below 150 lines, so this packet authorizes no split.
+
+The selected follow-up Label caller-provenance audit changes only loading-time
+attempt context. Stage 6 owns no new semantics, state, DICE input or proof for
+that successor.
