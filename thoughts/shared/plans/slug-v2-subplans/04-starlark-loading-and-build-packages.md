@@ -8285,3 +8285,37 @@ two-file allowlist. Invocation error/prepared scratch and evaluator method stay
 in `repository_rule_context.rs`; the async retry stays in the existing
 repository-file effect driver. No new key, lock, fixture or retained value is
 authorized.
+
+### Private proto-common predeclared facade audited (2026-09-02)
+
+Commit `f7c365234` accepts bounded direct-external-Label repository reads at
+98/265/363 gross production/proof/total Rust additions. Full loading/query
+gates and the CLI build pass. The authenticated replay clears the read and
+apple generated repository, then stops while recursively loading protobuf 33.4
+`bazel/private/native.bzl:3` because `proto_common_do_not_use` is absent.
+
+Pinned Bazel 9.2 registers an internal proto-common object, then bundled
+`common/exports.bzl` unconditionally replaces the `.bzl` top-level with a
+standard Starlark `struct` containing exactly
+`INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION = True`. The exported top-level
+enters both BUILD-loaded and MODULE-loaded `.bzl` environments, not direct
+BUILD files. Autoload removal deliberately retains the same one-member shape;
+the upstream shell proof requires that field and excludes native `compile`
+breadth.
+
+The protobuf consumer closure aliases the value in the exact 134-byte
+`native.bzl`; `proto_lang_toolchain_info.bzl` and `proto_common.bzl` intentionally
+observe absent native provider/pass fields and select their Starlark fallbacks,
+while `toolchain_helpers.bzl` reads only the Boolean during declarations. This
+is a bounded declaration-time facade, not proto configured semantics.
+
+Audit result: `ACCEPT`. Add one frozen `AllocStruct` value only inside
+`package.rs::complete_loading_globals`' existing `.bzl` branch and prove exact
+type, member inventory/value, fallback absence, native alias, Bzlmod presence
+and direct-BUILD absence. The fixed Bazel 9.2 default is exact behavior; its
+Rust allocation and lack of Bazel's Java option/injection machinery are
+Slug-native. False/nondefault flags, original native methods/providers,
+autoload configuration, proto fragments/toolchains/rules/actions and consumer
+special cases remain deferred. No DICE key, request input, fixture, source,
+catalog or second production owner is authorized. Select the one-file packet
+frozen in `current-packet.md`.

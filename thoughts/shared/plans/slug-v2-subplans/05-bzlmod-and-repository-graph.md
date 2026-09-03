@@ -4748,3 +4748,27 @@ Slug-native. Root/built-in/String/path, explicit-watch, non-ASCII,
 current-generated-repository and broader repository effects remain
 unsupported/deferred. Select the active two-file implementation packet; return
 `REPLAN` if a new Stage 5 owner or materialization/source shape is required.
+
+### Repository read accepted; protobuf predeclared boundary selected (2026-09-02)
+
+Commit `f7c365234` accepts the bounded repository read without a new Stage 5
+key or retained representation. The complete loading/query gates and CLI build
+pass. Authentic replay clears the apple generated repository and next stops in
+selected protobuf 33.4 at missing top-level `proto_common_do_not_use` while
+loading the prebuilt-protoc authenticity rule.
+
+The selected protobuf BCR descriptor has SHA-256
+`555f8686b4c7d6b5ba731fbea13bf656b4bfd9a7ff629c1d9d3f6e1d6155de79`
+and archive integrity
+`sha256-aH6YpHGXO1xf1xF1DEC4uCwK3jP2Sdtl4AspDyk0Wis=`. Existing canonical route,
+source observation, recursive external-Bzl and manifest owners already load
+the exact consumer closure. The missing fact is a Stage 4 predeclared-global
+constant, not repository graph state.
+
+Stage 5 therefore authorizes no change. No protobuf source copy, catalog row,
+mapping, route, materialization, lockfile, DICE key or source capability is
+needed. The fixed exact default facade is owned by Stage 4 loading globals;
+nondefault semantics and all proto providers, rules, toolchains and actions
+remain deferred. Select
+`WP-4-7A-proto-common-predeclared-facade-implementation-r1` under the active
+one-file allowlist and stop at the next independently owned replay boundary.
