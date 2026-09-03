@@ -8576,3 +8576,45 @@ error are Slug-native; Template construction/instances, configured lookup,
 make-variable behavior and Java execution stay deferred. The frozen successor
 changes only `provider.rs` and proof-only `host_package_load_tests.rs` under
 16/140/156 caps. Full hashes, proof matrix and stops are in `current-packet.md`.
+
+### Java-common private default-false loading facade audit (2026-09-03)
+
+Commit `60528af77` accepts the provider identity closure. Replay now stops in
+rules_java 9.1.0 `java/private/native.bzl:19` at missing Bzl global
+`java_common`. Its complete matching closure is six regular `0444` files with
+trailing LF and exactly 26 literal `get_internal_java_common` occurrences:
+five load imports plus 21 definition/call-form occurrences comprising the
+bridge definition and 20 returned-member calls using ten names. Default-false
+evaluation makes the legacy-only `java_common.bzl:293` call unreachable; one
+call at `:313` is eager and 18 are lazy. The lazy flag calls at
+`java_info.bzl:177,677` are admitted exact false queries; only the other 16
+invoke deferred members, and enclosing provider behavior remains deferred.
+
+Pinned Bazel 9.2 builtins construct an eleven-member private struct, check
+caller provenance on facade construction and again in native members, and
+read a default-false semantics flag. The sole unreferenced member is
+`incompatible_disable_non_executable_java_binary`. The selected loading
+category therefore admits only Bzl-only zero-argument
+`internal_DO_NOT_USE()` followed by zero-argument
+`google_legacy_api_enabled() == False`. Both calls use the same allocation-free
+package-local `BzlEvaluationContext::source_identity_for_call` predicate: a
+real caller must belong to canonical/apparent rules_java and package `java` or
+a descendant. Direct top-level/callerless calls reject. Do not reuse the broad
+default allowlist; freeze/import/re-export must not bypass the second check.
+The selected positive external rules_java `java/**` cases are exact. Bazel-
+permitted rules_java packages outside that prefix, the main-repository
+`javatests/com/google/devtools/grok/kythe/analyzers/build/testdata/pkg` and
+`third_party/bazel_rules/rules_java` allowlist prefixes, and any stricter
+callerless rejection are intentionally unsupported Slug-native fail-closed
+behavior and require negative proof. `/java` is only a descendant of the
+second entry, not a separate allowlist prefix.
+
+Implement, after independent review, as two zero-field simple values in the
+existing `package.rs` global owner. Exactness covers the selected default-false
+calls, positive selected source identity and lifetime. The narrow negative
+restriction, sparse Rust facade and missing-field failures are Slug-native.
+The other ten members, legacy-true mode and 16
+lazy Java provider/configured/toolchain/action calls remain deferred; do not
+publish placeholders. No package schema, retained semantic identity, DICE fact
+or fallback changes. The two-file 72/160/232 successor and proof/stops are
+frozen in `current-packet.md`.

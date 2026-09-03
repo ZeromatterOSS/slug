@@ -1,39 +1,35 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-6-7A-provider-declaration-identity-closure-audit-r1
+Packet: WP-4-7A-java-common-private-loading-facade-audit-r1
 
-Status: docs-only audit/design checkpoint complete; implementation is frozen
-but awaits independent review. No Rust work is authorized before `ACCEPT`.
+Status: docs-only audit/design checkpoint complete. The bounded implementation
+successor below is frozen but awaits independent review; no Rust work is
+authorized before `ACCEPT`.
 
-## Predecessor checkpoint and selected stop
+## Predecessor and selected replay stop
 
-Commit `2945accbe` terminally accepts the execution-group declaration closure
-within its 170/220/390 caps. It preserves nonallocating ordinary-rule state,
-the compact retained group/transition representation, exact declaration
-validation and the configured fail-closed boundary. Its focused and broad
-loading/query/CLI, formatting, diff, archive and daemon-hygiene gates pass.
+Commit `60528af77` terminally accepts the provider declaration-identity closure
+at 16 production/139 proof/155 total gross Rust additions. It admits exported
+live initialized-provider identities and TemplateVariableInfo only in loading
+declarations, while configured Template use still fails closed. Its accepted
+focused and broad loading/query/CLI, formatting, diff, archive and daemon gates
+pass.
 
-The authenticated bounded-PATH rules_rust replay clears the selected rules_cc
-execution-group declarations and reaches selected rules_java 9.1.0
-`java/common/rules/java_runtime.bzl:256-259`:
+The authenticated bounded-PATH rules_rust replay clears the selected
+rules_java declarations and stops while loading
+`@@rules_java+//java/private:native.bzl:19`:
 
 ```text
-java_runtime = rule(
-    ...
-    provides = [
-        JavaRuntimeInfo,
-        platform_common.TemplateVariableInfo,
-    ],
-)
-error: rule provides must contain exported provider constructors
+return java_common.internal_DO_NOT_USE()
+Variable `java_common` not found
 ```
 
-No Java rule implementation, initialized-provider callback or configured
-provider operation executes before this declaration error.
+No Java provider initializer, configured rule implementation, toolchain
+operation or action executes before this loading-global failure.
 
-## Durable selected rules_java closure
+## Durable selected rules_java evidence and complete closure
 
-The BCR coordinate is `rules_java` 9.1.0. Its durable source descriptor is
+The selected BCR coordinate is `rules_java` 9.1.0. Its durable descriptor is
 `https://bcr.bazel.build/modules/rules_java/9.1.0/source.json`, SHA-256
 `da589573c1dee2c9ac4a568b301269a2e8191110ff0345c1a959fa7ea6c4dfd6`.
 It selects
@@ -41,157 +37,166 @@ It selects
 a 114,566-byte/114-entry archive with SHA-256
 `4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f`
 and integrity `sha256-Thooolwu+lNQDJKNIs7/vFBd2VszWi0CWDaik7WSIS8=`.
-Its 94 regular entries are mode `0444`; its 20 directories are `0755`.
+All six closure files below are regular `0444` with trailing LF:
 
-The immediate source is regular `0444`
-`java/common/rules/java_runtime.bzl`, SHA-256
-`d908d3836e5796195596a1d7b4d36d7ca5c674db76acd5c4555b40204a602c08`,
-9,847 bytes/260 lines with trailing LF. Lines 31-54 export initialized
-`JavaRuntimeInfo`; lines 256-259 advertise it followed by
-`platform_common.TemplateVariableInfo`.
-
-The complete matching selected archive closure is:
-
-| Source-relative path | SHA-256 | Bytes/lines | Declaration role |
+| Source-relative path | SHA-256 | Bytes/lines | Selected role |
 |---|---|---:|---|
-| `toolchains/java_toolchain_alias.bzl` | `56f84699c33ebd2e871615b30bcab4ae5a824cfab78e0dd80afc7e1fbf92e510` | 3,937/110 | lines 60-65 constrain on JavaRuntimeInfo plus TemplateVariableInfo; lines 69-73 advertise both plus already-supported ToolchainInfo |
-| `java/private/java_info.bzl` | `02438c92066a825629a47f6dd01d9ea2200dc90a666b68fb4ee1ebf09e6a3026` | 47,438/1,038 | lines 825-886 and 1014-1038 export initialized JavaInfo and JavaPluginInfo |
-| `java/bazel/rules/bazel_java_import.bzl` | `c8a4747c72ec57e64cbf6cda8da0e5a0f3320583db58c57321e126391b0c62a1` | 1,962/66 | advertises imported frozen JavaInfo; already passes |
-| `java/bazel/rules/bazel_java_library.bzl` | `97f87b1bc3c6a5faa186e26d325578e2aca274a8131755a7805976b7ee5fb2f7` | 2,117/65 | advertises imported frozen JavaInfo; already passes |
-| `java/bazel/rules/bazel_java_plugin.bzl` | `9e03f44ac8d32bb4f20f8dc83c80ed079e6c1dfe28c20ea0d7d133fe361b44bc` | 5,726/154 | advertises imported frozen JavaPluginInfo; already passes |
-| `java/bazel/rules/bazel_java_binary.bzl` | `7788ed4c824a57be330f692f4e9ac4dab378bc70fa461b0ded4f046f444b8ab8` | 19,305/476 | advertises imported frozen JavaInfo; already passes |
+| `java/private/native.bzl` | `81fd742661f632db4c6b36efa5acb76075e5d65d176ffa3372ed47b340bc9ae1` | 844/19 | lines 18-19 define the sole bridge and call `java_common.internal_DO_NOT_USE()` |
+| `java/private/java_common.bzl` | `f40732378d4e0ae55646958c9ff17313e5f98cd8af5751deaadaa2d8437ddfe5` | 11,126/323 | lines 296-323 construct/export the public struct; line 313 is the sole eager internal-member call |
+| `java/private/java_info.bzl` | `02438c92066a825629a47f6dd01d9ea2200dc90a666b68fb4ee1ebf09e6a3026` | 47,438/1,038 | four lazy member calls inside provider helpers/initializers |
+| `java/private/java_common_internal.bzl` | `a1c0222c084b2110fcec953b74e782f3287d8edba816b1efe3a7eb5275b0e652` | 19,260/467 | seven lazy provider/action/classpath calls |
+| `java/common/rules/java_toolchain.bzl` | `5ad6511cdef925246961c7e7a9039475c192371fedbf909c63cf92334779e875` | 24,304/612 | three lazy `expand_java_opts` calls |
+| `java/common/rules/java_package_configuration.bzl` | `d0b7fd1e91158b9605a15bec544fa2b574f088336f77f2b857ed9692c38bfacd` | 3,475/124 | one lazy `expand_java_opts` call |
 
-All are regular `0444` with trailing LF. There are no other selected
-`rule(provides=...)` sites. Only same-module JavaRuntimeInfo is a live
-initialized callable at its advertiser; the JavaInfo and JavaPluginInfo
-advertisers import already-supported frozen initialized callables and are
-regression-preserved, not newly closed.
+This is the complete matching closure: exactly 26 literal
+`get_internal_java_common` occurrences across six files. Five are load imports;
+the other 21 are definition/call-form occurrences comprising one bridge
+definition plus 20 returned-member call sites using ten distinct selected
+names. `java_common.bzl:293` is a legacy-only `check_provider_instances` call
+unreachable when the default legacy flag is false. The remaining 19 reachable
+member calls are one eager call at `java_common.bzl:313` and 18 lazy calls.
+Two lazy calls, `java_info.bzl:177,677`, are exact admitted
+`google_legacy_api_enabled() == False` queries; only the other 16 lazy calls
+invoke deferred members. Enclosing JavaInfo/provider behavior remains deferred.
+`google_legacy_api_enabled` therefore has exactly three syntactic calls.
 
-TemplateVariableInfo has exactly three declaration occurrences across two
-files: `java_runtime.bzl:258`, alias required-provider `:64`, and alias
-advertisement `:71`. Its three nondeclaration uses remain deferred:
-`java_runtime.bzl:152` and alias `:26` construct instances, while alias `:48`
-performs configured Target indexing.
+The generated compatibility proxy is durably specified by
+`java/rules_java_deps.bzl:29-58`, SHA-256
+`40ce0f5b44b124f9fdc3986d542caa6b3a3213c2abbd4927cdea65ad42f31a23`,
+8,257 bytes/224 lines. It loads the private Java common producer after the
+runtime/toolchain modules. Public `java/common/java_common.bzl`, SHA-256
+`2848c3ac4f305d2b2d4c96dc2daa2828b1031ee0c0764515ecdebc8f125bdb71`,
+727 bytes/18 lines, re-exports that proxy value. `toolchains/BUILD` and
+`toolchains/java_toolchain_alias.bzl` are the selected entry route; they hash
+to `b23a9b08e5928120d2d3f3a559b9c54f8472cabf1a4b99baf7cc6f29886a9b73`
+and `56f84699c33ebd2e871615b30bcab4ae5a824cfab78e0dd80afc7e1fbf92e510`.
 
 ## Bazel 9.2 authority and learned facts
 
-Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-is the sole compatibility authority:
+Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a` is
+the sole compatibility authority:
 
-- `analysis/starlark/StarlarkRuleClassFunctions.java:1153-1155`, SHA-256
-  `a1f706cfbbc67aa3cd2521df2091dd5ed9af96eb4568049f8eee966d06c622f7`,
-  routes `provides` through one provider-key converter;
-- `analysis/starlark/StarlarkAttrModule.java:597-610`, SHA-256
-  `388421c44c623c1c6625fd9f2b059d2a7d1e13b8d45e7c96173f24866a917967`,
-  accepts Provider values, rejects unexported values and uses exact keys;
-- `packages/StarlarkProvider.java:211-218,415-427,470-484`, SHA-256
-  `cac43a3a9ab1d8653e05ae8b4304ffa6b573bad66bbfb207641d1a652d10cdc1`,
-  gives initialized and ordinary user providers the same export/key contract;
-- `packages/BuiltinProvider.java:39-80`, SHA-256
-  `4551cf08d71dd305a14546f88f184dcef30f3c5882242899a83f865b531ecd93`,
-  makes builtin providers always exported with stable keys;
-- `rules/platform/PlatformCommon.java:43-50` and
-  `starlarkbuildapi/platform/PlatformCommonApi.java:29-43`, SHA-256
-  `010d4bb681cf44d6ed913ddd05d24eef1c4e214c6543f38f69e780a7e9d64d36`
-  and `ef93f7b95a54069ba9fdba9ce978cec938db5b4f4a64471fb78c3b2b2f6c611b`,
-  expose TemplateVariableInfo as its builtin provider constructor/key; and
-- `analysis/TemplateVariableInfo.java:31-65`, SHA-256
-  `21847cc2e32e271ea5a7c44f17f51ffe3baacd163652ad5f99fa270b8f94b8da`,
-  owns the singleton provider and materially broader instance constructor.
+- `src/main/starlark/builtins_bzl/common/java/java_common.bzl:17-42`,
+  SHA-256
+  `2083873bdc74038b46f7773277d66eb3dd80b5e73af75d78791e006bc3922cfb`,
+  constructs an eleven-member private facade, checks its rules_java allowlist
+  and exports `internal_DO_NOT_USE`;
+- `src/main/java/com/google/devtools/build/lib/bazel/rules/JavaRules.java:63-65`,
+  SHA-256
+  `2819dd07d95cc6afb57a997683f71e9e6cd7019b90f527c42f84e4a7397f928c`,
+  injects the Bzl top-level and native Java implementation;
+- `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/java/JavaCommonApi.java:645-690`,
+  SHA-256
+  `b701da2231e7f82080ee1991bd8d1f7c9a92bef0e3af272ad1a484a2e36eb824`,
+  declares the private member APIs;
+- `src/main/java/com/google/devtools/build/lib/rules/java/JavaStarlarkCommon.java:282-284,345-392`,
+  SHA-256
+  `a8bc7d5e1875978d60550088ab517a38430068730f680267054e8f0b847c2e92`,
+  repeats the caller check at member invocation and reads the semantics flag;
+- `src/main/java/com/google/devtools/build/lib/packages/semantics/BuildLanguageOptions.java:313-322,916`,
+  SHA-256
+  `b01e106ef0ff7af458766248bce7799b49c0f54fc14d023a8297aeb7dbfb44e5`,
+  establishes `experimental_google_legacy_api=false` by default; and
+- `src/main/java/com/google/devtools/build/lib/packages/BuiltinRestriction.java:34-91,124-149,169-216`,
+  SHA-256
+  `383c157100c35564c11ddcc270f7a2757c9f151f343ac0ce6253bffb5dfb5081`,
+  establishes innermost-Bzl caller provenance and rules_java allowlisting.
 
-`StarlarkRuleClassFunctionsTest.java:2498-2535` (SHA-256
-`e09c93616e096d639ec69b6b0c6a397a8a36bc8a95fa21b986cb5fc7f8f010aa`)
-proves initialized-provider export identity. `TemplateVariableInfoTest.java`
-(SHA-256
-`e3762b88d8871e7c77538a6e57e0dc420f8225080e4a124face71c99acc3298e`)
-proves configured construction/indexing and is deferred, not copied into this
-declaration packet.
-
-Slug's immediate first failure is `JavaRuntimeInfo`: live
-`InitializedUserProviderCallable` receives its `ProviderId` in `export_as`, but
-`starlark_provider_identity` recognizes only its frozen sibling. After that
-fix, TemplateVariableInfo would fail because the existing analysis-builtin
-identity allowlist names only DefaultInfo and ToolchainInfo. Existing
-`ProviderIdentity`, compact strings, Arc advertised-provider slice,
-deduplication, freeze and equality already represent both values.
+`JavaStarlarkApiTest.java:1847-1886`, SHA-256
+`56518ceb51aeb7297fafe7bcc95cb4b72c11b1da894be1b4485b6c51da0039b8`,
+proves the internal Java members are private. Bazel's facade contains eleven
+members; selected rules_java references ten, and
+`incompatible_disable_non_executable_java_binary` is the sole unreferenced
+member.
 
 ## Decision and compatibility boundary
 
-Audit result: `ACCEPT` for one generic **provider declaration-identity
-closure**, pending independent review.
+Audit result: `ACCEPT`, pending independent review, for one bounded
+**java_common private loading facade**.
 
-Classify as **exact**: recognize an exported live initialized user-provider
-constructor by the same producer-owned `ProviderId` as its frozen form;
-recognize exactly the existing TemplateVariableInfo callable as builtin
-`ProviderIdentity::Builtin("TemplateVariableInfo")`; accept both through the
-shared rule/aspect `provides` and required-provider declaration paths; preserve
-order/deduplication, freeze/import/re-export, and reject raw constructors,
-unexported initialized providers, unrelated callables and non-providers.
+Classify as **exact** for the admitted default configuration: expose
+`java_common` only to ordinary/Bzlmod `.bzl` evaluation; admit zero-argument
+`internal_DO_NOT_USE()` and zero-argument `google_legacy_api_enabled()`; apply
+the same allocation-free package-local source-identity predicate at both
+method calls for a selected canonical/apparent rules_java caller in package
+`java` or a descendant; return `False`; survive freeze/import/re-export; and
+omit the global from direct BUILD evaluation.
 
-Classify as **Slug-native**: the existing compact string/user-ID
-representation and this configured diagnostic:
+Classify as **Slug-native**: two zero-sized Rust Starlark values replace the
+eleven-field Bazel struct, expose only the selected eager member, and use
+Slug's canonical repository/source-manifest identity and standard missing-field
+diagnostic for the sparse deferred surface. The narrow predicate deliberately
+fails closed where Bazel is broader: `internal_DO_NOT_USE` calls from
+rules_java packages outside `java/**`, Bazel's two main-repository allowlist
+prefixes (`javatests/com/google/devtools/grok/kythe/analyzers/build/testdata/pkg`
+and `third_party/bazel_rules/rules_java`), and any stricter direct top-level/
+callerless case are unsupported Slug-native rejections, not exact parity claims.
 
-`platform_common.TemplateVariableInfo configured-target membership and indexing are unsupported`
+Keep **unsupported/deferred**: `experimental_google_legacy_api=true`; the ten
+other Bazel facade members and their 16 selected lazy calls; enclosing JavaInfo
+and provider behavior even around the two admitted false queries; Java provider
+payloads or initialization, target membership/indexing, fragments, configured
+rule implementations, toolchain resolution, option expansion, classpath
+processing and Java compilation/actions. Do not add inert placeholders.
 
-Keep **unsupported/deferred**: TemplateVariableInfo invocation, instance
-construction, target membership/indexing and make-variable semantics; Java
-provider payloads, rule implementations, fragments, toolchain resolution and
-actions; other platform_common provider breadth. Direct BUILD exposure is
-unchanged.
+## Ownership, lifetime and invalidation
 
-## Ownership, retained data and fail-closed analysis seam
+`app/slug_loading_v2/src/package.rs` owns loading-global registration, both
+stateless facade values and one allocation-free caller predicate. At both the
+bridge and returned-member call, use
+`BzlEvaluationContext::source_identity_for_call` and admit only a real Bzl
+caller whose canonical/apparent repository identity is `rules_java` and whose
+package is exactly `java` or its descendant. Reject direct top-level/callerless
+calls. Do not reuse the broader `builtin_restriction` default allowlist. This
+is exact for selected positive rules_java `java/**` callers and intentionally
+Slug-native fail-closed for the broader cases above; no direct filesystem
+lookup occurs.
 
-`app/slug_loading_v2/src/provider.rs` remains the sole production owner. In
-`starlark_provider_identity`, project a live `InitializedUserProviderCallable`
-only when its existing `OnceCell<ProviderId>` is populated, and add only
-TemplateVariableInfo to the existing analysis-builtin identity match. In
-`configured_target_provider_identity`, reject TemplateVariableInfo before the
-shared projection. Do not add it to `alloc_starlark_provider_callable`.
+Both values are zero-field `starlark_simple_value!` carriers. They may live in
+the existing Globals/frozen-module heaps but retain no evaluator reference,
+source identity, collection, callable, semantic marker or dynamic allocation.
+Add no package/configured value, map, compact string, Arc slice, interner,
+registry, cache, DICE key/input/observation, lock, await, retry or fixture.
+Existing module source/recursive-manifest fingerprints provide invalidation;
+request overlays, overlapping requests, equality cutoffs, cancellation and
+shutdown behavior are unchanged. Buck2/V1 provides no implementation and no
+Stage 9 row is needed. The package file exceeds the size trigger, but remains
+the cohesive owner because this adds only two Bzl-global ZSTs beside existing
+`platform_common`; splitting would add registration/module plumbing without a
+new semantic owner.
 
-No `package.rs` edit is needed: `declaration_provider_identity` and
-`declaration_required_providers::is_provider` already use the shared classifier,
-so both `provides` and `attr.label(providers=...)` receive the exact identities.
-No analysis production edit is needed: configured Target indexing and
-membership already call the configured classifier before map lookup. The
-existing unsupported callable invocation remains the construction boundary.
-
-Add no retained field, owner, representation, map, interner, registry, cache,
-DICE key/input/observation, lock, await, retry or fixture. The projection clones
-the existing compact ProviderId once into the already-owned Arc slice. Existing
-structural equality/invalidation and module/source fingerprints remain
-unchanged. Buck2/V1 supplies no implementation; no Stage 9 row is required.
-
-## Frozen successor implementation and proof
+## Frozen implementation successor
 
 After independent `ACCEPT`, activate
-`WP-4-6-7A-provider-declaration-identity-closure-implementation-r1` and change
-only:
+`WP-4-7A-java-common-private-loading-facade-implementation-r1` and modify only:
 
-- `app/slug_loading_v2/src/provider.rs`, sole production owner plus adjacent
-  classifier/configured-rejection proof; and
+- `app/slug_loading_v2/src/package.rs`, production owner plus adjacent
+  zero-size proof; and
 - `app/slug_loading_v2/src/host_package_load_tests.rs`, proof only.
 
-Caps: 16 production Rust, 140 proof Rust, 156 aggregate gross additions.
+Caps: 72 production Rust, 160 proof Rust, 232 aggregate gross additions.
 
-Required proof must cover selected-source-shaped JavaRuntimeInfo plus
-TemplateVariableInfo advertisement in exact order; the alias-shaped required
-provider list; ordinary/Bzlmod rule and aspect declaration; same-module live
-export plus freeze/import/re-export; regression-preserved imported frozen
-JavaInfo/JavaPluginInfo identities;
-raw/unexported/non-provider rejection; exact TemplateVariableInfo builtin
-identity; configured pre-rejection before lookup; unchanged unsupported
-Template invocation; unchanged DefaultInfo, ToolchainInfo, ordinary/frozen
-providers and rules without these identities. No initialized callback or Java
-implementation may execute.
+Proof must cover the exact 844-byte/19-line `native.bzl` hash/source; the
+selected `_make_java_common` eager call under ordinary and Bzlmod globals;
+default `False` and absent legacy additions; zero arguments and rejection of
+positional/named extras; caller rejection for direct top-level/callerless calls,
+root, unrelated repositories and rules_java outside the admitted `java`
+prefix; provenance recheck after freeze/import/re-export; BUILD absence;
+zero-sized transient/frozen facade state; standard failure/absence for all ten
+deferred members; both lazy false queries without executing enclosing provider
+behavior; unchanged ordinary globals and no Java callback, implementation or
+action execution. Treat the selected positive caller cases as exact and every
+required broader/callerless negative as Slug-native fail-closed proof.
 
-Run serial focused provider/declaration tests first, then full loading library
-and integration targets, query library, direct pinned-nightly CLI rebuild, the
+Run serial focused facade/recursive-load tests, then the full loading library
+and integration targets, query library, direct pinned-nightly CLI rebuild,
 exact authenticated bounded-PATH replay, stale-slugd, formatting, diff,
-archive, allowlist and cap gates. Replay must clear the selected declarations
-and stop only at the next independent typed boundary.
+archive, allowlist and cap gates. Reuse the accepted archive/source evidence;
+add no oracle fixture. Replay must clear line 313 and stop only at the next
+independent typed boundary.
 
-Return `REPLAN` if the live initialized identity is unavailable after export;
-TemplateVariableInfo cannot be rejected before configured lookup; another
-production owner, retained marker or new key/cache/fixture is needed; invocation
-or configured Java/Template semantics are required; ordinary provider behavior
-changes; or the two-file allowlist/caps fail.
+Return `REPLAN` if another internal member executes during loading; either
+method cannot enforce caller provenance after import/re-export; configurable
+legacy semantics, Java provider/configured/action ownership, another production
+file, retained state, a new key/cache/fixture or more than the caps is required;
+or any deferred member becomes reflectively present or silently succeeds.

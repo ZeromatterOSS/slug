@@ -4941,3 +4941,19 @@ source observation/manifest invalidation and replay handoff. The successor
 adds no repository branch, source, materializer, mapping, request input, DICE
 key, observation, lockfile, cache or fixture. Its semantics remain wholly in
 the existing Stage 4 provider classifier with a Stage 6 fail-closed guard.
+
+### Provider identity accepted; java_common replay handoff (2026-09-03)
+
+Commit `60528af77` clears the selected rules_java provider declarations. The
+same authenticated BCR 9.1.0 repository then stops at
+`@@rules_java+//java/private:native.bzl:19` because `java_common` is absent.
+The descriptor, 114,566-byte archive and complete six-file closure hashes are
+frozen in `current-packet.md`; no disposable extraction path is authority.
+
+Existing selected-BCR materialization, canonical mapping, routed source
+observation and recursive Bzl manifest remain the sole Stage 5 provenance and
+invalidation owners. The successor reuses that manifest only to authenticate
+the innermost Bzl caller at both facade calls. Add no repository branch,
+source, generated proxy, mapping, request input, DICE key, observation,
+lockfile, cache, lock or fixture. Stage 5 owns only this replay/provenance
+handoff and no changed semantics.

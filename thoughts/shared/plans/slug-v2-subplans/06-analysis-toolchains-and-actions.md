@@ -23153,3 +23153,19 @@ call sites are regression anchors only. Construction, provider payloads,
 membership/indexing, make variables, Java rule analysis and actions remain
 unsupported/deferred. Removing this guard requires a separately reviewed
 complete TemplateVariableInfo configured-provider packet.
+
+### Java-common loading facade retains the configured Java stop (2026-09-03)
+
+The post-`60528af77` stop is one eager loading-time default-false flag query.
+Of 18 reachable lazy calls, `java_info.bzl:177,677` are also exact admitted
+false queries, but their enclosing JavaInfo/provider behavior remains deferred.
+Only the other 16 calls invoke deferred members. Stage 6 owns no changed Rust,
+Java provider value, fragment, configured target key, toolchain context,
+action, equality/fingerprint fact or DICE dependency.
+
+The Stage 4 sparse facade must omit every configured member so access fails
+before Java implementation or action effects. Any need for provider-instance
+validation, option expansion, target inspection, classpath transformation,
+toolchain checks, compilation actions or configurable legacy semantics returns
+`REPLAN` for a separately reviewed complete analysis category. Stage 5 records
+only source provenance and replay handoff.
