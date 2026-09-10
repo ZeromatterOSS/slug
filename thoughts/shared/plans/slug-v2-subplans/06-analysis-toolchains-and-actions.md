@@ -23604,3 +23604,65 @@ A new configuration domain, alternate forced-key side store, arbitrary preferenc
 discovery, missing retained consumer, cap overflow or second material correction
 is REPLAN. Group constraints/policy/views/action routing remain the immediate
 post-correction design, not silently forgotten or implemented piecemeal.
+
+### Selected-toolchain implementation stop: cross-owner output conflicts (2026-09-10)
+
+The selected-toolchain request implementation returns `REPLAN`, not ACCEPT.
+The candidate passes its six new analysis cases (0.13s), ten selected-toolchain
+cases (0.18s), fourteen configured-target cases (0.01s), thirteen retained-value
+cases (<0.01s), and two core identity/closure cases (0.08s). Its seven production
+files carry the reviewed preference field, full-node/projection corrections,
+parent configuration and resolver behavior. None of this is runtime acceptance.
+
+The frozen contract's two-preference closure proof exposes an earlier design
+assumption: there is no existing cross-owner output-conflict rejection to
+preserve. Two parents select the same implementation with unchanged configuration
+and A/B execution-platform preferences. Nested selected leaf toolchains produce
+different `implementation.txt` contents. Both structural owners survive the
+same action closure; FileWrite semantic identities differ, but output roots and
+relative paths are equal. The added core test
+`selected_toolchain_request_conflicting_outputs_require_preexecution_rejection`
+passes those discriminators, then fails at the required rejection assertion:
+exit 101, one failed test, 0.04 seconds. This is a pure configured-graph proof;
+no execution RPC, credential use or actual overwriting materialization occurred.
+
+Current consumer trace (base `ca284c2ae`):
+
+- `slug_core_v2/src/runtime/dice.rs:3284-3302` gathers all closure FileWrite
+  views without cross-owner output validation.
+- CLI `commands/build.rs:250-268` and server `reapi.rs:94-113` execute every
+  view and derive its output root only from the owner's configuration.
+- Core `runtime/configured_output.rs:147-152` maps that configuration to the
+  same `bazel-out/<configuration>/bin` root for both preferences.
+- REAPI `executor.rs:426-456` validates bytes, then removes and rewrites each
+  path. This is legitimate stale-output replacement, not conflict detection.
+- The action registry's duplicate check (`actions/registry.rs:57-73`) belongs
+  to one fresh per-rule `CtxActions` (`starlark_rule.rs:1636-1638`), so it cannot
+  protect a different configured owner's output.
+
+Do not ship the selected-request fix by weakening output identity, reverting
+the preference, keeping the wrong Exec transition, skipping one action or
+adding a command-side repair. The next packet is docs/source design of a
+producer-owned cross-owner output-conflict/equivalence boundary. It must trace
+Bazel 9.2 `Actions.canBeShared`, artifact conflict/prefix ownership and
+`OutputArtifactConflictTest`, distinguish root-set-dependent closure state from
+intrinsic action facts, and freeze all consumer/equality/lifetime/proof/cap
+changes before one complete implementation resumes. Exact configuration/output
+bytes remain deferred; an action-equivalence rule cannot be guessed from full
+owner-key inequality or a REAPI digest.
+
+Candidate preservation: `/tmp/slug-selected-request.yZYoSi/candidate.patch`,
+SHA-256 `d184284baa4dd28e37c248a4c1fb94b69e26b64a1c54f6c66ef61247b617bfe0`,
+against `ca284c2ae`; adjacent `validation.txt` records passed, failed and unrun
+gates. Rust sources were restored exactly, and patch applicability was checked.
+The saved observed cancellation/Need/error test is unrun. REAPI compilation hit
+the 60-second command bound before any tests; its suite and full owner/direct
+dependent gates are unaccepted. Core compilation likewise first hit 60 seconds,
+then succeeded as compile-only under an investigated 180-second bound; executed
+tests remained subsecond. Formatting and diff checks pass for the candidate.
+The patch is not committed runtime, a fallback or authority to restore itself.
+Named/automatic group, computed-default and C++/Java guards remain unchanged.
+Independent terminal review ACCEPTS this REPLAN and the docs-only successor,
+not the runtime candidate. Action sharing, root-set versus intrinsic ownership,
+prefix conflicts and the complete consumer/file allowlist remain reserved
+decisions for that design.

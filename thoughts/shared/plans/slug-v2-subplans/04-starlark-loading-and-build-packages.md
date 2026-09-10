@@ -8861,3 +8861,7 @@ Stage 6's selected-toolchain request correction owns the complete key/retained
 value/resolver fix. The successor changes no loading declaration, schema or
 guard. After it is accepted, resume the shared named/automatic runtime design;
 do not bypass this package's guard or computed-default boundary in the meantime.
+
+That selected-request candidate is now parked after its cross-owner output
+conflict discriminator failed. Stage 6 owns the output-conflict prerequisite
+design and saved candidate evidence; no loading or configured behavior shipped.
