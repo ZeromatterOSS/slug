@@ -20,6 +20,7 @@ mod process_host;
 pub mod reapi;
 mod registry_io;
 mod repository_archive;
+mod repository_archive_file;
 mod repository_archive_http;
 mod repository_archive_patch;
 mod repository_archive_realize;

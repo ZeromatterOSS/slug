@@ -880,7 +880,7 @@ fn archive_repo_spec(
         .ok_or_else(|| fail(module, "missing source url"))?;
     let primary_url = Url::parse(primary)
         .map_err(|error| fail(module, format!("invalid source url: {error}")))?;
-    if !primary_url.has_host() {
+    if !primary_url.has_host() && primary_url.scheme() != "file" {
         return Err(fail(module, "source url must be absolute"));
     }
     let integrity = source
@@ -8488,6 +8488,72 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn archive_file_primary_mirrors_and_registry_payloads_preserve_projection() {
+        // IndexRegistry.testGetArchiveRepoSpec/testFileUrl and constructUrl.
+        for (primary, suffix) in [
+            ("file:///tmp/a.tgz", "/tmp/a.tgz"),
+            ("https://origin.test/a.tgz", "origin.test/a.tgz"),
+        ] {
+            let mut parsed = source(
+                r#"{"url":"https://unused.test/a.tgz","integrity":"sha256-source","mirror_urls":["file:///backup/a.tgz"],"patches":{"p.diff":"sha256-p"},"overlay":{"generated":"sha256-o"}}"#,
+            );
+            parsed.url = Some(primary.into());
+            let registry = RegistryJson {
+                mirrors: vec!["file:///mirror".into(), "https://mirror.test".into()],
+                module_base_path: None,
+            };
+            let module_url = "file:///registry/modules/demo/1/MODULE.bazel";
+            let spec = archive_repo_spec(
+                &module(),
+                &parsed,
+                "file:///registry",
+                module_url.into(),
+                [17; 32],
+                &["file:///mirror".into()],
+                Some(&registry),
+                "demo",
+                "1",
+            )
+            .unwrap();
+            assert_eq!(
+                list_attr(&spec, "urls"),
+                [
+                    format!("file:///mirror/{suffix}"),
+                    format!("https://mirror.test/{suffix}"),
+                    primary.into(),
+                    "file:///backup/a.tgz".into()
+                ]
+            );
+            assert_eq!(list_attr(&spec, "remote_module_file_urls"), [module_url]);
+            assert_eq!(
+                string_attr(&spec, "remote_module_file_integrity"),
+                format!("sha256-{}", BASE64.encode([17; 32]))
+            );
+            assert_eq!(
+                map_string_keys(&spec, "remote_patches"),
+                ["file:///registry/modules/demo/1/patches/p.diff"]
+            );
+            let OverrideAttributeValue::Map(overlays) =
+                spec.attributes.get("remote_file_urls").unwrap()
+            else {
+                panic!()
+            };
+            let OverrideAttributeValue::Iterable(urls) = overlays
+                .get(&OverrideAttributeKey::String("generated".into()))
+                .unwrap()
+            else {
+                panic!()
+            };
+            assert_eq!(
+                urls.as_ref(),
+                &[OverrideAttributeValue::String(
+                    "file:///registry/modules/demo/1/overlay/generated".into()
+                )]
+            );
+        }
     }
 
     #[test]

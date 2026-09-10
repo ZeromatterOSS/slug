@@ -23949,3 +23949,8 @@ packet selected. All four roles use existing immutable request/generation/sessio
 publication with no new key or cache; implementation/native lifecycle evidence is
 still required. This docs-only milestone neither proves CLI source closure nor
 changes any combined R2 gate or source/fixture authority.
+Stage5 file capture is now independently implemented/ACCEPTED at238/1019/1257
+gross additions; archive46pass/1ignored, real native sessions4 and direct CLI
+compile pass. This removes the HTTPS-only local payload boundary, not the real
+CLI source-closure gate. The next source-only packet freezes authentic input
+assembly or its first concrete stop; complete R2 stays preserved/unaccepted.

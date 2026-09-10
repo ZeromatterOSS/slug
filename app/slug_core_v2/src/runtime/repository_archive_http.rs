@@ -1,3 +1,4 @@
+use std::cell::OnceCell;
 use std::io;
 use std::io::Write;
 use std::net::SocketAddr;
@@ -154,6 +155,9 @@ type HttpSender = http1::SendRequest<Empty<Bytes>>;
 
 trait Environment {
     fn limits(&self) -> Limits;
+    fn prepare_https(&self) -> Result<(), String> {
+        Ok(())
+    }
     fn resolve(&self, url: &url::Url) -> Result<Vec<SocketAddr>, String>;
     fn connect(
         &self,
@@ -165,46 +169,56 @@ trait Environment {
 }
 
 struct NativeEnvironment {
-    tls: Arc<rustls::ClientConfig>,
+    tls: OnceCell<Result<Arc<rustls::ClientConfig>, String>>,
 }
 
 impl NativeEnvironment {
-    fn new() -> Result<Self, ArchiveMaterializationError> {
+    fn new() -> Self {
+        Self {
+            tls: OnceCell::new(),
+        }
+    }
+
+    fn load_tls() -> Result<Arc<rustls::ClientConfig>, String> {
         let loaded = rustls_native_certs::load_native_certs();
         let mut roots = rustls::RootCertStore::empty();
         for certificate in loaded.certs {
-            roots.add(certificate).map_err(|error| {
-                ArchiveMaterializationError::transport(format!(
-                    "loading native TLS certificate: {error}"
-                ))
-            })?;
+            roots
+                .add(certificate)
+                .map_err(|error| format!("loading native TLS certificate: {error}"))?;
         }
         if roots.is_empty() {
-            return Err(ArchiveMaterializationError::transport(format!(
+            return Err(format!(
                 "loading native TLS roots produced no certificates{}",
                 loaded
                     .errors
                     .last()
                     .map(|error| format!(": {error}"))
                     .unwrap_or_default()
-            )));
+            ));
         }
         let tls = rustls::ClientConfig::builder_with_provider(Arc::new(
             rustls::crypto::ring::default_provider(),
         ))
         .with_safe_default_protocol_versions()
-        .map_err(|error| {
-            ArchiveMaterializationError::transport(format!("configuring TLS: {error}"))
-        })?
+        .map_err(|error| format!("configuring TLS: {error}"))?
         .with_root_certificates(roots)
         .with_no_client_auth();
-        Ok(Self { tls: Arc::new(tls) })
+        Ok(Arc::new(tls))
     }
 }
 
 impl Environment for NativeEnvironment {
     fn limits(&self) -> Limits {
         Limits::NATIVE
+    }
+
+    fn prepare_https(&self) -> Result<(), String> {
+        self.tls
+            .get_or_init(Self::load_tls)
+            .as_ref()
+            .map(|_| ())
+            .map_err(Clone::clone)
     }
 
     fn resolve(&self, url: &url::Url) -> Result<Vec<SocketAddr>, String> {
@@ -234,6 +248,13 @@ impl Environment for NativeEnvironment {
         url: &url::Url,
         address: SocketAddr,
     ) -> Result<ArchiveStream, String> {
+        let tls = self
+            .tls
+            .get()
+            .expect("HTTPS prepared before connect")
+            .as_ref()
+            .map_err(Clone::clone)?
+            .clone();
         let stream = runtime
             .block_on(async { timeout(self.limits().connect, TcpStream::connect(address)).await })
             .map_err(|_| "TCP connect timed out".to_owned())?
@@ -245,7 +266,7 @@ impl Environment for NativeEnvironment {
             .block_on(async {
                 timeout(
                     self.limits().header,
-                    TlsConnector::from(self.tls.clone()).connect(server_name, stream),
+                    TlsConnector::from(tls).connect(server_name, stream),
                 )
                 .await
             })
@@ -264,7 +285,7 @@ pub(super) fn capture_selected_bcr(
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
-    let environment = NativeEnvironment::new()?;
+    let environment = NativeEnvironment::new();
     capture_selected_bcr_with(plan, runtime, active, &environment)
 }
 
@@ -290,7 +311,7 @@ pub(super) fn capture_selected_bcr_module(
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
-    let environment = NativeEnvironment::new()?;
+    let environment = NativeEnvironment::new();
     capture_urls(
         std::slice::from_ref(&plan.module_url),
         plan.module_integrity,
@@ -307,7 +328,7 @@ pub(super) fn capture_selected_bcr_overlay(
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
-    let environment = NativeEnvironment::new()?;
+    let environment = NativeEnvironment::new();
     capture_urls(
         &overlay.urls,
         overlay.integrity,
@@ -324,7 +345,7 @@ pub(super) fn capture_selected_bcr_patch(
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
-    let environment = NativeEnvironment::new()?;
+    let environment = NativeEnvironment::new();
     capture_urls(
         std::slice::from_ref(&patch.url),
         patch.integrity,
@@ -381,6 +402,19 @@ fn capture_one(
     environment: &impl Environment,
 ) -> Result<tempfile::NamedTempFile, String> {
     let mut capture = environment.capture()?;
+    if original
+        .get(..5)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("file:"))
+    {
+        return super::repository_archive_file::capture_file(
+            original,
+            capture,
+            integrity,
+            capture_limit,
+            subject,
+            active,
+        );
+    }
     let mut url = url::Url::parse(original).map_err(|error| error.to_string())?;
     for redirect in 0..=MAX_REDIRECTS {
         if !active() {
@@ -510,6 +544,7 @@ fn request(
     environment: &impl Environment,
 ) -> Result<ResponseOwner, String> {
     validate_https(url)?;
+    environment.prepare_https()?;
     let addresses = environment.resolve(url)?;
     if addresses.len() > MAX_ADDRESSES {
         return Err(format!(

@@ -1171,6 +1171,66 @@ fn selected_bcr_spec() -> RepoSpec {
     RepoSpec { rule_id: RepoRuleId { bzl_file: CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:http.bzl").unwrap(), rule_name: "http_archive".into() }, attributes: Arc::new(SmallMap::from_iter(attributes)) }
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn all_selected_bcr_payload_roles_use_the_same_file_grammar() {
+    for role in ["archive", "MODULE", "patch", "overlay"] {
+        for (url, admitted) in [
+            ("file:///tmp/payload", true),
+            ("FILE:///tmp/λ%20x", true),
+            ("file:///mirror//tmp/a", true),
+            ("file:///tmp/../a", false),
+            ("file:///tmp/%2e/a", false),
+            ("file:///tmp/a%2Fb", false),
+            ("file://localhost/tmp/a", false),
+            ("file:///tmp/a?query", false),
+            ("file:///tmp/%00", false),
+            ("http://host/a", false),
+            ("https://user:password@host/a", true),
+        ] {
+            let mut spec = selected_bcr_spec();
+            let attrs = Arc::make_mut(&mut spec.attributes);
+            let sri = attrs.get("integrity").unwrap().clone();
+            let urls =
+                OverrideAttributeValue::Iterable(Arc::new([OverrideAttributeValue::String(
+                    url.into(),
+                )]));
+            match role {
+                "archive" => {
+                    attrs.insert("urls".into(), urls);
+                }
+                "MODULE" => {
+                    attrs.insert("remote_module_file_urls".into(), urls);
+                }
+                "patch" => {
+                    attrs.insert(
+                        "remote_patches".into(),
+                        OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter([(
+                            OverrideAttributeKey::String(url.into()),
+                            sri,
+                        )]))),
+                    );
+                }
+                _ => {
+                    let key = OverrideAttributeKey::String("overlay".into());
+                    attrs.insert(
+                        "remote_file_urls".into(),
+                        OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter([(
+                            key.clone(),
+                            urls,
+                        )]))),
+                    );
+                    attrs.insert(
+                        "remote_file_integrity".into(),
+                        OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter([(key, sri)]))),
+                    );
+                }
+            }
+            assert_eq!(parse_archive_plan(&spec).is_ok(), admitted, "{role}: {url}");
+        }
+    }
+}
+
 fn selected_bcr_request(
     workspace: &NormalizedAbsolutePath,
     repo: &str,

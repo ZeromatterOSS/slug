@@ -129,6 +129,8 @@ impl Drop for Server {
 }
 
 struct TestEnvironment {
+    preparations: Mutex<usize>,
+    prepare_error: Option<String>,
     addresses: HashMap<String, Vec<SocketAddr>>,
     resolutions: Mutex<Vec<String>>,
     connections: Mutex<Vec<(String, SocketAddr)>>,
@@ -142,6 +144,8 @@ struct TestEnvironment {
 impl TestEnvironment {
     fn new(entries: impl IntoIterator<Item = (String, Vec<SocketAddr>)>) -> Self {
         Self {
+            preparations: Mutex::new(0),
+            prepare_error: None,
             addresses: entries.into_iter().collect(),
             resolutions: Mutex::new(Vec::new()),
             connections: Mutex::new(Vec::new()),
@@ -167,6 +171,11 @@ impl TestEnvironment {
 impl Environment for TestEnvironment {
     fn limits(&self) -> Limits {
         self.limits
+    }
+
+    fn prepare_https(&self) -> Result<(), String> {
+        *self.preparations.lock().unwrap() += 1;
+        self.prepare_error.clone().map_or(Ok(()), Err)
     }
 
     fn resolve(&self, url: &url::Url) -> Result<Vec<SocketAddr>, String> {
@@ -229,6 +238,166 @@ fn runtime() -> tokio::runtime::Runtime {
         .enable_all()
         .build()
         .unwrap()
+}
+
+// Pinned Bazel HttpConnectorTest.localFileDownload, with Slug's mandatory SRI.
+#[cfg(target_os = "linux")]
+#[test]
+fn native_local_file_payload_is_verified() {
+    let mut source = tempfile::NamedTempFile::new().unwrap();
+    source.write_all(b"verified local payload").unwrap();
+    let url = url::Url::from_file_path(source.path()).unwrap().to_string();
+    let plan = plan(vec![url], b"verified local payload");
+    let mut captured = capture_selected_bcr(&plan, &runtime(), &|| true).unwrap();
+    captured.rewind().unwrap();
+    let mut bytes = String::new();
+    captured.read_to_string(&mut bytes).unwrap();
+    assert_eq!(bytes, "verified local payload");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn all_native_file_roles_keep_sri_caps_and_tls_uninitialized() {
+    let runtime = runtime();
+    let mut source = tempfile::NamedTempFile::new().unwrap();
+    let url = url::Url::from_file_path(source.path()).unwrap().to_string();
+    let mut plan = plan(vec![url.clone()], b"local");
+    plan.module_url = url.clone();
+    plan.module_integrity = plan.integrity;
+    for (role, limit) in [
+        ("archive", CAPTURE_LIMIT),
+        ("MODULE", MODULE_CAPTURE_LIMIT),
+        ("patch", PATCH_CAPTURE_LIMIT),
+        ("overlay", OVERLAY_CAPTURE_LIMIT),
+    ] {
+        source.as_file().set_len(0).unwrap();
+        source.rewind().unwrap();
+        source.write_all(b"local").unwrap();
+        let run = || match role {
+            "archive" => capture_selected_bcr(&plan, &runtime, &|| true),
+            "MODULE" => capture_selected_bcr_module(&plan, &runtime, &|| true),
+            "patch" => capture_selected_bcr_patch(
+                &SelectedBcrPatch {
+                    url: url.clone(),
+                    integrity: plan.integrity,
+                },
+                &runtime,
+                &|| true,
+            ),
+            _ => capture_selected_bcr_overlay(
+                &SelectedBcrOverlay {
+                    destination: "out".into(),
+                    urls: vec![url.clone()].into_boxed_slice(),
+                    integrity: plan.integrity,
+                },
+                &runtime,
+                &|| true,
+            ),
+        };
+        let mut captured = run().unwrap();
+        captured.rewind().unwrap();
+        let mut body = String::new();
+        captured.read_to_string(&mut body).unwrap();
+        assert_eq!(body, "local");
+        source.rewind().unwrap();
+        source.write_all(b"wrong").unwrap();
+        assert!(run().unwrap_err().message.contains("SRI mismatch"));
+        source.as_file().set_len(limit + 1).unwrap(); // sparse, rejected before reading
+        assert!(
+            run()
+                .unwrap_err()
+                .message
+                .contains(&format!("{limit} byte capture limit"))
+        );
+        let native = NativeEnvironment::new();
+        assert!(
+            capture_urls(
+                &plan.urls,
+                plan.integrity,
+                limit,
+                role,
+                &runtime,
+                &|| true,
+                &native
+            )
+            .is_err()
+        );
+        assert!(native.tls.get().is_none());
+    }
+    source.as_file().set_len(0).unwrap();
+    source.rewind().unwrap();
+    source.write_all(b"local").unwrap();
+    let native = NativeEnvironment::new();
+    drop(capture_selected_bcr_with(&plan, &runtime, &|| true, &native).unwrap());
+    assert!(native.tls.get().is_none());
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn explicit_file_mirrors_preserve_mixed_order_and_lazy_https_failure() {
+    let root = tempfile::tempdir().unwrap();
+    let good = root.path().join("good");
+    let bad = root.path().join("bad");
+    std::fs::write(&good, b"good").unwrap();
+    std::fs::write(&bad, b"bad").unwrap();
+    let file = |path: &std::path::Path| url::Url::from_file_path(path).unwrap().to_string();
+    let environment = TestEnvironment::new([]);
+    let selected = plan(
+        vec![
+            file(&root.path().join("missing")),
+            file(&bad),
+            file(&good),
+            "https://unused.test/a".into(),
+        ],
+        b"good",
+    );
+    drop(capture_selected_bcr_with(&selected, &runtime(), &|| true, &environment).unwrap());
+    assert_eq!(environment.captures().len(), 3);
+    assert_eq!(*environment.preparations.lock().unwrap(), 0);
+    assert!(environment.resolutions.lock().unwrap().is_empty());
+    assert!(environment.connections.lock().unwrap().is_empty());
+    assert_captures_deleted(&environment);
+
+    let mut environment = TestEnvironment::new([]);
+    environment.prepare_error = Some("scripted TLS root failure".into());
+    let selected = plan(vec!["https://first.test/a".into(), file(&good)], b"good");
+    drop(capture_selected_bcr_with(&selected, &runtime(), &|| true, &environment).unwrap());
+    assert_eq!(*environment.preparations.lock().unwrap(), 1);
+    assert!(environment.resolutions.lock().unwrap().is_empty());
+    assert_eq!(environment.captures().len(), 2);
+    assert_captures_deleted(&environment);
+
+    let server = Server::new(vec![Reply::fixed(200, b"good")]);
+    let environment = TestEnvironment::new([("next.test".into(), vec![server.address])]);
+    let selected = plan(
+        vec![file(&bad), url("next.test", &server, "/a"), file(&good)],
+        b"good",
+    );
+    drop(capture_selected_bcr_with(&selected, &runtime(), &|| true, &environment).unwrap());
+    assert_eq!(*environment.preparations.lock().unwrap(), 1);
+    assert_eq!(environment.captures().len(), 2);
+    assert_eq!(server.requests().len(), 1);
+    assert_captures_deleted(&environment);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn https_redirect_cannot_acquire_file_authority() {
+    let source = tempfile::NamedTempFile::new().unwrap();
+    let file = url::Url::from_file_path(source.path()).unwrap().to_string();
+    let server = Server::new(vec![Reply::redirect(302, &file)]);
+    let environment = TestEnvironment::new([("redirect.test".into(), vec![server.address])]);
+    let error = capture_selected_bcr_with(
+        &plan(vec![url("redirect.test", &server, "/a")], b""),
+        &runtime(),
+        &|| true,
+        &environment,
+    )
+    .unwrap_err();
+    assert!(error.message.contains("unauthenticated HTTPS"));
+    assert_eq!(environment.captures().len(), 1);
+    assert_eq!(*environment.preparations.lock().unwrap(), 1);
+    assert_captures_deleted(&environment);
 }
 
 fn plan(urls: Vec<String>, bytes: &[u8]) -> SelectedBcrArchive {

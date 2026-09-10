@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-selected-bcr-file-capture-impl-r1`
-verified local source-capture implementation](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-configured-cli-authentic-input-recipe-r1`
+authentic local CLI input recipe](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -88,11 +88,11 @@ are independently accepted at2/80/82 gross additions; extractor11pass/1ignored
 in3.41s and direct CLI compile pass. Slug-native0755 directory normalization remains.
 The next source audit stops at a concrete transport mismatch: file registries
 produce file MODULE URLs, but selected-BCR capture admits only HTTPS. Pinned Bazel
-supports file mirrors/payloads. Independent review now accepts Stage5's verified
-Linux file-capture design across all four roles, safe descriptor pinning, bounded
-SRI capture, lazy TLS and existing immutable publication. Implement only its exact
-500/1100/1600-capped packet; no Rust or runtime proof is accepted in the design
-milestone, and no complete CLI closure or full-suite retry is claimed.
+supports file mirrors/payloads. Stage5's reviewed Linux file-capture implementation
+is now ACCEPTED across all four roles, with safe pinning, bounded SRI, lazy TLS and
+unchanged immutable publication:238/1019/1257 gross additions, archive46pass/1ignored,
+native session4 and direct CLI compile pass. Resolve only the authentic local CLI
+input recipe next; no complete CLI closure or full-suite retry is claimed.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 

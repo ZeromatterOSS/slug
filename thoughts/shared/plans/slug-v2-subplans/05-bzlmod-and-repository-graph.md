@@ -5336,3 +5336,35 @@ extend automatically. Complete R2 and actual CLI/REAPI sharing remain open.
 Design source/structure/diff and preserved-candidate hash/applicability checks
 pass; archive checker exits1 with exactly the known3 thoughts paths. No Rust,
 test, CLI, daemon, Bazel, acquisition or replay ran during this design milestone.
+
+### Verified local-file capture implementation accepted (2026-09-10)
+
+WP-5-7A-selected-bcr-file-capture-impl-r1 is independently terminally ACCEPTED.
+The private file owner implements the frozen raw grammar, Linux O_PATH regular
+pin/procfd reopen, descriptor identity and fixed64KiB capped EOF/SRI capture.
+All four plan/capture roles use it; Bzlmod preserves primary/mirror projection,
+including interior doubled separators. Common ordered capture now initializes
+TLS only for an actual HTTPS attempt, never for file-only success or failure.
+No semantic request/key/equality/lock or immutable publication owner changed.
+
+Gross additions238 production/1019 proof/1257 total, below500/1100/1600 caps.
+New file owner167 production plus3 test-declaration lines; separate proofs299
+and419 lines. Root implemented transport and low-level/projection proof; one
+disjoint worker supplied only the repository_io include/native-session proof.
+Tiny baseline red1 fails at the prior HTTPS-only guard in0.01s; green is covered
+by archive46passed/1ignored in3.64s. Native session4pass in0.01s, including real
+archive->overlay->patch->MODULE contents, actual observed-root revalidation after
+source deletion, successful changed-MODULE-SRI A/B/A roots/instances, generation
+missing/create/mismatch/repair and stale real-capture cleanup/replacement.
+Bzlmod source projection3pass/0.00s; existing observed materialization3pass/0.05s;
+direct CLI check, formatting and diff pass. One test-fixture type annotation was
+fixed after compile-only E0283; no semantic gate failed or timed out. All compiler/
+test commands timeout60, serialized; no full suite, CLI, daemon, Bazel, acquisition
+or replay. Archive checker retains exactly known3; preserved R2 hash/applicability
+pass. Linux/procfs and responsive-local-filesystem assumptions remain explicit.
+
+Next: WP-5-7A-configured-cli-authentic-input-recipe-r1, docs/source only. Freeze
+the exact source-backed local registry/mirror setup for the preserved combined
+CLI gate, or identify its first concrete unavailable input/unsupported boundary.
+Do not equate this unit/native acceptance with a complete authentic CLI closure,
+restore R2, enlarge stub repositories or run the spent fake-platform setup.

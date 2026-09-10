@@ -4643,4 +4643,7 @@ mod tests {
         ));
         materializer.discard(token).unwrap();
     }
+
+    #[cfg(target_os = "linux")]
+    include!("tests/repository_archive_file_session_tests.rs");
 }

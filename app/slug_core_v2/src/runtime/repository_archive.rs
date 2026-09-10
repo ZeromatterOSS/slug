@@ -103,8 +103,10 @@ pub(super) fn parse_archive_plan(spec: &RepoSpec) -> Result<ArchivePlan, String>
         return Err("http_archive has an unsupported attribute shape".into());
     }
     let urls = strings(spec, "urls")?;
-    if urls.is_empty() || urls.iter().any(|url| !https(url)) {
-        return Err("selected BCR http_archive urls must be nonempty HTTPS URLs".into());
+    if urls.is_empty() || urls.iter().any(|url| !capture_url(url)) {
+        return Err(
+            "selected BCR http_archive urls must be nonempty HTTPS or admitted file URLs".into(),
+        );
     }
     let format = selected_bcr_format(spec, &urls)?;
     let strip_prefix =
@@ -124,8 +126,8 @@ pub(super) fn parse_archive_plan(spec: &RepoSpec) -> Result<ArchivePlan, String>
     let [module_url] = module_urls.as_slice() else {
         return Err("selected BCR http_archive requires exactly one remote MODULE URL".into());
     };
-    if !https(module_url) {
-        return Err("selected BCR http_archive MODULE URL must be HTTPS".into());
+    if !capture_url(module_url) {
+        return Err("selected BCR http_archive MODULE URL must be HTTPS or admitted file".into());
     }
     Ok(ArchivePlan::SelectedBcrTarGz(SelectedBcrArchive {
         format,
@@ -202,8 +204,8 @@ fn selected_bcr_patches(spec: &RepoSpec) -> Result<Vec<SelectedBcrPatch>, String
         .iter()
         .map(|(key, value)| {
             let url = attribute_string_key(key, "remote_patches")?;
-            if !https(url) {
-                return Err("selected BCR remote patch URL must be HTTPS".into());
+            if !capture_url(url) {
+                return Err("selected BCR remote patch URL must be HTTPS or admitted file".into());
             }
             Ok(SelectedBcrPatch {
                 url: url.to_owned(),
@@ -225,8 +227,10 @@ fn selected_bcr_overlays(spec: &RepoSpec) -> Result<Vec<SelectedBcrOverlay>, Str
             let destination = normalized_transform_path(destination, false, "overlay destination")?
                 .expect("nonempty overlay destination");
             let urls = attribute_strings(value, "remote_file_urls")?;
-            if urls.is_empty() || urls.iter().any(|url| !https(url)) {
-                return Err("selected BCR overlay URLs must be nonempty HTTPS URLs".into());
+            if urls.is_empty() || urls.iter().any(|url| !capture_url(url)) {
+                return Err(
+                    "selected BCR overlay URLs must be nonempty HTTPS or admitted file URLs".into(),
+                );
             }
             let integrity = integrities
                 .get(key)
@@ -351,6 +355,10 @@ fn https(value: &str) -> bool {
     url::Url::parse(value)
         .map(|url| url.scheme() == "https" && url.host_str().is_some())
         .unwrap_or(false)
+}
+
+fn capture_url(value: &str) -> bool {
+    https(value) || super::repository_archive_file::file_path(value).is_ok()
 }
 
 #[cfg(test)]
