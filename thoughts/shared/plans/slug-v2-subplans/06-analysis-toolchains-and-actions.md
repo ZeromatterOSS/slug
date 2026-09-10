@@ -23935,3 +23935,7 @@ descriptor/archive hashes match; its real host source still requires generated
 host_platform and rules_license. No full CLI closure, replay or registry-local
 source admission is established. Complete R2 remains preserved/unaccepted;
 current manifest owns the bounded prerequisite, not combined runtime resumption.
+The mode prerequisite is now independently accepted (2/80/82 additions,
+extractor11pass/1ignored in3.41s, direct CLI compile pass); the next current packet
+audits existing authentic CLI source inputs. R2 restoration/runtime remains deferred
+until its real source/proof route is frozen; no partial candidate or weaker gate.

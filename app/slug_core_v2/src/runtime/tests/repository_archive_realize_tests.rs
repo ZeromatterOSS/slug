@@ -227,6 +227,68 @@ fn selected_bcr_realizes_streamed_files_gnu_name_modes_mtime_and_module() {
     assert!(!module_path.exists());
 }
 
+// Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
+// CompressedTarFunction.java:142-152 retains regular mode | 0400 and mtime.
+// platforms 1.0.0 archive SHA-256:
+// 3384eb1c30762704fbe38e440204e114154086c8fc8a8c2e3e28441028c019a8
+// has eleven regular 0640 entries and three directory 0750 entries.
+#[cfg(unix)]
+#[test]
+fn selected_bcr_admits_regular_0640_without_changing_bytes_mode_or_mtime() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut raw = Vec::new();
+    append(&mut raw, b"file", b'0', 0o640, 123, b"probe bytes");
+    finish(&mut raw);
+    let root = tempfile::tempdir().unwrap();
+    extract(capture(&gzip(&raw)).as_file(), root.path(), None, &|| true).unwrap();
+    let path = root.path().join("file");
+    assert_eq!(std::fs::read(&path).unwrap(), b"probe bytes");
+    let metadata = std::fs::metadata(path).unwrap();
+    assert_eq!(metadata.permissions().mode() & 0o7777, 0o640);
+    assert_eq!(
+        metadata
+            .modified()
+            .unwrap()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        123
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn selected_bcr_admits_directory_0750_with_native_normalization_and_prefix() {
+    use std::os::unix::fs::PermissionsExt;
+
+    // Bazel creates directories without archive chmod (same pinned source:110-112).
+    // Slug intentionally keeps its own deterministic 0755 directory projection.
+    let mut raw = Vec::new();
+    append(&mut raw, b"./", b'5', 0o750, 0, b"");
+    append(&mut raw, b"pkg/", b'5', 0o750, 0, b"");
+    append(&mut raw, b"pkg/nested/", b'5', 0o750, 0, b"");
+    append(&mut raw, b"pkg/nested/file", b'0', 0o644, 0, b"child");
+    finish(&mut raw);
+    for prefix in [None, Some("pkg")] {
+        let root = tempfile::tempdir().unwrap();
+        extract(capture(&gzip(&raw)).as_file(), root.path(), prefix, &|| {
+            true
+        })
+        .unwrap();
+        let directory = root.path().join(if prefix.is_some() {
+            "nested"
+        } else {
+            "pkg/nested"
+        });
+        assert_eq!(std::fs::read(directory.join("file")).unwrap(), b"child");
+        assert_eq!(
+            std::fs::metadata(directory).unwrap().permissions().mode() & 0o7777,
+            0o755
+        );
+    }
+}
+
 #[test]
 fn selected_bcr_prefix_overlay_patch_module_order_and_modes_are_exact() {
     let mut raw = Vec::new();
@@ -441,15 +503,25 @@ fn selected_bcr_rejects_paths_namespace_modes_and_malformed_streams() {
     finish(&mut collision);
     assert!(extraction_error(&collision).contains("ancestor collision"));
 
-    let mut mode = Vec::new();
-    append(&mut mode, b"file", b'0', 0o600, 0, b"a");
-    finish(&mut mode);
-    assert!(extraction_error(&mode).contains("unsupported entry mode"));
+    for mode in [0o600, 0o750, 0o4640, 0o2640, 0o1640] {
+        let mut raw = Vec::new();
+        append(&mut raw, b"file", b'0', mode, 0, b"a");
+        finish(&mut raw);
+        assert!(
+            extraction_error(&raw).contains("unsupported entry mode"),
+            "{mode:o}"
+        );
+    }
 
-    let mut directory_mode = Vec::new();
-    append(&mut directory_mode, b"dir/", b'5', 0o700, 0, b"");
-    finish(&mut directory_mode);
-    assert!(extraction_error(&directory_mode).contains("unsupported entry mode"));
+    for mode in [0o700, 0o640, 0o4750, 0o2750, 0o1750] {
+        let mut raw = Vec::new();
+        append(&mut raw, b"dir/", b'5', mode, 0, b"");
+        finish(&mut raw);
+        assert!(
+            extraction_error(&raw).contains("unsupported entry mode"),
+            "{mode:o}"
+        );
+    }
 
     let mut checksum = Vec::new();
     append(&mut checksum, b"file", b'0', 0o644, 0, b"a");

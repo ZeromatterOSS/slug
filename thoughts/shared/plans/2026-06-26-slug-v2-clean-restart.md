@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-selected-bcr-0640-0750-mode-implementation-r1`
-bounded archive-mode prerequisite](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-configured-cli-authentic-source-closure-audit-r1`
+authentic CLI source inputs](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -83,9 +83,11 @@ registry's rules_shell is only discovery scaffolding without shell/sh_binary.bzl
 local_repository admission alone cannot establish CLI success. Both fast core failures
 reproduce identically on clean nodep Rust; other full-core failures remain unattributed.
 The cached platforms1.0.0 archive matches its descriptor integrity and contains
-11 regular0640 files/three0750 directories. Freeze only these generic extractor
-admissions; retain Slug-native0755 directory normalization. This does not establish
-the real CLI source closure. No full-suite retry is selected.
+11 regular0640 files/three0750 directories. These generic extractor admissions
+are independently accepted at2/80/82 gross additions; extractor11pass/1ignored
+in3.41s and direct CLI compile pass. Slug-native0755 directory normalization remains.
+Audit the real CLI's existing authentic source inputs next; no closure acceptance
+or full-suite retry is selected.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 

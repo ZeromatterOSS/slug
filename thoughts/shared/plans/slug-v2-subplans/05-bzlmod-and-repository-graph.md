@@ -5154,3 +5154,14 @@ This prerequisite must be reviewed/accepted before restoring the complete R2;
 the real CLI/common REAPI and remaining core gates are not waived.
 Independent terminal source-audit/activation review ACCEPTS this successor;
 source/hash/applicability/diff checks pass, archive checker retains known3.
+
+Implementation independently ACCEPTED:2 production/80 proof/82 total gross
+additions in the frozen two files. Both independent new mode regressions first
+fail at unsupported-entry-mode (2failed/0.00s), then pass (2passed/0.00s).
+Extractor module:11passed/1intentionally ignored/3.41s; direct slug_cli_v2 check
+exit0, formatting/diff and saved-R2 applicability pass. Every command stayed
+within timeout60; no binary/replay/network/source acquisition. Negative matrix
+retains wrong-kind and special-bit rejection. No source route or lifetime change.
+Next audit only existing authentic inputs and lawful producer/transport options
+for the real configured CLI proof, stopping at its first missing input/owner;
+do not infer that the mode correction establishes a hermetic source closure.
