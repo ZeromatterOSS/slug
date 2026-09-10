@@ -1,179 +1,108 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-6-7A-selected-request-and-output-conflict-implementation-r1
+Packet: WP-5-7A-nodep-fixed-point-pruning-audit-r1
 
-Status: independently reviewed architecture ACCEPT; implementation selected.
-The completed design milestone changed docs only; no runtime acceptance claimed.
+Status: selected after independently confirmed combined-implementation REPLAN.
+Docs/source audit only; no Rust implementation or CLI proof acceptance.
+Independent terminal review accepts this stop and bounded audit successor.
 
-## Observable result and authoritative contract
+## Observable result and priority
 
-Complete the selected-toolchain request correction AND producer-owned output
-integrity together: two preference variants retain parent configuration and full
-owner identity, but different FileWrite contents at one materialized path reject
-before RPC/materialization. Equivalent scalar FileWrites remain shareable, retain
-both owners in analysis/aquery, and execute through one producer-chosen action.
+Freeze the smallest producer-owned correction for still-unfulfilled Bzlmod
+`repo_name=None` (nodep) edges at discovery fixed point, then return to the
+combined selected-toolchain-request/output-conflict implementation. This is a
+concrete prerequisite of its mandatory local CLI gate, not general Bzlmod breadth.
+Named/automatic group activation remains behind the combined implementation.
 
-Read Stage 6's "Selected-toolchain request correction before group activation"
-and "Configured-action closure integrity contract" sections. Together they own
-the full edge/selection, sharing, scope, publication, lifetime and proof contract.
-The latter supersedes the old conflict reservation and old 900/1800/2700 caps.
-No named/automatic group, computed-default, C++/Java or configured-aspect guard
-is removed. Resume shared named/automatic group design after this implementation.
+Predecessor WP-6-7A-selected-request-and-output-conflict-implementation-r1
+is preserved against 9cc3c4a73 at:
+/tmp/slug-conflict-candidate.FIkPZj/candidate.patch
+SHA-256: 72fabf28cf02355cadc7f3a243f81aadd4824f20cc57275f2ab4e2b4f01aba73
+Adjacent validation.txt records 718 production/1772 proof/2490 aggregate gross
+Rust additions, focused passes, failed setup and remaining obligations. Reverse
+check passed; only owned Rust changes were restored via apply_patch, and forward
+git apply --check passes. Do not partially ship or reconstruct this candidate.
+The original smaller patch remains preserved at its prior recorded path.
 
-Predecessor 8f082eeed preserved an unaccepted candidate against ca284c2ae:
-/tmp/slug-selected-request.yZYoSi/candidate.patch, SHA-256
-d184284baa4dd28e37c248a4c1fb94b69e26b64a1c54f6c66ef61247b617bfe0.
-Adjacent validation.txt records passed, failed and unrun gates. Recheck the hash
-and applicability, then reuse the candidate and red core regression after review;
-do not repeat the general group audit, archives or authenticated replay.
-The red test selected_toolchain_request_conflicting_outputs_require_preexecution_rejection
-proved distinct owners/identities and equal output roots/paths with A/B contents,
-then failed only missing rejection (exit 101, 0.04s); no RPC/overwrite occurred.
-Its correct successor assertion is producer failure, not a later accessor error.
-Prior focused passes are evidence to reuse, not acceptance of the combined diff.
-REAPI/full dependent gates and saved observed cancellation proof remain unrun.
+Final focused core conflict gate passed 10 tests in 0.03s; selected-request core
+3, selected-toolchain analysis 11 and REAPI 18 passed. CLI setup instead hit
+implicit platforms archive admission, then timeout60 with the existing local
+platform scaffold. Local-only registry diagnostics promptly exposed missing
+rules_license and then MissingSelectedModule(bazel_features1.42.1). No CLI child,
+daemon, execution RPC or action-output mutation was reached in the failed setup.
+Full integration, loaded raw-fact/message cutoff, conflict-specific lifecycle,
+positive REAPI sharing and final combined implementation review remain unaccepted.
+Rebuild the CLI before later binary proofs; cached binary still contains candidate.
 
-## Source basis, decisions and non-decisions
+## Learned facts and authority
 
-Bazel 9.2 authority: local /home/wgray/bazel git object
-8220c6198837d5c13d53fea211cf3282aa12408a, not checkout HEAD. Stage 6 records
-Actions.canBeShared (including the both-unshareable ownerful-alias branch),
-MapBasedActionGraph, Artifact ownerless identity, FileWrite factory/key, empty
-FileWrite action exec properties, raw PlatformInfo inputs and prefix exemption.
-Relevant OutputArtifactConflictTest themes: invalidation, new/overlapping roots,
-unused actions, repeated/null builds and directory nesting. CqueryCommand:191
-explicitly disables action-conflict checking; preserve configured query admission.
-Reuse the selected-request ToolchainResolutionFunctionTest/ToolchainsForTargetsTest
-anchors and retained Buck2 DICE worker tests named in Stage 6.
+Read Stage 5's nodep fixed-point prerequisite and Stage 6's combined-implementation
+stop. Preserve the accepted Stage 6 selected-request and closure-integrity contracts.
 
-Exact named behavior is admitted scalar FileWrite equivalence and generic output
-prefix conflicts. Structural output/configuration identity, first-error order and
-display bytes are Slug-native. Exact Bazel checksum/path/ActionKey bytes remain
-deferred. Inventory every registered action output, not only requested files.
-Non-FileWrite exact-output sharing is explicitly unsupported, with its own
-terminal classification, not a false Bazel-conflict claim; noncolliding typed
-analysis remains admitted. Do not activate broader execution/formatter families.
-No root suffix, whole-owner-key/ActionSpec/REAPI-digest equivalence, skipped owner,
-command-side scan, global registry/cache, filesystem guess or new key family.
+Pinned Bazel source authority is local /home/wgray/bazel git object
+8220c6198837d5c13d53fea211cf3282aa12408a, not checkout HEAD.
+Discovery.java:62-78 repeats rounds until nodep name fulfillment reaches fixed
+point; :205-217 gates following nodep edges on prior-round module names; :146-165
+removes still-unfulfilled transformed exact module-key edges before selection.
+Source tests: DiscoveryTest.testNodep_unfulfilled, testNodep_fulfilled,
+testNodep_fulfilled_manyRounds, testNodep_fulfilled_withOverride.
 
-The existing DICE compute_build_action_closure constructs a private immutable
-ValidatedActionClosure after all tracked children complete. BuildCommandEvaluation
-retains it at every constructor, including explicit empty/loading-only paths.
-Only successful validated closures reach build/run/aquery consumers. Cquery is
-unchanged. Retain all owners and only duplicate action coordinates for execution
-sharing; CLI/server switch to the core execution-view accessor, not own dedup.
+Live app/slug_bzlmod_v2/src/selected_graph.rs name-gates discovery at :640-650,
+but validate_and_reachable(include_nodep=true) resolves retained nodep rows
+unconditionally at :990-992. An absent optional module incorrectly becomes
+MissingSelectedModule. Existing ordinary-dependency registry fixtures expose
+this defect; acquiring unrelated modules would mask it, not prove correctness.
+The first review's complete-authentic-closure acquisition proposal is superseded
+by this pinned-source diagnosis. No new registry/archive acquisition is authorized.
 
-ConfiguredActionOwnerContext additionally retains raw platform facts before its
-existing property merge. PlatformSemanticFact gains a normalized optional shared
-missing_toolchain_error message from the loaded native attribute (empty -> None);
-explicit values remain admitted and merges preserve it. Raw and merged properties
-remain distinct; structural equality/Allocative include all these source facts.
-FileWrite semantic bytes add a conditional raw-property tag when raw differs
-from already encoded merged properties, plus a nullable-message tag when unequal
-to the pinned native default. Existing None-owner/default-platform bytes stay
-stable. Source edits masked by target overrides and default/empty/custom message
-edits still invalidate sharing and semantic identity. No diagnostic breadth added.
-Stage 6 freezes the comparison inputs, constructor invariants and error order.
+## Decisions to freeze, not implement
 
-## Exact implementation/proof allowlist and gross caps
+- Exact named behavior: prune only unfulfilled transformed nodep edges after
+  discovery convergence; retain fulfilled version constraints and ordinary errors.
+- Verify exact-key presence, root/self and nonregistry/single/multiple-version
+  override interaction, multi-round/later-name fulfillment and deterministic order.
+  Do not prune early based only on names or ignore a fetched module's failure.
+- Name the existing HostSelectedModuleGraphKey producer, tracked discovery inputs,
+  raw/final graph values and natural cutoff boundary. No new DICE key, graph,
+  command bypass, fake bazel_tools, explicit platform-flag admission or side store.
+- Freeze same-DICE absent/present/absent and unchanged-semantic cutoff proofs,
+  observed Need/error/cancellation precedence, and downstream mapping consumption.
+  Reuse existing selected_graph unit/DICE scaffolds and Buck2 worker
+  when_equal_return_same_instance, test_detecting_changed_dependencies and
+  mismatch_epoch_results_in_cancelled_result as concept/test guidance only.
+- Preserve immutable compact graph ownership/Allocative. Pruning is phase scratch
+  at its natural producer; no retained duplicate graph, global registry or lock
+  across awaits. Existing reachable versions/command tokens own retention/release.
+- Inspect physical size/cohesion before choosing exact implementation files/caps.
+  Prefer a bounded helper in the existing selected-graph producer if cohesive.
+- Specify how to reassess the existing local ordinary-module registry scaffold
+  after correction, without claiming that the remaining host/platform/toolchain
+  source gate will necessarily pass. Do not invent module bodies or broaden
+  materialization to force the conflict CLI tests through.
 
-Production, paths relative to app/:
+Structural graph identity, order and Host observation remain Slug-native;
+exact checksum/path/ActionKey bytes, broader execution and unsupported platform
+flags remain deferred. No donor code or new optimization/fallback is selected.
 
-- slug_analysis_v2/src/key.rs
-- slug_analysis_v2/src/dice.rs
-- slug_analysis_v2/src/analysis_value.rs
-- slug_analysis_v2/src/starlark_rule.rs
-- slug_analysis_v2/src/result.rs
-- slug_build_api_v2/src/analysis_value.rs
-- slug_core_v2/src/runtime/file_write_identity.rs
-- slug_core_v2/src/runtime/configured_action_closure.rs (new private owner)
-- slug_core_v2/src/runtime/mod.rs (module declaration only)
-- slug_core_v2/src/runtime/dice.rs (producer, carrier, errors and view plumbing)
-- slug_cli_v2/src/commands/build.rs (execution-view call only)
-- slug_server_v2/src/reapi.rs (execution-view call only)
+## Scope, validation and stops
 
-Proof, paths relative to app/:
+Writable repo files: this manifest; canonical Live Status; relevant Stage 5 and
+Stage 6 owner status; orchestration routing log and its existing August archive
+only for bounded rollover. Maintain /home/wgray/PROGRESS.md separately <=500 lines.
+Cap: <=250 added documentation lines outside this manifest. Read only the named
+source/tests and existing fixture precedents needed to resolve the frozen questions.
+No Rust, dependency, fixture/harness, vendored, source override, archive or registry
+input edits; no Cargo, Bazel, network replay, checkout-wide query or oracle run.
 
-- slug_build_api_v2/tests/analysis_value.rs
-- slug_analysis_v2/tests/configured_target.rs
-- slug_analysis_v2/tests/starlark_rule.rs
-- slug_core_v2/src/runtime/file_write_identity.rs (existing unit module)
-- slug_core_v2/src/runtime/configured_action_closure.rs (bounded pure units)
-- slug_core_v2/src/runtime/dice.rs (saved proofs, new include and helper wiring)
-- slug_core_v2/src/runtime/tests/build_command_tests.rs (carrier updates/controls)
-- slug_core_v2/src/runtime/tests/configured_action_conflicts_tests.rs (new)
-- slug_reapi_v2/tests/reapi.rs
-- slug_cli_v2/tests/cli.rs (one-shot and stable-daemon consumer proof)
+Produce a reviewed implementation successor with exact allowlist, gross caps,
+source-derived red/green tests, named dependents and stops. Validate source/structure,
+scripts/v2_archive_status.sh (three established thoughts-path failures only), and
+git diff --check. Require independent reserved-boundary review before activation.
+Commit/push the accepted docs milestone, then implement the correction before
+restoring the combined candidate. Do not repeat the general execution-group audit.
 
-Docs: this manifest, canonical Live Status and relevant Stage 6 owner status;
-maintain /home/wgray/PROGRESS.md separately, at most 500 lines.
-Combined gross additions, including saved patch and moved lines: <=1,400
-production, <=3,000 proof, <=4,400 aggregate Rust. New validator <=600 physical
-production lines; new core proof module <=1,200 lines; new helpers <=100 lines.
-Do not inflate giant files with copied resolver/traversal/test scaffolds.
-Analysis dice.rs (6,055 lines) remains resolution/delegation producer; core
-dice.rs (12,475 lines) gets only its existing traversal/publication integration.
-The new validator owns pure collision/equivalence policy, never DICE/transport.
-Other large files receive only cohesive fields/projections/consumer plumbing.
-No dependency, vendored, harness, oracle-tree or additional production file edits.
-
-## Proof and validation
-
-Use existing inline temporary BUILD/MODULE/Starlark fixtures with pinned-source
-adaptation comments, no new copied oracle assets or external registry inputs.
-First restore the saved candidate/red regression and reproduce the producer gap;
-then complete sharing/conflict and selected-request behavior as one diff.
-Required discriminators are enumerated in Stage 6: content/executable/platform/
-raw-versus-merged properties; default/empty/custom missing-toolchain message and
-unchanged-message cutoff; long/unicode writes; distinct roots/paths; unused
-actions; exact/prefix error order; directory and RunfilesTree/MANIFEST cases;
-unsupported non-FileWrite equivalence; A/B/A, separate/combined/overlapping roots,
-warm repeated conflict, cquery nonregression, owner-complete aquery, one execution
-representative and zero RPC/output mutation on failed closure.
-Retain None/A/B full-key identity, edge-clearing/transition/nested preference,
-known-platform aliases/optional fallback and observed cancellation/Need/error
-proofs from the saved correction. Validate raw-platform equality cutoff even if
-merged properties do not change. No partial parent or incomplete closure escapes.
-
-Run one Cargo command at a time, initially timeout 60s for each command:
-
-- cargo test -q -p slug_core_v2 --lib configured_action_conflicts
-- cargo test -q -p slug_core_v2 --lib selected_toolchain_request
-- cargo test -q -p slug_analysis_v2 --test starlark_rule selected_toolchain_
-- cargo test -q -p slug_cli_v2 --test cli configured_action_conflicts
-- cargo test -q -p slug_reapi_v2 --test reapi
-
-At integration, full slug_build_api_v2 and slug_analysis_v2 package tests, core
-library tests, and CLI aquery_text_keeps_root_order_across_one_shot_and_retained_daemon_restoration
-plus the new configured_action_conflicts build/run cases, each bounded and recorded.
-Compile direct dependents with cargo check -q -p slug_query_v2 -p slug_server_v2;
-rebuild cargo build -q -p slug_cli_v2 BEFORE any changed CLI-binary proof.
-Run cargo fmt --all, scripts/v2_archive_status.sh and git diff --check. The
-archive checker has three recorded thoughts-path failures; compare, do not waive
-new ones. Independently review the actual combined diff and recorded gate limits.
-Do not claim prior unrun REAPI/cancellation/full dependent gates are accepted.
-
-Investigate commands over one minute: compilation is distinguished from test
-execution, never hidden by an automatic longer retry. Fifteen minutes is an
-absolute maximum. No checkout-wide or authenticated workspace replay; local
-fixture/loopback transport proof only. Inspect/clean owned test slugd before and
-after daemon-sensitive validation, never unrelated processes.
-
-## Lifecycle and stops
-
-Memory: raw facts, optional shared messages and duplicate coordinates are DICE-retained
-semantic state; sorted borrowed output rows/ancestor stacks are phase scratch.
-No retained output index or new service/cache lifetime. Existing root keys,
-tracked full child results and structural equality own invalidation/cutoff.
-Independent roots never share a conflict registry. Complete errors retain the
-existing observation/certificate terminal path; historical Host states remain
-unavailable rather than guessed. Cancellation joins existing scoped work,
-publishes no incomplete closure and releases scratch; reachable DICE versions,
-command tokens and runtime shutdown own retained release. No lock across awaits.
-Reuse Arc/Allocative/compact utilities under the utility skill; no donor import,
-new optimization claim or unrelated path-epoch benchmark. No fallback introduced.
-
-Missing retained source facts, broader-family key admission, altered root paths,
-new semantic side store, unsafe output publication, cap overflow or a second
-material correction is REPLAN. Never partially ship the saved candidate. Finish
-the combined milestone, update owner status/log, commit and push to main.
+If fixed-point pruning needs new semantic ownership, broad graph-policy changes,
+unmodeled source facts or fixture acquisition, return REPLAN with the concrete
+decision. Do not substitute fixture downloads for missing nodep semantics.
+Tests in the later implementation start with timeout60; over one minute requires
+investigation and fifteen minutes is absolute maximum. No longer automatic retry.

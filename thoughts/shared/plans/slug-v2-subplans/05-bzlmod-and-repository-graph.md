@@ -4973,3 +4973,31 @@ Later historical statements naming selected 0.2.4 do not justify an override;
 the attempted downgrade is rejected acceptance evidence. The successor audits
 generic named-execution-group runtime semantics in Stages 4/6, without a Stage 5
 special case or new source owner.
+
+### Nodep fixed-point prerequisite for configured CLI proof (2026-09-10)
+
+The combined Stage 6 request/conflict implementation is preserved but unaccepted;
+its mandatory local CLI setup exposed a Stage 5 selection defect. An empty local
+registry reports the genuine ordinary rules_license dependency. Reusing the
+existing registry-module-discovery-recovery ordinary-module scaffold instead
+reports MissingSelectedModule(bazel_features1.42.1), before action analysis.
+The first suggestion to acquire a complete authentic registry closure is withdrawn:
+that would mask an absent-nodep bug, not establish the required semantics.
+
+Pinned Bazel 8220c6198837d5c13d53fea211cf3282aa12408a Discovery.java:62-78
+repeats name-fulfillment rounds; :205-217 gates nodep traversal by prior-round
+module names; :146-165 removes still-unfulfilled transformed exact-key edges
+before selection. DiscoveryTest.testNodep_unfulfilled, testNodep_fulfilled,
+testNodep_fulfilled_manyRounds and testNodep_fulfilled_withOverride are the
+source regression basis. Slug selected_graph.rs:640-650 implements name gating,
+but :990-992 unconditionally resolves retained nodep rows after convergence.
+Independent source review confirms REPLAN to the smallest producer correction.
+
+WP-5-7A-nodep-fixed-point-pruning-audit-r1 freezes exact-key pruning and
+override/version/root interaction at the existing HostSelectedModuleGraphKey,
+with multi-round fulfillment, same-DICE restoration/cutoff, Need/error/cancellation
+and downstream mapping proof. No new graph/key, side store, fallback, source
+override, platform-flag admission or registry/archive acquisition is authorized.
+Absent nodep edges must not become mandatory downloads; ordinary missing/failing
+dependencies remain errors. Only after correction may the existing local fixture
+be reassessed; its later source/materialization success is not yet proved.

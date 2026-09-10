@@ -23848,3 +23848,35 @@ Design validation: pinned-source/structure checks and git diff --check pass;
 archive check retains exactly three known thoughts-path failures. Saved candidate
 hash/applicability remain verified. No Rust, build, test, replay or materialization
 ran for this design; implementation and previously unrun gates remain unaccepted.
+
+### Combined implementation stop: local CLI nodep prerequisite (2026-09-10)
+
+WP-6-7A-selected-request-and-output-conflict-implementation-r1 returns REPLAN,
+not runtime acceptance. The candidate implements the above producer boundary and
+full request identity together. Final focused conflict gate: 10 passed in 0.03s;
+selected-request core 3, selected-toolchain analysis 11 and REAPI 18 passed.
+The restored red regression first failed at missing producer rejection, then
+passed with a structured producer error. Raw/merged property, message/constraint,
+None-context, long-Unicode, structural-root, typed-output and exact/prefix tests
+are present; loaded raw-fact/message A/B/A/cutoff and conflict-specific concurrent
+lifecycle proof, actual CLI/daemon gates, positive REAPI sharing integration and
+full owner/dependent/final-review gates are still incomplete.
+
+The local CLI fixture failed before conflict assertions: implicit platforms archive
+admission, then timeout60 in setup after reusing the existing local-platform
+scaffold. No CLI child/daemon, action RPC or output overwrite was reached. A
+local-only registry diagnostic exposed the independent selected-graph nodep defect
+now recorded by Stage 5. Do not replace this proof with downloads or a runtime bypass.
+
+Complete unaccepted patch: /tmp/slug-conflict-candidate.FIkPZj/candidate.patch,
+base 9cc3c4a73, SHA-256
+72fabf28cf02355cadc7f3a243f81aadd4824f20cc57275f2ab4e2b4f01aba73.
+Adjacent validation.txt records all passed/failed/unrun gates. Gross Rust additions
+are 718 production/1772 proof/2490 total; the validator has 287 production lines.
+Only owned Rust changes were restored via apply_patch; reverse/forward applicability
+checks pass. No partial implementation is committed. Cached CLI build products
+still contain the candidate: rebuild before any later binary proof.
+
+The successor audits/freezes nodep fixed-point pruning, implements that reviewed
+Stage 5 prerequisite, then resumes this same combined contract and preserved patch.
+It does not reopen general execution-group architecture or relax any proof gate.

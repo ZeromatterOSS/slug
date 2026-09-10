@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-6-7A-selected-request-and-output-conflict-implementation-r1`
-combined correction](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-nodep-fixed-point-pruning-audit-r1`
+configured-CLI prerequisite](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -58,24 +58,29 @@ cc_library declares `cpp_link` and `_use_auto_exec_groups=True`. Its composed
 schema has no named `config.exec` transition; `_def_parser` uses ordinary Exec.
 Stage 4 records complete declaration provenance and Stage 6 records the pinned
 runtime matrix, default-only live owners and shared-state proof obligations.
-The selected-toolchain request candidate preserves parent configuration and a
-separate platform preference and passes focused analysis/identity/core gates,
-but returns REPLAN at the required cross-owner output-conflict proof. Two
-preference variants produce different contents at the same materialized path;
-the closure accepts both and existing CLI/server materialization overwrites.
-The candidate patch and exact red-test evidence are preserved outside the repo;
-Rust sources are restored to ca284c2ae, not accepted or partially activated.
-Stage 6 now freezes the root-set-dependent validated action-closure contract:
-source-derived scalar FileWrite sharing, raw versus merged platform facts,
-all-output prefix checking, explicit broader-family sharing limits, owner-complete
-aquery and one execution representative. Cquery keeps its upstream conflict-check
-exemption. Independent architecture review accepts after adding the normalized
-missing-toolchain message to retained platform facts, equality and proof. No Rust
-is restored or runtime acceptance claimed by this docs milestone.
-The selected successor combines this producer boundary with the saved request
-correction under one exact allowlist and revised caps, then resumes the shared
-named/automatic group contract. Loading/computed-default/C++/Java guards remain
-unchanged. Do not use an Exec transition or output-path suffix to hide conflicts.
+The combined selected-request/output-conflict implementation returns `REPLAN`
+at its mandatory local CLI gate. The candidate retains parent configuration/full
+preference identity and rejects conflicting outputs in the producer; focused core
+conflict tests pass 10/10 in 0.03s, selected-request core 3/3, analysis 11/11 and
+REAPI 18/18. Full integration, conflict lifecycle and CLI acceptance remain open.
+Only owned Rust changes were restored to 9cc3c4a73; the complete unaccepted patch,
+hash and exact gate limits are preserved in the manifest. No partial activation.
+
+Local-only CLI setup exposed an independent Stage 5 defect, not a requirement to
+download a larger dependency graph: Slug name-gates nodep discovery but fails to
+drop still-unfulfilled edges before selection. Pinned Bazel Discovery.java:146-165
+drops them; Slug instead emits MissingSelectedModule(bazel_features1.42.1).
+Independent source review confirms the prerequisite. Audit/freeze the smallest
+existing selected-graph producer correction, then reassess the local fixture and
+resume the preserved combined implementation. No new fixture acquisition, source
+override, explicit platform flag, runtime bypass or broad replay is authorized.
+
+Stage 6's accepted root-set-owned closure/sharing contract remains unchanged:
+raw platform facts/messages, all-output prefix checking, explicit broader-family
+limits, owner-complete aquery, one execution representative and cquery exemption.
+Named/automatic group design resumes only after the combined milestone passes.
+Loading/computed-default/C++/Java guards remain unchanged; no Exec transition or
+output-path suffix may hide conflicts.
 
 Short diagnostics confirm cumulative path-epoch fanout, not a proven semantic
 loop: retry 116 recomputes 109 path keys and rechecks 163 module/192 registry
