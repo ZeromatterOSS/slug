@@ -5412,3 +5412,32 @@ object. No payload traversal, source execution, fixture copying or lock injectio
 Keep complete R2 preserved and all actual CLI/sharing/full relevant gates open.
 Independent terminal review ACCEPTS the evidenced scope stop and bounded
 successor; catalog verification alone cannot close selection/payload/CLI gates.
+
+### Exact registry metadata catalog verified (2026-09-10)
+
+WP-5-7A-authentic-registry-catalog-audit-r1 completes its named availability gate:
+all184 rows verified,156 MODULE.bazel/27 source.json/1 bazel_registry.json;
+276705bytes read,184 exact Bazel CAS paths,184 CAS hits,0 fallback hits. Every
+object was regular, remained within the cache roots, matched stat/open identity
+and preflight/EOF length, and matched the pinned lock's SHA-256. The generator
+and50706byte lock hashes above were reverified. No payload bodies were followed.
+The read-only timeout60 Perl audit exited0; an initial regex-capture bookkeeping
+bug exited255 during catalog validation before any cache-object reads, then was
+corrected. No semantic/test failure, runtime invocation or source write occurred.
+
+Reproduce via registryFileHashes in bytewise URL order; for each expected hash,
+read only the explicit Bazel CAS <hash>/file path above. Ordered evidence SHA-256:
+2f151850222649e94f8aea1b85efe543443ad1bb147d7b2cdb9df5deac711a3e.
+Ledger byte framing per row: URL,NUL,verified lowercase hash,NUL,decimal byte
+length,NUL,absolute chosen path,LF; hash the concatenation, with no header.
+This proves local metadata availability at audit time, not historical filesystem
+snapshots, Slug-selected versions, source transforms, extension inputs or CLI success.
+
+Next: WP-5-7A-authentic-payload-recipe-audit-r1, source-only:27 exact descriptors,
+at most27 archives/128 distinct declared payloads/256 explicit locator attempts;
+archive128MiB/patch8MiB/overlay64MiB,256MiB aggregate payload reads,64KiB scratch.
+Metadata cap1MiB/object/4MiB aggregate. Stop at first unavailable, unsupported,
+unsafe, mismatching or over-budget input. No extraction, execution, fixture
+assembly, acquisition, dependency walk or complete/partial R2 restoration.
+Independent terminal review ACCEPTS the metadata gate and bounded successor;
+selection, extension closure, fixture correctness and CLI/REAPI success remain open.
