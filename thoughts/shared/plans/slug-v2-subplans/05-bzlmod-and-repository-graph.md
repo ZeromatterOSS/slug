@@ -5225,3 +5225,114 @@ local_repository, fixture, acquisition or broader scheme admission is selected;
 real CLI and complete R2 acceptance remain open. Stop closure enumeration here.
 Independent terminal review ACCEPTS the source-audit stop and design selection;
 source/hash/diff/preserved-patch checks pass, archive retains only known3.
+
+### Verified selected-BCR local-file capture contract (2026-09-10)
+
+WP-5-7A-selected-bcr-file-capture-design-r1 freezes the following reserved
+boundary, independently terminally ACCEPTED. Its selected successor is
+WP-5-7A-selected-bcr-file-capture-impl-r1; no implementation is accepted yet.
+This closes the six design questions above, not the real CLI source closure.
+
+**Compatibility and grammar.** The pinned IndexRegistry/HttpConnector sources
+and tests above establish explicit local payloads, ordered file mirrors and SRI.
+These are exact only for the admitted subset; the parser, errors, safety limits
+and Rust filesystem observations are Slug-native. File queries present in
+IndexRegistryTest's mirror projection remain deferred in capture, not silently
+claimed as parity. HTTP-to-file redirects, other schemes and other OS support
+remain unsupported. Existing HTTPS auth/redirect semantics do not widen.
+
+One private runtime/repository_archive_file.rs owns file grammar and capture.
+Admit case-insensitive file:/// followed by a nonempty absolute Linux path,
+valid Unicode, with at most16384 URL bytes and4095 decoded path bytes. Reject
+authority (including localhost/UNC), credentials/port, raw query/fragment,
+raw whitespace/control/backslash, malformed percent escapes, decoded NUL/ASCII
+controls/backslash/non-UTF8, percent-encoded separators, empty first/trailing
+path segments, standalone raw/decoded dot or dot-dot segments and first segments
+starting with an ASCII letter plus colon or vertical bar. Interior repeated
+slashes are admitted: pinned IndexRegistry.constructUrl:134-142 and mirrored_url
+produce them for authority-free file primaries plus mirrors; Linux resolves them
+as ordinary separators. Extra leading slash/root-only stays rejected.
+Percent-encoded ordinary filename bytes (space, %, #, ?) and
+literal Unicode are admitted. Validate raw segments before url2.5.8 normalizes
+them; decode exactly once with the existing url crate. No path canonicalization
+or cache lookup. Both plan parsing and transport use this same file validator;
+the existing HTTPS plan guard and stricter transport validator stay distinct.
+Bzlmod archive_repo_spec only relaxes its has_host absoluteness predicate for
+parsed file scheme, retaining raw URLs/order/SRI; core remains the filesystem
+grammar owner. No new public URL type or core dependency in Bzlmod.
+
+**Linux descriptor safety.** Use existing libc constants through safe std
+OpenOptionsExt: first pin the path with O_PATH|O_CLOEXEC and require fstat regular
+file, then open the held /proc/self/fd/N read-only with CLOEXEC|NONBLOCK; require
+regular type and matching dev/ino before reading. Hold the pin through reopening.
+Never reopen the mutable original pathname. Ordinary symlinks may resolve to a
+regular file; replacement/unlink after pin cannot retarget the data descriptor.
+Directories, FIFOs, sockets and devices fail before data-open, including through
+symlinks. Inaccessible/missing procfs fails closed, without a pathname fallback.
+This procfd path reopens an owned descriptor, not a source/cache locator.
+Linux man-pages6.7 open(2), O_PATH/fstat and proc_pid_fd(5) own this mechanism:
+uncompressed SHA-256 respectively
+83938a9f95bfbc18b4c8fcb8d42c92b124db421d4e6a750e4ad8ef3448307b11 and
+1c8d7e1212b9ea55df406a5c6569a7c00f98f66bbfa61502420791d16711c3ed.
+The url crate's to_file_path is decoding machinery, not admission authority.
+
+**Bounded capture.** Preflight descriptor length against the existing role cap;
+read at most64KiB per step into existing NamedTempFile, SHA-256 the actual stream,
+check actual cumulative bytes without overflow, require EOF/SRI, flush and check
+activity before success. Caps remain archive128MiB/MODULE1MiB/patch8MiB/overlay64MiB.
+Check cancellation before pin, after reopen, between reads and around finalization;
+every error/cancellation drops descriptors and temporary capture. No body-sized
+allocation, mmap, worker/task, persistent cache or shared lock across capture.
+Symlink/path mutation selects one inode; concurrent byte mutation is acceptable
+only if the completed captured stream equals declared SRI. Metadata is not a
+digest substitute or historical snapshot. Syscall latency assumes responsive
+local regular-file storage; remote/FUSE/pseudo-filesystem latency and forcibly
+interruptible kernel calls are deferred. NONBLOCK does not bound regular-file I/O.
+
+**Transport and lifetime.** repository_archive_http remains the common ordered
+capture_urls owner; capture_one dispatches explicit file input to the new helper.
+All four wrappers preserve their caps and existing transform order. A failed
+file may try only the next explicitly supplied URL; first verified success stops.
+NativeEnvironment becomes I/O-free to construct, with phase-local
+OnceCell<Result<Arc<ClientConfig>, String>> initialized only by prepare_https
+after URL/activity validation and before DNS. A default Environment hook preserves
+the existing test seam. TLS success/failure lives only for that payload's ordered
+capture call; file-only attempts never load certificates, resolve or connect.
+No service/DICE-retained representation change: Stage9/donor work and performance
+claims do not apply. The existing URL/spec request remains immutable.
+
+**Publication and revisions.** Bzlmod source_preparation.rs:5201-5343 owns exact
+RepositoryMaterializationResultKey request equality, immutable roots/observation
+instances, and generation-key dependencies for transport/materialization errors.
+Unchanged URL/spec/digests may reuse an already verified, still-valid immutable
+root after original inputs disappear/change; a new URL/spec/SRI is a distinct
+request. Missing/mismatching bytes are generation-scoped transport failure;
+newer generation demands retry, not in-place repair of a published root.
+repository_io materialize_native_with_runtime captures outside the state lock,
+revalidates the session and retains provisional AssociatedImmutable roots;
+observe_native/accept and final source certificates remain the only publication
+route. Stale session/discard drops provisional ownership. Successful reuse still
+requires existing root/source observations, never mere original-path existence.
+Relevant DICE guidance is docs/developers/dice.md and vendored
+dice/dice/docs/{writing_computations,transients}.md (concept only, no donor code).
+No DICE key/lock/equality, injected-input protocol or cross-request cache changes.
+
+**Implementation/proof boundary.** The successor manifest owns exact files and
+500 production/1100 proof/1600 aggregate gross-addition caps. The new file owner
+is <=260 production lines; selected_repo_spec's15912-line owner receives only a
+<=10-production-line projection adjustment and focused existing-module tests.
+repository_io's4646-line owner receives only a test include; new session proof
+lives separately. The918-line archive parser keeps plan admission; the700-line
+HTTP owner keeps ordered transport and lazy TLS. No broad split/utility framework.
+Tiny source-derived unit bodies replace no real fixture/source; no fixture tree,
+external archive or Bazel run is added. Adapt upstream file-download and mirror
+themes; upstream HTTP/JVM implementation-detail cases beyond current HTTPS gates
+are deferred. Require real native file capture, all-role limits, rejection and
+race/cancellation cleanup, mirror/no-TLS proof, immutable A/B/A/reuse and native
+session generation/repair/stale-token publication tests. Reuse existing DICE
+request/generation regressions separately; do not call fake Materialized values
+proof of the new native path. Gates start timeout60, serialize Cargo, and never
+extend automatically. Complete R2 and actual CLI/REAPI sharing remain open.
+Design source/structure/diff and preserved-candidate hash/applicability checks
+pass; archive checker exits1 with exactly the known3 thoughts paths. No Rust,
+test, CLI, daemon, Bazel, acquisition or replay ran during this design milestone.

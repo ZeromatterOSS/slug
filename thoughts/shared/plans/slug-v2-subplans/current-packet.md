@@ -1,95 +1,159 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-5-7A-selected-bcr-file-capture-design-r1
+Packet: WP-5-7A-selected-bcr-file-capture-impl-r1
 
-Status: reserved-boundary design selected after authentic-source audit REPLAN.
-Docs/source only. No Rust, fixture, test/runtime, acquisition or replay authority.
+Status: implementation selected after independent terminal design ACCEPT.
+The design milestone changed docs only; implementation and its gates remain unrun.
 
-## Observable result and learned boundary
+## Observable result
 
-Freeze an implementable, independently reviewed verified local-file capture
-contract for the selected-BCR archive/MODULE/patch/overlay category, including
-primary and mirror source URLs. Do not merely weaken a URL guard or deliver a
-test-only cache bypass. This packet designs a new local-input/transport boundary;
-implementation follows only when every safety/ownership question below is settled.
+Implement verified Linux local-file capture for selected-BCR archive, MODULE,
+patch and overlay payloads, including explicit primary/mirror source URLs.
+Stage5's "Verified selected-BCR local-file capture contract" is the frozen
+architecture/grammar/safety/lifecycle authority; read it before implementation.
 
-The accepted mode prerequisite0f45fab28 admits regular0640/directory0750
-(2/80/82 gross additions, extractor11pass/1ignored/3.41s). It remains accepted.
-Source audit then found: HyperRegistryIo reads file registries and Bzlmod retains
-their MODULE URL/SRI, but core SelectedBcrArchive and native capture require HTTPS
-for every payload. Local archive-backed registry modules therefore cannot supply
-their file MODULE capture. This is a source-proved boundary, not a replay result.
-Cached real platforms/rules_shell sources do not establish a full CLI closure.
+Accepted predecessor: archive modes0f45fab28, then audit checkpointcfd4de0ec
+proved that file-registry MODULE URLs reach HTTPS-only selected-BCR capture.
+No authentic complete CLI closure is established. Do not restore preserved R2.
 
-Read Stage5's "Authentic-source audit stops at selected-BCR file capture" for
-exact cached provenance, source hashes and producer anchors. Pinned Bazel9.2 is
-/home/wgray/bazel git object8220c6198837d5c13d53fea211cf3282aa12408a.
-IndexRegistry.java:245-255,448-538 and IndexRegistryTest.testFileUrl/
-testGetArchiveRepoSpec establish local registry MODULE and file mirror projection.
-HttpConnector.java:114-120 and HttpConnectorTest.localFileDownload establish
-file payload transport. Preserve mirror order and existing checksum/transform
-semantics; broad arbitrary schemes/URL forms are not implicitly accepted.
+## Source basis, classification and decisions
 
-## Decisions required before implementation activation
+Pinned Bazel9.2 /home/wgray/bazel git object
+8220c6198837d5c13d53fea211cf3282aa12408a:
+IndexRegistry.java:134-142,245-255,448-538; IndexRegistryTest.testFileUrl and
+testGetArchiveRepoSpec; HttpConnector.java:114-120 and
+HttpConnectorTest.localFileDownload. Stage5 records exact paths/source hashes.
+Adapt local-byte download, registry MODULE/SRI and ordered-mirror themes in tiny
+unit fixtures. No Java runtime/implementation-detail port or new oracle fixture.
+Query-bearing file mirrors in upstream projection are not admitted in capture.
 
-1. Define one admitted file URL/path grammar and platform boundary for all four
-   payload roles; reconcile Bzlmod primary source absoluteness with core parser
-   and capture validation. Name unsupported authorities, credentials, ports,
-   queries/fragments, Unicode/percent decoding and path forms explicitly from
-   pinned evidence. Do not create divergent URL validators or silently broaden
-   HTTPS/auth/redirect behavior. HTTP-to-file redirects are a separate decision.
-2. Choose the existing natural capture/request owners and cohesive module split.
-   Keep local file input separate from LocalTar override and local_repository.
-   Preserve expected SRI, byte caps (archive128MiB/MODULE1MiB/patch8MiB/overlay64MiB),
-   ordered mirror handling and exact successful capture. No production cache
-   scanning, locator inference, dependency/source override or persistent side store.
-3. Specify safe opening and reads of regular files: special-file blocking, symlink
-   and path replacement races, descriptor identity, mutation during capture,
-   finite buffers, overflow/size checks, cancellation and deterministic errors.
-   No metadata-check-then-unbounded-blocking-open shortcut. Define unsupported
-   OS/filesystem guarantees honestly; do not claim arbitrary historical snapshots.
-4. Prove how verified immutable bytes enter existing AssociatedImmutable and Host
-   final source-certificate publication. Existing request equality/digest and
-   generation-scoped error retry may suffice, but source evidence must establish
-   successful reuse, changed content, missing/create/delete/repair and overlapping
-   sessions. Do not assume mutable paths equal content-addressed immutable inputs.
-5. Keep file-only capture free of TLS initialization/DNS/network. Current public
-   capture wrappers eagerly create NativeEnvironment; freeze a bounded lazy
-   transport choice and its phase lifetime without a new service/global cache.
-   Consult the utility skill/Stage9 only if proposing retained representation.
-6. Freeze exact production/proof files, gross caps and a cohesion decision.
-   Require tiny source-derived local-file red/green, byte/SRI mismatch, every
-   payload cap, URI rejection, mirror ordering, no-network success, failure/
-   cancellation cleanup and generation/recovery/publication proof. Reuse existing
-   archive capture/extraction helpers and direct compile consumers, no full suite,
-   giant fixture tree or external archive replay. All later commands timeout60;
-   investigate over one minute, fifteen minutes absolute maximum, no longer retry.
+Exact named subset: explicit local payload bytes/SRI and ordered mirror selection.
+Slug-native: narrow Unicode URL grammar, Linux descriptor safety, limits/errors,
+filesystem observations and existing structural immutable repository identity.
+Unsupported/deferred: other OS capture, arbitrary file authorities/URL forms,
+query/fragment, HTTP-to-file redirects, remote/FUSE/pseudo-filesystem latency
+guarantees and interrupting stuck kernel calls. Existing HTTPS admission stays
+unchanged except error wording that must name the newly admitted file subset.
 
-Compatibility: pinned named local-file/mirror/verified-payload behavior may be
-exact once the admitted subset is specified; Rust filesystem observations,
-bounded failures, Unicode paths and structural identity remain Slug-native.
-Everything not frozen stays unsupported/deferred. No new retained state/key,
-fallback or ownership change is already authorized. If needed, justify it through
-the plan-authoring checklist and independent reserved architecture review.
+Decisions: one new private file grammar/capture owner; O_PATH regular-file pin
+then checked procfd reopen; <=64KiB streaming into existing NamedTempFile with
+exact SHA-256/EOF; existing four role caps; common ordered capture_urls dispatcher;
+I/O-free NativeEnvironment construction plus per-payload lazy TLS, never file DNS.
+No temporary bridge/fallback. Failure may only try the next explicit mirror.
+Do not change LocalTar/local_repository, scan caches or infer source locators.
 
-## Exact design scope and terminal gates
+## Ownership, revisions and memory
 
-Writable docs: this manifest, canonical Live Status and relevant Stage5/6 owner
-status; routing log only on REPLAN. <=180 added doc lines outside manifest.
-Keep /home/wgray/PROGRESS.md <=500 lines. Read only named capture/source owners,
-relevant existing helpers/tests and pinned sources needed for the six decisions.
-No Rust/dependency/harness/fixture/cache/registry/source-input/vendored edits.
-No tests, binary/CLI/Bazel/oracle/daemon/network commands, acquisition or replay.
+RepositoryMaterializationRequest retains full URL/spec/SRI identity; existing
+RepositoryMaterializationResultKey and generation-key dependency own retry.
+No new key/semantic field or representation. Verified immutable reuse survives
+original-source deletion/mutation only while existing root observations validate;
+changed URL/spec/SRI requires a distinct request. Failures bind current generation;
+newer generation retries. No mutable-source historical snapshot claim.
+Native materializer captures outside locks, rechecks session, owns provisional
+AssociatedImmutable roots and publishes only via existing observation/final
+source-certificate acceptance. Stale/discarded sessions cannot publish.
+Read docs/developers/dice.md and dice/dice/docs/{writing_computations,transients}.md;
+these are ownership concepts, not code donors or generic transient replacement.
+
+New path/descriptor/fixed buffer/temp capture/TLS cell are phase scratch; descriptors
+and captures drop on error/cancellation, successful captures transfer to the existing
+realizer, TLS cell drops after its payload's mirror group. Existing root lifetime,
+equality cutoff, generation invalidation and session shutdown/discard stay intact.
+No service/global cache, background task, blocking worker, body Vec or mmap.
+No retained-representation change; utility/Stage9 work and benchmarks inapplicable.
+
+## Exact file allowlist and caps
+
+All paths below are relative to the checkout. Production and colocated proof:
+- app/slug_bzlmod_v2/src/selected_repo_spec.rs: <=10 production added lines in
+  archive_repo_spec primary absoluteness only; focused projection tests.
+- app/slug_core_v2/src/runtime/repository_archive.rs: all-role plan admission
+  through shared file grammar; existing HTTPS guard stays unchanged.
+- app/slug_core_v2/src/runtime/repository_archive_http.rs: explicit file dispatch,
+  lazy NativeEnvironment TLS and default prepare_https seam; keep HTTPS lifecycle.
+- app/slug_core_v2/src/runtime/repository_archive_file.rs (new): shared grammar
+  and safe capped capture; <=260 production lines, no unsafe syscall wrappers.
+- app/slug_core_v2/src/runtime/mod.rs: new private module declaration only.
+Proof-only:
+- app/slug_core_v2/src/runtime/tests/repository_archive_tests.rs.
+- app/slug_core_v2/src/runtime/tests/repository_archive_http_tests.rs.
+- app/slug_core_v2/src/runtime/tests/repository_archive_file_tests.rs (new).
+- app/slug_core_v2/src/runtime/tests/repository_archive_file_session_tests.rs (new).
+- app/slug_core_v2/src/runtime/repository_io.rs: test-only include inside existing
+  test module, reusing its private native request/session/archive helpers.
+
+Gross additions <=500 production/1100 proof/1600 aggregate. New proof files each
+<=550 lines. Stage5 records the inspected size/cohesion decision; do not grow the
+large repository_io owner with another inline test subsystem.
+Docs: this manifest, canonical Live Status and relevant Stage5/6 status; routing
+only for REPLAN. <=180 added doc lines outside manifest; PROGRESS.md <=500 lines.
+No dependency, extraction/patch semantics, DICE/source-preparation, registry IO,
+CLI, harness/fixture, vendored source, cache/source-input or unrelated edits.
+
+## Required discriminating proof
+
+1. Bzlmod primary file URL and ordered file/HTTPS mirrors, including primary-file
+   plus mirror projection/capture with its doubled interior slash (keep source
+   projection unchanged); registry MODULE URL/SRI,
+   patches and overlays retain exact projection. Preserve old relative/missing
+   source rejection. All four core roles share grammar; table-test its complete
+   admitted/negative boundary including raw/encoded normalization traps.
+2. First tiny file success is red on baseline and green through real native
+   capture. Empty/nonempty/Unicode and escaped filenames, exact/mismatching SRI,
+   truncation/growth, per-role sparse oversize and streamed overflow rejection.
+   Use tiny configured limits for stream boundaries and sparse set_len for native
+   caps; no giant physical body, ignored artifact test or external archive.
+3. Missing/mismatching file falls back in explicit order; first verified file
+   stops before later capture/TLS/DNS/connect. NativeEnvironment TLS cell stays
+   empty for file-only success/failure; fake transport counters prove mixed-order
+   behavior. Preserve existing HTTPS redirect/auth/lifecycle tests; explicitly
+   reject HTTP-to-file redirect. Only existing loopback test servers are allowed.
+4. Reject directory/FIFO/socket/device before data-open; symlink-to-regular works.
+   Deterministic replacement/unlink after pin and mutation of unread bytes via
+   existing active callback; no sleeps, timing races or new production test hook.
+   Cancellation before pin, after reopen, during streaming and finalization drops
+   temporary capture and both descriptors. Missing procfs branch fails closed;
+   do not mutate mounts or require privileges to exercise it.
+5. Native materialize_native_with_runtime with tiny complete archive/overlay/
+   patch/MODULE source establishes actual immutable root contents/transform order.
+   Exact-request accepted reuse after source deletion, changed-SRI A/B/A, missing/
+   create and mismatch/repair in newer generation, invalid source then retry;
+   inspect result generation, root/instance and cleanup. Reuse real observations/
+   accept helpers; compare current writer output, not hard-coded marker formats.
+   Add stale-token/discard and overlapping-session rejection around real capture
+   using existing callback seam, not synthetic Materialized success. No lock across
+   capture. Reuse existing Bzlmod DICE request/generation tests for key behavior.
+
+## Focused validation and stops
+
+Every test/compiler command starts timeout60; serialize Cargo. Investigate any
+command exceeding one minute; fifteen minutes is the absolute ceiling, never an
+automatic extension/retry. Stop on timeout, unexpected failure, unsafe/blocking
+open or scope overflow; report exact evidence rather than retrying a broad suite.
+Use installed pinned nightly-2025-09-14. Record exit/count/duration, not full logs.
+
+- timeout 60s cargo +nightly-2025-09-14 test -q -p slug_bzlmod_v2 --lib selected_repo_spec::tests::archive_
+- timeout 60s cargo +nightly-2025-09-14 test -q -p slug_bzlmod_v2 --lib observed_repository_materialization_
+- timeout 60s cargo +nightly-2025-09-14 test -q -p slug_core_v2 --lib runtime::repository_archive
+- timeout 60s cargo +nightly-2025-09-14 test -q -p slug_core_v2 --lib selected_bcr_file_session
+- timeout 60s cargo +nightly-2025-09-14 check -q -p slug_cli_v2
+
+Name new native session tests selected_bcr_file_session_* so the exact gate
+selects them. New file tests are included in the repository_archive prefix gate.
+Confirm selected tests actually ran; keep existing large ignored test ignored.
+No full-core/full-suite retry, network acquisition, CLI/Bazel/daemon execution,
+external archive replay, source override or fake-platform control. The CLI check
+is compile evidence only; any later actual CLI proof requires a fresh build.
+Run formatting/diff, preservation hash/forward-applicability and archive checker
+(only known3 thoughts paths). Independent terminal review precedes acceptance,
+commit/push and successor selection. A new identity/public owner, unsafe fallback,
+scope overflow or second material correction is REPLAN, not implicit authority.
 Never inspect/print/copy ~/.bazelrc or derived secrets.
-Validate source/structure, diff, candidate preservation and archive checker
-(only known3 thoughts paths). Require independent terminal design review, then
-commit/push accepted design and select its exact implementation contract.
-An unresolved safety/identity owner, unbounded scope or second material
-correction returns REPLAN; never substitute a fake-platform control for real CLI.
 
-Complete unaccepted R2 remains /tmp/slug-conflict-r2.XZJWwv/candidate.patch,
+Complete unaccepted R2: /tmp/slug-conflict-r2.XZJWwv/candidate.patch,
 base97dffd5d4, SHA-256
 90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e.
 Adjacent validation.txt owns all passed/failed/unrun gates. Do not restore or
-partially ship R2 here. Actual one-shot/stable-daemon CLI and positive common
-REAPI sharing remain open; only two fast core failures are baseline-attributed.
+partially ship here. Actual one-shot/stable-daemon CLI and positive common REAPI
+sharing remain open; only two fast core failures are baseline-attributed.

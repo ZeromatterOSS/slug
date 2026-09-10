@@ -23944,3 +23944,8 @@ local registry MODULE URLs cannot materialize, despite pinned Bazel file support
 The new Stage5 file-capture design owns URL/path/safety and immutable publication
 decisions. It does not admit local_repository, supply a complete CLI fixture or
 restore/partially accept R2. No replay was performed.
+That design is now independently ACCEPTED and its exact file-capture implementation
+packet selected. All four roles use existing immutable request/generation/session
+publication with no new key or cache; implementation/native lifecycle evidence is
+still required. This docs-only milestone neither proves CLI source closure nor
+changes any combined R2 gate or source/fixture authority.
