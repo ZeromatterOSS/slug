@@ -8729,7 +8729,7 @@ lexical `.bzl` identities; a nested output belongs to the BUILD package and is
 published as a generated file owned by the genrule. Full hashes, commands and
 outputs are frozen in `current-packet.md`.
 
-Accept, pending independent review, only the generic selected form with named
+The independently accepted design admits only the generic selected form with named
 required `name`, `cmd`, and nonempty `outs`, optional `srcs`, `toolchains`, and
 `tags`, no other attributes, omitted `executable=false`, generator metadata
 and atomic rule/output publication. The early empty-output rejection is a
@@ -8746,3 +8746,60 @@ expansion, shell/environment selection, providers, actions, ActionKeys,
 execution and Java semantics remain unsupported/deferred. Query and configured
 analysis fail closed before inventing any of them. The exact six-file
 170/260/430 successor is frozen in `current-packet.md`.
+
+Implementation and terminal replay reviews return ACCEPT at 170 production/
+255 proof/425 total gross Rust additions. Full loading passes 548 units plus
+all integration targets (one ignored unit), query-library 55/55 and analysis-
+library 19/19; the pinned-nightly CLI build, formatting, diff and scope gates
+pass. The extra full query-package run retains the previously recorded untouched
+diagnostic-prefix assertion failure; it is not a claim of a fully green query
+integration suite.
+The archive checker retains only its three established thoughts-path failures;
+no new archive violation is introduced.
+
+The targeted root-alias loading replay finishes with exit 2 in 62.74s,
+21.02s user/36.29s system CPU and 96,492 KiB peak RSS. It clears all six
+unconditional helper calls at BUILD:102/107/112/117/122/127, then stops at
+BUILD:138 -> rules_cc cc/cc_library.bzl:19 with
+`target invocation for named execution-group semantics is unsupported`.
+Sequential evaluation of the authenticated BUILD proves the six helper bodies
+returned. No package publishes, no genrule/generated output is selected for
+analysis, and Java runtime rule analysis does not begin. The former BUILD:365
+prediction was not contractual evidence.
+
+Replay provenance (base `bf8a9208048ed70751a112e905923e272ac69214`): copy fixture
+`rules-rust-073-toolchain-owner/workspace`, Git tree
+`02c393e9299635821bff31ea738dda5f0a4a1468`, into disposable scratch. Add only
+`bazel_dep(name = "rules_java", version = "9.1.0")` and root BUILD
+`alias(name = "java_runtime", actual = "@rules_java//toolchains:current_java_runtime")`.
+Original MODULE SHA-256 is
+`a357133030b94360b37061f380984caa374f7383841fabdc8c5d26bc114e3b10`;
+scratch MODULE is `1381310de5e63af52e94f337f6cde3dbf8f86bb3e27a1fd0ec4888c037a69c71`;
+scratch BUILD is `9c3d948a99cb504b5147bb603959127e1b3603e1d2b47ae57eba24f42641c01f`.
+Run rebuilt `slug cquery //:java_runtime` from scratch with
+`PATH=/usr/local/bin:/usr/bin:/bin`, ordinary RC policy and
+`timeout --signal=INT --kill-after=2s 180s`. CLI SHA-256 is
+`d6453952e211194610db5c1c635a8ba0ab03fd4bd53b4acb22b1cd0dbe79df6b`.
+Installed oracle reports Bazel 9.2.0. The rules_java archive and both source
+hashes above were independently reverified; no upstream source or tracked
+fixture was changed. This is a targeted root-alias replay, not an unchanged
+rules_rust fixture run or a query/configured genrule parity claim.
+
+The one-minute red flag was investigated before the single three-minute gate.
+Scratch-only counters confirm global path-epoch fanout: retry 116 recomputes
+109 path keys and rechecks 163 module/192 registry-file keys. Earlier retries
+have fewer path recomputations; registry generations are fixed. Mio waker
+traffic is not proof of a semantic loop. The checkout-wide replay stays stopped;
+tests over one minute require investigation and fifteen minutes is the absolute
+maximum. Preserve the fanout as a separate runtime performance concern.
+
+Dependency-provenance correction: the tracked lock, built-in MODULE regression
+and accepted private-bridge lineage above select rules_cc 0.2.17. Later prose
+calling 0.2.4 selected must not be used to force a downgrade. Independent review
+rejects that scratch override and its early `CcInfo` failure as milestone
+evidence; the selected rules_java 9.1.0 archive and both file hashes still match.
+
+The authentic next boundary selects the docs-only named-execution-group runtime
+audit. The existing Stage 6 reservation requires a reviewed complete generic
+cross-stage design before removing the pre-publication guard; do not simply
+move it later or erase groups to load this package.

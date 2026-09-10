@@ -413,6 +413,11 @@ static TEST_SUITE_RULE_CAPABILITY: RuleCapability = RuleCapability {
     executable: false,
     test_kind: Some(TestRuleKind::Suite),
 };
+static GENRULE_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("genrule"),
+    executable: false,
+    test_kind: None,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct TestMetadata {
@@ -492,6 +497,16 @@ pub struct ConfigSettingTarget {
     constraint_values: ConfigSettingAttribute<Arc<[CanonicalLabel]>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct GenruleDeclaration {
+    pub srcs: Option<Arc<[CanonicalLabel]>>,
+    pub toolchains: Option<Arc<[CanonicalLabel]>>,
+    pub cmd: CompactString,
+    pub outs: Arc<[CanonicalLabel]>,
+    pub tags: Option<Arc<[CompactString]>>,
+    pub generator: Option<(CompactString, CompactString, CompactString)>,
+}
+
 impl ConfigSettingTarget {
     pub fn values(&self) -> &ConfigSettingAttribute<Arc<[(CompactString, CompactString)]>> {
         &self.values
@@ -543,6 +558,7 @@ pub enum PackageTargetKind {
         contents: Arc<PackageGroupContents>,
         includes: Arc<[CanonicalLabel]>,
     },
+    Genrule(GenruleDeclaration),
     /// A file declared by an `attr.output` or `attr.output_list` value.
     /// Its generator is retained explicitly; names alone cannot determine it.
     GeneratedFile {
@@ -566,6 +582,7 @@ impl PackageTargetKind {
             Self::ConfigSetting { .. } => Some(&CONFIG_SETTING_RULE_CAPABILITY),
             Self::NativeToolchain(target) => Some(target.rule_capability()),
             Self::TestSuite { .. } => Some(&TEST_SUITE_RULE_CAPABILITY),
+            Self::Genrule(_) => Some(&GENRULE_RULE_CAPABILITY),
             Self::StarlarkRule(rule) => Some(&rule.capability),
             Self::ExportedFile | Self::GeneratedFile { .. } | Self::PackageGroup { .. } => None,
         }
@@ -1744,6 +1761,91 @@ impl PackageRecorder {
             }),
             visibility.map_or(VisibilitySource::PackageDefault, VisibilitySource::Declared),
         )
+    }
+
+    fn genrule(
+        &self,
+        name: String,
+        srcs: Option<Arc<[CanonicalLabel]>>,
+        toolchains: Option<Arc<[CanonicalLabel]>>,
+        cmd: CompactString,
+        outs: Arc<[CanonicalLabel]>,
+        tags: Option<Arc<[CompactString]>>,
+        generator: Option<(CompactString, CompactString, CompactString)>,
+    ) -> anyhow::Result<()> {
+        self.precheck_genrule(
+            &self.output_label(&name)?,
+            srcs.as_deref().unwrap_or(&[]),
+            toolchains.as_deref().unwrap_or(&[]),
+            &outs,
+        )?;
+        self.record_target(
+            name.clone(),
+            PackageTargetKind::Genrule(GenruleDeclaration {
+                srcs,
+                toolchains,
+                cmd,
+                outs: outs.clone(),
+                tags,
+                generator,
+            }),
+            VisibilitySource::PackageDefault,
+        )?;
+        for output in outs.iter().cloned() {
+            if output.target().as_str() != name {
+                self.generated_file(output, &name)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn precheck_genrule(
+        &self,
+        rule: &CanonicalLabel,
+        srcs: &[CanonicalLabel],
+        toolchains: &[CanonicalLabel],
+        outs: &[CanonicalLabel],
+    ) -> anyhow::Result<()> {
+        if outs.is_empty() {
+            anyhow::bail!("native genrule requires at least one output");
+        }
+        let conflicts = |left: &str, right: &str| {
+            left == right
+                || left
+                    .strip_prefix(right)
+                    .is_some_and(|suffix| suffix.starts_with('/'))
+                || right
+                    .strip_prefix(left)
+                    .is_some_and(|suffix| suffix.starts_with('/'))
+        };
+        for (index, output) in outs.iter().enumerate() {
+            if srcs.iter().chain(toolchains).any(|input| input == output) {
+                anyhow::bail!("native genrule input is also an output: {output}");
+            }
+            for prior in &outs[..index] {
+                if conflicts(output.target().as_str(), prior.target().as_str()) {
+                    anyhow::bail!("native genrule outputs conflict: {prior} and {output}");
+                }
+            }
+        }
+        let state = self.state.borrow();
+        for candidate in std::iter::once(rule).chain(outs) {
+            if state.targets.get(candidate.target().as_str()).is_some() {
+                anyhow::bail!(
+                    "native genrule target/output conflicts with existing target '{}'",
+                    candidate.target()
+                );
+            }
+        }
+        for output in outs {
+            if let Some((existing, _)) = state.targets.iter().find(|(name, target)| {
+                matches!(target.kind, PackageTargetKind::GeneratedFile { .. })
+                    && conflicts(output.target().as_str(), name)
+            }) {
+                anyhow::bail!("native genrule output conflicts with generated file '{existing}'");
+            }
+        }
+        Ok(())
     }
 
     fn dependency_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
@@ -9322,6 +9424,49 @@ static NATIVE_METHODS: MethodsStatic = MethodsStatic::new();
 
 #[starlark_module]
 fn native_methods(builder: &mut MethodsBuilder) {
+    fn genrule<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] cmd: &str,
+        #[starlark(require = named)] outs: Value<'v>,
+        #[starlark(require = named)] srcs: Option<Value<'v>>,
+        #[starlark(require = named)] toolchains: Option<Value<'v>>,
+        #[starlark(require = named)] tags: Option<UnpackListOrTuple<&str>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        let generator = starlark_generator_metadata(recorder, eval);
+        let generator =
+            (!generator.0.is_empty() || !generator.1.is_empty() || !generator.2.is_empty())
+                .then_some(generator);
+        let CoercedAttributeValue::OutputList(outs) =
+            coerce_starlark_value(recorder, AttributeKind::OutputList, "outs", false, outs)?
+        else {
+            anyhow::bail!("attribute `outs` must be a list of labels");
+        };
+        recorder.genrule(
+            name.to_owned(),
+            srcs.map(|value| coerce_native_direct_labels(recorder, "srcs", value))
+                .transpose()?,
+            toolchains
+                .map(|value| coerce_native_direct_labels(recorder, "toolchains", value))
+                .transpose()?,
+            cmd.into(),
+            outs,
+            tags.map(|tags| {
+                let mut tags = tags
+                    .items
+                    .into_iter()
+                    .map(CompactString::new)
+                    .collect::<Vec<_>>();
+                tags.sort_unstable();
+                tags.into()
+            }),
+            generator,
+        )?;
+        Ok(NoneType)
+    }
+
     fn package<'v>(
         #[starlark(this)] _native: Value<'v>,
         default_visibility: Option<UnpackVisibility>,

@@ -993,6 +993,11 @@ fn package_graph_from_loaded(
                 visibility_edges,
                 Vec::new(),
             ),
+            PackageTargetKind::Genrule(_) => {
+                return Err(QueryError::unsupported_feature(
+                    "native genrule query projection is unsupported",
+                ));
+            }
             PackageTargetKind::TestSuite { membership, .. } => {
                 let tests = membership
                     .tests()
@@ -1395,6 +1400,11 @@ fn external_package_graph_from_targets(
                 Arc::from([]),
                 Arc::from([]),
             ),
+            PackageTargetKind::Genrule(_) => {
+                return Err(QueryError::unsupported_feature(
+                    "native genrule query projection is unsupported",
+                ));
+            }
             PackageTargetKind::TestSuite { membership, .. } => {
                 let tests = membership
                     .tests()
@@ -2272,6 +2282,19 @@ mod graph_tests {
     use super::QueryNodeKind;
     use super::external_package_graph_from_targets;
 
+    const GENRULE_QUERY_ERROR: &str = "native genrule query projection is unsupported";
+
+    fn genrule_kind(output: &str) -> PackageTargetKind {
+        PackageTargetKind::Genrule(slug_loading_v2::package::GenruleDeclaration {
+            srcs: None,
+            toolchains: None,
+            cmd: "true".into(),
+            outs: Arc::from([CanonicalLabel::parse(output).unwrap()]),
+            tags: None,
+            generator: None,
+        })
+    }
+
     #[test]
     fn unsupported_feature_message_survives_composed_external_label_context() {
         let message = "Slug does not support MODULE.bazel include cycles in direct local_path_override repository '@dep'";
@@ -2524,6 +2547,11 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
                 QueryNodeKind::SourceFile
             );
         }
+        let mut genrule_loaded = (*loaded).clone();
+        genrule_loaded.targets[0].kind = genrule_kind("@@//:generated.out");
+        let error = super::package_graph_from_loaded(&workspace, Path::new(""), &genrule_loaded)
+            .unwrap_err();
+        assert_eq!(error.to_string(), GENRULE_QUERY_ERROR);
         fs::remove_dir_all(&workspace).unwrap();
     }
 
@@ -3092,6 +3120,21 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
                 .to_string()
                 .contains("external repository rule graph is deferred")
         );
+        let genrule = external_package_graph_from_targets(
+            &canonical_repo,
+            &apparent_repo,
+            &package,
+            Path::new("/external/dep+/BUILD.bazel"),
+            &RuleVisibility::Private,
+            &[PackageTarget {
+                name: "generated".to_owned(),
+                kind: genrule_kind("@@dep+//:generated.out"),
+                visibility: VisibilitySource::PackageDefault,
+            }],
+            None,
+        )
+        .unwrap_err();
+        assert_eq!(genrule.to_string(), GENRULE_QUERY_ERROR);
     }
 
     #[tokio::test]

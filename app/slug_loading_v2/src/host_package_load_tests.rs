@@ -944,7 +944,7 @@ fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservat
     epoch.materialized_file(
         instance,
         "/registry-dep/package_defs.bzl",
-        "def emit(): native.filegroup(name='canonical_files', srcs=[Label('@rules_rust//mapped:apparent')])\n",
+        "def emit(): native.genrule(name='canonical_genrule',srcs=['@rules_rust//mapped:apparent'],toolchains=[Label('@rules_rust//:tool')],cmd='c',outs=['mapped.out'])\n",
         901,
     );
     epoch.materialized_file(
@@ -35103,6 +35103,47 @@ async fn repository_package_imported_defs_resolve_labels_and_restore_source() {
     assert!(RepositoryPackageLoadKey::equality(&a, &restored));
 }
 
+#[tokio::test]
+async fn repository_package_genrule_preserves_external_identity_and_source_aba() {
+    let sources = |[cmd, input, toolchain, output, tag]: [&'static str; 5]| {
+        let definition = Box::leak(format!(
+            "def emit(): native.genrule(name='generated',srcs=['{input}',Label('@@dep+//:typed')],toolchains=['{toolchain}'],cmd='{cmd}',outs=['{output}'],tags=['{tag}'])\n"
+        ).into_boxed_str());
+        [
+            (
+                "BUILD.bazel",
+                b"load(':defs.bzl','emit')\nemit()\n".as_slice(),
+            ),
+            ("defs.bzl", definition.as_bytes()),
+        ]
+    };
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let base = ["c", ":i", ":t", "o", "m"];
+    let a = load_repository_package_fixture_on(&dice, &sources(base), 601).await;
+    let package = repository_package_terminal(&a);
+    let crate::PackageTargetKind::Genrule(rule) = &package.targets[0].kind else {
+        panic!("external genrule declaration was not admitted")
+    };
+    assert_eq!(rule.srcs.as_deref().unwrap()[0].to_string(), "@@dep+//:i");
+    assert_eq!(
+        rule.srcs.as_deref().unwrap()[1].to_string(),
+        "@@dep+//:typed"
+    );
+    assert_eq!(
+        rule.toolchains.as_deref().unwrap()[0].to_string(),
+        "@@dep+//:t"
+    );
+    for index in 0..base.len() {
+        let mut changed = base;
+        changed[index] = ["d", ":j", ":u", "p", "n"][index];
+        let b =
+            load_repository_package_fixture_on(&dice, &sources(changed), 602 + index as i64).await;
+        assert!(!RepositoryPackageLoadKey::equality(&a, &b), "field {index}");
+    }
+    let restored = load_repository_package_fixture_on(&dice, &sources(base), 607).await;
+    assert!(RepositoryPackageLoadKey::equality(&a, &restored));
+}
+
 #[test]
 fn package_label_call_source_lookup_is_sparse_and_fail_closed() {
     let identity = |label: &str, path: &str| BzlModuleIdentity {
@@ -37710,14 +37751,11 @@ async fn canonical_package_policy_adapter_reuses_inventory_result_and_epoch_arcs
     let LoadingPreparationOutcome::Complete(Ok(inventory)) = inventory else {
         panic!("canonical package inventory must complete")
     };
-    assert_eq!(
-        inventory.result().as_ref().as_ref().unwrap().targets[0].name,
-        "canonical_files"
-    );
     assert!(matches!(
         &inventory.result().as_ref().as_ref().unwrap().targets[0].kind,
-        PackageTargetKind::Filegroup { srcs, .. }
-            if srcs[0].to_string() == "@@dep+//mapped:apparent"
+        PackageTargetKind::Genrule(rule)
+            if rule.srcs.as_deref().unwrap()[0].to_string() == "@@dep+//mapped:apparent"
+                && rule.toolchains.as_deref().unwrap()[0].to_string() == "@@dep+//:tool"
     ));
     assert!(!inventory.observations().observations().is_empty());
     assert_eq!(

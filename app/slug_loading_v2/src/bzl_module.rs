@@ -5883,8 +5883,11 @@ impl Key for RootPackageLoadObservationKey {
     }
 }
 
-fn loaded_external_target_kind(kind: &PackageTargetKind) -> Option<&'static str> {
-    match kind {
+fn loaded_external_target_kind(
+    target: &crate::package::PackageTarget,
+    targets: &[crate::package::PackageTarget],
+) -> Option<&'static str> {
+    match &target.kind {
         PackageTargetKind::ExportedFile
         | PackageTargetKind::Filegroup { .. }
         | PackageTargetKind::Alias { .. }
@@ -5893,9 +5896,16 @@ fn loaded_external_target_kind(kind: &PackageTargetKind) -> Option<&'static str>
         // when the external BUILD uses `load()`. The load gate only protects
         // target kinds whose loaded form is not yet represented.
         PackageTargetKind::NativeToolchain(_) => None,
+        PackageTargetKind::Genrule(_) => None,
         PackageTargetKind::TestSuite { .. } => Some("test_suite"),
         PackageTargetKind::PackageGroup { .. } => Some("package_group"),
-        PackageTargetKind::GeneratedFile { .. } => Some("generated file"),
+        PackageTargetKind::GeneratedFile {
+            generating_rule, ..
+        } => (!targets.iter().any(|target| {
+            target.name == generating_rule.as_str()
+                && matches!(target.kind, PackageTargetKind::Genrule(_))
+        }))
+        .then_some("generated file"),
         PackageTargetKind::StarlarkRule(_) => Some("Starlark rule"),
     }
 }
@@ -6578,7 +6588,8 @@ fn validate_loaded_repository_package(
         return Ok(());
     }
     if let Some((target, kind)) = loaded.targets.iter().find_map(|target| {
-        loaded_external_target_kind(&target.kind).map(|kind| (target.name.as_str(), kind))
+        loaded_external_target_kind(target, &loaded.targets)
+            .map(|kind| (target.name.as_str(), kind))
     }) {
         return Err(RepositoryPackageLoadError::new(
             RepositoryPackageLoadErrorInner::LoadedTargetKind {

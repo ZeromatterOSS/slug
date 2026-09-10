@@ -23242,3 +23242,17 @@ transitions, toolchain/provider validation, command expansion, actions,
 ActionKey/REAPI identity and output materialization. If the authenticated replay
 selects or analyzes a genrule or generated output instead of merely loading the
 package, the loading successor returns `REPLAN`.
+
+The implementation and authentic loading replay are now independently ACCEPTED.
+Direct producer and generated-output rejection proof passes, with no analysis
+production edit. The targeted root alias stops during external package loading
+at rules_java BUILD:138 -> rules_cc cc_library.bzl:19, before Java runtime or
+genrule analysis, with the existing named-execution-group invocation guard.
+
+This observed boundary selects the docs-only generic named-execution-group
+runtime audit. Preserve the cross-stage reservation above: group-specific
+transitions, constraint/toolchain resolution, ctx.exec_groups, exec properties,
+action routing, structural identity and DICE invalidation need one reviewed
+complete design. Do not move the guard merely to publish a loading target,
+silently choose the default platform or activate the unused prototype. No new
+Stage 6 Rust is authorized until that audit and architecture review complete.

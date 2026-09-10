@@ -4952,3 +4952,149 @@ fn bzl_visibility_allows_same_package_and_rejects_build_cross_package_before_eva
         "{error}"
     );
 }
+
+#[test]
+fn imported_native_genrule_retains_selected_declaration_and_generated_outputs() {
+    let workspace = scratch("imported-native-genrule");
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    let defs = workspace.join("defs");
+    let consumer = workspace.join("consumer");
+    fs::create_dir_all(&defs).unwrap();
+    fs::create_dir_all(&consumer).unwrap();
+    let helper = defs.join("helper.bzl");
+    fs::write(
+        &helper,
+        concat!(
+            "TYPED = Label(':typed.txt')\n",
+            "def make_genrule(name, index):\n",
+            "    native.filegroup(name = name + '_pre')\n",
+            "    native.genrule(name = name, srcs = ['raw.txt', TYPED], toolchains = [TYPED], cmd = 'cp ' + str(index), outs = ['nested/' + name + '.out'], tags = ['z', 'manual', 'a'])\n",
+            "def omitted(name): native.genrule(name = name, cmd = 'true', outs = [name + '.out'])\n",
+            "def empty(name): native.genrule(name = name, cmd = 'true', outs = [name + '.out'], srcs = [], toolchains = [], tags = [])\n",
+        ),
+    )
+    .unwrap();
+    fs::write(
+        consumer.join(BUILD_FILE_PRIMARY),
+        concat!(
+            "load('//defs:helper.bzl', 'make_genrule', 'omitted', 'empty')\n",
+            "make_genrule(name = 'generated0', index = 0)\n",
+            "make_genrule(name = 'generated1', index = 1)\n",
+            "make_genrule(name = 'generated2', index = 2)\n",
+            "make_genrule(name = 'generated3', index = 3)\n",
+            "make_genrule(name = 'generated4', index = 4)\n",
+            "make_genrule(name = 'generated5', index = 5)\n",
+            "omitted(name = 'omitted')\nempty(name = 'empty')\n",
+        ),
+    )
+    .unwrap();
+    let loaded = try_load_package_with_extra_bzl(&workspace, &consumer, &[helper]).unwrap();
+    let rules = loaded
+        .targets
+        .iter()
+        .filter_map(|target| match &target.kind {
+            PackageTargetKind::Genrule(rule) => Some((target, rule)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(rules.len(), 8);
+    let (target, selected) = rules[0];
+    assert_eq!(
+        selected.srcs.as_deref().unwrap(),
+        [
+            CanonicalLabel::parse("@@//consumer:raw.txt").unwrap(),
+            CanonicalLabel::parse("@@//defs:typed.txt").unwrap(),
+        ]
+    );
+    assert_eq!(
+        selected.toolchains.as_deref().unwrap()[0].to_string(),
+        "@@//defs:typed.txt"
+    );
+    assert_eq!(
+        selected.outs[0].to_string(),
+        "@@//consumer:nested/generated0.out"
+    );
+    assert_eq!(selected.tags.as_deref().unwrap(), ["a", "manual", "z"]);
+    let generator = selected.generator.as_ref().unwrap();
+    assert_eq!(
+        (generator.0.as_str(), generator.1.as_str()),
+        ("generated0", "make_genrule")
+    );
+    assert!(generator.2.starts_with("consumer/BUILD.bazel:2:"));
+    let capability = target.rule_capability().unwrap();
+    assert_eq!(
+        (capability.rule_class.as_str(), capability.executable),
+        ("genrule", false)
+    );
+    assert!(
+        rules[6].1.srcs.is_none() && rules[6].1.toolchains.is_none() && rules[6].1.tags.is_none()
+    );
+    assert!(
+        rules[7].1.srcs.as_ref().unwrap().is_empty()
+            && rules[7].1.toolchains.as_ref().unwrap().is_empty()
+            && rules[7].1.tags.as_ref().unwrap().is_empty()
+    );
+    let output = loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "nested/generated0.out")
+        .unwrap();
+    assert!(
+        matches!(&output.kind, PackageTargetKind::GeneratedFile { generating_rule, .. } if generating_rule == "generated0")
+    );
+    assert_eq!(
+        loaded.effective_visibility(output),
+        Some(RuleVisibility::Private)
+    );
+}
+
+#[test]
+fn imported_native_genrule_rejects_unadmitted_and_conflicting_shapes_atomically() {
+    let workspace = scratch("native-genrule-rejections");
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "genrule(name='bare',cmd='x',outs=['x'])\n",
+    )
+    .unwrap();
+    assert!(try_load_package(&workspace, &package).is_err());
+    let cases = [
+        "native.genrule('x', cmd='x', outs=['x.out'])",
+        "native.genrule(cmd='x', outs=['x.out'])",
+        "native.genrule(name=1, cmd='x', outs=['x.out'])",
+        "native.genrule(name='x', cmd=1, outs=['x.out'])",
+        "native.genrule(name='x', cmd='x')",
+        "native.genrule(name='x', cmd='x', outs=1)",
+        "native.genrule(name='x',cmd='x',outs=['o'],srcs=1)",
+        "native.genrule(name='x',cmd='x',outs=['o'],toolchains=1)",
+        "native.genrule(name='x',cmd='x',outs=['o'],tags=[1])",
+        "native.genrule(name='x', cmd='x', outs=[])",
+        "native.genrule(name='x', cmd='x', outs=['x.out'], srcs=select({'//conditions:default': []}))",
+        "native.genrule(name='x', cmd='x', outs=['x.out'], executable=True)",
+        "native.genrule(name='x', cmd='x', outs=['same','same'])",
+        "native.filegroup(name='taken')\n    native.genrule(name='x',cmd='x',outs=['taken'])",
+        "native.genrule(name='x',cmd='x',outs=['dir','dir/out'])",
+        "native.genrule(name='prior',cmd='x',outs=['dir/out'])\n    native.genrule(name='x',cmd='x',outs=['dir'])",
+        "native.genrule(name='prior',cmd='x',outs=['dir'])\n    native.genrule(name='x',cmd='x',outs=['dir/out'])",
+        "native.genrule(name='x',cmd='x',srcs=['same'],outs=['same'])",
+        "native.genrule(name='x',cmd='x',toolchains=['same'],outs=['same'])",
+    ];
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(':defs.bzl','bad')\nbad()\n",
+    )
+    .unwrap();
+    for body in cases {
+        fs::write(
+            package.join("defs.bzl"),
+            format!("def bad():\n    {}\n", body.replace('\n', "\n    ")),
+        )
+        .unwrap();
+        assert!(
+            try_load_package(&workspace, &package).is_err(),
+            "accepted: {body}"
+        );
+    }
+}

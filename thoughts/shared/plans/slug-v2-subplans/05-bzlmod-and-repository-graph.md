@@ -4957,3 +4957,19 @@ the innermost Bzl caller at both facade calls. Add no repository branch,
 source, generated proxy, mapping, request input, DICE key, observation,
 lockfile, cache, lock or fixture. Stage 5 owns only this replay/provenance
 handoff and no changed semantics.
+
+### Imported-genrule acceptance and selected-source correction (2026-09-09)
+
+The accepted targeted root-alias replay clears all six rules_java 9.1.0
+genrule declarations through the existing selected-BCR/Host loading route and
+stops at its BUILD:138 cc_library call. Archive and source hashes are unchanged;
+Stage 4 records the exact scratch input, binary, timeout and terminal provenance.
+No repository/materializer/observation/mapping production changes were needed.
+
+The selected rules_cc lineage is 0.2.17, archive SHA-256
+`283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a`,
+matching the tracked root lock source descriptor and built-in MODULE regression.
+Later historical statements naming selected 0.2.4 do not justify an override;
+the attempted downgrade is rejected acceptance evidence. The successor audits
+generic named-execution-group runtime semantics in Stages 4/6, without a Stage 5
+special case or new source owner.

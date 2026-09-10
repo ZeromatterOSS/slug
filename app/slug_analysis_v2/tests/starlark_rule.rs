@@ -11340,3 +11340,34 @@ made_macro = macro(
         .unwrap_err();
     assert_eq!(restored, expected);
 }
+
+#[tokio::test]
+async fn native_genrule_and_generated_output_fail_before_configured_work() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "def emit():\n    native.genrule(name='blocked',srcs=['missing-src'],toolchains=['missing-toolchain'],cmd='must not run',outs=['blocked.out'])\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(':defs.bzl','emit')\nemit()\n",
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    for target in ["blocked", "blocked.out"] {
+        let key = ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+            test_configuration(),
+        );
+        let error = analyze_request(&dice, &workspace, &key, None, false)
+            .await
+            .unwrap_err();
+        assert!(
+            error.contains("target `@@//:blocked` is not a Starlark rule"),
+            "{error}"
+        );
+        assert!(!error.contains("missing-src") && !error.contains("missing-toolchain"));
+    }
+}
