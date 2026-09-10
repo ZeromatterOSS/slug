@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-configured-cli-authentic-source-closure-audit-r1`
-authentic CLI source inputs](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-selected-bcr-file-capture-design-r1`
+verified local source-capture boundary](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -86,8 +86,10 @@ The cached platforms1.0.0 archive matches its descriptor integrity and contains
 11 regular0640 files/three0750 directories. These generic extractor admissions
 are independently accepted at2/80/82 gross additions; extractor11pass/1ignored
 in3.41s and direct CLI compile pass. Slug-native0755 directory normalization remains.
-Audit the real CLI's existing authentic source inputs next; no closure acceptance
-or full-suite retry is selected.
+The next source audit stops at a concrete transport mismatch: file registries
+produce file MODULE URLs, but selected-BCR capture admits only HTTPS. Pinned Bazel
+supports file mirrors/payloads. Freeze verified file capture across all payload
+roles before implementation; no complete CLI closure or full-suite retry is claimed.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 

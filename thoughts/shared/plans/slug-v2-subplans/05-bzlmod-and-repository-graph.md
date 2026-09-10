@@ -5165,3 +5165,63 @@ retains wrong-kind and special-bit rejection. No source route or lifetime change
 Next audit only existing authentic inputs and lawful producer/transport options
 for the real configured CLI proof, stopping at its first missing input/owner;
 do not infer that the mode correction establishes a hermetic source closure.
+
+### Authentic-source audit stops at selected-BCR file capture (2026-09-10)
+
+WP-5-7A-configured-cli-authentic-source-closure-audit-r1 identifies the first
+concrete transport gap for local authentic inputs, not a runtime failure newly
+replayed. Native HyperRegistryIo accepts file registries, and selected_repo_spec
+preserves their MODULE URL plus its digest. Core parse_archive_plan requires
+HTTPS for archive mirrors, MODULE, patches and overlays; capture URLs additionally
+require unauthenticated HTTPS. Thus an authentic archive-backed module in a file
+registry cannot materialize its own file:// MODULE. Existing local-tar override
+is a different plan and must not become a fallback. No production cache reader
+exists in this native capture path; cached source bodies are evidence only.
+
+Pinned Bazel8220c6198837d5c13d53fea211cf3282aa12408a sources:
+
+- bazel/bzlmod/IndexRegistry.java:245-255,448-538 retains registry MODULE URL/SRI
+  and ordered mirrors, including file mirrors. SHA-256:
+  d254002a53f6bbac5587538da8b3441e86736f13fd4d6eed5692018d09c61bc4.
+- Corresponding IndexRegistryTest.java:testGetArchiveRepoSpec expects a file
+  mirror; testFileUrl exercises local registry bytes.
+  SHA-256:04c43c8865968f794e729fd6a8741a009b5f1bb0eca5048de54429b11364bb6b.
+- bazel/repository/downloader/HttpConnector.java:114-120 opens file URLs;
+  HttpConnectorTest.localFileDownload is its source-derived test theme.
+  Source SHA-256:0355c15e29f1d607d27f8783ef412f0e3c180982c2f053888ad2ce7869605b48.
+
+Paths above are under src/main/java/com/google/devtools/build/lib/ or matching
+src/test/java/. No Bazel/JVM or source content was executed.
+
+The real cached platforms1.0.0 host extension uses existing repository_ctx.os
+name/arch facades and file effects to generate host_platform; this inspection
+does not prove successful extension evaluation. Its rules_license0.0.7 MODULE
+has only dev dependencies; no downstream closure was traversed. Real rules_shell
+0.6.1 descriptor SHA-256:
+20ec05cd5e592055e214b2da8ccb283c7f2a421ea0dc2acbf1aa792e11c03d0c;
+cached release23916 bytes, SHA-256
+e6b87c89bd0b27039e3af2c5da01147452f240f75d505f5b6880874f31036307,
+matching descriptor SRI. Archived shell/sh_binary.bzl matches its cached source
+copy at SHA-256 ab8ff142abbefef817b9cf1c311f3be15dc361b5b4b2a8320c340eb2e9aeeef3.
+Unlike the spent stub registry, this file exists; it loads a private implementation.
+Its descriptor has a registry patch and its MODULE declares further dependencies;
+no complete patched/materialized source closure is claimed or fabricated.
+
+Current immutable request/result owner already binds URL/spec and integrity;
+RepositoryMaterializationResultKey:5223-5335 uses exact request equality and
+generation-scoped transient errors, while captures publish only through existing
+AssociatedImmutable/session/source-certificate owners. Any file transport must
+prove verified-byte capture and failure/recovery at that boundary, not use mutable
+paths as historical snapshots. The capture layer currently eagerly initializes TLS
+even before URL iteration; file-only capture must not acquire TLS/network authority.
+Blocking special-file opens, symlink/path races, URL decoding and cleanup/cancellation
+are unresolved design gates, not incidental parser allowances.
+
+REPLAN to WP-5-7A-selected-bcr-file-capture-design-r1: freeze the generic verified
+file payload category (archive, MODULE, patch, overlay) and primary/mirror source
+projection with a bounded safety/ownership contract. This is a reserved new local
+input/transport boundary, so design review precedes implementation. No cache,
+local_repository, fixture, acquisition or broader scheme admission is selected;
+real CLI and complete R2 acceptance remain open. Stop closure enumeration here.
+Independent terminal review ACCEPTS the source-audit stop and design selection;
+source/hash/diff/preserved-patch checks pass, archive retains only known3.

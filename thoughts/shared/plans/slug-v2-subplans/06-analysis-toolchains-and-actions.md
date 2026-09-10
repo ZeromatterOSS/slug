@@ -23939,3 +23939,8 @@ The mode prerequisite is now independently accepted (2/80/82 additions,
 extractor11pass/1ignored in3.41s, direct CLI compile pass); the next current packet
 audits existing authentic CLI source inputs. R2 restoration/runtime remains deferred
 until its real source/proof route is frozen; no partial candidate or weaker gate.
+The authentic-input audit stops at selected-BCR HTTPS-only payload admission:
+local registry MODULE URLs cannot materialize, despite pinned Bazel file support.
+The new Stage5 file-capture design owns URL/path/safety and immutable publication
+decisions. It does not admit local_repository, supply a complete CLI fixture or
+restore/partially accept R2. No replay was performed.

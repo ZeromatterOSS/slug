@@ -1,81 +1,95 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-5-7A-configured-cli-authentic-source-closure-audit-r1
+Packet: WP-5-7A-selected-bcr-file-capture-design-r1
 
-Status: source audit selected after accepted archive-mode prerequisite.
-Read-only source/cache inspection and bounded documentation edits only.
-No executable tests, binary invocation, replay, acquisition or source-policy edits.
+Status: reserved-boundary design selected after authentic-source audit REPLAN.
+Docs/source only. No Rust, fixture, test/runtime, acquisition or replay authority.
 
-## Observable result and immediate predecessor
+## Observable result and learned boundary
 
-Identify the first missing authentic input or producer needed for the unchanged
-one-shot/stable-daemon cquery/aquery/build/run conflict proof. Freeze a lawful
-bounded successor with exact input provenance and ownership, not a smaller CLI
-assertion, fake platform/module body, explicit platform flag or local override.
+Freeze an implementable, independently reviewed verified local-file capture
+contract for the selected-BCR archive/MODULE/patch/overlay category, including
+primary and mirror source URLs. Do not merely weaken a URL guard or deliver a
+test-only cache bypass. This packet designs a new local-input/transport boundary;
+implementation follows only when every safety/ownership question below is settled.
 
-Generic regular0640/directory0750 admission is independently ACCEPTED:
-2 production/80 proof/82 gross Rust additions. Two independent red tests fail
-at unsupported entry mode; green2/0.00s; full extractor11pass/1ignored/3.41s;
-direct slug_cli_v2 compile, formatting/diff and saved-R2 applicability pass.
-All commands timeout60. No CLI/source closure or combined runtime acceptance.
-Stage5 owns pinned source and cached platforms1.0.0 descriptor/archive hashes.
-Regular mode retention is exact; directory0755 normalization remains Slug-native.
-That source includes host/constraints.bzl forwarding to @host_platform and
-requires rules_license; no executed proof of those downstream paths is claimed.
+The accepted mode prerequisite0f45fab28 admits regular0640/directory0750
+(2/80/82 gross additions, extractor11pass/1ignored/3.41s). It remains accepted.
+Source audit then found: HyperRegistryIo reads file registries and Bzlmod retains
+their MODULE URL/SRI, but core SelectedBcrArchive and native capture require HTTPS
+for every payload. Local archive-backed registry modules therefore cannot supply
+their file MODULE capture. This is a source-proved boundary, not a replay result.
+Cached real platforms/rules_shell sources do not establish a full CLI closure.
 
-## Bounded source questions
+Read Stage5's "Authentic-source audit stops at selected-BCR file capture" for
+exact cached provenance, source hashes and producer anchors. Pinned Bazel9.2 is
+/home/wgray/bazel git object8220c6198837d5c13d53fea211cf3282aa12408a.
+IndexRegistry.java:245-255,448-538 and IndexRegistryTest.testFileUrl/
+testGetArchiveRepoSpec establish local registry MODULE and file mirror projection.
+HttpConnector.java:114-120 and HttpConnectorTest.localFileDownload establish
+file payload transport. Preserve mirror order and existing checksum/transform
+semantics; broad arbitrary schemes/URL forms are not implicitly accepted.
 
-Read Stage6's selected-request and configured-action-closure contracts, preserved
-R2 CLI fixture, and Stage5's latest source audit. Never restore R2 in this audit.
-Trace only the demanded real host-platform and builtin tools/test source path:
+## Decisions required before implementation activation
 
-1. Inspect existing authentic platforms1.0.0 host extension and relevant
-   rules_license/rules_shell metadata/source archives already present locally.
-   Verify descriptor/archive integrity, version, actual required file and direct
-   source dependencies. Do not enumerate/download arbitrary dependency closure.
-2. Trace existing Host canonical source projection, immutable materialization
-   request, tracked source observations and source certificates for those paths.
-   Determine whether existing transport/scaffolding can supply real CLI inputs
-   without untracked filesystem reads, source overrides or invented builtin files.
-   Cached files are evidence, not automatic production cache-ingestion authority.
-3. Stop at the first missing input or unsupported producer. Name the concrete
-   source/provenance/transport or semantic decision required. Freeze implementation
-   only with compatibility class, natural owner, exact files/caps, safety/lifecycle
-   proof and independent review. If evidence is insufficient, retain that explicit
-   stop; never infer a complete hermetic closure from archive admission.
+1. Define one admitted file URL/path grammar and platform boundary for all four
+   payload roles; reconcile Bzlmod primary source absoluteness with core parser
+   and capture validation. Name unsupported authorities, credentials, ports,
+   queries/fragments, Unicode/percent decoding and path forms explicitly from
+   pinned evidence. Do not create divergent URL validators or silently broaden
+   HTTPS/auth/redirect behavior. HTTP-to-file redirects are a separate decision.
+2. Choose the existing natural capture/request owners and cohesive module split.
+   Keep local file input separate from LocalTar override and local_repository.
+   Preserve expected SRI, byte caps (archive128MiB/MODULE1MiB/patch8MiB/overlay64MiB),
+   ordered mirror handling and exact successful capture. No production cache
+   scanning, locator inference, dependency/source override or persistent side store.
+3. Specify safe opening and reads of regular files: special-file blocking, symlink
+   and path replacement races, descriptor identity, mutation during capture,
+   finite buffers, overflow/size checks, cancellation and deterministic errors.
+   No metadata-check-then-unbounded-blocking-open shortcut. Define unsupported
+   OS/filesystem guarantees honestly; do not claim arbitrary historical snapshots.
+4. Prove how verified immutable bytes enter existing AssociatedImmutable and Host
+   final source-certificate publication. Existing request equality/digest and
+   generation-scoped error retry may suffice, but source evidence must establish
+   successful reuse, changed content, missing/create/delete/repair and overlapping
+   sessions. Do not assume mutable paths equal content-addressed immutable inputs.
+5. Keep file-only capture free of TLS initialization/DNS/network. Current public
+   capture wrappers eagerly create NativeEnvironment; freeze a bounded lazy
+   transport choice and its phase lifetime without a new service/global cache.
+   Consult the utility skill/Stage9 only if proposing retained representation.
+6. Freeze exact production/proof files, gross caps and a cohesion decision.
+   Require tiny source-derived local-file red/green, byte/SRI mismatch, every
+   payload cap, URI rejection, mirror ordering, no-network success, failure/
+   cancellation cleanup and generation/recovery/publication proof. Reuse existing
+   archive capture/extraction helpers and direct compile consumers, no full suite,
+   giant fixture tree or external archive replay. All later commands timeout60;
+   investigate over one minute, fifteen minutes absolute maximum, no longer retry.
 
-The spent registry rules_shell0.6.1 has only MODULE/source.json/BUILD with
-exports_files([]), not shell/sh_binary.bzl. Its fixture.toml declares discovery
-scaffolding, not registry source evidence. Do not grow it or propose
-local_repository admission alone to manufacture success. Prefer authentic existing
-inputs and source-derived proof; do not redo baseline tests or spent CLI setup.
+Compatibility: pinned named local-file/mirror/verified-payload behavior may be
+exact once the admitted subset is specified; Rust filesystem observations,
+bounded failures, Unicode paths and structural identity remain Slug-native.
+Everything not frozen stays unsupported/deferred. No new retained state/key,
+fallback or ownership change is already authorized. If needed, justify it through
+the plan-authoring checklist and independent reserved architecture review.
 
-Pinned Bazel authority remains /home/wgray/bazel git object
-8220c6198837d5c13d53fea211cf3282aa12408a, never checkout HEAD. Inspect only relevant
-builtin/module/extension/repository source and tests for any new exact claim.
-Rust Host observations and structural identity remain Slug-native. No new
-retained state, key/cache/utility, fallback, lifetime or optimization is selected;
-existing DICE equality, cancellation and final publication remain mandatory.
+## Exact design scope and terminal gates
 
-## Scope, validation and handoff
-
-Writable repo files: this manifest, canonical Live Status and relevant Stage5/6
-owner status; routing log only on REPLAN. <=150 added doc lines outside manifest.
-Maintain /home/wgray/PROGRESS.md <=500 lines. No Rust, dependencies, fixtures,
-harnesses, registry/cache/archive bodies, source inputs or vendored edits.
+Writable docs: this manifest, canonical Live Status and relevant Stage5/6 owner
+status; routing log only on REPLAN. <=180 added doc lines outside manifest.
+Keep /home/wgray/PROGRESS.md <=500 lines. Read only named capture/source owners,
+relevant existing helpers/tests and pinned sources needed for the six decisions.
+No Rust/dependency/harness/fixture/cache/registry/source-input/vendored edits.
+No tests, binary/CLI/Bazel/oracle/daemon/network commands, acquisition or replay.
 Never inspect/print/copy ~/.bazelrc or derived secrets.
-No test/runtime/CLI/Bazel/oracle/daemon/network commands, acquisition or replay.
-Read-only inspection, source hashing/listing, git diff --check, preserved-patch
-hash/applicability and archive checker are allowed; only known3 thoughts failures.
-Require independent terminal review; commit/push accepted audit/scheduling work.
-An implementation or new runtime proof requires a separately frozen bounded
-contract. Tests over one minute require investigation;15 minutes absolute maximum,
-initial timeout60 and no automatic longer retry remain future execution limits.
+Validate source/structure, diff, candidate preservation and archive checker
+(only known3 thoughts paths). Require independent terminal design review, then
+commit/push accepted design and select its exact implementation contract.
+An unresolved safety/identity owner, unbounded scope or second material
+correction returns REPLAN; never substitute a fake-platform control for real CLI.
 
 Complete unaccepted R2 remains /tmp/slug-conflict-r2.XZJWwv/candidate.patch,
 base97dffd5d4, SHA-256
 90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e.
-Adjacent validation.txt owns gates;757 production/2103 proof/2860 total additions.
-Two fast core failures reproduce on accepted nodep baseline; remaining full-core
-failures stay unattributed. Actual CLI/daemon and positive common REAPI sharing
-remain open. Do not partially ship R2, weaken its gate or reactivate broad replay.
+Adjacent validation.txt owns all passed/failed/unrun gates. Do not restore or
+partially ship R2 here. Actual one-shot/stable-daemon CLI and positive common
+REAPI sharing remain open; only two fast core failures are baseline-attributed.
