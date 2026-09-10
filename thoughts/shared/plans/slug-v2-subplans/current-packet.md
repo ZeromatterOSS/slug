@@ -1,109 +1,136 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-6-7A-rule-execution-group-runtime-design-r1
+Packet: WP-6-7A-selected-toolchain-request-implementation-r1
 
-Status: docs/source design selected by the named-only runtime audit's REPLAN.
-No Rust implementation or runtime admission is authorized by this packet.
+Status: independent architecture review ACCEPT; prerequisite implementation
+selected within the frozen scope below. No Rust changed in the design milestone.
 
-## Immediate predecessor and learned facts
+## Immediate predecessor and decision
 
-Imported native genrule loading is accepted and pushed as `de62232ad`.
-Its authenticated root-alias replay cleared all six rules_java helper calls,
-then stopped at toolchains/BUILD:138 -> rules_cc cc/cc_library.bzl:19 with
-`target invocation for named execution-group semantics is unsupported`.
-No package, genrule analysis or Java runtime analysis published.
+The shared rule execution-group design returns REPLAN to this prerequisite.
+Pinned Bazel 9.2 gives selected toolchain implementations the parent's unchanged
+configuration plus a separate execution-platform preference in their key.
+Slug currently substitutes an Exec configuration; one selected-toolchain test
+asserts the resulting target-option loss. Correct this semantic defect before
+activating named/automatic groups. Do not rerun the completed general audit.
 
-The named-execution-group audit authenticates rules_cc 0.2.17's generated
-proxy and complete private cc_library declaration. It declares named
-`cpp_link` plus `_use_auto_exec_groups=True`, with the same mandatory C++
-toolchain requirement on the default declaration and named group. There are
-no named `config.exec` edges in this library's schema: `_def_parser` uses
-ordinary `cfg="exec"`; the two named test transitions belong to another rule.
-There is no initializer; its computed-default runtime remains independently
-unsupported. Stage 4 records exact member hashes and source anchors.
+Stage 6, "Selected-toolchain request correction before group activation
+(2026-09-10)", is the frozen representation, propagation, evidence and proof
+contract. It also retains resolved automatic-policy/action/alias decisions for
+the subsequent complete group-runtime design. The authenticated rules_cc guard
+and independent computed-default boundary stay unchanged; no package/Java
+runtime success is claimed. Imported native genrule loading remains accepted
+at de62232ad; the prior named-only audit is committed at 87e705ef7.
 
-Named-only activation cannot erase the selected automatic policy. Stage 6's
-"Rule execution-group runtime prerequisite: named-only REPLAN" records the
-pinned behavior matrix, live gaps, shared ownership obligations and tests.
-Reuse it; do not repeat archive downloads, authentic replay or the entire audit.
+## Observable result and authority
 
-## Observable result and reserved decision
+Two platforms are registered A then B. A parent's selected toolchain requires
+B; its implementation declares no toolchains and writes an output. The
+implementation retains the parent's target configuration/settings while its
+default action context selects B. Its ordinary Exec attributes still perform
+the existing Exec transition. First observe the new regression fail, then fix
+the complete direct-toolchain request category, not only that fixture.
 
-Produce one independently reviewed, implementation-ready contract for the
-shared generic rule execution-group runtime needed by this owner: default,
-named and automatic group normalization/resolution and their dependency,
-provider/property/action consumers. Explicitly classify test-runner and rule
-inheritance behavior; configured aspects remain deferred. This is one shared
-cross-stage abstraction, not a rules_cc/C++ branch or a loading-only bridge.
+Bazel authority is local git object 8220c6198837d5c13d53fea211cf3282aa12408a
+in /home/wgray/bazel, not its working HEAD. Reuse the Stage 6 anchors in
+DependencyProducer, PrerequisitesProducer, ConfiguredTargetKey,
+TargetAndConfigurationProducer, DependencyResolver, ToolchainContextUtil,
+UnloadedToolchainContextsProducer, ToolchainResolutionFunction and PlatformKeys.
+Adapt the named forceExecutionPlatform tests and keepParentToolchainContext;
+the latter is source/synthetic-key evidence, not a full end-to-end replay.
+The C++ coverage-action variant is deferred with that unsupported action family.
 
-Close the remaining design questions: automatic flag/attribute precedence,
-default versus per-toolchain requirements, generated-name identity and alias
-handling, toolchain-to-action inference including omitted versus explicit None,
-named+toolchain compatibility, and common group constraint/property ownership.
-Extend the already traced named behavior; do not run a second general audit.
-Freeze exact files, compact fields/keys, caps and executable proof commands.
-If the category cannot be bounded, identify a concrete prerequisite owner and
-its observable contract; do not authorize a partial guard removal.
+Exact: admitted direct implementation configuration, preference priority and
+edge-specific propagation. Slug-native: tracked DICE state, structural owner
+identity, key framing and existing paths. Deferred: named/automatic activation,
+test groups, rule inheritance, configured aspects/subrule contexts, manual
+feature-flag trimming, new platform policies, exact Bazel configuration/path
+bytes, broader execution and action families. No compatibility fallback added;
+delete the old selected-implementation Exec substitution/assertions outright.
 
-## Authority and implementation-readiness gates
+## Ownership, identity and bounded scope
 
-Use Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-from local git objects, not the different `/home/wgray/bazel` working HEAD.
-Read the Stage 6 audit's relevant anchors and remaining automatic-policy
-consumers/tests: DeclaredExecGroup, UnloadedToolchainContextsProducer,
-ToolchainCollection, RuleContext, StarlarkActionFactory, StarlarkAttributesCollection,
-StarlarkRuleClassFunctions and AutoExecGroupsTest. Establish precise public
-behavior/failure order from source and discriminating tests before claiming
-exactness. Internal Java identity/state-machine assertions are not Slug APIs.
+Use existing configured-node and resolution DICE owners, an optional shared
+canonical platform label in full/retained keys, one analysis-owned projection,
+and the existing FileWrite owner encoder. Keep configuration payload bytes
+separate. Default constructors clear the preference; same-node incoming rule
+transitions preserve it, ordinary attributes including alias.actual do not.
+Known-platform preference lookup cannot discover arbitrary labels. The optional
+known-preference topology field preserves provenance without inventing a
+registration candidate. Stage 6 freezes its zero/all-optional target-platform
+case, alias lookup and suitable-first/fallback behavior.
 
-Read the plan-authoring guide and docs/developers/dice.md. Apply the Buck2
-utility skill only for proposed retained representation, using the matching
-Stage 9 rows, not a broad donor archaeology pass. Obtain one independent
-architecture/retained-state review before authorizing implementation.
+Seven production files, exactly:
 
-Required contract:
+- app/slug_analysis_v2/src/key.rs
+- app/slug_build_api_v2/src/analysis_value.rs
+- app/slug_analysis_v2/src/dice.rs
+- app/slug_analysis_v2/src/analysis_value.rs
+- app/slug_analysis_v2/src/starlark_rule.rs
+- app/slug_analysis_v2/src/result.rs
+- app/slug_core_v2/src/runtime/file_write_identity.rs
 
-- Loading-owned normalized declarations/named transitions through final target
-  equality; immutable request/configuration inputs and tracked source/repository
-  observations, with no command-side semantic reconstruction.
-- Constraint-bearing resolution inputs, including zero-toolchain groups; one
-  configured-target-owned immutable group collection supplying selected Exec
-  configurations, toolchain provider views, properties and action routing.
-- Distinct target/Exec and default/named/automatic identity; complete structural
-  equality/invalidation with unchanged configuration/path/ActionKey/REAPI domains.
-- Source/configuration/platform A/B/A; unchanged-input cutoff; overlapping
-  requests; cancellation/Need/error, atomic parent publication and final source
-  validation. Never fabricate historical Host snapshots.
-- Retained/scratch/view/async lifetimes, compact sharing and Allocative;
-  no second global registry, side cache or lock across DICE awaits.
-- Pinned-source regressions/focused oracles for actual evidence gaps, default
-  controls and named downstream consumers. Reuse existing scaffolding and
-  record fixture provenance; do not add copied real-workspace breadth.
-- Exact file allowlist and production/proof/aggregate growth caps, with a
-  bounded split or concrete cohesion decision for large package.rs/dice.rs.
-  No placeholder caps or unspecified public/schema consumers at handoff.
+Additional proof files, exactly:
 
-Exact describes only established admitted Bazel surfaces. Host/DICE integrity
-and structural identities are Slug-native. This design admits nothing yet;
-later computed defaults, C++/Java providers/actions, configured aspects,
-broader action/execution families and exact configuration bytes stay deferred.
+- app/slug_build_api_v2/tests/analysis_value.rs
+- app/slug_analysis_v2/tests/configured_target.rs
+- app/slug_analysis_v2/tests/starlark_rule.rs
+- app/slug_core_v2/src/runtime/dice.rs (proof only)
+- app/slug_reapi_v2/tests/reapi.rs (proof only)
 
-## Scope and stops
+Inline tests in the seven production files count as proof. Gross caps, counting
+moved lines: 900 production / 1,800 proof / 2,700 aggregate Rust additions.
+Docs: this manifest, canonical Live Status and relevant Stage 4/6 owner sections.
+No loading, configuration, query, REAPI transport or runtime-orchestration
+production edits, fixtures, dependencies, vendored sources or harness changes.
+Stage 6 records the concrete cohesion decision for large producer/evaluator
+files, retained/scratch/view/async lifetimes, nullable Arc/Allocative reuse,
+source certificates, cancellation and eviction. No locks across DICE awaits,
+side cache, command reconstruction, fresh-graph workaround or new interner.
 
-Allowed edits: this manifest, canonical Live Status, and relevant Stage 4/6
-owner sections. No Rust, fixtures, vendored sources, harness, dependencies,
-runtime or repository changes. Design additions are capped at 300 text lines
-excluding manifest replacement. Keep reusable decisions compact, with Git
-history retaining completed chronology.
+## Discriminating proof and validation
 
-Never move the named invocation guard just to publish loading targets, erase
-group names, substitute the default platform or wire the unused
-toolchains/exec_groups.rs prototype into live analysis. A new semantic owner,
-request projection, async boundary or default behavior change needs explicit
-contract/review; a second material design correction is REPLAN.
+Use existing Rust source-derived workspace scaffolds; no new oracle fixture or
+network replay. New regressions use the prefix selected_toolchain_request_.
+Cover the Stage 6 matrix: full-key Eq/Hash/Ord, None/A/B discrimination and
+unchanged config bytes; options, aliases, incoming transitions, ordinary and
+nested edges; suitable preference before optional coverage, unavailable or
+unsuitable fallback, no match and empty/all-optional known target preference;
+same-DICE source/configuration/platform/property A/B/A and unchanged cutoff;
+overlapping preference requests, cancellation/Need/error/recovery and atomic
+publication; provider/derived-file owner identity, closure-resolved FileWrite
+bytes and direct configured REAPI handoff. The REAPI digest still represents
+the actual command/action payload, never the structural owner key itself.
+Do not reconstruct full keys from only label/configuration in proof helpers.
+Exercise two preference variants in one closure: retain distinct owners and
+preserve existing output-conflict rejection; a required path redesign is REPLAN.
 
-Validation here is source/structure checks and `git diff --check`; no build or
-network replay is needed. The stopped checkout-wide query must not restart.
-Tests above one minute require investigation; fifteen minutes is the absolute
-maximum. Preserve the separately demonstrated path-epoch fanout concern, with
-no longer-timeout, disabled-provenance or fresh-graph workaround.
+Run these commands serially from the checkout with PATH containing the pinned
+nightly-2025-09-14-x86_64-unknown-linux-gnu toolchain. Every command starts with
+a 60-second limit; investigate timeout before any targeted retry. Fifteen
+minutes is the absolute per-test maximum, not a default timeout. A filter must
+run its intended nonzero tests; inspect failures, not only the exit code.
+
+```sh
+timeout 60s cargo test -q -p slug_analysis_v2 --test starlark_rule selected_toolchain_request_
+timeout 60s cargo test -q -p slug_analysis_v2 --test starlark_rule selected_toolchain_
+timeout 60s cargo test -q -p slug_analysis_v2 --test starlark_rule root_toolchain_
+timeout 60s cargo test -q -p slug_analysis_v2 --test starlark_rule default_exec_
+timeout 60s cargo test -q -p slug_analysis_v2 --test starlark_rule rule_transition_
+timeout 60s cargo test -q -p slug_analysis_v2 --test configured_target
+timeout 60s cargo test -q -p slug_build_api_v2 --test analysis_value
+timeout 60s cargo test -q -p slug_core_v2 --lib selected_toolchain_request_
+timeout 60s cargo test -q -p slug_reapi_v2 --test reapi
+timeout 60s cargo check -q -p slug_query_v2 -p slug_core_v2 -p slug_reapi_v2 -p slug_cli_v2
+timeout 60s cargo fmt --all -- --check
+git diff --check
+```
+
+At milestone, run affected owner suites once, serially and under the same
+limits; rebuild CLI before any later binary validation. No checkout-wide
+query, downloads, credential access or authentic replay is needed here.
+Require independent identity/architecture and terminal review. A missing
+retained consumer, new semantic/async owner, cap overflow, path redesign or
+second material correction is REPLAN, not permission to broaden the allowlist.
+After acceptance resume the shared named/automatic group-runtime contract;
+never move the invocation guard or substitute a default group to make progress.

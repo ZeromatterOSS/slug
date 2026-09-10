@@ -23393,3 +23393,214 @@ computed defaults, C++/Java providers/actions, aspects and execution remain
 separate unsupported owners. The path-epoch performance issue is unchanged;
 do not restart checkout-wide replay, exceed the user's test limits, disable
 provenance or use a fresh graph to hide it.
+
+### Selected-toolchain request correction before group activation (2026-09-10)
+
+`WP-4-6-7A-rule-execution-group-runtime-design-r1` returns `REPLAN` to
+`WP-6-7A-selected-toolchain-request-implementation-r1`. This is a concrete
+configuration/identity prerequisite, not permission to admit a smaller
+execution-group category. Named/automatic runtime activation stays reserved
+until its complete cross-stage contract is ready. The prerequisite corrects
+the live selected-toolchain producer for ordinary rules, then group design
+resumes from the learned facts below without another general audit.
+
+Independent Sol architecture/REPLAN review accepts the frozen prerequisite
+contract, including alias lookup and the known-target all-optional case.
+Source/structure and diff checks pass; no Rust/test/build/replay acceptance is
+claimed. Implementation fidelity at full-key projection, alias clearing and
+atomic same-DICE interleaving/cancellation remains the named residual risk.
+
+#### Remaining group decisions resolved by pinned source
+
+At Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`:
+`RuleClass.AutoExecGroupsMode.isEnabled:169-193` makes ordinary dynamic mode
+use the private attribute when present (false and true both override the flag),
+otherwise the native flag. Auto on empties default requirements and creates
+one group per declared toolchain type; auto off retains the default requirements.
+`skyframe/toolchains/ToolchainContextUtil.java:54-92,120-245` and
+`DeclaredExecGroup.process` own this normalization and target group constraints.
+
+`RuleContext.java:1091-1141` uses direct automatic-group lookup followed by
+resolved requested-label alias lookup for `ctx.toolchains`; action
+`toolchain=` does not get that alias-search fallback. `StarlarkRuleContext.java:
+860-909` builds a composite automatic view or default view and thin
+`ctx.exec_groups`. Explicit action group names still pass public-name validation;
+the internal automatic label string is not a user-nameable `exec_group=`.
+`StarlarkActionFactory.java:129-138,405-472,718-895` distinguishes omitted
+toolchain from explicit None. Under auto policy, no explicit group and multiple
+contexts, an unassociated executable/tool requires explicit toolchain or None;
+recognized dependency runfiles and string executables do not trigger that check.
+Nested tool depsets trigger it before element-type conversion. This is validation,
+not automatic inference of a toolchain label from an artifact.
+Slug's `subrule_invocation.rs::bind_toolchain` currently erases None/omission;
+the future complete group packet must fix that at the binder, not in the sink.
+
+`AutoExecGroupsTest:303-431,488-705,750-824,1279-1305,2500-2558` supplies the
+policy/action/alias discriminators. Ordinary rule inheritance via `rule(parent=)`
+is not currently admitted by Slug; preserve its rejection, not an invented copy
+keyword. `rule(test=True)` injects a test group in Bazel
+(`StarlarkRuleClassFunctions.java:1064-1080`) and has separate test-action
+ownership; that category and configured aspect/subrule toolchain contexts remain
+deferred. These decisions activate nothing in the selected prerequisite.
+
+#### Contradiction and authoritative correction
+
+Bazel's direct toolchain implementation edge does **not** apply the ordinary
+Exec configuration transition. `analysis/producers/DependencyProducer.java:
+161-176` passes the parent's configuration and separately the selected group's
+execution-platform label; `PrerequisitesProducer.java:350-355` attaches that
+label to the configured-target key. `skyframe/ConfiguredTargetKey.java:
+127-139,188-220` includes it in equality/hash. The pinned
+`skyframe/toolchains/README.md:31-45` explicitly distinguishes this mechanism
+from a configuration transition. Toolchain-resolution tagged trimming
+(`RuleTransitionApplier.java:187-218`) is not an implementation-edge Exec
+transition; manual feature-flag trimming remains unadmitted in Slug.
+
+In contrast, live `dice.rs::prepare_selected_toolchain_context:3525-3695`
+constructs implementations in the selected platform's Exec configuration.
+`tests/starlark_rule.rs::selected_toolchain_accepts_declared_actions_and_default_outputs`
+asserts Exec and removal of target-scoped settings at 2625-2643. Those
+assertions encode the defect, not compatibility evidence. The new packet must
+replace them: preserve the parent's configuration/target-scoped settings on the
+implementation edge; only the implementation's actual Exec attributes perform
+Exec projection. Semantic option loss cannot be classified as a Slug-native
+checksum/path-byte divergence.
+
+The child default context receives the separate preference through
+`DependencyResolver.java:477-510` and `ToolchainContextUtil.java:120-143`.
+It is a **preference**, not unconditional forcing:
+`ToolchainResolutionFunction.java:324-359` selects it first if suitable, otherwise
+continues ordinary eligible-candidate selection. `PlatformKeys.java:255-305`
+looks it up among the known target/execution platforms; absent preferences do
+not trigger new discovery. Zero requirements still honor a suitable preference.
+Allowed-toolchain-type platform policy is already outside Slug's admitted
+platform schema; do not silently admit it while implementing this preference.
+
+Propagation is edge-specific. Incoming rule-transition delegation preserves
+the preference and the existing apply-transition marker
+(`TargetAndConfigurationProducer.java:304-316`). Ordinary Target/Exec/Starlark
+attributes, including alias.actual, do not copy it
+(`DependencyProducer.java:268-334`; `rules/Alias.java:61-96`).
+A direct alias wrapper may carry the preference, while its actual does not.
+Each nested direct toolchain edge gets its own selecting context's platform.
+Future named/automatic child contexts use fresh unforced resolution keys
+(`UnloadedToolchainContextsProducer.java:100-124`), not the child default's hint.
+Direct source/nonconfigurable implementations still fail the existing
+ToolchainInfo/provider boundary; this packet does not invent a successful
+nonconfigurable toolchain category.
+
+#### Frozen prerequisite representation and producer contract
+
+Add `toolchain_execution_platform: Option<Arc<CanonicalLabel>>` for the preference
+to `ConfiguredTargetKey`, not `ConfigurationKey` or the native option vector.
+Default construction is None; one explicit toolchain-key constructor/builder
+sets it from the selected platform's canonical actual label. Allocate/share one
+label Arc per selected context across implementation requests. Derived Eq/Hash/
+Ord/Allocative must include label contents, not pointer identity. Preserve it
+on same-node incoming-transition delegation, including non-idempotent final
+keys. Keep user-facing label/configuration display unchanged; display is not
+semantic identity.
+
+The existing `ConfiguredNodeAnalysisKey` and observation wrapper inherit this
+field through their node; no new DICE key family or global owner. Extend
+`ConfiguredToolchainResolutionKey` and its observation wrapper with the same
+optional structural preference, supplied from the analyzed owner's key.
+Resolution retains existing tracked registration/platform/toolchain producers
+and selection order, changing only suitable-preference priority, including
+empty requirements. Known target-platform preference may need an Exec-shaped
+platform view for Slug action ownership; obtain it through the existing tracked
+platform producer without changing the candidate registration sequence.
+Add `known_preferred_execution_platform: Option<ConfiguredTargetKey>` to
+`ToolchainTopology`, produced only from the resolver's tracked known-platform
+lookup and passed through analysis finalization. Its constructor validates Exec
+shape and accepts a selected platform only from candidates or this explicit
+known preference. Keep the field in structural equality/Allocative; do not
+fabricate registration. A target platform outside the candidate sequence has no
+resolved toolchain matches: empty/all-optional requirements can select it, but
+do not run declaration matching against it as an extra registered candidate.
+Preserve pinned `PlatformKeys.find` alias lookup: resolved target and host labels,
+ordinary registered requested labels; the selected platform's actual label is
+the preference on a direct implementation edge. An actual label reachable only
+through an ordinary registration alias is not arbitrary discovery permission.
+
+Selected implementation requests use the parent owner configuration unchanged,
+plus the preference. Requested selection rows keep that full key; actual rows
+keep the exact analyzed/delegated result key. Update the context invariants that
+currently equate implementation configuration with execution-platform Exec
+configuration: requested implementation configuration equals owner configuration;
+actual identity is the producer's validated transition/alias result, not a
+reconstructed key or an assumed unchanged configuration. Toolchain type
+requests remain in owner configuration and action platforms remain Exec-shaped.
+
+Replace lossy label/configuration reconstruction in `compute_actual_child` and
+`observed_configured_result` with the existing full-node compute path.
+Ordinary attribute construction deliberately starts with no preference; this is
+not a blanket propagation rule. Preserve full keys through cycle tracking,
+selected-toolchain edges, query/closure membership and runfiles package collection.
+
+Extend the Arc-backed `AnalysisConfiguredTargetKeyData` with the same optional
+shared label. Add one analysis-owned projection from full configured key and use
+it at all four production conversion sites: dice artifact lowering, loaded-rule
+owner creation and both materializer target routes. Derived artifacts, providers,
+FilesToRun and runfiles then retain this owner distinction through existing
+structural equality. Never append it to the configuration byte payload.
+
+FileWrite semantic identity adds one optional tagged canonical-label field to
+its configured-owner encoding; None preserves existing bytes, Some differs even
+for identical label/configuration/content/platform. This is a Slug-native owner
+projection, not Bazel checksum, output-path spelling, ActionKey or REAPI digest.
+No new execution/action family or output-path algorithm is admitted.
+
+#### Proof, lifetime, complexity and stop contract
+
+Pinned tests: `ToolchainResolutionFunctionTest.resolve_forceExecutionPlatform`,
+`_alias`, `_host`, `_host_alias`, `_noRequiredToolchains`;
+`ToolchainsForTargetsTest.keepParentToolchainContext` is a synthetic-key source
+discriminator, not a prior successful end-to-end Slug replay. Add source-derived
+Rust regressions for the live consumer: two registered platforms A then B, parent
+toolchain restricted to B, implementation with no toolchains and a FileWrite;
+its options stay Target while its action platform is B. Include ordinary Target
+and Exec child controls, nested toolchain selection, suitable preference over
+greater optional coverage, unsuitable/absent preference fallback and no match,
+platform aliases, incoming transitions, alias.actual clearing and missing source/
+wrong-provider terminals. The existing named-group guard remains covered.
+
+Required same-DICE cases: source and registration/platform/property A/B/A;
+target-setting/native option preservation versus actual Exec projection;
+None/A/B/A request interleaving; concurrent distinct preferences; cancellation/
+Need/error and recovery without partial parent/provider/action publication.
+Retained provider/derived-file identity and FileWrite owner bytes must distinguish
+None/A/B even when all other fields match; None preserves old controls. Use full
+retained keys, not helper reconstruction that omits the field.
+
+Memory is DICE-retained semantic state: one nullable Arc per configured key/
+retained target payload/resolution key plus the topology's optional known key,
+sharing label/configuration storage rather than new maps.
+No command cache, new interner, global registry or unowned evaluator borrow.
+Constructor/key scratch and joined child buffers release with their phase; views
+expire with existing tokens; DICE reachable versions/results own retained release
+and service shutdown. Cancellation may leave valid DICE child cache entries but
+publishes no incomplete parent; existing scoped joins/cycle guard and final source
+certificate remain authoritative. Never hold a shared lock over a DICE await.
+Reuse current Arc/Allocative utilities (Stage 9 Stages 3/6 utility row); V1/Buck2
+are concept/utility guidance only, no donor code or new dependency is imported.
+DICE worker equality/dependency/cancellation tests cited in the prior section
+remain applicable, not Bazel semantics.
+
+Exact runtime/proof files and gross caps are frozen in the manifest:
+900 production / 1,800 proof / 2,700 aggregate additions, counting moved lines.
+The seven production files stay cohesive: key/carrier definitions, four thin
+projections, existing resolution/delegation orchestration, result invariants and
+the existing owner encoder. `dice.rs` stays the established single producer;
+no new policy dispatcher or helper graph. Its selection helper must remain local
+and bounded rather than copying the 460-line resolver. Large carrier/evaluator
+files receive only fields/projections/invariants; tests reuse existing scaffolds.
+
+The implementation must first add the nonfirst-platform/parent-option regression
+and observe its expected failure, then fix the complete request category.
+No archive/real-workspace replay is needed to discriminate this prerequisite.
+No source overrides, fresh graphs, disabled provenance or longer-timeout workaround.
+A new configuration domain, alternate forced-key side store, arbitrary preference
+discovery, missing retained consumer, cap overflow or second material correction
+is REPLAN. Group constraints/policy/views/action routing remain the immediate
+post-correction design, not silently forgotten or implemented piecemeal.

@@ -8853,3 +8853,11 @@ full C++ provider/compilation/linking behavior remains deferred. The independent
 computed-default guard also remains relevant, but no later terminal was replayed
 or accepted in this audit. Generic execution-group support alone is not a
 claim that this package or Java runtime analysis will succeed.
+
+The shared-runtime design identified a prior configured semantic prerequisite:
+selected toolchain implementations must keep the parent configuration plus a
+separate execution-platform preference, not an ordinary Exec transition.
+Stage 6's selected-toolchain request correction owns the complete key/retained
+value/resolver fix. The successor changes no loading declaration, schema or
+guard. After it is accepted, resume the shared named/automatic runtime design;
+do not bypass this package's guard or computed-default boundary in the meantime.
