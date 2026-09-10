@@ -23891,3 +23891,40 @@ gates continue; actual CLI proof must resolve the recorded source boundary throu
 accepted local scaffolding or return a concrete REPLAN, never mask it. Cached CLI
 now contains the nodep correction without this candidate and must be rebuilt after
 restoration. Hash and forward applicability remain verified.
+
+### R2 integration stop and preserved correction (2026-09-10)
+
+R2 returns independently reviewed REPLAN. Complete unaccepted candidate against
+97dffd5d4: /tmp/slug-conflict-r2.XZJWwv/candidate.patch, SHA-256
+90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e.
+Adjacent validation.txt owns exact gates; 757 production/2103 proof/2860 aggregate
+Rust additions. Reverse check passed before owned-Rust restoration; forward check
+passes. The original R1 artifact remains unchanged. Do not partially ship either.
+
+Added proof covers concurrent root-set conflict/restoration and loaded raw/message
+A/B/A/context-pointer cutoff through both default constructor paths. It exposed
+omitted target exec_properties wiring: the existing loading-owned resolved StringDict
+now feeds one phase-scratch map borrowed by the existing constructors. Independently
+accepted correction rejects dotted group-qualified keys per pinned ExecGroupCollection
+parsing, keeps group maps empty and adds no retained state or group admission.
+CLI helper drains both pipes concurrently with bounded retention/failure output.
+Focused conflict12 passed0.44s before final dotted guard; full analysis147/build-api76
+and query/server check pass after it; helper-only CLI proof passes1/0.00s.
+
+Full core311 hit timeout60 with multiple failures and no terminal summary. Tight
+in-memory diagnostics expose duplicate-target event-order mismatch0.04s and missing
+retained Host action-environment facts0.06s. Both reproduce identically on clean
+97dffd5d4 Rust: exit101,1failed/294filtered each,0.04s and0.06s (whole commands
+0.60s/0.66s with cached builds). Only these two failures are attributed to baseline;
+the other full-core failures remain unattributed. No expectation or semantic fix.
+No full-suite retry, actual CLI/daemon replay or positive common REAPI sharing proof
+was completed. Final combined acceptance and all unresolved gates remain open.
+
+The spent diagnostic registry is not a real source closure: rules_shell contains
+only MODULE/source.json/BUILD(exports_files([])), no shell/sh_binary.bzl, and its
+provenance explicitly calls builtin rows discovery scaffolding. Do not select a
+local_repository implementation merely to advance that fixture. The original real
+platforms archive-mode terminal needs authentic source/provenance and safety audit.
+Successor WP-5-7A-configured-cli-source-and-baseline-audit-r1 completed the two
+baseline comparisons and now only audits existing authentic inputs/producer ownership;
+no downloads, source-policy fixes, new fixture bodies or repeated setup are selected.

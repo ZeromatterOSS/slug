@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-6-7A-selected-request-and-output-conflict-implementation-r2`
-combined implementation resumption](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-configured-cli-source-and-baseline-audit-r1`
+combined integration prerequisites](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -76,8 +76,14 @@ set. Both graph modes preserve ownership, observations/errors and lifecycle.
 Actual additions: 12 production/412 proof/424 aggregate; nodep12, selected_graph34,
 full Bzlmod607 and direct compile/CLI rebuild gates pass. The single local diagnostic
 clears the false nodep error, then stops at rules_shell's unsupported local_repository
-source projection in 0.37s. Resume the preserved combined candidate's remaining
-proofs; its CLI gate and this independent source boundary remain unaccepted.
+source projection in 0.37s. R2 then added loaded raw/message cutoff and concurrent
+root-set proofs, but full core timed out60 with failures and real CLI proof remains
+unmet. Its expanded candidate is preserved, not partially accepted. The spent
+registry's rules_shell is only discovery scaffolding without shell/sh_binary.bzl;
+local_repository admission alone cannot establish CLI success. Both fast core failures
+reproduce identically on clean nodep Rust; other full-core failures remain unattributed.
+Inspect authentic existing source/archive provenance before selecting a producer
+prerequisite. No full-suite retry is selected.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 
