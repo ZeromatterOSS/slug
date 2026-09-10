@@ -1,84 +1,92 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-5-7A-configured-cli-authentic-input-recipe-r1
+Packet: WP-5-7A-authentic-registry-catalog-audit-r1
 
-Status: source-only successor to independently accepted verified file capture.
+Status: source-only successor to the authentic-input recipe audit's scope REPLAN.
 No Rust, fixture/source-input edits, acquisition, tests, CLI, daemon or replay.
 
 ## Observable result and learned boundary
 
-Freeze the exact authentic local registry/mirror input recipe needed by the
-preserved combined R2 mandatory CLI conflict gate, or report the first concrete
-unavailable input/unsupported owner with evidence. This is not another generic
-transport design or arbitrary dependency inventory. Unit/native file capture
-now works; actual authentic CLI source closure is still unproved.
+Verify availability and SHA-256 of the exact 184 registry metadata objects in
+pinned Bazel's empty-workspace default lockfile, or report the first unavailable,
+mismatching or over-budget object. This bounded metadata catalog is upstream
+evidence, not an exact Slug-selected graph, a complete CLI recipe, or authority
+to inject a lockfile/copy every catalog row into a fixture.
 
-Predecessor WP-5-7A-selected-bcr-file-capture-impl-r1 is independently ACCEPTED:
-238 production/1019 proof/1257 gross additions; archive46pass/1ignored/3.64s,
-native session4/0.01s, Bzlmod projection3/0.00s, observed materialization3/0.05s,
-direct CLI compile and formatting/diff pass. No full suite or actual CLI ran.
-Stage5's accepted local-file contract remains the sole transport authority.
+Predecessor WP-5-7A-configured-cli-authentic-input-recipe-r1 stopped at its12
+additional-module-version ceiling. No missing object or unsupported owner was
+established. Several absent Slug-cache paths had verified Bazel CAS counterparts.
+Stage5 records authentic patch/payload findings and the direct-core sentinel/
+CLI request-policy obligation. Complete preserved R2 remains unaccepted.
 
-## Exact read scope and decisions
+## Exact read scope and procedure
 
-1. Read the preserved R2 validation.txt and only its CLI setup/gate patch hunks,
-   plus app/slug_cli_v2/tests/cli.rs helpers needed to identify exact required
-   inputs and commands. Never restore the candidate or repeat its spent setup.
-2. Start from Stage5's already pinned platforms1.0.0/rules_shell0.6.1 metadata,
-   archive provenance and actual builtin bazel_tools MODULE/tools/test source.
-   Inspect only explicitly required selected metadata/payloads in existing
-   local caches; no whole-cache scan, checkout query or arbitrary closure walk.
-   At most12 additional module versions in this audit. Stop earlier at the first
-   missing input or unsupported production boundary instead of guessing.
-3. For every proposed input, bind module/version, original registry URL and SRI,
-   actual cached object path/digest, declared patches/overlays/MODULE, and intended
-   explicit local file-registry/mirror projection. Reuse known hashes rather than
-   recopying complete source bodies. Verify any newly nominated object's bytes.
-   Cached data is test-input evidence, never production implicit cache authority.
-4. Distinguish a reproducible complete recipe from an incomplete list. Real
-   generated host_platform and builtin selected dependencies must remain real;
-   no fake-platform override, local_repository admission, version/source override,
-   stub BUILD/export body, cache locator, Rust semantic fix or oracle weakening.
-   Identify actual module-extension/transport limits if source inspection proves
-   one; do not execute sources or predict runtime success from mere file presence.
-5. If all required inputs are available, select one exact bounded assembly/proof
-   packet with explicit writable fixture/temp paths, provenance, cleanup, source
-   isolation, real CLI command/result matrix and pipe/timeout limits. Otherwise
-   select only the first evidenced prerequisite or report missing authority.
-   Do not quietly acquire missing bytes or authorize broad replay.
-   Complete R2 resumes only when its authentic input/proof route is frozen.
+Authority: Bazel9.2 object8220c6198837d5c13d53fea211cf3282aa12408a in
+/home/wgray/bazel. Read via git show, never execute:
+src/test/tools/bzlmod/update_default_lock_file.sh, SHA-256
+2b91d85d3e012ea77392ca53b58df7d139209b25b15572dd16a94252b4ab249c;
+src/test/tools/bzlmod/MODULE.bazel.lock, 50706bytes, SHA-256
+d7cbba1d746f5522d7dde4a2f7ea7a24d8f0befdf23d7cb4984689b48781049a.
+The generator creates an empty MODULE root and invokes external Bazel mod deps;
+it is provenance only. Do not rerun it or substitute Bazel's own root-project lock.
 
-## Authority, classification and ownership
+1. Verify these two pins, then parse only registryFileHashes: exactly184 rows,
+   all https://bcr.bazel.build URLs and64-hex SHA-256;156 MODULE.bazel,
+   27 source.json and1 bazel_registry.json. Unexpected shape/count is a stop.
+2. Visit rows in bytewise URL order, not dependency order. Primary explicit path:
+   /home/wgray/.cache/bazel/_bazel_wgray/cache/repos/v1/content_addressable/sha256/
+   <expected-hash>/file. If absent, try only the exact URL-path counterpart under
+   /home/wgray/.cache/slug/registry/bcr.bazel.build/. Never enumerate caches.
+   Validate URL components before path projection; no dot/parent components.
+   A fallback is merely an audit locator, never production/request policy.
+3. Accept only regular local objects; stat then bounded stream/hash, retaining
+   at most64KiB scratch. Cap1MiB/object,32MiB total bytes read,368 candidate paths.
+   Stop on first digest mismatch, nonregular/unsafe object, both-path absence,
+   size/count cap or command timeout. Do not silently try alternatives after a
+   mismatching existing object. No symlink traversal outside the two cache roots.
+   Read/hash only; no module evaluation, dependency recursion or source execution.
+4. Record exact verified counts/bytes and a compact reproducible locator rule.
+   Bind any stop to URL, expected hash, attempted paths and actual observation;
+   distinguish unavailable from uninspected. Do not dump184 rows into plans.
+   No new archive, patch, overlay, module-extension or descriptor-SRI payload
+   traversal is allowed in this packet, even if all184 metadata rows verify.
+5. If complete, choose one bounded source-only descriptor/payload recipe audit
+   from this exact catalog plus the preserved CLI roots; freeze its object/byte
+   caps and selection uncertainty before starting it. Otherwise choose only the
+   first evidenced prerequisite or request missing authority. Do not invent a
+   semantic fix or infer missing bytes from only one cache's absence.
 
-Pinned Bazel9.2 object8220c6198837d5c13d53fea211cf3282aa12408a in /home/wgray/bazel
-remains source authority. Reuse Stage5 IndexRegistry file-mirror/MODULE and
-HttpConnector.localFileDownload anchors plus authentic source/archive hashes.
-Exact/Slug-native/deferred classes remain unchanged; this packet adds no parity
-or runtime-success claim. No oracle fixture is created, so fixture execution/
-growth gates and donor/Stage9 representation work are inapplicable here.
-Existing selected RepoSpec/immutable request, SRI capture, Host observations and
-source-certificate publication remain owners. No key, revision/overlap policy,
-retained cache, lock, fallback or async task changes are proposed.
+## Classification and ownership
+
+Exact/Slug-native/deferred classes are unchanged; no runtime/parity claim.
+Reuse Stage5's pinned IndexRegistry file-mirror/MODULE and HttpConnector source/
+tests for later recipe projection. No new oracle is needed for metadata hashes.
+Current selected RepoSpec/immutable requests, SRI capture, Host observations and
+source-certificate publication remain semantic owners; no production cache
+locator, key, equality, request overlap, lock, async task or retained value change.
+Audit buffers are command scratch; no persistent inventory or fallback is added.
+Buck2/Stage9 donor, fixture growth, runtime lifecycle and hot-path gates are
+inapplicable to read-only metadata verification. No source tree is copied.
 
 ## Files, validation and stops
 
 Writable: this manifest, canonical Live Status, relevant Stage5/6 status; routing
 only for REPLAN. <=120 added doc lines outside manifest. PROGRESS.md <=500 lines.
-Everything else is read-only, including source caches and preserved candidates.
+Everything else is read-only, including caches and both preserved candidates.
 Source/structure/hash, git diff --check, R2 forward-applicability and archive
 checker (only known3 thoughts paths); no Cargo/test/binary/Bazel/network commands.
-Any later tests/compiler commands start timeout60, serialized; investigate over
-one minute, fifteen minutes absolute maximum, never extend automatically.
+Bound every audit command at60seconds; any overrun requires investigation, not
+automatic extension. Future tests/compiler commands start timeout60, serialized;
+over one minute is a red flag, fifteen minutes is the absolute maximum.
 Never inspect/print/copy ~/.bazelrc or derived secrets.
-Independent terminal review for new reserved authority, REPLAN or milestone close.
-Commit/push the accepted recipe or concrete stop with its exact successor.
-An unbounded inventory, missing source authority, unsupported owner or second
-material correction is REPLAN, not permission to fabricate content or run replay.
+Independent terminal review for REPLAN, new reserved authority or milestone close.
+Commit/push accepted findings with the exact successor. Unbounded inventory,
+missing source authority or second material correction is REPLAN.
 
 Complete unaccepted R2: /tmp/slug-conflict-r2.XZJWwv/candidate.patch,
 base97dffd5d4, SHA-256
 90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e.
-Adjacent validation.txt owns all passed/failed/unrun gates. Keep the complete
-candidate preserved; no partial shipping. Actual one-shot/stable-daemon CLI,
-positive common execution-view/REAPI sharing and complete relevant gates remain
-open; only two fast core failures have been baseline-attributed.
+Adjacent validation.txt owns all passed/failed/unrun gates. No partial restoration
+or shipping. Real one-shot/stable-daemon conflicts, common execution-view/REAPI
+sharing and complete relevant gates remain open. No fake platforms, stubs,
+local_repository/version/source overrides, runtime bypass or broad replay.

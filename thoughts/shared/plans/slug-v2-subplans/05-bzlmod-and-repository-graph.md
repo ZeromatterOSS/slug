@@ -5363,8 +5363,52 @@ test commands timeout60, serialized; no full suite, CLI, daemon, Bazel, acquisit
 or replay. Archive checker retains exactly known3; preserved R2 hash/applicability
 pass. Linux/procfs and responsive-local-filesystem assumptions remain explicit.
 
-Next: WP-5-7A-configured-cli-authentic-input-recipe-r1, docs/source only. Freeze
-the exact source-backed local registry/mirror setup for the preserved combined
-CLI gate, or identify its first concrete unavailable input/unsupported boundary.
-Do not equate this unit/native acceptance with a complete authentic CLI closure,
-restore R2, enlarge stub repositories or run the spent fake-platform setup.
+### Authentic CLI recipe scope stop (2026-09-10)
+
+WP-5-7A-configured-cli-authentic-input-recipe-r1 returns scope REPLAN at12
+additional module versions: rules_license1.0.0, buildozer8.5.1,
+bazel_features1.42.1, bazel_skylib1.6.1, zlib1.3.1.bcr.5, rules_cc0.2.17,
+protobuf33.4, rules_java9.1.0, rules_python1.7.0, apple_support1.24.2,
+rules_shell0.3.0 and platforms0.0.7. This is not a selected closure or proof
+of missing inputs. The two starting versions remain platforms1.0.0/rules_shell0.6.1.
+No tests, CLI, daemon, Bazel, acquisition, source writes or replay ran.
+
+Absence from Slug's registry cache is not absence from the available authentic
+inputs: the exact Bazel CAS path is
+/home/wgray/.cache/bazel/_bazel_wgray/cache/repos/v1/content_addressable/sha256/<hash>/file.
+Newly byte-verified objects include rules_shell0.6.1's320byte version patch,
+5f0700eaa9a33770aae4ae8b06bec8e433f518eb50711378c8cd3a5d7854ff2d;
+rules_license1.0.0's35903byte archive,
+26d4021f6898e23b82ef953078389dd49ac2b5618ac564ade4ef87cced147b38;
+bazel_features1.42.1's508byte descriptor,
+fcd4396b2df85f64f2b3bb436ad870793ecf39180f1d796f913cc9276d355309,
+18078byte archive8189bac9a6bf9cc155a854c4cbebfebf58b9ca7a2d0a67645f7d0c1f83c523ac,
+and270byte patchb69c27e64c4ac5043a3f254d88ef2d8383bbfaefd20881a24ed5b6eb13d4b818;
+rules_java9.1.0's4218byte MODULE,
+ee63f27e36a3fada80342869361182f120a9819c74320e8e65b1e04ba0cd7a9d.
+Archive/patch hashes match their authentic descriptors' SRI; these are evidence
+objects, not newly proposed fixture inputs or proof that their versions select.
+Existing patch handling already admits rules_shell's equals separator/version
+hunk, and its0664/0775 archive modes are admitted. No new patch/mode fix is selected.
+
+The preserved CLI fixture must remove its fake-platform override/bodies when
+complete R2 eventually resumes. Authentic local registry/mirror request policy
+must reach both its direct-core sentinel_outputs and every CLI request; adding
+CLI flags alone leaves the sentinel on default policy. No fixture changes here.
+
+Better bounded inventory authority: pinned Bazel9.2 object8220c6198837d5c13d53fea211cf3282aa12408a,
+src/test/tools/bzlmod/update_default_lock_file.sh (read, never executed), SHA-256
+2b91d85d3e012ea77392ca53b58df7d139209b25b15572dd16a94252b4ab249c,
+creates an empty MODULE root and runs mod deps. Its companion MODULE.bazel.lock
+is50706bytes, SHA-256 d7cbba1d746f5522d7dde4a2f7ea7a24d8f0befdf23d7cb4984689b48781049a.
+registryFileHashes has184 entries:156 MODULEs,27 source.json and1 registry config.
+This is an upstream empty-root catalog, not Bazel's root-project lock, an exact
+Slug graph, evidence that every row is available, or a complete CLI input recipe.
+
+Next: WP-5-7A-authentic-registry-catalog-audit-r1 verifies only those184 metadata
+objects in URL order, using exact digest paths then exact Slug URL-path locators,
+with1MiB/object,32MiB total and368 path caps; stop first mismatch/absence/unsafe
+object. No payload traversal, source execution, fixture copying or lock injection.
+Keep complete R2 preserved and all actual CLI/sharing/full relevant gates open.
+Independent terminal review ACCEPTS the evidenced scope stop and bounded
+successor; catalog verification alone cannot close selection/payload/CLI gates.

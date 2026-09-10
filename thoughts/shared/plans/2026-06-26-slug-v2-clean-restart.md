@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-configured-cli-authentic-input-recipe-r1`
-authentic local CLI input recipe](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-authentic-registry-catalog-audit-r1`
+bounded authentic registry metadata audit](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -91,8 +91,11 @@ produce file MODULE URLs, but selected-BCR capture admits only HTTPS. Pinned Baz
 supports file mirrors/payloads. Stage5's reviewed Linux file-capture implementation
 is now ACCEPTED across all four roles, with safe pinning, bounded SRI, lazy TLS and
 unchanged immutable publication:238/1019/1257 gross additions, archive46pass/1ignored,
-native session4 and direct CLI compile pass. Resolve only the authentic local CLI
-input recipe next; no complete CLI closure or full-suite retry is claimed.
+native session4 and direct CLI compile pass. The authentic CLI input audit stopped
+at its12 additional-version cap without a proved missing input/unsupported owner.
+Pinned Bazel's empty-workspace default lock records184 exact registry metadata
+hashes; verify only that finite catalog next. Availability, Slug selection and
+complete CLI source closure remain unproved; no full-suite retry is selected.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 
