@@ -857,6 +857,16 @@ async fn discover_round(
     }
 }
 
+fn prune_unfulfilled_nodep_edges(entries: &mut [RawModule], keys: &SmallSet<HostGraphModuleKey>) {
+    // Bazel Discovery.java:146-165: membership uses the overridden exact key,
+    // not just its name. Only call after discovery has successfully converged.
+    for entry in entries {
+        entry
+            .nodep_dependencies
+            .retain(|dependency| keys.contains(&dependency.transformed));
+    }
+}
+
 async fn discover_fixed_point(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
@@ -869,7 +879,7 @@ async fn discover_fixed_point(
     let mut previous_keys: Option<SmallSet<HostGraphModuleKey>> = None;
     loop {
         let root = raw_root(ctx, workspace, mode, root_module, cache, observations).await?;
-        let entries = discover_round(
+        let mut entries = discover_round(
             ctx,
             workspace,
             mode,
@@ -888,6 +898,7 @@ async fn discover_fixed_point(
             .map(|entry| entry.key.clone())
             .collect::<SmallSet<_>>();
         if previous_keys.as_ref() == Some(&keys) {
+            prune_unfulfilled_nodep_edges(&mut entries, &keys);
             return Ok(entries);
         }
         prior_names = entries
@@ -1346,6 +1357,8 @@ mod tests {
     use crate::module_eval::RootModuleRegistrations;
     use crate::registry::RegistryBaseUrl;
     use crate::source_preparation::HostDiscoveredModuleProvenance;
+
+    include!("selected_graph_nodep_tests.rs");
 
     fn version(value: &str) -> BazelModuleVersion {
         BazelModuleVersion::parse(value).unwrap()

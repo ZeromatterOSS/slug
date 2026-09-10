@@ -23881,7 +23881,13 @@ The successor audits/freezes nodep fixed-point pruning, implements that reviewed
 Stage 5 prerequisite, then resumes this same combined contract and preserved patch.
 It does not reopen general execution-group architecture or relax any proof gate.
 
-The completed Stage 5 source audit freezes the small transformed-key stable-retain
-correction at the existing discovery fixed-point return. Implement and validate
-that prerequisite before restoring this candidate. Only then reassess the retained
-local CLI fixture; its later materialization/action gates are not presumed to pass.
+The Stage 5 nodep prerequisite is now independently accepted: 12 production/412
+proof additions; nodep12, selected_graph34, full Bzlmod607 and dependent/CLI build
+gates pass. The one local diagnostic advances to rules_shell's unsupported
+local_repository source projection (exit2, 0.37s, RSS36716KiB); no retry or acquisition.
+WP-6-7A-selected-request-and-output-conflict-implementation-r2 resumes the preserved
+candidate and unchanged contract. Remaining in-memory, lifecycle, REAPI and full
+gates continue; actual CLI proof must resolve the recorded source boundary through
+accepted local scaffolding or return a concrete REPLAN, never mask it. Cached CLI
+now contains the nodep correction without this candidate and must be rebuilt after
+restoration. Hash and forward applicability remain verified.

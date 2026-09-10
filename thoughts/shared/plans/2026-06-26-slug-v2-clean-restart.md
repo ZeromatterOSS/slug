@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-nodep-fixed-point-pruning-implementation-r1`
-configured-CLI prerequisite](./slug-v2-subplans/current-packet.md).
+[`WP-6-7A-selected-request-and-output-conflict-implementation-r2`
+combined implementation resumption](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -70,14 +70,16 @@ Local-only CLI setup exposed an independent Stage 5 defect, not a requirement to
 download a larger dependency graph: Slug name-gates nodep discovery but fails to
 drop still-unfulfilled edges before selection. Pinned Bazel Discovery.java:146-165
 drops them; Slug instead emits MissingSelectedModule(bazel_features1.42.1).
-The completed source audit freezes one stable-retain helper at the existing
-discovery fixed-point return, using its already-computed transformed-key set.
-Both graph modes retain their existing ownership, observation/error and lifecycle
-boundaries. Implement under 40 production/650 proof/690 aggregate gross additions,
-with absent/later-round/override/equality controls and existing observed lifecycle
-gates, then reassess the local fixture and resume the preserved combined candidate.
+The nodep correction is independently accepted: one stable-retain helper at the
+existing discovery fixed-point return, using its already-computed transformed-key
+set. Both graph modes preserve ownership, observations/errors and lifecycle.
+Actual additions: 12 production/412 proof/424 aggregate; nodep12, selected_graph34,
+full Bzlmod607 and direct compile/CLI rebuild gates pass. The single local diagnostic
+clears the false nodep error, then stops at rules_shell's unsupported local_repository
+source projection in 0.37s. Resume the preserved combined candidate's remaining
+proofs; its CLI gate and this independent source boundary remain unaccepted.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
-or broad replay is authorized. Audit/contract review is not runtime acceptance.
+or broad replay is authorized. Do not repeat the spent diagnostic setup.
 
 Stage 6's accepted root-set-owned closure/sharing contract remains unchanged:
 raw platform facts/messages, all-output prefix checking, explicit broader-family

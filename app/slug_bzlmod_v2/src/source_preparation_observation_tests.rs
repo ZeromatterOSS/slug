@@ -9788,7 +9788,7 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
             "https://registry.invalid/modules/a/1/MODULE.bazel",
             ModuleSourceRegistryResponse::Found(module(
                 "a",
-                "bazel_dep(name='b',version='1')\nbazel_dep(name='b',version='2',repo_name=None)\n",
+                "bazel_dep(name='b',version='1')\nbazel_dep(name='b',version='2',repo_name=None)\nbazel_dep(name='absent_nodep',version='1',repo_name=None)\n",
             )),
         ),
         (
@@ -9834,6 +9834,15 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
     let observed_value = transaction.compute(&observed_key).await.unwrap();
     let observed = complete_observed_selected_graph(&observed_value);
     let graph = observed.result().as_ref().as_ref().unwrap();
+    for entries in [&graph.resolved, &graph.unpruned] {
+        assert_eq!(entries[1].nodep_dependencies.len(), 1);
+        assert!(matches!(&entries[1].nodep_dependencies[0].key,
+            HostGraphModuleKey::Module { name, .. } if name == "b"));
+    }
+    assert!(!tracker.rows.lock().unwrap().iter().any(|(owner, dependencies)| {
+        owner.contains("discovered") && owner.contains("absent_nodep")
+            || dependencies.iter().any(|dep| dep.contains("discovered") && dep.contains("absent_nodep"))
+    }));
     assert_eq!(
         graph
             .unpruned
@@ -9940,6 +9949,16 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
         discovered_event_values(&discovered_eventful(&tracker)),
         discovered_event_values(&observed_events)
     );
+    // Same semantic graph, but changed real root-byte observations: no wrapper cutoff.
+    let mut comment_transaction = module_source_registry_transaction(
+        &dice, tracker, &format!("{root}# observation-only edit\n"),
+        &["https://registry.invalid"], 990, PathObservationEpoch::empty(),
+    ).await;
+    let comment_value = comment_transaction.compute(&observed_key).await.unwrap();
+    let comment = complete_observed_selected_graph(&comment_value);
+    assert_eq!(observed.result(), comment.result());
+    assert_ne!(observed.observations(), comment.observations());
+    assert!(!HostSelectedModuleGraphObservationKey::equality(&observed_value, &comment_value));
 }
 
 #[tokio::test]

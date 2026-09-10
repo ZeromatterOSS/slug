@@ -5075,3 +5075,17 @@ receives only the existing nodep-test extension. Exact files/caps/gates live in 
 implementation manifest. After correction, one 15-second network-disabled local
 CLI diagnostic may reassess the retained fixture; a later source failure is recorded,
 not suppressed. The saved combined candidate still requires its original full gates.
+
+Implementation independently ACCEPTED: 12 production/412 proof/424 aggregate
+Rust additions, new proof file 390 lines and observed proof +20. Producer red
+reproduced MissingSelectedModule(optional1), 1 failed in 0.01s. Final nodep12
+(0.03s), selected_graph34 (0.07s), full Bzlmod607 (0.35s), loading/core check and
+CLI rebuild pass under timeout60; formatting/diff pass, archive retains known3.
+Proof preserves no-fetch, eligible errors, multi-round fulfillment, transformed
+override/Root/empty keys, source Arcs, stable order, same-DICE restoration and
+observed epoch inequality. No new semantic state or source-policy admission.
+The one network-disabled local aquery diagnostic exits2 in0.37s, RSS36716KiB:
+the false absent-nodep terminal is gone; @@bazel_tools//tools/test/BUILD now stops
+loading @rules_shell//shell:sh_binary.bzl because its selected local_repository
+source projection is unsupported. No retry, acquisition or fixture edit followed.
+Resume the preserved Stage 6 candidate without claiming its remaining CLI gates.
