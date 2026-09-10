@@ -5625,3 +5625,44 @@ exceptional kill/reap/close phase with harmless lifecycle self-checks before one
 new-target compile. No old-target retry or warmed-cache speed claim; timeout stops.
 Independent terminal/next-contract review ACCEPTS this docs-only audit and library
 target contract. No implementation, cleanup correction or runtime is yet accepted.
+
+### Authentic library sentinel diagnostic (2026-09-10)
+
+Accepted opt-in harness:35line native test body relocated byte-for-byte from the
+preserved draft into src/payload_demand_probe.rs,3line cfg(test) lib.rs declaration,
+318line driver;356 total additions,0 production semantics, no Cargo/profile change.
+One unconditional finalizer now owns normal/error/timeout/signal/overflow cleanup.
+Harmless normal/deadline/live-descendant injected-exception checks pass before
+compilation:0.00395/0.25379/0.00420s; all reached ECHILD, closed every pipe and found
+no live process group. Pre-execution independent review ACCEPTED the correction.
+Driver's single pinned --lib no-run compilation:exit0/7.49533s,0 Cargo errors,
+one compiler-reported slug_cli_v2 library-test executable3904e9d937a2b42d,
+successful build-finished, no selected slug binary. Compiler stdout SHA256
+670718dc90b4a48e336dd6acaa54946ac804f95ea40fec5455ef1d3dd994009c.
+No speedup attribution is claimed: prior work also warmed dependency artifacts.
+
+Actual evidence: /tmp/slug-sentinel-demand.PXDhxy/logs. The driver hash-verified
+183 metadata files and exactly3 payloads, then staged the unchanged R2 root
+BUILD/defs and MODULE minus fake-platform override with explicit mirror config.
+Input bytes310070; inventory digest
+f2ba80a0e34843c823f9d14f34ec7b28af82f716b3370bb4778d1997bfbed86c.
+Native stdout43bytes reports publication exit1; stderr exceeded8192bytes and
+the supervisor stopped at14.44984s (raw status9, driver exit2). Result INCONCLUSIVE.
+Retained stderr prefix SHA256
+fb87c7edd97ae52bcf5615477cd52f1c7693cac0a69eb53ff6d0b7d482c5c70f
+begins BuildCommandError/toolchains registration row3/CanonicalRoute for
+bazel_tools+winsdk_configure+local_config_winsdk, with a Generated wrapper and
+selected_missing predecessor graph. This prefix is not the complete leaf cause.
+Trace261bytes SHA256 d3e285e0d519e8430921e853e95c5463c52804b534200eff455dbc77ce43c140
+contains only thread exits and no abseil-open syscall; publication failure/overflow
+precludes non-demand. Empty resources file means peak RSS unavailable, not zero.
+Finalizer reaped3 processes, reached ECHILD/open_pipes0/group_alive0; escalated
+process-name check finds no compiler/tracer/test/daemon survivors. Scoped staged
+trees removed, logs retained; source caches/preserved patches unchanged. No retry.
+Formatting/shell+Perl syntax/diff/R2 hash+apply/draft hash+body comparison pass;
+archive checker only known3 paths. Independent terminal review ACCEPTS the harness
+and inconclusive evidence, not abseil demand/non-demand or any R2 runtime gate.
+Next WP-5-7A-generated-route-diagnostic-audit-r1 follows the generic prefix owner
+read-only; no output-cap increase, missing-input guess or Windows-specific bypass.
+Independent close/next-contract review ACCEPTS this bounded source-only successor;
+the exact leaf cause remains an evidence gap, not permission to reconstruct it.

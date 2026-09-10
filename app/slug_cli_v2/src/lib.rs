@@ -10,6 +10,9 @@
 
 pub mod commands;
 
+#[cfg(test)]
+mod payload_demand_probe;
+
 pub fn main() -> i32 {
     commands::dispatch(std::env::args())
 }

@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-authentic-sentinel-library-probe-r1`
-same authentic sentinel through a library-only test target](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-generated-route-diagnostic-audit-r1`
+bounded source audit of the retained generated-route error prefix](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -107,10 +107,14 @@ User-installed strace6.8 passes harmless isolated preflight outside the tool san
 Focused probe compilation reached timeout60/exit124 before any executable or fixture
 evaluation; no compiler survivors were found. Read-only Cargo audit finds automatic
 binary selection for integration tests and profile variants consistent with the
-workspace's abort/test-unwind split, but no timed root-cause attribution. Select
-the same native test through cfg(test)/--lib, with unchanged60second compile and
+workspace's abort/test-unwind split, but no timed root-cause attribution. The same
+native test was moved to cfg(test)/--lib with unchanged60second compile and
 15second runtime limits, after repairing/proving exceptional process cleanup.
-No original-target retry, profile override or promise of a sub60second build.
+The library probe now compiles in7.4953seconds and runs once: publication1, then
+stderr overflow at14.4498seconds. Cleanup succeeds; no abseil open is traced, but
+the result is INCONCLUSIVE. Retained prefix names the implicit winsdk generated
+route, not a complete terminal cause. Audit that generic error owner read-only;
+no retry, output-cap increase, source acquisition or consumer-specific bypass.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 
