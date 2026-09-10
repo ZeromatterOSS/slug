@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-abseil-payload-locator-audit-r1`
-first unverified payload's exact alternate locator](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-configured-cli-payload-demand-review-r1`
+actual CLI archive-demand review](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -96,9 +96,10 @@ at its12 additional-version cap without a proved missing input/unsupported owner
 Pinned Bazel's empty-workspace default lock records184 exact registry metadata
 hashes; all184 metadata objects now verify in276705bytes/184 exact CAS paths.
 Its27 descriptors declare47 payloads; the first abseil-cpp20250814.1 archive is
-absent at its exact Bazel CAS path. No payload bytes were read. Resolve only a
-source-backed alternate Slug locator next; global absence and CLI necessity
-are not established. Payload/selection/CLI gates remain open; no retry/acquisition.
+absent at both its exact Bazel CAS and source-derived Slug paths. The archived
+filename rule is resolved and controlled;2 exact stat attempts read0 payload bytes.
+Review actual CLI demand next, not global absence or blanket catalog acquisition.
+Payload/selection/CLI gates remain open; no retry/acquisition is selected.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 

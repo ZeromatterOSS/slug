@@ -5479,3 +5479,33 @@ If both exact locators are absent, establish CLI demand before any acquisition
 proposal; a candidate upstream catalog must not become a blanket download gate.
 Independent terminal review ACCEPTS this first-locator stop and narrowly bounded
 provenance successor; no selected closure, CLI demand or R2 acceptance is inferred.
+
+### Alternate abseil locator resolved; scoped absence (2026-09-10)
+
+WP-5-7A-abseil-payload-locator-audit-r1 resolves its sole filename question.
+Verified archive ref e218054d4c796655939b968d90208b185decb352; read one source file,
+app/slug_bzlmod/src/cache.rs,26823bytes,blob149e203dd3f0ff35e2cbe41684f35190a894abbf,
+SHA-256 313a208e529b698d6bb5f6e57477c5827297868eff0c500422c1666c2cb2febf.
+Lines80-87 choose XDG_CACHE_HOME/slug or the home .cache/slug default;153-156
+join base/downloads/download_safe_name(integrity);549-552 replace each '/', '+'
+and '=' in the literal integrity string with '_'. This is filename provenance,
+not proof of the historical writer's environment or production cache authority.
+The existing explicit /home/wgray/.cache/slug base is fixed audit scope.
+Control derivation exactly matches recorded rules_shell0.6.1 filename
+sha256-5rh8ib0LJwOeOvLF2gEUdFLyQPddUF9baICHTzEDYwc_; no control payload rehashed.
+
+Before lookup, froze the one derived abseil alternate:
+/home/wgray/.cache/slug/downloads/sha256-FpL3fRc5us8_lDNxiLeFg88JurfkINLcbFYFpPhnhaE_.
+Read-only lstat returned errno2/ENOENT for it and the exact Bazel CAS path above:
+2 target attempts,0 payload bytes,0 verified archives. No cache enumeration,
+alternate-base search, source execution/restoration, extraction, tests, downloads
+or replay. This proves absence at two evidenced locations, not global absence.
+
+Next: WP-5-7A-configured-cli-payload-demand-review-r1 traces only actual R2
+sentinel/CLI roots through metadata discovery, RepoSpec and archive demand.
+Do not require all27 catalog archives or propose acquiring abseil before proving
+its demand. If source tracing cannot decide within18 live files/2MiB excerpts,
+select one tiny, isolated diagnostic design with explicit authentic inputs and
+time/memory/pipe bounds; do not create another arbitrary inventory or run it here.
+Independent terminal review ACCEPTS the scoped locator result and demand-review
+successor; unresolved source conditions require diagnostic design, not execution.
