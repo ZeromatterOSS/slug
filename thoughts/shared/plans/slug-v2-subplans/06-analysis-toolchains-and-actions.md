@@ -23666,3 +23666,185 @@ Independent terminal review ACCEPTS this REPLAN and the docs-only successor,
 not the runtime candidate. Action sharing, root-set versus intrinsic ownership,
 prefix conflicts and the complete consumer/file allowlist remain reserved
 decisions for that design.
+
+### Configured-action closure integrity contract (2026-09-10)
+
+Independent architecture review ACCEPTS the combined selected-request/conflict
+successor after one correction: retain the normalized missing-toolchain message.
+This contract supersedes the preceding reserved conflict decisions, not the
+accepted selected-request edge/resolution contract. No candidate Rust is restored
+by this docs milestone. The implementation must deliver both changes together.
+
+#### Source semantics and compatibility boundary
+
+Authority is Bazel git object `8220c6198837d5c13d53fea211cf3282aa12408a`, not
+the working-tree Java files. `actions/Actions.java:85-115` compares mnemonic,
+Action implementation eligibility and action key, then ordered mandatory inputs
+and outputs ownerlessly for two shareable actions. There is no explicit Java
+class comparison. Its both-unshareable branch instead permits equal ownerful
+input/output aliases; one-shareable/one-unshareable cannot share. The earlier
+read-only audit's simplified "both must be shareable" is not the full predicate.
+`Artifact.java:690-697` defines ownerless identity as root plus exec path;
+`MapBasedActionGraph.java:49-66` registers by that identity, not configured owner.
+
+For admitted string `ctx.actions.write`, `StarlarkActionFactory.java:360-379`
+always calls the same FileWrite factory. `FileWriteAction.java:190-202,249-355`
+selects compression deterministically from string length and fixed policy;
+regular/compressed keys use distinct GUIDs plus executable bit and content or
+compressed content. Equal text under this one factory therefore has equal
+representation/key inputs even above 256 bytes; comparing structural text does
+not require recreating gzip or claiming exact ActionKey bytes. Native custom
+compression policies, lazy text and input-bearing writes are not admitted here.
+Args writes are ParameterFileWriteAction, not this family despite their mnemonic.
+
+`ActionKeyComputer.java:37-57` adds execution-platform presence/full PlatformInfo,
+exec properties and a process-constant uniquifier. `AbstractFileWriteAction.java:
+124-127` returns EMPTY action exec properties: target/group property overrides
+must not cause false FileWrite conflicts. Raw platform properties still matter.
+`PlatformInfo.java:164-179`, `ConstraintCollection.java:275-284` and constraint
+value/setting `addTo` establish actual platform label, ordered setting/value
+labels, raw platform properties and normalized missing-toolchain error message
+for Slug's admitted no-parent/default-policy platforms. `Platform.java:98-100`
+supplies the native attribute; `PlatformInfo.java:363-369` maps empty string to
+None, preserving nonempty text. Slug already accepts explicit native overrides
+(package.rs:2289-2294,8971-8991); retain them, do not add a new rejection guard.
+Configured-key configuration, preference, toolchain provenance and
+merged owner properties are not substitutes for these inputs. Existing platform
+guards keep parents, remote properties, flags and toolchain policies unsupported.
+
+Exact named behavior: scalar FileWrite same-output sharing/conflict, generic
+strict-segment output-prefix rejection and runfiles-tree/MANIFEST exemption.
+Slug-native: structural configuration/root identity, deterministic first-error
+diagnostics, structural equality rather than Bazel fingerprint/hash collisions,
+and existing output/display bytes. Exact checksum/ActionKey bytes remain deferred.
+All registered outputs in the requested dependency closure enter the inventory,
+including unused outputs and File/Directory/Symlink/RunfilesTree kinds. Prefixes
+are checked within the same structural output root; equal paths are handled by
+exact collision checking. Only a RunfilesTree outer output exempts its immediate
+MANIFEST path, never an arbitrary Directory or other nested child (Actions:291-368).
+
+The accepted executable/aquery family remains scalar FileWrite. Typed Spawn,
+ArgsWrite, artifact/absolute symlinks and four runfiles-support families retain
+their configured-analysis admission and existing execution/formatter guards.
+Noncolliding outputs are not newly rejected. Their cross-owner exact-output
+equivalence is explicitly unsupported in this packet: a collision requiring
+one of those family keys returns an unsupported-equivalence terminal, NOT a
+claim that Bazel rejects it and NOT ActionSpec/REAPI-digest equality. Legacy
+Run/RunShell/WriteJson/ExpandTemplate/Symlink rows receive the same treatment.
+This leaves broader-family sharing for its family admission work; do not
+silently omit their outputs, invent a blanket owner inequality rule or broaden
+their executor. Configured aspects remain unsupported at their existing guard.
+
+#### Natural owner, publication and consumers
+
+Conflict freedom is a ROOT-SET-dependent fact, not a ConfiguredNodeAnalysisKey
+invariant. A and B may each build successfully while A+B conflicts; an unchanged
+child reused from DICE must still participate in a new root-set validation.
+Keep `compute_build_action_closure` as the single traversal/producer, after all
+roots and transitive configured children complete and before its Complete(Ok).
+Extract a private `runtime/configured_action_closure.rs` for a pure constructor
+of `ValidatedActionClosure`, with private fields, owners Arc slice and compact
+shared-duplicate action coordinates. Empty/loading-only closures use its empty
+constructor. No unchecked nonempty conversion or success boolean beside raw data.
+BuildCommandEvaluation retains this immutable value; every observed singleton,
+legacy and observed multi-root constructor uses the same producer. No new DICE
+key family: existing command-root keys already retain ordered roots/workspace/
+configuration policy and depend on all full configured node keys.
+
+Retain raw platform facts separately from merged execution properties in
+ConfiguredActionOwnerContext, supplied by its existing constructor BEFORE merge;
+do not recover them by closure lookup or reverse a target-property override.
+Add one optional shared PlatformSemanticFact (Arc-backed properties) and accessor.
+Extend PlatformSemanticFact itself with `missing_toolchain_error: Option<Arc<str>>`,
+read/normalize it at platform_semantic_fact from the loaded native attribute, and
+carry it unchanged through ConfiguredPlatform and property merges. Include both
+changes in structural equality/Allocative. Unresolved contexts retain None.
+FileWrite equivalence uses optional actual platform label, ordered constraint
+labels and this full raw fact, mnemonic, exact content and executable bit. Scalar
+shape validation proves one File output and empty inputs/tools/other execution
+fields; no-platform pairs can be compared during analysis without admitting
+them to the selected-platform executor. Missing/inconsistent raw selected facts
+fail closed. FileWriteSemanticIdentity must also encode raw facts when they differ
+from its already encoded merged properties (new optional tag). A second optional
+tag encodes the normalized message when unequal to the pinned native default;
+its framing distinguishes None from nonempty text. The default constant is only
+an encoding elision rule, never substituted for the loaded source fact. This
+preserves old default-platform bytes while distinguishing empty/custom messages.
+No broader no-toolchain diagnostic-format claim is made. Neither this identity
+nor full owner equality decides sharing.
+
+Output identity is `(owner structural SlugConfiguration, bin root, relative
+output path)` inside one workspace; preferences never change the output root.
+Use borrowed scratch output rows sorted by structural configuration bytes,
+path SEGMENTS and existing owner/action/output encounter ordinal. Exact collision
+pass precedes prefix pass; report the first incompatible pair in that order.
+For an equivalent FileWrite group choose its first closure-order action as the
+execution representative. Retain all owners/actions for analysis, action counts,
+literal/deps aquery and diagnostics, plus only nonrepresentative coordinates in
+an immutable Arc slice. This is explicit sharing, not lost owner/action identity.
+CLI/server use a new execution-view accessor that filters those coordinates;
+existing semantic-view accessors remain owner-complete. Run consumes validated
+evaluation but keeps its current one-action/executable restrictions. The low-level
+test-only/document-hidden view constructor is not a graph validation certificate.
+No materializer/REAPI executor repair or command-side collision scan is added.
+
+Cquery deliberately remains independent: pinned `CqueryCommand.java:191` sets
+checkForActionConflicts=false. Query/loading do not own an action closure either.
+Aquery uses the validated build closure even when its formatter selects literal
+owner rows. CLI/server/build/run cannot receive a successful conflicting closure,
+so failure precedes execution RPC, action-output materialization and formatting.
+Exact errors and unsupported-equivalence errors become structured retained
+BuildCommandError variants, with path and both full owners, exit 2 and existing
+source-certificate publication. Need/analysis failure precedence is unchanged:
+validate only a completed closure; cancellation/outer errors publish no value.
+
+#### Lifetime, proof and implementation boundary
+
+Scratch is O(outputs + path depth) borrowed rows/ancestor stack and phase-local
+duplicate coordinates; sorting is O(outputs log outputs), no pairwise all-action
+scan. Retained growth is one shared raw-platform fact per action context, one
+optional shared message per platform fact (cloned without text copies), and
+O(shared duplicate actions) coordinates per command-root result. No retained
+output map, global registry, cache, interner, new dependency or mutable service
+state. Reuse Arc/Allocative and Stage 9 Stages 3/6 utilities; Buck2/V1 are concept
+guidance only, no code imported. Unchanged derived equality permits DICE cutoff;
+raw fact edits invalidate even when owner overrides mask the merged properties.
+Results release with reachable DICE versions/command tokens, scratch on return,
+cancellation or error; existing scoped joins/shutdown own async release. No lock
+crosses an await. Existing observation/final-certificate checks remain mandatory;
+unavailable historical Host state is rejected, never synthesized.
+
+Adapt OutputArtifactConflictTest invalidation/new-target/overlap, unused action,
+repeated/null build and directory-nesting tests to existing inline temporary
+workspaces; preserve source attribution, with no copied oracle tree. Add same-
+path equal-content share versus changed-content/executable/platform/raw-property
+conflicts, equal raw/unequal merged-property sharing and unequal raw/equal merged
+conflicts, default/empty/custom missing-toolchain message A/B/A and unchanged-value
+cutoff, long/unicode content, distinct configuration/path controls, deterministic
+multi-conflict order, runfiles exemption and non-FileWrite unsupported-equivalence
+classification. Prove A and B alone succeed, combined fails, warm repeats fail,
+source A/B/A restores and concurrent disjoint requests do not poison one another.
+Preserve cquery success and all owners in aquery; execution emits one representative
+per shared group. The saved selected-toolchain red regression must fail at the
+new producer before RPC, not be weakened to a later accessor assertion.
+
+Retained Buck2 worker tests `when_equal_return_same_instance`,
+`test_detecting_changed_dependencies`, `mismatch_epoch_results_in_cancelled_result`
+remain guidance; reuse Slug observed Need/error/cancellation and source certificates.
+CLI one-shot/stable-daemon build/run/aquery conflict tests use local fixture inputs,
+zero accepted mock-transport calls and no output changes. Run positive sharing
+through the common core execution-view/REAPI plan boundary without external replay.
+Full owner and direct-dependent gates remain required after focused discriminators.
+No performance improvement is claimed; large-closure benchmark work is not reopened.
+
+Exact files, executable gates and revised combined caps live in the successor
+manifest. Existing giant analysis/core dice files receive only cohesive producer
+integration and field plumbing; the new validator and separate core proof module
+prevent another policy subsystem accumulating in either file. No fallback exists.
+Missing source facts, a newly admitted action-family key, broad execution change,
+output suffix, key side store, cap overflow or a second material correction is
+REPLAN. Named/automatic group design resumes immediately after combined acceptance.
+Design validation: pinned-source/structure checks and git diff --check pass;
+archive check retains exactly three known thoughts-path failures. Saved candidate
+hash/applicability remain verified. No Rust, build, test, replay or materialization
+ran for this design; implementation and previously unrun gates remain unaccepted.
