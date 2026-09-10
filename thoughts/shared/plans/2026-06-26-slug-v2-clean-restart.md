@@ -103,6 +103,9 @@ archive capture, but the fixture's configured traversal remains conditional.
 Select one isolated native sentinel diagnostic with authentic metadata/two known
 archives, no networking,15second child/2GiB AS limits and exact abseil-open tracing.
 Earlier failures remain inconclusive; no all-catalog download or R2 retry is selected.
+Probe preflight is stopped before staging/compilation: strace is not installed.
+Harmless user/network namespace and resource-limit preflight passes. Obtain a
+provided tracer or installation approval; keep the existing probe contract intact.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 

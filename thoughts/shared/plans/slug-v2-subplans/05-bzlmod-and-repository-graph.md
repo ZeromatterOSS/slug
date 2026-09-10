@@ -5551,3 +5551,15 @@ bounded pipes/trace and terminal cleanup. No diagnostic ran in this source revie
 Independent terminal/pre-execution review ACCEPTS after clarifying actual child
 syscall evidence, separate preflight traces and native success plus publication0
 for the narrow non-demand conclusion. All earlier/resource failures are inconclusive.
+
+### Sentinel probe tooling preflight stop (2026-09-10)
+
+Required strace is absent from PATH and /usr/bin,/bin,/usr/local/bin; dpkg-query
+reports no installed strace package. unshare/prlimit are present. Harmless
+timeout5 env -i PATH=/usr/bin:/bin unshare --user --map-root-user --net
+prlimit --as=2147483648 --cpu=2 --fsize=16777216 /usr/bin/true exits0.
+No fixture, compiler, sentinel, test, CLI, daemon, source acquisition or replay
+started; no partial harness was created. Abseil demand remains inconclusive.
+Request a supplied strace executable or installation approval, then resume the
+same reviewed packet. Do not weaken trace/isolation/resource gates or acquire inputs.
+Independent terminal review ACCEPTS this tooling stop with the contract unchanged.

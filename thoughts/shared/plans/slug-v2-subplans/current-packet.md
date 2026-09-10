@@ -2,9 +2,13 @@
 
 Packet: WP-5-7A-authentic-sentinel-demand-probe-r1
 
-Status: bounded diagnostic implementation/execution, after independent contract
-review. No production semantics, complete/partial R2 restoration, acquisition,
-Bazel, CLI conflict-suite rerun or checkout-wide/bounded replay.
+Status: preflight STOP before implementation/staging/compilation or evaluation.
+Required strace is absent from PATH and standard executable locations; dpkg-query
+reports no installed strace package. Harmless user/network namespace plus prlimit
+preflight passes. Request a provided executable or approval to install strace;
+do not remove tracing. Resume this same reviewed contract once tooling exists.
+No production semantics, complete/partial R2 restoration, acquisition, Bazel,
+CLI conflict-suite rerun or checkout-wide/bounded replay.
 
 ## Observable result and source basis
 
