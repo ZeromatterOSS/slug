@@ -5593,3 +5593,35 @@ evidence before any revised compilation route. Original authentic native API/inp
 contract and all runtime limits remain; demand and every R2 runtime gate stay open.
 Independent terminal review ACCEPTS the docs-only stop and bounded successor;
 the saved implementation remains REVISE/uncompiled, not accepted by that review.
+
+### Sentinel build-target audit (2026-09-10)
+
+Read-only audit reverified the compiler JSON hash and inspected Cargo.toml:331-339,
+.cargo/config.toml, rust-toolchain and the CLI manifest. Additional inputs were
+7 files/116829bytes:3 installed official Cargo HTML pages plus4 exact core/CLI
+fingerprint JSON files selected from compiler-reported artifact paths, no cache scan.
+At /home/wgray/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/share/doc/rust/html/cargo/:
+commands/cargo-test.html:305-321 says selected integration tests automatically
+build binaries, while --lib selects the library test target (SHA256
+20fe107ba66426458e89d274ac06648ee8ac321c1ba8fba6a849c6844a603169).
+reference/profiles.html:316-331,394-396 describes forced test/dependency unwind
+and test inheritance from dev (SHA256
+d14948a68d2b0c212840b732eadb299fe1eb05623bfc5e85e7ca04ca1f9e88d8).
+reference/cargo-targets.html:273-294 corroborates binary auto-build (SHA256
+8b45871e1d38ae82a68d65d18d3f11d2ff9618e71b6943f06ecde78ce7d9c3ba).
+Workspace dev is opt1/debug/incremental/panic=abort; test inherits it except
+Cargo-forced unwind. Exact .fingerprint core ece28e9b6d9a540e/94be86daf8cf0181
+and CLI d78578b05db7c057/3625fb2532c85a13 lib JSON pairs have equal source target,
+features,rustc,rustflags/config/compile-kind, but profiles11414037041067575059
+versus8767022122572628570 and distinct dependency fingerprints. This is consistent
+with abort/unwind build graphs; opaque hashes alone do not identify which is which.
+No per-phase timing or full rustc command was captured, so neither exact timeout
+cause nor expected wall-time improvement is proved. No Cargo/test/runtime ran here.
+REPLAN selects the same ignored native test under a cfg(test) library module and
+--lib compilation, eliminating the documented integration-triggered binary route
+without changing profiles, dependencies, API, fixture, limits or demand semantics.
+Inspect the small-library owner before editing; correct/prove the saved draft's
+exceptional kill/reap/close phase with harmless lifecycle self-checks before one
+new-target compile. No old-target retry or warmed-cache speed claim; timeout stops.
+Independent terminal/next-contract review ACCEPTS this docs-only audit and library
+target contract. No implementation, cleanup correction or runtime is yet accepted.

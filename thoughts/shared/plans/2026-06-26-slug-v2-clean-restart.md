@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-sentinel-build-cost-audit-r1`
-bounded read-only sentinel compilation investigation](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-authentic-sentinel-library-probe-r1`
+same authentic sentinel through a library-only test target](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -105,8 +105,12 @@ archives, no networking,15second child/2GiB AS limits and exact abseil-open trac
 Earlier failures remain inconclusive; no all-catalog download or R2 retry is selected.
 User-installed strace6.8 passes harmless isolated preflight outside the tool sandbox.
 Focused probe compilation reached timeout60/exit124 before any executable or fixture
-evaluation; no compiler survivors were found. Preserve the uncompiled draft outside
-the checkout and investigate build cost read-only; no retry or cap increase.
+evaluation; no compiler survivors were found. Read-only Cargo audit finds automatic
+binary selection for integration tests and profile variants consistent with the
+workspace's abort/test-unwind split, but no timed root-cause attribution. Select
+the same native test through cfg(test)/--lib, with unchanged60second compile and
+15second runtime limits, after repairing/proving exceptional process cleanup.
+No original-target retry, profile override or promise of a sub60second build.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 
