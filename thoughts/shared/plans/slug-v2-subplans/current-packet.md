@@ -1,102 +1,137 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-5-7A-configured-cli-payload-demand-review-r1
+Packet: WP-5-7A-authentic-sentinel-demand-probe-r1
 
-Status: source/docs only; no production/fixture/source writes, acquisition,
-tests, CLI, daemon, Bazel, archive extraction or replay.
+Status: bounded diagnostic implementation/execution, after independent contract
+review. No production semantics, complete/partial R2 restoration, acquisition,
+Bazel, CLI conflict-suite rerun or checkout-wide/bounded replay.
 
-## Observable result and learned boundary
+## Observable result and source basis
 
-Determine whether the preserved R2 authentic CLI route actually demands the
-abseil-cpp20250814.1 archive that is absent at both evidenced cache locators.
-Distinguish registry metadata discovery, selected RepoSpec construction and
-archive materialization. Catalog membership alone is never acquisition authority.
+Run exactly one isolated native sentinel evaluation with authentic registry
+metadata and the two already-evidenced prerequisite archives. Determine whether
+it opens the absent abseil mirror path, completes analysis without that demand,
+or stops earlier. Earlier errors, missing inputs and resource limits are
+inconclusive about abseil; preserve their exact first boundary instead of retrying.
 
-Predecessor WP-5-7A-abseil-payload-locator-audit-r1 resolved the filename rule
-from one26823byte archived source file, controlled it against the known rules_shell
-name, and observed ENOENT at both exact abseil locations:2 attempts,0 payload bytes.
-Stage5 owns source/blob/SHA/path details. The locator uncertainty is resolved;
-global unavailability, selected closure and actual CLI demand remain unproved.
-All184 metadata hashes remain accepted; the27-descriptor/47-payload catalog is
-only upstream evidence, not a mandatory download list. Complete R2 is unaccepted.
+Predecessor WP-5-7A-configured-cli-payload-demand-review-r1 proves metadata/spec
+construction is separate from capture: selected_repo_spec.rs:1241-1370,1495-1525
+reads/project specs; core runtime/dice.rs:7161-7213 materializes only emitted Needs.
+source_preparation.rs:5226-5252 emits a Need for an absent/mismatched result;
+repository_io.rs:1489-1509,1664-1680 dispatches http_archive capture. Actual
+configured traversal remains conditional, not proved required/nonrequired.
+Stage5 records exact implicit-registration/launcher/source anchors. No source
+change or runtime was performed in that review.
 
-## Exact read scope and authority
+## One diagnostic and fixture identity
 
-Read preserved /tmp/slug-conflict-r2.XZJWwv/validation.txt and only CLI fixture/
-sentinel/request patch hunks plus app/slug_cli_v2/tests/cli.rs helpers.
-Trace live source owners beginning with:
-- app/slug_bzlmod_v2/src/{selected_graph.rs,selected_repo_spec.rs};
-- app/slug_core_v2/src/runtime/{repository_io.rs,root_apparent_repository_route.rs};
-- app/slug_loading_v2/src/{root_repository_load_route.rs,canonical_repository_load_route.rs,package.rs};
-- app/slug_bzlmod_v2/builtin/bazel_tools/MODULE.bazel and tools/{test,launcher}/BUILD.
-Targeted symbol/caller searches may identify up to6 additional production owner
-files only within those three crates. Read relevant function hunks, not complete
-oversized modules: <=2MiB aggregate source excerpts and18 distinct live source files.
-No unrelated owner expansion or archive/source-cache scan. docs/developers/dice.md
-is read-only ownership context if required; no key or ownership change is selected.
+Implement an opt-in ignored integration test in
+app/slug_cli_v2/tests/payload_demand_probe.rs and one bounded driver
+tools/v2_oracle/run_payload_demand_probe.sh. <=600 total added implementation/
+proof/driver lines,0 production lines. No Cargo/dependency changes; inspect the
+CLI Cargo manifest and existing test helpers first, stop if a new dependency or
+public interface would be needed. Prefer existing dependencies/shell utilities.
+Do not append to oversized cli.rs or add broad scaffolding.
 
-Pinned Bazel9.2 object8220c6198837d5c13d53fea211cf3282aa12408a in /home/wgray/bazel
-remains compatibility authority. Reuse Stage5's accepted selected discovery,
-IndexRegistry and file-capture evidence. Read at most3 directly corresponding
-pinned Bazel source/test files if an eager/lazy demand assertion needs authority.
-The pinned empty-root lock d7cbba1d746f5522d7dde4a2f7ea7a24d8f0befdf23d7cb4984689b48781049a
-is a metadata catalog, not Slug demand authority. Do not reevaluate its156 MODULE
-bodies, rehash its184 rows or resume the47-payload inventory.
-V1 filename evidence is now resolved; no further V1 source reading/reuse needed.
+The test performs exactly R2 sentinel_outputs' native API call, using
+BuildRequest::parse with --registry=file://<scratch>/registry and //:root,
+then evaluate_workspace_build_command_with_bzlmod_inputs with the resulting
+policy/registry fields and the same default environment/configuration projection
+as R2. Project to TerminalOutput and publish through the same accepted-command
+boundary; report native errors and published exit status. Do not write sentinels,
+execute configured actions, invoke a CLI, or start slugd.
+Name the test authentic_sentinel_demand; it is ignored in ordinary test runs.
+This is a Slug-native demand diagnostic, not Bazel parity or actual CLI acceptance.
 
-## Questions, decisions and stops
+Use a new mktemp directory /tmp/slug-sentinel-demand.XXXXXX owned by the driver:
+workspace/{MODULE.bazel,BUILD.bazel,defs.bzl},registry/,mirror/,logs/.
+Copy only the preserved R2 root BUILD/defs and MODULE root name, root-local
+platform/toolchain registrations and platforms1.0.0 dependency. Remove only
+fake-platform local_path_override and generated fake-platform bodies. No semantic
+root simplification, source/version override, stub, explicit platform flag,
+command root change or conflict mutation. Candidate patch stays untouched.
 
-1. Starting from direct-core sentinel_outputs and each real CLI command's root/
-   request options, identify when registry MODULE/source.json reads occur versus
-   when an archive is captured/materialized. Name concrete callers and conditions.
-   Account for implicit bazel_tools, real host_platform, registered builtin
-   toolchains, and root-local platform/toolchain declarations; do not replace
-   any with fake sources or assume a custom root platform avoids implicit loading.
-2. For the absent abseil archive, record one of: source-proved required demand,
-   source-proved non-demand for the named route, or a specifically unresolved
-   conditional edge. Absence of a symbol in a search is not non-demand proof.
-   Do not infer runtime success from source presence or metadata selection.
-3. If the archive is required, freeze only the first exact missing input and a
-   proposed acquisition/proof route for separate review; no download here.
-   If it is not required, remove the all-catalog-payload prerequisite and select
-   a bounded authentic fixture/proof route using only evidenced needed inputs.
-   No version/source override, local_repository admission, parser/semantic fix
-   or change of the requested final conflict/REAPI behavior is permitted.
-4. If source cannot resolve demand within these caps, select a single bounded
-   discriminating diagnostic design, not another arbitrary dependency audit.
-   Its future contract must name authentic inputs, isolated writable paths,
-   no credentials/network acquisition, exact command/outputs and stop condition,
-   <=15second child timeout/8192 retained bytes per pipe, <=60second whole command,
-   explicit memory cap and terminal child/daemon cleanup. No execution here.
-5. Every proposed future fixture must carry the same explicit registry/mirror
-   policy to direct-core sentinel and all CLI requests, remove the preserved
-   fake-platform override/bodies and preserve real builtin/generated host inputs.
-   Incomplete authentic setup must fail honestly; do not enlarge stubs or
-   replace real behavior with an easier control. Full R2 resumes only under a
-   reviewed complete-candidate fixture/proof contract, never partial shipping.
+Fixture metadata is a bounded temporary input superset, not a selected graph:
+from pinned Bazel8220c6198837d5c13d53fea211cf3282aa12408a default lock
+src/test/tools/bzlmod/MODULE.bazel.lock, SHA-256
+d7cbba1d746f5522d7dde4a2f7ea7a24d8f0befdf23d7cb4984689b48781049a,
+stage only its183 MODULE/source.json rows from exact verified Bazel CAS paths,
+preserving bytes and relative registry paths. Hash-check regular inputs first;
+<=1MiB/file and1MiB total fixture input bytes. No lockfile injection or module
+evaluation during staging. The184th original registry-config row is NOT copied:
+write explicit test-owned bazel_registry.json with only
+{"mirrors":["file://<scratch>/mirror"]}. This is transport policy, not fabricated
+module/source metadata. Record both this generated config and its purpose.
 
-## Classification, ownership and validation
+Stage exactly these3 hash-verified payloads, no other archive or patch:
+- platforms1.0.0 archive3384eb1c30762704fbe38e440204e114154086c8fc8a8c2e3e28441028c019a8
+  (7879bytes), from the exact Bazel CAS hash/file locator;
+- rules_shell0.6.1 archivee6b87c89bd0b27039e3af2c5da01147452f240f75d505f5b6880874f31036307
+  (23916bytes), from Stage5's exact Slug downloads filename;
+- rules_shell version patch5f0700eaa9a33770aae4ae8b06bec8e433f518eb50711378c8cd3a5d7854ff2d
+  (320bytes), from the exact Bazel CAS hash/file locator.
+Archive mirror paths are original descriptor URL host+path under mirror/;
+patch is registry/modules/rules_shell/0.6.1/patches/module_dot_bazel_version.patch.
+Keep source.json/MODULE/SRI/strip/patch order unchanged. Authentic host_platform
+generation/builtin content must execute normally if demanded. No pre-extraction.
+Leave the exact abseil mirror path absent, as observed at both cache locators.
+Never stage abseil or resume the47-payload inventory in this diagnostic.
 
-Exact/Slug-native/deferred classes remain unchanged; this is demand evidence/
-route selection, not a runtime or parity acceptance. Existing selected graph/
-RepoSpec, immutable request policy, Host observations, SRI capture and source
-publication remain owners. No new key, retained cache, lock, fallback, request
-overlap policy or async lifetime. Read-only audit scratch is command-local.
-No representation/Buck2 donor/hot-path/fixture changes; corresponding gates are
-inapplicable. Any implementation or destructive authority needs a new review.
+## Execution, observation and hard limits
 
-Writable: this manifest, canonical Live Status, relevant Stage5/6 status; routing
-only for REPLAN. <=120 added doc lines outside manifest; PROGRESS.md <=500 lines.
-All sources/caches/candidates read-only. Every audit command timeout60; overrun
-requires investigation, never automatic extension/retry. Future tests/compiler
-commands start timeout60, serialized; one minute is a red flag,15minutes absolute.
-Source/structure/diff checks, R2 hash/applicability, archive checker (known3 only);
-independent terminal review, commit/push accepted result and exact successor.
-Cap overflow, new unbounded prerequisite or second material correction is REPLAN.
+Compile only the named ignored integration test: timeout60 cargo test -q
+-p slug_cli_v2 --test payload_demand_probe --no-run; serialize Cargo, no full suite.
+The driver selects the compiler-reported test executable, never a stale guessed
+binary. No slug CLI rebuild is needed because no CLI executable is invoked.
+
+Before evaluating, require available unshare, prlimit and strace plus a working
+unprivileged user/network namespace. Preflight with a harmless child only.
+Failure is an isolation/tooling stop, not permission to drop the boundary.
+Run the test executable --ignored --exact authentic_sentinel_demand --nocapture
+inside that network namespace under prlimit AS=2GiB/CPU=15seconds/FSIZE=16MiB and
+a15second wall-clock process-group deadline; KILL/reap the entire scoped group
+on deadline and clean any remaining group members on every exit. No daemon.
+These AS limits are per process, not an aggregate-RSS performance claim.
+Use a minimal environment; no credential forwarding, RC reads or network access.
+
+Use strace -f with only openat/openat2 and -P selecting the exact absent
+mirror/github.com/abseil/abseil-cpp/releases/download/20250814.1/abseil-cpp-20250814.1.tar.gz.
+Keep trace <=64KiB; concurrently drain stdout/stderr retaining <=8192bytes each.
+Overflow is a stop, not silently truncated passing evidence. Entire invocation/
+supervision <=60seconds. Never retry after timeout or enlarge a resource cap.
+Record return status, elapsed time, peak RSS where available, trace and complete
+bounded diagnostics. Positive demand requires an actual traced child openat/
+openat2 syscall targeting the exact abseil path, never strace startup/path-warning
+text. Keep harmless preflight traces separate; they never count as probe evidence.
+Non-demand requires native evaluation success AND published exit status0 with
+no such syscall, and applies only to this exact sentinel/input revision, not
+other CLI commands. A nonzero publication, earlier error, timeout, overflow or
+resource/isolation failure is inconclusive and leaves demand unresolved.
+
+## Evidence hygiene, ownership and close
+
+The183 small metadata files are temporary discovery inputs, not checked-in
+fixture breadth; every file is hash/provenance bounded by the pinned catalog.
+Keep only a compact generated inventory/digest and diagnostic logs for handoff;
+remove staged trees after recording the result, without deleting any source cache.
+The diagnostic must not become a production cache locator or mandatory test in
+ordinary CI. Reuse/copy bounded pipe themes only, no whole existing test module.
+No new exact-parity fixture; native diagnostic provenance belongs in Stage5.
+No DICE/key/lock/retained-state/overlap/fallback changes; buffers are phase scratch,
+child lifetime belongs to the driver and source publication stays native-owned.
+
+Writable: the2 named new files, this manifest, canonical Live Status and relevant
+Stage5/6 status; routing only for REPLAN; <=120 added doc lines outside manifest,
+PROGRESS.md<=500. Source caches/preserved candidates read-only; all edits apply_patch.
+Run formatting/shell syntax, diff/R2 hash/apply and archive checker (known3 only).
+One diagnostic attempt; independent terminal review; commit/push accepted evidence
+or concrete stop and select its first actual prerequisite. No speculative fixes
+or input acquisition. Second material correction/new owner/cap overflow is REPLAN.
 Never inspect/print/copy ~/.bazelrc or derived secrets.
 
-R2: /tmp/slug-conflict-r2.XZJWwv/candidate.patch,base97dffd5d4,
+R2 /tmp/slug-conflict-r2.XZJWwv/candidate.patch remains unaccepted,base97dffd5d4,
 SHA-256 90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e.
-Adjacent validation.txt owns gates. Actual one-shot/stable-daemon conflicts,
-positive common execution-view/REAPI sharing and complete relevant gates stay
-open; no full-suite retry, checkout-wide/bounded replay or partial restoration.
+Its validation.txt owns gates: actual one-shot/stable-daemon conflicts, positive
+common execution-view/REAPI sharing and complete relevant gates remain open.
+Future complete R2 fixtures must propagate this explicit policy to both sentinel
+and every CLI request; no partial restoration/shipping or broad replay.

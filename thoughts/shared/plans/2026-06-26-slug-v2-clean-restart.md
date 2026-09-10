@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-configured-cli-payload-demand-review-r1`
-actual CLI archive-demand review](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-authentic-sentinel-demand-probe-r1`
+one isolated authentic sentinel-demand diagnostic](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -98,8 +98,11 @@ hashes; all184 metadata objects now verify in276705bytes/184 exact CAS paths.
 Its27 descriptors declare47 payloads; the first abseil-cpp20250814.1 archive is
 absent at both its exact Bazel CAS and source-derived Slug paths. The archived
 filename rule is resolved and controlled;2 exact stat attempts read0 payload bytes.
-Review actual CLI demand next, not global absence or blanket catalog acquisition.
-Payload/selection/CLI gates remain open; no retry/acquisition is selected.
+Source review separates eager metadata/spec construction from demand-driven
+archive capture, but the fixture's configured traversal remains conditional.
+Select one isolated native sentinel diagnostic with authentic metadata/two known
+archives, no networking,15second child/2GiB AS limits and exact abseil-open tracing.
+Earlier failures remain inconclusive; no all-catalog download or R2 retry is selected.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 

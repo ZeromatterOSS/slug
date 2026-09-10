@@ -5509,3 +5509,45 @@ select one tiny, isolated diagnostic design with explicit authentic inputs and
 time/memory/pipe bounds; do not create another arbitrary inventory or run it here.
 Independent terminal review ACCEPTS the scoped locator result and demand-review
 successor; unresolved source conditions require diagnostic design, not execution.
+
+### Actual demand trace: conditional; single diagnostic selected (2026-09-10)
+
+WP-5-7A-configured-cli-payload-demand-review-r1 does not prove abseil required or
+nonrequired by the actual fixture. It does prove distinct metadata/capture owners:
+selected_repo_spec.rs:1241-1370 reads descriptor/registry metadata and constructs
+a RepoSpec;1495-1525 iterates selected entries, without reading archive bytes.
+source_preparation/canonical_repository_source.rs:79-144 projects one addressed
+route into a request; source_preparation.rs:5226-5252 emits repository Need when
+its exact result is missing/mismatched. core runtime/dice.rs:7161-7213 services
+only emitted repository Needs; repository_io.rs:1489-1509,1664-1680 dispatches
+http_archive to selected-BCR capture. Spec/catalog membership alone is not demand.
+
+Preserved sentinel_outputs calls native core evaluation for //:root; live
+runtime/mod.rs:76-97 constructs native WorkspaceRuntime and delegates the request.
+The root has its own platform/toolchain, but selected_graph.rs:537-563 adds
+implicit bazel_tools. selected_repo_spec.rs:5629-5688 retains all selected module
+registration patterns, not only root patterns. Builtin MODULE registers launcher,
+test, Windows-SDK and resource toolchains; tools/test/BUILD loads real rules_shell;
+tools/launcher/BUILD loads real platforms host constraints and tools/build_defs.bzl.
+The latter declares manual implementation targets with binary dependencies,
+including launcher C++ sources, rather than eagerly executing those binaries.
+Live/upstream pinned tools/build_defs.bzl SHA-256 both equal
+d5f935c4e72a365438711f08a2640094cbf0a03392eebb06d8cecdc58b8ab19c.
+Core configured dependency traversal crosses into slug_analysis_v2 keys
+(runtime/dice.rs:4257-4315); whether that traversal selects a path to abseil is
+unresolved within this source packet. A missing symbol or custom root platform
+cannot prove non-demand.17 live files/6 additional owners inspected via excerpts,
+below2MiB; no source-cache dependency walk, production change or execution.
+
+Next: WP-5-7A-authentic-sentinel-demand-probe-r1 freezes one opt-in native sentinel
+diagnostic, not the CLI/R2 gate. Temporary183 authentic MODULE/descriptor inputs
+are an explicitly bounded metadata superset; a test-owned registry config sets
+the file mirror. Only known platforms/rules_shell archives and the shell patch
+are staged; no abseil or catalog-payload acquisition. Exact missing-mirror open
+tracing supplies a positive demand discriminator. Success without that open is
+non-demand only for this sentinel revision; earlier failure/timeout is inconclusive.
+Require network namespace,15second process-group deadline,2GiB per-process AS,
+bounded pipes/trace and terminal cleanup. No diagnostic ran in this source review.
+Independent terminal/pre-execution review ACCEPTS after clarifying actual child
+syscall evidence, separate preflight traces and native success plus publication0
+for the narrow non-demand conclusion. All earlier/resource failures are inconclusive.
