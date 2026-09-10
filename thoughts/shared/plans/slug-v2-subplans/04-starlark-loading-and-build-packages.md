@@ -8803,3 +8803,53 @@ The authentic next boundary selects the docs-only named-execution-group runtime
 audit. The existing Stage 6 reservation requires a reviewed complete generic
 cross-stage design before removing the pre-publication guard; do not simply
 move it later or erase groups to load this package.
+
+### Selected cc_library execution-group runtime audit (2026-09-10)
+
+`WP-4-6-7A-named-execution-group-runtime-audit-r1` returns `REPLAN`, not
+implementation authority. The selected declaration requires a shared named
+and automatic rule execution-group owner. Stage 6 records the runtime gaps
+and successor design contract; the current target-invocation guard stays put.
+
+All members below come from the already authenticated rules_cc 0.2.17 archive
+(`283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a`),
+under strip prefix `rules_cc-0.2.17/`; no source override or new replay:
+
+| Archive member | SHA-256 |
+|---|---|
+| `cc/extensions.bzl` | `a190a467ac48329a76e1a9ccab1fea53519af4bb2202e22346b23fc24dcf9872` |
+| `cc/private/rules_impl/cc_library.bzl` | `87b491f10af315c9574f7dd96125b05fb53827da2442fbbe2f10e513167d1f70` |
+| `cc/private/rules_impl/attrs.bzl` | `2ce75f73e5a7825908335c0f1b18945a87274cbaeb08353c89c8ab5ad4de6967` |
+| `cc/common/semantics.bzl` | `029254fd58eb8b3bf32a0f772e479b991a51ce21a6f6cc8a5739aadbce3900da` |
+| `cc/find_cc_toolchain.bzl` | `3f62d3ea99f59674f71dbc669c80dd0dc5ef14637933d727b74f0bd556334655` |
+
+The public wrapper loads the generated compatibility proxy. Its generator in
+`cc/extensions.bzl:29` selects private Starlark rules for Bazel versions at
+least `9.0.0-pre.20250911`, including pinned 9.2; its proxy imports this
+private `cc_library`, not `native.cc_library`. The complete `rule()` call is
+`cc/private/rules_impl/cc_library.bzl:574-961`: `common_attrs` plus the local
+attribute dict plus two empty semantics attribute dicts, `_cc_library_impl`,
+`[CcInfo]`, fragment `cpp`, the default C++ toolchain requirement, and one named
+group `cpp_link` carrying the same mandatory requirement. `find_cc_toolchain.bzl`
+defines that requirement at 57/114-131 using the canonicalized label
+`@bazel_tools//tools/cpp:toolchain_type`; semantics adds no runtime toolchains
+or fragments. The rule has no initializer, incoming transition or subrules.
+
+Crucially, line 953 declares `_use_auto_exec_groups = attr.bool(default=True)`.
+Pinned `AutoExecGroupsTest.automaticExecutionGroups_disabledAndAttributeTrue_enabled`
+and `.automaticExecutionGroups_enabledAndAttributeTrue_enabled` establish that
+this attribute enables automatic groups even when the global flag is false.
+A named-only runtime design cannot silently erase that selected policy.
+
+There are **zero named `config.exec` references in this library's composed
+schema**. `_def_parser` comes from `semantics.bzl:54-66`: a function default
+with ordinary `cfg="exec"`, not `config.exec("cpp_link")`. The two named
+`config.exec("test")` descriptors at 77-89 belong to the separate coverage
+attribute helper, which this library does not merge. Do not attribute the
+whole proxy closure's test-rule transitions to the selected library.
+Thus the observed generic guard is explained by the nonempty `cpp_link`
+declaration alone. Its implementation starts by finding the C++ toolchain;
+full C++ provider/compilation/linking behavior remains deferred. The independent
+computed-default guard also remains relevant, but no later terminal was replayed
+or accepted in this audit. Generic execution-group support alone is not a
+claim that this package or Java runtime analysis will succeed.

@@ -1,118 +1,109 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-6-7A-named-execution-group-runtime-audit-r1
+Packet: WP-4-6-7A-rule-execution-group-runtime-design-r1
 
-Status: docs/source audit selected after terminal acceptance of imported native
-genrule loading. No new Rust implementation is authorized by this audit.
+Status: docs/source design selected by the named-only runtime audit's REPLAN.
+No Rust implementation or runtime admission is authorized by this packet.
 
-## Immediate predecessor and authentic boundary
+## Immediate predecessor and learned facts
 
-The imported-native-genrule implementation is independently ACCEPTED at
-170 production/255 proof/425 aggregate gross Rust additions. Full loading,
-query-library and analysis-library gates, CLI build, formatting and scope checks
-pass. The targeted root-alias replay finishes with exit 2 in 62.74 seconds:
-all six authenticated rules_java helper/genrule calls return before the next
-top-level statement at toolchains/BUILD:138 calls cc_library.
+Imported native genrule loading is accepted and pushed as `de62232ad`.
+Its authenticated root-alias replay cleared all six rules_java helper calls,
+then stopped at toolchains/BUILD:138 -> rules_cc cc/cc_library.bzl:19 with
+`target invocation for named execution-group semantics is unsupported`.
+No package, genrule analysis or Java runtime analysis published.
 
-The next terminal is:
+The named-execution-group audit authenticates rules_cc 0.2.17's generated
+proxy and complete private cc_library declaration. It declares named
+`cpp_link` plus `_use_auto_exec_groups=True`, with the same mandatory C++
+toolchain requirement on the default declaration and named group. There are
+no named `config.exec` edges in this library's schema: `_def_parser` uses
+ordinary `cfg="exec"`; the two named test transitions belong to another rule.
+There is no initializer; its computed-default runtime remains independently
+unsupported. Stage 4 records exact member hashes and source anchors.
 
-```text
-@@rules_java+//toolchains:BUILD:138 -> cc_library
-@@rules_cc+//cc:cc_library.bzl:19 -> _cc_library(**kwargs)
-target invocation for named execution-group semantics is unsupported
-```
+Named-only activation cannot erase the selected automatic policy. Stage 6's
+"Rule execution-group runtime prerequisite: named-only REPLAN" records the
+pinned behavior matrix, live gaps, shared ownership obligations and tests.
+Reuse it; do not repeat archive downloads, authentic replay or the entire audit.
 
-No package publishes; no genrule/generated output is selected for analysis and
-Java runtime rule analysis does not begin. The former BUILD:365 prediction was
-unproven and is superseded by this observed earlier boundary. Complete replay
-provenance and validation are recorded in Stage 4's imported-genrule section.
+## Observable result and reserved decision
 
-The selected rules_cc archive is 0.2.17, SHA-256
-`283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a`.
-Its 19-line cc/cc_library.bzl wrapper hashes to
-`f78cea09a88fff65a5409d7e2b725cf9fcbdbf6d409a2b4b94216565be79b2dc`
-and imports cc_library from the generated compatibility proxy.
-The tracked root lock and built-in MODULE regression agree on 0.2.17.
-Do not downgrade to 0.2.4 based on contradictory historical prose.
+Produce one independently reviewed, implementation-ready contract for the
+shared generic rule execution-group runtime needed by this owner: default,
+named and automatic group normalization/resolution and their dependency,
+provider/property/action consumers. Explicitly classify test-runner and rule
+inheritance behavior; configured aspects remain deferred. This is one shared
+cross-stage abstraction, not a rules_cc/C++ branch or a loading-only bridge.
 
-## Observable audit result
+Close the remaining design questions: automatic flag/attribute precedence,
+default versus per-toolchain requirements, generated-name identity and alias
+handling, toolchain-to-action inference including omitted versus explicit None,
+named+toolchain compatibility, and common group constraint/property ownership.
+Extend the already traced named behavior; do not run a second general audit.
+Freeze exact files, compact fields/keys, caps and executable proof commands.
+If the category cannot be bounded, identify a concrete prerequisite owner and
+its observable contract; do not authorize a partial guard removal.
 
-Authenticate the proxy's complete selected cc_library declaration, identify
-which declared groups and named exec transitions trigger the existing generic
-guard, and design the complete generic named-execution-group runtime category
-needed by that owner. Inventory automatic groups separately; do not silently
-admit or erase them. The result is a bounded cross-stage design or an explicit
-REPLAN identifying the prerequisite owner, not a rules_cc special case.
+## Authority and implementation-readiness gates
 
-The accepted Stage 6 execution-group declaration design explicitly reserves
-removing this pre-publication guard for a reviewed cross-stage packet owning
-group-specific transitions, constraint/toolchain resolution, ctx.exec_groups,
-exec properties and action routing. Do not simply move the guard later, erase
-group names, fall back to the default platform, or wire the unused
-toolchains/exec_groups.rs prototype into live analysis.
+Use Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
+from local git objects, not the different `/home/wgray/bazel` working HEAD.
+Read the Stage 6 audit's relevant anchors and remaining automatic-policy
+consumers/tests: DeclaredExecGroup, UnloadedToolchainContextsProducer,
+ToolchainCollection, RuleContext, StarlarkActionFactory, StarlarkAttributesCollection,
+StarlarkRuleClassFunctions and AutoExecGroupsTest. Establish precise public
+behavior/failure order from source and discriminating tests before claiming
+exactness. Internal Java identity/state-machine assertions are not Slug APIs.
 
-## Authority and inspection
+Read the plan-authoring guide and docs/developers/dice.md. Apply the Buck2
+utility skill only for proposed retained representation, using the matching
+Stage 9 rows, not a broad donor archaeology pass. Obtain one independent
+architecture/retained-state review before authorizing implementation.
 
-Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` remains the
-compatibility authority. Read its applicable source and discriminating tests:
+Required contract:
 
-- packages/DeclaredExecGroup.java;
-- analysis/ExecGroupCollection.java;
-- analysis/starlark/StarlarkExecGroupCollection.java;
-- starlarkbuildapi/ExecGroupApi.java and platform/ExecGroupCollectionApi.java;
-- analysis/StarlarkExecGroupTest.java and AutoExecGroupsTest.java;
-- skyframe/toolchains/ToolchainResolutionFunctionTest.java and
-  SingleToolchainResolutionFunctionTest.java;
-- starlark/StarlarkRuleClassFunctionsTest.java.
+- Loading-owned normalized declarations/named transitions through final target
+  equality; immutable request/configuration inputs and tracked source/repository
+  observations, with no command-side semantic reconstruction.
+- Constraint-bearing resolution inputs, including zero-toolchain groups; one
+  configured-target-owned immutable group collection supplying selected Exec
+  configurations, toolchain provider views, properties and action routing.
+- Distinct target/Exec and default/named/automatic identity; complete structural
+  equality/invalidation with unchanged configuration/path/ActionKey/REAPI domains.
+- Source/configuration/platform A/B/A; unchanged-input cutoff; overlapping
+  requests; cancellation/Need/error, atomic parent publication and final source
+  validation. Never fabricate historical Host snapshots.
+- Retained/scratch/view/async lifetimes, compact sharing and Allocative;
+  no second global registry, side cache or lock across DICE awaits.
+- Pinned-source regressions/focused oracles for actual evidence gaps, default
+  controls and named downstream consumers. Reuse existing scaffolding and
+  record fixture provenance; do not add copied real-workspace breadth.
+- Exact file allowlist and production/proof/aggregate growth caps, with a
+  bounded split or concrete cohesion decision for large package.rs/dice.rs.
+  No placeholder caps or unspecified public/schema consumers at handoff.
 
-These are paths under src/main/java/com/google/devtools/build/lib or
-src/test/java/com/google/devtools/build/lib at that commit. Record which tests
-apply, which belong to deferred automatic/aspect breadth, and why. Reuse
-accepted source/oracle evidence before adding a new oracle.
+Exact describes only established admitted Bazel surfaces. Host/DICE integrity
+and structural identities are Slug-native. This design admits nothing yet;
+later computed defaults, C++/Java providers/actions, configured aspects,
+broader action/execution families and exact configuration bytes stay deferred.
 
-Inspect the live Stage 4 declaration/target boundary, Stage 6 configured
-transition and toolchain owners, configured action-group identity, and
-existing default-context tests. Read docs/developers/dice.md before proposing
-key or ownership changes. Buck2/DICE are ownership/utility guidance only, never
-Bazel compatibility authority. Preserve the Rust-native architecture.
+## Scope and stops
 
-## Required design and non-decisions
+Allowed edits: this manifest, canonical Live Status, and relevant Stage 4/6
+owner sections. No Rust, fixtures, vendored sources, harness, dependencies,
+runtime or repository changes. Design additions are capped at 300 text lines
+excluding manifest replacement. Keep reusable decisions compact, with Git
+history retaining completed chronology.
 
-The audit must cover declaration-to-target retention, structural identity and
-equality, request/configuration projections, target versus execution platform,
-constraint and toolchain ownership, named dependency transitions, provider/ctx
-views, action-group selection and failure ordering. Identify natural producers
-and retained lifetimes; no command-side semantic reconstruction.
+Never move the named invocation guard just to publish loading targets, erase
+group names, substitute the default platform or wire the unused
+toolchains/exec_groups.rs prototype into live analysis. A new semantic owner,
+request projection, async boundary or default behavior change needs explicit
+contract/review; a second material design correction is REPLAN.
 
-Specify source/configuration/platform A/B/A, overlapping requests, cancellation
-and failure publication, and default-group nonregression. Preserve distinct
-configuration, output-path, ActionKey and REAPI digest domains. All new owners,
-fields, keys and async boundaries require explicit review and memory accounting.
-
-Exact means only source/oracle-established named surfaces. DICE/Host integrity
-and structural identities remain Slug-native. Unselected automatic/aspect
-behavior, later C++/Java initializer/provider/action semantics and execution
-remain unsupported/deferred unless separately selected. This audit itself
-activates none of them.
-
-## Scope, review and stops
-
-Allowed edits: this manifest, canonical Live Status and the relevant Stage 4
-and Stage 6 owner sections; Stage 5 only if provenance changes. No Rust,
-fixtures, vendored sources, harness, dependency, runtime or repository changes.
-Keep audit additions under 300 text lines, excluding replacement of this
-manifest. Do not add chronological status copies or speculative APIs.
-
-Before implementation, apply the plan-authoring guide and obtain independent
-architecture/retained-state review. Freeze exact files, caps, compact owners,
-Bazel tests, focused validation, compatibility classes, complexity decisions
-and explicit stops. A new DICE/global/retained owner, unsupported transition,
-default-platform fallback or incomplete category is a design decision or
-REPLAN, not implicit implementation authority.
-
-The stopped checkout-wide replay must not restart. Tests over one minute are
-a red flag requiring investigation; fifteen minutes is the absolute maximum.
-The completed 62.74-second gate followed short diagnostics confirming global
-path-epoch revalidation fanout. Preserve that separate performance concern;
-do not hide it with source overrides, longer timeouts, disabled provenance or
-a fresh graph. Prefer deterministic focused tests during iteration.
+Validation here is source/structure checks and `git diff --check`; no build or
+network replay is needed. The stopped checkout-wide query must not restart.
+Tests above one minute require investigation; fifteen minutes is the absolute
+maximum. Preserve the separately demonstrated path-epoch fanout concern, with
+no longer-timeout, disabled-provenance or fresh-graph workaround.

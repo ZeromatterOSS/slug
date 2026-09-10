@@ -23256,3 +23256,140 @@ action routing, structural identity and DICE invalidation need one reviewed
 complete design. Do not move the guard merely to publish a loading target,
 silently choose the default platform or activate the unused prototype. No new
 Stage 6 Rust is authorized until that audit and architecture review complete.
+
+### Rule execution-group runtime prerequisite: named-only REPLAN (2026-09-10)
+
+The selected 0.2.17 cc_library has named `cpp_link` **and** an explicit true
+automatic-group policy. Stage 4 authenticates the entire declaration and
+corrects the named-transition attribution. The named-only audit terminates in
+`REPLAN`: before runtime activation, design the shared rule execution-group
+category including automatic policy, requirements and action selection.
+Successor `WP-4-6-7A-rule-execution-group-runtime-design-r1` is docs/source only.
+It must freeze a bounded implementation contract, not another carrier-only
+loading bypass. No guard moves, runtime code, test fixture or representation
+change is admitted by this audit.
+
+Independent terminal architecture review returns `ACCEPT` for this docs-only
+REPLAN and successor selection; it does not approve runtime implementation.
+
+#### Pinned semantic basis and discriminators
+
+Authority is Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`.
+Use that git object in `/home/wgray/bazel`; its working HEAD is different.
+Paths below are relative to Bazel's `com/google/devtools/build/lib` Java main
+or test trees. These are source-established requirements, not new passing
+Slug tests or a whole-category Bazel parity claim.
+
+| Concern | Source and discriminating test |
+|---|---|
+| Named requirements/constraints and internal default-copy | `packages/DeclaredExecGroup.java:43-149`; `packages/RuleClassBuilderTest.testDuplicateExecGroupsThatInheritFromRuleIsOk`. `COPY_FROM_DEFAULT` is internal, not a public `copy_from_rule` keyword. |
+| Independent resolution, including no-toolchain groups | `analysis/producers/UnloadedToolchainContextsProducer.java:100-124`; `skyframe/toolchains/ToolchainResolutionFunctionTest.resolve_noToolchainType`, `.resolve_execConstraints`, `.resolve_noMatchingPlatform`. Each group has its own requirements/exec constraints under the owner's target configuration. |
+| Named dependency transition | `analysis/DependencyResolutionHelpers.java:231-255`; `analysis/StarlarkExecGroupTest.testExecGroupTransition`, `.testInvalidExecGroupTransition`. Resolve the named group's execution platform; unknown name errors, never default fallback. |
+| Provider view | `analysis/starlark/StarlarkExecGroupCollection.java:43-159`; `starlarkbuildapi/platform/ExecGroupCollectionApi.java`. String-indexed thin views expose resolved `.toolchains`, exclude default and report unknown names. Collection absence differs from an empty resolved toolchain map. |
+| Properties | `analysis/ExecGroupCollection.java:70-180,195-245`; `StarlarkExecGroupTest.testSetExecGroupExecProperty` and unknown/inherited/override tests at 605-712. Validate target group prefixes; merge using the selected platform for each group. |
+| Action routing/failure | `analysis/starlark/StarlarkActionFactory.determineExecGroup:855-895`; `StarlarkExecGroupTest.testExecGroupActionHasExecGroupPlatform`, invalid-action tests at 395-438. Validate existence/public name, then bind that group's owner/platform; automatic mode also checks explicit toolchain/group agreement. |
+| Automatic policy/group derivation | `DeclaredExecGroup.process:131-148`; `analysis/AutoExecGroupsTest` flag/attribute matrix at 303-431, group membership at 756-770, action inference/mismatch at 505-704/1281-1304. Per-toolchain generated names are distinct from public identifiers. These are required successor research, not admitted behavior. |
+
+Property precedence must account for `computeProperties` filling missing
+target-group keys from target defaults before its final merge. Effective
+precedence is platform-default < platform-group < target-default < target-group;
+a target-default value therefore beats a same-key platform-group value. Add
+that discriminator, not just the simpler target-group override case.
+Toolchain selection invariants may reuse `SingleToolchainResolutionFunctionTest`
+multiple-platform/requirement equality tests; they do not prove the public
+group API. Aspect group propagation and `AspectAutoExecGroupsTest` remain
+deferred configured-aspect breadth. Built-in test-runner groups and inheritance
+must be explicitly classified by the successor before any generic rule claim;
+neither can be inferred from this non-test cc_library declaration.
+
+#### Live owners and required replacement boundary
+
+In `slug_loading_v2/src/package.rs`, `DeclaredExecGroup` currently retains
+only toolchains; nonempty group constraints reject. Frozen declarations retain
+the sparse group/name-index carriers, then `FrozenRuleDefinition::invoke:7636`
+rejects them before initializer/computed-default checks and publication.
+`StarlarkRuleImplementation:855` and its structural equality have no group
+carrier. `attrs.rs::AttributeDependencyConfiguration` has Target/Exec/Starlark,
+not a named execution-group edge. Builtin target constraints/property schemas
+already exist; declaration shape alone is not a configured semantic owner.
+
+In `slug_analysis_v2/src/dice.rs`, `ConfiguredToolchainResolutionKey:216`
+contains workspace/configuration/requirements but **no group exec constraints**.
+`compute_configured_toolchain_resolution` selects the first platform immediately
+for empty requirements; it cannot implement a constraint-only named group by
+calling the unchanged key. `root_declared_dependency_keys:1444` accepts one
+exec configuration and marks every Exec edge Default. Root preparation at
+5713-5995 resolves one context; `prepare_selected_toolchain_context:3525`
+and the no-toolchain branch manufacture Default action contexts.
+
+`starlark_rule.rs::AnalysisContextGen` exposes one `toolchains` view and no
+`exec_groups`; `validate_default_spawn_context:1378` rejects explicit groups
+and nondefault toolchain selection. `result.rs::ConfiguredActionOwnerContext`
+already retains structural group/platform/toolchain identity and validates
+matches; `with_action_contexts` can match multiple contexts, but this is not
+evidence that the live producer supplies them. Its current property helper
+is not proof of Bazel's group-prefix/default-fill semantics. The detached
+`toolchains/exec_groups.rs` prototype has a mutable second context map, owned
+String/Vec/BTreeMap storage and no live DICE provenance: avoid activation.
+
+#### Cross-stage ownership and proof obligations
+
+The natural declaration producer is the loaded rule/package, with compact
+detached requirements, constraints and named transition identity participating
+in `StarlarkRuleImplementation`/schema equality. The natural normalization
+producer is configured-target preparation: combine declaration, resolved target
+attributes and the immutable native command configuration, never CLI-side
+reconstruction. The native option registry already contains
+`incompatible_auto_exec_groups`; the successor must establish its runtime
+projection and attribute precedence rather than introduce ambient flag reads.
+
+Resolution must consume all normalized requirements and group constraints
+through tracked keys, preserving ordered registrations, alias normalization,
+target settings and distinct target/selected Exec configurations. The successor
+decides whether to extend the existing structural resolution key or extract
+its cohesive owner; it must justify equality sharing when two groups have
+identical resolution inputs without collapsing their group/action identities.
+One immutable configured-target-owned group collection must supply named
+dependency transitions, provider views, property selection and action routing.
+No second semantic registry, command cache or evaluator-owned retained map.
+
+Default/named/automatic identity, normalized inputs, selected platform,
+configured toolchain providers and merged action properties must remain
+structural at their natural owner and affect downstream equality/invalidation.
+Configuration identity, output-path/display projections, Bazel ActionKey and
+REAPI/content digests remain separate domains. No exact checksum/path claim.
+
+New declarations/contexts are DICE-retained semantic memory, not command
+scratch. Prefer current CompactString/Arc-slice/SmallMap/Allocative utilities
+(Stage 9's Stages 3/6 utility and Stage 6 platform-property rows); Buck2 is
+utility/concept guidance only. Views/normalization/join buffers are evaluator
+or phase scratch; no retained borrow of scratch or unowned heap. Publish only
+a complete immutable collection after all required group resolutions/children
+and final source-certificate validation. DICE may retain independently valid
+child results on parent failure, but no partial parent/provider/action escapes.
+Cancellation joins scoped work; no manual lock crosses a DICE await. DICE
+version reachability owns retained release; views expire with the analysis
+token, scratch with its phase, and service shutdown drops runtime-owned state.
+
+Required proof is same-DICE source/configuration/platform A/B/A (including
+constraints, automatic policy, toolchain payload and properties); absent/edit/
+delete/recreate and unavailable-history rejection; overlapping request policies
+without cross-contamination; equality cutoff for unchanged normalized inputs;
+Need/error/cancellation and default-only nonregression. Reuse retained Buck2
+`dice/dice/src/impls/worker/tests.rs` tests `when_equal_return_same_instance`,
+`test_detecting_changed_dependencies`, `mismatch_epoch_results_in_cancelled_result`
+as ownership guidance, not compatibility evidence. Existing Slug
+`tests/starlark_rule.rs` default-exec all-label-shapes, selected-platform terminal,
+zero-toolchain, recursive invalidation and cancellation tests are controls;
+`tests/toolchain.rs` prototype collection tests do not prove the live path.
+
+The successor must freeze executable proof commands and upstream adaptations,
+exact Rust/test file allowlist, production/proof/aggregate caps, all direct
+consumers and a concrete split/cohesion decision for `package.rs` (11,851 lines)
+and `dice.rs` (6,055 lines), before implementation review. This audit proposes
+no final representation/API or cap by guesswork. No fallback is introduced;
+guard removal is contingent on complete reviewed runtime ownership. Later
+computed defaults, C++/Java providers/actions, aspects and execution remain
+separate unsupported owners. The path-epoch performance issue is unchanged;
+do not restart checkout-wide replay, exceed the user's test limits, disable
+provenance or use a fresh graph to hide it.
