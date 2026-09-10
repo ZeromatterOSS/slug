@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-generated-route-diagnostic-audit-r1`
-bounded source audit of the retained generated-route error prefix](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-registration-error-identity-presentation-design-r1`
+typed registration-error identity and bounded diagnostic design](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -100,8 +100,8 @@ absent at both its exact Bazel CAS and source-derived Slug paths. The archived
 filename rule is resolved and controlled;2 exact stat attempts read0 payload bytes.
 Source review separates eager metadata/spec construction from demand-driven
 archive capture, but the fixture's configured traversal remains conditional.
-Select one isolated native sentinel diagnostic with authentic metadata/two known
-archives, no networking,15second child/2GiB AS limits and exact abseil-open tracing.
+The isolated native sentinel diagnostic used authentic metadata/two known archives,
+no networking,15second child/2GiB AS limits and exact abseil-open tracing.
 Earlier failures remain inconclusive; no all-catalog download or R2 retry is selected.
 User-installed strace6.8 passes harmless isolated preflight outside the tool sandbox.
 Focused probe compilation reached timeout60/exit124 before any executable or fixture
@@ -113,8 +113,11 @@ native test was moved to cfg(test)/--lib with unchanged60second compile and
 The library probe now compiles in7.4953seconds and runs once: publication1, then
 stderr overflow at14.4498seconds. Cleanup succeeds; no abseil open is traced, but
 the result is INCONCLUSIVE. Retained prefix names the implicit winsdk generated
-route, not a complete terminal cause. Audit that generic error owner read-only;
-no retry, output-cap increase, source acquisition or consumer-specific bypass.
+route, not a complete terminal cause. Source audit proves Debug emits the retained
+selected-module predecessor graph before the generated error; Analysis eagerly
+stores that text in an Eq error. Core completed-error equality makes display-only
+truncation unsafe as an identity fix. Design a typed causal handoff and separate
+bounded presentation; no runtime retry, source acquisition or consumer bypass.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 

@@ -5666,3 +5666,45 @@ Next WP-5-7A-generated-route-diagnostic-audit-r1 follows the generic prefix owne
 read-only; no output-cap increase, missing-input guess or Windows-specific bypass.
 Independent close/next-contract review ACCEPTS this bounded source-only successor;
 the exact leaf cause remains an evidence gap, not permission to reconstruct it.
+
+### Generated-route diagnostic owner audit (2026-09-10)
+
+Read-only source audit inspected4 initial owners plus10 additional source/test
+files; excerpts below2MiB, no cache walk/runtime or production changes. Reverified
+the saved stderr/trace hashes. registration_expansion.rs:136-179,612-666 owns the
+typed CanonicalRoute failure and renders it through derived Debug. The canonical
+load-route wrapper at canonical_repository_load_route.rs:55-90,298-307 preserves
+the route error. canonical_repository_route.rs:41-85,270-295 first observes the
+selected-module Missing, then tries generated lookup. Generated contains the
+expected selected_missing before the real generated error. The separate Missing
+variant is used when generated lookup itself returns Missing; those are distinct.
+selected_repo_spec.rs:2954-3008,3399-3408 shows Missing retains the full selected
+routes Arc and derived Debug renders it, including successful graph/source bytes.
+This explains why the retained8192byte prefix ends before the real failing child.
+generated_repository_definition.rs:39-64,253-296 restricts the unseen non-Missing
+branch to Demand/DemandCompute/Loading/LoadingCompute/Duplicate, not one leaf cause.
+Demand errors can carry mappings/owners; owner-certificate errors can carry pure
+plans/instantiated state before an actual error (selected_extension_demand.rs:
+215-240; module_extension_repository_validation.rs:152-179). A blanket nested Debug
+or larger output cap is not a cause-preserving bounded diagnostic design.
+
+Analysis dice.rs:3062-3071,3174-3186 eagerly calls error.to_string into
+AnalysisError::Message(String), including before later Need precedence. Both
+AnalysisError/Kind (121-136) and Core BuildCommandError/Kind (3004-3050) derive Eq.
+Core Debug (3757-3762) then allocates to_string again; changing the test's Debug
+to Display cannot undo the earlier graph serialization. Analysis/resolution
+success-only equality (2859-2875,3697-3713) does not eliminate the downstream risk:
+Core terminal Result derives Eq (2474-2485), and completed build-key equality at
+5278-5284 uses complete_eq, whose Bzlmod source_preparation.rs:158-163 compares
+the completed payload including errors. Lossy error text must not become identity.
+No measured allocation/time attribution or explanation of the historical14GB is
+proved, and the actual generated error leaf remains absent from retained evidence.
+
+REPLAN selects WP-5-7A-registration-error-identity-presentation-design-r1: reserve
+the cross-crate typed error handoff and separate borrowed/bounded cause-first
+presentation. Preserve producer identity, Needed/Complete ordering, observation,
+cutoff/publication and lifetime; no cache/key or semantic bypass. Design must cover
+same-display/different-cause inequality, A/B/A and no graph Debug traversal before
+implementation. Actual probe stays INCONCLUSIVE, no repeat or R2 gate acceptance.
+Independent terminal review ACCEPTS the source audit and reserved-design scope;
+concrete adapter/identity shape and implementation limits remain design work.
