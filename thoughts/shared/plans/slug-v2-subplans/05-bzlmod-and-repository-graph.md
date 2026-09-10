@@ -5441,3 +5441,41 @@ unsafe, mismatching or over-budget input. No extraction, execution, fixture
 assembly, acquisition, dependency walk or complete/partial R2 restoration.
 Independent terminal review ACCEPTS the metadata gate and bounded successor;
 selection, extension closure, fixture correctness and CLI/REAPI success remain open.
+
+### Declared payload audit: first locator stop (2026-09-10)
+
+WP-5-7A-authentic-payload-recipe-audit-r1 reverified the pinned catalog and27
+descriptor hashes (8277 descriptor bytes). Descriptors declare27 archives,
+20 patches in source JSON map order,0 overlays; every descriptor has a matching
+MODULE hash in the accepted184-row catalog. No MODULE dependency bodies followed.
+All descriptors use the default archive source kind and SHA-256 SRI; archive_type
+is absent. bazel_features.docs_url is documentation, not a repository payload.
+selected_repo_spec.rs:493-514,867-959 supplies the existing source projection;
+patch URLs append modules/<name>/<version>/patches/<file> to the registry root,
+MODULE uses its authentic registry hash, archive mirrors preserve host/path.
+Eventual explicit local registry/mirror projection must preserve these bytes,
+map MODULE/patch paths under the local registry and archive host/path under the
+mirror; strip prefixes and patch_strip remain descriptor-owned, not overrides.
+
+The deterministic payload walk (descriptor URL order, archive then ordered patches)
+stopped at its first primary locator: abseil-cpp20250814.1, ENOENT,1 path attempt,
+0 verified payloads/0 payload bytes. Descriptor hash:
+cea3901d7e299da7320700abbaafe57a65d039f10d0d7ea601c4a66938ea4b0c;
+MODULE hash51f2312901470cdab0dbdf3b88c40cd21c62a7ed58a3de45b365ddc5b11bcab2.
+URL https://github.com/abseil/abseil-cpp/releases/download/20250814.1/abseil-cpp-20250814.1.tar.gz,
+SRI sha256-FpL3fRc5us8/lDNxiLeFg88JurfkINLcbFYFpPhnhaE=,
+strip_prefix abseil-cpp-20250814.1, no patches/overlays. Missing exact primary:
+/home/wgray/.cache/bazel/_bazel_wgray/cache/repos/v1/content_addressable/sha256/1692f77d1739bacf3f94337188b78583cf09bab7e420d2dc6c5605a4f86785a1/file.
+Targeted live app search did not find a download-cache filename owner; no guessed
+alternate path was tested. This is unresolved locator authority, not global
+unavailability or proof that the CLI fixture needs this archive. No other payload
+was touched. No extraction, acquisition, runtime/test/replay or source write ran.
+
+Scope REPLAN: WP-5-7A-abseil-payload-locator-audit-r1 permits only archived V1
+filename provenance (pinned e218054d4c796655939b968d90208b185decb352,3 source files/
+1MiB), the known rules_shell filename control and one derived alternate abseil
+path. Archive code is evidence only, never production reuse or restored code.
+If both exact locators are absent, establish CLI demand before any acquisition
+proposal; a candidate upstream catalog must not become a blanket download gate.
+Independent terminal review ACCEPTS this first-locator stop and narrowly bounded
+provenance successor; no selected closure, CLI demand or R2 acceptance is inferred.
