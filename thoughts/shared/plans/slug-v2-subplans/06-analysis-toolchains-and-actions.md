@@ -23928,3 +23928,10 @@ platforms archive-mode terminal needs authentic source/provenance and safety aud
 Successor WP-5-7A-configured-cli-source-and-baseline-audit-r1 completed the two
 baseline comparisons and now only audits existing authentic inputs/producer ownership;
 no downloads, source-policy fixes, new fixture bodies or repeated setup are selected.
+
+The completed source audit now freezes only Stage5's generic regular0640 and
+directory0750 selected-BCR mode prerequisite. Existing platforms1.0.0 cached
+descriptor/archive hashes match; its real host source still requires generated
+host_platform and rules_license. No full CLI closure, replay or registry-local
+source admission is established. Complete R2 remains preserved/unaccepted;
+current manifest owns the bounded prerequisite, not combined runtime resumption.

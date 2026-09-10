@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-configured-cli-source-and-baseline-audit-r1`
-combined integration prerequisites](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-selected-bcr-0640-0750-mode-implementation-r1`
+bounded archive-mode prerequisite](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -82,8 +82,10 @@ unmet. Its expanded candidate is preserved, not partially accepted. The spent
 registry's rules_shell is only discovery scaffolding without shell/sh_binary.bzl;
 local_repository admission alone cannot establish CLI success. Both fast core failures
 reproduce identically on clean nodep Rust; other full-core failures remain unattributed.
-Inspect authentic existing source/archive provenance before selecting a producer
-prerequisite. No full-suite retry is selected.
+The cached platforms1.0.0 archive matches its descriptor integrity and contains
+11 regular0640 files/three0750 directories. Freeze only these generic extractor
+admissions; retain Slug-native0755 directory normalization. This does not establish
+the real CLI source closure. No full-suite retry is selected.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 

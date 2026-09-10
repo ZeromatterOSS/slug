@@ -5089,3 +5089,68 @@ the false absent-nodep terminal is gone; @@bazel_tools//tools/test/BUILD now sto
 loading @rules_shell//shell:sh_binary.bzl because its selected local_repository
 source projection is unsupported. No retry, acquisition or fixture edit followed.
 Resume the preserved Stage 6 candidate without claiming its remaining CLI gates.
+
+### Configured CLI source audit: regular 0640 and directory 0750 (2026-09-10)
+
+The bounded source/baseline audit identifies a generic selected-BCR extractor
+prerequisite, not a complete CLI source closure. Both named fast core failures
+reproduce on clean97dffd5d4 Rust (exit101,0.04s/0.06s); other full-core failures
+remain unattributed. No test/runtime command, replay or acquisition ran in the
+source-audit continuation.
+
+Existing Bazel content cache root:
+/home/wgray/.cache/bazel/_bazel_wgray/cache/repos/v1/content_addressable/sha256/.
+The platforms1.0.0 source descriptor is <descriptor-sha>/file, SHA-256
+f4ff1fd412e0246fd38c82328eb209130ead81d62dcd5a9e40910f867f733d96.
+It names https://github.com/bazelbuild/platforms/releases/download/1.0.0/platforms-1.0.0.tar.gz
+with SRI sha256-M4TrHDB2JwT7445EAgThFBVAhsj8iowuPihEECjAGag=.
+The existing <archive-sha>/file is 7,879 bytes; independently recomputed SHA-256
+3384eb1c30762704fbe38e440204e114154086c8fc8a8c2e3e28441028c019a8
+matches that SRI. Complete read-only tar listing: 11 regular files at0640,
+three directories at0750; first entry BUILD is0640. No archive was extracted
+to disk or executed. Its MODULE declares platforms1.0.0, matching the builtin
+direct-module declaration. The original failing HTTP capture was not retained,
+so this is cached release evidence with matching descriptor integrity, not a claim
+that the discarded runtime capture was byte-compared.
+
+Real host/constraints.bzl is present (120 bytes), forwarding HOST_CONSTRAINTS
+from @host_platform; MODULE declares that extension and rules_license0.0.7.
+Thus archive admission alone does not prove later host generation or CLI closure.
+The spent local-registry rules_shell remains discovery scaffolding without
+shell/sh_binary.bzl, not authority for local_repository admission or fake stubs.
+No source override, explicit platform flag, acquisition or replay is selected.
+
+Pinned Bazel8220c6198837d5c13d53fea211cf3282aa12408a source under
+src/main/java/com/google/devtools/build/lib/bazel/repository/decompressor/:
+CompressedTarFunction.java:110-112 creates directories without archive chmod;
+142-152 streams regular bytes, applies entry.getMode()|0400 and retains mtime.
+SHA-256:28dd9b8ace7d64b432b4bf566b1d1325cffea81df338ace428dfff7c756ae333.
+Corresponding src/test/java/.../CompressedTarFunctionTest.java SHA-256:
+3a2865acca41f7ebe484886a978aeef2eeb9aba2aa9d3337f0b81a6576c925c2.
+Its without/with-prefix tests supply themes, not a permission matrix; link tests
+remain outside Slug's admitted regular/directory category. New inline header
+regressions must discriminate the pinned mode projection without copied bodies.
+
+Selected source ownership stays host_canonical_repository_source_input ->
+request_kind -> existing immutable RepositoryMaterializationRequest. Core
+parse_archive_plan owns the bounded SelectedBcrArchive; capture_one verifies
+SHA-256 before realize_selected_bcr/extract. request_kind's LocalUnsupported
+policy is independent and unchanged. Verified archive integrity already covers
+mode bytes; selected_bcr_source_association covers the archive, prefix, ordered
+transforms and MODULE. RepositoryMaterializer stages AssociatedImmutable roots,
+rechecks the session and retains provisional roots for existing final validation;
+HostRepositorySourceObservationKey/EpochKey keep the tracked source observations.
+No new key, certificate, cache, input, lifetime, task or fallback is needed.
+
+Freeze WP-5-7A-selected-bcr-0640-0750-mode-implementation-r1: add only regular0640
+and directory0750 to the existing kind-specific allowlists. Regular0640 retention
+is exact pinned-source behavior; directory admission is compatible, but Slug's
+existing0755 directory normalization remains explicitly Slug-native, not exact
+Bazel/umask reproduction. Other modes/types and bounds remain unsupported.
+The existing 765-line extractor owns one bounded stream/namespace pass; extract
+exceeds150 lines but only its two cohesive mode predicates change, no refactor.
+Two-file production/proof scope and focused nonnetwork gates live in the manifest.
+This prerequisite must be reviewed/accepted before restoring the complete R2;
+the real CLI/common REAPI and remaining core gates are not waived.
+Independent terminal source-audit/activation review ACCEPTS this successor;
+source/hash/applicability/diff checks pass, archive checker retains known3.
