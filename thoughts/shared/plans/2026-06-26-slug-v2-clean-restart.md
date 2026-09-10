@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-nodep-fixed-point-pruning-audit-r1`
+[`WP-5-7A-nodep-fixed-point-pruning-implementation-r1`
 configured-CLI prerequisite](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
@@ -70,10 +70,14 @@ Local-only CLI setup exposed an independent Stage 5 defect, not a requirement to
 download a larger dependency graph: Slug name-gates nodep discovery but fails to
 drop still-unfulfilled edges before selection. Pinned Bazel Discovery.java:146-165
 drops them; Slug instead emits MissingSelectedModule(bazel_features1.42.1).
-Independent source review confirms the prerequisite. Audit/freeze the smallest
-existing selected-graph producer correction, then reassess the local fixture and
-resume the preserved combined implementation. No new fixture acquisition, source
-override, explicit platform flag, runtime bypass or broad replay is authorized.
+The completed source audit freezes one stable-retain helper at the existing
+discovery fixed-point return, using its already-computed transformed-key set.
+Both graph modes retain their existing ownership, observation/error and lifecycle
+boundaries. Implement under 40 production/650 proof/690 aggregate gross additions,
+with absent/later-round/override/equality controls and existing observed lifecycle
+gates, then reassess the local fixture and resume the preserved combined candidate.
+No new fixture acquisition, source override, explicit platform flag, runtime bypass
+or broad replay is authorized. Audit/contract review is not runtime acceptance.
 
 Stage 6's accepted root-set-owned closure/sharing contract remains unchanged:
 raw platform facts/messages, all-output prefix checking, explicit broader-family

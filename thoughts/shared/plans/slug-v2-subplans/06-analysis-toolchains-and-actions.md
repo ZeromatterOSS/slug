@@ -23880,3 +23880,8 @@ still contain the candidate: rebuild before any later binary proof.
 The successor audits/freezes nodep fixed-point pruning, implements that reviewed
 Stage 5 prerequisite, then resumes this same combined contract and preserved patch.
 It does not reopen general execution-group architecture or relax any proof gate.
+
+The completed Stage 5 source audit freezes the small transformed-key stable-retain
+correction at the existing discovery fixed-point return. Implement and validate
+that prerequisite before restoring this candidate. Only then reassess the retained
+local CLI fixture; its later materialization/action gates are not presumed to pass.

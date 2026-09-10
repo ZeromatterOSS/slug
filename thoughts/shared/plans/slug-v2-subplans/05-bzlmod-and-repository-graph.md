@@ -5001,3 +5001,77 @@ override, platform-flag admission or registry/archive acquisition is authorized.
 Absent nodep edges must not become mandatory downloads; ordinary missing/failing
 dependencies remain errors. Only after correction may the existing local fixture
 be reassessed; its later source/materialization success is not yet proved.
+
+### Frozen nodep fixed-point pruning correction (2026-09-10)
+
+The source audit selects WP-5-7A-nodep-fixed-point-pruning-implementation-r1.
+This fixes one exact named discovery behavior, not general MVS/compatibility,
+registry acquisition, source materialization, or configured execution admission.
+Structural ordering/identity and Host observations remain Slug-native.
+
+Pinned Discovery.java:146-165 filters nodep edges by presence of their transformed
+exact ModuleKey in that round's completed graph. Discovery.run:62-78 repeats when
+an unfulfilled nodep name became known; :205-217 gates the next fetch by prior-round
+names. Slug already repeats to key-set convergence. Pruning only its final successful
+round is equivalent here: intermediate discovery continues from unmodified loaded
+inputs and no graph is published before convergence. Do not prune within an earlier
+round or substitute name membership for exact-key membership.
+
+At discover_fixed_point's existing previous_keys == keys return, borrow that
+already-computed SmallSet<HostGraphModuleKey> in one synchronous private helper.
+Mutate only each transient RawModule.nodep_dependencies with stable Vec::retain
+on dependency.transformed membership, then return the same owned entries. Keep
+Root, ordinary/original dependencies, modules, source Arcs, and all remaining row
+order unchanged. No new set/index, source clone, retained collection, key or export.
+select_graph consumes the corrected input; do not catch MissingSelectedModule or
+change selection/error rewriting to compensate. Both graph modes already use this
+one producer, so no command/observation-specific repair is needed.
+
+Discovery.java:172-181 transforms root-name dependencies to Root, nonregistry
+overrides to empty version, and nonempty single-version overrides before pruning;
+multiple-version overrides leave discovery versions intact. Presence of the
+transformed key, including Root, is authoritative. Once a name is eligible, normal
+fetch errors and Needs are returned before convergence, never pruned as optional.
+Selection.java:225-242,305-343 keeps fulfilled nodep version constraints for initial
+validation, then omits nodep-only final reachability. Preserve Slug's existing
+unused-override/allowed-version/no-ceiling behavior and all unrelated limitations.
+Selection's broader compatibility-level tests do not authorize new policy here.
+
+Proof adapts DiscoveryTest.testNodep_unfulfilled, testNodep_fulfilled,
+testNodep_fulfilled_manyRounds and testNodep_fulfilled_withOverride. Require an
+actual producer red/green absent-nodep case and a registry spy proving no fetch
+even when optional metadata is available. Preserve later-name two/three-round
+fulfillment; an eligible missing requested version remains a discovery error.
+Pure helper tests discriminate same-name/wrong-version (not a valid successful
+converged graph), requested-versus-transformed key, Root, empty version, stable
+filter order, idempotence, and untouched ordinary/source state. Same-name discovery
+in an end-to-end test must fetch the requested version, not falsely prune it.
+Retain multiple-version/nodep reachability controls from selected_graph tests.
+
+Use the existing in-memory registry/root helpers for same-DICE absent/present/absent,
+held-old-result isolation and warm/comment-only normalized equality. Do not promise
+cutoff for changed parsed source: original module facts still participate in the
+retained source Arc's equality. Observed equality also includes its actual epoch;
+equal semantic results with changed observations must remain unequal wrappers.
+Extend only the existing observed diamond/cycle/nodep proof with an absent edge,
+checking its absence from graph dependencies/discovery activations while preserving
+legacy parity, events and exact source epoch. Reuse the existing selected-graph
+Need/error, effective-override and poll/drop recovery gates rather than copying
+their lifecycle scaffolds. Buck2 worker equality/dependency/cancelled-epoch tests
+remain concept guidance; no donor code is imported.
+
+Memory is unchanged: pruning mutates phase scratch after awaited discovery joins;
+the already-existing key set drops on return/error/cancellation. Retained graph
+and source Arcs keep Eq/Allocative and release with DICE versions/command tokens.
+No lock crosses an await; no incomplete graph or invented historical epoch escapes.
+Downstream selected_repo_spec graph children continue consuming the same result
+and observations, with existing mapping/route lifecycle tests and direct compile
+dependents covering the unchanged interface. No fallback is added.
+
+The 2,481-line selected_graph.rs remains cohesive: 1,324 production lines own
+discovery/selection, and this change adds only a small producer helper/call.
+New tests go in a bounded included file; the 10,369-line observation proof file
+receives only the existing nodep-test extension. Exact files/caps/gates live in the
+implementation manifest. After correction, one 15-second network-disabled local
+CLI diagnostic may reassess the retained fixture; a later source failure is recorded,
+not suppressed. The saved combined candidate still requires its original full gates.
