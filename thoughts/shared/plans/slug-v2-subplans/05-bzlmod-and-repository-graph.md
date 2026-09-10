@@ -5563,3 +5563,33 @@ started; no partial harness was created. Abseil demand remains inconclusive.
 Request a supplied strace executable or installation approval, then resume the
 same reviewed packet. Do not weaken trace/isolation/resource gates or acquire inputs.
 Independent terminal review ACCEPTS this tooling stop with the contract unchanged.
+
+### Sentinel compilation stop (2026-09-10)
+
+User installed /usr/bin/strace6.8. Harmless timeout5 namespace/prlimit/strace true
+preflight fails with ptrace EPERM in the tool sandbox, but exits0 on approved
+execution outside that sandbox with the same user/network/resource isolation.
+Two opt-in diagnostic files were drafted (35 Rust/233 driver lines), not accepted.
+Pinned nightly-2025-09-14 focused cargo test -q -p slug_cli_v2 --test
+payload_demand_probe --no-run --message-format=json under timeout --kill-after=1
+60 exits124. No compiler-reported executable or build-finished record. Log:
+/tmp/slug-sentinel-compile.pv7ol5/compiler.jsonl, SHA256
+bd23fde38480b2a64d30b24571a4814128efe8bb30a2ce0a8fc1c047707dc544;
+1039 records:682 artifacts,57 build scripts,300 warnings,0 error messages.
+20 fresh=false artifacts span10 Slug crate names, with duplicate variants; this
+does not establish the precise stalled phase or why variants differ. Stderr empty.
+Escalated process-name check finds no cargo/rustc/rust-lld/cc/ld/slugd survivors.
+No retry, staging, native evaluation, CLI, daemon, source acquisition or replay ran.
+Shell/Perl syntax, pinned rustfmt, diff/R2 hash/apply pass; archive checker reports
+only the known3 thoughts paths. These are static checks, not harness acceptance.
+Uncompiled draft preserved at /tmp/slug-sentinel-draft.Lln8y0/candidate.patch,
+SHA256 8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2;
+adjacent validation.txt owns review caveats. No draft Rust/driver ships in checkout.
+Independent static review marks the draft REVISE: its supervisor exception branch
+kills but does not complete bounded reap/pipe finalization. Before any future run,
+add a finally-style kill/reap/close phase; any cleanup failure is inconclusive.
+REPLAN selects WP-5-7A-sentinel-build-cost-audit-r1: bounded read-only build-cost
+evidence before any revised compilation route. Original authentic native API/input
+contract and all runtime limits remain; demand and every R2 runtime gate stay open.
+Independent terminal review ACCEPTS the docs-only stop and bounded successor;
+the saved implementation remains REVISE/uncompiled, not accepted by that review.

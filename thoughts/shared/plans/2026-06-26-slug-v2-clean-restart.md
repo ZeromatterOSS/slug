@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-authentic-sentinel-demand-probe-r1`
-one isolated authentic sentinel-demand diagnostic](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-sentinel-build-cost-audit-r1`
+bounded read-only sentinel compilation investigation](./slug-v2-subplans/current-packet.md).
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -103,9 +103,10 @@ archive capture, but the fixture's configured traversal remains conditional.
 Select one isolated native sentinel diagnostic with authentic metadata/two known
 archives, no networking,15second child/2GiB AS limits and exact abseil-open tracing.
 Earlier failures remain inconclusive; no all-catalog download or R2 retry is selected.
-Probe preflight is stopped before staging/compilation: strace is not installed.
-Harmless user/network namespace and resource-limit preflight passes. Obtain a
-provided tracer or installation approval; keep the existing probe contract intact.
+User-installed strace6.8 passes harmless isolated preflight outside the tool sandbox.
+Focused probe compilation reached timeout60/exit124 before any executable or fixture
+evaluation; no compiler survivors were found. Preserve the uncompiled draft outside
+the checkout and investigate build cost read-only; no retry or cap increase.
 No new fixture acquisition, source override, explicit platform flag, runtime bypass
 or broad replay is authorized. Do not repeat the spent diagnostic setup.
 
