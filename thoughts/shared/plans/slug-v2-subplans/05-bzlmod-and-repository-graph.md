@@ -5708,3 +5708,49 @@ same-display/different-cause inequality, A/B/A and no graph Debug traversal befo
 implementation. Actual probe stays INCONCLUSIVE, no repeat or R2 gate acceptance.
 Independent terminal review ACCEPTS the source audit and reserved-design scope;
 concrete adapter/identity shape and implementation limits remain design work.
+
+### Typed registration diagnostics: reserved design (2026-09-10)
+
+Contract is in current-packet; independent reserved review ACCEPTS the design.
+Further audit covers9 initial+12 additional source/test owners, excerpts<2MiB.
+In addition to the prior three conversions, Analysis execution-platform-only
+preparation at dice.rs:3794-3799 eagerly serializes registration errors. All four
+must share the natural Loading failure, not store lossy display as error identity.
+Loading's private labels Err becomes one Arc allocated in ExpansionScratch::finish;
+labels() retains its borrowed API and labels_with_shared_error() exposes that Arc.
+Analysis's Registration wrapper carries it structurally and bounds both Display
+and Debug. Global Loading/Bzlmod formatters and unrelated error families stay put.
+
+Cause audit: module_extension.rs:633 Pure AfterInputs carries inputs/request/calls
+before its message. module_extension_innate_repository.rs:62 has Inputs, Compute,
+Label, LoadRoute, RootBzl, ExternalBzl, Export, Drift and Call. Instantiation
+request errors (module_extension_repository_instantiation.rs:167-178) carry current
+repositories/call before Join/Namespace/Attribute. Validation request errors
+(module_extension_repository_validation.rs:412-425) are Join or typed validation
+reason/offender. These successful-state fields are identity, not diagnostic text.
+Bzlmod Demand and owner Inputs use fixed-depth typed adapters: owner names and
+actual messages, never owner/mapping/selected graph Debug. Bzl Child errors recurse
+through the failing child, with a shared32-node bound, not their retained graphs.
+
+Loading owns one3072byte stack buffer including any explicit incomplete suffix;
+bounded UTF-8 decoding emits ASCII escapes before output. The existing Core Debug
+escaping layer then remains below8192bytes. No full string serialization/truncate,
+arbitrary nested formatter, new cache or general diagnostics framework. Named
+unaudited owner boundaries emit an explicit incomplete diagnostic, not a claimed
+leaf or semantic unsupported error; full structural cause stays in the shared Arc.
+A later actual probe at such a boundary needs its own reviewed diagnostic extension.
+No runtime result or recovered exact cause is claimed by this design.
+
+Downstream Analysis/Core terminals now retain the shared error DAG instead of its
+serialized String. This deliberate lifetime extension ends only when all retained
+terminal/version references release; command completion is not an eviction promise.
+No inner graph clone; Arc/Allocative remain accounted. Proof must cover pointer
+sharing, same-display/different-cause inequality, full A/B/A, Need/first-error and
+event/publication behavior, bounded output/work, and final-reference release.
+New helpers isolate presentation from oversized semantic owner files. Accepted
+implementation caps650 production/950 proof/1600 gross, existing oversized-owner
+production additions<=80; focused owner tests/direct query+CLI checks timeout60.
+Actual probe, CLI/replay/acquisition, limit increases and R2 restoration stay out.
+Review corrected one allocation-scope overstatement: only the new renderer is
+heap-buffer-free; preserved Core to_string and final stderr Strings are explicitly
+bounded/counted, not claimed absent. Implementation/proofs have not started.

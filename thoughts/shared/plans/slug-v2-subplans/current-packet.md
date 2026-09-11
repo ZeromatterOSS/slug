@@ -1,109 +1,230 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-5-7A-registration-error-identity-presentation-design-r1
+Packet: WP-5-7A-registration-error-identity-presentation-impl-r1
 
-Status: independent review ACCEPTS the source audit and this reserved-design scope.
-Docs/source only; no implementation, runtime retry, acquisition or cap increase.
+Status: reserved design independently ACCEPTED; implementation not started.
+Root owns the bounded Rust/proof work below, followed by independent final review.
+The design checkpoint changed docs only; it ran no compiler/test/probe/replay.
 
-## Observable result and learned facts
+## Decision and evidence
 
-Freeze one bounded implementation contract that preserves registration failure
-identity across Loading -> Analysis -> Core while rendering a cause-first,
-bounded Slug-native diagnostic. This is a cross-crate retained-error/public-kind
-decision, not permission for a formatter-only truncation patch.
+Choose Loading-owned shared typed registration failures, carried unchanged
+through Analysis and Core, plus a separate borrowed bounded diagnostic. Presentation
+is Slug-native; registration semantics, structural identity/integrity, source
+observations and publication are unchanged. No Bazel diagnostic-parity claim.
+This prerequisite serves complete M7A selected-request/output-conflict acceptance;
+it does not accept or partially restore the preserved R2 implementation.
 
-Source audit proves the captured selected_missing field is the expected
-selected-module lookup miss before generated lookup, not its failure cause.
-canonical_repository_route.rs:270-295 preserves it beside the actual generated
-error, but derived Debug prints its retained graph first. Generated narrows the
-unseen branch to Demand/DemandCompute/Loading/LoadingCompute/Duplicate; it does
-not identify which branch or a missing source. The8192byte prefix cannot recover
-the exact terminal cause. No Windows-specific bypass or semantic fix is selected.
+The Stage5 source audit at09fc8f0bd proves successful selected_missing graph Debug
+precedes the unseen generated error. This design also finds the execution-platform
+only path at analysis dice.rs:3794-3799 serializes the same error. All four
+conversions (merge's two, prepare_registrations, prepare_execution_platform_registrations)
+must change together. Observation errors and DICE compute errors are separate
+families and are not silently reclassified or repaired.
 
-registration_expansion.rs:172-179 Debug-renders the nested kind; analysis
-dice.rs:3062-3071,3174-3186 converts it to AnalysisError::Message(String).
-That conversion is eager even before the later Need precedence check. Core
-BuildCommandError::Debug at3757-3762 calls to_string again. Merely changing the
-probe's Debug to Display is too late: the large string already exists.
+Analysis/resolution keys retain success-only equality. Core completed build
+terminals compare Result errors through complete_eq. Preserve complete structural
+registration errors, not their display, digest or pointer address, as identity.
+No claim that old Debug text was an injective encoding, or that the historical14GB
+allocation / exact captured terminal cause has been recovered.
+Already-materialized compute/evaluation messages and other error families are
+unchanged; a bounded borrowed renderer does not prove bounded total build memory.
 
-AnalysisError and BuildCommandError derive Eq/PartialEq. Analysis/resolution keys
-use success-only equality, but Core's completed build terminal retains
-Result<BuildCommandEvaluation,BuildCommandError> and complete_eq compares completed
-values, including errors (core dice.rs:2474-2485,5247-5284; Bzlmod
-source_preparation.rs:158-163). Shortened messages must not collapse distinct
-failures into equal retained errors or replace structural identity with a hash.
-The exact14GB allocation and measured timing costs remain unattributed.
+## Frozen typed ownership
 
-## Required design decisions
+- In loading registration_expansion.rs, change only the private labels Err
+  storage to Arc<ModuleRegistrationExpansionError>; allocate that Arc once in
+  ExpansionScratch::finish. Existing labels() keeps its public borrowed-error
+  signature through Arc::as_ref. Add doc-hidden labels_with_shared_error() returning
+  Result<&Arc<[CanonicalLabel]>, &Arc<ModuleRegistrationExpansionError>>.
+  Both views borrow the same retained error, without cloning its inner graph.
+- Add public AnalysisErrorKind::Registration(RegistrationAnalysisError).
+  The Analysis-owned wrapper has one private Arc<ModuleRegistrationExpansionError>,
+  derives Clone/Eq/PartialEq/Allocative, and exposes a borrowed error accessor.
+  Constructor consumes/shares that Arc; no public unchecked error fabrication.
+  Its Display AND Debug use the bounded Loading diagnostic, preventing the
+  surrounding derived AnalysisError/Kind Debug from visiting the retained graph.
+- All four conversions use the shared-error view and cheap Arc clone. Existing
+  Core BuildCommandErrorKind::Analysis and CqueryCommandError::Analysis retain
+  the wrapper unchanged. Core's current Debug-to-string is bounded for this
+  variant once Analysis Display is bounded; do not rewrite other Core variants.
+  No change to global Loading/Bzlmod error Display/Debug or string-error consumers.
+- Loading outcome equality is unchanged by structural Arc equality. Analysis
+  errors may distinguish old text collisions; no two distinct typed causes may
+  become equal because diagnostics truncate. Success-only cutoff/validity,
+  complete_eq, outer-error precedence, Need precedence, family/row ordering,
+  dependency recording and event publication stay exactly at current owners.
+- Explicit lifetime change: downstream retained Analysis/Core errors now share
+  the full Loading error DAG, instead of retaining its serialized String. Existing
+  predecessors may therefore live until the last downstream error/DICE version
+  releases them, not merely command completion. This is deliberate typed semantic
+  retention, not a second graph, scratch borrow, command cache or global root.
+  Arc/Allocative remain accounted; no deep inner clone, new interner/key/lock.
+  Need/outer-error discarded temporaries drop immediately; retained terminals
+  release on last reference/version eviction, transaction/runtime shutdown and
+  cancellation/join as applicable. Do not promise release while DICE still owns it.
 
-- Choose the natural Loading-owned typed error handoff into Analysis and Core.
-  Preserve full semantic distinctions/causal identity and existing observation,
-  Need/Complete, first-error ordering, cutoff, validity and publication behavior.
-  No new cache/key/lock, graph rebuild or command-side repair.
-- Separate a borrowed/phase-scratch presentation from retained semantic identity.
-  Prefer a typed registration error over an eagerly serialized graph string,
-  but resolve concrete public enum/adapter ownership and all affected match sites.
-  Do not retain a second graph or silently extend predecessor lifetimes; specify
-  Arc ownership, Allocative accounting, terminal release and A/B/A equality.
-- Freeze cause-first typed traversal: wrapper kind/repository/row then actual
-  failing child. Successful predecessor graphs, pure plans, mappings and raw
-  source bytes are not diagnostic causes and must not be traversed/formatted.
-  Audit the Demand and Loading owner error shapes before choosing an adapter;
-  an unseen branch stays unknown, never guessed from the winsdk repository name.
-- Bound work and allocation before serialization, with UTF-8/escaping-aware
-  output limits below the unchanged8192byte runtime stderr cap. No full
-  format/to_string followed by truncation; no arbitrary Debug implementation
-  that can allocate/scan retained graphs before a bounded writer can stop it.
-  If a causal chain exceeds the declared bound, expose an explicit incomplete
-  diagnostic, not a claimed complete leaf. Do not change existing global Debug/
-  Display consumers without auditing their retained-error/string identity use.
-- Name one implementation allowlist, caps, exact error families and direct
-  dependents. Add only a borrowed adapter/type needed by this surface; no
-  repository-wide diagnostic framework or migration layer.
-- Define discriminating proof: same bounded display but different typed causes
-  remain unequal; A/B/A exact restoration; no successful-state Debug traversal;
-  multibyte/escaping/depth/large-message bounds; first-error/Need and publication
-  invariants. Use a focused synthetic error fixture, not copied source trees.
-  Required owner/direct-dependent builds remain timeout60 and serialized.
-  A later authentic probe requires its own explicit reviewed run authorization.
+## Bounded presentation and causal coverage
 
-## Read scope, compatibility and exclusions
+Loading adds error.diagnostic() -> impl Display + '_; no retained text field.
+A focused Loading helper owns a3072byte stack output buffer, including an explicit
+"[diagnostic incomplete: ...]" suffix. Encode control/non-ASCII characters as
+ASCII escapes while consuming bounded UTF-8 prefixes. Stop before an escape would
+cross the budget; never split a code point/escape, scan a whole oversized string,
+format a full error then truncate, or call arbitrary nested Debug/Display.
+Return a completed borrowed-buffer rendering, not fmt::Error for internal budget
+exhaustion. Actual downstream writer errors still propagate normally.
+The current Core Debug adds at most one escaping layer: <=6144bytes plus its
+fixed wrapper/newline, below unchanged8192stderr cap. Test the real Core wrapper.
+The new Loading/Bzlmod renderer allocates no heap presentation buffer. Preserved
+Core Debug still allocates its to_string() String (<=3072bytes of content), and
+publication allocates the final escaped stderr String (<8192bytes of content).
+Count/report these existing bounded buffers and their actual allocator capacities;
+the no-heap claim does not apply to the full Analysis/Core publication path.
 
-Root owns design; one independent reserved-decision review is required.
-Read docs/developers/dice.md and the authoring guide before designing. Start with
-the Stage5 audit anchors: registration_expansion.rs, canonical_repository_route.rs,
-canonical_repository_load_route.rs, generated_repository_definition.rs,
-module_extension_repository_validation.rs, selected_repo_spec.rs and
-selected_repo_spec/selected_extension_demand.rs; Analysis/Core dice.rs.
-At most12 additional source/test files/2MiB excerpts, only to resolve the concrete
-typed-error/diagnostic handoff and direct public-kind consumers.
-Inspect complexity before selecting edits: module_extension_repository_validation
-already2314lines; Analysis/Core dice.rs and selected_repo_spec.rs are oversized.
-Prefer focused helper files plus small owner delegations, with a cohesion decision
-rather than appending a generic framework to those modules.
+At most32 recursive Loading error nodes; fixed finite Bzlmod walks at most8
+variants each, all streamed through the same bounded writer. Propagate writer
+stop immediately. No collection iteration or successful-state formatting.
+Use family/row, fixed variant tags and borrowed repository/label components,
+then the actual failing child. No selected_missing graph for Generated;
+Missing may name both lookup misses without opening their successful predecessors.
+Do not use label/repository to_string unless its implementation is verified bounded;
+prefer existing borrowed component accessors.
 
-Presentation is Slug-native, not Bazel diagnostic parity. Existing exact semantic
-identity/integrity stays unchanged. No new Bazel/Buck2 oracle execution is needed
-for design; DICE ownership guidance governs cutoff/retention, and local tests must
-be named before implementation. No donor utility/runtime or fallback selected.
-No CLI/Bazel/test/compiler/probe/daemon/replay, source-cache walk or acquisition.
-Do not simplify the sentinel, change registrations/platforms, restore R2, or
-increase time/memory/output limits. No graph omission in identity to reduce work.
+Required generated branch coverage:
+- Demand / DemandCompute / Loading / LoadingCompute / Duplicate and Missing.
+  Compute branches emit bounded borrowed messages; Duplicate emits both ordinals.
+- Demand Missing/Ambiguous/Inconsistent names requested repo and at most two owner
+  names, never owner Debug. Mappings follows RoutesCompute/RootFiles/
+  RootFilesCompute/Invalid messages and Routes' compute/Invalid/RegistryMismatch/
+  CanonicalCollision scalars. No selected graph or RepoSpec traversal.
+- Loading follows Pure, InnatePure, Compute, Instantiation, InnateInstantiation,
+  Validation and InnateValidation through their error fields, not pure,
+  instantiated, inputs, requests, current_calls, current repositories or call data.
+  Pure Compute/AfterInputs emits message; Inputs uses the Bzlmod adapter.
+  Innate Compute/Label/Export/Call emits message, Drift its fixed reason,
+  LoadRoute recurses with the same depth budget, Inputs uses the adapter.
+  Instantiation emits Join/Namespace/Attribute and message. Validation emits
+  Join message or MissingImport/MissingOverride/InjectCollision reason; no
+  arbitrary offender Debug. Bzlmod owner-input Missing/Inconsistent/Unsupported
+  names owner; Invalid adds its borrowed message; Mappings as above.
+- Innate RootBzl/ExternalBzl follows Child with the shared depth budget; direct
+  Parse/Freeze and external SourceCompute/Route/Evaluation emit messages;
+  Absent/Encoding/Cycle name their fixed reason. Source/input/load-label and
+  root Evaluation owners not audited here are explicit incomplete boundaries.
 
-Writable: this manifest, canonical Live Status, relevant Stage5/6 and routing
-REPLAN only; <=120 added doc lines outside manifest; PROGRESS.md<=500.
-Implementation/proof additions0; accepted probe and both preserved patches unchanged.
-Validate diff, R2 hash/forward-apply, old draft hash and archive checker (known3).
-Independent design/terminal review; commit/push the accepted implementation contract,
-or explicit unresolved decision. A new owner, public boundary beyond this error
-handoff or read-cap overflow requires REPLAN, not scope expansion.
+Every remaining registration/load-route kind still receives its own fixed tag
+and safe scalar context, never a generic "registration failed". Parse/MissingTarget/
+RowOverflow/RootMappingUnavailable are direct leaf diagnostics. Other unaudited
+child owners (Selected/Configuration/RootMapping/subtree/package, load-route
+Effect/Projection, route Builtin/Selected, Bzlmod Graph/RepoSpecs) must say
+"[diagnostic incomplete: <owner>]" without claiming a leaf or silently dropping
+the cause. These boundaries are diagnostic coverage, NOT unsupported semantics;
+the entire typed error stays retained/equal-compared. No fallback to graph Debug.
+If the actual future probe lands at such a boundary, its exact next owner receives
+a reviewed bounded extension; this packet never guesses a missing source or
+changes registrations/platforms to get past it.
 
-## Evidence boundary
+Bzlmod adds only doc-hidden write_registration_diagnostic(&mut dyn fmt::Write)
+methods on Demand and the two owner-input error wrappers, implemented in a
+child helper; fixed-depth typed matching and borrowed strings only. This narrow
+presentation handoff is not a general error trait, schema or diagnostics framework.
+Loading private fields needed by its sibling helper may become pub(crate) only.
 
-Actual probe /tmp/slug-sentinel-demand.PXDhxy/logs remains INCONCLUSIVE:
-publication1/stderr overflow14.4498s/no abseil open; complete cleanup, no survivors.
-Leaf cause is not present in the retained prefix. No runtime repeated in the audit.
-Complete R2 /tmp/slug-conflict-r2.XZJWwv/candidate.patch SHA256
-90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e
-remains unaccepted; actual CLI conflicts, positive sharing and full gates stay open.
-Never partially restore/ship it or inspect/print/copy ~/.bazelrc or secrets.
+## Implementation allowlist and complexity
+
+Only these Rust paths may change (prefixes app/slug_*_v2/src):
+- loading: registration_expansion.rs, canonical_repository_load_route.rs,
+  module_extension_repository_validation.rs, lib.rs; new registration_diagnostic.rs,
+  registration_diagnostic_tests.rs; existing registration_expansion_tests.rs.
+- bzlmod: selected_repo_spec/selected_extension_demand.rs; new child
+  selected_repo_spec/selected_extension_demand/registration_diagnostic.rs
+  and registration_diagnostic_tests.rs.
+- analysis: dice.rs, lib.rs; new dice/registration_error.rs and
+  dice/registration_error_tests.rs.
+- core: runtime/dice.rs for a cfg(test) include only; new
+  runtime/tests/registration_error_tests.rs.
+No Cargo/profile/dependency, CLI/probe/driver or other semantic owner changes.
+Caps:650 production/950 proof/1600 gross additions; existing oversized owners
+<=80 added production lines combined. New production helper<=350lines each.
+Above2000lines: Analysis dice6055, Core dice12475, selected_repo_spec15978,
+certificate2314, extension3162, instantiation3345. Keep traversal in focused
+helpers; existing owners only storage/API/handoff/visibility or test includes.
+No general split/reorganization of their semantic computes.
+
+Audited public-kind consumers: Analysis Display and Core cquery mapping;
+the latter's catch-all already preserves typed errors. Analysis lib reexports
+the wrapper. root_analysis.rs:760 checks Message for deleted package (unchanged);
+starlark_rule.rs checks other named variants. Core build-command tests and Loading
+registration tests inspect preserved typed variants. Compile both query and CLI
+direct consumers; no enum wildcard may silently stringify Registration.
+
+## Proof and validation contract
+
+Use focused in-memory synthetic errors and existing registration EpochBuilder/
+tracker scaffolding, no copied trees, fake platform, acquired payload or replay.
+Tests are Slug-native structured/diagnostic comparisons, not Bazel oracle fixtures.
+Bazel 9.2 RegisteredToolchainsFunction/RegisteredExecutionPlatformsFunction semantics
+are not changed; Stage6:18541-18570 retains their source/test basis. Rerunning their
+oracle tests is unnecessary for this representation.
+DICE basis: docs/developers/dice.md, retained dice/dice/src/api/key.rs equality/
+validity contract, and existing complete_eq; use concept/tests only, no donor runtime.
+Stage9 retained Arc/Allocative row applies; no new utility import or fallback.
+
+Required tests, all named registration_diagnostic or registration_error:
+1. Real Loading error views share one Arc; full predecessor-sensitive unequal
+   errors can render identical bounded text. A/B/A restores exact typed equality,
+   including Core completed terminal complete_eq; no pointer-only comparison.
+2. Natural registration producer integration in both command/module and legacy/
+   observed paths; four-source and execution-platform-only first-error/Need/outer
+   precedence, observations, no later-row activation, event/publication unchanged.
+3. Each generated/owner branch above, including explicit incomplete boundaries;
+   failing message precedes no successful graph text. Pure/selected predecessor
+   changes discriminate identity but not display. No formatter visits those fields.
+4. UTF-8, controls, quotes/backslashes, huge messages/names,32-node recursion and
+   output exhaustion; exact complete/incomplete marker and real Analysis/Core
+   Debug and terminal stderr envelope remain below8192bytes.
+5. Arc pointer sharing/no deep clones, Allocative derivation, Weak/reference-count
+   release after temporary drops and final terminal/DICE owner release; retained
+   references must stay alive while terminals own them. No cancellation leaks.
+6. Bounded synthetic control/candidate A/B/B/A measurements, workload <=1MiB,
+   no runtime graph. Preserve typed outcome/ordering and compare expected causal
+   diagnostic fields (new presentation intentionally differs from old graph text).
+   Acceptance: zero successful-predecessor render visits, one output buffer<=3072,
+   only bounded-depth scalar traversal frames, encoded body<=3072, constant Arc
+   handoff cost and observed final-reference release; no heap presentation buffer
+   in the new Loading/Bzlmod renderer. Count the preserved bounded Core/publication
+   Strings separately as above; do not report their allocation as zero.
+   Record wall/RSS where available, no measured speedup/peak-memory reduction claim
+   without stable evidence. Do not hide downstream retained-DAG lifetime cost.
+
+Serialize pinned Cargo; every command timeout60, no automatic longer retry.
+Run each crate's new filtered libtests separately (bzlmod/loading/analysis/core),
+existing loading registration_expansion_tests, then cargo check -p slug_query_v2
+-p slug_cli_v2. Reuse Analysis --test starlark_rule filters registration_family_
+and command_registrations_precede_module_and_empty_overlay_restores_module_only_result,
+and --test root_analysis filter
+observed_toolchain_closure_depends_on_both_sources_and_families_once, separately.
+These preserve existing message/Need/outer/dependency-order/restoration assertions;
+do not replace them with only new synthetic helpers. First compile timeout/failure
+stops runtime tests for investigation.
+No full suite or actual probe is implied. Run rustfmt/diff, R2 hash/forward-apply,
+old draft hash, archive checker (exact known3 failures), independent final review.
+A future authentic probe requires explicit reviewed authorization at unchanged caps.
+
+Docs writable: manifest, canonical Live Status, relevant Stage5/6 and routing
+REPLAN only;<=120added lines outside manifest, PROGRESS<=500. The design inspected
+the9 initial owners plus12 additional source/test files, excerpts<2MiB. Read the
+declared owners/direct consumers; any further semantic-owner or public-boundary
+expansion requires REPLAN. Missing ownership, cap overflow, graph formatting,
+lossy equality or second material correction requires REPLAN, not a bypass.
+
+## Preserved evidence
+
+Probe /tmp/slug-sentinel-demand.PXDhxy/logs remains INCONCLUSIVE:
+publication1/stderr overflow14.4498s/no abseil open; cleanup complete, no survivors.
+No runtime repeated. Complete R2 /tmp/slug-conflict-r2.XZJWwv/candidate.patch SHA256
+90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e stays unaccepted;
+actual CLI conflicts, positive sharing and full gates remain open. Old probe draft
+SHA2568eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2 unchanged.
+Never partially restore/ship R2 or inspect/print/copy ~/.bazelrc or secrets.

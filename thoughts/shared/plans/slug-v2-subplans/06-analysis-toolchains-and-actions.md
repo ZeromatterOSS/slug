@@ -7,6 +7,31 @@ configuration transitions, toolchain resolution, and action declarations.
 
 ## Scope
 
+### Registration-error identity handoff (accepted design, 2026-09-10)
+
+Accepted contract selects AnalysisErrorKind::Registration(RegistrationAnalysisError),
+one shared Loading-owned Arc<ModuleRegistrationExpansionError> with structural
+Eq/PartialEq/Allocative and bounded Display AND Debug. Implementation not started.
+Replace all four eager registration labels-error conversions, including the
+execution-platform-only path at dice.rs:3798. Do not change observation-error/DICE
+compute-error classification, first-error/outer-error/Need ordering or publication.
+The Core Analysis branch already preserves the error; cquery's catch-all does too.
+Analysis/resolution success-only equality remains unchanged, while Core completed
+terminal complete_eq must distinguish typed failures with identical short displays.
+
+Registration error retention deliberately changes from a serialized graph string
+to a shared DAG. No new graph/key/cache/lock or deep clone; retained references may
+outlive the command until final terminal/version release. Require Arc-sharing and
+Weak/release proof, full typed A/B/A, real completed-terminal equality, bounded
+Analysis/Core Debug output and command/module legacy/observed precedence proofs.
+Existing deleted-package Message and executable/missing-target variants remain
+unchanged. Loading owns cause-first3072byte presentation and explicit incomplete
+owner/depth/output boundaries; these are not new semantic unsupported outcomes.
+Stage5 owns traversal coverage; no authentic runtime retry or R2 restoration is
+authorized. See current-packet for the exact implementation allowlist/gates.
+
+### Analysis surface
+
 - configured target keys and analysis DICE keys;
 - user-defined providers and native providers;
 - depset semantics and validation;

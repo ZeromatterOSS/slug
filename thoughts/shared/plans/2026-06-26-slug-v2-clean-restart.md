@@ -36,8 +36,15 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-registration-error-identity-presentation-design-r1`
-typed registration-error identity and bounded diagnostic design](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-registration-error-identity-presentation-impl-r1`
+shared typed registration errors and bounded causal diagnostics](./slug-v2-subplans/current-packet.md).
+
+Reserved design independently ACCEPTED; implementation/proofs not started.
+One Loading-owned error Arc preserves structural identity through Analysis/Core;
+separate3072byte causal rendering bounds both Analysis Display/Debug. Downstream
+DAG lifetime and existing Core/publication allocations remain explicit proof gates.
+No runtime reran; the authentic demand result remains INCONCLUSIVE and R2 stays
+preserved/unaccepted. The manifest owns the exact Rust allowlist and focused gates.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
