@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-native-probe-observer-authentic-attempt-r1`
-accepted one-attempt observer execution](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-source-observation-diagnostic-boundary-audit-r1`
+read-only natural-owner audit](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -47,11 +47,18 @@ activity frames and post-quiescence fail-closed decoding while preserving the
 exact API/input, activation tracker and destruction order. Eight focused proofs,
 default/feature compiler gates, CLI compile-only selection and expanded supervisor
 self-checks pass; callback, FD/mapping/Arc lifetime, real DICE events, API teardown,
-accounting, decoder and cleanup obligations are closed. No authentic observer run
-executed, so demand, phase, cause, performance and historical14GB attribution
-remain unknown. Independent review accepts exactly one later bounded invocation
-after its execution-contract checkpoint is pushed; no retry or preliminary run
-is authorized. Output-conflict R2 stays preserved and unaccepted.
+accounting, decoder and cleanup obligations are closed. One authentic observer
+run has now executed, but demand, cause, performance and historical14GB
+attribution remain unknown. The accepted invocation is consumed: the native test
+ended with semantic exit101 in14.01s, not a wall stop; cleanup and telemetry are
+valid, but no exact abseil open or success marker exists. Latest committed phase
+is TerminalRelease Exit and activity is ConfiguredNodeAnalysisObservationKey
+CheckDepsFinished; the published route ends at incomplete SourceObservation.
+Result is `bounded-observer-inconclusive`, with no causal/demand/performance/14GB
+claim and no retry. Review only the bounded natural source-observation owner next.
+Independent terminal review ACCEPTS the receipt and interpretation. Current work
+is a static audit of that natural SourceObservation boundary only; no execution or
+implementation is selected. Output-conflict R2 stays preserved and unaccepted.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic

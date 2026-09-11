@@ -19297,3 +19297,24 @@ inconclusive. Counters are not coherent, timestamps are not durations and the
 unsampled interval remains UNKNOWN. Independent review required two wording-only
 corrections so every stream cap routes to observer-unavailable before returning
 terminal ACCEPT. No command, compiler, test or `strace` ran during this design.
+
+The sole accepted command later ran from clean pushed `d6a9c41de`; evidence is
+`/tmp/slug-sentinel-demand.cnhzug/logs`. Compiler selection succeeded in0.168s
+with one library-test executable. Native test exit101 after14.01s; supervisor
+elapsed14.039s with no wall/output/telemetry stop, complete cleanup, ECHILD,
+open_pipes0, group_alive0 and no surviving process. Peak RSS is47176KiB.
+Stdout/stderr/trace/raw/JSON bytes are282/738/292/512/630. No exact abseil open
+or success marker exists. Inventory is183 metadata/310070bytes, digest
+`265488a896dec39229833afed0408be65ea6f6e40fe9ade8f278097573c7f77f`.
+
+Valid telemetry has disabled1, claim0, overflow0, dropped0 and independent event
+counters30247/30247/28781/28781/3056/3056. Latest phase is TerminalRelease Exit;
+latest activity is CheckDepsFinished for complete36byte
+`ConfiguredNodeAnalysisObservationKey`. The semantic error traverses generated
+winsdk configuration and rules_cc cc_configure before ending at incomplete
+SourceObservation. Contract classification is `bounded-observer-inconclusive`:
+these scalars do not establish a coherent snapshot, duration, causal leaf,
+demand/non-demand, performance change, deadlock or historical14GB cause. The one
+authorization is consumed; no retry or implementation correction is selected.
+Independent evidence review confirms raw/decoded consistency, uncapped outputs,
+complete cleanup and the exact inconclusive classification; terminal ACCEPT.
