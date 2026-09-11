@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-7A-run-registry-policy-implementation-r2`
-bounded explicit run registry parity successor](./slug-v2-subplans/current-packet.md).
+[`WP-7A-daemon-sandbox-serve-attribution-audit-r1`
+same-boundary direct daemon serve attribution](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -127,6 +127,15 @@ no process survived and independent terminal review returned ACCEPT. Select one
 fresh registry-propagation R2 attempt under the original four-file caps and
 compile-first gates. This is not an automatic R1 retry: any new failure replans
 with the now-distinct child-status/timeout evidence. R2 fixture remains untouched.
+The fresh successor stayed within caps at6/147/153, compiled in7.93s, and passed
+parser2 plus workspace1 in0.00s. Its one-shot integration half passed, then the
+daemon child exited before readiness with status2; the named proof failed in0.10s
+and Server wire was not run. No retry followed and all four registry files were
+restored. The exact socket path is87 bytes in an owned0755 directory, yet no socket
+inode survived, excluding simple Unix path length/owner explanations. Select one
+ordinary-sandbox direct `--serve` foreground diagnostic on those exact leftover
+paths with captured stderr and a2s deadline; no test, request, registry, network,
+compile, replay, credential, Rust or R2 action.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic

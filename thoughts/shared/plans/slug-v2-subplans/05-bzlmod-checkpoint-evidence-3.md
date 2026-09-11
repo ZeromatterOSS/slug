@@ -19627,3 +19627,34 @@ attempt of the already accepted four-file registry design. Format, compile once
 <=12/15s and checks<=30s. If daemon startup fails, preserve the new early-status
 versus timeout evidence and replan immediately; no retry. No R2/fixture, replay,
 network, credential or source-boundary change.
+
+### Run registry successor stop at early daemon exit (2026-09-10)
+
+**Status: REPLAN; registry source restored; status2 attributed before readiness.**
+The fresh four-file successor was6 production/147 proof/153 gross after formatting,
+within every cap, and independent pre-execution review returned `ACCEPT`. Combined
+compile-only passed7.93s. Frozen hashes for accepted CLI build, Commands run, CLI
+run, CLI integration and Server tests were respectively
+`a391d3464309720c1fc7fa9b0d296a26b67a5d25ca5b01a8cefe1d7677bd9b52`,
+`3af8a7d6978f3cd4c1844ecfe3097071f38c66fd64593e740b4df34d73df7144`,
+`eeafc8aa5d1b0fd209e90e2c7669b4ada131e9194682f1d4b82a794c922ef52f`,
+`92994cc9a6f862484c4f7e93f719664e6e75c336a5d03dda070ee692d791bc34`
+and `a5e7bcbe204761b39706ff15bb3365b94380bb34f325fe8831535c866caabbab`.
+
+Commands parser2 and CLI workspace1 passed in0.00s. The fresh integration's
+one-shot half passed; daemon startup then returned the new exact early-exit
+category with status2, failing the proof in0.10s. Server wire was not run. No
+retry, extension, correction or later gate followed. All four registry files were
+restored, accepted `build.rs` kept its hash, no process survived, and no R2/fixture
+section changed.
+
+The exact failed socket path is87 bytes, below Linux108; its directory is0755 and
+uid/gid1000, PID file0644, and no socket inode survives. This excludes simple path
+length and directory ownership but not pre-bind argument or bind-policy failure;
+normal detached stderr was null. Cause remains unknown.
+
+Next only `WP-7A-daemon-sandbox-serve-attribution-audit-r1`: directly run the
+already-built binary's `--serve` foreground path inside the same ordinary sandbox
+and on the exact leftover workspace/socket, capture bounded stderr, and stop after
+2s plus1s kill grace. No test, request, registry, remote, network, compile, Rust,
+replay, credential or R2 action. Review the result before another correction.
