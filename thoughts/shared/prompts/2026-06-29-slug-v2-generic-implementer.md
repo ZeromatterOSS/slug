@@ -7,7 +7,9 @@ Read AGENTS.md and execute the root-supplied packet using:
 .codex/skills/slug-agent-orchestration/references/implementation-worker.md
 The packet must already satisfy
 thoughts/shared/plans/slug-v2-plan-authoring-guide.md; do not repair or widen
-an unready contract during implementation.
+an unready contract during implementation. Routine invocation, compiler and
+focused implementation corrections within that contract are authorized by the
+orchestration skill; report a real new decision to the root.
 
 Do not choose roadmap priority or expand the packet. Return its scoped patch,
 focused validation, source/oracle anchors, applicable request/lifetime proof,

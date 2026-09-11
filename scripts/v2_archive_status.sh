@@ -176,9 +176,13 @@ fi
 
 thought_v1_paths=$(git ls-files -- thoughts \
   ':!thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md' \
+  ':!thoughts/shared/plans/slug-v2-plan-authoring-guide.md' \
+  ':!thoughts/shared/plans/plan-history.md' \
+  ':!thoughts/shared/evidence/filewrite-actionkey-source-anchors.md' \
   ':!thoughts/shared/plans/slug-v2-subplans/**' \
   ':!thoughts/shared/prompts/2026-06-29-slug-v2-generic-implementer.md' \
   ':!thoughts/shared/prompts/2026-07-23-slug-v2-root-orchestrator.md' \
+  ':!thoughts/shared/prompts/2026-08-12-slug-v2-plan-author.md' \
   2>/dev/null || true)
 if [ -n "$thought_v1_paths" ]; then
   fail "tracked non-V2 thoughts paths remain:"

@@ -1,5 +1,15 @@
 # Stage 2: Rust Skeleton and Runtime Substrate
 
+## Current status and reading guide
+
+M1 shared DICE/request/source-certificate ownership is accepted. Preserve
+`docs/developers/dice.md` and the canonical accepted boundary; older skeleton
+and fresh-graph repair priorities below are historical.
+Canonical Live Status and `current-packet.md` are the sole schedule. Dated
+current/next/stop language in the detailed owner record below describes its
+historical packet; it cannot override the live contract or current user request.
+Read a particular retained decision as needed, not this complete chronology.
+
 ## Goal
 
 Create the minimal Slug V2 Rust binary/server skeleton while reusing Buck2

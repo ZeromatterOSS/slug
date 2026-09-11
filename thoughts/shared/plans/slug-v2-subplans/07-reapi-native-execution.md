@@ -18,20 +18,29 @@ Make REAPI the primary and routine execution boundary for Slug V2.
 - no Slug-local sandbox implementation until the post-aquery execution/cache
   gate is stable.
 
-## Current Priority Hold After Aquery
+## Current priority and handoff
 
-The landed NativeLink write/shell action proofs remain required regressions,
-but new Stage 7 breadth does not control the next milestone. Freeze new cache,
-materializer, retry/TLS, and backend feature work unless it:
+Canonical Live Status and [current-packet.md](./current-packet.md) own scheduling.
+Bounded FileWrite M5/M6 are accepted; their NativeLink proofs remain regressions.
+Broader Stage 7 work enters M7A only when the
+[bootstrap readiness matrix](./bootstrap-readiness.md) identifies a required
+family/input-tree/execution capability. Each family first passes its Stage 6/8
+semantic and aquery gates; completing every formatter or backend is not a
+prerequisite. Remaining breadth stays in M7B or a later product packet.
 
-- preserves an already-landed regression;
-- enables the Stage 10 Bazel/BuildBuddy developer build without changing Slug
-  execution semantics; or
-- begins after Stage 8 has accepted exact `aquery` for the gate matrix.
+Consume the retained Stage 6 action and owner context used by aquery. Once the
+preserved output-conflict R2 design has been accepted and applied, consume its
+`ValidatedActionClosure` at the requested-root handoff. Do not reconstruct or
+bypass that validation from an individually valid action or cached child. R2
+remains unapplied; this future dependency does not authorize its restoration.
 
-Once the hold lifts, consume the exact Stage 6/`aquery` action objects. Do not
-maintain a second executor-only action description that can drift from query
-output.
+Before activating a broader family, prove A and B may each succeed but their
+conflicting combined root set publishes no successful closure, Execute request,
+or materialized result, including when both children are already warm in DICE.
+Use Stage 6's configured-action closure integrity contract for ownership and
+sharing equivalence; Stage 7 owns projection and execution, not a second
+output-conflict checker. Keep one semantic action source and independently
+verified query and REAPI projections.
 
 ## V1 Extraction Candidates
 
@@ -300,9 +309,10 @@ and provisional ownership bounded; never remove the accepted generation before
 the successor is validated. Detect damaged requested outputs and rebuild or
 rematerialize them through the ordinary action graph.
 
-These sections do not lift the current Stage 7 priority hold. They become
-eligible only through later bounded packets after immutable action-owner
-context and Stage 1's REAPI concurrency fixtures exist.
+These extensions become eligible only through bounded packets under the
+current M7A/M7B order. Require immutable action-owner context and the applicable
+Stage 1 evidence immediately before the selected implementation; unrelated
+concurrency, progress, and watch features are not a bootstrap prerequisite.
 
 ## Exact Test Criteria
 
@@ -347,12 +357,19 @@ context and Stage 1's REAPI concurrency fixtures exist.
   a downstream action.
 - Remote Action Cache hit proof survives Slug daemon restart and local persistent
   cache deletion.
-- Hosted CI cannot silently skip the local REAPI proof on Linux.
+- CI is not currently admitted. If a later user request admits a CI lane, that
+  lane must fail closed on its declared mandatory REAPI proofs.
 - The accepted matrix includes BuildBuddy for scaled RBE/cache and actiond for
   local REAPI conformance; NativeLink continues to run the historical
   regression subset.
-- The protobuf action shown by accepted `aquery` is the action uploaded to
-  CAS/Execution, modulo only REAPI envelope fields that Stage 7 owns and tests.
+- Aquery's `ActionGraphContainer` record and REAPI `Command`/`Directory`/`Action`
+  are distinct projections of the same retained semantic action and owner
+  context. Verify shared semantic provenance and each projection's fields,
+  ordering, serialized bytes and digest independently; do not compare the two
+  protobuf schemas for equality or substitute a Bazel ActionKey for ActionDigest.
+- After output-conflict R2 is accepted and applied, the executor consumes only
+  the validated requested-root closure; cold and warm combined-root conflicts
+  produce zero Execute requests and no materialization.
 
 ## Validation
 
@@ -372,7 +389,7 @@ slug-v2-oracle run --fixture tag-no-remote-cache
 slug-v2-oracle run --fixture tag-no-cache
 slug-v2-oracle validate-evidence /path/to/evidence.jsonl
 ```
-## Checkpoint Evidence
+## Historical checkpoint evidence (not scheduling authority)
 
 - 2026-06-27 Stage 7.2/7.3 REAPI substrate: added `slug_reapi_v2`
   with remote executor/cache config parsing, Bazel-shaped bare

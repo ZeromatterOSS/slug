@@ -1,0 +1,104 @@
+# Authentic configured CLI fixture and R2 gate ledger
+
+## Selected policy
+
+The September 11 review-fix instruction selects a portable repository-owned
+fixture, including its demanded verbatim upstream metadata, archive/patch
+bytes and upstream notices. Use ordinary archive files, not text/base64 bundles.
+Inventory actual total size and licenses in `fixture.toml` and `NOTICE`; do not
+fetch or vendor the entire registry catalog. Exact missing objects may be
+acquired from their pinned source URL after demand is established, using normal
+execution/network permissions. Never read credentials or private user RC files.
+
+An explicitly supplied personal cache may seed preparation or diagnose demand;
+its location is not committed and is never read by default acceptance tests.
+The final fixture owns every required byte and assembles offline in a fresh
+temporary directory. A missing/mismatched object fails before Slug starts;
+no implicit network fallback, fake upstream module, or success-by-skip.
+This policy resolves the former user-level choice in the old manifest. It does
+not claim the fixture exists or its configured closure has already succeeded.
+
+## Known inputs and question
+
+The original candidate is `27e9e9c0c` on `review/output-conflict-r2`, based on
+`97dffd5d4`; `review-evidence/candidate.patch` contains all 19 owners and the
+original receipt. Its CLI fixture has four fake-source sites: a root
+`local_path_override` for platforms and synthetic platforms MODULE,
+`host/BUILD.bazel`, and `host/constraints.bzl` writes. Replace those with the
+real sources. Preserve the custom test root's platform/toolchain/BUILD/defs and
+conflict scenarios; unrelated upstream modules must not be stubbed to force it.
+
+Known exact authentic content:
+
+| Object | SHA-256 / size where recorded |
+|---|---|
+| platforms 1.0.0 MODULE | `f05feb42b48f1b3c225e4ccf351f367be0371411a803198ec34a389fb22aa580` |
+| platforms source.json | `f4ff1fd412e0246fd38c82328eb209130ead81d62dcd5a9e40910f867f733d96` |
+| platforms archive | `3384eb1c30762704fbe38e440204e114154086c8fc8a8c2e3e28441028c019a8`, 7,879 bytes |
+| rules_license 0.0.7 MODULE | `088fbeb0b6a419005b89cf93fe62d9517c0a2b8bb56af3244af65ecfe37e7d5d` |
+| rules_license 1.0.0 MODULE | `a7fda60eefdf3d8c827262ba499957e4df06f659330bbe6cdbdb975b768bb65c` |
+| rules_license 1.0.0 source.json | `a52c89e54cc311196e478f8382df91c15f7a2bfdf4c6cd0e2675cc2ff0b56efb` |
+| rules_license 1.0.0 archive | `26d4021f6898e23b82ef953078389dd49ac2b5618ac564ade4ef87cced147b38`, 35,903 bytes |
+
+The real platforms module loads `//host:extension.bzl`, generates host_platform,
+and depends on rules_license. The catalog audit verified 184 registry metadata
+objects; the previous staged runtime recipe used 183 plus real platforms,
+rules_shell archives and the rules_shell patch. Catalog membership is not
+payload demand. The configured probe reached
+`bazel_tools+winsdk_configure+local_config_winsdk` and did not publish success.
+Abseil demand remains unknown; its archive was absent at two checked paths.
+Use the accepted typed source-observation diagnostic to identify the precise
+missing requested source or unsupported producer. Do not infer causality from
+a previous truncated display or acquire all 47 declared payloads.
+
+## Provenance and semantic owners
+
+Use pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
+`IndexRegistry`/`RepoSpecFunction` and the existing Stage 1 fixture provenance
+contract. Record source URL, module/version, exact content digest, applied patch
+order, strip prefix, source test adaptation, upstream notices and comparison
+class. Test root declarations are original fixture code; upstream bodies stay
+verbatim. Fixture preparation is test infrastructure, not a Slug semantic owner.
+
+Production keeps the accepted Bzlmod source/session observation, immutable
+capture and publication boundaries. Missing source semantics require a separate
+producer correction; no command-side filesystem bypass or fresh DICE graph.
+The probe supervisor remains bounded and releases child/pipe/temp resources.
+Preserve the old probe SHA-256
+`8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2` as historical
+evidence. The new bounded question does not turn old inconclusive output into
+proof or permit an unchanged blind retry.
+
+## Acceptance dependencies
+
+| Gate | Current state | Required evidence / successor |
+|---|---|---|
+| F1 authentic input inventory | partial; objects above verified historically | demand-linked fixture inventory, pinned URLs/hashes/notices; exact missing object if blocked |
+| F2 portable offline assembly | not implemented | fresh-root assembly independent of user caches; missing/hash/patch mismatch rejection |
+| F3 configured source closure | unresolved winsdk route; abseil demand unknown | same R2 root completes configured source observation with no fake module bodies; a missing input/unsupported producer leaves F3 blocked and selects its prerequisite |
+| B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
+| R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
+| R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
+| R3 positive sharing and closure | pending R1 | common execution-view/REAPI emits one representative; aquery retains all owners |
+| R4 owner/dependent regression and review | incomplete | partitioned full required owner/dependent suites, all failures attributed, independent invariant-to-evidence review |
+
+B1 can be investigated independently of fixture construction. The two proven
+baseline failures are
+`build_command_root_selects_each_terminal_producer_once_for_duplicate_targets`
+(event order) and `resolved_run_view_reuses_exact_executable_filewrite_relation`
+(missing retained Host action-environment facts). Other reported terminal event,
+exported-source, external query, cquery retry and build/public path failures were
+not attributed. Do not call full Core green or waive them based on two controls.
+
+Use the orchestration preflight and classify invocation/environment failures
+separately. Compile <=60 seconds apart from tests <=12/15 seconds; partition
+suite execution with exact test accounting, rather than raise the user's limit.
+Required acceptance is unchanged when a suite is partitioned. Record base and
+candidate revisions/features/environment, exact selected count, command and exit.
+
+Only successful F1–F3 acceptance selects recovery of combined R2 on an isolated
+worktree. A diagnostic naming a missing/unsupported producer is useful evidence,
+but never F3 acceptance.
+Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
+before validating; preservation metadata never ships. R1–R4 completion permits
+atomic integration, followed by Stage 6 named/automatic group design.

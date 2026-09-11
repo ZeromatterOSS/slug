@@ -36,7 +36,13 @@ Stop if:
 - Dirty ownership overlaps
 - Accepted evidence contradicts the packet
 - A reserved decision or scope expansion is required
-- The failure class changes or validation would weaken an assertion
+- Completion would weaken an assertion or require a new design/permission
+
+Recovery:
+- Correct invocation/environment and implementation failures within the accepted
+  contract using the orchestration skill; a changed failure class alone is not
+  REPLAN. Preserve valid evidence and unfinished source in the review worktree.
+- Report new dependencies/ownership decisions to the root rather than guessing.
 
 Return:
 - Changed files and behavior

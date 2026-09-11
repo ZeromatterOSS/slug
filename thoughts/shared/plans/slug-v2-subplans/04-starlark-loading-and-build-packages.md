@@ -1,5 +1,15 @@
 # Stage 4: Starlark Loading and BUILD Packages
 
+## Current status and reading guide
+
+M7A loading is partial. Imported genrule loading is accepted at `de62232ad`;
+configured named/automatic execution groups remain blocked on combined Stage 6
+R2. Current source fixture work is owned by `configured-cli-fixture.md`.
+Canonical Live Status and `current-packet.md` are the sole schedule. Dated
+current/next/stop language in the detailed owner record below describes its
+historical packet; it cannot override the live contract or current user request.
+Read a particular retained decision as needed, not this complete chronology.
+
 ## Goal
 
 Load and evaluate Bazel `BUILD.bazel` and `.bzl` files with starlark-rust,

@@ -20,7 +20,8 @@ commits.
    decision or unresolved contradiction, and Stage 9 only for retained
    representation or reuse work. Read evidence files only as the task needs.
 5. Inspect agents/Cargo/`slugd` only before overlapping work, retries, or
-   daemon-sensitive validation.
+   daemon-sensitive validation. Run `python3 scripts/v2_plan_status.py` after
+   scheduling edits; the root reconciles any mismatch before delegation.
 
 Read `thoughts/shared/plans/slug-v2-plan-authoring-guide.md` before creating or
 materially revising a packet. Read
@@ -33,29 +34,22 @@ packet touches one of its listed surfaces.
 
 ## Route
 
-| Work | Route |
-|------|-------|
-| Small read-only/mechanical | Root |
-| Simple exact-oracle formatter/CLI/query slice | Root |
-| Audit, oracle, focused tests, one abstraction | Terra medium |
-| Approved difficult Rust/DICE/Starlark/query architecture | Terra high |
-| Reserved decision or risky final review | Sol low |
-| Concrete unresolved architecture miss | Sol high |
+The root may complete a cohesive packet directly. Delegate only a concrete
+independent implementation or review task; give concurrent writers disjoint
+files/worktrees. Use the user's selected model and delegation preferences;
+there is no mandatory model-name or effort downgrade. Under token pressure,
+default to root-only work and reuse accepted evidence.
 
-Ordinary packets use at most one write worker and one reviewer. Add read-only
-audits only for distinct unresolved semantic questions; parallel writers must
-own disjoint files. Correction rereviews inspect only the correction diff and
-prior blocker. Never run parallel Cargo commands on one target directory.
+Obtain independent review for a new shared public boundary, semantic
+identity/ownership or DICE locking change, lifecycle risk, and milestone close.
+Use one design review when such a decision must precede implementation, and
+review the final diff against its material invariants. Routine invocation,
+test-selector, formatting, and compiler corrections do not need a new reviewer.
+For correction rereviews, inspect the correction and affected evidence only.
 
-Spawn workers and reviewers with `fork_turns="none"` unless prior conversation
-is essential. Pass the packet path, diff base, compact validation summary, and
-specific question; agents read shared files from disk.
-
-When the user identifies token pressure, default to root-only serial work and
-no implementation delegation. Do not run speculative audits, reconstruct
-accepted evidence, or delegate mechanical work. Prefer the next observable
-vertical slice over substrate breadth. Keep simple query, formatter, and CLI
-slices on the root exact-oracle path unless they cross a reserved boundary.
+When delegating, pass the packet path, baseline, validation summary, and
+specific question with `fork_turns="none"` unless conversation is essential.
+Never run concurrent Cargo commands sharing a target directory.
 
 ## Packet
 
@@ -85,7 +79,7 @@ gap. Keep design, source/oracle evidence, implementation, and tests in one
 logical packet when they cover one abstraction and behavior family under a
 small allowlist. Use a separate design packet only for a new shared public
 boundary, DICE key/lock or ownership model, cross-crate identity, destructive
-action, or a decision the canonical plan explicitly reserves. Obtain one Sol
+action, or a decision the canonical plan explicitly reserves. Obtain one independent
 pre-review for those decisions.
 
 Workers edit named files and run focused tests. The root inspects the diff,
@@ -112,14 +106,42 @@ presentation, persistence, and transport ownership, require either a bounded
 split or a concrete cohesion decision. These are review gates, not automatic
 authorization for cleanup outside the packet.
 
-Use `references/design-reviewer.md` for reserved decisions or risky patches;
-require independent review for reserved architecture, DICE/ownership/identity,
-retained representation, public wire/schema changes, lifecycle risk, `REPLAN`,
-and milestone close. Exact-oracle changes within an existing formatter/CLI
-boundary may use root review. Under token pressure, batch one independent
-review across two to four such slices. Allow one focused correction after a
-concrete miss; a second material implementation/contract correction is
-`REPLAN`.
+Use `references/design-reviewer.md` when independent review is required.
+Review actual code and discriminating evidence for each material invariant;
+line counts, hashes, and a passing test count do not establish semantics.
+A second correction calls for reassessment, not automatic `REPLAN`. Keep
+correcting within the accepted contract when the design remains valid.
+
+## Recovery and candidate ownership
+
+User instructions and session authorization take precedence over packet-local
+stops. Preserve explicit resource and permission limits. The historical
+12-second test deadline/15-second absolute ceiling remains in force unless
+the user changes it; compile separately, with preparation bounded to 60 seconds.
+A packet must distinguish inherited user limits from its own estimates.
+
+- **Invocation/environment failure:** launcher failure, zero selected tests,
+  or an attributed environment problem leaves a gate unproved. Correct the
+  invocation within existing permissions and run only the missing gate.
+- **Implementation failure:** diagnose and correct within the same owner,
+  scope, compatibility class, and acceptance criteria; invalidate affected
+  evidence. Do not repeat an identical failure without a new hypothesis.
+- **Design/prerequisite failure:** use `REPLAN` only when evidence contradicts
+  the contract or completion requires a new ownership/compatibility decision,
+  unavailable prerequisite, or authorization. Name the precise decision.
+  REPLAN is not itself a user-permission request; the root may resolve
+  decisions already covered by the user's task and existing authorization.
+- **Resource limit:** stop that operation and preserve its evidence. Split
+  preparation from runtime or select a smaller discriminating check; do not
+  silently raise a user ceiling or treat timeout as a semantic test failure.
+
+Keep unfinished substantial candidates on a local review branch/worktree with
+base revision and validation receipt. Do not restore and reconstruct code for
+routine validation failures. A preservation commit is not acceptance and must
+not be merged as such. Reconcile landed prerequisites before continuing;
+record evidence against the source, toolchain/features and environment tested.
+Preserve passing results unless relevant inputs change. Keep coupled semantic
+activation atomic at integration; no partial landing to bypass an unmet gate.
 
 Every oracle packet reuses deterministic scaffolding and removes
 nondiscriminating copied assets, mutations, manifests, fields, and assertions.
@@ -139,23 +161,31 @@ redundant or nondiscriminating.
 - Public/cross-crate Rust: focused owner tests plus named direct dependents.
 - DICE/daemon/platform: relevant lifecycle and cross-target gates.
 
-Run broad repository suites once at a milestone/integration checkpoint, not
-after each packet or correction. Reviewers inspect recorded output and rerun
-only missing, stale, or suspect evidence. Use quiet validation where supported;
-review handoffs include command, exit status, test count, and relevant failure
-output, not passing logs. Multiple fresh-root Bazel replays are required only
-for repository, materialization, or non-hermetic behavior. Run Rust formatting
-when Rust changes and always run `git diff --check`.
+Before Rust validation, resolve the pinned toolchain from `rust-toolchain` using
+`rustup which --toolchain <channel> cargo` (and rustc/rustdoc/rustfmt) rather
+than assuming the PATH launcher works. Compile with `--no-run` and Cargo JSON
+output when selecting Rust test executables. Before a named precompiled test,
+run `python3 scripts/v2_test_preflight.py <executable> --exact <full-test-name>`;
+a zero-test result never proves a gate. For daemon tests, check the required
+Unix-socket capability in the actual execution environment and use the normal
+approval mechanism if a sandbox exception is necessary.
 
-At terminal `ACCEPT`, `REPLAN`, or genuine stop:
+Run broad suites once at milestone/integration checkpoints. Partition suites
+into named tests or bounded groups when needed to preserve user deadlines;
+all required tests must still be accounted for. Reuse baseline failure records
+only for their recorded base/environment and do not waive unattributed failures.
+Reviewers rerun only missing, stale, or suspect evidence. Handoffs contain
+command, exit status, selected/pass count, elapsed time, and failure output.
+Use fresh-root Bazel replays only for state/non-hermetic behavior. Format changed
+Rust and always run `git diff --check`.
 
-1. update the owner plan only when milestone/gate state, a blocker, a reusable
-   architecture decision, or `REPLAN` changes;
-2. update the manifest and canonical Live Status only for a scheduling change;
-3. add a routing-log row only for `REPLAN`, an unusual route/parallel layout,
-   a model-route change, or a reusable routing lesson; and
-4. commit accepted work, folding status into it when practical.
+At acceptance or a genuine blocker, update the owner contract only for changed
+architecture/gates and update manifest/canonical status only for scheduling.
+Run the plan status checker. Commit accepted work with its compact evidence;
+do not publish a new status commit per audit or invocation correction.
+Routing logs record only reusable routing lessons or unusual delegation.
 
-Git history of the manifest and implementation commit records ordinary
-`ACCEPT` packets. Do not publish per-audit/correction status commits or
-duplicate ordinary acceptance evidence in routing history.
+Record packet elapsed time, compile/test/review time where available, replan
+reason, and observable gate advanced in the acceptance receipt or commit.
+Do not claim workflow speedups without measurements, or impose a separate
+metrics/reporting packet on routine work.

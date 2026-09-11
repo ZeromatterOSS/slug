@@ -14,9 +14,15 @@ Read:
 Do not implement, edit files, or broaden the packet.
 For a correction rereview, read only the correction diff, affected evidence,
 and the prior blocker. Do not reconstruct the full packet.
-Treat tests-only or evidence-only correction as non-material unless it changes
-the accepted contract or architecture. Inspect recorded validation output;
-rerun commands only when evidence is missing, stale, or suspect.
+Tests/evidence-only corrections do not automatically require architecture
+re-review. Reassess acceptance if coverage, assertions, provenance or failure
+attribution changes even when the contract is unchanged. Inspect recorded
+validation output; rerun only missing, stale, or suspect evidence.
+
+Map each material contract invariant to the actual implementation and its
+recorded discriminating test. Passing counts, line caps and frozen hashes alone
+are insufficient. Invocation/environment recovery is not an architecture
+REPLAN; request the smallest missing validation instead.
 
 Check only applicable risks:
 1. Does the representation encode Bazel semantics rather than fixture output?

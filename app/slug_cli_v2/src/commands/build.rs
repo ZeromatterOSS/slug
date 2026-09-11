@@ -482,8 +482,10 @@ pub(super) fn start_daemon(output_base: &std::path::Path) -> anyhow::Result<()> 
         .spawn()
         .map_err(|e| anyhow::anyhow!("spawning daemon: {e}"))?;
     if let Err(error) = std::fs::write(&pid_file, child.id().to_string()) {
-        terminate_and_reap(&mut child);
-        anyhow::bail!("writing pid file: {error}");
+        return Err(terminate_and_reap(
+            &mut child,
+            anyhow::anyhow!("writing pid file: {error}"),
+        ));
     }
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     wait_for_daemon_ready(&socket, &mut child, deadline)
@@ -501,10 +503,12 @@ fn wait_for_daemon_ready(
             }
             Ok(None) => {}
             Err(error) => {
-                terminate_and_reap(child);
-                anyhow::bail!(
-                    "checking daemon process status while waiting for readiness: {error}"
-                );
+                return Err(terminate_and_reap(
+                    child,
+                    anyhow::anyhow!(
+                        "checking daemon process status while waiting for readiness: {error}"
+                    ),
+                ));
             }
         }
         if std::os::unix::net::UnixStream::connect(&socket).is_ok() {
@@ -512,22 +516,45 @@ fn wait_for_daemon_ready(
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
-    terminate_and_reap(child);
-    anyhow::bail!(
-        "daemon did not become ready within 10s (socket: {})",
-        socket.display()
-    )
+    Err(terminate_and_reap(
+        child,
+        anyhow::anyhow!(
+            "daemon did not become ready within 10s (socket: {})",
+            socket.display()
+        ),
+    ))
 }
 
-fn terminate_and_reap(child: &mut std::process::Child) {
-    if child.try_wait().ok().flatten().is_none() {
-        let _ = child.kill();
-        let _ = child.wait();
+fn terminate_and_reap(child: &mut std::process::Child, primary: anyhow::Error) -> anyhow::Error {
+    let kill_result = child.kill();
+    daemon_cleanup_error(primary, kill_result, child.wait())
+}
+
+fn daemon_cleanup_error(
+    primary: anyhow::Error,
+    kill_result: std::io::Result<()>,
+    wait_result: std::io::Result<std::process::ExitStatus>,
+) -> anyhow::Error {
+    // A failed kill can race with child exit; only a successful reap proves cleanup.
+    match wait_result {
+        Ok(_) => primary,
+        Err(wait_error) => {
+            let cleanup = match kill_result {
+                Ok(()) => format!("waiting for daemon: {wait_error}"),
+                Err(kill_error) => {
+                    format!("killing daemon: {kill_error}; waiting for daemon: {wait_error}")
+                }
+            };
+            let message = format!("{primary}; daemon cleanup failed: {cleanup}");
+            primary.context(message)
+        }
     }
 }
 
 #[cfg(test)]
 mod daemon_readiness_tests {
+    use std::os::unix::process::ExitStatusExt;
+
     use super::*;
 
     #[test]
@@ -550,5 +577,62 @@ mod daemon_readiness_tests {
             error.to_string(),
             "daemon exited before becoming ready (status: exit status: 0)"
         );
+    }
+
+    #[test]
+    fn readiness_timeout_kills_and_reaps_a_live_child() {
+        let mut child = std::process::Command::new("/bin/sleep")
+            .arg("5")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let socket = std::env::temp_dir().join(format!("slug-no-socket-{}", child.id()));
+        let result = wait_for_daemon_ready(&socket, &mut child, std::time::Instant::now());
+        // Check before try_wait so the test cannot reap a zombie left by cleanup.
+        #[cfg(target_os = "linux")]
+        assert!(!std::path::Path::new(&format!("/proc/{}", child.id())).exists());
+        assert_eq!(child.try_wait().unwrap().unwrap().signal(), Some(9));
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            format!(
+                "daemon did not become ready within 10s (socket: {})",
+                socket.display()
+            )
+        );
+    }
+
+    #[test]
+    fn cleanup_failures_append_to_the_primary_error_and_reap_resolves_kill_races() {
+        for (kill_failed, wait_failed, suffix) in [
+            (false, false, ""),
+            (true, false, ""),
+            (
+                false,
+                true,
+                "; daemon cleanup failed: waiting for daemon: wait failed",
+            ),
+            (
+                true,
+                true,
+                "; daemon cleanup failed: killing daemon: kill failed; waiting for daemon: wait failed",
+            ),
+        ] {
+            let primary = std::io::Error::other("startup failed");
+            let kill_result = if kill_failed {
+                Err(std::io::Error::other("kill failed"))
+            } else {
+                Ok(())
+            };
+            let wait_result = if wait_failed {
+                Err(std::io::Error::other("wait failed"))
+            } else {
+                Ok(std::process::ExitStatus::from_raw(0))
+            };
+            let error = daemon_cleanup_error(primary.into(), kill_result, wait_result);
+            assert_eq!(error.to_string(), format!("startup failed{suffix}"));
+            assert_eq!(error.root_cause().to_string(), "startup failed");
+        }
     }
 }

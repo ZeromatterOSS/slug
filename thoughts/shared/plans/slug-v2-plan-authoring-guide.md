@@ -15,8 +15,11 @@ evidence, not scheduling authority.
 
 ## Required packet record
 
-Every implementation packet must state the following, omitting a section only
-when the packet explains why it is inapplicable:
+Every packet states its observable outcome, compatibility class, semantic
+owner/invariants, scope, evidence, validation, and genuine decision boundaries.
+Use the following conditional guidance only where relevant. Omit inapplicable
+sections without placeholder explanations; link inherited contracts instead of
+recopying them. This guide and the worker template use the same rule.
 
 1. **Learned facts and research basis**
    - Name the relevant Bazel 9.2 source and tests before implementation.
@@ -66,8 +69,11 @@ when the packet explains why it is inapplicable:
    - A fallback without those four fields is not plan-ready.
 8. **Scope and stops**
    - Name an observable result, exact file allowlist, exclusions, production
-     and test growth caps where useful, validation, residual risk, and explicit
-     `REPLAN` conditions.
+     and test growth estimates where useful, validation, residual risk, and
+     explicit `REPLAN` conditions. A size estimate is a review trigger, not an
+     automatic failure or permission request. Distinguish user resource limits
+     from estimates. Invocation/test-selection corrections remain in the packet;
+     the orchestration skill owns failure classification and recovery.
    - Do not broaden a packet merely because adjacent work is convenient.
 
 ## Upstream-test and donor policy
@@ -121,8 +127,11 @@ every key family, action kind, builtin, or command. Tests may be colocated when
 that improves ownership, but no policy should force tens of thousands of test
 lines into one physical production module.
 
-Keep the canonical Live Status and current packet compact. Move completed
-chronology into capped companion evidence files or Git history. A stage owner
+Keep canonical Live Status to a milestone table, current packet link and short
+ready/blocked queue. Keep exactly one explicit `Packet: WP-...` line in both
+canonical and manifest; run `python3 scripts/v2_plan_status.py` after changes.
+Move completed chronology to Git history with a pinned commit/path and a compact
+topic index. Do not open an endlessly growing "active evidence" companion. A stage owner
 should describe current architecture and reusable decisions; it should not be
 the only archive of every worker turn.
 
@@ -162,8 +171,21 @@ change. Correctness and exact outputs are prerequisites.
       covered when applicable.
 - [ ] Fixture provenance and skipped-upstream-test reasons are recorded.
 - [ ] Every fallback has an invariant, deletion condition, owner, and test.
-- [ ] File allowlist, growth caps, validation, residual risk, and stops are
+- [ ] File allowlist, growth estimates, validation, residual risk, and stops are
       bounded.
 - [ ] Complexity triggers and hot-path measurement needs were reviewed.
 - [ ] Completed chronology has an evidence destination rather than expanding
       the active scheduling surface.
+
+## Readiness and closure
+
+A ready packet can execute useful work without another design-only handoff.
+Name prerequisites separately from acceptance: an environment-bound diagnostic
+may prove a failure cause, but cannot replace a portable acceptance fixture.
+For integration, list required gates with base/candidate attribution and exact
+missing evidence. For M7A use `slug-v2-subplans/bootstrap-readiness.md`; admit
+only capabilities demanded by that finite target closure.
+
+Review branches preserve unfinished code and receipts; their commits do not
+change milestone state. Acceptance requires the applicable invariant-to-test
+mapping, not a source hash or an arbitrary number of review rounds.
