@@ -19416,3 +19416,38 @@ packet admits only those corrections in one added existing test owner, then one
 format, one compile-only preparation and precompiled12s tests. No code changed
 under the rejected recovery draft. Independent rereview ACCEPTS the revised
 six-file scope and compile-first/no-edit-after-compile sequence.
+
+### WP-5-7A SourceObservation diagnostic implementation (2026-09-10)
+
+**Status: ACCEPTED; return to complete-R2 fixture policy by read-only audit.**
+The final six-owner implementation is299 production/557 proof/856 gross net,
+below400/700/1100. Helper/test files are292/517 lines; Loading production,
+diagnostic-test and expansion-test net growth is5/34/6, below40/120/80. Final
+source hashes are recorded in the current checkpoint evidence; diff, formatting,
+forbidden-operation, credential-pattern and preserved-patch hygiene pass.
+Ordered final hashes are parent/helper/helper-test/Loading-renderer/
+Loading-diagnostic-test/Loading-expansion-test:
+`0da3ea6bd4db6b9d9f9bc1a02d6dea256c422415eeeccc0f8cd5965cfe04888a`,
+`bba24744480161e724d0c7a9606fd61f80d51f9c29e2801a4c9419536af26d6b`,
+`03efd74c983ca3dc94d389d5f5179b813d3e5a67ccb2d59bb6fcdf7d48e86d4f`,
+`e0e9125367eab2f2111fe3f217b81e0dac1c056e0e09061199ec7d095c3bc197`,
+`5b0929e95111f87683032ae210728cf4ff016c060de13985ce4b1736aa8a3d18`,
+`b8f0c61e0f246e06f36609de6184698b89e0e9c31a89f241f8836fafa9acab42`.
+
+The Bzlmod writer exhaustively borrows four source classes, five outer error
+kinds, all four built-in/two built-in-source kinds, eleven request/ten
+materialization/six operation/four node/four observation/all39 I/O discriminators.
+Paths are allocation-free encoded-byte lowercase hex. Loading adds only the exact
+canonical leaf prefix and delegates through its existing fixed3072byte ASCII sink.
+No fallback Debug, diagnostic String, retained state, key, dependency, DICE edge,
+source admission, equality, ordering or lifetime behavior changed.
+
+Final combined no-run completed in40.98s. Bzlmod proofs passed7/7 in0.01s; its
+command spent5.52s compiling an alternate single-package Cargo feature set but
+stayed below12s with unchanged source. Natural legacy/observed Loading passed1/1
+in0.02s and the focused diagnostic group11/11 in0.02s, each0.2s total. Combined
+default check passed25.58s. No process survived. Independent final review ACCEPTS
+the feature-resolution nuance, exhaustive grammar, same-display A/B/A, None I/O,
+canonical legacy/observed parity and Child Arc/final-Weak release. No probe,
+strace, CLI, replay, acquisition, cache scan or R2 restoration ran; the consumed
+receipt remains inconclusive and cannot explain14GB.

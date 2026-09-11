@@ -266,7 +266,12 @@ fn walk(out: &mut Buffer, mut node: Node<'_>) -> fmt::Result {
                     E::Encoding { label } => { out.write_str("Encoding ")?; return out.label(label); }
                     E::Cycle(_) => return out.write_str("Cycle"),
                     E::Source { .. } => return out.incomplete("Source"),
-                    E::SourceObservation { .. } => return out.incomplete("SourceObservation"),
+                    E::SourceObservation { label, error } => {
+                        out.write_str("SourceObservation ")?;
+                        out.label(label)?;
+                        out.write_str(": ")?;
+                        return error.write_registration_diagnostic(out);
+                    }
                     E::LoadLabel { .. } => return out.incomplete("LoadLabel"),
                 }
             }

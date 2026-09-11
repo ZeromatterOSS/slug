@@ -9,6 +9,8 @@
 
 use super::*;
 
+mod registration_diagnostic;
+
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum HostRepositorySourceObservationInput {

@@ -342,15 +342,49 @@ fn registration_diagnostic_utf8_escapes_budget_and_writer_failure() {
 
 #[tokio::test]
 async fn registration_diagnostic_natural_bzl_incomplete_boundaries() {
+    let mut source_observation_text = Vec::new();
     for (error, owner) in
         crate::registration_expansion_tests::registration_diagnostic_bzl_errors().await
     {
         let text = render_node(Node::Innate(&error));
-        assert!(
-            text.ends_with(&format!("[diagnostic incomplete: {owner}]"))
-                && !text.contains("POISON")
-        );
+        if owner.starts_with("SourceObservation") {
+            assert!(
+                text.ends_with("SourceObservation @@dep+//:ext.bzl: CanonicalRequest: Request.WrongKind path=hex:6578742e627a6c actual=Directory")
+                    && !text.contains("POISON")
+            );
+            source_observation_text.push(text.clone());
+            if owner == "SourceObservationObserved" {
+                use ExternalBzlModuleError as E;
+                let Innate::ExternalBzl(leaf) = error else {
+                    unreachable!()
+                };
+                let leaf = Arc::new(leaf);
+                let weak = Arc::downgrade(&leaf);
+                let wrapped = Innate::ExternalBzl(E::Child {
+                    raw_load: "@raw//:leaf.bzl".into(),
+                    canonical_label: CanonicalLabel::parse("@@outer//:leaf.bzl").unwrap(),
+                    error: leaf.clone(),
+                });
+                let before = Arc::strong_count(&leaf);
+                assert!(
+                    render_node(Node::Innate(&wrapped))
+                        .contains("Child @raw//:leaf.bzl: ExternalBzl: SourceObservation")
+                );
+                assert_eq!(Arc::strong_count(&leaf), before);
+                drop(wrapped);
+                assert!(weak.upgrade().is_some());
+                drop(leaf);
+                assert!(weak.upgrade().is_none());
+            }
+        } else {
+            assert!(
+                text.ends_with(&format!("[diagnostic incomplete: {owner}]"))
+                    && !text.contains("POISON")
+            );
+        }
     }
+    assert_eq!(source_observation_text.len(), 2);
+    assert_eq!(source_observation_text[0], source_observation_text[1]);
 }
 
 #[test]

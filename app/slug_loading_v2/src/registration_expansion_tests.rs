@@ -191,7 +191,7 @@ fn command_configuration(
 
 #[rustfmt::skip]
 pub(crate) async fn registration_diagnostic_bzl_errors() -> Vec<(crate::module_extension_innate_repository::HostPureInnateRepositoryOwnerError, &'static str)> {
-    use crate::bzl_module::{HostBzlModuleEvalKey, HostRootBzlLabel, HostBzlModuleError, ExternalBzlModuleObservationKey, RepositoryBzlLabel, ExternalBzlModuleError};
+    use crate::bzl_module::{HostBzlModuleEvalKey, HostRootBzlLabel, HostBzlModuleError, ExternalBzlModuleEvalKey, ExternalBzlModuleObservationKey, RepositoryBzlLabel, ExternalBzlModuleError};
     use crate::module_extension_innate_repository::HostPureInnateRepositoryOwnerError as Innate;
     let module = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1.0.0')\nlocal_path_override(module_name='dep', path='dep')\n";
     let initial = EpochBuilder::canonical_package(module, "", 1);
@@ -214,11 +214,17 @@ pub(crate) async fn registration_diagnostic_bzl_errors() -> Vec<(crate::module_e
     let LoadingPreparationOutcome::Complete(route) = tx.compute(&crate::HostCanonicalRepositoryLoadRouteKey::new(
         workspace(), CanonicalRepoName::new("dep+").unwrap())).await.unwrap() else { panic!("route Need") };
     let label = RepositoryBzlLabel::new(PackagePath::parse("").unwrap(), slug_bzlmod_v2::RootPackageBzlTarget::parse("ext.bzl").unwrap()).unwrap();
+    let input = route.as_ref().as_ref().unwrap().input().clone();
+    let LoadingPreparationOutcome::Complete(value) = tx.compute(&ExternalBzlModuleEvalKey::new_canonical(
+        input.clone(), label.clone())).await.unwrap() else { panic!("legacy external source Need") };
+    let error = value.as_ref().as_ref().unwrap_err().clone();
+    assert!(matches!(error, ExternalBzlModuleError::SourceObservation { .. }));
+    errors.push((Innate::ExternalBzl(error), "SourceObservationLegacy"));
     let LoadingPreparationOutcome::Complete(Ok(value)) = tx.compute(&ExternalBzlModuleObservationKey::new_canonical(
-        route.as_ref().as_ref().unwrap().input().clone(), label)).await.unwrap() else { panic!("external source Need/outer") };
+        input, label)).await.unwrap() else { panic!("external source Need/outer") };
     let error = value.result().as_ref().as_ref().unwrap_err().clone();
     assert!(matches!(error, ExternalBzlModuleError::SourceObservation { .. }));
-    errors.push((Innate::ExternalBzl(error), "SourceObservation"));
+    errors.push((Innate::ExternalBzl(error), "SourceObservationObserved"));
     errors
 }
 

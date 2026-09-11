@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-source-observation-registration-diagnostic-proof-r2`
-proposed separated compile/proof recovery](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-complete-r2-authentic-fixture-policy-audit-r1`
+read-only complete-R2 fixture-policy audit](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -79,7 +79,13 @@ three pre-compile corrections: exhaustive disposition matching, the missing None
 I/O-code proof, and natural legacy plus typed same-display/Arc release coverage.
 The revised six-file recovery keeps output-conflict R2 preserved and unaccepted.
 Independent rereview ACCEPTS that exact recovery; its code and gates begin only
-after the docs checkpoint is pushed.
+after the docs checkpoint is pushed. The implementation is now independently
+ACCEPTED at299/557/856 production/proof/gross net. Final compile-only, focused
+tests and default checks pass within55/12/30s caps; no test exceeded5.6s total.
+The exact natural diagnostic now exposes canonical label, source class and typed
+failure without changing retained identity or DICE semantics. It does not
+reclassify the spent observer receipt. Resume only a read-only audit of authentic
+registry/mirror fixture policy for complete R2; do not restore any section yet.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
