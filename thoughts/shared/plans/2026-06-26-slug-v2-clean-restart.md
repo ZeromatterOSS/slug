@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-7A-run-registry-policy-design-r1`
-docs/source design for explicit run registry parity](./slug-v2-subplans/current-packet.md).
+[`WP-7A-run-registry-policy-implementation-r1`
+bounded explicit run registry parity](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -89,9 +89,12 @@ returns REPLAN at one exact production gap: build/query/cquery/aquery already
 retain and propagate `--registry`, but `RunRequest` has no registry field,
 one-shot run passes an empty registry slice and daemon run uses the no-registry
 Bzlmod constructor. Adding flags only to R2 tests would therefore be a false
-handoff. Design and separately accept normal run registry parity first; complete
-R2 remains untouched. The later fixture correction still removes its one fake
-override plus three fake platforms bodies and must restore all 19 files atomically.
+handoff. The bounded design reuses the existing ordered registry parser and
+daemon wire field: add one `RunRequest` vector, borrow it in one-shot, and use
+the registry-aware daemon constructor. Preserve `--` program arguments and the
+workspace override split. Implement/review this four-file correction alone;
+complete R2 remains untouched. Its later fixture correction still removes one
+fake override plus three fake platforms bodies and restores all19 files atomically.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic

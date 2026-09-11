@@ -19488,3 +19488,32 @@ or broad replay. Missing payload, external-network attempt or source boundary in
 the later R2 fixture remains REPLAN, not permission to acquire or fake source.
 Demand, performance and historical14GB cause remain UNKNOWN; the consumed
 observer is not reopened.
+
+### Explicit run registry policy design (2026-09-10)
+
+**Status: design complete; bounded implementation selected after review.** The
+existing owners are sufficient. `RunRequest` gains one ordered `Vec<String>`
+populated by the common `bzlmod_registry_urls` helper. Empty values retain their
+current error; repeats retain order. `split_args` already ensures registry text
+after `--` remains only a program argument. The workspace override branch keeps
+registry flags in `run_args`, not its temporary BuildRequest `policy_args`, and
+continues to copy only normalized command policy.
+
+One-shot borrows that vector in place of `&[]`; daemon mode uses existing
+`from_normalized_with_registry_urls`. The primitive server wire and decoder
+already retain the URLs, and RemoteConfig ignores non-remote flags. No new
+protocol field, parser, identity, DICE input, source admission or retained output
+state is needed. Request lifetime owns the vector; daemon construction copies it
+into the existing wire owner. Registry values do not enter launch argv, remote
+headers or diagnostic formatting.
+
+Exact files are Commands run, CLI run, CLI integration tests and Server tests;
+caps are40 production/160 proof/200 gross. Prove ordered/empty/after-`--` parsing,
+workspace-override and program-argument invariance, one-shot/daemon invalid local
+registry rejection before remote execution, and Run wire/default compatibility.
+Compile once under55s, then run only precompiled named tests under12s/15s absolute
+and affected checks under30s. No full suite, retry, extension, network, fixture
+edit or R2 restoration. Independent pre-execution and terminal review are required.
+Independent architecture review returns `ACCEPT`: the single vector, existing
+parser/wire destinations, argument partition, four-file boundary and bounded
+negative proofs are implementation-ready with no remaining design correction.
