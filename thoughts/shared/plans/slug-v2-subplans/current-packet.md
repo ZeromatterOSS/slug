@@ -1,71 +1,102 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-5-7A-source-observation-diagnostic-boundary-audit-r1
+Packet: WP-5-7A-source-observation-registration-diagnostic-design-r1
 
-Status: SELECTED, READ-ONLY AUDIT. No implementation or execution is authorized.
+Status: SELECTED, DOCS-ONLY DESIGN. No implementation or execution is authorized.
 
-## Accepted predecessor
+## Accepted predecessor and audit result
 
-The default-off bounded observer implementation is accepted in `64c7d2475` and
-its single execution contract in `d6a9c41de`. That one authorization was consumed
-from clean pushed sources. Independent terminal evidence review ACCEPTS the result
-as `bounded-observer-inconclusive`; no retry is available.
+The default-off observer is accepted in `64c7d2475`; its one execution contract
+in `d6a9c41de` was consumed and independently accepted as
+`bounded-observer-inconclusive` in `fded00c79`. No retry is available.
 
-Evidence `/tmp/slug-sentinel-demand.cnhzug/logs` records compiler success in0.168s
-and semantic native exit101 after14.01s, below the15s wall cap. Cleanup is complete
-with ECHILD/open_pipes0/group_alive0 and no survivor. Peak RSS is47176KiB. No
-output cap, telemetry error, exact abseil open or success marker occurred. Valid
-telemetry reports counters30247/30247/28781/28781/3056/3056, disabled1, claim0,
-overflow0, dropped0, latest TerminalRelease Exit and latest
-ConfiguredNodeAnalysisObservationKey CheckDepsFinished. Those independent last
-scalars are not a duration, coherent snapshot, causal leaf, demand classification,
-performance result, deadlock proof or historical14GB explanation.
+The source-boundary audit inspected nine direct source/test owners with excerpts
+below2MiB and establishes the natural ownership chain. A canonical external Bzl
+read computes `HostRepositorySourceObservationKey` or its epoch wrapper. The
+result retains `HostRepositorySourceObservationError { input, relative_path,
+kind }`; `finish_external_bzl_source` clones that full typed error and the exact
+`CanonicalLabel` into `ExternalBzlModuleError::SourceObservation`, retaining the
+observation epoch. Success is distinct: built-in or request-present continues,
+and request-absent becomes `ExternalBzlModuleError::Absent`.
 
-The semantic error traverses toolchains registration row3,
-`bazel_tools+winsdk_configure+local_config_winsdk`,
-`@bazel_tools//tools/cpp:cc_configure.bzl` and
-`@rules_cc//cc/private/toolchain:cc_configure.bzl`, ending at
-`[diagnostic incomplete: SourceObservation]`. This is an explicit diagnostic
-boundary, not proof of a missing input or unavailable payload.
+`HostRepositorySourceObservationErrorKind` exhaustively distinguishes
+`BuiltinPath`, `Builtin`, `BuiltinCompute`, `Request(RepositorySourceFileError)`
+and `RequestCompute`. The nested request enum has eleven typed variants covering
+invalid paths, materialization/compute, observation/inconsistent state, wrong
+kind, cycle/infinite expansion and resolution/file compute. The canonical source
+input separately retains route and built-in/request disposition.
+
+The terminal marker is intentional presentation, not lost semantic identity:
+the bounded registration renderer explicitly maps `SourceObservation { .. }` to
+`[diagnostic incomplete: SourceObservation]`, and natural tests freeze that
+behavior while proving hidden `POISON` state is not formatted. Recursive `Child`
+nodes publish `raw_load`, not their retained canonical label. Therefore the
+receipt proves the exact outer `ExternalBzlModuleError::SourceObservation`
+variant, but not the hidden error-kind discriminator, canonical leaf label,
+materialization outcome, cache availability, payload demand or root cause. An
+absent successful request would have rendered `Absent`, so this is also not an
+absence result. Those remaining runtime facts are UNKNOWN.
+
+The existing reusable pattern is a borrowed
+`write_registration_diagnostic(&mut dyn fmt::Write)` method owned beside its
+typed Bzlmod error. Loading supplies the fixed3072byte ASCII-escaping sink and
+depth limit. The helper performs exhaustive causal matching, propagates writer
+stop and never uses arbitrary `Debug`; retained equality remains unchanged.
+Independent terminal review ACCEPTS the owner chain, counts, evidence limits and
+docs-only successor scope.
 
 ## Goal
 
-Locate and describe the natural typed owner represented by the terminal
-`SourceObservation` cutoff. Determine whether the cutoff means an intentionally
-bounded renderer boundary, an unaudited error variant, a missing predecessor
-handoff, or some combination. Trace only enough static source to name the exact
-variant/owner and its immediate producer/consumer edges. Do not infer that the
-last DICE activity caused the terminal error.
-
-The audit must distinguish:
-
-- retained error identity from bounded Display/Debug projection;
-- SourceObservation error variants from successful predecessor/source state;
-- route/loading ownership from cache/payload availability;
-- an exact source request from generic module/dependency enumeration;
-- evidence that supports a later bounded design from UNKNOWN.
+Freeze one bounded cross-crate presentation extension for the existing
+`SourceObservation` owner. The design must make the exact retained leaf label,
+source class/path and typed discriminator visible enough to distinguish source
+failures without rendering retained route/materialization graphs or changing
+semantic identity.
 
 ## Authorized work
 
-- Read the accepted registration-error implementation/proofs, the exact native
-  stderr/telemetry receipt, relevant DICE documentation and direct source owners.
-- Start with at most eight source/test owners located by the exact diagnostic
-  marker and route variants. Add at most eight directly referenced owners only if
-  needed. Keep combined excerpts below2MiB; do not dump all of `runtime/dice.rs`.
-- Check retained utility/DICE patterns before proposing any new representation.
+- Read only the nine audited owners and at most four directly referenced utility
+  or proof owners if an output field or proof obligation cannot otherwise be
+  frozen. Keep combined excerpts below2MiB.
+- Specify the exact output grammar for all five observation error kinds, all
+  eleven `RepositorySourceFileError` variants and four built-in source variants.
+- Reuse the existing borrowed writer pattern. The outer Loading buffer continues
+  to own ASCII escaping, the3072byte output limit and writer-stop behavior.
+- Freeze a file/line budget and focused proof matrix. Required proofs include
+  exhaustive variant projection, natural legacy/observed Loading handoff, exact
+  canonical leaf label, no retained request/route Debug leakage, output/depth
+  limits, early writer stop, typed same-display inequality/A-B-A, unchanged Arc
+  sharing/final release, unchanged Need/outer-error precedence and default build
+  behavior.
 - Update only this manifest, canonical Live Status, Stage5 summary and
   `~/PROGRESS.md`; outside this manifest add at most80 lines.
-- Obtain independent terminal review of the audit and any proposed next packet.
+- Obtain independent terminal review before selecting implementation.
+
+## Design invariants
+
+- Add no retained field, key, cache, lock, allocation owner or DICE edge.
+- Do not alter `Debug`, `Display`, equality, hashing, cloning, route selection,
+  source admission, materialization, observation epochs, Need ordering or error
+  propagation.
+- The prospective Bzlmod helper must borrow the current error, match every
+  private discriminator explicitly and stop immediately when its writer fails.
+  It may stream bounded scalar strings/paths through the caller sink; it must not
+  allocate a diagnostic String or format a retained request, route, graph or
+  error through a fallback `Debug` implementation.
+- The prospective Loading arm must print its retained canonical label before
+  delegating to the helper; recursive child text remains explicitly raw-load
+  presentation rather than canonical identity.
+- This is diagnostic observability only. It cannot retroactively classify the
+  consumed observer receipt, prove payload demand/unavailability, explain14GB or
+  authorize acquisition/replay.
 
 ## Prohibited work and stops
 
-Do not run Cargo, a test, compiler, probe, `strace`, CLI, daemon, Bazel or network
-replay. Do not inspect caches broadly, enumerate arbitrary dependencies, acquire
-sources, edit Rust/Perl/fixtures, increase caps, or restore any output-conflict R2
-section. If sixteen source owners or2MiB excerpts do not establish the exact
-boundary, record UNKNOWN and REPLAN. If the natural fix would change retained
-identity, DICE key equality, source admission or semantic ordering, stop at a
-separately reviewed design; do not implement it here.
+Do not edit Rust/tests/fixtures, run Cargo, a compiler, test, probe, `strace`, CLI,
+daemon, Bazel, network, cache scan or replay. Do not inspect/acquire sources,
+increase any cap or restore any output-conflict R2 section. If the grammar cannot
+be exhaustive without rendering retained graph/request state, changing identity
+or introducing a new semantic owner, record UNKNOWN and REPLAN.
 
 Preserve `/tmp/slug-conflict-r2.XZJWwv/candidate.patch` at SHA-256
 `90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e`

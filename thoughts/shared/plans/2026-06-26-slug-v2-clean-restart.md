@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-source-observation-diagnostic-boundary-audit-r1`
-read-only natural-owner audit](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-source-observation-registration-diagnostic-design-r1`
+docs-only bounded-presentation design](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -55,10 +55,17 @@ valid, but no exact abseil open or success marker exists. Latest committed phase
 is TerminalRelease Exit and activity is ConfiguredNodeAnalysisObservationKey
 CheckDepsFinished; the published route ends at incomplete SourceObservation.
 Result is `bounded-observer-inconclusive`, with no causal/demand/performance/14GB
-claim and no retry. Review only the bounded natural source-observation owner next.
-Independent terminal review ACCEPTS the receipt and interpretation. Current work
-is a static audit of that natural SourceObservation boundary only; no execution or
-implementation is selected. Output-conflict R2 stays preserved and unaccepted.
+claim and no retry. Independent terminal review ACCEPTS the receipt and
+interpretation. The subsequent static audit locates the full retained
+`HostRepositorySourceObservationError` and exact outer
+`ExternalBzlModuleError::SourceObservation`; the marker is an intentional bounded
+renderer branch. Successful absent source, route ownership and the five hidden
+error-kind families are distinct. Because recursive output prints raw loads and
+suppresses the canonical leaf/error discriminator, the receipt cannot identify
+the exact request, inner failure, cache/payload availability or root cause.
+Current work only designs an exhaustive borrowed causal projection; no execution
+or implementation is selected. Independent terminal audit review ACCEPTS.
+Output-conflict R2 stays preserved and unaccepted.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic

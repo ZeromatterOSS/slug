@@ -19318,3 +19318,36 @@ demand/non-demand, performance change, deadlock or historical14GB cause. The one
 authorization is consumed; no retry or implementation correction is selected.
 Independent evidence review confirms raw/decoded consistency, uncapped outputs,
 complete cleanup and the exact inconclusive classification; terminal ACCEPT.
+
+### WP-5-7A SourceObservation diagnostic-boundary audit (2026-09-10)
+
+**Status: ACCEPTED; design only a bounded borrowed projection next.**
+Nine direct source/test owners were inspected with excerpts below2MiB and no
+execution. Canonical external Bzl loading computes the existing source-observation
+key/epoch owner. Its result retains input, relative path and one of five typed
+error kinds. Loading clones that error plus the exact canonical label into
+`ExternalBzlModuleError::SourceObservation` while preserving observations.
+Successful built-in/request-present values continue and request-absent becomes
+the separate `Absent` variant.
+
+Registration rendering deliberately replaces `SourceObservation { .. }` with an
+incomplete marker; natural tests freeze that cutoff and prevent hidden retained
+state from leaking. Recursive Child rendering publishes raw-load text, not its
+retained canonical label. Thus the receipt establishes the exact outer variant,
+but not its hidden discriminator, canonical leaf identity, materialization state,
+cache/payload availability or cause. `RepositorySourceFileError` alone has eleven
+possible typed request failures, and compute/built-in families are separate.
+Absence would have followed a different success branch. No historical14GB,
+performance, demand/non-demand or source-unavailability conclusion follows.
+
+The reusable owner-side pattern is a borrowed
+`write_registration_diagnostic(&mut dyn fmt::Write)` with exhaustive matching,
+immediate writer-stop propagation and no arbitrary Debug fallback. Loading's
+existing fixed3072byte ASCII-escaping buffer remains the sole output budget. The
+selected successor is docs-only: freeze exact grammar and proofs for all five
+observation kinds, eleven nested request variants and four built-in variants,
+including natural legacy/observed handoff, identity/lifetime/Need invariance and
+no route/request graph leakage. No Rust, compiler, test, probe, replay, cache scan,
+acquisition or output-conflict R2 restoration was authorized or performed.
+Independent terminal review ACCEPTS the owner chain, variant counts, raw-load
+boundary, UNKNOWN claims, utility invariants and documentation limits.
