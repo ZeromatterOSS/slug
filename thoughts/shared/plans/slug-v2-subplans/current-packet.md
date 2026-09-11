@@ -1,75 +1,81 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-5-7A-complete-r2-authentic-fixture-policy-audit-r1
+Packet: WP-7A-run-registry-policy-design-r1
 
-Status: SELECTED, READ-ONLY AUDIT. No R2 restoration, implementation or execution
-is authorized.
+Status: SELECTED, DOCS/SOURCE DESIGN ONLY. Complete R2 remains preserved and
+must not be restored, copied, staged or executed.
 
-## Accepted predecessor
+## Audit result and concrete stop
 
-The bounded SourceObservation registration diagnostic is independently accepted
-in the preceding checkpoint. Six Rust owners add299 production/557 proof/856
-gross net lines within400/700/1100; helper/test files are292/517 and Loading
-production/diagnostic/expansion net growth is5/34/6 within40/120/80.
+WP-5-7A-complete-r2-authentic-fixture-policy-audit-r1 returns `REPLAN` at the
+`run` request boundary. The read-only audit inspected the preserved R2 and its
+validation plus bounded current CLI request, fixture, mirror and accepted-recipe
+owners. It ran no compiler, test, CLI, daemon, Bazel, probe, strace, network,
+cache scan, acquisition or replay and did not read credentials.
 
-The Bzlmod owner now borrows the retained error and exhaustively streams four
-source classes, five top-level kinds, four built-in variants/two source kinds,
-eleven request variants, ten materialization kinds, six operations, four node
-kinds, four observation-error forms and all39 I/O kinds. Paths are allocation-free
-byte-exact lowercase hex. Loading alone owns canonical-label prefixing, ASCII
-escaping, the fixed3072byte output budget and depth stop. No Debug fallback,
-diagnostic String, retained field, dependency, key, DICE edge or semantic change
-was added.
+The repeated `--registry` flag is the natural request-policy input. Existing
+Build, Query, Cquery and Aquery requests retain it in `registry_urls`; their
+one-shot and daemon paths pass that value to Bzlmod. R2's direct
+`sentinel_outputs` and subprocess calls omit the flag, but adding it everywhere
+does not fix `run`: `slug_commands_v2::run::RunRequest` has no `registry_urls`,
+one-shot `commands/run.rs` explicitly passes `&[]`, and daemon mode constructs
+`BzlmodRequestInputs::from_normalized` without registries. Complete R2 cannot
+receive one authentic policy on every entry path without a production change.
 
-After the mandatory15s compile frontier, accepted recovery separated final
-compilation from tests. Current-source combined no-run completed in40.98s under55.
-Bzlmod diagnostic proofs passed7/7 in0.01s (5.6s command including alternate
-single-package feature compilation); natural Loading legacy/observed proof passed
-1/1 in0.02s, and the focused Loading diagnostic group passed11/11 in0.02s (both
-0.2s commands). Combined default check passed in25.58s under30. Every test command
-was below12s. Hash/cap/diff/credential/process hygiene passed with no survivor.
-Independent final review ACCEPTS the feature-resolution nuance and all proofs.
-
-This presentation does not retroactively classify the consumed observer receipt.
-Demand, cache/payload availability, cause, performance and historical14GB
-attribution remain UNKNOWN; the observer attempt cannot be retried.
+The fake fixture inventory is nevertheless exact and remains frozen. In R2's
+new `configured_action_conflicts` module, remove the root MODULE's
+`local_path_override` and three writes under `.slug_test_builtin/platforms`:
+`MODULE.bazel`, `host/BUILD.bazel`, and `host/constraints.bzl`. Retain the root
+`//:platform`, toolchain declarations, BUILD and defs; those are conflict
+semantics, not fake external source bodies.
 
 ## Goal
 
-Return to the accepted scheduling gap: define the exact authentic fixture policy
-required before the preserved complete output-conflict R2 candidate can be
-restored and validated as one whole. Determine how explicit registry/mirror policy
-must reach both the direct-core sentinel request and every CLI request, and which
-fake-platform override/bodies must be removed, without changing production
-semantics or inspecting credentials.
+Freeze the smallest normal command-policy correction that gives `run` the same
+explicit registry semantics already owned by build/query/cquery/aquery, before
+any Rust edit or R2 restoration. Cover direct parsing, workspace override-policy
+normalization, one-shot Core evaluation, daemon request construction, program
+argument separation and command diagnostics. This is command parity, not an R2
+test-only bypass.
 
 ## Authorized work
 
-- Read only the preserved R2 manifest/evidence, its current applicable source
-  owners, the accepted file-registry/file-payload transport recipe and directly
-  referenced fixture/request constructors.
-- Begin with at most eight source/test/doc owners and add at most eight directly
-  referenced owners. Keep excerpts below2MiB; do not enumerate dependencies or
-  inspect caches broadly.
-- Name the single natural registry/mirror configuration owner and trace its exact
-  handoff to direct Core and CLI requests. Separate test transport policy from
-  semantic source identity, selected graph state and output-conflict behavior.
-- Inventory only the exact fake-platform override/body sites already present in
-  complete R2 and define their removal/replacement without restoring any section.
-- Freeze a complete all-or-nothing restoration/proof design or record UNKNOWN and
-  REPLAN. Update only this manifest, canonical Live Status, Stage5 and
-  `~/PROGRESS.md`, with at most80 added lines outside this manifest.
-- Obtain independent terminal review of the audit and proposed successor.
+- Read at most eight initial source/test/doc owners and at most eight directly
+  referenced owners, excerpts below2MiB. Start with Commands `run.rs`/common
+  parsing, CLI `commands/run.rs`, BuildRequest parity, server Bzlmod inputs and
+  their closest tests.
+- Trace repeated/ordered `--registry` occurrences before and after `--`, the
+  `parse_run_request_at_workspace` override branch, one-shot and daemon handoff,
+  and existing redaction/error behavior. Preserve program arguments verbatim.
+- Decide whether `RunRequest.registry_urls: Vec<String>` plus the existing
+  `bzlmod_registry_urls` parser and `from_normalized_with_registry_urls` daemon
+  constructor is the single sufficient representation. No second policy owner.
+- Freeze exact production/test files, structural/equality/lifetime behavior,
+  failure precedence, proof cases, line caps and compile-first bounded gates for
+  a separately reviewed implementation packet.
+- Update only this manifest, canonical Live Status, Stage5 and `~/PROGRESS.md`.
+  Obtain independent terminal review before selecting Rust implementation.
 
 ## Stops and prohibitions
 
-Do not apply, copy, reconstruct or partially stage R2. Do not edit Rust/Perl/
-fixtures, run Cargo, compiler, test, probe, `strace`, CLI, daemon, Bazel, network,
-cache scan, acquisition or replay. Do not infer source demand/availability from
-the consumed diagnostic. If16 owners or2MiB cannot establish one authentic policy
-handoff for both entry paths, stop UNKNOWN/REPLAN. Any proposal that changes
-retained identity, source admission, output-conflict semantics or DICE ordering
-requires a separately reviewed design.
+No Rust, fixture, payload or driver edits. No Cargo/compiler/test/CLI/daemon/
+Bazel/probe/strace/network/cache scan/acquisition/replay. Do not apply, copy,
+reconstruct or partially stage R2. Do not add a test-only flag parser, mutate
+semantic identity, alter selected graph/source admission, or combine the run
+correction with R2 before its own design and implementation are accepted.
+
+Every future test invocation is capped at12 seconds with15 seconds absolute;
+compile-only preparation may be separately bounded below60 seconds. No full
+suite, automatic retry, timeout extension or broad replay. Any design needing a
+second retained policy, changed argument partition, credential handling or broad
+server protocol change is `REPLAN`.
+
+After an independently accepted run-policy implementation, return to one atomic
+complete-R2 restoration plus authentic fixture correction. That later fixture
+must use the already verified byte-authentic local registry/file-mirror recipe,
+give one exact registry argument to direct Core and every CLI subprocess, and
+stop at any missing payload, external-network attempt or new source boundary.
+Transport policy must not enter configured/action/output-conflict identity.
 
 Preserve `/tmp/slug-conflict-r2.XZJWwv/candidate.patch` at SHA-256
 `90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e`

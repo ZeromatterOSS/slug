@@ -19451,3 +19451,40 @@ the feature-resolution nuance, exhaustive grammar, same-display A/B/A, None I/O,
 canonical legacy/observed parity and Child Arc/final-Weak release. No probe,
 strace, CLI, replay, acquisition, cache scan or R2 restoration ran; the consumed
 receipt remains inconclusive and cannot explain14GB.
+
+### Complete-R2 authentic fixture policy audit stop (2026-09-10)
+
+**Status: REPLAN at run registry propagation; R2 remains untouched.** The
+read-only audit inspected the preserved R2/validation and bounded current request,
+fixture, mirror and accepted-recipe owners. No compiler, test, CLI, daemon, Bazel,
+probe, strace, network, cache scan, acquisition, replay or credential access ran.
+
+The repeated `--registry` flag is the natural configuration input. Build, Query,
+Cquery and Aquery requests retain `registry_urls`, and their existing one-shot
+and daemon paths pass it to Bzlmod. R2's direct `sentinel_outputs` parses the
+default because it supplies only `//:root`; its subprocess helper also supplies
+no registry flag. More importantly, flags cannot correct `run`: `RunRequest`
+retains no registry URLs, one-shot `commands/run.rs` passes `&[]`, and daemon run
+uses `BzlmodRequestInputs::from_normalized`. A test-only injection would therefore
+still lose policy at both run execution paths. This requires separately designed
+and accepted production command parity before complete R2 can resume.
+
+The exact later fake-source correction is still established. Four sites in R2's
+new CLI test module are affected: one root-MODULE `local_path_override` and writes
+of synthetic platforms `MODULE.bazel`, `host/BUILD.bazel`, and
+`host/constraints.bzl`. The root platform, toolchain, BUILD and defs are conflict
+semantics and remain. After run parity is accepted, one authentic fixture owner
+must hold byte-identical verified registry/module/source/archive/patch inputs,
+its test-owned file mirror and the exact local-registry argument. Direct Core and
+the sole subprocess helper must use that same argument. Transport paths do not
+enter selected-module, configured-action, output-root, sharing or conflict identity.
+
+Next `WP-7A-run-registry-policy-design-r1` audits and freezes only normal
+`RunRequest` parsing/workspace normalization plus one-shot/daemon propagation,
+program-argument separation, errors, files, caps and bounded proofs. No Rust or
+fixture edit is yet authorized. Complete R2 remains preserved all-or-nothing.
+Every future named test is capped12s/15s absolute; no full suite, retry, extension
+or broad replay. Missing payload, external-network attempt or source boundary in
+the later R2 fixture remains REPLAN, not permission to acquire or fake source.
+Demand, performance and historical14GB cause remain UNKNOWN; the consumed
+observer is not reopened.

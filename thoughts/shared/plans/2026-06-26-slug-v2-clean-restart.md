@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-complete-r2-authentic-fixture-policy-audit-r1`
-read-only complete-R2 fixture-policy audit](./slug-v2-subplans/current-packet.md).
+[`WP-7A-run-registry-policy-design-r1`
+docs/source design for explicit run registry parity](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -84,8 +84,14 @@ ACCEPTED at299/557/856 production/proof/gross net. Final compile-only, focused
 tests and default checks pass within55/12/30s caps; no test exceeded5.6s total.
 The exact natural diagnostic now exposes canonical label, source class and typed
 failure without changing retained identity or DICE semantics. It does not
-reclassify the spent observer receipt. Resume only a read-only audit of authentic
-registry/mirror fixture policy for complete R2; do not restore any section yet.
+reclassify the spent observer receipt. The subsequent read-only fixture audit
+returns REPLAN at one exact production gap: build/query/cquery/aquery already
+retain and propagate `--registry`, but `RunRequest` has no registry field,
+one-shot run passes an empty registry slice and daemon run uses the no-registry
+Bzlmod constructor. Adding flags only to R2 tests would therefore be a false
+handoff. Design and separately accept normal run registry parity first; complete
+R2 remains untouched. The later fixture correction still removes its one fake
+override plus three fake platforms bodies and must restore all 19 files atomically.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
@@ -179,8 +185,8 @@ output-path suffix may hide conflicts.
 Short diagnostics confirm cumulative path-epoch fanout, not a proven semantic
 loop: retry 116 recomputes 109 path keys and rechecks 163 module/192 registry
 keys. Preserve this separate performance concern. The checkout-wide replay is
-stopped; tests above one minute require investigation and fifteen minutes is
-the absolute maximum.
+stopped. Every test invocation is capped at12 seconds with15 seconds absolute;
+more than one minute is a red flag even for non-test preparation.
 
 Commit `64a0f29f6` terminally accepts generic `attr.label` function-default
 declaration retention at 59/178/237 gross production/proof/total Rust
