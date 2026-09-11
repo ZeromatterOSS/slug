@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-source-observation-registration-diagnostic-implementation-r1`
-proposed bounded-presentation implementation](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-source-observation-registration-diagnostic-proof-r2`
+proposed separated compile/proof recovery](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -69,8 +69,17 @@ five observation kinds, eleven request variants, four built-in variants and
 stable nested scalar tokens under the existing3072byte sink. It adds no semantic
 owner or retained state. Review corrected the distinct two-way built-in source
 kind versus four-way path node kind, then returned terminal ACCEPT. The bounded
-five-file implementation is selected only after the design push; no runtime
-scenario is selected. Output-conflict R2 stays preserved and unaccepted.
+five-file candidate is303/479/782 net production/proof/gross before formatting.
+Bzlmod compilation succeeded and five of six proofs passed; the corrected sixth
+passed alone. A Loading test command then hit its15s cap entirely during
+incremental compilation, before any test start/result. No process survived and no
+longer test/retry is allowed. A separately reviewed packet must compile the final
+candidate first, then cap every named test at12s. Initial recovery review requires
+three pre-compile corrections: exhaustive disposition matching, the missing None
+I/O-code proof, and natural legacy plus typed same-display/Arc release coverage.
+The revised six-file recovery keeps output-conflict R2 preserved and unaccepted.
+Independent rereview ACCEPTS that exact recovery; its code and gates begin only
+after the docs checkpoint is pushed.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic

@@ -19381,3 +19381,38 @@ restoration ran during design. Independent review returned REVISE because the
 first draft conflated built-in `File`/`Directory` with four-way path node kind;
 the grammar and exhaustive proof obligation now separate those types. Corrected
 terminal rereview returned ACCEPT; all other boundaries and caps remain intact.
+
+### WP-5-7A SourceObservation implementation compile frontier (2026-09-10)
+
+**Status: REPLAN; review a separated compile/proof recovery before any command.**
+The natural Loading red expectation compiled, then failed at the old marker in
+0.01s. Two Snap launcher failures ended before compilation; exact installed
+nightly Cargo/rustc resolved them. The five-owner candidate is303 production/479
+proof/782 gross net before formatting, with295/468-line helper/test files and
+Loading growth6/11. No semantic owner, dependency or fixture outside the designed
+files changed.
+
+Bzlmod current-source no-run compilation completed in16.27s. Six focused proofs
+then ran in0.01s: five passed; source-class construction found its synthetic
+local_repository lacked the required path attribute. After that exact correction,
+the named proof compiled incrementally in4.84s and passed with0.00s test time.
+
+The subsequent Loading test command hit its15s shell cap during incremental
+Bzlmod/Loading compilation. It emitted no compiler error, test start or result;
+shell wall15.2s includes kill overhead. Authoritative process inspection found no
+Cargo/rustc/linker/test survivor. No retry or longer test is permitted. The
+proposed recovery freezes the current five hashes, formats once, performs one
+combined compile-only preparation under55s, then runs only precompiled named
+proofs under12s each and one default combined check under30s. Any error, timeout,
+hash drift or survivor replans. No probe, strace, CLI, replay, acquisition, cache
+scan, broad suite or output-conflict R2 restoration ran.
+
+Independent recovery review returned REVISE before any further command. Boolean
+source-class projection must become nested exhaustive input/disposition matches;
+`raw_os_error=None` needs its grammar proof; and the natural helper/tests must
+cover both legacy and observed SourceObservation handoffs plus typed A/B/A
+same-display stat omission and unchanged Child Arc/final weak release. The revised
+packet admits only those corrections in one added existing test owner, then one
+format, one compile-only preparation and precompiled12s tests. No code changed
+under the rejected recovery draft. Independent rereview ACCEPTS the revised
+six-file scope and compile-first/no-edit-after-compile sequence.
