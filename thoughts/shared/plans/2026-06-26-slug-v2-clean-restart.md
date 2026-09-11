@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-native-probe-observer-attempt-design-r1`
-one-attempt observer execution contract design](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-native-probe-observer-authentic-attempt-r1`
+accepted one-attempt observer execution](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -49,8 +49,9 @@ default/feature compiler gates, CLI compile-only selection and expanded supervis
 self-checks pass; callback, FD/mapping/Arc lifetime, real DICE events, API teardown,
 accounting, decoder and cleanup obligations are closed. No authentic observer run
 executed, so demand, phase, cause, performance and historical14GB attribution
-remain unknown. Current work is design/review only for at most one later bounded
-attempt. Output-conflict R2 stays preserved and unaccepted.
+remain unknown. Independent review accepts exactly one later bounded invocation
+after its execution-contract checkpoint is pushed; no retry or preliminary run
+is authorized. Output-conflict R2 stays preserved and unaccepted.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic

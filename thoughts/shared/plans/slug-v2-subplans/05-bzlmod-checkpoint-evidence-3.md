@@ -19276,3 +19276,24 @@ each parent channel FD closes. Fmt/diff, preserved patch hashes/forward apply an
 archive exact-known-three baseline pass. Independent correction rereview returned
 ACCEPT. No authentic run/replay/acquisition occurred, and no causal or historical
 14GB conclusion follows.
+
+### WP-5-7A observer authentic-attempt contract (2026-09-10)
+
+**Status: ACCEPTED; run exactly one command only after this docs checkpoint is
+pushed.** The reviewed contract freezes the accepted driver/probe hashes and one
+`bash tools/v2_oracle/run_payload_demand_probe.sh` invocation. That invocation is
+consumed even by preflight, self-check, compile or staging failure; no separate
+preliminary command, retry, changed limit, code/fixture correction or acquisition
+is authorized. Compiler remains capped60s and native wall/CPU15s, with AS2GiB per
+process, FSIZE16MiB, stdout/stderr8192 each, trace57344 and raw+decoded telemetry
+8192 under the existing namespace/finalizer/staging contract.
+
+Positive demand and sentinel-only non-demand require no stop, complete cleanup/
+trace and valid post-quiescence telemetry. Clean bounded semantic/process stops
+with valid uncapped evidence remain observer-inconclusive but may report the last
+committed scalar location. Pre-native failure, incomplete cleanup, invalid or
+missing telemetry/trace, and any stdout/stderr/trace/telemetry cap are explicitly
+inconclusive. Counters are not coherent, timestamps are not durations and the
+unsampled interval remains UNKNOWN. Independent review required two wording-only
+corrections so every stream cap routes to observer-unavailable before returning
+terminal ACCEPT. No command, compiler, test or `strace` ran during this design.
