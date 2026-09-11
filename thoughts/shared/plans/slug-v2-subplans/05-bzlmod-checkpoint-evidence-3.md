@@ -19600,3 +19600,30 @@ handle is exact. One private helper plus controlled quickly-exiting-child proof
 fits only CLI build.rs at35 production/90 proof/125 gross. Compile once<=55s,
 freeze, named precompiled proof<=12/15s and default CLI check<=30s; no post-compile
 edit/retry. No caller, protocol, deadline, successful behavior or R2 change.
+
+### Daemon child-status diagnostic implementation (2026-09-10)
+
+**Status: ACCEPTED; select one fresh run-registry successor.** The one-file CLI
+build implementation retains the spawned Child while polling and checks status
+before connectivity. PID-write and process-observation failures plus the existing
+deadline kill/reap the exact owned child. Early exit and observation errors use
+the designed stable text; timeout text is byte-identical. Success still drops the
+handle with null stdio, and no caller, server, protocol, deadline or path artifact
+ownership changed. PID/socket paths are not unlinked on failure because their
+identity can be concurrently replaced.
+
+The implementation is31 production/25 proof/56 gross additions against caps
+35/90/125. Exact nightly formatting and diff checks pass. The single library-test
+compile-only preparation passed in6.04s; frozen build.rs SHA-256 is
+`a391d3464309720c1fc7fa9b0d296a26b67a5d25ca5b01a8cefe1d7677bd9b52`.
+The direct precompiled controlled-child early-exit proof passed1/1 in0.05s and
+the default CLI check passed in7.60s. No compiler, test, slugd or tracer survived;
+preserved R2/probe hashes remain exact. Independent pre-execution and terminal
+reviews returned `ACCEPT`.
+
+Next `WP-7A-run-registry-policy-implementation-r2` may make one fresh successor
+attempt of the already accepted four-file registry design. Format, compile once
+<=55s, freeze all five affected hashes, then run only named precompiled proofs
+<=12/15s and checks<=30s. If daemon startup fails, preserve the new early-status
+versus timeout evidence and replan immediately; no retry. No R2/fixture, replay,
+network, credential or source-boundary change.

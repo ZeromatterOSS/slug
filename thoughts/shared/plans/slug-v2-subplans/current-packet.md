@@ -1,84 +1,72 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7A-daemon-start-child-status-design-r1
+Packet: WP-7A-run-registry-policy-implementation-r2
 
-Status: SELECTED after the bounded launch trace reached bind/listen. Design only;
-the run-registry implementation remains restored and complete R2 untouched.
+Status: SELECTED after independent acceptance of daemon child-status diagnostics.
+This is one fresh successor attempt, not a retry of the rejected R1 process.
+Complete output-conflict R2 remains untouched.
 
-## Accepted attribution boundary
+## Accepted prerequisite
 
-The initial sandbox `strace` preflight failed immediately with `PTRACE_TRACEME`
-denied, wrote an empty trace and launched no Slug process. The approved
-out-of-sandbox diagnostic used the freshly compiled candidate binary only because
-its launch/serve code is byte-for-byte represented by the restored source. It
-sent no command request, registry value, remote endpoint, network traffic or
-credential.
+`start_daemon` now retains the child during readiness, checks exit before socket
+connect, reports stable early/observation errors, and kills/reaps the exact owned
+child on PID-write failure, observation failure or the existing deadline. It keeps
+null stdio, the byte-identical timeout, successful detached behavior and all five
+callers unchanged. It never removes PID/socket paths whose ownership could have
+been replaced concurrently.
 
-The direct invocation executed `target/debug/slug --serve`, bound and listened on
-the fresh short Unix socket, emitted its normal started record, and remained alive
-until the fixed five-second SIGTERM. Inner wall was5.00s, peak RSS15812KiB and the
-trace was201854 bytes, below2MiB. The traced process and one runtime descendant
-were killed by SIGTERM; no slug/strace survivor remained, and the verified socket
-was removed. Evidence is `/tmp/slug-daemon-readiness.oZv7p5`: trace SHA-256
-`bd19d68de9569087c07fc62ef3e90818546af69a608d805b78c8ea68f5af7bbf`,
-stderr `6fb1701220d16a6250b13ea43d5efaa38a0fd05e8c3ca67008af1394c072c4f9`,
-time `ebb1ec0e2ca4ce2d5e5fbbcea4bbb321ef90d6527e61e145e9435c1ed43c7517`.
+The one-file implementation is31 production/25 proof/56 gross additions. Exact
+nightly formatting and diff checks pass. Compile-only passed in6.04s, its sole
+controlled early-exit proof passed1/1 in0.05s, default CLI check passed7.60s, and
+no process survived. Frozen source SHA-256 is
+`a391d3464309720c1fc7fa9b0d296a26b67a5d25ca5b01a8cefe1d7677bd9b52`.
+Independent terminal review returned `ACCEPT`.
 
-This proves only that the binary can exec, dispatch, bind and remain live with
-the diagnostic socket/workspace. It does not reproduce `start_daemon` ownership,
-the exact failed output-base/workspace, or the earlier integration failure, and
-does not prove a transient, path-length, resource or scheduling cause. That cause
-remains unknown. Do not rerun the failed test to classify it.
+## Registry propagation successor
 
-## Child-status and cleanup design audit
+Reapply the accepted normal request design from R1 without copying its rejected
+worktree. Add one owned ordered `registry_urls: Vec<String>` to
+`slug_commands_v2::run::RunRequest`, populated by existing
+`bzlmod_registry_urls`. Preserve repeated order, existing empty-value errors and
+`split_args`: registry text before `--` is policy, identical text after `--` is
+only a program argument.
 
-Audit only `app/slug_cli_v2/src/commands/build.rs`, all five CLI callers of
-`start_daemon`, the CLI integration daemon cleanup/helper, and existing daemon
-launch/error assertions. Freeze the smallest correction that makes a future
-failure attributable without retaining daemon output pipes:
+In CLI `parse_run_at_workspace`, retain registries in `run_args`; do not copy them
+to temporary BuildRequest `policy_args`, which still transfers only normalized
+command policy. One-shot borrows request URLs instead of `&[]`; daemon uses
+`BzlmodRequestInputs::from_normalized_with_registry_urls`. The existing server
+wire remains the only daemon owner. Do not alter protocol fields, RemoteConfig,
+program argv, diagnostics, action/configuration identity, retained state, DICE,
+source admission or fixture payloads.
 
-- keep the spawned `Child` mutable during the readiness loop;
-- before each connect attempt, call `try_wait` and immediately return
-  `daemon exited before becoming ready (status: {status})` if it has exited;
-- on `try_wait` error, terminate/reap the owned child and return
-  `checking daemon process status while waiting for readiness: {error}`;
-- on the existing readiness deadline, terminate and reap the owned child, then
-  return the byte-identical existing timeout message;
-- on successful connect, drop only the parent handle and preserve current daemon
-  ownership, PID file, null stdio and caller behavior.
+Exact files and caps remain:
 
-Do not pipe or inherit daemon stdout/stderr: CLI integration callers use
-`Command::output`, so a successful background daemon retaining those pipes could
-hold the foreground capture open. Add no log file, async task, dependency, public
-API, signal protocol or daemon lifetime owner. Termination first calls `try_wait`;
-an observed status is already reaped. Otherwise it attempts `kill` and always
-calls `wait`, tolerating an already-exited kill race only when `wait` successfully
-reaps the child. The primary observation/timeout result stays the reported error;
-cleanup detail may be appended but cannot replace its category.
+- `app/slug_commands_v2/src/run.rs`
+- `app/slug_cli_v2/src/commands/run.rs`
+- `app/slug_cli_v2/tests/cli.rs`
+- `app/slug_server_v2/src/tests.rs`
+- at most40 production/160 proof/200 gross additions, with per-file net caps
+  80/80/50/40.
 
-Do not unlink the PID file or socket on a failure path. Their pathname identity
-cannot prove they still belong to this child after a concurrent replacement; the
-owned `Child` is the only identity-safe cleanup authority. Existing later launch
-and fixture cleanup behavior remains unchanged. A separately designed ownership
-protocol would be required to remove path artifacts safely.
+Prove ordered/missing/after-`--` parsing, workspace-override normalization and
+program-argument invariance, one-shot plus daemon invalid file-registry rejection
+before analysis/launch/remote execution, and ordered/default Run wire transport.
+The integration proof may make one fresh R2 invocation only; if daemon startup
+fails, retain the new early-status/timeout distinction and immediately `REPLAN`.
 
-Implementation may touch only `app/slug_cli_v2/src/commands/build.rs`, adding at
-most35 production/90 proof/125 gross lines. Factor a private readiness helper so
-a unit proof can pass a controlled quickly exiting child and a nonexistent short
-socket, assert the exact early-status message, and finish below1 second without
-using the ten-second deadline. Compile that library-test target once under55
-seconds; then run only its precompiled named proof under12/15 seconds absolute and
-the affected default CLI check under30 seconds. Freeze hashes after compilation;
-no edit, retry or timeout extension afterward.
+Format once, then perform one combined compile-only preparation capped55s. Freeze
+all five changed source hashes, including accepted `build.rs`. Run only named
+precompiled proofs serially, each<=12s and<=15s absolute. Run affected default
+checks<=30s. No broad/full suite, replay, network, automatic retry, timeout
+extension or post-compile edit. Any compiler error, test failure, timeout, hash
+drift, survivor, remote connection, source-boundary need or cap overflow is
+`REPLAN`.
 
-This packet is read-only. No Rust, test, compile, direct server, strace, replay,
-network, credential, fixture or R2 action is authorized. Independently review the
-design before implementation. Any need to change the five command callers, server
-wire/protocol, daemon main loop, deadline, path-artifact ownership or successful-
-launch semantics is `REPLAN`. Independent review ACCEPTS the corrected process-
-only cleanup boundary; implementation begins only after this checkpoint is pushed.
-
-Preserve `/tmp/slug-conflict-r2.XZJWwv/candidate.patch` at SHA-256
+Obtain independent pre-execution and terminal review. If accepted, commit/push
+registry parity separately, then return to a newly reviewed all-or-nothing
+authentic-fixture application of complete R2. Do not apply/copy/stage any R2
+section here. Preserve `/tmp/slug-conflict-r2.XZJWwv/candidate.patch` at SHA-256
 `90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e`
 and `/tmp/slug-sentinel-draft.Lln8y0/candidate.patch` at SHA-256
 `8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2`.
+Never inspect, print, copy or commit `~/.bazelrc` or derived credentials.

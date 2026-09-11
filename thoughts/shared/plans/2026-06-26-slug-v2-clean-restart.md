@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-7A-daemon-start-child-status-design-r1`
-daemon launch child-status and cleanup design](./slug-v2-subplans/current-packet.md).
+[`WP-7A-run-registry-policy-implementation-r2`
+bounded explicit run registry parity successor](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -118,6 +118,15 @@ cleanup is excluded because concurrent replacement cannot be proven to belong to
 the owned child; only its process handle is identity-safe. Freeze one-file
 35/90/125 implementation/proof/gross caps and a controlled subsecond early-exit
 proof. Independent corrected design review ACCEPTS this boundary.
+The resulting one-file implementation is31 production/25 proof/56 gross. It
+checks child status before connectivity, preserves null stdio/success behavior,
+and kills/reaps only the identity-safe Child on all owned failure paths without
+unlinking replaceable path artifacts. Compile-only passed6.04s, controlled
+early-exit proof1/0.05s and default CLI check7.60s; source hash stayed frozen,
+no process survived and independent terminal review returned ACCEPT. Select one
+fresh registry-propagation R2 attempt under the original four-file caps and
+compile-first gates. This is not an automatic R1 retry: any new failure replans
+with the now-distinct child-status/timeout evidence. R2 fixture remains untouched.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic

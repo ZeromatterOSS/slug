@@ -470,7 +470,7 @@ pub(super) fn start_daemon(output_base: &std::path::Path) -> anyhow::Result<()> 
     let exe = std::env::current_exe()
         .map_err(|e| anyhow::anyhow!("getting current exe for daemon: {e}"))?;
     let _ = std::fs::remove_file(&socket);
-    let child = std::process::Command::new(&exe)
+    let mut child = std::process::Command::new(&exe)
         .arg("--serve")
         .arg("--socket")
         .arg(&socket)
@@ -481,18 +481,74 @@ pub(super) fn start_daemon(output_base: &std::path::Path) -> anyhow::Result<()> 
         .stderr(std::process::Stdio::null())
         .spawn()
         .map_err(|e| anyhow::anyhow!("spawning daemon: {e}"))?;
-    std::fs::write(&pid_file, child.id().to_string())
-        .map_err(|e| anyhow::anyhow!("writing pid file: {e}"))?;
-    // Wait for the socket to become connectable.
+    if let Err(error) = std::fs::write(&pid_file, child.id().to_string()) {
+        terminate_and_reap(&mut child);
+        anyhow::bail!("writing pid file: {error}");
+    }
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    wait_for_daemon_ready(&socket, &mut child, deadline)
+}
+
+fn wait_for_daemon_ready(
+    socket: &std::path::Path,
+    child: &mut std::process::Child,
+    deadline: std::time::Instant,
+) -> anyhow::Result<()> {
     while std::time::Instant::now() < deadline {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                anyhow::bail!("daemon exited before becoming ready (status: {status})")
+            }
+            Ok(None) => {}
+            Err(error) => {
+                terminate_and_reap(child);
+                anyhow::bail!(
+                    "checking daemon process status while waiting for readiness: {error}"
+                );
+            }
+        }
         if std::os::unix::net::UnixStream::connect(&socket).is_ok() {
             return Ok(());
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
+    terminate_and_reap(child);
     anyhow::bail!(
         "daemon did not become ready within 10s (socket: {})",
         socket.display()
     )
+}
+
+fn terminate_and_reap(child: &mut std::process::Child) {
+    if child.try_wait().ok().flatten().is_none() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
+#[cfg(test)]
+mod daemon_readiness_tests {
+    use super::*;
+
+    #[test]
+    fn controlled_child_exit_is_reported_before_the_deadline() {
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .arg("--list")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let socket = std::env::temp_dir().join(format!("slug-no-socket-{}", child.id()));
+        let error = wait_for_daemon_ready(
+            &socket,
+            &mut child,
+            std::time::Instant::now() + std::time::Duration::from_secs(1),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "daemon exited before becoming ready (status: exit status: 0)"
+        );
+    }
 }
