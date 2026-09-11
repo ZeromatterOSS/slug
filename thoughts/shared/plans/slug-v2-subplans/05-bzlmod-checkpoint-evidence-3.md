@@ -19517,3 +19517,40 @@ edit or R2 restoration. Independent pre-execution and terminal review are requir
 Independent architecture review returns `ACCEPT`: the single vector, existing
 parser/wire destinations, argument partition, four-file boundary and bounded
 negative proofs are implementation-ready with no remaining design correction.
+
+### Run registry implementation stop and daemon-readiness audit (2026-09-10)
+
+**Status: REPLAN; source restored; bounded launch attribution selected.** The
+four-file candidate measured6 production/132 proof/138 gross additions. Frozen
+hashes for Commands run, CLI run, CLI integration and Server tests were
+`f6737fe55ecae2e322f1d0876e819203a97f6915feb6007677b6fa4e4db35b18`,
+`41bd3d7c660001461e068955229584a76e655e341e5a7ed358564961944c7392`,
+`df154265347fbf8b604c2217bb096012253c985c68beeeaccc99133062df8b31`,
+and `6fe3ce7f65f64ae0a0fe42b7cc66b3bf9f8484f2a231aa220ff2059798a38b6a`.
+Both Snap formatting entry points failed before action; exact nightly `rustfmt`
+then passed.
+
+The sole combined compile-only preparation passed in41.7s. Commands registry
+parser2 and CLI workspace-partition1 passed in0.00s. The CLI integration's
+one-shot half completed, then its daemon half failed in10.04s because the socket
+did not become ready within10s. The Server wire proof was not run. The frozen
+contract permits no retry, extension or post-compile correction, so all four
+Rust edits were restored. The source tree and `git diff --check` are clean and
+no test, compiler, slugd or tracer survived. Complete R2 and all fixtures stayed
+untouched.
+
+`target/debug/slug` was freshly produced at local timestamp
+`2026-09-10 20:44:12.555`, size649612568 bytes. This rules out a stale launch
+binary as the simple explanation but proves no cause. `start_daemon` discards
+the child handle plus stdout/stderr, polls only connectability and does not call
+`try_wait`; therefore immediate exit, dispatch/bind failure and nonbinding liveness
+share one timeout. The server binds before `Daemon::new`, while direct Server
+tests bypass re-exec and successful CLI daemon tests retain no failure output.
+
+Next run only `WP-7A-run-daemon-readiness-attribution-audit-r1`: one direct,
+non-request `strace -f` of the already-built binary's `--serve` path, process/
+network/descriptor syscalls only, a short fresh socket, bounded stderr/trace and
+a5s deadline plus1s kill grace. No test, compile, command request, registry,
+remote endpoint, network, replay, credential access, Rust edit or R2 restoration.
+Stop above2MiB, on any survivor or ambiguity. Independently review the result
+before designing a supervised launch proof or production child-exit diagnostic.

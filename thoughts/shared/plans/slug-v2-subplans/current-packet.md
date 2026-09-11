@@ -1,91 +1,69 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7A-run-registry-policy-implementation-r1
+Packet: WP-7A-run-daemon-readiness-attribution-audit-r1
 
-Status: SELECTED after independent acceptance of the preceding docs/source
-design. Complete R2 remains untouched.
+Status: SELECTED after the run-registry implementation gate returned `REPLAN`.
+All four Rust edits were restored; complete R2 remains untouched.
 
-## Design result
+## Preceding implementation stop
 
-The existing representation is sufficient. Add one owned `Vec<String>` field to
-`slug_commands_v2::run::RunRequest`, populated by the existing
-`bzlmod_registry_urls(&parsed.flags)` helper. That helper already rejects empty
-values and preserves repeated occurrence order. Derived Clone/Eq then cover the
-new field without a second owner or custom identity.
+The rejected candidate stayed inside its four-file allowlist and measured 6
+production, 132 proof and 138 gross added lines. Its frozen source hashes were:
 
-`split_args` already partitions at the first literal `--`: registry flags before
-it remain parsed flags, while identical text after it remains a program argument.
-In CLI `parse_run_at_workspace`, the override branch must leave registry flags in
-`run_args` and must not add them to `policy_args`; only the normalized Bzlmod
-command policy is copied from the temporary BuildRequest. This preserves relative
-module-override normalization and exact program arguments.
+- Commands run: `f6737fe55ecae2e322f1d0876e819203a97f6915feb6007677b6fa4e4db35b18`
+- CLI run: `41bd3d7c660001461e068955229584a76e655e341e5a7ed358564961944c7392`
+- CLI integration: `df154265347fbf8b604c2217bb096012253c985c68beeeaccc99133062df8b31`
+- Server tests: `6fe3ce7f65f64ae0a0fe42b7cc66b3bf9f8484f2a231aa220ff2059798a38b6a`
 
-One-shot run must replace its literal empty registry slice with a borrow of
-`request.registry_urls`. Daemon run must replace
-`BzlmodRequestInputs::from_normalized` with the existing
-`from_normalized_with_registry_urls`, borrowing the same field before the request
-is moved. The server wire type, decoder and Core API already own ordered registry
-URLs, so no protocol, server production, DICE, source-admission or identity change
-is required. `RemoteConfig` intentionally ignores non-remote flags, so the parsed
-registry occurrence does not alter executor configuration.
+Direct `rustfmt` passed after both Snap formatter entry points failed before
+formatting. The single combined compile-only preparation passed in 41.7 seconds.
+Two Commands parser proofs passed in 0.00 seconds and the CLI workspace-partition
+unit proof passed in 0.00 seconds. The CLI one-shot/daemon integration proof then
+failed in 10.04 seconds: its one-shot half completed, but daemon startup reported
+that its socket did not become ready within 10 seconds. The server wire proof was
+not run. There was no retry, extension or test over the 15-second absolute cap.
 
-The vector lives only for the command request. One-shot borrows it synchronously
-into existing normalized runtime input; daemon construction clones its strings
-into the existing primitive wire owner. It is not added to program argv, remote
-headers, diagnostics, action/configuration identity or retained output state.
-Existing registry URL diagnostics remain unchanged and no value is logged.
+The candidate was fully restored after the failed gate. `git diff --check` and
+the source worktree are clean, and no Cargo, compiler, slug, slugd or tracer
+process survived. No R2 section or fixture changed. The compile had produced a
+fresh 649612568-byte `target/debug/slug` at
+`2026-09-10 20:44:12.555` local time, so staleness does not explain the result;
+it also does not establish why the child failed.
 
-## Exact implementation allowlist and caps
+## Read-only attribution audit
 
-- `app/slug_commands_v2/src/run.rs`: import the existing helper, add/populate the
-  field, and add focused parser proofs.
-- `app/slug_cli_v2/src/commands/run.rs`: wire one-shot/daemon and prove the
-  workspace-override partition retains registries and program arguments.
-- `app/slug_cli_v2/tests/cli.rs`: add a focused invalid-file-registry proof for
-  one-shot and stable-daemon run before any remote execution.
-- `app/slug_server_v2/src/tests.rs`: prove a Run daemon request retains ordered
-  registry wire input and omitted input remains empty.
+`start_daemon` re-execs `current_exe` with `--serve`, writes its PID, discards the
+child handle and redirects stdin/stdout/stderr to null. It then polls only socket
+connectability for 10 seconds. It never calls `try_wait`, so an immediate child
+exit, dispatch/argument error, bind error and a process that remains alive without
+binding collapse into the same timeout. `serve_daemon` does dispatch `--serve`
+and the server binds before constructing `Daemon`; direct Server tests construct
+or call the daemon in-process and therefore do not cover CLI re-exec readiness.
+Existing CLI tests prove successful launches but retain no failed-child stderr or
+exit status. The failed fixture was cleaned, so no causal child output survives.
 
-Production additions cap40 lines, proof additions cap160, gross cap200. Per-file
-net growth caps are80/80/50/40 respectively. No new file, dependency, feature,
-key, cache, lock, service, parser, protocol field or fixture/payload change.
+Run one diagnostic only, using the already-built binary whose launch/serve code
+matches the restored source. Invoke `strace -f` on direct `slug --serve` with a
+fresh short socket path and the repository as workspace. Select only process,
+network and descriptor syscalls, retain bounded trace/stderr under `/tmp`, and
+enforce a 5-second wall deadline with a 1-second kill grace. Send no build/run
+request, registry value, remote endpoint or credential; do not inspect
+`~/.bazelrc`. The only question is whether this binary reaches exec, argument
+dispatch and Unix bind or exits first. Check and remove only the diagnostic
+socket/temp directory after process reaping; retain the bounded logs by path and
+hash if informative.
 
-## Required proof
-
-- Parser table: two registry occurrences retain order; missing/empty value keeps
-  the existing exact InvalidFlagValue category; registry-like text after `--` is
-  an unchanged program argument and does not enter `registry_urls`.
-- Workspace override A/B/A: relative override normalization stays identical,
-  registry order survives, and target/program arguments including `--` payload
-  are byte-for-byte unchanged. No registry duplication into policy args.
-- One-shot and daemon CLI run with a deliberately invalid non-local file registry
-  and a syntactically valid loopback remote executor both return the existing
-  registry error before analysis, launch authorization or remote execution. The
-  daemon PID is cleaned by existing ownership.
-- Server primitive wire: Run preserves ordered URLs, omitted field defaults to
-  empty, and existing backward-compatible BuildRequest encoding is unchanged.
-- Static checks prove the old `&[]`/no-registry constructor is absent only from
-  run handoff, both paths use the request field, program launch sees only
-  `program_args`, and no registry value enters diagnostic formatting.
-
-## Compile and execution order
-
-Format and perform one combined compile-only preparation of the affected Commands,
-CLI library/integration and Server test targets, capped55 seconds. Do not run a
-test during compilation. Freeze hashes after compile. Invoke only the precompiled
-named tests serially with12-second wall limits, bounded output and15 seconds
-absolute. Then run affected default checks under30 seconds. No full suite, broad
-replay, automatic retry or timeout extension. Any compile error, timeout, remote
-connection, daemon survivor, unrelated failure, cap overflow or second material
-correction is `REPLAN`.
-
-Obtain independent pre-execution and terminal reviews. If accepted, commit/push
-this correction alone, then return to a separately frozen atomic complete-R2 plus
-authentic-fixture implementation. Do not combine, apply, copy or stage any R2
-section here. No credential access, network acquisition, Bazel, probe or strace.
+Do not rerun the failed integration test, compile, execute a command request,
+start a replay, edit Rust or apply any R2 section during this packet. Any trace
+growth above 2 MiB, wall time above 5 seconds, surviving process, ambiguous
+binary, unexpected workspace mutation or credential-bearing access is `REPLAN`.
+After the diagnostic, independently review attribution and select either a
+test-only supervised launch proof or a narrowly designed `start_daemon`
+child-exit diagnostic correction before revisiting registry propagation.
 
 Preserve `/tmp/slug-conflict-r2.XZJWwv/candidate.patch` at SHA-256
 `90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e`
 and `/tmp/slug-sentinel-draft.Lln8y0/candidate.patch` at SHA-256
 `8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2`.
-Never inspect/print/copy/commit `~/.bazelrc` or derived credentials.
+Every future test remains capped at 12 seconds, 15 seconds absolute. More than a
+minute is a red flag for any iterative command.

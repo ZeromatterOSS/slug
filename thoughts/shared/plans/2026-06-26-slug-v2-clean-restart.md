@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-7A-run-registry-policy-implementation-r1`
-bounded explicit run registry parity](./slug-v2-subplans/current-packet.md).
+[`WP-7A-run-daemon-readiness-attribution-audit-r1`
+bounded direct launch attribution](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -95,6 +95,17 @@ the registry-aware daemon constructor. Preserve `--` program arguments and the
 workspace override split. Implement/review this four-file correction alone;
 complete R2 remains untouched. Its later fixture correction still removes one
 fake override plus three fake platforms bodies and restores all19 files atomically.
+The implementation candidate stayed within caps at6 production/132 proof/138
+gross and compiled once in41.7s. Commands parser2 and CLI workspace1 passed in
+0.00s, but the combined CLI integration proof failed in10.04s when its daemon
+socket did not become ready within the existing10s deadline; its server-wire gate
+was not run. Per the frozen contract there was no retry or correction, all four
+Rust files were restored, and no process survived. The binary was freshly built,
+but `start_daemon` discards child stdio and never observes child exit, so the exact
+cause is unknown. Select only a five-second direct `strace` launch/bind audit with
+a short socket and no request, registry, network, replay, credential or source
+edit. Do not resume registry implementation or R2 until that attribution and its
+next correction packet are independently accepted.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
