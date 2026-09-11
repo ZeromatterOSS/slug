@@ -36,17 +36,19 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-registration-error-identity-presentation-proof-r2`
-complete typed-handoff and bounded-diagnostic proofs](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-native-probe-phase-observation-audit-r1`
+bounded source audit of passive native phase observation](./slug-v2-subplans/current-packet.md).
 
 Implementation/proof-r2 independently ACCEPTED at473/1380/1853 gross production/
 proof/total. Full structural typed errors share one Loading Arc through all four
 Analysis handoffs; a separate3072byte renderer bounds causal Display/Debug without
 traversing successful predecessors. Natural handoff/branch/lifetime proofs and all
 named owner/direct-dependent gates pass. Preserved Core/publication Strings remain
-allocated and counted. Next: separately review one authentic probe at original
-caps; no execution authorized yet. Demand remains INCONCLUSIVE, and the complete
-output-conflict R2 stays preserved/unaccepted. No historical14GB attribution.
+allocated and counted. One reviewed probe compiled48.043s, then stopped at its
+original15s native deadline before publication or diagnostic. Result INCONCLUSIVE;
+cleanup complete, no survivors or repeat. Independent review ACCEPTS the evidence
+and source-only phase-hook audit; no new execution or instrumentation authorized.
+Output-conflict R2 stays preserved/unaccepted. No historical14GB attribution.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic

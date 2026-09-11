@@ -5828,3 +5828,43 @@ Pinned fmt/diff and preserved R2 hash/forward applicability/old draft hash pass;
 archive retains exactly known3 paths, host process check has no survivors.
 Next is a separately reviewed one-attempt authentic probe at original limits,
 not source acquisition, CLI/replay, partial R2 restoration or closure acceptance.
+
+### Bounded diagnostic repeat: wall-stop evidence (2026-09-10)
+
+After independent pre-execution ACCEPT, root invoked the unchanged accepted
+driver exactly once on a06f3ddfc. Driver SHA256
+789a0471dda593974ffa3515da15d52b808002c0fb6378617dd9c6df4c1f3915;
+native body7d28acfd5f8222b834d4ca83f21f500143d7f4e001d0a8c5e173a17741ad35e7.
+No Rust/driver/fixture edits, CLI/Bazel/broad replay, acquisition or R2 restoration.
+Evidence /tmp/slug-sentinel-demand.8dkd3P/logs includes the attempted contract.md.
+All normal/deadline/exception self-checks passed. Compiler success48.043s,
+zero errors/build-finished true, one reported library executable
+target/debug/deps/slug_cli_v2-3904e9d937a2b42d; no slug binary target.
+Compiler stdout592721bytes SHA256
+164efede603d198be2bfbb3f501b8c3e4c65b8b3400138e093d1b8de7f7b47d6.
+
+Same183 cached metadata files,3 payloads,3 root files and explicit mirror config:
+310070 staged bytes. Inventory SHA256
+7f9426025eb71e2e419da08d560855ddc8225402f6dfad26096d885a0f2e5fc9;
+fresh scratch path changes mirror-config bytes, so this is not a nondeterminism
+claim versus the previous path-dependent digest. All original limits retained:
+native wall15/CPU15/AS2GiB per process, stdout+stderr8192 each/trace65536.
+Native stopped15.0093s/raw9 on wall deadline, driver exit2. stdout16bytes only
+test-start header, stderr0, exact-path trace319bytes only thread exits and no
+abseil open; resources0 means peak RSS unavailable. No publication or causal leaf.
+INCONCLUSIVE: neither abseil demand nor non-demand, active phase, speedup/memory
+regression, source closure or historical14GB attribution is proved.
+result.json SHA25635e1280d61af6655199b9e422b5761dded65c4cfecaf358df3b07ad166608ec6;
+probe.stdout daf071121a9ffe32bbce44190e37a068c96d08bff63fd7b660dd95b77d786dca;
+probe.trace5a5c91620bfa4d591be4a4bcf37df329245dd255276364c1e9d934bad74359d9.
+Finalizer reaped3/ECHILD/open_pipes0/group_alive0; authoritative host check no
+compiler/tracer/test/daemon survivors. Exact staged workspace/registry/mirror
+removed by EXIT; logs, source caches and complete preserved patches retained.
+
+No repeat or cap increase. REPLAN proposes a bounded source-only audit of existing
+native entry/evaluation/source-preparation/publication phase-observation seams.
+It may recommend one future bounded passive diagnostic, not implement or execute
+it. No active-phase inference from source reachability or thread exits. Unchanged
+R2 hash/forward apply, old draft hash, shell syntax/diff pass; archive only known3.
+Independent evidence-close and successor review ACCEPTS this inconclusive stop
+and source-only audit. Audit not yet performed; next runtime remains unauthorized.
