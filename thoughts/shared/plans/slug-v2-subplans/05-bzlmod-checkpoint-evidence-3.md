@@ -19785,3 +19785,35 @@ commit/push registry parity, then read the preserved complete R2 patch and exact
 fixture owners to design one atomic19-file application replacing its known four
 fake fixture sites with one registry-fed authentic source closure. Docs only;
 do not apply/reconstruct R2, edit source, compile, test, replay or acquire.
+
+### Complete-R2 authentic fixture application design stop (2026-09-10)
+
+**Status: REPLAN; user-level fixture ownership choice required.** The preserved
+154761-byte R2 patch still hashes
+`90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e`
+and contains exactly19 file diffs. Its only fake-source sites remain one MODULE
+local override and three synthetic platforms body writes in the new CLI module.
+No patch was applied, transformed, copied or reconstructed.
+
+Exact authentic platforms1.0.0 MODULE/source/archive inputs are present at hashes
+`f05feb42b48f1b3c225e4ccf351f367be0371411a803198ec34a389fb22aa580`,
+`f4ff1fd412e0246fd38c82328eb209130ead81d62dcd5a9e40910f867f733d96`,
+and `3384eb1c30762704fbe38e440204e114154086c8fc8a8c2e3e28441028c019a8`.
+Real platforms loads its host extension and depends on rules_license. Exact
+rules_license0.0.7/1.0.0 metadata and the35903-byte1.0.0 archive are also present.
+That is not a complete configured CLI closure: the previous same-root staging of
+183 exact BCR metadata objects plus real platforms/rules_shell payloads and patch
+did not publish success and reached the generated winsdk canonical route. Abseil
+demand remained unresolved and its exact archive remains absent at both known
+paths.
+
+No checked-in fixture owns this authenticated set. Existing registry fixtures use
+synthetic local paths. A normal test that reads absolute Bazel CAS paths would be
+nonportable; vendoring a text-encoded third-party bundle adds ownership,
+licensing and repository-weight policy and still needs a separately authorized
+demand-gated acquisition if an absent payload is required. Either is broader than
+the accepted R2 patch and cannot be selected implicitly. A new runtime diagnostic
+would likewise require separate authorization and cannot reopen the consumed
+observer. No Rust/fixture edit, compile, test, Slug/Bazel invocation, replay,
+acquisition or credential access occurred. Exact inspected owners are recorded in
+the current packet; excerpts stayed below2MiB.
