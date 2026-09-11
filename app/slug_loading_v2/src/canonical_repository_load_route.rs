@@ -52,7 +52,7 @@ impl HostCanonicalRepositoryLoadRoute {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostCanonicalRepositoryLoadRouteErrorKind {
+pub(crate) enum HostCanonicalRepositoryLoadRouteErrorKind {
     Route(HostCanonicalRepositoryRouteError),
     RouteCompute(Arc<str>),
     Effect(HostSelectedRepositoryFileEffectError),
@@ -63,8 +63,8 @@ enum HostCanonicalRepositoryLoadRouteErrorKind {
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct HostCanonicalRepositoryLoadRouteError {
-    canonical_repo: CanonicalRepoName,
-    kind: HostCanonicalRepositoryLoadRouteErrorKind,
+    pub(crate) canonical_repo: CanonicalRepoName,
+    pub(crate) kind: HostCanonicalRepositoryLoadRouteErrorKind,
 }
 
 impl HostCanonicalRepositoryLoadRouteError {

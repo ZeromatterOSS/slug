@@ -2,14 +2,14 @@
 
 Packet: WP-5-7A-registration-error-identity-presentation-proof-r2
 
-Status: narrow proof-correction successor independently ACCEPTED. R1 returned
-REPLAN for missing required proofs and the necessary proof-cap increase; its
-production architecture is sound, but no implementation acceptance is claimed.
-Implement only the focused proof correction; preserve production unchanged.
-Reviewer authorized exactly one investigation command before rollover:
-`cargo test -p slug_core_v2 --lib --no-run --message-format=json`, serialized with
-pinned Cargo and timeout60. This closes compile-frontier evidence only; no stale
-binary, automatic runtime test, longer retry, probe or replay is authorized.
+Status: implementation and proof correction independently ACCEPTED; packet closed.
+Final patch473 production/1380 proof/1853 gross,16 Rust files. R2 changes only
+three proof files versus the preserved R1 candidate; production is byte-identical.
+All named gates pass; Stage5 records exact final evidence and residual risks.
+No further implementation work is selected here. The next action is to author
+and independently review a one-attempt authentic probe contract at the original
+resource/output caps. This close does not authorize that probe, acquisition,
+CLI/replay, output-conflict R2 restoration, or a source-closure acceptance claim.
 
 ## Immediate predecessor and focused correction
 

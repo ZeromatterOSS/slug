@@ -156,6 +156,15 @@ pub struct ModuleRegistrationExpansionError {
 }
 
 impl ModuleRegistrationExpansionError {
+    #[cfg(test)]
+    pub(crate) fn diagnostic_test(kind: ModuleRegistrationExpansionErrorKind) -> Self {
+        Self {
+            family: ModuleRegistrationFamily::Toolchains,
+            row: Some(3),
+            kind,
+        }
+    }
+
     pub fn family(&self) -> ModuleRegistrationFamily {
         self.family
     }
@@ -183,12 +192,19 @@ impl std::error::Error for ModuleRegistrationExpansionError {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct ModuleRegistrationExpansion {
-    labels: Result<Arc<[CanonicalLabel]>, ModuleRegistrationExpansionError>,
+    labels: Result<Arc<[CanonicalLabel]>, Arc<ModuleRegistrationExpansionError>>,
     ambiguities: Arc<[ModuleRegistrationAmbiguity]>,
 }
 
 impl ModuleRegistrationExpansion {
     pub fn labels(&self) -> Result<&Arc<[CanonicalLabel]>, &ModuleRegistrationExpansionError> {
+        self.labels.as_ref().map_err(Arc::as_ref)
+    }
+
+    #[doc(hidden)]
+    pub fn labels_with_shared_error(
+        &self,
+    ) -> Result<&Arc<[CanonicalLabel]>, &Arc<ModuleRegistrationExpansionError>> {
         self.labels.as_ref()
     }
 
@@ -505,7 +521,7 @@ impl ExpansionScratch {
 
     fn finish(self, error: Option<ModuleRegistrationExpansionError>) -> DriverOutcome {
         let labels = match error {
-            Some(error) => Err(error),
+            Some(error) => Err(Arc::new(error)),
             None => Ok(self.labels.into()),
         };
         SourcePreparationOutcome::Complete(Ok((

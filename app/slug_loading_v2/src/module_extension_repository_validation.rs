@@ -149,9 +149,9 @@ impl HostSelectedExtensionOwnerCertificate {
 #[doc(hidden)]
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError);
+pub struct HostSelectedExtensionOwnerCertificateError(pub(crate) PrivateOwnerCertificateError);
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum PrivateOwnerCertificateError {
+pub(crate) enum PrivateOwnerCertificateError {
     Pure(HostSelectedExtensionOwnerPureError),
     InnatePure(HostPureInnateRepositoryOwnerError),
     Compute(CompactString),

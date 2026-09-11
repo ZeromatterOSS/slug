@@ -16,6 +16,8 @@ use starlark_map::small_map::SmallMap;
 
 use super::*;
 
+mod registration_diagnostic;
+
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
 pub enum HostSelectedExtensionOwnerKind {

@@ -93,6 +93,25 @@ fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
 }
 
+pub(crate) async fn registration_diagnostic_missing_route(
+    extension_name: &str,
+) -> Arc<crate::ModuleRegistrationExpansionError> {
+    let module = format!(
+        "module(name = 'bazel_tools')\nuse_extension('//:unloaded.bzl', {extension_name:?})\nregister_toolchains('@@unknown+//:bad')\n"
+    );
+    let mut tx = transaction(&module, EpochBuilder::root_package(&module, "", 40)).await;
+    let outcome = tx
+        .compute(&ModuleRegistrationExpansionKey::toolchains(workspace()))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
+        panic!("route returned Need")
+    };
+    let shared = value.labels_with_shared_error().unwrap_err();
+    assert!(std::ptr::eq(value.labels().unwrap_err(), shared.as_ref()));
+    Arc::clone(shared)
+}
+
 fn default_configuration() -> SlugConfiguration {
     SlugConfiguration::default_target(
         &HostConversionInputs::new(
@@ -107,6 +126,60 @@ fn default_configuration() -> SlugConfiguration {
     .unwrap()
 }
 
+#[tokio::test]
+#[rustfmt::skip]
+async fn registration_diagnostic_natural_selection_and_mapping_boundaries() {
+    use slug_bzlmod_v2::{HostSelectedRegistrationPatternsKey, HostRootRepositoryMappingKey,
+        HostBuiltinBazelToolsRepositoryMappingKey};
+    let module = "module(POISON\n";
+    let mut tx = transaction(module, EpochBuilder::root_package(module, "", 1)).await;
+    let LoadingPreparationOutcome::Complete(selected) = tx.compute(
+        &HostSelectedRegistrationPatternsKey::new(workspace())).await.unwrap() else { panic!("Need") };
+    let LoadingPreparationOutcome::Complete(mapping) = tx.compute(
+        &HostRootRepositoryMappingKey::new(workspace())).await.unwrap() else { panic!("Need") };
+    for (kind, owner) in [
+        (ModuleRegistrationExpansionErrorKind::Selected(selected.as_ref().as_ref().unwrap_err().clone()), "Selected"),
+        (ModuleRegistrationExpansionErrorKind::RootMapping(mapping.as_ref().as_ref().unwrap_err().clone()), "RootMapping"),
+    ] {
+        let error = crate::ModuleRegistrationExpansionError::diagnostic_test(kind);
+        let text = error.diagnostic().to_string();
+        assert!(text.ends_with(&format!("[diagnostic incomplete: {owner}]")) && !text.contains("POISON"));
+    }
+    let LoadingPreparationOutcome::Complete(builtin) = tx.compute(
+        &HostBuiltinBazelToolsRepositoryMappingKey::new(workspace())).await.unwrap() else { panic!("Need") };
+    let route = crate::canonical_repository_route::HostCanonicalRepositoryRouteError {
+        canonical_repo: CanonicalRepoName::new("bazel_tools").unwrap(),
+        kind: crate::canonical_repository_route::HostCanonicalRepositoryRouteErrorKind::Builtin(
+            builtin.as_ref().as_ref().unwrap_err().clone()) };
+    let error = crate::ModuleRegistrationExpansionError::diagnostic_test(
+        ModuleRegistrationExpansionErrorKind::CanonicalRoute(
+            crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteError {
+                canonical_repo: CanonicalRepoName::new("bazel_tools").unwrap(),
+                kind: crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteErrorKind::Route(route) }));
+    assert!(error.diagnostic().to_string().ends_with("Route bazel_tools: [diagnostic incomplete: Builtin]"));
+}
+
+#[tokio::test]
+#[rustfmt::skip]
+async fn registration_diagnostic_natural_canonical_boundaries() {
+    for (pattern, owner) in [("@dep//:bad", "CanonicalPackage"), ("@dep//notdir/...:all", "CanonicalSubtree")] {
+        let module = format!("module(name='bazel_tools')\nbazel_dep(name='dep', version='1.0.0')\nlocal_path_override(module_name='dep', path='dep')\nregister_toolchains({pattern:?})\n");
+        let initial = EpochBuilder::canonical_package(&module, "POISON(\n", 1);
+        let mut epoch = EpochBuilder { entries: initial.observations().iter().map(|(demand, result)|
+            (demand.clone(), result.as_ref().clone())).collect() };
+        epoch.file("/workspace/dep/notdir", "not a directory", 1);
+        let mut tx = transaction(&module, epoch.build()).await;
+        let LoadingPreparationOutcome::Complete(value) = tx.compute(
+            &ModuleRegistrationExpansionKey::toolchains(workspace())).await.unwrap() else { panic!("Need") };
+        let error = value.labels().unwrap_err();
+        assert!(matches!((owner, error.kind()),
+            ("CanonicalPackage", ModuleRegistrationExpansionErrorKind::CanonicalPackage(_)) |
+            ("CanonicalSubtree", ModuleRegistrationExpansionErrorKind::CanonicalSubtree(_))));
+        let text = error.diagnostic().to_string();
+        assert!(text.ends_with(&format!("[diagnostic incomplete: {owner}]")) && !text.contains("POISON"));
+    }
+}
+
 fn command_configuration(
     occurrences: impl IntoIterator<Item = CommandConfigurationOccurrence>,
 ) -> SlugConfiguration {
@@ -114,6 +187,39 @@ fn command_configuration(
     default_configuration()
         .with_command_configuration(StarlarkOptions::default(), &overlay)
         .unwrap()
+}
+
+#[rustfmt::skip]
+pub(crate) async fn registration_diagnostic_bzl_errors() -> Vec<(crate::module_extension_innate_repository::HostPureInnateRepositoryOwnerError, &'static str)> {
+    use crate::bzl_module::{HostBzlModuleEvalKey, HostRootBzlLabel, HostBzlModuleError, ExternalBzlModuleObservationKey, RepositoryBzlLabel, ExternalBzlModuleError};
+    use crate::module_extension_innate_repository::HostPureInnateRepositoryOwnerError as Innate;
+    let module = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1.0.0')\nlocal_path_override(module_name='dep', path='dep')\n";
+    let initial = EpochBuilder::canonical_package(module, "", 1);
+    let mut epoch = EpochBuilder { entries: initial.observations().iter().map(|(demand, result)|
+        (demand.clone(), result.as_ref().clone())).collect() };
+    epoch.file("/workspace/BUILD.bazel", "", 1);
+    epoch.file("/workspace/ext.bzl", "fail('POISON')\n", 1);
+    epoch.missing("/workspace/absent.bzl");
+    epoch.directory("/workspace/dep/ext.bzl", 1);
+    let mut tx = transaction(module, epoch.build()).await;
+    let mut errors = Vec::new();
+    for (name, owner) in [("absent.bzl", "Source"), ("ext.bzl", "Evaluation")] {
+        let label = HostRootBzlLabel::new(PackagePath::parse("").unwrap(), slug_bzlmod_v2::RootPackageBzlTarget::parse(name).unwrap());
+        let LoadingPreparationOutcome::Complete(value) = tx.compute(&HostBzlModuleEvalKey::new(workspace(), label)).await.unwrap()
+            else { panic!("root source Need") };
+        let error = value.as_ref().as_ref().unwrap_err().clone();
+        assert!(matches!((owner, &error), ("Source", HostBzlModuleError::Source(_)) | ("Evaluation", HostBzlModuleError::Evaluation(_))));
+        errors.push((Innate::RootBzl(error), owner));
+    }
+    let LoadingPreparationOutcome::Complete(route) = tx.compute(&crate::HostCanonicalRepositoryLoadRouteKey::new(
+        workspace(), CanonicalRepoName::new("dep+").unwrap())).await.unwrap() else { panic!("route Need") };
+    let label = RepositoryBzlLabel::new(PackagePath::parse("").unwrap(), slug_bzlmod_v2::RootPackageBzlTarget::parse("ext.bzl").unwrap()).unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(value)) = tx.compute(&ExternalBzlModuleObservationKey::new_canonical(
+        route.as_ref().as_ref().unwrap().input().clone(), label)).await.unwrap() else { panic!("external source Need/outer") };
+    let error = value.result().as_ref().as_ref().unwrap_err().clone();
+    assert!(matches!(error, ExternalBzlModuleError::SourceObservation { .. }));
+    errors.push((Innate::ExternalBzl(error), "SourceObservation"));
+    errors
 }
 
 #[derive(Debug)]
@@ -1332,6 +1438,12 @@ async fn subtree_error_stops_before_later_package_row_and_retains_prefix() {
         error.kind(),
         ModuleRegistrationExpansionErrorKind::RootSubtree(_)
     ));
+    assert!(
+        error
+            .diagnostic()
+            .to_string()
+            .ends_with("[diagnostic incomplete: RootSubtree]")
+    );
     for (demand, result) in observed.observations().observations() {
         assert!(Arc::ptr_eq(result, expected_epoch.get(demand).unwrap()));
     }
@@ -1367,6 +1479,12 @@ async fn package_error_stops_before_later_row_and_retains_decisive_epoch() {
         error.kind(),
         ModuleRegistrationExpansionErrorKind::RootPackage(_)
     ));
+    assert!(
+        error
+            .diagnostic()
+            .to_string()
+            .ends_with("[diagnostic incomplete: RootPackage]")
+    );
     for (demand, result) in observed.observations().observations() {
         assert!(Arc::ptr_eq(result, expected_epoch.get(demand).unwrap()));
     }

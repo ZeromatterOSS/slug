@@ -39,14 +39,14 @@ and must name the same packet.
 [`WP-5-7A-registration-error-identity-presentation-proof-r2`
 complete typed-handoff and bounded-diagnostic proofs](./slug-v2-subplans/current-packet.md).
 
-Implementation R1 review returned REPLAN: production architecture sound, but
-natural Analysis handoffs and declared diagnostic branches lack complete proofs.
-R2 contract independently ACCEPTED; preserve473 production additions unchanged,
-raise only proof/gross caps to1400/2050 within the same allowlist. Bzlmod3/Loading4/
-Analysis1 passed; newer Loading proof uncompiled. Core timed out before tests;
-one reviewed compile-only diagnostic now succeeds26.98s, no runtime gate claimed.
-Shared DAG lifetime and bounded Core/publication allocations remain proof gates.
-Authentic demand remains INCONCLUSIVE; output-conflict R2 stays preserved/unaccepted.
+Implementation/proof-r2 independently ACCEPTED at473/1380/1853 gross production/
+proof/total. Full structural typed errors share one Loading Arc through all four
+Analysis handoffs; a separate3072byte renderer bounds causal Display/Debug without
+traversing successful predecessors. Natural handoff/branch/lifetime proofs and all
+named owner/direct-dependent gates pass. Preserved Core/publication Strings remain
+allocated and counted. Next: separately review one authentic probe at original
+caps; no execution authorized yet. Demand remains INCONCLUSIVE, and the complete
+output-conflict R2 stays preserved/unaccepted. No historical14GB attribution.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic

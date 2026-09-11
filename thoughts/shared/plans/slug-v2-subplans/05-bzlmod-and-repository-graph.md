@@ -5791,3 +5791,40 @@ implementation. Final-reference and complete branch/handoff evidence remain open
 Diff/check, complete candidate reverse-check, output-conflict R2 forward-check and
 both preserved hashes pass; archive checker retains exactly the known3 thoughts
 paths, and authoritative host ps finds no compiler/tracer/daemon survivors.
+
+### Typed registration diagnostics: implementation accepted (2026-09-10)
+
+Independent final review ACCEPTS473 production/1380 proof/1853 gross additions
+across16 Rust files. Only three test files differ from preserved R1; the other
+patch sections match SHA256cc85e555dbc12c20d809754a97f0c5fbe5ddf2a3808f73c7f6dba9a7f350d845.
+Natural Legacy/Observed command/module errors exercise every changed conversion,
+four-source and execution-only first-error/Need/outer precedence, exact shared
+Arc identity and discarded-reference release. All declared causal/incomplete
+branches now have proof, including opaque natural source errors; no public
+unchecked constructor or production expansion was needed. Existing cancellation,
+Need and ambiguity tests prove unchanged event publication/recovery. The new Arc
+allocation is synchronous after awaits, so no additional cancellation seam exists.
+
+Final logs /tmp/slug-registration-errors.gM2tqt: Bzlmod3/.00s (R1 unchanged);
+Loading diagnostics11/.02s whole10.31s; complete registration expansion28/.06s
+whole0.22s; Analysis new3/.04s whole3.00s, existing Need/outer2/.07s whole24.75s,
+command order/restoration1/.07s whole0.22s, observed four-source dependencies1/.03s
+whole2.97s; Core terminal1/.02s whole0.23s; query/CLI check exit0/17.49s.
+Core body3072bytes/capacity3072 and escaped stderr6058bytes/capacity11520: output
+is below8192; allocator capacity is separately reported, not claimed below8192.
+Final diagnostic old/new/new/old control39680/112/112/39680bytes,44/2/0/26us;
+no stable speedup or runtime peak-memory claim. The shared semantic DAG deliberately
+lives until the last retained terminal/version releases it; Weak proofs verify
+final release, not command-completion eviction.
+
+Key log SHA256: analysis-exec-precedence-r2.log
+0daafdf04349c9a2caa9a47f8ffbccda28ee9cc748217309e654f9b73d3bad2b;
+loading-bzl-r2.log13330b3ac46e9f71dd5aedb3687c19a4f125c6573c9f5d5d625153417d3ff8ce;
+loading-expansion-final-r2.logfc518168d4de1f03314b772a317601e8c9ada5e01462dfca9963274de9dc9ff8;
+dependents-r2.logdf51998f26ca4cd2e7222cce8f11fb8bee1fab139fc0a16a6c1da82790bea46d.
+Three test-only compile errors (enum import, value-vs-Arc, iterator call) were
+investigated and fixed; no runtime failure/timeout or cap increase in R2.
+Pinned fmt/diff and preserved R2 hash/forward applicability/old draft hash pass;
+archive retains exactly known3 paths, host process check has no survivors.
+Next is a separately reviewed one-attempt authentic probe at original limits,
+not source acquisition, CLI/replay, partial R2 restoration or closure acceptance.

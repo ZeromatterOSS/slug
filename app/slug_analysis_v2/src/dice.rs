@@ -117,6 +117,12 @@ use crate::subrule::DeclaredDependencyKey;
 use crate::subrule::configured_dependency_rows;
 use crate::subrule::validate_configured_dependency;
 
+mod registration_error;
+pub use registration_error::RegistrationAnalysisError;
+#[cfg(test)]
+#[path = "dice/registration_error_tests.rs"]
+mod registration_error_tests;
+
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum AnalysisErrorKind {
     TargetNotFound {
@@ -127,6 +133,7 @@ pub enum AnalysisErrorKind {
         rule_class: CompactString,
     },
     Message(String),
+    Registration(RegistrationAnalysisError),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -181,6 +188,7 @@ impl fmt::Display for AnalysisError {
                 "The rule '{rule_class}' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns."
             ),
             AnalysisErrorKind::Message(message) => f.write_str(message),
+            AnalysisErrorKind::Registration(error) => error.fmt(f),
         }
     }
 }
@@ -3064,11 +3072,11 @@ fn merge_registration_labels(
     module: &ModuleRegistrationExpansion,
 ) -> Result<Arc<[CanonicalLabel]>, AnalysisError> {
     let command = command
-        .labels()
-        .map_err(|error| AnalysisError::new(error.to_string()))?;
+        .labels_with_shared_error()
+        .map_err(AnalysisError::from_registration)?;
     let module = module
-        .labels()
-        .map_err(|error| AnalysisError::new(error.to_string()))?;
+        .labels_with_shared_error()
+        .map_err(AnalysisError::from_registration)?;
     let mut seen = SmallSet::with_capacity(command.len() + module.len());
     let mut labels = Vec::with_capacity(command.len() + module.len());
     for label in command.iter().chain(module.iter()) {
@@ -3173,10 +3181,10 @@ async fn prepare_registrations(
                 first_error = Some(error);
             }
             RegistrationExpansionInput::Semantic(_) => {}
-            RegistrationExpansionInput::Value(value) => match value.labels() {
+            RegistrationExpansionInput::Value(value) => match value.labels_with_shared_error() {
                 Ok(_) => values[index] = Some(value),
                 Err(error) if first_error.is_none() => {
-                    first_error = Some(AnalysisError::new(error.to_string()));
+                    first_error = Some(AnalysisError::from_registration(error));
                 }
                 Err(_) => {}
             },
@@ -3790,10 +3798,10 @@ async fn prepare_execution_platform_registrations(
             RegistrationExpansionInput::Semantic(error) if semantic.is_none() => {
                 semantic = Some(error)
             }
-            RegistrationExpansionInput::Value(value) => match value.labels() {
+            RegistrationExpansionInput::Value(value) => match value.labels_with_shared_error() {
                 Ok(_) => values[index] = Some(value),
                 Err(error) if semantic.is_none() => {
-                    semantic = Some(AnalysisError::message(error.to_string()))
+                    semantic = Some(AnalysisError::from_registration(error))
                 }
                 Err(_) => {}
             },

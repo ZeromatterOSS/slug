@@ -8237,6 +8237,10 @@ mod tests {
         )
     }
 
+    mod registration_error_tests {
+        include!("tests/registration_error_tests.rs");
+    }
+
     fn root_setting_overlay(value: Option<&str>) -> CommandConfigurationOverlay {
         value
             .map(|value| CommandConfigurationOccurrence::starlark("//:setting", Some(value), false))

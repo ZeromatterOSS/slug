@@ -51,6 +51,7 @@ pub use dice::ConfiguredToolchainResolutionKey;
 pub use dice::ConfiguredToolchainResolutionObservationKey;
 #[doc(hidden)]
 pub use dice::ObservedConfiguredNodeAnalysisPreparationOutcome;
+pub use dice::RegistrationAnalysisError;
 pub use dice::prepare_configured_node_analysis;
 #[doc(hidden)]
 pub use dice::prepare_configured_node_analysis_observed;
