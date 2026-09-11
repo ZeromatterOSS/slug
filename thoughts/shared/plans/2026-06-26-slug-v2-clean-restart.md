@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-7A-daemon-exact-path-escalated-bind-audit-r1`
-exact-path complementary daemon bind attribution](./slug-v2-subplans/current-packet.md).
+[`WP-7A-run-registry-precompiled-unsandboxed-validation-r1`
+frozen registry artifact validation](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -144,6 +144,14 @@ Select one complementary2s foreground direct serve outside the sandbox using the
 exact same workspace/socket. If it binds there, only a separately reviewed
 outside-sandbox invocation of the already-compiled named registry proof may
 validate the candidate; no automatic retry, compile, source edit, network or R2.
+The exact-path outside-sandbox complement bound and started normally, staying live
+to2.00s SIGTERM at16128KiB RSS with187 log bytes; no survivor remained and the
+socket was removed. Same binary/path/workspace isolates managed-sandbox bind denial
+as the integration failure cause. Select one outside-sandbox invocation of the
+frozen compiled named registry integration proof, then its precompiled Server wire
+proof inside the sandbox. Only both passes permit mechanical restoration of the
+four byte-identical frozen source hashes and one<=30s default check; no compilation,
+retry, network, fixture or output-conflict R2 action.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic

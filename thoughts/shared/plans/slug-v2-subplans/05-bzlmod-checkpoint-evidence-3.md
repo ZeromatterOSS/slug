@@ -19683,3 +19683,31 @@ serve outside the managed sandbox on the exact same paths, <=2s plus1s kill grac
 Rust/replay/R2. Success may select a separate one-shot outside-sandbox invocation
 of the already-compiled named registry proof; failure selects error-chain/path
 design. Neither outcome itself accepts registry propagation.
+
+### Exact-path sandbox boundary attribution (2026-09-10)
+
+**Status: managed sandbox bind denial isolated; frozen validation selected.** The
+approved direct foreground complement used the identical binary, workspace and
+87-byte socket outside the sandbox. It emitted normal started stderr, created the
+socket and stayed live until fixed2.00s SIGTERM. Peak RSS16128KiB, logs187 bytes,
+no survivor, verified socket removed. No request, registry, remote, network traffic
+or credential ran.
+
+Evidence `/tmp/slug-daemon-exact-path.TwxPXM` hashes are stdout
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, stderr
+`3e96d8e39419b5c445c9041058f3411d1efb9d13eb59c482c012ae6817c965a5`, time
+`4fe9e3c541e7c8d9d30af617dfaa60dd6a2b7f946d9d7d876d3b17329a77ef9e`.
+Together with the inside-sandbox exact-path bind error, the sole controlled
+difference isolates the managed sandbox boundary; path, workspace, binary and
+registry semantics are not the bind-failure cause.
+
+Next `WP-7A-run-registry-precompiled-unsandboxed-validation-r1` reverifies frozen
+slug/CLI-test/Server-test artifact hashes
+`d3f0dc23c0b394f37ac80c27cadde63bd2adf7a7a37538524d538c0b131417f9`,
+`5338c19c1fc465dd19c607bf15ae5ac48d5be7f6016c36529545e1f2136f36f4`, and
+`14bb5e4dbd1cebf16875efbf2226717ee9f23c73daff307e9037609d452fd31a`.
+Run only the compiled named CLI proof outside sandbox<=12/15s; if green, run only
+the compiled Server wire proof inside<=12/15s. Both green permit mechanical exact-
+hash four-source restoration, no format/compile, one default check<=30s and final
+review. Any drift/failure restores baseline. No retry, network, replay, fixture or
+R2 action.
