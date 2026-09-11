@@ -19554,3 +19554,49 @@ a5s deadline plus1s kill grace. No test, compile, command request, registry,
 remote endpoint, network, replay, credential access, Rust edit or R2 restoration.
 Stop above2MiB, on any survivor or ambiguity. Independently review the result
 before designing a supervised launch proof or production child-exit diagnostic.
+
+### Direct daemon launch attribution (2026-09-10)
+
+**Status: bounded diagnostic complete; direct serve succeeds; prior cause remains
+UNKNOWN.** Sandbox `strace` preflight was denied at `PTRACE_TRACEME` in0.00s and
+launched no Slug process. The approved out-of-sandbox run directly invoked the
+fresh binary's `--serve` path with a short fresh socket and repository workspace.
+It sent no command request, registry value, remote endpoint, network traffic or
+credential and did not read `.bazelrc`.
+
+Trace proves `execve=0`, Unix `bind=0`, `listen=0`, normal daemon-start stderr and
+liveness until the fixed SIGTERM. Inner wall5.00s, peak RSS15812KiB, trace201854
+bytes; the process and one runtime descendant died by SIGTERM, no slug/strace
+survived and the verified socket was removed. Evidence directory
+`/tmp/slug-daemon-readiness.oZv7p5` has trace SHA-256
+`bd19d68de9569087c07fc62ef3e90818546af69a608d805b78c8ea68f5af7bbf`,
+stderr `6fb1701220d16a6250b13ea43d5efaa38a0fd05e8c3ca67008af1394c072c4f9`
+and time `ebb1ec0e2ca4ce2d5e5fbbcea4bbb321ef90d6527e61e145e9435c1ed43c7517`.
+
+This rules out only a general exec/dispatch/bind defect for that binary under the
+diagnostic path/workspace. It does not reproduce `start_daemon`, the exact failed
+paths or its parent ownership and cannot establish transient, length, resource or
+scheduling cause. Do not rerun the failed registry integration proof.
+
+Next `WP-7A-daemon-start-child-status-design-r1` audits and freezes only a narrow
+future-attribution correction. Retain the spawned child while polling; report an
+early exit status; on observation error or deadline kill/reap it; on readiness
+preserve the existing null-stdio detached behavior.
+Pipes/inherited output are forbidden because a successful daemon could keep CLI
+`Command::output` captures open. Design exact races, cleanup and one controlled
+subsecond proof before Rust. No caller, protocol, server loop, deadline, registry,
+fixture or R2 semantic change.
+
+Corrected design review returns `ACCEPT`. Check child status before every connect;
+early exit text is exactly
+`daemon exited before becoming ready (status: {status})`, observation failure is
+`checking daemon process status while waiting for readiness: {error}`, and the
+existing timeout text stays byte-identical. Cleanup first accepts an already
+reaped `try_wait` status; otherwise it attempts kill and always waits, treating an
+already-exited kill race as harmless only if wait reaps successfully. Primary
+error category wins over appended cleanup detail. Never unlink PID/socket on a
+failure: pathname identity cannot exclude concurrent replacement, while the Child
+handle is exact. One private helper plus controlled quickly-exiting-child proof
+fits only CLI build.rs at35 production/90 proof/125 gross. Compile once<=55s,
+freeze, named precompiled proof<=12/15s and default CLI check<=30s; no post-compile
+edit/retry. No caller, protocol, deadline, successful behavior or R2 change.

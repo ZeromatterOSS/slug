@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-7A-run-daemon-readiness-attribution-audit-r1`
-bounded direct launch attribution](./slug-v2-subplans/current-packet.md).
+[`WP-7A-daemon-start-child-status-design-r1`
+daemon launch child-status and cleanup design](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -106,6 +106,18 @@ cause is unknown. Select only a five-second direct `strace` launch/bind audit wi
 a short socket and no request, registry, network, replay, credential or source
 edit. Do not resume registry implementation or R2 until that attribution and its
 next correction packet are independently accepted.
+The bounded direct trace then proved exec, dispatch, Unix bind/listen and stable
+liveness until its fixed5.00s SIGTERM, using201854 trace bytes and15812KiB peak
+RSS; no request, network endpoint, credential or replay ran, no process survived,
+and the socket was removed. This excludes a general inability of that binary to
+serve with the diagnostic path/workspace, but does not reproduce parent launch or
+explain the earlier timeout. Audit/design only a narrow `start_daemon` correction:
+retain the child during readiness, surface early exit status, and kill/reap while
+preserving null stdio and successful background ownership. PID/socket pathname
+cleanup is excluded because concurrent replacement cannot be proven to belong to
+the owned child; only its process handle is identity-safe. Freeze one-file
+35/90/125 implementation/proof/gross caps and a controlled subsecond early-exit
+proof. Independent corrected design review ACCEPTS this boundary.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
