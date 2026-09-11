@@ -1328,22 +1328,38 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
 
 #[test]
 fn run_wire_carries_only_build_inputs_and_bounded_launch_authorization() {
+    let registry_urls = vec![
+        "https://a.example/".to_owned(),
+        "file:///tmp/registry".to_owned(),
+    ];
     let request = DaemonRequest::Run(BuildRequest {
         targets: vec!["//pkg:hello".to_owned()],
         configuration_overlay: CommandConfigurationOverlay::default(),
         executor: Some("grpc://executor".to_owned()),
         default_exec_properties: vec![("cpu".to_owned(), "x86_64".to_owned())],
-        bzlmod: BzlmodRequestInputs::default(),
+        bzlmod: BzlmodRequestInputs {
+            registry_urls: registry_urls.clone(),
+            ..BzlmodRequestInputs::default()
+        },
         repository_environment: Default::default(),
     });
     let json = serde_json::to_string(&request).unwrap();
     assert!(json.contains("\"kind\":\"run\""));
     assert!(!json.contains("program_args"));
     assert!(!json.contains("CLIENT_SECRET"));
-    assert!(matches!(
-        serde_json::from_str::<DaemonRequest>(&json).unwrap(),
-        DaemonRequest::Run(BuildRequest { targets, .. }) if targets == ["//pkg:hello"]
-    ));
+    let DaemonRequest::Run(decoded) = serde_json::from_str::<DaemonRequest>(&json).unwrap() else {
+        panic!("expected run request")
+    };
+    assert_eq!(decoded.targets, ["//pkg:hello"]);
+    assert_eq!(decoded.bzlmod.registry_urls, registry_urls);
+    let omitted: DaemonRequest = serde_json::from_str(
+        r#"{"kind":"run","request":{"targets":["//pkg:hello"],"executor":null,"default_exec_properties":[]}}"#,
+    )
+    .unwrap();
+    let DaemonRequest::Run(omitted) = omitted else {
+        panic!("expected run request")
+    };
+    assert!(omitted.bzlmod.registry_urls.is_empty());
 
     let plan = crate::RunLaunchPlan {
         executable_path: "/workspace/out/pkg/hello.sh".to_owned(),

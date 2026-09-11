@@ -19711,3 +19711,77 @@ the compiled Server wire proof inside<=12/15s. Both green permit mechanical exac
 hash four-source restoration, no format/compile, one default check<=30s and final
 review. Any drift/failure restores baseline. No retry, network, replay, fixture or
 R2 action.
+
+### Frozen registry validation address correction (2026-09-10)
+
+**Status: CLI proof passed; Server exact filter corrected before proof.** All three
+frozen artifact hashes matched. The approved already-compiled CLI proof ran once
+outside the managed sandbox and passed1/1 in0.06s with RSS18504KiB; no retry,
+survivor, remote execution, network or credential access occurred.
+
+The subsequent Server command exited0 in0.00s but selected zero tests and
+filtered56 because the unqualified exact filter omitted its module prefix. This
+is no semantic proof and no source was restored or changed. Read-only harness
+listing identifies the sole exact name as
+`tests::run_wire_carries_only_build_inputs_and_bounded_launch_authorization`.
+
+Next `WP-7A-run-registry-precompiled-server-address-correction-r1` requires
+independent review, reverifies the frozen Server hash, and runs that fully
+qualified precompiled test once inside the sandbox <=12/15s. A1/1 pass permits
+the already-designed exact-hash four-source restoration and one combined check;
+zero selection or any other failure replans without retry. No network, replay,
+fixture or R2 action.
+
+### Registry combined-check launcher correction (2026-09-10)
+
+**Status: both frozen runtime proofs passed; combined check did not start Cargo.**
+The fully qualified Server wire proof passed1/1 in0.00s/RSS12520KiB after exact
+artifact revalidation. Together with the earlier CLI1/1 in0.06s/RSS18504KiB,
+the frozen candidate now has both required runtime proofs. The four formatted
+source files were mechanically restored with exact hashes.
+
+The final combined check resolved bare `cargo` to `/snap/bin/cargo`; the host
+rejected snap applications for this user, status46 in0.63s/RSS23336KiB. Cargo,
+rustc and rustdoc did not start. Per stop policy there was no retry, and the four
+registry files were restored exactly. Read-only preflight confirms the direct
+nightly Cargo executable at
+`/home/wgray/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo`
+reports Cargo1.91.0-nightly and matches the already selected rustc/rustdoc
+toolchain.
+
+Next `WP-7A-run-registry-direct-cargo-check-correction-r1`, after independent
+review, reuses the exact-hash source restoration and runs only one combined check
+via the absolute nightly Cargo/rustc/rustdoc paths <=30s. It does not repeat the
+passed runtime proofs. Any failure restores baseline without retry. No network,
+replay, fixture or R2 action.
+
+### Explicit run registry parity acceptance (2026-09-10)
+
+**Status: terminally accepted.** `RunRequest` retains ordered registry URLs via
+the shared parser; `split_args` keeps values after `--` only in program argv and
+workspace override parsing preserves both policy normalization and registry
+flags. One-shot evaluation borrows the request URLs. Daemon setup uses the
+registry-aware Bzlmod constructor and existing wire owner; omitted older wire
+values remain empty. No registry value enters remote configuration, launch argv
+or diagnostics.
+
+Final scope is6 production/147 proof/153 gross additions. Exact four-source
+hashes are Commands
+`3af8a7d6978f3cd4c1844ecfe3097071f38c66fd64593e740b4df34d73df7144`, CLI run
+`eeafc8aa5d1b0fd209e90e2c7669b4ada131e9194682f1d4b82a794c922ef52f`, CLI
+integration `92994cc9a6f862484c4f7e93f719664e6e75c336a5d03dda070ee692d791bc34`,
+and Server tests
+`a5e7bcbe204761b39706ff15bb3365b94380bb34f325fe8831535c866caabbab`.
+Parser2/workspace1 passed in0.00s. Frozen CLI one-shot/daemon integration passed
+1/1 outside the managed sandbox in0.06s/RSS18504KiB; fully qualified Server wire
+passed1/1 inside in0.00s/RSS12520KiB. The affected three-crate default check via
+absolute nightly Cargo/rustc/rustdoc passed in2.73s/RSS253172KiB. The rejected
+snap shim never started Cargo and caused no semantic retry. Diff/hash/count and
+cleanup checks pass; independent terminal review returns `ACCEPT`. No network,
+replay, credential, fixture or R2 action occurred.
+
+Next only `WP-7A-output-conflict-r2-authentic-fixture-application-design-r1`:
+commit/push registry parity, then read the preserved complete R2 patch and exact
+fixture owners to design one atomic19-file application replacing its known four
+fake fixture sites with one registry-fed authentic source closure. Docs only;
+do not apply/reconstruct R2, edit source, compile, test, replay or acquire.

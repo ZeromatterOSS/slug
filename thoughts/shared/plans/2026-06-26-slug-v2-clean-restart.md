@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-7A-run-registry-precompiled-unsandboxed-validation-r1`
-frozen registry artifact validation](./slug-v2-subplans/current-packet.md).
+[`WP-7A-output-conflict-r2-authentic-fixture-application-design-r1`
+read-only complete-R2 authentic-fixture design](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer

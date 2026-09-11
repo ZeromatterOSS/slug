@@ -5411,3 +5411,49 @@ fn repository_environment_capture_and_transport_never_echo_values() {
         assert!(!generated.contains(ambient_secret), "{name}: {generated}");
     }
 }
+
+#[test]
+fn equality_form_registry_reaches_one_shot_and_daemon_run() {
+    let workspace = scratch("run-registry-command-transport");
+    let output_base = scratch("run-registry-command-transport-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        workspace.join("BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+    let output_base_arg = format!("--output_base={}", output_base.display());
+
+    for (runtime_mode, output_base) in [
+        ("one-shot", None),
+        ("daemon", Some(output_base_arg.as_str())),
+    ] {
+        let mut command = slug();
+        command.current_dir(&workspace);
+        if let Some(output_base) = output_base {
+            command.arg(output_base);
+        }
+        let output = command
+            .args([
+                "run",
+                "--registry=file://bad",
+                "--remote_executor=grpc://127.0.0.1:1",
+                "//:probe",
+            ])
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{runtime_mode}: {output:?}");
+        assert!(output.stdout.is_empty(), "{runtime_mode}: {output:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("Invalid registry URL: file://bad: Unsupported non-local file URL"),
+            "{runtime_mode}: {stderr}"
+        );
+        assert!(
+            stderr.contains(&format!("\"runtime_mode\":\"{runtime_mode}\"")),
+            "{runtime_mode}: {stderr}"
+        );
+        assert!(!stderr.contains("analysis_not_implemented"), "{stderr}");
+        assert!(!stderr.contains("daemon_connect_error"), "{stderr}");
+    }
+}

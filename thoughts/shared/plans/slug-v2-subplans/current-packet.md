@@ -1,64 +1,75 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7A-run-registry-precompiled-unsandboxed-validation-r1
+Packet: WP-7A-output-conflict-r2-authentic-fixture-application-design-r1
 
-Status: SELECTED after the exact-path matrix isolated managed-sandbox Unix bind
-denial. Registry source is restored; its frozen compiled artifacts remain exact.
-Complete output-conflict R2 remains untouched.
+Status: SELECTED, READ-ONLY DESIGN after terminal acceptance of normal `run`
+registry parity. First commit/push that accepted milestone. Complete output-
+conflict R2 remains preserved, unapplied and all-or-nothing.
 
-## Accepted environment attribution
+## Accepted prerequisite
 
-Direct foreground `--serve` inside the managed sandbox failed binding the exact
-87-byte socket in0.02s. The complementary approved invocation used the identical
-binary, workspace and socket outside the sandbox; it emitted normal started
-stderr, created the socket and remained live until the fixed2.00s SIGTERM. Peak
-RSS was16128KiB, aggregate logs187 bytes, no process survived and the verified
-socket was removed.
+`RunRequest` now retains ordered `--registry=` values from the shared parser.
+Text after `--` remains program arguments; workspace override normalization
+preserves registry flags. One-shot run borrows the retained URLs and daemon run
+uses the registry-aware Bzlmod wire constructor. The existing wire field remains
+the sole daemon owner and omitted older requests still default to no registry.
 
-Evidence `/tmp/slug-daemon-exact-path.TwxPXM` hashes are stdout
-`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, stderr
-`3e96d8e39419b5c445c9041058f3411d1efb9d13eb59c482c012ae6817c965a5`, and time
-`4fe9e3c541e7c8d9d30af617dfaa60dd6a2b7f946d9d7d876d3b17329a77ef9e`.
-The exact controlled difference is the managed sandbox boundary, so it—not path,
-workspace, binary or registry semantics—caused both integration daemon bind
-failures. No external network or command request ran.
-
-## Frozen validation recovery
-
-The compiled registry candidate corresponds to accepted `build.rs` plus frozen
-four-file source hashes already recorded in Stage5. Artifact SHA-256 values are:
-
-- `target/debug/slug`: `d3f0dc23c0b394f37ac80c27cadde63bd2adf7a7a37538524d538c0b131417f9`
-- CLI integration: `5338c19c1fc465dd19c607bf15ae5ac48d5be7f6016c36529545e1f2136f36f4`
-- Server unit: `14bb5e4dbd1cebf16875efbf2226717ee9f23c73daff307e9037609d452fd31a`
-
-First reverify these hashes, then invoke the already-compiled CLI integration
-binary outside the sandbox once, selecting exactly
-`equality_form_registry_reaches_one_shot_and_daemon_run`, with a12s wall deadline
-and1s kill grace. It may create only its test-owned workspace/output base and
-loopback Unix daemon; invalid `file://bad` must stop before analysis, launch,
-remote execution or network. The loopback executor token remains syntactic only.
-No credential environment or `.bazelrc` access.
-
-If and only if that passes, invoke the already-compiled Server binary in the
-ordinary sandbox once for exactly
-`run_wire_carries_only_build_inputs_and_bounded_launch_authorization`, also <=12s.
-Then mechanically reapply the four formatted source changes without compiling or
-formatting and require byte-identical source hashes:
+The accepted change is6 production/147 proof/153 gross additions. Frozen source
+SHA-256 values are:
 
 - Commands run `3af8a7d6978f3cd4c1844ecfe3097071f38c66fd64593e740b4df34d73df7144`
 - CLI run `eeafc8aa5d1b0fd209e90e2c7669b4ada131e9194682f1d4b82a794c922ef52f`
 - CLI integration `92994cc9a6f862484c4f7e93f719664e6e75c336a5d03dda070ee692d791bc34`
 - Server tests `a5e7bcbe204761b39706ff15bb3365b94380bb34f325fe8831535c866caabbab`
 
-Run only one combined affected default check under30s, then independent terminal
-review. Any artifact/source hash drift, test/check failure, timeout, remote
-connection, survivor or second edit is `REPLAN`; restore the four registry files.
-No compilation, automatic retry, full suite, replay, acquisition, fixture/R2
-change or timeout extension. Every test remains <=12s and <=15s absolute.
+Previously compiled parser2 and workspace1 proofs passed in0.00s. The frozen CLI
+integration passed1/1 outside the managed sandbox in0.06s/RSS18504KiB and covers
+both one-shot and daemon invalid-local-registry handoff before remote execution.
+The fully qualified Server wire proof passed1/1 inside in0.00s/RSS12520KiB. The
+absolute nightly Cargo combined check passed in2.73s/RSS253172KiB. The earlier
+bare `/snap/bin/cargo` status46 occurred before Cargo startup and is not evidence
+or a repeated semantic check. Independent terminal review returned `ACCEPT`.
+No network, replay, credential, fixture or R2 action occurred.
 
-On acceptance commit/push registry parity alone, then design the complete-R2
-authentic fixture application anew. Preserve complete R2 SHA-256
-`90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e` and old
-probe SHA-256
+## Design goal
+
+Design one atomic application of the complete preserved R2 candidate onto this
+accepted registry baseline while replacing its known fake fixture inputs with an
+authentic registry-fed source closure. The known fake sites are one MODULE
+`local_path_override` and three synthetic platforms MODULE/host BUILD/constraints
+body writes in the new CLI proof. The accepted `run --registry=` handoff is the
+only newly admitted fixture input route; it must not enter action,
+configuration, output-conflict or execution identity.
+
+The design must preserve every non-fixture R2 hunk and its all-or-nothing19-file
+ownership, exact output-conflict semantics, concurrent root-set conflict/
+restoration, loaded raw/message A/B/A and context-pointer cutoff, CLI pipe
+draining, and selected exec-properties correction. It must define the authentic
+registry directory/payload inventory, one retained registry value shared by
+direct Core and every CLI subprocess, cleanup/lifecycle ownership, source hashes,
+and bounded named proof sequence before any application is authorized.
+
+## Authorized work
+
+- Reverify, but do not apply, `/tmp/slug-conflict-r2.XZJWwv/candidate.patch` at
+  SHA-256 `90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e`
+  and read its adjacent `validation.txt`.
+- Read only the preserved patch hunks, the accepted registry handoff, and exact
+  fixture/source owners needed to replace the four fake sites. Keep added source
+  excerpts below2MiB and record every file read.
+- Produce docs only: a reviewed atomic merge/fixture/proof contract with explicit
+  production/proof/per-file caps. Update canonical live status, Stage5 and
+  `~/PROGRESS.md`; keep the progress ledger below500 lines.
+- Obtain independent architecture review before authorizing application.
+
+## Prohibited work and stops
+
+Do not apply, reverse, copy, reconstruct or partially stage any R2 hunk; do not
+edit Rust, fixtures or the preserved patch. Do not compile, test, invoke Slug or
+Bazel, start a daemon, replay network, acquire sources, inspect credentials, or
+raise any limit. A missing authentic payload, patch overlap that cannot be mapped
+without semantic change, need for a second fixture route, or inability to keep
+all19 files atomic is `REPLAN`.
+
+Every future test remains <=12s and <=15s absolute. Preserve old probe SHA-256
 `8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2`.

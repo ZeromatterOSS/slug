@@ -59,10 +59,11 @@ pub fn run(argv: Vec<String>) -> i32 {
         Err(error) => return run_error(&error.to_string(), "one-shot", 2),
     };
     if let Some(output_base) = super::build::extract_output_base(&argv) {
-        let bzlmod = slug_server_v2::BzlmodRequestInputs::from_normalized(
+        let bzlmod = slug_server_v2::BzlmodRequestInputs::from_normalized_with_registry_urls(
             &request.bzlmod_policy,
             &environment,
             &request.lockfile_mode,
+            &request.registry_urls,
         );
         let repository_environment =
             slug_server_v2::RepositoryEnvironmentRequestInputs::from_normalized(
@@ -82,7 +83,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         request.bzlmod_policy,
         environment,
         request.lockfile_mode,
-        &[],
+        &request.registry_urls,
         repository_environment,
         Default::default(),
     ) {
@@ -344,5 +345,45 @@ mod tests {
         std::fs::set_permissions(&executable, permissions).unwrap();
         assert_eq!(launch(plan, &["alpha".to_owned()], "one-shot"), 7);
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn workspace_override_keeps_registry_policy_and_program_arguments_partitioned() {
+        let workspace = Path::new("/tmp/slug-run-registry-workspace");
+        let argv = [
+            "--override_module=dep=deps/dep",
+            "--registry=https://a.example/",
+            "--registry=https://b.example/",
+            "//pkg:bin",
+            "--",
+            "--registry=file://program-argument",
+            "tail",
+        ]
+        .map(str::to_owned);
+        let request = parse_run_at_workspace(&argv, workspace).unwrap();
+        assert_eq!(
+            request.registry_urls,
+            ["https://a.example/", "https://b.example/"]
+        );
+        assert_eq!(
+            request.program_args,
+            ["--registry=file://program-argument", "tail"]
+        );
+        assert_eq!(
+            request
+                .bzlmod_policy
+                .module_overrides()
+                .map(|(name, path)| (name, path.to_path_buf()))
+                .collect::<Vec<_>>(),
+            [("dep", workspace.join("deps/dep"))]
+        );
+        assert_eq!(
+            request
+                .flags
+                .iter()
+                .filter(|flag| flag.name == "registry")
+                .count(),
+            2
+        );
     }
 }
