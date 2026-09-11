@@ -5926,3 +5926,50 @@ Independent review ACCEPTS the source audit and reserved design scope, not an
 implementation. Diff and preserved R2 hash/forward apply plus old draft hash pass;
 archive retains exactly the known3 failures. No runtime or compiler ran in this
 audit. Next packet freezes the observer contract; no instrumentation is authorized.
+
+### Reserved native observer design (2026-09-10)
+
+Concrete proposal follows the accepted audit without executing anything. Read8
+new sources/docs: DICE impls/events.rs and impls/tests/events.rs, CLI Cargo/lib,
+Linux memfd/fcntl headers and installed memfd_create/mmap manuals; excerpts<2MiB.
+Retained DICE test_events_modern covers independent events across recomputation;
+its unbounded Mutex/Vec collector is not reused. Stage9/DICE utility guidance
+supports fixed scalar scratch plus existing Arc/Allocative, no donor extraction.
+
+Choose a default-off Core diagnostic feature forwarded by CLI. Reject feature-on
+non-test CLI builds; Core remains a normal dependency, not cfg(test). The exact
+CLI library probe installs a thread-local initiating guard; only the existing
+one-shot API captures it into feature-only runtime state. DICE gets the existing
+independent event listener, never a replacement activation tracker. Existing
+request, source observations, terminal identity/publication and field drop order
+remain unchanged. No environment-triggered production observer or new API args.
+
+One512byte sealed-size anonymous memfd holds six atomic counts plus double-buffer
+committed phase/activity frames. Callbacks do fixed scalar work and one optional
+try-claim sample per1024 events: wall/processCPU clocks and <=64static tag bytes.
+No I/O, wait loop, writer thread, graph/value retention or dynamic collector.
+Record overflow, omitted samples, invalid clocks and tag truncation explicitly.
+Parent reads only after existing finalizer proves group/children/pipes terminal;
+this avoids live torn-frame reads and preserves data after a killed child.
+Trace57344 + raw/decoded telemetry<=8192 preserves total65536; stdout/stderr8192
+each, compiler60/native15 and all source/isolation/resource limits unchanged.
+Logical state is bounded below4096; account mapped512 plus metadata explicitly,
+and separately report/count the kernel's4096byte mapping-page granularity.
+Last observer Arc releases the mapping; guard disable is not worker quiescence.
+Runtime teardown and wildcard terminal destruction stay before original output.
+
+The exact10-file implementation envelope is650production/1100proof/1750gross,
+with new helpers isolating unsafe mapping/telemetry from12479line dice.rs.
+Harmless layout, invalid-channel, concurrency, partial-commit, disable/panic/last-
+reference and destructor-order proofs plus default/opt-in compile gates precede
+any future authentic attempt. Shared memory has no pipe backpressure; fixed-cap
+and output-failure proofs replace that inapplicable transport test. Latest samples
+cannot classify the unsampled interval, prove deadlock or identify a causal key.
+No speedup, source closure or historical14GB claim. Independent review found one
+FD ownership ambiguity: corrected to unique launcher transfer, one documented
+unsafe OwnedFd adoption in the test, then safe Core validation/map/close on every
+path before native work. No duplicate/arbitrary raw-FD close helper. Focused
+rereview ACCEPTS the complete design. Diff/preserved hashes/forward applicability
+pass; archive only known3. No code, tests, compiler or runtime ran in design.
+Activate the identical bounded implementation/harmless gates; authentic runtime
+still requires its own independent selection after implementation acceptance.

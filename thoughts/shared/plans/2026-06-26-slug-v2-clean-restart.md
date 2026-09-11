@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-native-probe-observer-design-r1`
-reserved test-build-only native observer design](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-native-probe-observer-implementation-r1`
+bounded test-build-only native observer implementation](./slug-v2-subplans/current-packet.md).
 
 Implementation/proof-r2 independently ACCEPTED at473/1380/1853 gross production/
 proof/total. Full structural typed errors share one Loading Arc through all four
@@ -48,9 +48,11 @@ allocated and counted. One reviewed probe compiled48.043s, then stopped at its
 original15s native deadline before publication or diagnostic. Result INCONCLUSIVE;
 cleanup complete, no survivors or repeat. Source audit finds an independent DICE
 event listener left as no-op, but no caller-accessible native phase observer.
-Accepted successor reserves a default-off test-build observer design, preserving
-the native API/target/fixture, activation tracker and destruction order. No new
-execution or instrumentation is authorized; independent scope review ACCEPTS.
+Accepted design freezes a default-off test-build observer: fixed512byte memfd,
+post-quiescence decoding and bounded scalar phase/DICE samples. Preserve native
+API/target/fixture, activation tracker and destruction order. Independent review
+ACCEPTS after one FD-ownership correction. Implementation/harmless gates next;
+no authentic runtime is authorized and no instrumentation has been implemented.
 Output-conflict R2 stays preserved/unaccepted. No historical14GB attribution.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
