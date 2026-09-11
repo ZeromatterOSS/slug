@@ -19658,3 +19658,28 @@ already-built binary's `--serve` foreground path inside the same ordinary sandbo
 and on the exact leftover workspace/socket, capture bounded stderr, and stop after
 2s plus1s kill grace. No test, request, registry, remote, network, compile, Rust,
 replay, credential or R2 action. Review the result before another correction.
+
+### Same-sandbox daemon bind attribution (2026-09-10)
+
+**Status: reproduced bind failure; complementary exact-path audit selected.** The
+single direct foreground `--serve` used the exact failed workspace and87-byte
+socket inside the ordinary managed sandbox. It sent no request, registry, remote,
+network traffic or credential. It exited2 in0.02s at peak RSS11048KiB with exact
+`daemon_serve_error` / `binding daemon socket <path>`. No socket was created and
+no process survived; aggregate logs were218 bytes.
+
+Evidence `/tmp/slug-daemon-sandbox-serve.ptko98` hashes are stdout
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, stderr
+`6cbd3d516de1c2237db390fd8aa3bb9de6abb1736948db7736cd520d679179a4`, time
+`c65c1f448fbc7c3c4e1ca5469fd0e910d481334fa76b360ed77610a9c431ee10`.
+This explains the registry proof's early status2 as a Unix bind failure in the
+managed-sandbox execution, not registry propagation. It does not yet distinguish
+sandbox policy from exact path/workspace state because the current display omits
+the OS source.
+
+Next only `WP-7A-daemon-exact-path-escalated-bind-audit-r1`: one direct foreground
+serve outside the managed sandbox on the exact same paths, <=2s plus1s kill grace,
+<=64KiB logs, no strace/test/request/registry/remote/network/credential/compile/
+Rust/replay/R2. Success may select a separate one-shot outside-sandbox invocation
+of the already-compiled named registry proof; failure selects error-chain/path
+design. Neither outcome itself accepts registry propagation.

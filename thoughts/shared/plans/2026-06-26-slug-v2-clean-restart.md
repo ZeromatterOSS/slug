@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-7A-daemon-sandbox-serve-attribution-audit-r1`
-same-boundary direct daemon serve attribution](./slug-v2-subplans/current-packet.md).
+[`WP-7A-daemon-exact-path-escalated-bind-audit-r1`
+exact-path complementary daemon bind attribution](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -136,6 +136,14 @@ inode survived, excluding simple Unix path length/owner explanations. Select one
 ordinary-sandbox direct `--serve` foreground diagnostic on those exact leftover
 paths with captured stderr and a2s deadline; no test, request, registry, network,
 compile, replay, credential, Rust or R2 action.
+The same-boundary foreground diagnostic reproduced exit2 in0.02s with exact
+`daemon_serve_error: binding daemon socket`, no socket creation or survivor, and
+only218 log bytes. This attributes the integration's child exit to managed-sandbox
+bind failure rather than registry semantics, but the top error omits its OS cause.
+Select one complementary2s foreground direct serve outside the sandbox using the
+exact same workspace/socket. If it binds there, only a separately reviewed
+outside-sandbox invocation of the already-compiled named registry proof may
+validate the candidate; no automatic retry, compile, source edit, network or R2.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
