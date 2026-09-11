@@ -19351,3 +19351,33 @@ no route/request graph leakage. No Rust, compiler, test, probe, replay, cache sc
 acquisition or output-conflict R2 restoration was authorized or performed.
 Independent terminal review ACCEPTS the owner chain, variant counts, raw-load
 boundary, UNKNOWN claims, utility invariants and documentation limits.
+
+### WP-5-7A SourceObservation registration-diagnostic design (2026-09-10)
+
+**Status: ACCEPTED; select the bounded implementation after this docs push.**
+The proposed five-file implementation adds one private Bzlmod child module with
+a public/doc-hidden borrowed writer, its focused tests, and only the existing
+Loading renderer arm/tests. Caps are400 production/700 proof/1100 gross, with
+helper/test files capped320/600 and Loading growth40/100. It adds no dependency,
+feature, retained field, key, cache, lock, allocation owner or DICE edge.
+
+Exact grammar emits canonical leaf label, one of four input/disposition classes,
+and exhaustive literal tokens for all five observation-error kinds, four built-in
+and eleven request variants. The distinct two-way built-in source kind plus
+materialization, path operation, four-way node kind, observation error and all39
+I/O-kind discriminators use explicit matches. Paths
+are current-platform encoded bytes rendered as lowercase hex; text streams to the
+existing ASCII-escaping fixed3072byte sink. Full stat fields and retained input,
+route, request/materialization graphs are never rendered; same-display typed
+inequality remains allowed. No fallback Debug or diagnostic String is admitted.
+
+Proofs freeze source-class/variant exhaustiveness, nested tokens, non-UTF8 paths,
+writer/output/depth stops, canonical-leaf/raw-child distinction, natural legacy/
+observed handoffs, poison nonleakage, typed A/B/A and Arc lifetime, and unchanged
+Need/outer precedence. Compile preparation is capped60s, affected default checks
+30s and every named focused test15s; no whole suite, automatic retry or extension.
+No Rust, compiler, test, probe, strace, CLI, replay, acquisition, cache scan or R2
+restoration ran during design. Independent review returned REVISE because the
+first draft conflated built-in `File`/`Directory` with four-way path node kind;
+the grammar and exhaustive proof obligation now separate those types. Corrected
+terminal rereview returned ACCEPT; all other boundaries and caps remain intact.

@@ -36,8 +36,8 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-source-observation-registration-diagnostic-design-r1`
-docs-only bounded-presentation design](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-source-observation-registration-diagnostic-implementation-r1`
+proposed bounded-presentation implementation](./slug-v2-subplans/current-packet.md).
 
 Registration-error implementation/proof-r2 remains independently ACCEPTED at
 473/1380/1853 production/proof/total. The subsequent default-off native observer
@@ -63,9 +63,14 @@ renderer branch. Successful absent source, route ownership and the five hidden
 error-kind families are distinct. Because recursive output prints raw loads and
 suppresses the canonical leaf/error discriminator, the receipt cannot identify
 the exact request, inner failure, cache/payload availability or root cause.
-Current work only designs an exhaustive borrowed causal projection; no execution
-or implementation is selected. Independent terminal audit review ACCEPTS.
-Output-conflict R2 stays preserved and unaccepted.
+The audit is accepted in `2a86d108f`. A docs-only design now proposes an
+exhaustive borrowed causal projection: canonical leaf, four source classes, all
+five observation kinds, eleven request variants, four built-in variants and
+stable nested scalar tokens under the existing3072byte sink. It adds no semantic
+owner or retained state. Review corrected the distinct two-way built-in source
+kind versus four-way path node kind, then returned terminal ACCEPT. The bounded
+five-file implementation is selected only after the design push; no runtime
+scenario is selected. Output-conflict R2 stays preserved and unaccepted.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic
