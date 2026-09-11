@@ -10,6 +10,9 @@
 
 pub mod commands;
 
+#[cfg(all(feature = "native-probe-observer", not(test)))]
+compile_error!("native-probe-observer is available only to the slug_cli_v2 library test");
+
 #[cfg(test)]
 mod payload_demand_probe;
 

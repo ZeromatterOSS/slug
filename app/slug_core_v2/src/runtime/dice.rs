@@ -23,6 +23,29 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::task::Poll;
 
+#[cfg(feature = "native-probe-observer")]
+macro_rules! begin_probe_phase {
+    ($binding:ident, $runtime:expr, $phase:ident) => {
+        let $binding = $runtime.probe_phase(super::probe_observer::Phase::$phase);
+    };
+}
+#[cfg(not(feature = "native-probe-observer"))]
+macro_rules! begin_probe_phase {
+    ($binding:ident, $runtime:expr, $phase:ident) => {};
+}
+#[cfg(feature = "native-probe-observer")]
+macro_rules! finish_probe_phase {
+    ($binding:ident) => {
+        if let Some(phase) = $binding {
+            phase.finish();
+        }
+    };
+}
+#[cfg(not(feature = "native-probe-observer"))]
+macro_rules! finish_probe_phase {
+    ($binding:ident) => {};
+}
+
 use allocative::Allocative;
 use anyhow::Context;
 use async_trait::async_trait;
@@ -470,6 +493,8 @@ pub struct WorkspaceRuntime {
     request_revision: Arc<super::request_revision::RequestRevisionRuntime>,
     #[cfg(test)]
     activation_audit: Option<Arc<ExternalQueryActivationAudit>>,
+    #[cfg(feature = "native-probe-observer")]
+    probe_observer: Option<Arc<super::probe_observer::Observer>>,
 }
 
 #[cfg(test)]
@@ -5815,7 +5840,28 @@ impl WorkspaceRuntime {
             request_revision,
             #[cfg(test)]
             activation_audit: None,
+            #[cfg(feature = "native-probe-observer")]
+            probe_observer: None,
         })
+    }
+
+    #[cfg(feature = "native-probe-observer")]
+    pub(crate) fn attach_probe_observer(&mut self, observer: Arc<super::probe_observer::Observer>) {
+        assert!(
+            self.probe_observer.is_none(),
+            "probe observer attached once"
+        );
+        self.probe_observer = Some(observer);
+    }
+
+    #[cfg(feature = "native-probe-observer")]
+    fn probe_phase(
+        &self,
+        phase: super::probe_observer::Phase,
+    ) -> Option<super::probe_observer::PhaseGuard> {
+        self.probe_observer
+            .as_ref()
+            .map(|observer| observer.phase(phase))
     }
 
     pub fn workspace(&self) -> &Path {
@@ -5835,6 +5881,10 @@ impl WorkspaceRuntime {
             cycle_detector: Some(analysis_cycle_detector()),
             ..Default::default()
         };
+        #[cfg(feature = "native-probe-observer")]
+        if let Some(observer) = self.probe_observer.as_ref() {
+            data.tracker = observer.clone();
+        }
         self.demand_owner.install(&self.dice, &mut data, effects)?;
         super::repository_host_input::install_repository_host_input_transaction(
             &mut data,
@@ -5974,7 +6024,9 @@ impl WorkspaceRuntime {
     where
         R: NativeCommandRoot,
     {
+        begin_probe_phase!(preflight_phase, self, CommandPreflight);
         let preflight = self.begin_native_demand_command_with_inputs(request)?;
+        finish_probe_phase!(preflight_phase);
         let mut guard = NativeDemandAbortGuard::new(preflight.into_command());
         let allows_empty_terminal = root.allows_empty_terminal();
         let mut attempts = 0usize;
@@ -5987,6 +6039,7 @@ impl WorkspaceRuntime {
             }
             let attempt_root = root.clone();
             let attempt = self.runtime.block_on(async {
+                begin_probe_phase!(attempt_phase, self, AttemptInjectionRevision);
                 let data = guard.attempt_user_computation_data()?;
                 let mut updater = self.dice.updater_with_data(data);
                 guard.inject_attempt(&mut updater)?;
@@ -5998,7 +6051,10 @@ impl WorkspaceRuntime {
                 } else {
                     self.request_revision.commit(updater).await
                 };
+                finish_probe_phase!(attempt_phase);
+                begin_probe_phase!(root_phase, self, RootCompute);
                 let root_outcome = attempt_root.compute(&mut transaction).await?;
+                finish_probe_phase!(root_phase);
                 match &root_outcome {
                     slug_bzlmod_v2::SourcePreparationOutcome::Need(needs) => {
                         let needs = needs.clone();
@@ -6035,7 +6091,10 @@ impl WorkspaceRuntime {
                             guard.seal_terminal()?
                         };
                         let terminal_root_count = sealed.root_count();
+                        begin_probe_phase!(selection_phase, self, TerminalSelection);
                         let selected = sealed.select(&transaction).await?;
+                        finish_probe_phase!(selection_phase);
+                        begin_probe_phase!(preparation_phase, self, AcceptancePreparation);
                         let mut prepared = match guard
                             .prepare_accept_with_revision_events(
                                 selected,
@@ -6046,7 +6105,10 @@ impl WorkspaceRuntime {
                             )
                             .await
                         {
-                            Ok(prepared) => prepared,
+                            Ok(prepared) => {
+                                finish_probe_phase!(preparation_phase);
+                                prepared
+                            }
                             Err(error) => {
                                 drop(root_outcome);
                                 drop(attempt_root);
@@ -6065,6 +6127,7 @@ impl WorkspaceRuntime {
                                 attempt_root.observed_selection_association(),
                             )?;
                         }
+                        begin_probe_phase!(revision_phase, self, RevisionFinalization);
                         let revision_retry = if let Some(source_certificate) = source_certificate {
                             let selected_updater = prepared
                                 .selected_updater
@@ -6110,12 +6173,15 @@ impl WorkspaceRuntime {
                                 .await?;
                             None
                         };
+                        finish_probe_phase!(revision_phase);
+                        begin_probe_phase!(cleanup_phase, self, TransactionCleanup);
                         drop(root_outcome);
                         drop(attempt_root);
                         drop(transaction);
                         #[cfg(test)]
                         self.native_demand_sessions
                             .record_trace(NativeDemandTestTrace::TerminalTransactionDropped);
+                        finish_probe_phase!(cleanup_phase);
                         if let Some(epoch) = revision_retry {
                             prepared
                                 .terminal_token
@@ -6165,7 +6231,9 @@ impl WorkspaceRuntime {
                     }
                 }
                 CommandAttemptResult::Terminal(terminal, prepared, terminal_root_count) => {
+                    begin_probe_phase!(acceptance_phase, self, FinalAcceptance);
                     let accepted = guard.accept_prepared(prepared, terminal)?;
+                    finish_probe_phase!(acceptance_phase);
                     return Ok(DrivenCommand {
                         accepted,
                         attempts,
@@ -6262,6 +6330,7 @@ impl WorkspaceRuntime {
         AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
         BuildCommandError,
     > {
+        begin_probe_phase!(request_phase, self, RequestConfiguration);
         let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
             .map_err(BuildCommandError::infrastructure)?;
         let host = self
@@ -6285,6 +6354,7 @@ impl WorkspaceRuntime {
             registry_urls,
             repository_environment,
         };
+        finish_probe_phase!(request_phase);
         let accepted = if let Some(observed) = BuildCommandRootObservationKey::new(root.clone()) {
             self.drive_command(request, observed)
                 .map_err(|error| {
@@ -7174,6 +7244,7 @@ impl NativeDemandCommand<'_> {
                 .then_with(|| left.id.canonical_repo.cmp(&right.id.canonical_repo))
         });
         if !repository_needs.is_empty() {
+            begin_probe_phase!(need_phase, self.runtime, NeedRepository);
             let mut new_requests = Vec::new();
             for request in repository_needs {
                 match self.issued_requests.get(&request.id) {
@@ -7210,10 +7281,12 @@ impl NativeDemandCommand<'_> {
                 self.reusable_requests.shift_remove(&request.id);
                 self.issued_requests.insert(request.id.clone(), request);
             }
+            finish_probe_phase!(need_phase);
             return Ok(NativeDemandProgress::Repositories);
         }
 
         if let Some(environment_need) = needs.repository_environment() {
+            begin_probe_phase!(need_phase, self.runtime, NeedEnvironment);
             let expected =
                 NormalizedAbsolutePath::new(self.runtime.workspace.clone()).map_err(|error| {
                     NativeDemandSessionError::Injection(anyhow::anyhow!(error.to_string()))
@@ -7235,9 +7308,11 @@ impl NativeDemandCommand<'_> {
             self.repository_environment_frontier = self
                 .repository_environment_frontier
                 .union(environment_need.names());
+            finish_probe_phase!(need_phase);
             return Ok(NativeDemandProgress::Environment);
         }
 
+        begin_probe_phase!(need_phase, self.runtime, NeedPath);
         let Some(path_needs) = needs.path_observations() else {
             return Err(NativeDemandSessionError::PathInternalNonProgress);
         };
@@ -7268,6 +7343,7 @@ impl NativeDemandCommand<'_> {
             );
         self.path_observations = PathObservationEpoch::from_shared(merged)
             .map_err(NativeDemandSessionError::PathEpoch)?;
+        finish_probe_phase!(need_phase);
         Ok(NativeDemandProgress::Paths)
     }
 
@@ -8239,6 +8315,11 @@ mod tests {
 
     mod registration_error_tests {
         include!("tests/registration_error_tests.rs");
+    }
+
+    #[cfg(feature = "native-probe-observer")]
+    mod probe_observer_tests {
+        include!("tests/probe_observer_tests.rs");
     }
 
     fn root_setting_overlay(value: Option<&str>) -> CommandConfigurationOverlay {

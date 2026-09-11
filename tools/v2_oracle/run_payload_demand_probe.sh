@@ -23,6 +23,7 @@ use JSON::PP qw(decode_json encode_json);
 use Digest::SHA qw(sha256_hex);
 use File::Path qw(make_path);
 use File::Basename qw(dirname);
+use Fcntl qw(F_GETFD F_SETFD);
 use Cwd qw(abs_path);
 use IO::Select;
 use POSIX qw(setsid WNOHANG);
@@ -53,12 +54,76 @@ sub write_new {
     print {$out} $bytes or die "write $path: $!\n";
     close $out or die "close $path: $!\n";
 }
+sub observer_channel {
+    my $name = 'slug-native-probe-observer';
+    my $fd = syscall(SYS_memfd_create(), $name, 3);
+    $fd >= 0 or die "memfd_create: $!\n";
+    open my $handle, '+<&=', $fd or die "adopt memfd: $!\n";
+    truncate($handle, 512) or die "truncate memfd: $!\n";
+    fcntl($handle, 1033, 7) == 0 or die "seal memfd: $!\n";
+    return $handle;
+}
+sub decode_observer {
+    my ($raw) = @_;
+    return {available => JSON::PP::false, reason => 'wrong-size'} unless length($raw) == 512;
+    my @word = unpack('Q<64', $raw);
+    my $magic = unpack('Q<', 'SLGOBS01');
+    return {available => JSON::PP::false, reason => 'not-installed'}
+        if !grep($_ != 0, @word);
+    return {available => JSON::PP::false, reason => 'bad-header'}
+        unless $word[0] == $magic && $word[1] == 1;
+    return {available => JSON::PP::false, reason => 'bad-phase-selector'}
+        unless $word[7] <= 2;
+    return {available => JSON::PP::false, reason => 'bad-activity-selector'}
+        unless $word[22] <= 2;
+    my $frame = sub {
+        my ($selector, $base, $stride, $activity) = @_;
+        return undef unless $selector == 1 || $selector == 2;
+        my $start = $base + ($selector - 1) * $stride;
+        if (!$activity) {
+            return {phase => $word[$start] & 0xffff,
+                status => ($word[$start] >> 16) & 0xffff,
+                monotonic_ns => $word[$start + 1], process_cpu_ns => $word[$start + 2],
+                clock_validity => $word[$start + 3]};
+        }
+        my ($full, $copied) = @word[$start + 4, $start + 5];
+        return {invalid => 'tag-length'} if $copied > 64 || $copied > $full;
+        my $tag = join('', map { pack('Q<', $word[$start + $_]) } 6..13);
+        $tag = substr($tag, 0, $copied);
+        return {event_kind => $word[$start], monotonic_ns => $word[$start + 1],
+            process_cpu_ns => $word[$start + 2], clock_validity => $word[$start + 3],
+            full_tag_bytes => $full, copied_tag_bytes => $copied,
+            tag_prefix_hex => unpack('H*', $tag)};
+    };
+    my $phase = $frame->($word[7], 14, 4, 0);
+    return {available => JSON::PP::false, reason => 'bad-phase-frame'}
+        if $phase && ($phase->{phase} < 1 || $phase->{phase} > 18 ||
+            $phase->{status} < 1 || $phase->{status} > 3 || $phase->{clock_validity} > 3);
+    my $activity = $frame->($word[22], 23, 14, 1);
+    return {available => JSON::PP::false, reason => 'bad-activity-frame'}
+        if $activity && ($activity->{invalid} || $activity->{event_kind} > 5 ||
+            $activity->{clock_validity} > 3);
+    return {available => JSON::PP::true, installed_pid => $word[2], disabled => $word[3],
+        overflow_flags => $word[4], dropped_activity_samples => $word[5],
+        activity_claim => $word[6], counters_are_independent => JSON::PP::true,
+        counters => [@word[8..13]],
+        phase => $phase, activity => $activity,
+        interpretation => 'latest committed samples only; unsampled interval unknown'};
+}
+sub cap_observer_output {
+    my ($telemetry, $json) = @_;
+    return ($json, undef) if length($telemetry) + length($json) <= 8192;
+    return (encode_json({available => JSON::PP::false, reason => 'output-cap'}) . "\n",
+        'telemetry output cap');
+}
 
 # All child exits, including exceptions, pass through one bounded finalizer.
 syscall(SYS_prctl(), 36, 1, 0, 0, 0) == 0 or die "subreaper: $!\n";
 sub supervise {
-    my ($name, $deadline, $caps, $launch, $inject) = @_;
+    my ($name, $deadline, $caps, $launch, $inject, $with_observer, $json_padding) = @_;
     $^F = 1024;
+    my $observer = $with_observer ? observer_channel() : undef;
+    my $observer_number = $observer ? fileno($observer) : undef;
     my (@readers, @writers);
     for (0..2) {
         pipe(my $reader, my $writer) or die "pipe: $!\n";
@@ -73,7 +138,10 @@ sub supervise {
         open STDOUT, '>&', $writers[0] or die "stdout: $!\n";
         open STDERR, '>&', $writers[1] or die "stderr: $!\n";
         close $writers[0]; close $writers[1];
-        $launch->(fileno($writers[2]));
+        if ($observer) {
+            fcntl($observer, F_SETFD, 0) == 0 or die "inherit observer: $!\n";
+        }
+        $launch->(fileno($writers[2]), $observer ? fileno($observer) : undef);
         die "launch returned\n";
     }
     close $_ for @writers;
@@ -135,32 +203,94 @@ sub supervise {
     my $group_alive = kill 0, -$pid;
     my $clean = $no_children && !$open_pipes && !$group_alive;
     $stop //= 'cleanup incomplete' unless $clean;
+    my $telemetry = '';
+    my $telemetry_error;
+    if ($observer) {
+        if ($clean) {
+            sysseek($observer, 0, 0) == 0 or $telemetry_error = "telemetry seek: $!";
+            while (length($telemetry) < 512 && !defined($telemetry_error)) {
+                my $n = sysread($observer, my $bytes, 512 - length($telemetry));
+                if (!defined $n) { next if $!{EINTR}; $telemetry_error = "telemetry read: $!"; last; }
+                if (!$n) { $telemetry_error = 'telemetry short read'; last; }
+                $telemetry .= $bytes;
+            }
+        }
+        close $observer or $telemetry_error //= "telemetry close: $!";
+    }
     my $result = {
         raw_status => $status, stop => $stop, elapsed_seconds => time - $started,
         cleanup_complete => $clean ? JSON::PP::true : JSON::PP::false,
         reaped_pids => \@reaped, group_alive => $group_alive,
         no_children => $no_children, open_pipes => $open_pipes,
+        telemetry_error => $telemetry_error,
     };
     my @names = qw(stdout stderr trace);
     write_new("$logs/$name.$names[$_]", $buffers[$_]) for 0..2;
+    if ($with_observer) {
+        write_new("$logs/$name.telemetry.raw", $telemetry);
+        my $decoded = $clean && !$telemetry_error ? decode_observer($telemetry) :
+            {available => JSON::PP::false,
+                reason => $telemetry_error // 'process-tree-not-quiescent'};
+        my $json = encode_json($decoded) . "\n";
+        $json .= 'x' x $json_padding if $json_padding;
+        my $cap_error;
+        ($json, $cap_error) = cap_observer_output($telemetry, $json);
+        $telemetry_error //= $cap_error;
+        write_new("$logs/$name.telemetry.json", $json);
+    }
+    $stop //= $telemetry_error if defined $telemetry_error;
+    $result->{stop} = $stop;
+    $result->{telemetry_error} = $telemetry_error;
     write_new("$logs/$name.supervision.json", encode_json($result) . "\n");
-    return ($result, \@buffers);
+    return ($result, \@buffers, $telemetry, $observer_number);
 }
 sub isolated {
-    my (@command) = @_;
+    my ($observer_fd, @command) = @_;
     %ENV = (PATH => '/usr/bin:/bin', SLUG_SENTINEL_SCRATCH => $scratch);
+    $ENV{SLUG_SENTINEL_OBSERVER_FD} = $observer_fd if defined $observer_fd;
     exec 'unshare', '--user', '--map-root-user', '--net',
         'prlimit', '--as=2147483648', '--cpu=15', '--fsize=16777216', @command;
     die "exec: $!\n";
 }
 if ($mode eq 'self-check') {
+    decode_observer("\0" x 512)->{reason} eq 'not-installed' or die "zero decode\n";
+    decode_observer('short')->{reason} eq 'wrong-size' or die "short decode\n";
+    my @bad_frame = (0) x 64;
+    @bad_frame[0, 1, 7] = (unpack('Q<', 'SLGOBS01'), 1, 3);
+    decode_observer(pack('Q<64', @bad_frame))->{reason} eq 'bad-phase-selector'
+        or die "bad frame decode\n";
+    $bad_frame[7] = 1;
+    decode_observer(pack('Q<64', @bad_frame))->{reason} eq 'bad-phase-frame'
+        or die "bad phase decode\n";
+    @bad_frame = (0) x 64;
+    @bad_frame[0, 1, 22, 23] = (unpack('Q<', 'SLGOBS01'), 1, 1, 6);
+    decode_observer(pack('Q<64', @bad_frame))->{reason} eq 'bad-activity-frame'
+        or die "bad activity decode\n";
+    my ($capped, $cap_error) = cap_observer_output("\0" x 512, 'x' x 8192);
+    my $cap_stop;
+    $cap_stop //= $cap_error;
+    $cap_stop eq 'telemetry output cap' && decode_json($capped)->{reason} eq 'output-cap'
+        or die "telemetry cap did not stop\n";
+    my $output_failure = eval { write_new($logs, 'must fail'); 1 };
+    !$output_failure && $@ or die "output failure did not fail closed\n";
+    my $write = 'open my $o,"+<&=$ENV{SLUG_SENTINEL_OBSERVER_FD}" or die $!; ' .
+        'sysseek($o,0,0)==0 or die $!; syswrite($o,pack("H*","8877665544332211"),8)==8 or die $!; ';
     for my $case (qw(normal deadline exception)) {
-        my $body = $case eq 'normal' ? 'print "NORMAL\n"; exit 0;' :
+        my $body = $write . ($case eq 'normal' ? 'print "NORMAL\n"; exit 0;' :
             '$|=1; my $pid=fork(); defined($pid) or die $!; ' .
-            'if (!$pid) { print "DESCENDANT_READY $$\n"; sleep 30; exit 0; } sleep 30;';
-        my ($r, $buffers) = supervise("self-check-$case", $case eq 'deadline' ? 0.25 : 2,
-            [8192,8192,65536], sub { isolated('/usr/bin/perl', '-e', $body) }, $case eq 'exception');
+            'if (!$pid) { print "DESCENDANT_READY $$\n"; sleep 30; exit 0; } sleep 30;');
+        my ($r, $buffers, $telemetry, $observer_number) = supervise(
+            "self-check-$case", $case eq 'deadline' ? 0.25 : 2,
+            [8192,8192,57344],
+            sub { my ($trace_fd, $observer_fd) = @_; isolated($observer_fd, '/usr/bin/perl', '-e', $body) },
+            $case eq 'exception', 1);
         $r->{cleanup_complete} && $r->{elapsed_seconds} < 5 or die "$case cleanup failed\n";
+        length($telemetry) == 512 && substr($telemetry, 0, 8) eq pack('H*', '8877665544332211')
+            or die "$case observer inheritance/retention failed\n";
+        syscall(SYS_fcntl(), $observer_number, F_GETFD, 0) == -1 && $!{EBADF}
+            or die "$case parent observer fd remained open\n";
+        decode_observer($telemetry)->{reason} eq 'bad-header'
+            or die "$case corrupt observer decode\n";
         if ($case eq 'normal') {
             !$r->{stop} && $r->{raw_status} == 0 && $buffers->[0] eq "NORMAL\n" or die "normal failed\n";
         } else {
@@ -173,14 +303,24 @@ if ($mode eq 'self-check') {
         }
         print "$case: cleanup verified\n";
     }
+    my ($cap_result, undef, undef, $cap_fd) = supervise(
+        'self-check-telemetry-cap', 2, [8192,8192,57344],
+        sub { my ($trace_fd, $observer_fd) = @_; isolated(
+            $observer_fd, '/usr/bin/perl', '-e', $write . 'exit 0;') }, 0, 1, 8192);
+    $cap_result->{cleanup_complete} &&
+        $cap_result->{stop} eq 'telemetry output cap' &&
+        $cap_result->{telemetry_error} eq 'telemetry output cap' &&
+        syscall(SYS_fcntl(), $cap_fd, F_GETFD, 0) == -1 && $!{EBADF}
+        or die "telemetry cap supervision did not fail closed\n";
     exit 0;
 }
 if ($mode eq 'compile') {
     my ($r, $buffers) = supervise('compiler', 60, [16777216,16777216,65536], sub {
         $ENV{PATH} = '/home/wgray/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin';
-        exec 'timeout', '--kill-after=1', '60', 'cargo', 'test', '-q', '-p', 'slug_cli_v2', '--lib', '--no-run', '--message-format=json';
+        exec 'timeout', '--kill-after=1', '60', 'cargo', 'test', '-q', '-p', 'slug_cli_v2',
+            '--features', 'native-probe-observer', '--lib', '--no-run', '--message-format=json';
         die "cargo exec: $!\n";
-    }, 0);
+    }, 0, 0);
     my ($errors, $finished, @executables) = (0, 0);
     for my $line (split /\n/, $buffers->[0]) {
         my $row = eval { decode_json($line) };
@@ -285,14 +425,14 @@ my $absent = "$scratch/mirror/github.com/abseil/abseil-cpp/releases/download/202
 !-e $absent && !-l $absent or die "abseil mirror must remain absent\n";
 
 
-my ($supervision, $buffers) = supervise('probe', 15, [8192,8192,65536], sub {
-    my ($trace_fd) = @_;
+my ($supervision, $buffers) = supervise('probe', 15, [8192,8192,57344], sub {
+    my ($trace_fd, $observer_fd) = @_;
     chdir "$scratch/workspace" or die "chdir: $!\n";
-    isolated('/usr/bin/time', '-f', 'peak_rss_kib=%M', '-o', "$logs/resources",
+    isolated($observer_fd, '/usr/bin/time', '-f', 'peak_rss_kib=%M', '-o', "$logs/resources",
         'strace', '-f', '-s', '4096', '-e', 'trace=openat,openat2', '-P', $absent,
         '-o', "/proc/self/fd/$trace_fd", $executable, '--ignored', '--exact',
         'payload_demand_probe::authentic_sentinel_demand', '--nocapture');
-}, 0);
+}, 0, 1);
 my $demand = $buffers->[2] =~ /(?:openat|openat2)\([^\n]*"\Q$absent\E"/;
 my $success = defined($supervision->{raw_status}) && $supervision->{raw_status} == 0 &&
     !$supervision->{stop} && $buffers->[0] =~ /^SLUG_SENTINEL_NATIVE_SUCCESS_PUBLISHED_0$/m;
@@ -313,6 +453,9 @@ timeout 5 env -i PATH=/usr/bin:/bin unshare --user --map-root-user --net \
     >"$probe_scratch/logs/preflight.stdout" 2>"$probe_scratch/logs/preflight.stderr"
 probe_perl self-check
 if [[ $# == 1 ]] && [[ "$1" == "--self-check" ]]; then exit 0; fi
-[[ $# == 0 ]] || { printf 'usage: %s [--self-check]\n' "$0" >&2; exit 2; }
+[[ $# == 0 ]] || { [[ $# == 1 && "$1" == "--compile-only" ]] || {
+    printf 'usage: %s [--self-check|--compile-only]\n' "$0" >&2; exit 2;
+}; }
 probe_perl compile
+if [[ $# == 1 ]] && [[ "$1" == "--compile-only" ]]; then exit 0; fi
 probe_perl run

@@ -16,6 +16,8 @@ mod file_write_aquery_text;
 mod file_write_identity;
 mod generated_repository_definition;
 mod path_observation;
+#[cfg(feature = "native-probe-observer")]
+pub mod probe_observer;
 mod process_host;
 pub mod reapi;
 mod registry_io;
@@ -71,6 +73,15 @@ pub use slug_identity_v2::TargetPattern;
 pub use slug_query_v2::QueryError;
 pub use slug_query_v2::QueryOutputCompletion;
 
+#[cfg(all(test, feature = "native-probe-observer"))]
+static PANIC_AFTER_OBSERVER_ATTACH: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(all(test, feature = "native-probe-observer"))]
+fn arm_observer_api_panic_for_test() {
+    PANIC_AFTER_OBSERVER_ATTACH.store(true, std::sync::atomic::Ordering::Release);
+}
+
 /// One-shot typed build command. Source preparation observes only paths
 /// demanded by the retained command root.
 pub fn evaluate_workspace_build_command_with_bzlmod_inputs(
@@ -85,16 +96,54 @@ pub fn evaluate_workspace_build_command_with_bzlmod_inputs(
     AcceptedCommand<std::sync::Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
     BuildCommandError,
 > {
+    #[cfg(feature = "native-probe-observer")]
+    let observer = probe_observer::capture();
+    #[cfg(feature = "native-probe-observer")]
+    if let Some(observer) = observer.as_ref() {
+        observer.enter(probe_observer::Phase::NativeApi);
+    }
+    #[cfg(feature = "native-probe-observer")]
+    let _api_finished = observer
+        .as_ref()
+        .map(|observer| observer.deferred_exit(probe_observer::Phase::NativeApi));
+    #[cfg(feature = "native-probe-observer")]
+    let mut teardown_finished = None;
+    #[cfg(feature = "native-probe-observer")]
+    let construction = observer
+        .as_ref()
+        .map(|observer| observer.phase(probe_observer::Phase::RuntimeConstruction));
     let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::native())
         .map_err(BuildCommandError::infrastructure)?;
-    runtime.build_command_with_bzlmod_inputs(
+    #[cfg(feature = "native-probe-observer")]
+    let mut runtime = runtime;
+    #[cfg(feature = "native-probe-observer")]
+    if let Some(construction) = construction {
+        construction.finish();
+    }
+    #[cfg(feature = "native-probe-observer")]
+    if let Some(observer) = observer.as_ref() {
+        runtime.attach_probe_observer(observer.clone());
+        teardown_finished = Some(observer.deferred_exit(probe_observer::Phase::RuntimeTeardown));
+    }
+    #[cfg(feature = "native-probe-observer")]
+    let _teardown_started = observer
+        .as_ref()
+        .map(|observer| observer.deferred_entry(probe_observer::Phase::RuntimeTeardown));
+    #[cfg(all(test, feature = "native-probe-observer"))]
+    if PANIC_AFTER_OBSERVER_ATTACH.swap(false, std::sync::atomic::Ordering::AcqRel) {
+        panic!("injected observer API unwind");
+    }
+    let result = runtime.build_command_with_bzlmod_inputs(
         targets,
         command_policy,
         environment_policy,
         lockfile_mode,
         registry_urls,
         configuration_overlay,
-    )
+    );
+    #[cfg(feature = "native-probe-observer")]
+    std::hint::black_box(&mut teardown_finished);
+    result
 }
 
 pub fn evaluate_workspace_build_command_with_repository_environment(

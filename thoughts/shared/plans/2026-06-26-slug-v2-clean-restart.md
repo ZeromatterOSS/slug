@@ -36,24 +36,21 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-5-7A-native-probe-observer-implementation-r1`
-bounded test-build-only native observer implementation](./slug-v2-subplans/current-packet.md).
+[`WP-5-7A-native-probe-observer-attempt-design-r1`
+one-attempt observer execution contract design](./slug-v2-subplans/current-packet.md).
 
-Implementation/proof-r2 independently ACCEPTED at473/1380/1853 gross production/
-proof/total. Full structural typed errors share one Loading Arc through all four
-Analysis handoffs; a separate3072byte renderer bounds causal Display/Debug without
-traversing successful predecessors. Natural handoff/branch/lifetime proofs and all
-named owner/direct-dependent gates pass. Preserved Core/publication Strings remain
-allocated and counted. One reviewed probe compiled48.043s, then stopped at its
-original15s native deadline before publication or diagnostic. Result INCONCLUSIVE;
-cleanup complete, no survivors or repeat. Source audit finds an independent DICE
-event listener left as no-op, but no caller-accessible native phase observer.
-Accepted design freezes a default-off test-build observer: fixed512byte memfd,
-post-quiescence decoding and bounded scalar phase/DICE samples. Preserve native
-API/target/fixture, activation tracker and destruction order. Independent review
-ACCEPTS after one FD-ownership correction. Implementation/harmless gates next;
-no authentic runtime is authorized and no instrumentation has been implemented.
-Output-conflict R2 stays preserved/unaccepted. No historical14GB attribution.
+Registration-error implementation/proof-r2 remains independently ACCEPTED at
+473/1380/1853 production/proof/total. The subsequent default-off native observer
+implementation is independently ACCEPTED at564/about715/1279 within its frozen
+caps. It uses one fixed512byte sealed memfd, six DICE counters, committed phase/
+activity frames and post-quiescence fail-closed decoding while preserving the
+exact API/input, activation tracker and destruction order. Eight focused proofs,
+default/feature compiler gates, CLI compile-only selection and expanded supervisor
+self-checks pass; callback, FD/mapping/Arc lifetime, real DICE events, API teardown,
+accounting, decoder and cleanup obligations are closed. No authentic observer run
+executed, so demand, phase, cause, performance and historical14GB attribution
+remain unknown. Current work is design/review only for at most one later bounded
+attempt. Output-conflict R2 stays preserved and unaccepted.
 
 Imported native genrule loading is terminally accepted at 170/255/425 gross
 production/proof/total Rust additions. Independent implementation and authentic

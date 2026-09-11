@@ -19245,3 +19245,34 @@ Because that owner is not bounded here, the successor retains only the complete
 callerless module value. Its exact two-file, 110-production/300-test/410-total
 contract is frozen in `current-packet.md`; a public export, consumer, mapping,
 selection, or third file is a stop.
+
+### WP-5-7A bounded native probe observer implementation (2026-09-10)
+
+**Status: ACCEPTED; design only the one-attempt execution contract next.** The
+default-off feature compiles out of ordinary Core/CLI builds, and CLI rejects it
+outside its library test. The exact ignored probe alone adopts one inherited FD;
+safe Core code validates and maps an exact zeroed512byte sealed read-write memfd,
+then closes the descriptor. One Arc owns the mapping and DICE callbacks retain no
+runtime, graph, key or terminal. Six atomic counters and sampled phase/activity
+frames use release-committed inactive slots; parent decoding begins only after
+kill/reap/drain proves complete process-tree quiescence.
+
+Final scope is564 production/about715 proof/1279 gross additions within
+650/1100/1750. Existing production runtime call sites are120/120; observer,
+mapping, focused tests and driver are299/300,158/160,486/700 and158/250 lines.
+The accounting proof freezes a24byte Arc allocation,8byte observer/guard/TLS Arc
+handles,16byte phase/deferred guards,512 mapped bytes, control<=512 and logical
+state<=4096; Linux mapping granularity remains one4096byte page.
+
+Feature Core no-run compilation passed in19.07s. Eight focused tests passed in
+0.08s, whole command5.53s, covering real DICE change/dependency checks with the
+semantic activation tracker intact, callback-disable/final-Arc release, API
+teardown success/error/unwind, full rejected-FD closure, frames and accounting.
+Default CLI check passed2.23s; non-test opt-in rejected as designed in4.59s.
+Latest compile-only evidence `/tmp/slug-sentinel-demand.sHLUmW/logs` selected one
+library-test executable and finished in0.73s after expanded normal/deadline/
+exception/cap self-checks. Malformed records are unavailable; cap errors stop;
+each parent channel FD closes. Fmt/diff, preserved patch hashes/forward apply and
+archive exact-known-three baseline pass. Independent correction rereview returned
+ACCEPT. No authentic run/replay/acquisition occurred, and no causal or historical
+14GB conclusion follows.

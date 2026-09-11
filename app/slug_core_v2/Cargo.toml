@@ -6,6 +6,10 @@ name = "slug_core_v2"
 repository = { workspace = true }
 version = "0.1.0"
 
+[features]
+default = []
+native-probe-observer = []
+
 [dependencies]
 allocative = { workspace = true }
 anyhow = { workspace = true }
