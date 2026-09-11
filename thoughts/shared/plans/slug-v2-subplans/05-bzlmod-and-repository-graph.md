@@ -5753,4 +5753,41 @@ production additions<=80; focused owner tests/direct query+CLI checks timeout60.
 Actual probe, CLI/replay/acquisition, limit increases and R2 restoration stay out.
 Review corrected one allocation-scope overstatement: only the new renderer is
 heap-buffer-free; preserved Core to_string and final stderr Strings are explicitly
-bounded/counted, not claimed absent. Implementation/proofs have not started.
+bounded/counted, not claimed absent. The following close supersedes that initial
+implementation status and its proof-cap estimate.
+
+### Typed registration diagnostics: proof-correction REPLAN (2026-09-10)
+
+R1 independent implementation review returns REPLAN, not partial acceptance.
+Candidate16files/473production/912proof/1385gross retained in worktree; complete
+patch /tmp/slug-registration-r1.NfIhTj/candidate.patch at base78bfaee3c, SHA256
+05c392952c62e652e0a13176206569ed63891f974e300e46b40da2480fb8fac1.
+Architecture is sound; Analysis tests bypass four changed production handoffs,
+declared Loading causal/incomplete branch proof is incomplete, and latest natural
+owner/Core/lifetime tests lack runtime evidence. Narrow proof-r2 preserves every
+production line and the exact allowlist, raises proof/gross caps to1400/2050,
+and closes only these originally required proofs. No source/semantic expansion.
+
+Logs /tmp/slug-registration-errors.gM2tqt: Bzlmod3pass/.00s whole21.29s;
+Loading initially3pass1failed ineffective comment discriminator, corrected real
+extension identity4pass/.02s whole23.80s; Analysis1pass/.02s whole50.96s.
+New natural Loading owner proof added afterward remains uncompiled. Synthetic
+control/candidate/candidate/control39680/112/112/39680bytes, capacity54248/112/112/
+54248;76/3/0/29us are noisy, not a speedup or peak-memory claim.
+Core command timeout124/60.00s before test start/result; no compiler error.
+Fingerprint invoked17:27:45 versus command~17:27:07, empty completion fingerprint,
+stale14:34:33 executable. No precise rustc/link phase or historical14GB attribution.
+One independently authorized unchanged60s compile-only JSON diagnostic succeeds
+exit0/26.98s/RSS2821376KiB; fresh Core executable/build-finished true,367 artifacts,
+51 build scripts/22 compiler messages. No tests executed; prior warmed work means
+no isolated compile-performance claim. core-frontier.jsonl SHA256
+cd3eee353b34122406ae3eacb7a29f2f23c8897ecfb208767c5f5c0f7421b47f;
+core-frontier.stderr SHA256
+6d23963b35e0854fd4acc65ef038a61ae5396e005c5cf7661b66344cb0d20f57.
+Named runtime gates resume only after R2 contract acceptance; no automatic retry,
+cap extension, stale binary, full suite, authentic probe, CLI/replay or acquisition.
+Independent successor review ACCEPTS proof-r2 and its named gates, not the
+implementation. Final-reference and complete branch/handoff evidence remain open.
+Diff/check, complete candidate reverse-check, output-conflict R2 forward-check and
+both preserved hashes pass; archive checker retains exactly the known3 thoughts
+paths, and authoritative host ps finds no compiler/tracer/daemon survivors.

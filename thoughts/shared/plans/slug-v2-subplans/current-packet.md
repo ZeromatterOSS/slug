@@ -1,10 +1,54 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-5-7A-registration-error-identity-presentation-impl-r1
+Packet: WP-5-7A-registration-error-identity-presentation-proof-r2
 
-Status: reserved design independently ACCEPTED; implementation not started.
-Root owns the bounded Rust/proof work below, followed by independent final review.
-The design checkpoint changed docs only; it ran no compiler/test/probe/replay.
+Status: narrow proof-correction successor independently ACCEPTED. R1 returned
+REPLAN for missing required proofs and the necessary proof-cap increase; its
+production architecture is sound, but no implementation acceptance is claimed.
+Implement only the focused proof correction; preserve production unchanged.
+Reviewer authorized exactly one investigation command before rollover:
+`cargo test -p slug_core_v2 --lib --no-run --message-format=json`, serialized with
+pinned Cargo and timeout60. This closes compile-frontier evidence only; no stale
+binary, automatic runtime test, longer retry, probe or replay is authorized.
+
+## Immediate predecessor and focused correction
+
+R1 candidate: base78bfaee3c,16 Rust files,473 production/912 proof/1385 gross additions.
+Complete export /tmp/slug-registration-r1.NfIhTj/candidate.patch SHA256
+05c392952c62e652e0a13176206569ed63891f974e300e46b40da2480fb8fac1.
+It remains in the worktree and must ship only after all gates and final review.
+R2 preserves every production line/semantic choice below; only missing proofs
+and their cfg(test) scaffolding may change within the same exact allowlist.
+No new source fixture, semantic family, shared boundary or source audit is selected.
+
+Required correction: exercise the actual merge command/module conversions and
+both preparation functions with natural Loading-produced errors, legacy/observed
+and command/module sources. Explicitly inspect the typed Registration payload,
+first-error selection and Arc sharing; manual wrapper construction alone is not
+production-handoff coverage. Retain the named existing Need/outer/order/dependency
+gates. Complete the declared causal/incomplete branch matrix, notably Generated
+Demand through Loading, direct Registration/Load/Route boundaries, RootBzl and
+Pure/Innate Inputs/LoadRoute. Compile/run the new natural owner and Core/lifetime
+proofs. Existing scaffolding and table-driven rows keep correction focused.
+Budget adds488 proof lines of headroom over current912 (estimated220 for natural
+handoffs and268 for missing branch/scaffolding rows):1400 proof/2050 gross,
+production cap650 unchanged. This is a proof-estimate correction, not permission
+to trim required assertions, broaden behavior or modify frozen production.
+
+Recorded R1 gates in /tmp/slug-registration-errors.gM2tqt: Bzlmod3pass/21.29s;
+Loading4pass/23.80s after replacing an ineffective comment-only discriminator
+with real extension identity; Analysis1pass/50.96s. New Loading owner proof added
+after its gate remains uncompiled. Core filtered libtest timed out60s before any
+test start/result; no compiler error, completion fingerprint empty, executable
+stale. Invocation timestamps support about38s before Core and22s after, not a
+precise compiler/link phase. No stale binary ran and host process check is clear.
+The one reviewed JSON compile-only diagnostic then succeeded: exit0,26.98s,
+peak compiler-command RSS2821376KiB, fresh Core executable and build-finished true;
+367 artifacts/51 build scripts/22 compiler messages. No tests ran. Warm prior work
+precludes an isolated timing claim. Its success clears the compile-stop for the
+named runtime gates only after R2 contract review; no further diagnostic retry.
+Synthetic old/new/new/old rendering39680/112/112/39680bytes,76/3/0/29us;
+no speedup or runtime peak-memory claim. Stage5 owns durable close evidence.
 
 ## Decision and evidence
 
@@ -145,7 +189,8 @@ Only these Rust paths may change (prefixes app/slug_*_v2/src):
 - core: runtime/dice.rs for a cfg(test) include only; new
   runtime/tests/registration_error_tests.rs.
 No Cargo/profile/dependency, CLI/probe/driver or other semantic owner changes.
-Caps:650 production/950 proof/1600 gross additions; existing oversized owners
+Caps:650 production/1400 proof/2050 gross additions relative to78bfaee3c;
+R2 may not change the preserved473 production additions. Existing oversized owners
 <=80 added production lines combined. New production helper<=350lines each.
 Above2000lines: Analysis dice6055, Core dice12475, selected_repo_spec15978,
 certificate2314, extension3162, instantiation3345. Keep traversal in focused
