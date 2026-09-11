@@ -1,95 +1,115 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-5-7A-native-probe-phase-observation-audit-r1
+Packet: WP-5-7A-native-probe-observer-design-r1
 
-Status: docs-only successor independently ACCEPTED; source audit not started.
-No runtime, compiler or test execution is authorized by this packet.
+Status: source audit and reserved design scope independently ACCEPTED; design not started.
+Docs only. No instrumentation, compiler, test or runtime execution is authorized.
 
-## Immediate predecessor and decision
+## Learned facts and selected decision
 
-a06f3ddfc accepts typed registration-error identity and bounded diagnostics.
-The independently authorized unchanged driver then compiled successfully in48.043s
-but its single native attempt hit the original15s wall limit before publication.
-Evidence /tmp/slug-sentinel-demand.8dkd3P/logs: stdout16bytes ("running 1 test"),
-stderr0, exact absent-abseil open trace319bytes of thread exits only, resources0.
-Native raw status9, wall15.0093s, driver2; no successful publication or exact open.
-INCONCLUSIVE: no demand/non-demand, causal leaf, active phase, speedup, memory
-regression or historical14GB attribution can be inferred. No repeat is selected.
-Finalizer reaped3, reached ECHILD/open_pipes0/group_alive0; host process check
-clear. Only exact staged workspace/registry/mirror were removed; logs survive.
-Pre-execution contract is preserved beside them as contract.md.
+The source-only phase audit at2cf2a4dd3 inspected5 initial+8 additional owners,
+full-file size699829bytes, excerpts<2MiB. Stage5 owns exact source anchors.
+The first native output follows runtime construction, request preparation, DICE
+attempts/source capture, terminal acceptance, WorkspaceRuntime destruction,
+terminal projection, event publication and discarded-terminal destruction.
+No prior trace identifies which phase consumed the15s limit.
 
-Choose a bounded source-only audit to identify the smallest existing passive
-phase-observation seam for a future reviewed probe under unchanged limits.
-The observable deliverable is a source-anchored map from native test entry through
-evaluation/source preparation to accepted publication, naming existing timing/
-event/tracing hooks and what each could prove within one15s run. If no usable
-existing hook exists, describe one bounded test-only proposal with exact owner,
-lifetime, output/resource cost and teardown before asking for implementation review.
-Do not implement it, invent a phase result, or use a faster substitute fixture.
-This prerequisite still serves full M7A selected-request/output-conflict evidence;
-actual CLI/daemon conflicts and positive common-view sharing remain open.
+Existing DICE DiceEventListener is independent of the semantic activation tracker
+and currently defaults to NoOpTracker in native UserComputationData. Its six
+static-key-type events can expose DICE activity without key/graph serialization.
+Existing activation/event owners are semantic; their tracker must remain intact.
+Core NativeDemandTestTrace is cfg(test)-only, late-stage and Mutex/Vec-backed;
+it is absent from the CLI probe's Core dependency and is not a live timing hook.
 
-## Scope and research contract
+Choose one reserved design: a default-off, test-build-only Core observer behind
+a narrow opt-in build gate, carried through the existing DiceEventListener, plus
+fixed native/teardown/publication phase observations. Preserve the existing CLI
+library test target, exact BuildRequest/native API, input fixture and destruction
+order. No public production API signature change, general observer framework,
+Core unit-test target migration, copied evaluation driver or semantic workaround.
+A build-gated cross-crate diagnostic boundary needs independent design acceptance;
+this manifest selects that design work, not a frozen implementation or runtime.
 
-Initial read-only owners:
-- app/slug_cli_v2/src/payload_demand_probe.rs
-- tools/v2_oracle/run_payload_demand_probe.sh
-- app/slug_core_v2/src/runtime/mod.rs
-- app/slug_core_v2/src/runtime/dice.rs
-- app/slug_core_v2/src/runtime/events.rs
+Presentation/telemetry is Slug-native. Existing exact Bazel9.2 registration/source
+semantics remain unchanged; no new Bazel oracle is applicable to this design.
+Use retained DICE api/events.rs and api/user_data.rs as existing supported hook
+contracts, plus docs/developers/dice.md for ownership/locking. Reuse Stage5 fixture/
+source provenance and accepted finalizer tests; no donor or fallback is selected.
 
-Follow only directly referenced native evaluation, source-capture/publication or
-existing observation-hook owners: at most8 additional source/test/doc files,
-excerpts<=2MiB total. Resolve paths by targeted rg; no broad cache/tree scan,
-dependency enumeration or reconstruction of accepted prior audits. Read
-docs/developers/dice.md if evaluating DICE observation/cancellation ownership.
-The prior harness/source provenance and finalizer evidence in Stage5 are accepted;
-do not rerun self-checks or recreate source fixtures to re-prove them.
+## Required design deliverable
 
-Questions:
-1. Which explicit caller boundaries precede the first existing stdout/stderr
-   marker, and which evidence is unavailable because the run ended before it?
-2. Which existing hooks can distinguish CPU work, external waits, source capture,
-   DICE evaluation and publication without serializing graphs or changing order?
-3. What does a hook retain, when is it released/cancelled/joined, and can it add
-   bounded command scratch without a semantic key, global cache, lock across
-   DICE await, changed equality or publication dependency?
-4. Can a proposed future observation preserve the exact native API/input fixture,
-   fresh staging, network isolation, compiler60/native15 limits, AS2GiB/CPU15,
-   stdout/stderr8192 each/trace65536 and unconditional finalizer? Explicitly separate
-   observation evidence from assertions about the underlying semantic cause.
+Freeze one concrete implementation contract, with exact allowlist and measured
+production/proof/gross caps, addressing all of these before code:
 
-Classification: Slug-native diagnostic design, no Bazel compatibility change.
-Existing Bazel9.2 registration/source semantics and Rust-native ownership remain;
-new oracle tests are inapplicable because no behavior is implemented. DICE docs
-and existing owner tests are concept/evidence only; no runtime/donor import,
-fallback, interner or representation change. Source code can identify reachable
-phases, not prove which phase consumed the15s. No output from the original killed
-process can be recovered through a new execution.
+- The build gate is default-off and selected only by the opt-in probe driver.
+  Production CLI/default builds retain no observer state or output; no ambient
+  user environment turns the observer on. Keep the original native API call.
+- The initiating test owns observation resources; at most4096bytes retained
+  telemetry state, no key/graph/value/label/error clones or unbounded collections.
+  A listener sees static key-type tags and scalar counters only, constant bounded
+  work per event. Name overflow, concurrent update and cancellation semantics.
+- Preserve the semantic activation tracker, event selection, Needs/order, DICE
+  keys/equality/invalidation, source certificates and accepted publication.
+  The observer cannot decide success, skip work, change source requests or prolong
+  retained terminal/DICE lifetimes beyond existing ownership.
+- Name markers for runtime construction, command preflight, DICE attempt/root
+  evaluation, Need service, terminal selection/validation/acceptance, runtime
+  teardown, diagnostic projection, event publication and terminal release.
+  Cover early error/unwind paths without borrowing command scratch across tasks.
+  Do not move terminal destruction past output or omit runtime teardown.
+- Freeze a bounded, nonblocking transport independent of semantic stdout/stderr.
+  Preserve stdout/stderr8192bytes each and total trace/telemetry<=65536bytes
+  (subdivide the existing trace budget, do not add a larger output allowance).
+  Never block a DICE callback on I/O or a shared lock across await.
+- Specify how bounded wall/process-CPU samples complement phase/DICE counters.
+  Inclusive DICE duration is not CPU time, last key type is not a causal error,
+  and unfinished events alone do not prove waiting/deadlock. Sampling failure
+  or dropped observations must be explicit, not fabricated as zero.
+- Freeze complete lifecycle: guard installation, concurrent/nested rejection or
+  isolation, activation, quiescence, writer/thread/FD close, drop/panic/cancel,
+  last Arc release and supervisor forced termination. Reuse the unconditional
+  kill/reap/drain finalizer; any extra pipe/thread gets bounded cleanup proof.
+- Preserve compiler60/native15/AS2GiB per process/CPU15/FSIZE16MiB, isolated
+  networking and exact input staging. No profile/dependency implementation change
+  just to obtain a faster build. Any selected gate-only Cargo edit must be explicit.
+- Name harmless proof for disabled output, finite capacity/overflow, callback
+  concurrency, I/O failure/backpressure, panic/cancellation and final-reference
+  release, plus direct default/opt-in compile checks. Do not execute them here.
+  At most one future authentic attempt only after implementation and review.
 
-## Deliverable, validation and stops
+No measured improvement or active-phase diagnosis is claimed. Timing can guide
+investigation only; it cannot become a semantic cache key or acceptance shortcut.
 
-Docs writable: this manifest, canonical Live Status, relevant Stage5 audit/close,
-routing log only for REPLAN; <=100 added lines outside manifest, PROGRESS<=500.
-Rust, harness, Cargo/profile/dependencies and fixtures:0 additions. No strace,
-perf, process attach, native/CLI/Bazel run, compiler, self-check, acquisition,
-credential inspection, missing-source guess, semantic repair or R2 restoration.
-An observation proposal is not execution authorization; it needs independent
-scope/lifecycle review as a successor. New shared public boundary or inability to
-stay within resource/owner limits is REPLAN, not permission to widen this audit.
+## Research scope and complexity
 
-Record exact source anchors, learned facts/non-decisions, file count/bytes and
-one bounded recommendation. Validate docs/diff, preserved R2 hash/forward apply,
-old probe hash and archive checker (the same3 known thoughts paths).
-Independent terminal review must accept the evidence and selected successor before
-commit/push. Runtime state is terminal, not a reason to poll or retry it.
+Read the five audit initial owners and its eight named additional owners only as
+needed; do not reconstruct accepted audits. Follow at most8 additional directly
+referenced hook-emission, transport or lifecycle source/doc/test files, excerpts
+<=2MiB. No cache scan, payload/dependency enumeration, source acquisition or runtime.
+A new observation helper must isolate instrumentation from oversized dice.rs
+(>12000lines); only bounded phase/hook call sites belong in existing owners.
+Do not couple semantic discovery, transport and metrics into that module.
 
-## Preserved evidence
+Docs writable: this manifest, canonical Live Status, relevant Stage5 design,
+routing log only for REPLAN; <=100added lines outside manifest, PROGRESS<=500.
+All Rust/driver/Cargo/fixture additions0 in this design packet. Missing ownership,
+unbounded callback/output/lifetime, changed semantic behavior, higher limits or
+scope overflow is REPLAN. An additional shared public semantic boundary is out.
+Independent reserved review is required before any implementation; validate docs,
+diff, R2 hash/forward apply, old draft hash and archive's exact known3 failures.
 
-Output-conflict R2 /tmp/slug-conflict-r2.XZJWwv/candidate.patch SHA256
-90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e remains unaccepted;
-never partially restore/ship it. Prior native result
-/tmp/slug-sentinel-demand.PXDhxy/logs remains INCONCLUSIVE. Old probe draft SHA256
-8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2 unchanged.
-Checkout-wide replay remains stopped. Never inspect/print/copy ~/.bazelrc or secrets.
+## Preserved evidence and exclusions
+
+a06f3ddfc accepted typed registration identity/bounded diagnostics at473/1380/1853.
+Latest authentic evidence /tmp/slug-sentinel-demand.8dkd3P/logs remains
+INCONCLUSIVE: compile48.043s succeeded; native wall15.0093s/raw9/driver2,
+stdout16bytes test-start only, stderr0, no exact abseil open, RSS unavailable.
+Cleanup complete/no survivors; staged trees removed, logs retained. Prior
+/tmp/slug-sentinel-demand.PXDhxy/logs remains INCONCLUSIVE independently.
+No historical14GB attribution, demand/non-demand or source-closure claim.
+
+Complete output-conflict R2 /tmp/slug-conflict-r2.XZJWwv/candidate.patch SHA256
+90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e remains unaccepted.
+Old probe draft SHA2568eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2
+unchanged. Never partially restore/ship R2; no CLI/Bazel/broad replay, process
+attach, compiler/self-check/native run, credential inspection or semantic fix.

@@ -5868,3 +5868,61 @@ it. No active-phase inference from source reachability or thread exits. Unchange
 R2 hash/forward apply, old draft hash, shell syntax/diff pass; archive only known3.
 Independent evidence-close and successor review ACCEPTS this inconclusive stop
 and source-only audit. Audit not yet performed; next runtime remains unauthorized.
+
+### Native phase-observation source audit (2026-09-10)
+
+Read-only audit used5 initial owners plus8 additional files (DICE ownership docs,
+runtime demands/process_host, Core/Commands Cargo manifests, DICE api events/
+user_data/computations); combined full-file size699829bytes, excerpts<2MiB.
+No compiler/test/probe/attach, fixture change or acquisition. The stopped run's
+active phase remains unknowable from its retained output; thread exits are not
+an evaluation/teardown attribution.
+
+Source map at2cf2a4dd3: payload_demand_probe.rs:13-34 parses BuildRequest, calls
+the exact native API, projects the terminal, publishes event text, discards the
+returned terminal, then prints its first native publication marker. Core runtime/
+mod.rs:76-98 constructs WorkspaceRuntime and calls its build method; the local
+runtime is destroyed before that API returns. runtime/dice.rs:5770-5819 owns
+canonicalization, loader, current-thread Tokio runtime, DICE and native owners;
+6252-6334 resolves request/Host configuration and selects the existing observed/
+neutral/root command path, then claims configured outputs on success.
+drive_command:5967-6180 owns preflight, attempt injection/revision, root compute
+(6007), Need cleanup/progress, terminal closure selection (6037), snapshot/revision
+validation, transaction drop and final acceptance. progress_inner:7161-7273
+services ordered repository materialization, environment and path observations.
+These are reachable boundaries, not measurements of the killed run.
+events.rs:461-467 projects terminal formatting;508-531 renders buffered events,
+appends terminal stderr and transfers the terminal. The probe's wildcard tuple
+discard atline30 destroys that terminal before line31 output. With typed errors,
+that can release retained DAG references: preserve this destruction point in any
+probe correction, do not move it after output to manufacture apparent progress.
+
+Existing hooks: DICE api/events.rs:14-35 supplies six static-key-type start/finish,
+dependency-check and compute notifications through DiceEventListener. user_data.rs:
+28-42,85-106 owns its independent Arc tracker and defaults it to NoOpTracker.
+runtime/dice.rs:5829-5860 does not replace that listener. demands.rs:277-301,409-433
+installs the sole activation tracker for semantic demand metadata and event
+ownership; do not replace/bypass it or emit its full keys/graphs for diagnostics.
+events.rs:924-953 stores/seals batches rather than streaming progress. Existing
+NativeDemandTestTrace (dice.rs:1104-1114,2403-2422) is cfg(test)-only, late-stage,
+Mutex/Vec-backed and read after work, not bounded live telemetry. Core is a normal
+dependency in the current CLI library test; those Core unit-test hooks are absent.
+No live phase/timing output exists in the five inspected runtime owners.
+
+Recommend a reserved design for a default-off, test-build-only Core observer using
+the existing independent DiceEventListener, plus fixed native/teardown/publication
+phase markers. Keep the existing CLI library target, BuildRequest/native API and
+fixture unchanged; moving to Core libtests would activate unrelated cfg(test)
+paths and require a new Commands dev-dependency, so is not the selected shortcut.
+The design must freeze the cross-crate opt-in gate, command-local bounded storage,
+constant-time scalar callbacks, nonblocking bounded transport, CPU/wall sampling,
+overflow/drop accounting and complete disable/drop/join behavior before code.
+No general tracing framework, semantic observer, new key/cache, graph formatting,
+output-cap increase or timing-based correctness decision. DICE event durations
+are not CPU time; last key type is not a causal leaf, and no wait/deadlock claim
+follows from absent finish records alone. A separately reviewed implementation
+and harmless lifecycle proof must precede any future authentic attempt.
+Independent review ACCEPTS the source audit and reserved design scope, not an
+implementation. Diff and preserved R2 hash/forward apply plus old draft hash pass;
+archive retains exactly the known3 failures. No runtime or compiler ran in this
+audit. Next packet freezes the observer contract; no instrumentation is authorized.
