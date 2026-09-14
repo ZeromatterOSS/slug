@@ -23,19 +23,19 @@ def _copy_fixture(tmp_path: Path) -> Path:
 
 def test_authentic_fixture_verifies_and_assembles_offline(tmp_path: Path) -> None:
     verified = verify_fixture()
-    assert len(verified.objects) == 19
+    assert len(verified.objects) == 21
     assert len(verified.registry_entries) == 177
-    assert verified.total_bytes == 901_651
+    assert verified.total_bytes == 7_793_087
     assert (
         verified.inventory_sha256
-        == "f4d6a54ff985fe03a5f489613a0f782422bb69fef5b12b1cc13640c96f925a2d"
+        == "57a78210ed99a85f7461bef726e8153174ad10d62a64a0f65b263fb696f126fd"
     )
 
     destination = tmp_path / "assembled"
     receipt = assemble(destination)
-    assert receipt["object_count"] == 19
+    assert receipt["object_count"] == 21
     assert receipt["registry_metadata_count"] == 177
-    assert receipt["source_bytes"] == 901_651
+    assert receipt["source_bytes"] == 7_793_087
     assert receipt["inventory_sha256"] == verified.inventory_sha256
     assert "local_path_override" not in (destination / "workspace/MODULE.bazel").read_text()
     assert (destination / "workspace/BUILD.bazel").read_text().endswith(
@@ -48,6 +48,10 @@ def test_authentic_fixture_verifies_and_assembles_offline(tmp_path: Path) -> Non
     assert (
         destination
         / "mirror/github.com/bazelbuild/platforms/releases/download/1.0.0/platforms-1.0.0.tar.gz"
+    ).is_file()
+    assert (
+        destination
+        / "mirror/github.com/protocolbuffers/protobuf/releases/download/v33.4/protobuf-33.4.bazel.tar.gz"
     ).is_file()
     assert json.loads((destination / "inventory.json").read_text()) == receipt
     with pytest.raises(FixtureError, match="already exists"):

@@ -34,8 +34,8 @@ DEFAULT_FIXTURE_ROOT = (
 DRIVER = REPO_ROOT / "tools" / "v2_oracle" / "run_payload_demand_probe.sh"
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
 HUNK_RE = re.compile(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
-MAX_OBJECT_BYTES = 1 << 20
-MAX_FIXTURE_BYTES = 1 << 20
+MAX_OBJECT_BYTES = 16 << 20
+MAX_FIXTURE_BYTES = 16 << 20
 
 
 class FixtureError(ValueError):

@@ -20,7 +20,7 @@ verification_command = "python3 tools/v2_oracle/configured_cli_fixture.py prove 
 
 [authentic]
 inventory_version = 1
-total_source_bytes = 901651
+total_source_bytes = 7793087
 historical_probe_sha256 = "8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2"
 candidate_commit = "27e9e9c0c"
 candidate_patch_sha256 = "90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e"
@@ -173,11 +173,27 @@ source_url = "https://github.com/bazelbuild/rules_cc/releases/download/0.2.17/ru
 kind = "archive"
 
 [[objects]]
+source = "mirror/github.com/protocolbuffers/protobuf/releases/download/v33.4/protobuf-33.4.bazel.tar.gz"
+destination = "mirror/github.com/protocolbuffers/protobuf/releases/download/v33.4/protobuf-33.4.bazel.tar.gz"
+sha256 = "687e98a471973b5c5fd711750c40b8b82c0ade33f649db65e00b290f29345a2b"
+size = 6889704
+source_url = "https://github.com/protocolbuffers/protobuf/releases/download/v33.4/protobuf-33.4.bazel.tar.gz"
+kind = "archive"
+
+[[objects]]
 source = "licenses/platforms-LICENSE"
 destination = "licenses/platforms-LICENSE"
 sha256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
 size = 11357
 source_url = "https://github.com/bazelbuild/platforms/releases/download/1.0.0/platforms-1.0.0.tar.gz#LICENSE"
+kind = "license"
+
+[[objects]]
+source = "licenses/protobuf-LICENSE"
+destination = "licenses/protobuf-LICENSE"
+sha256 = "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d"
+size = 1732
+source_url = "https://github.com/protocolbuffers/protobuf/releases/download/v33.4/protobuf-33.4.bazel.tar.gz#protobuf-33.4/LICENSE"
 kind = "license"
 
 [[objects]]

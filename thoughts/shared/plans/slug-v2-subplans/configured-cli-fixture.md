@@ -115,9 +115,9 @@ fixture hashes, command, counts, status and supervisor receipt.
 
 | Gate | Current state | Required evidence / successor |
 |---|---|---|
-| F1 authentic input inventory | partial at the next named payload; all 183 demanded metadata objects and the selected platforms, rules_shell, and `rules_cc@0.2.17` payloads/patches/notices are repository-owned and verified | add exact protobuf 33.4 archive `687e98a471973b5c5fd711750c40b8b82c0ade33f649db65e00b290f29345a2b` from its pinned BCR URL plus notice, then resume the unchanged demand proof |
-| F2 portable offline assembly | accepted by focused checkpoint evidence | 19 objects / 901,651 source bytes and 177 bundled metadata entries verify and assemble in a fresh root; missing, corrupt, and semantically mismatched patch inputs fail closed |
-| F3 configured source closure | blocked by missing protobuf 33.4 archive while reading `REPO.bazel` for `@@protobuf+//bazel/private/toolchains/prebuilt` | add only that demand-established authentic payload, then rerun once to name the next payload or semantic owner |
+| F1 authentic input inventory | partial at the next named payload; protobuf 33.4 is now repository-owned alongside the prior selected payloads and all 183 demanded metadata objects | add exact bazel_features 1.42.1 archive `8189bac9a6bf9cc155a854c4cbebfebf58b9ca7a2d0a67645f7d0c1f83c523ac`, BCR patch `b69c27e64c4ac5043a3f254d88ef2d8383bbfaefd20881a24ed5b6eb13d4b818`, and notice, then resume the unchanged proof |
+| F2 portable offline assembly | accepted through the protobuf checkpoint | 21 objects / 7,793,087 source bytes, inventory `57a78210ed99a85f7461bef726e8153174ad10d62a64a0f65b263fb696f126fd`, and 177 bundled metadata entries verify and assemble in a fresh root; negative checks remain green |
+| F3 configured source closure | blocked by missing bazel_features 1.42.1 archive while loading `@@bazel_features+//:features.bzl` from protobuf's prebuilt-toolchain package | add only that demand-established authentic payload/patch, then rerun once to name the next payload or semantic owner |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -188,6 +188,18 @@ strip prefix `protobuf-33.4`, and SHA-256
 `687e98a471973b5c5fd711750c40b8b82c0ade33f649db65e00b290f29345a2b`.
 This establishes the next authentic payload demand and accepts the diagnostic
 chain; it remains F3 blocker evidence until the archive is repository-owned.
+
+The protobuf checkpoint raised the explicit fixture cap to 16 MiB, verified 21
+objects / 7,793,087 bytes at inventory SHA-256
+`57a78210ed99a85f7461bef726e8153174ad10d62a64a0f65b263fb696f126fd`,
+and passed all 3 focused fixture tests. With that archive present, the same F3
+run advanced through protobuf's `REPO.bazel` and nested loads before naming
+`@@bazel_features+//:features.bzl` in 8.43 seconds. Pinned bazel_features 1.42.1
+metadata supplies archive SHA-256
+`8189bac9a6bf9cc155a854c4cbebfebf58b9ca7a2d0a67645f7d0c1f83c523ac`
+and patch SHA-256
+`b69c27e64c4ac5043a3f254d88ef2d8383bbfaefd20881a24ed5b6eb13d4b818`.
+That payload/patch is the only next acquisition established by this receipt.
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits
 atomic integration, followed by the demand-scoped Stage 6 execution-group

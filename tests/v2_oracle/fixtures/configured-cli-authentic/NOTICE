@@ -11,6 +11,10 @@ platforms 1.0.0
   Source: https://github.com/bazelbuild/platforms/releases/tag/1.0.0
   License: Apache License 2.0, copied as licenses/platforms-LICENSE
 
+protobuf 33.4
+  Source: https://github.com/protocolbuffers/protobuf/releases/tag/v33.4
+  License: BSD 3-Clause, copied as licenses/protobuf-LICENSE
+
 rules_cc 0.2.17
   Source: https://github.com/bazelbuild/rules_cc/releases/tag/0.2.17
   License: Apache License 2.0, copied as licenses/rules_cc-LICENSE
