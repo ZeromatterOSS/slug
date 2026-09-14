@@ -2207,6 +2207,85 @@ pub struct RepositoryPackageLoadError {
     inner: RepositoryPackageLoadErrorInner,
 }
 
+pub(crate) enum RepositoryPackageLoadDiagnostic<'a> {
+    Leaf(RepositoryPackageLoadDiagnosticLeaf<'a>),
+    Bzl {
+        raw_load: &'a str,
+        canonical_label: &'a CanonicalLabel,
+        error: &'a ExternalBzlModuleError,
+    },
+}
+
+pub(crate) struct RepositoryPackageLoadDiagnosticLeaf<'a>(&'a RepositoryPackageLoadErrorInner);
+
+impl RepositoryPackageLoadDiagnosticLeaf<'_> {
+    pub(crate) fn write(&self, out: &mut dyn fmt::Write) -> fmt::Result {
+        match self.0 {
+            RepositoryPackageLoadErrorInner::Source { error } => {
+                out.write_str(if error.is_unsupported_feature() {
+                    "Source.Unsupported"
+                } else {
+                    "Source"
+                })
+            }
+            RepositoryPackageLoadErrorInner::SourceCompute {
+                canonical_repo,
+                package,
+                ..
+            } => write!(out, "SourceCompute @@{canonical_repo}//{package}"),
+            RepositoryPackageLoadErrorInner::Encoding { path } => {
+                write!(out, "Encoding {}", path.display())
+            }
+            RepositoryPackageLoadErrorInner::Parse {
+                canonical_repo,
+                package,
+                ..
+            } => write!(out, "Parse @@{canonical_repo}//{package}"),
+            RepositoryPackageLoadErrorInner::LoadLabel {
+                canonical_repo,
+                package,
+                ..
+            } => write!(out, "LoadLabel @@{canonical_repo}//{package}"),
+            RepositoryPackageLoadErrorInner::LoadedTargetKind {
+                canonical_repo,
+                package,
+                target,
+                kind,
+            } => write!(
+                out,
+                "LoadedTargetKind @@{canonical_repo}//{package}:{target} kind={kind}"
+            ),
+            RepositoryPackageLoadErrorInner::LoadedStarlarkRule {
+                canonical_repo,
+                package,
+                target,
+                reason,
+            } => write!(
+                out,
+                "LoadedStarlarkRule @@{canonical_repo}//{package}:{target}: {reason}"
+            ),
+            RepositoryPackageLoadErrorInner::GlobSourceRoot {
+                canonical_repo,
+                package,
+                build_file,
+            } => write!(
+                out,
+                "GlobSourceRoot @@{canonical_repo}//{package} build_file={}",
+                build_file.display()
+            ),
+            RepositoryPackageLoadErrorInner::Attempt(error) => out.write_str(match error {
+                HostPackageAttemptError::Loading(_) => "Attempt.Loading",
+                HostPackageAttemptError::Glob(_) => "Attempt.Glob",
+                HostPackageAttemptError::Input(_) => "Attempt.Input",
+                HostPackageAttemptError::Invariant(_) => "Attempt.Invariant",
+            }),
+            RepositoryPackageLoadErrorInner::Bzl { .. } => {
+                unreachable!("Bzl errors have a traversable diagnostic view")
+            }
+        }
+    }
+}
+
 impl RepositoryPackageLoadError {
     fn new(inner: RepositoryPackageLoadErrorInner) -> Self {
         Self { inner }
@@ -2218,6 +2297,24 @@ impl RepositoryPackageLoadError {
             RepositoryPackageLoadErrorInner::Source { error }
                 if error.is_unsupported_feature()
         )
+    }
+
+    pub(crate) fn registration_diagnostic(&self) -> RepositoryPackageLoadDiagnostic<'_> {
+        match &self.inner {
+            RepositoryPackageLoadErrorInner::Bzl {
+                raw_load,
+                canonical_label,
+                error,
+                ..
+            } => RepositoryPackageLoadDiagnostic::Bzl {
+                raw_load,
+                canonical_label,
+                error,
+            },
+            inner => {
+                RepositoryPackageLoadDiagnostic::Leaf(RepositoryPackageLoadDiagnosticLeaf(inner))
+            }
+        }
     }
 }
 

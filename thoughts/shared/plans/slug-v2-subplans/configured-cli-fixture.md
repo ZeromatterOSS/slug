@@ -117,7 +117,7 @@ fixture hashes, command, counts, status and supervisor receipt.
 |---|---|---|
 | F1 authentic input inventory | partial at a named semantic boundary; all 183 demanded metadata objects and the selected platforms, rules_shell, and `rules_cc@0.2.17` payloads/patches/notices are repository-owned and verified | resume demand-linked payload acquisition only after the current registration diagnostic is causal; no later payload demand is yet established |
 | F2 portable offline assembly | accepted by focused checkpoint evidence | 19 objects / 901,651 source bytes and 177 bundled metadata entries verify and assemble in a fresh root; missing, corrupt, and semantically mismatched patch inputs fail closed |
-| F3 configured source closure | blocked at `toolchains registration row 5: [diagnostic incomplete: CanonicalPackage]` after selecting `rules_cc@0.2.17` | add a bounded borrowed diagnostic projection for the canonical-package load error, then rerun the unchanged fresh-root proof to name its exact owner or continue demand |
+| F3 configured source closure | blocked at `toolchains registration row 5: CanonicalPackage: Source` after selecting `rules_cc@0.2.17` | extend the same bounded borrowed projection through the opaque repository-package source error, then rerun the unchanged fresh-root proof to name its exact input/owner or continue demand |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -153,6 +153,14 @@ terminal message was
 This is F3 blocker evidence, not configured-source acceptance. The immediate
 prerequisite is a bounded causal diagnostic for that private loader error; it
 must not change loading, toolchain, DICE, or source-selection semantics.
+
+The bounded canonical-package projection then passed its 11-test diagnostic
+slice and changed the same fresh-root terminal message to
+`toolchains registration row 5: CanonicalPackage: Source` in 5.88 seconds, again
+with one selected/executed test, valid observer evidence, and complete cleanup.
+That accepts the package-load projection and selects the smaller opaque
+`RepositoryPackageSourceError` diagnostic prerequisite; it still does not name
+an input or accept F3.
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits
 atomic integration, followed by the demand-scoped Stage 6 execution-group

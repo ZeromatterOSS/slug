@@ -176,7 +176,11 @@ async fn registration_diagnostic_natural_canonical_boundaries() {
             ("CanonicalPackage", ModuleRegistrationExpansionErrorKind::CanonicalPackage(_)) |
             ("CanonicalSubtree", ModuleRegistrationExpansionErrorKind::CanonicalSubtree(_))));
         let text = error.diagnostic().to_string();
-        assert!(text.ends_with(&format!("[diagnostic incomplete: {owner}]")) && !text.contains("POISON"));
+        if owner == "CanonicalPackage" {
+            assert!(text.ends_with("CanonicalPackage: Parse @@dep+//") && !text.contains("POISON"));
+        } else {
+            assert!(text.ends_with(&format!("[diagnostic incomplete: {owner}]")) && !text.contains("POISON"));
+        }
     }
 }
 

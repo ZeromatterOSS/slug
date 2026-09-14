@@ -8,6 +8,7 @@ use crate::ModuleRegistrationExpansionError;
 use crate::ModuleRegistrationExpansionErrorKind as Registration;
 use crate::bzl_module::ExternalBzlModuleError;
 use crate::bzl_module::HostBzlModuleError;
+use crate::bzl_module::RepositoryPackageLoadDiagnostic;
 use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteError;
 use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteErrorKind as Load;
 use crate::canonical_repository_route::HostCanonicalRepositoryRouteError;
@@ -163,7 +164,18 @@ fn render(out: &mut Buffer, error: &ModuleRegistrationExpansionError) -> fmt::Re
         Registration::RootSubtree(_) => return out.incomplete("RootSubtree"),
         Registration::CanonicalSubtree(_) => return out.incomplete("CanonicalSubtree"),
         Registration::RootPackage(_) => return out.incomplete("RootPackage"),
-        Registration::CanonicalPackage(_) => return out.incomplete("CanonicalPackage"),
+        Registration::CanonicalPackage(error) => {
+            out.write_str("CanonicalPackage: ")?;
+            match error.registration_diagnostic() {
+                RepositoryPackageLoadDiagnostic::Leaf(error) => return error.write(out),
+                RepositoryPackageLoadDiagnostic::Bzl { raw_load, canonical_label, error } => {
+                    write!(out, "Bzl {raw_load} ")?;
+                    out.label(canonical_label)?;
+                    out.write_str(": ")?;
+                    Node::ExternalBzl(error)
+                }
+            }
+        }
     };
     walk(out, node)
 }

@@ -1,14 +1,14 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7A-canonical-package-diagnostic
+Packet: WP-7A-repository-package-source-diagnostic
 Status: ready
 
 ## Result and owner
 
-Replace the terminal `[diagnostic incomplete: CanonicalPackage]` in the authentic
-configured CLI proof with a bounded causal projection of the underlying private
-repository-package load error. Stage 5 owns the diagnostic boundary; fixture and
-Stage 6 semantics remain unchanged. Use
+Replace the terminal `CanonicalPackage: Source` in the authentic configured CLI
+proof with a bounded causal projection of the opaque
+`RepositoryPackageSourceError`. Stage 5 owns the source diagnostic boundary;
+fixture and Stage 6 semantics remain unchanged. Use
 [configured-cli-fixture.md](./configured-cli-fixture.md) for the preserved F1/F2
 checkpoint and the exact F3 blocker receipt.
 
@@ -20,21 +20,23 @@ registration behavior, and any later payload demand exposed by the causal error.
 
 Allowed changes:
 
-- `app/slug_loading_v2/src/registration_diagnostic.rs` and its focused tests for
-  the bounded rendering and traversal;
-- `app/slug_loading_v2/src/bzl_module.rs` only for a private borrowed projection
-  of `RepositoryPackageLoadError`; do not change loading or expose owned errors;
+- `app/slug_bzlmod_v2/src/host_package.rs` and a focused diagnostic module/test
+  for the opaque source-error projection;
+- the existing repository-source observation diagnostic only to reuse its
+  bounded `RepositorySourceFileError` rendering without changing semantics;
+- `app/slug_loading_v2/src/bzl_module.rs` and focused registration tests only to
+  consume the new borrowed source projection;
 - this manifest, canonical status, and the configured-fixture gate ledger at a
   genuine acceptance or newly named blocker.
 
 Start with these evidence handles:
 
-- `app/slug_loading_v2/src/registration_diagnostic.rs`: the existing bounded
-  borrowed traversal and current `CanonicalPackage` incomplete branch;
-- `app/slug_loading_v2/src/bzl_module.rs`: the private
-  `RepositoryPackageLoadError` variants whose safe scalar identity is needed;
-- `app/slug_loading_v2/src/registration_diagnostic_tests.rs`: natural malformed
-  external-package coverage, including poison and deterministic truncation;
+- `app/slug_bzlmod_v2/src/host_package.rs`: private source-error variants and
+  exact source selection/read stages;
+- `app/slug_bzlmod_v2/src/source_preparation/repository_source_observation/registration_diagnostic.rs`:
+  existing bounded request/source observation rendering;
+- the accepted `RepositoryPackageLoadDiagnosticLeaf::Source` handoff in
+  `app/slug_loading_v2/src/bzl_module.rs`;
 - [F3 invocation contract](./configured-cli-fixture.md#f3-invocation-contract):
   rerun the same portable proof after the focused diagnostic checks pass.
 
@@ -46,11 +48,12 @@ poison resistance, and deterministic incomplete/truncated classifications.
 ## Work and validation
 
 1. Add the smallest borrowed projection needed for
-   `RepositoryPackageLoadError`; render variant identity and bounded safe scalar
+   `RepositoryPackageSourceError`; render stage identity and bounded safe scalar
    context without cloning, recursive allocation, or semantic evaluation.
-2. Replace only the `CanonicalPackage` incomplete leaf in the registration
-   diagnostic traversal. Prove the natural malformed-package case is causal,
-   poison-free, deterministic, and bounded; preserve all existing leaf behavior.
+2. Reuse the existing bounded source-observation/request rendering for direct
+   and observed source failures. Replace only the generic `Source` leaf in the
+   accepted canonical-package handoff. Prove natural errors are causal,
+   poison-free, deterministic, and bounded.
 3. Run focused owner/dependent checks within 12/15 seconds per test process.
    Compile the observer harness separately within 60 seconds, then rerun the
    unchanged authentic fresh-root F3 proof once.
@@ -66,13 +69,13 @@ until the same proof names its demand.
 
 ## Immediate predecessor and durable candidate
 
-Authentic fixture F2 is accepted at the immediately preceding checkpoint: 19
-objects / 901,651 bytes, 177 bundled metadata entries, fresh-root offline
-assembly, and negative missing/hash/patch checks. F1 remains partial only because
-the next payload demand is hidden behind the current diagnostic. The September
-14 F3 run selected/executed one test, retained valid observer/cleanup evidence,
-and failed at `toolchains registration row 5: [diagnostic incomplete:
-CanonicalPackage]` after selecting `rules_cc@0.2.17`.
+The bounded canonical-package projection passed its 11-test diagnostic slice and
+the same fresh-root proof changed from `[diagnostic incomplete:
+CanonicalPackage]` to `CanonicalPackage: Source` in 5.88 seconds. It selected and
+executed one test, retained valid observer/cleanup evidence, and failed native
+publication after selecting `rules_cc@0.2.17`. The projection is accepted; F3
+remains blocked because the opaque source error does not yet name its input or
+producer.
 
 R2 snapshot: branch `review/output-conflict-r2`, commit `27e9e9c0c`,
 base `97dffd5d4`, original patch SHA-256
