@@ -6,7 +6,12 @@ The September 11 review-fix instruction selects a portable repository-owned
 fixture, including its demanded verbatim upstream metadata, archive/patch
 bytes and upstream notices. Use ordinary archive files, not text/base64 bundles.
 Inventory actual total size and licenses in `fixture.toml` and `NOTICE`; do not
-fetch or vendor the entire registry catalog. Exact missing objects may be
+fetch or vendor registry content merely because it appears in a catalog. The
+September 14 typed trace requested all 183 metadata objects in the pinned
+catalog before repository loading. Preserve those exact demanded bytes in one
+deterministic tar plus a per-entry order/hash/size/URL inventory; this crosses
+the fixture-growth checkpoint without adding 177 loose files. Catalog membership
+still cannot establish payload-archive demand. Exact missing objects may be
 acquired from their pinned source URL after demand is established, using normal
 execution/network permissions. Never read credentials or private user RC files.
 
@@ -15,8 +20,9 @@ its location is not committed and is never read by default acceptance tests.
 The final fixture owns every required byte and assembles offline in a fresh
 temporary directory. A missing/mismatched object fails before Slug starts;
 no implicit network fallback, fake upstream module, or success-by-skip.
-This policy resolves the former user-level choice in the old manifest. It does
-not claim the fixture exists or its configured closure has already succeeded.
+This policy resolves the former user-level choice in the old manifest. Its F2
+assembly is implemented and accepted below; it does not claim that the partial
+F1 payload closure or F3 configured-source proof has succeeded.
 
 ## Known inputs and question
 
@@ -41,12 +47,15 @@ Known exact authentic content:
 | rules_license 1.0.0 archive | `26d4021f6898e23b82ef953078389dd49ac2b5618ac564ade4ef87cced147b38`, 35,903 bytes |
 
 The real platforms module loads `//host:extension.bzl`, generates host_platform,
-and depends on rules_license. The catalog audit verified 184 registry metadata
-objects; the previous staged runtime recipe used 183 plus real platforms,
-rules_shell archives and the rules_shell patch. Catalog membership is not
-payload demand. The configured probe reached
-`bazel_tools+winsdk_configure+local_config_winsdk` and did not publish success.
-Abseil demand remains unknown; its archive was absent at two checked paths.
+and depends on rules_license. The catalog audit verified 184 registry rows: one
+registry policy and 183 module/source metadata objects. The bounded portable
+trace subsequently requested every metadata object, then reached
+`bazel_tools+winsdk_configure+local_config_winsdk` and named the selected
+`rules_cc@0.2.17` archive as the first missing payload. The previous staged
+runtime recipe used platforms and rules_shell archives plus the rules_shell
+patch. Abseil metadata is demanded, but its archive demand remains unknown; its
+archive was absent at two checked paths. Catalog membership is not payload
+demand.
 Use the accepted typed source-observation diagnostic to identify the precise
 missing requested source or unsupported producer. Do not infer causality from
 a previous truncated display or acquire all 47 declared payloads.
@@ -106,9 +115,9 @@ fixture hashes, command, counts, status and supervisor receipt.
 
 | Gate | Current state | Required evidence / successor |
 |---|---|---|
-| F1 authentic input inventory | partial; objects above verified historically | demand-linked fixture inventory, pinned URLs/hashes/notices; exact missing object if blocked |
-| F2 portable offline assembly | not implemented | fresh-root assembly independent of user caches; missing/hash/patch mismatch rejection |
-| F3 configured source closure | unresolved winsdk route; abseil demand unknown | same R2 root completes configured source observation with no fake module bodies; a missing input/unsupported producer leaves F3 blocked and selects its prerequisite |
+| F1 authentic input inventory | partial at a named semantic boundary; all 183 demanded metadata objects and the selected platforms, rules_shell, and `rules_cc@0.2.17` payloads/patches/notices are repository-owned and verified | resume demand-linked payload acquisition only after the current registration diagnostic is causal; no later payload demand is yet established |
+| F2 portable offline assembly | accepted by focused checkpoint evidence | 19 objects / 901,651 source bytes and 177 bundled metadata entries verify and assemble in a fresh root; missing, corrupt, and semantically mismatched patch inputs fail closed |
+| F3 configured source closure | blocked at `toolchains registration row 5: [diagnostic incomplete: CanonicalPackage]` after selecting `rules_cc@0.2.17` | add a bounded borrowed diagnostic projection for the canonical-package load error, then rerun the unchanged fresh-root proof to name its exact owner or continue demand |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -132,6 +141,18 @@ candidate revisions/features/environment, exact selected count, command and exit
 Only successful F1–F3 acceptance selects recovery of combined R2 on an isolated
 worktree. A diagnostic naming a missing/unsupported producer is useful evidence,
 but never F3 acceptance.
+
+The September 14 fresh-root checkpoint verified fixture inventory SHA-256
+`f4d6a54ff985fe03a5f489613a0f782422bb69fef5b12b1cc13640c96f925a2d`,
+then selected and executed exactly one probe test in 6.38 seconds. Native
+publication exited 1, the test failed, the observer receipt was valid, and
+cleanup completed. The source closure had already consumed the full typed
+metadata inventory and selected the verified `rules_cc@0.2.17` payload; its
+terminal message was
+`toolchains registration row 5: [diagnostic incomplete: CanonicalPackage]`.
+This is F3 blocker evidence, not configured-source acceptance. The immediate
+prerequisite is a bounded causal diagnostic for that private loader error; it
+must not change loading, toolchain, DICE, or source-selection semantics.
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits
 atomic integration, followed by the demand-scoped Stage 6 execution-group

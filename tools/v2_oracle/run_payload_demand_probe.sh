@@ -5,18 +5,32 @@ cd -- "$(dirname -- "$0")/../.."
 for probe_tool in unshare prlimit strace perl timeout; do
     command -v "$probe_tool" >/dev/null
 done
-probe_scratch=$(mktemp -d /tmp/slug-sentinel-demand.XXXXXX)
+probe_harness=
+probe_portable=0
+if [[ $# == 3 && "$1" == "--portable-run" ]]; then
+    probe_portable=1
+    probe_scratch=$2
+    probe_harness=$3
+    [[ "$probe_scratch" == /tmp/slug-configured-cli-*/fixture ]]
+    [[ -d "$probe_scratch/workspace" && -d "$probe_scratch/registry" && -d "$probe_scratch/mirror" ]]
+    [[ "$probe_harness" == /* && -x "$probe_harness" ]]
+else
+    probe_scratch=$(mktemp -d /tmp/slug-sentinel-demand.XXXXXX)
+fi
 printf 'Diagnostic evidence: %s/logs\n' "$probe_scratch"
 mkdir "$probe_scratch/logs"
-trap 'for probe_tree in workspace registry mirror; do
-    if [[ -d "$probe_scratch/$probe_tree" ]]; then
-        rm -rf -- "$probe_scratch/$probe_tree"
-    fi
-done' EXIT
+if [[ $probe_portable == 0 ]]; then
+    trap 'for probe_tree in workspace registry mirror; do
+        if [[ -d "$probe_scratch/$probe_tree" ]]; then
+            rm -rf -- "$probe_scratch/$probe_tree"
+        fi
+    done' EXIT
+fi
 probe_perl() {
     local -a probe_guard=()
     if [[ "$1" == run ]]; then probe_guard=(timeout --kill-after=2 58); fi
-    "${probe_guard[@]}" perl - "$probe_scratch" "$1" <<'PERL'
+    if [[ "$1" == portable-run ]]; then probe_guard=(timeout --kill-after=2 15); fi
+    "${probe_guard[@]}" perl - "$probe_scratch" "$1" "$probe_harness" <<'PERL'
 use strict;
 use warnings;
 use JSON::PP qw(decode_json encode_json);
@@ -29,8 +43,17 @@ use IO::Select;
 use POSIX qw(setsid WNOHANG);
 use Time::HiRes qw(time sleep);
 require 'syscall.ph';
-my ($scratch, $mode) = @ARGV;
-$scratch =~ m{\A/tmp/slug-sentinel-demand\.[A-Za-z0-9]{6}\z} or die "scratch path\n";
+my ($scratch, $mode, $portable_harness) = @ARGV;
+if ($mode eq 'portable-run') {
+    $scratch =~ m{\A/tmp/slug-configured-cli-[A-Za-z0-9_]+/fixture\z}
+        or die "portable scratch path\n";
+    defined($portable_harness) && $portable_harness =~ m{\A/} && -x $portable_harness
+        or die "portable harness\n";
+    -d "$scratch/workspace" && -d "$scratch/registry" && -d "$scratch/mirror"
+        or die "portable fixture shape\n";
+} else {
+    $scratch =~ m{\A/tmp/slug-sentinel-demand\.[A-Za-z0-9]{6}\z} or die "scratch path\n";
+}
 my $logs = "$scratch/logs";
 sub read_small {
     my ($path, $cap) = @_;
@@ -314,6 +337,54 @@ if ($mode eq 'self-check') {
         or die "telemetry cap supervision did not fail closed\n";
     exit 0;
 }
+if ($mode eq 'portable-run') {
+    my $test = 'payload_demand_probe::authentic_sentinel_demand';
+    my ($selector, $selector_buffers) = supervise(
+        'selector', 2, [16384,16384,1024],
+        sub { isolated(undef, $portable_harness, '--list', '--ignored', '--exact', $test) },
+        0, 0);
+    my @listed = grep { /: test\z/ } split /\n/, $selector_buffers->[0];
+    my $selector_ok = !$selector->{stop} && defined($selector->{raw_status}) &&
+        $selector->{raw_status} == 0 && @listed == 1 && $listed[0] eq "$test: test";
+    my ($run, $buffers, $telemetry) = supervise(
+        'portable-proof', 12, [131072,131072,1024],
+        sub { my ($trace_fd, $observer_fd) = @_;
+            chdir "$scratch/workspace" or die "chdir: $!\n";
+            isolated($observer_fd, $portable_harness, '--ignored', '--exact', $test, '--nocapture');
+        },
+        0, 1);
+    my $decoded = $run->{cleanup_complete} && !$run->{telemetry_error}
+        ? decode_observer($telemetry) : {available => JSON::PP::false,
+            reason => $run->{telemetry_error} // 'process-tree-not-quiescent'};
+    my $executed = () = $buffers->[0] =~ /^test \Q$test\E \.\.\. (?:ok|FAILED)$/mg;
+    my $passed = () = $buffers->[0] =~ /^test result: ok\. 1 passed; 0 failed;/mg;
+    my $publication = () = $buffers->[0] =~ /^native publication exit=0$/mg;
+    my $sentinel = () = $buffers->[0] =~ /^SLUG_SENTINEL_NATIVE_SUCCESS_PUBLISHED_0$/mg;
+    my $success = $selector_ok && !$run->{stop} && defined($run->{raw_status}) &&
+        $run->{raw_status} == 0 && $run->{cleanup_complete} &&
+        $decoded->{available} && $executed == 1 && $passed == 1 &&
+        $publication == 1 && $sentinel == 1;
+    my $summary = encode_json({
+        result => $success ? 'complete-configured-source-closure' : 'incomplete',
+        selected_tests => $selector_ok ? 1 : 0,
+        executed_tests => $executed == 1 ? 1 : 0,
+        passed_tests => $passed ? 1 : 0,
+        native_publication_exit_zero => $publication == 1 ? JSON::PP::true : JSON::PP::false,
+        sentinel_success => $sentinel == 1 ? JSON::PP::true : JSON::PP::false,
+        selector_supervision => $selector,
+        run_supervision => $run,
+        observer => $decoded,
+    });
+    write_new("$logs/portable-result.json", "$summary\n");
+    print "$summary\n";
+    if (!$success) {
+        print STDERR "selector stdout:\n$selector_buffers->[0]";
+        print STDERR "selector stderr:\n$selector_buffers->[1]";
+        print STDERR "probe stdout:\n$buffers->[0]";
+        print STDERR "probe stderr:\n$buffers->[1]";
+    }
+    exit($success ? 0 : 2);
+}
 if ($mode eq 'compile') {
     my ($r, $buffers) = supervise('compiler', 60, [16777216,16777216,65536], sub {
         $ENV{PATH} = '/home/wgray/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin:/usr/bin:/bin';
@@ -451,6 +522,10 @@ timeout 5 env -i PATH=/usr/bin:/bin unshare --user --map-root-user --net \
     prlimit --as=2147483648 --cpu=2 --fsize=16777216 \
     strace -f -e trace=openat,openat2 -P /dev/null /usr/bin/true \
     >"$probe_scratch/logs/preflight.stdout" 2>"$probe_scratch/logs/preflight.stderr"
+if [[ $probe_portable == 1 ]]; then
+    probe_perl portable-run
+    exit 0
+fi
 probe_perl self-check
 if [[ $# == 1 ]] && [[ "$1" == "--self-check" ]]; then exit 0; fi
 [[ $# == 0 ]] || { [[ $# == 1 && "$1" == "--compile-only" ]] || {

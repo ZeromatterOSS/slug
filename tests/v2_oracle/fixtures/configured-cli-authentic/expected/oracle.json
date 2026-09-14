@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "fixture": "configured-cli-authentic",
+  "generated": false,
+  "oracle_notes": "This is an offline assembly and native configured-source fixture. Its acceptance entry point is tools/v2_oracle/configured_cli_fixture.py, not the generic Bazel command runner.",
+  "commands": []
+}

@@ -1,0 +1,197 @@
+[fixture]
+name = "configured-cli-authentic"
+description = "Portable offline authentic inputs for the configured CLI source-closure proof."
+comparison = "semantic"
+oracle_notes = "The generic runner has no command rows. F1-F3 are owned by tools/v2_oracle/configured_cli_fixture.py and the bounded native observer harness."
+required_host_os = "linux"
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/test/tools/bzlmod/MODULE.bazel.lock",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RepoSpecFunction.java",
+  "27e9e9c0c:app/slug_cli_v2/tests/cli.rs configured_action_conflicts",
+]
+translation_notes = "The test-owned R2 root drops its fake platforms override. Verbatim BCR metadata selects authentic archives through an assembly-local file mirror. A bounded typed diagnostic requested all 183 metadata objects in the pinned catalog before repository loading; six original rows remain direct objects and the other 177 are a deterministic tar with per-entry demand order, hash, size, and URL. Payload archives remain separately demand-gated."
+generation_command = "python3 tools/v2_oracle/configured_cli_fixture.py verify"
+verification_command = "python3 tools/v2_oracle/configured_cli_fixture.py prove --harness <cargo-json-lib-test-executable>"
+
+[authentic]
+inventory_version = 1
+total_source_bytes = 901651
+historical_probe_sha256 = "8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2"
+candidate_commit = "27e9e9c0c"
+candidate_patch_sha256 = "90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e"
+
+[[patch_checks]]
+archive = "mirror/github.com/bazelbuild/rules_shell/releases/download/v0.6.1/rules_shell-v0.6.1.tar.gz"
+member = "rules_shell-0.6.1/MODULE.bazel"
+patch = "registry/modules/rules_shell/0.6.1/patches/module_dot_bazel_version.patch"
+expected = "registry/modules/rules_shell/0.6.1/MODULE.bazel"
+preimage_sha256 = "3bed3c3d2d5c284f410202a1707ed5924f6bd8f71b146222bd8409057c9d7056"
+
+[[patch_checks]]
+archive = "mirror/github.com/bazelbuild/rules_cc/releases/download/0.2.17/rules_cc-0.2.17.tar.gz"
+member = "rules_cc-0.2.17/MODULE.bazel"
+patch = "registry/modules/rules_cc/0.2.17/patches/module_dot_bazel_version.patch"
+expected = "modules/rules_cc/0.2.17/MODULE.bazel"
+preimage_sha256 = "923381d234e38513078c4301ee419ad4c73dc9f312d007260b691ac2833689a9"
+
+[registry_bundle]
+archive = "registry-metadata.tar"
+inventory = "registry-metadata.json"
+entry_count = 177
+
+[[objects]]
+source = "registry-metadata.tar"
+destination = "registry-metadata.tar"
+sha256 = "60b023fc3b3abc4dee63beafc5cc563747bc7d4c3c0d34649886d0e3d7c89212"
+size = 409600
+source_url = "derived from the 177 typed BCR metadata demands recorded in registry-metadata.json"
+kind = "registry_bundle"
+
+[[objects]]
+source = "registry-metadata.json"
+destination = "registry-metadata.json"
+sha256 = "e2bb961d35545679f8dc74299478d65231fa11cf00c399c3d021350099559433"
+size = 41612
+source_url = "typed demand inventory; each row records its exact https://bcr.bazel.build source"
+kind = "registry_inventory"
+
+[[objects]]
+source = "workspace/BUILD.bazel"
+destination = "workspace/BUILD.bazel"
+sha256 = "59f66cb2d1107ade6046a88dac4efa6fd49ba7041407f4ed32df48fe4ed3675b"
+size = 395
+source_url = "git+https://github.com/ZeromatterOSS/slug.git@27e9e9c0c#app/slug_cli_v2/tests/cli.rs:5246"
+kind = "root"
+
+[[objects]]
+source = "workspace/MODULE.bazel"
+destination = "workspace/MODULE.bazel"
+sha256 = "a2913b39903832ef31445f7bc2579906b6ace71f9e827e40f10e6fad60326b23"
+size = 159
+source_url = "git+https://github.com/ZeromatterOSS/slug.git@27e9e9c0c#app/slug_cli_v2/tests/cli.rs:5259"
+kind = "root"
+
+[[objects]]
+source = "workspace/defs.bzl"
+destination = "workspace/defs.bzl"
+sha256 = "7d11da734d45f3b1a855b0aa04d3aa7c1b632ab4e3d6b1d6e130244f0f5a30c4"
+size = 656
+source_url = "git+https://github.com/ZeromatterOSS/slug.git@27e9e9c0c#app/slug_cli_v2/tests/cli.rs:5277"
+kind = "root"
+
+[[objects]]
+source = "registry/modules/platforms/1.0.0/MODULE.bazel"
+destination = "registry/modules/platforms/1.0.0/MODULE.bazel"
+sha256 = "f05feb42b48f1b3c225e4ccf351f367be0371411a803198ec34a389fb22aa580"
+size = 286
+source_url = "https://bcr.bazel.build/modules/platforms/1.0.0/MODULE.bazel"
+kind = "registry"
+
+[[objects]]
+source = "registry/modules/platforms/1.0.0/source.json"
+destination = "registry/modules/platforms/1.0.0/source.json"
+sha256 = "f4ff1fd412e0246fd38c82328eb209130ead81d62dcd5a9e40910f867f733d96"
+size = 176
+source_url = "https://bcr.bazel.build/modules/platforms/1.0.0/source.json"
+kind = "registry"
+
+[[objects]]
+source = "registry/modules/rules_license/0.0.7/MODULE.bazel"
+destination = "registry/modules/rules_license/0.0.7/MODULE.bazel"
+sha256 = "088fbeb0b6a419005b89cf93fe62d9517c0a2b8bb56af3244af65ecfe37e7d5d"
+size = 678
+source_url = "https://bcr.bazel.build/modules/rules_license/0.0.7/MODULE.bazel"
+kind = "registry"
+
+[[objects]]
+source = "registry/modules/rules_license/1.0.0/MODULE.bazel"
+destination = "registry/modules/rules_license/1.0.0/MODULE.bazel"
+sha256 = "a7fda60eefdf3d8c827262ba499957e4df06f659330bbe6cdbdb975b768bb65c"
+size = 753
+source_url = "https://bcr.bazel.build/modules/rules_license/1.0.0/MODULE.bazel"
+kind = "registry"
+
+[[objects]]
+source = "registry/modules/rules_shell/0.6.1/MODULE.bazel"
+destination = "registry/modules/rules_shell/0.6.1/MODULE.bazel"
+sha256 = "72e76b0eea4e81611ef5452aa82b3da34caca0c8b7b5c0c9584338aa93bae26b"
+size = 485
+source_url = "https://bcr.bazel.build/modules/rules_shell/0.6.1/MODULE.bazel"
+kind = "registry"
+
+[[objects]]
+source = "registry/modules/rules_shell/0.6.1/source.json"
+destination = "registry/modules/rules_shell/0.6.1/source.json"
+sha256 = "20ec05cd5e592055e214b2da8ccb283c7f2a421ea0dc2acbf1aa792e11c03d0c"
+size = 365
+source_url = "https://bcr.bazel.build/modules/rules_shell/0.6.1/source.json"
+kind = "registry"
+
+[[objects]]
+source = "registry/modules/rules_cc/0.2.17/patches/module_dot_bazel_version.patch"
+destination = "registry/modules/rules_cc/0.2.17/patches/module_dot_bazel_version.patch"
+sha256 = "a89845ad52cb03845e5c57eb74a50d1fb4bc34e377555ad6dc08d00b460bf799"
+size = 295
+source_url = "https://bcr.bazel.build/modules/rules_cc/0.2.17/patches/module_dot_bazel_version.patch"
+kind = "patch"
+
+[[objects]]
+source = "registry/modules/rules_shell/0.6.1/patches/module_dot_bazel_version.patch"
+destination = "registry/modules/rules_shell/0.6.1/patches/module_dot_bazel_version.patch"
+sha256 = "5f0700eaa9a33770aae4ae8b06bec8e433f518eb50711378c8cd3a5d7854ff2d"
+size = 320
+source_url = "https://bcr.bazel.build/modules/rules_shell/0.6.1/patches/module_dot_bazel_version.patch"
+kind = "patch"
+
+[[objects]]
+source = "mirror/github.com/bazelbuild/platforms/releases/download/1.0.0/platforms-1.0.0.tar.gz"
+destination = "mirror/github.com/bazelbuild/platforms/releases/download/1.0.0/platforms-1.0.0.tar.gz"
+sha256 = "3384eb1c30762704fbe38e440204e114154086c8fc8a8c2e3e28441028c019a8"
+size = 7879
+source_url = "https://github.com/bazelbuild/platforms/releases/download/1.0.0/platforms-1.0.0.tar.gz"
+kind = "archive"
+
+[[objects]]
+source = "mirror/github.com/bazelbuild/rules_shell/releases/download/v0.6.1/rules_shell-v0.6.1.tar.gz"
+destination = "mirror/github.com/bazelbuild/rules_shell/releases/download/v0.6.1/rules_shell-v0.6.1.tar.gz"
+sha256 = "e6b87c89bd0b27039e3af2c5da01147452f240f75d505f5b6880874f31036307"
+size = 23916
+source_url = "https://github.com/bazelbuild/rules_shell/releases/download/v0.6.1/rules_shell-v0.6.1.tar.gz"
+kind = "archive"
+
+[[objects]]
+source = "mirror/github.com/bazelbuild/rules_cc/releases/download/0.2.17/rules_cc-0.2.17.tar.gz"
+destination = "mirror/github.com/bazelbuild/rules_cc/releases/download/0.2.17/rules_cc-0.2.17.tar.gz"
+sha256 = "283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a"
+size = 380004
+source_url = "https://github.com/bazelbuild/rules_cc/releases/download/0.2.17/rules_cc-0.2.17.tar.gz"
+kind = "archive"
+
+[[objects]]
+source = "licenses/platforms-LICENSE"
+destination = "licenses/platforms-LICENSE"
+sha256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+size = 11357
+source_url = "https://github.com/bazelbuild/platforms/releases/download/1.0.0/platforms-1.0.0.tar.gz#LICENSE"
+kind = "license"
+
+[[objects]]
+source = "licenses/rules_cc-LICENSE"
+destination = "licenses/rules_cc-LICENSE"
+sha256 = "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd"
+size = 11357
+source_url = "https://github.com/bazelbuild/rules_cc/releases/download/0.2.17/rules_cc-0.2.17.tar.gz#rules_cc-0.2.17/LICENSE"
+kind = "license"
+
+[[objects]]
+source = "licenses/rules_shell-LICENSE"
+destination = "licenses/rules_shell-LICENSE"
+sha256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+size = 11358
+source_url = "https://github.com/bazelbuild/rules_shell/releases/download/v0.6.1/rules_shell-v0.6.1.tar.gz#rules_shell-0.6.1/LICENSE"
+kind = "license"

@@ -1,0 +1,8 @@
+load(":defs.bzl", "toolchain_impl", "writer", "root_rule")
+platform(name = "platform")
+toolchain_type(name = "kind")
+toolchain_impl(name = "implementation")
+toolchain(name = "registration", toolchain_type = ":kind", toolchain = ":implementation")
+writer(name = "writer_a", content = "same")
+writer(name = "writer_b", content = "same")
+root_rule(name = "root", deps = [":writer_a", ":writer_b"])

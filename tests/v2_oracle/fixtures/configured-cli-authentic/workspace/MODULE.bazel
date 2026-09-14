@@ -1,0 +1,4 @@
+module(name = 'conflicts')
+register_execution_platforms('//:platform')
+register_toolchains('//:registration')
+bazel_dep(name = 'platforms', version = '1.0.0')

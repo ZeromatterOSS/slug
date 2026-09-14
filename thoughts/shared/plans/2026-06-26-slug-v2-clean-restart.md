@@ -29,14 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7A-authentic-configured-fixture
+Packet: WP-7A-canonical-package-diagnostic
 Status: ready
 
-Implement the portable authentic configured fixture prerequisite described by
-[current-packet.md](./slug-v2-subplans/current-packet.md). The September 11
-review-fix instruction selects repository-owned authentic fixture inputs and
-permits routine bounded diagnostics/recovery; the prior fixture-choice REPLAN
-and packet-local no-retry rules no longer reserve that policy decision.
+Project the authentic fixture's private `CanonicalPackage` loader failure into
+the existing bounded borrowed registration diagnostic, as specified by
+[current-packet.md](./slug-v2-subplans/current-packet.md). F2's offline fixture is
+accepted; F1 remains partial until the causal diagnostic either names another
+payload demand or an unsupported semantic owner.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
@@ -53,13 +53,14 @@ Preservation is not integration. Do not activate it partially or weaken a gate.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Authentic configured CLI fixture | ready; [source/fixture contract](./slug-v2-subplans/configured-cli-fixture.md) separates portable inputs from diagnostic demand evidence |
-| 2 | Combined selected-request/output-conflict R2 | blocked on complete fixture and outstanding baseline attribution; [Stage 6](./slug-v2-subplans/06-analysis-toolchains-and-actions.md) owns semantics and gate ledger |
-| 3 | Bootstrap-demanded execution-group support | blocked on R2; reconcile existing closure artifacts and record named/automatic demand before freezing scope; reuse Stage 6's pinned source matrix |
-| 4 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
-| 5 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
-| 6 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
-| 7 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |
+| 1 | Bounded canonical-package diagnostic | ready; same authentic F3 run reached `[diagnostic incomplete: CanonicalPackage]` after verified metadata and `rules_cc@0.2.17` selection |
+| 2 | Authentic configured CLI fixture | F2 accepted; F1/F3 blocked on the causal diagnostic and any demand or semantic owner it names; [fixture ledger](./slug-v2-subplans/configured-cli-fixture.md) owns the receipt |
+| 3 | Combined selected-request/output-conflict R2 | blocked on complete fixture and outstanding baseline attribution; [Stage 6](./slug-v2-subplans/06-analysis-toolchains-and-actions.md) owns semantics and gate ledger |
+| 4 | Bootstrap-demanded execution-group support | blocked on R2; reconcile existing closure artifacts and record named/automatic demand before freezing scope; reuse Stage 6's pinned source matrix |
+| 5 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
+| 6 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
+| 7 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
+| 8 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |
 
 Tests retain the user's 12-second deadline/15-second absolute ceiling.
 Compile/preparation is separate and bounded to 60 seconds; split/check smaller

@@ -1,0 +1,24 @@
+This fixture redistributes verbatim metadata and source archives used by the
+Bazel Central Registry at the pinned Bazel 9.2.0 revision.
+
+registry-metadata.tar
+  Contains 177 verbatim BCR metadata objects that the bounded native trace
+  requested after the six direct registry objects listed in fixture.toml.
+  registry-metadata.json records each object's demand order, source URL, size,
+  and SHA-256. The metadata has no executable payload content.
+
+platforms 1.0.0
+  Source: https://github.com/bazelbuild/platforms/releases/tag/1.0.0
+  License: Apache License 2.0, copied as licenses/platforms-LICENSE
+
+rules_cc 0.2.17
+  Source: https://github.com/bazelbuild/rules_cc/releases/tag/0.2.17
+  License: Apache License 2.0, copied as licenses/rules_cc-LICENSE
+
+rules_shell 0.6.1
+  Source: https://github.com/bazelbuild/rules_shell/releases/tag/v0.6.1
+  License: Apache License 2.0, copied as licenses/rules_shell-LICENSE
+
+The custom workspace files are recovered from Slug R2 candidate 27e9e9c0c.
+The generated bazel_registry.json contains only the assembly-time file mirror
+location and is not upstream registry content.

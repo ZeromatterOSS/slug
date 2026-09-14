@@ -1,89 +1,78 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7A-authentic-configured-fixture
+Packet: WP-7A-canonical-package-diagnostic
 Status: ready
 
 ## Result and owner
 
-Deliver one repository-owned authentic source fixture for the configured CLI
-proof required by combined output-conflict R2. Stage 5 owns source provenance;
-Stage 1 owns fixture preparation; Stage 6 retains R2's semantic acceptance.
-Use [configured-cli-fixture.md](./configured-cli-fixture.md) for the selected
-storage/acquisition policy, inputs, dependency ledger, and exact exit criteria.
-The September 11 review-fix request authorizes this policy choice and bounded
-fixture preparation without another design-only approval loop.
+Replace the terminal `[diagnostic incomplete: CanonicalPackage]` in the authentic
+configured CLI proof with a bounded causal projection of the underlying private
+repository-package load error. Stage 5 owns the diagnostic boundary; fixture and
+Stage 6 semantics remain unchanged. Use
+[configured-cli-fixture.md](./configured-cli-fixture.md) for the preserved F1/F2
+checkpoint and the exact F3 blocker receipt.
 
-Exact: upstream MODULE/source/archive/patch bytes and hashes, plus the existing
-named Bazel behavior claims. Slug-native: current configuration/path identity
-and diagnostic infrastructure. Deferred: any new semantic source, execution-
-group, action-family or configured ruleset support exposed by the fixture.
+Slug-native: bounded borrowed diagnostic rendering and its poison/overflow
+behavior. Exact/deferred: upstream semantics, new source producers, toolchain
+registration behavior, and any later payload demand exposed by the causal error.
 
 ## Scope
 
 Allowed changes:
 
-- `tests/v2_oracle/fixtures/configured-cli-authentic/` for manifest, upstream
-  notices and demanded authentic metadata/payloads;
-- `tools/v2_oracle/configured_cli_fixture.py` and
-  `tests/v2_oracle/test_configured_cli_fixture.py` for portable offline assembly
-  and focused validation;
-- `tools/v2_oracle/run_payload_demand_probe.sh` only to reuse/parameterize bounded
-  supervision for the portable F3 gate; retain the historical evidence handles;
-- this manifest, canonical status and the Stage 5/6 gate ledger at a genuine
-  acceptance or blocker.
+- `app/slug_loading_v2/src/registration_diagnostic.rs` and its focused tests for
+  the bounded rendering and traversal;
+- `app/slug_loading_v2/src/bzl_module.rs` only for a private borrowed projection
+  of `RepositoryPackageLoadError`; do not change loading or expose owned errors;
+- this manifest, canonical status, and the configured-fixture gate ledger at a
+  genuine acceptance or newly named blocker.
 
-Start with these evidence handles; expand to the full R2 diff only for a semantic
-question or R2 recovery:
+Start with these evidence handles:
 
-- `git show 27e9e9c0c:app/slug_cli_v2/tests/cli.rs`, module
-  `configured_action_conflicts`, especially `BUILD` and `workspace()`
-  (lines 5246–5292): authentic test-owned root MODULE/BUILD/defs declarations.
-- `tools/v2_oracle/run_payload_demand_probe.sh` lines 345–434: historical staging
-  and invocation recipe; `app/slug_cli_v2/src/payload_demand_probe.rs` lines 20–67:
-  retained `//:root` request and native publication boundary.
+- `app/slug_loading_v2/src/registration_diagnostic.rs`: the existing bounded
+  borrowed traversal and current `CanonicalPackage` incomplete branch;
+- `app/slug_loading_v2/src/bzl_module.rs`: the private
+  `RepositoryPackageLoadError` variants whose safe scalar identity is needed;
+- `app/slug_loading_v2/src/registration_diagnostic_tests.rs`: natural malformed
+  external-package coverage, including poison and deterministic truncation;
 - [F3 invocation contract](./configured-cli-fixture.md#f3-invocation-contract):
-  the portable proof to implement. The historical driver has personal-cache and
-  vanished `/tmp` dependencies, deliberately missing abseil and an old timeout;
-  do not run it unchanged for F3.
+  rerun the same portable proof after the focused diagnostic checks pass.
 
-No production Rust, applying R2 to main, source-policy change, fake platforms
-body or upstream local override belongs to fixture preparation. Keep authentic
-custom root declarations; do not infer demand from the full registry catalog.
+No loading, DICE-key, registration, source-policy, toolchain, or R2 semantic
+change belongs in this packet. Do not render an unbounded recursive `Display`
+chain into the diagnostic. Preserve the existing fixed-capacity ASCII output,
+poison resistance, and deterministic incomplete/truncated classifications.
 
 ## Work and validation
 
-1. Resolve pinned tools and the targeted evidence above. Recover root declarations
-   from the durable Git object, not the obsolete temporary patch path. Preserve
-   the root's behavior while replacing upstream stubs/overrides with authentic
-   inputs under the fixture contract. Verify available content hashes.
-2. Assemble authentic inputs with provenance and copied upstream notices under
-   the selected repository-owned fixture directory; do not invent archive bytes.
-   Acquire only exact missing inputs whose demand is established, under the
-   ordinary execution/network permission mechanism.
-3. Use bounded diagnostics to identify the first missing source or unsupported
-   semantic owner. A diagnostic may use an explicitly supplied cache path;
-   final fixture assembly/tests may not depend on that path or personal caches.
-4. Prove offline assembly from a fresh temporary root, hash/patch mismatch and
-   missing-object rejection, and complete configured source observation for the
-   R2 root. Every named runtime test stays <=12 seconds/15 seconds absolute;
-   compile/preparation stays separate and <=60 seconds per operation.
-5. Record one terminal receipt: complete fixture, or exact missing input/owner
-   and the smaller prerequisite required. Hash verification alone is not a
-   complete configured-runtime proof. On success select combined R2 recovery;
-   baseline attribution and remaining semantic gates are still required.
+1. Add the smallest borrowed projection needed for
+   `RepositoryPackageLoadError`; render variant identity and bounded safe scalar
+   context without cloning, recursive allocation, or semantic evaluation.
+2. Replace only the `CanonicalPackage` incomplete leaf in the registration
+   diagnostic traversal. Prove the natural malformed-package case is causal,
+   poison-free, deterministic, and bounded; preserve all existing leaf behavior.
+3. Run focused owner/dependent checks within 12/15 seconds per test process.
+   Compile the observer harness separately within 60 seconds, then rerun the
+   unchanged authentic fresh-root F3 proof once.
+4. Record one terminal receipt: configured closure, an exact demanded input, or
+   an exact unsupported semantic owner. If the projection itself cannot remain
+   bounded and borrowed, stop with that implementation blocker.
 
 Invocation/compiler/test-selection corrections within this contract use the
-orchestration skill. New source semantics, evidence contradicting the design,
-unknown integrity/provenance, or inability to complete within user constraints
-are genuine decisions for the root. Preserve successful evidence; no blind
-repeat of the old spent probe. A fresh probe must name the new question and
-use the accepted typed source diagnostic, not reinterpret old receipts.
+orchestration skill. New source semantics or evidence contradicting the bounded
+diagnostic design selects a smaller prerequisite rather than widening this
+packet. Preserve the F1/F2 fixture checkpoint and do not acquire another payload
+until the same proof names its demand.
 
 ## Immediate predecessor and durable candidate
 
-Run registry policy accepted at `47163df7b`; earlier sandbox failures were
-attributed to bind denial, and the named CLI/Server proofs passed. The September
-11 review repairs workflow/status and daemon cleanup; it does not accept R2.
+Authentic fixture F2 is accepted at the immediately preceding checkpoint: 19
+objects / 901,651 bytes, 177 bundled metadata entries, fresh-root offline
+assembly, and negative missing/hash/patch checks. F1 remains partial only because
+the next payload demand is hidden behind the current diagnostic. The September
+14 F3 run selected/executed one test, retained valid observer/cleanup evidence,
+and failed at `toolchains registration row 5: [diagnostic incomplete:
+CanonicalPackage]` after selecting `rules_cc@0.2.17`.
 
 R2 snapshot: branch `review/output-conflict-r2`, commit `27e9e9c0c`,
 base `97dffd5d4`, original patch SHA-256
