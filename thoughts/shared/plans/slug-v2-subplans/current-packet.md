@@ -21,24 +21,41 @@ group, action-family or configured ruleset support exposed by the fixture.
 ## Scope
 
 Allowed changes:
+
 - `tests/v2_oracle/fixtures/configured-cli-authentic/` for manifest, upstream
   notices and demanded authentic metadata/payloads;
 - `tools/v2_oracle/configured_cli_fixture.py` and
   `tests/v2_oracle/test_configured_cli_fixture.py` for portable offline assembly
   and focused validation;
+- `tools/v2_oracle/run_payload_demand_probe.sh` only to reuse/parameterize bounded
+  supervision for the portable F3 gate; retain the historical evidence handles;
 - this manifest, canonical status and the Stage 5/6 gate ledger at a genuine
   acceptance or blocker.
 
-Read the preserved 19-file R2 patch and exact fixture module as evidence; do
-not apply it to main merely to prepare sources. No production Rust, semantic
-source-policy change, fake platforms body or local override of an upstream
-module belongs to this packet. Test-owned root MODULE/BUILD/defs remain genuine
-custom test declarations. Do not infer demand from the full registry catalog.
+Start with these evidence handles; expand to the full R2 diff only for a semantic
+question or R2 recovery:
+
+- `git show 27e9e9c0c:app/slug_cli_v2/tests/cli.rs`, module
+  `configured_action_conflicts`, especially `BUILD` and `workspace()`
+  (lines 5246–5292): authentic test-owned root MODULE/BUILD/defs declarations.
+- `tools/v2_oracle/run_payload_demand_probe.sh` lines 345–434: historical staging
+  and invocation recipe; `app/slug_cli_v2/src/payload_demand_probe.rs` lines 20–67:
+  retained `//:root` request and native publication boundary.
+- [F3 invocation contract](./configured-cli-fixture.md#f3-invocation-contract):
+  the portable proof to implement. The historical driver has personal-cache and
+  vanished `/tmp` dependencies, deliberately missing abseil and an old timeout;
+  do not run it unchanged for F3.
+
+No production Rust, applying R2 to main, source-policy change, fake platforms
+body or upstream local override belongs to fixture preparation. Keep authentic
+custom root declarations; do not infer demand from the full registry catalog.
 
 ## Work and validation
 
-1. Resolve the pinned tools, existing authentic staging recipe, exact root
-   declarations and retained diagnostic request. Verify available content hashes.
+1. Resolve pinned tools and the targeted evidence above. Recover root declarations
+   from the durable Git object, not the obsolete temporary patch path. Preserve
+   the root's behavior while replacing upstream stubs/overrides with authentic
+   inputs under the fixture contract. Verify available content hashes.
 2. Assemble authentic inputs with provenance and copied upstream notices under
    the selected repository-owned fixture directory; do not invent archive bytes.
    Acquire only exact missing inputs whose demand is established, under the

@@ -42,8 +42,11 @@ default to root-only work and reuse accepted evidence.
 
 Obtain independent review for a new shared public boundary, semantic
 identity/ownership or DICE locking change, lifecycle risk, and milestone close.
-Use one design review when such a decision must precede implementation, and
-review the final diff against its material invariants. Routine invocation,
+Use a design checkpoint within the implementation packet when the outcome and
+ownership are bounded; split out a design packet only when an unresolved choice
+prevents defining an implementable contract. Review consequential decisions
+before implementing them, then review the final diff. Label reviews `design` or
+`final`; reuse the reviewer for the final delta where practical. Routine invocation,
 test-selector, formatting, and compiler corrections do not need a new reviewer.
 For correction rereviews, inspect the correction and affected evidence only.
 
@@ -53,34 +56,18 @@ Never run concurrent Cargo commands sharing a target directory.
 
 ## Packet
 
-The manifest is the complete contract for a root-only packet. When delegating,
-use `references/implementation-worker.md` and name:
+The manifest is the complete contract for a root-only packet. The author uses
+[the plan-authoring guide](../../../thoughts/shared/plans/slug-v2-plan-authoring-guide.md#required-packet-record)
+as the single readiness checklist, recording applicable invariants and linking
+inherited contracts. When delegating, use `references/implementation-worker.md`
+with the manifest and role-specific evidence; workers need not reread the guide
+unless they are authorized to revise the contract.
 
-- one owner and observable result;
-- exact allowed files and exclusions;
-- accepted Bazel 9.2 oracle or pinned-source regression;
-- focused validation and stop conditions; and
-- residual risk.
-
-A new or materially revised packet is not ready until it passes the
-plan-authoring checklist: learned facts and non-decisions, upstream Bazel and
-applicable Buck2 tests, exact/Slug-native/deferred classification, natural
-producer/key ownership, request/revision behavior, memory lifetime, fixture
-provenance, fallback deletion, complexity triggers, allowlist/caps, and stops.
-Use only the applicable items, but do not silently omit an applicable risk.
-
-Add conditional sections only when used: fixture growth/hygiene for oracle
-work; DICE identity/equality for semantic keys; Stage 9/Buck2/V1 reuse for
-representation changes; downstream coverage for public interfaces; platform
-and lifecycle evidence for daemon/platform work.
-
-Reuse accepted discriminating evidence. Add an oracle only for an evidence
-gap. Keep design, source/oracle evidence, implementation, and tests in one
-logical packet when they cover one abstraction and behavior family under a
-small allowlist. Use a separate design packet only for a new shared public
-boundary, DICE key/lock or ownership model, cross-crate identity, destructive
-action, or a decision the canonical plan explicitly reserves. Obtain one independent
-pre-review for those decisions.
+Reuse accepted discriminating evidence; add an oracle only for an evidence gap.
+Keep design, evidence, implementation and tests together when they cover one
+abstraction and behavior family under a bounded allowlist. A new boundary or
+DICE/identity decision requires review, not automatically another packet.
+Canonical reserved decisions still require resolution before dependent work.
 
 Workers edit named files and run focused tests. The root inspects the diff,
 adds a discriminating case for identity/equality/invalidation/order/formatting
@@ -88,26 +75,13 @@ when needed, and owns broader validation and commits.
 
 ## Accept
 
-Check only applicable risks:
-
-- Bazel success/failure, diagnostics, order, and output;
-- structural identity, ownership, equality, and invalidation;
-- applicable create/edit/delete/recreate, environment, lockfile,
-  repository-mapping, and materialized-output transitions for incremental state;
-- DICE-owned discovery without direct filesystem/fresh-graph bypass;
-- named-surface-only activation and compact retained representation; and
-- downstream behavior for changed interfaces.
-
-When a packet touches a demonstrated hot path, require exact output/RPC
-invariants and balanced control/candidate measurements with declared metrics
-and thresholds; record rejected experiments compactly. When a touched
-production file exceeds the guide's complexity trigger or mixes semantic,
-presentation, persistence, and transport ownership, require either a bounded
-split or a concrete cohesion decision. These are review gates, not automatic
-authorization for cleanup outside the packet.
+Review the packet's material invariants and inherited contracts against the
+actual diff and discriminating evidence. Check for applicable risks omitted by
+the packet using the guide's required record, complexity and performance gates;
+read only those sections when needed. This does not authorize adjacent cleanup.
 
 Use `references/design-reviewer.md` when independent review is required.
-Review actual code and discriminating evidence for each material invariant;
+Review the actual change and discriminating evidence for each material invariant;
 line counts, hashes, and a passing test count do not establish semantics.
 A second correction calls for reassessment, not automatic `REPLAN`. Keep
 correcting within the accepted contract when the design remains valid.
@@ -164,10 +138,15 @@ redundant or nondiscriminating.
 Before Rust validation, resolve the pinned toolchain from `rust-toolchain` using
 `rustup which --toolchain <channel> cargo` (and rustc/rustdoc/rustfmt) rather
 than assuming the PATH launcher works. Compile with `--no-run` and Cargo JSON
-output when selecting Rust test executables. Before a named precompiled test,
-run `python3 scripts/v2_test_preflight.py <executable> --exact <full-test-name>`;
-a zero-test result never proves a gate. For daemon tests, check the required
-Unix-socket capability in the actual execution environment and use the normal
+output when selecting Rust test executables. Batch all selected ordinary tests
+for each executable into one preflight:
+`python3 scripts/v2_test_preflight.py <executable> --exact <name1> <name2> ...`.
+Reuse that selection evidence while the executable is unchanged; rebuilding or
+replacing it invalidates the preflight, and added selectors need coverage before
+execution. Preflight does not replace execution/pass counts; zero tests never
+prove a gate. The helper rejects ignored tests; an explicitly selected ignored
+probe needs the packet's supervised invocation and ignored-test selection check.
+For daemon tests, check the required Unix-socket capability in the actual execution environment and use the normal
 approval mechanism if a sandbox exception is necessary.
 
 Run broad suites once at milestone/integration checkpoints. Partition suites

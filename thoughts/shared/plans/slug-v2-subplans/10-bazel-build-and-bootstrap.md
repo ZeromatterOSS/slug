@@ -270,6 +270,10 @@ or basename heuristic to infer that arbitrary content is a generated path.
 An unmodeled occurrence is an unsupported comparison and blocks that family;
 it is not silently normalized or declared semantically unequal.
 
+The [Stage 6 feasibility checkpoint](./06-analysis-toolchains-and-actions.md#per-family-actionkey-feasibility-checkpoint)
+must establish runtime fingerprint inputs before family scope is frozen. This
+comparison-only path correspondence cannot produce missing exact ActionKey bytes.
+
 Preserve every accepted exact per-family Bazel ActionKey byte. The current
 executable/aquery FileWrite family alone retains its named Slug-native token
 exception until its exact projection lands. Configured-only Spawn, ArgsWrite,

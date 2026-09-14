@@ -69,6 +69,39 @@ Preserve the old probe SHA-256
 evidence. The new bounded question does not turn old inconclusive output into
 proof or permit an unchanged blind retry.
 
+## F3 invocation contract
+
+Implement this proposed entry point in the fixture packet:
+`python3 tools/v2_oracle/configured_cli_fixture.py prove --harness <lib-test-executable>`.
+Compile separately using pinned tools and
+`cargo test -p slug_cli_v2 --features native-probe-observer --lib --no-run --message-format=json`.
+Select the library test executable from Cargo JSON; the observer feature is
+intentionally unavailable to a production binary.
+
+The entry point assembles workspace/registry/mirror in a fresh temporary root
+from repository-owned inputs, then reuses the historical driver's bounded
+supervision via an explicit portable mode. Reuse its observer-FD setup, process
+isolation and cleanup; do not duplicate a second supervisor or inherit personal
+cache paths, the obsolete patch path, deliberate missing inputs or diagnostic
+success classification. Runtime has a 12-second deadline/15-second absolute
+ceiling; preparation is separate and <=60 seconds per operation.
+
+The supervisor supplies `SLUG_SENTINEL_SCRATCH` and a valid inherited
+`SLUG_SENTINEL_OBSERVER_FD`, verifies exactly one ignored test via
+`<harness> --list --ignored --exact payload_demand_probe::authentic_sentinel_demand`,
+and invokes `<harness> --ignored --exact payload_demand_probe::authentic_sentinel_demand --nocapture`.
+This opt-in probe uses its explicit ignored-selector check; the ordinary
+nonignored preflight helper must remain strict. Reuse selector evidence only
+while this executable is unchanged.
+
+F3 requires one selected/executed/passed test, process exit 0, native publication
+exit 0 and `SLUG_SENTINEL_NATIVE_SUCCESS_PUBLISHED_0`, with valid observer evidence
+and no timeout, output overflow or cleanup failure. This proves the retained
+configured source boundary on the recorded current source revision; R2's later
+conflict-rejection proof is separate. Missing/unsupported source diagnostics,
+sentinel non-demand or hashes alone cannot pass F3. Record source/features,
+fixture hashes, command, counts, status and supervisor receipt.
+
 ## Acceptance dependencies
 
 | Gate | Current state | Required evidence / successor |
@@ -101,4 +134,5 @@ worktree. A diagnostic naming a missing/unsupported producer is useful evidence,
 but never F3 acceptance.
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits
-atomic integration, followed by Stage 6 named/automatic group design.
+atomic integration, followed by the demand-scoped Stage 6 execution-group
+successor in canonical Live Status.

@@ -54,7 +54,7 @@ Preservation is not integration. Do not activate it partially or weaken a gate.
 |---|---|---|
 | 1 | Authentic configured CLI fixture | ready; [source/fixture contract](./slug-v2-subplans/configured-cli-fixture.md) separates portable inputs from diagnostic demand evidence |
 | 2 | Combined selected-request/output-conflict R2 | blocked on complete fixture and outstanding baseline attribution; [Stage 6](./slug-v2-subplans/06-analysis-toolchains-and-actions.md) owns semantics and gate ledger |
-| 3 | Named/automatic execution groups | blocked on R2; reuse Stage 6's pinned source matrix, no repeated general audit |
+| 3 | Bootstrap-demanded execution-group support | blocked on R2; reconcile existing closure artifacts and record named/automatic demand before freezing scope; reuse Stage 6's pinned source matrix |
 | 4 | Remaining M7A action/input-tree/REAPI capabilities | select only demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) |
 | 5 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 6 | M7B, then M9 | preserve current deferred classification |

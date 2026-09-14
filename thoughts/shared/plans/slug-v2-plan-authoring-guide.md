@@ -19,7 +19,8 @@ Every packet states its observable outcome, compatibility class, semantic
 owner/invariants, scope, evidence, validation, and genuine decision boundaries.
 Use the following conditional guidance only where relevant. Omit inapplicable
 sections without placeholder explanations; link inherited contracts instead of
-recopying them. This guide and the worker template use the same rule.
+recopying them. This is the authoritative authoring checklist; role prompts
+consume the resulting packet, not another copy of this list.
 
 1. **Learned facts and research basis**
    - Name the relevant Bazel 9.2 source and tests before implementation.
@@ -40,12 +41,16 @@ recopying them. This guide and the worker template use the same rule.
    - Prefer a producer-owned fact over a command-side repair, replay cache,
      global registry, path inference, or fallback scan.
    - State whether command result sets remain request-local or are reusable
-     semantic facts.
+     semantic facts. Cover structural identity/equality, validity, Need/error
+     behavior, event storage, invalidation/restoration and dependent pruning where applicable. Discovery
+     remains DICE-owned; no direct-filesystem or fresh-graph bypass.
 4. **Request and revision behavior**
    - For command options, environment, source reads, repositories, lockfiles,
      watchers, or daemon work, state the immutable request projection,
-     observed inputs, final validation boundary, and overlapping-request
-     behavior.
+     observed inputs/source certificate, final validation/promotion or retry,
+     provisional cleanup and overlapping-request sharing behavior. Cover the
+     applicable create/edit/delete/recreate, environment, lockfile, repository
+     mapping and materialized-output transitions.
    - Do not assume that a mutable host filesystem supplies historical snapshot
      reads. Unavailable historical state is unsupported rather than guessed.
 5. **Memory and asynchronous ownership**
@@ -58,7 +63,12 @@ recopying them. This guide and the worker template use the same rule.
 6. **Evidence and fixture provenance**
    - Reuse accepted discriminating evidence before adding a fixture.
    - Every new fixture follows the Stage 1 `fixture.toml` provenance contract
-     and records exact, message-shape, or structured-semantic comparison.
+     and records exact, message-shape, or structured-semantic comparison. Name
+     fixture growth, affected replays and the applicable hygiene checkpoint.
+   - Name discriminators for success/failure, negatives, diagnostics, ordering,
+     deduplication, formatting and lifecycle where applicable. Changed public
+     interfaces name downstream production-wrapper and compile coverage.
+     Repository/materialization checks use the current writer or manifest.
    - Record why a relevant upstream test was skipped: unsupported phase,
      implementation-detail assertion, obsolete Bazel behavior, or stronger
      existing coverage.
@@ -74,7 +84,10 @@ recopying them. This guide and the worker template use the same rule.
      automatic failure or permission request. Distinguish user resource limits
      from estimates. Invocation/test-selection corrections remain in the packet;
      the orchestration skill owns failure classification and recovery.
-   - Do not broaden a packet merely because adjacent work is convenient.
+   - Activate only named surfaces; do not broaden a packet because adjacent
+     work is convenient. Reuse/representation changes link the matching Stage 9
+     disposition and compact-utility, memory and clone decisions. Platform work
+     names the required cross-target or same-daemon evidence.
 
 ## Upstream-test and donor policy
 
@@ -158,30 +171,19 @@ change. Correctness and exact outputs are prerequisites.
 - Reject an optimization that merely moves cost to another phase or regresses
   the declared primary metric outside noise.
 
-## Plan-ready checklist
-
-- [ ] Canonical milestone and current-packet relationship is explicit.
-- [ ] Bazel 9.2 source/tests and any Buck2 DICE evidence are named.
-- [ ] Learned facts, decision, non-decisions, and proof are separate.
-- [ ] Exact, Slug-native, and unsupported/deferred surfaces are classified.
-- [ ] Natural producer/key/value ownership is named.
-- [ ] Request overlay, input observation, and overlapping-session behavior are
-      covered when applicable.
-- [ ] Retained, command, scratch, cache, and async-transfer lifetimes are
-      covered when applicable.
-- [ ] Fixture provenance and skipped-upstream-test reasons are recorded.
-- [ ] Every fallback has an invariant, deletion condition, owner, and test.
-- [ ] File allowlist, growth estimates, validation, residual risk, and stops are
-      bounded.
-- [ ] Complexity triggers and hot-path measurement needs were reviewed.
-- [ ] Completed chronology has an evidence destination rather than expanding
-      the active scheduling surface.
-
 ## Readiness and closure
 
-A ready packet can execute useful work without another design-only handoff.
-Name prerequisites separately from acceptance: an environment-bound diagnostic
-may prove a failure cause, but cannot replace a portable acceptance fixture.
+Before marking ready, confirm the required record above, applicable complexity
+and performance gates, and consistency with canonical scheduling. Keep a design
+checkpoint in the implementation packet when outcome and ownership are bounded.
+A separate design packet is useful only when an unresolved choice prevents an
+implementable contract; a boundary category alone does not require a handoff.
+Design review checks decisions, evidence and planned validation; final review
+checks the actual change and executed evidence. Neither substitutes for the
+other when both are required by the orchestration skill.
+
+A ready packet can execute useful work. Name prerequisites separately from
+acceptance: an environment-bound diagnostic may prove a failure cause, but cannot replace a portable acceptance fixture.
 For integration, list required gates with base/candidate attribution and exact
 missing evidence. For M7A use `slug-v2-subplans/bootstrap-readiness.md`; admit
 only capabilities demanded by that finite target closure.

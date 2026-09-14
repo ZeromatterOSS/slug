@@ -5,12 +5,12 @@ placeholder sections or `none with a reason`.
 
 ```text
 Task: <one bounded observable result>
-Owner: <milestone, plan path, packet ID>
+Owner: <milestone, manifest path, packet ID>
 Baseline: <branch, HEAD, dirty ownership>
 Validation tier: <docs | oracle | private/local | public/cross-crate | DICE/daemon/platform>
 
 Read:
-- AGENTS.md
+- AGENTS.md and the packet manifest, including linked applicable contracts
 - <owner section only for a reserved decision or unresolved contradiction>
 - <accepted oracle or exact Bazel 9.2 source>
 - <production/test files in scope>
@@ -52,36 +52,13 @@ Return:
 - Any stop condition
 ```
 
-## Conditional sections
+## Inherited requirements
 
-Add only what the task uses:
-
-- **Oracle/fixture:** exact rows, generated fields, reused scaffolding,
-  per-fixture and aggregate growth, last checkpoint, duplication reason,
-  hygiene/pruning, and affected replays.
-- **Repository/materialization:** compare the helper or manifest that writes
-  marker/output state; use fresh roots only when state or non-hermetic behavior
-  is under test.
-- **DICE/semantic key:** identity, ownership, equality, validity, Need/error
-  behavior, invalidation/restoration, event storage, and dependent pruning.
-  Cover applicable create/edit/delete/recreate, environment, repository
-  mapping, lockfile, and materialized-output transitions.
-- **Request/revision:** immutable complete overlay and narrow semantic
-  projection, exact observed inputs/source certificate, overlapping-request
-  sharing rule, final validation/promotion or retry, and cancellation cleanup.
-- **Memory/lifetime:** service, retained semantic, nonsemantic cache, command,
-  scratch, and async-transfer classification plus publication, cutoff,
-  invalidation, eviction, join, and shutdown release where applicable.
-- **Reuse/representation:** matching Stage 9 row, Buck2/V1 candidates, selected
-  utility boundary, memory/clone implications, and ledger disposition.
-- **Public/cross-crate:** downstream production wrapper and compile coverage.
-- **Platform/daemon:** exact platform evidence, lifecycle/process cleanup, and
-  cross-target or same-daemon coverage.
-- **Fallback:** violated invariant, deletion condition, owning packet, and the
-  test that prevents permanence.
-- **Measured hot path:** exact control/candidate output and RPC invariants,
-  balanced run order, declared threshold, instructions/cycles/wall/RSS, and
-  accepted or rejected ledger result.
+The packet author owns the guide's readiness checklist. Pass the worker only
+applicable packet invariants, exact owner/source sections and evidence handles;
+do not copy the authoring checklist into this prompt or require a full owner
+plan, guide, history or preserved patch read. Flag an omitted material risk to
+the root. Workers revise the contract only when explicitly assigned that task.
 
 An accepted discriminating Bazel 9.2 oracle is sufficient; do not add another
 fixture unless the packet names a missing behavior. Workers run focused tests.

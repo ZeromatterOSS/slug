@@ -37,6 +37,7 @@ unobserved action families cannot be declared unnecessary by assumption.
 | Bazel builds the CLI root, its 33-package closure and generated sources | Accepted developer graph; Stage 10 baseline Gates A–C and fixed manifest. Live coverage delta not re-audited | Stage 10 | Reconciled root labels, source/features/toolchain/lock inventory and explicit delta; no excluded production input |
 | Authentic MODULE, registry, archive, built-in and generated repository sources | Partial. Normal Run registry parity accepted at `47163df7b`; authentic complete R2 fixture closure remains unresolved. Stage 5 owns sources and registrations | Stages 4/5 | Portable authentic inputs and ordinary source/mapping/registration demand for the selected production closure; no synthetic package, user-CAS default-test dependency or hidden Bazel semantic delegation |
 | rules_rust/provider/transition/toolchain evaluation | Partial configured analysis; accepted generic declarations/providers/Args/runfiles do not prove the full rules_rust closure. Canonical M7 status names accepted owners | Stages 4/5/6 | Ordinary configured results for the production root with source-derived toolchain/provider/transition dependencies; exact named semantics and structural invalidation |
+| Named/automatic execution groups | Bootstrap demand unresolved. Stage 6's pinned rules_cc 0.2.17 example establishes semantics, not membership in the production closure | Stages 4/5/6 | Demand record naming producer/rule/action, named/automatic mode, configuration/toolchain pins and evidence artifact; complete shared owner if both modes are demanded, explicit remainder classification if narrower |
 | Requested-root output conflict freedom | Preserved R2 `ValidatedActionClosure` design; not applied. Stage 6 “Configured-action closure integrity contract” | Stage 6/Core | Completed root-set validation before build/aquery/Run success; cold/warm A+B conflicts produce no execution or materialization even if A and B separately succeed |
 | FileWrite | Accepted bounded aquery/REAPI handoff, Stage 7 canonical FileWrite projection and M5/M6 evidence. Its exact ActionKey projection remains queued | Stages 6/8/7 | Preserve accepted content/platform/protobuf/cache proof and named Slug-native token exception; land exact projection when separately selected |
 | Spawn: compiler, linker, proc-macro/build-script and generated-source tool invocations | Configured common non-callback Spawn/FilesToRun expansion accepted (`bfe6f2690`, `21db5d7b8`); broader aquery/REAPI activation open | Stages 6/8/7 | Source-derived invocation/tool/env/input/output semantics for observed production actions, exact per-family ActionKey, same-owner aquery and REAPI projections |
@@ -53,7 +54,11 @@ unobserved action families cannot be declared unnecessary by assumption.
    existing authenticated Bazel 9.2 artifacts where sufficient; any new oracle
    invocation requires its selected packet. Record exact root/config/toolchain
    pins, action family names, producer targets and the evidence artifact/commit.
-   Do not use a precomputed inventory as runtime input.
+   Before freezing a successor's scope, attach a compact `Demanded by / evidence`
+   record for each selected capability, including named/automatic execution-group
+   policy. The matrix's unresolved execution-group row is not proof of demand.
+   Reconcile existing artifacts first; request a bounded new observation only
+   for a specific evidence gap. Do not use this inventory as runtime input.
 2. Split only the unresolved production families/capabilities into observable
    packets, with Stage 6 semantic producer, Stage 8 query projection and Stage 7
    execution consumer linked. Source ownership and output-conflict gates precede
@@ -64,14 +69,18 @@ unobserved action families cannot be declared unnecessary by assumption.
    currently accepted FileWrite token is the only named executable/aquery
    ActionKey exception. All newly activated families need exact source-derived
    ActionKeys; configured-only declarations are not grandfathered. The packet
-   names each required fingerprint input and its ordinary semantic owner.
+   completes the [Stage 6 ActionKey feasibility checkpoint](./06-analysis-toolchains-and-actions.md#per-family-actionkey-feasibility-checkpoint)
+   before freezing scope: input producer, effective path mapping, exact-byte
+   availability and configuration discriminator. Unavailable bytes require a
+   precise prerequisite or a reviewed named exception decision; comparison-only
+   path correspondence cannot satisfy runtime key production.
 4. Mark a row accepted only with a reachable discriminating proof and coverage
    of its requested production consumers. An “absent from bootstrap” result
    needs the reconciled graph evidence, not an unsupported runtime guard. New
    observed families update this finite table before M7A acceptance; hidden or
    unmodeled fields, fake sources and alternate execution paths stop admission.
-5. The first eleven rows close M7A for this production closure. Independently
-   review the coverage/accounting once, then run Stage 10.3 ordinary graph
+5. All rows except the fixed-point row close M7A for this production closure.
+   Independently review the coverage/accounting once, then run Stage 10.3 ordinary graph
    comparison and Stage 10.4 fixed-point proof. The final row closes M8, not M7A.
    `run`, `test`, BEP, unrelated public rulesets and nonrequired formats stay
    M7B; existing accepted bounded Run remains a regression.

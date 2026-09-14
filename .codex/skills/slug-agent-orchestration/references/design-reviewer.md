@@ -2,14 +2,16 @@
 
 ```text
 Review packet <ID> as an independent Bazel-parity and architecture gate.
+Phase: <design | final>
+Baseline: <source/design revision; for final, accepted design and diff base>
 
 Read:
-- The approved packet
+- The proposed contract (design) or approved packet (final)
 - AGENTS.md
-- The actual diff, not only the worker summary
+- The design changes (design) or actual implementation diff (final)
 - The cited Bazel 9.2 source/oracle evidence
 - Relevant DICE ownership documentation where applicable
-- Compact validation results
+- Cited evidence and compact validation results available for this phase
 
 Do not implement, edit files, or broaden the packet.
 For a correction rereview, read only the correction diff, affected evidence,
@@ -19,38 +21,25 @@ re-review. Reassess acceptance if coverage, assertions, provenance or failure
 attribution changes even when the contract is unchanged. Inspect recorded
 validation output; rerun only missing, stale, or suspect evidence.
 
-Map each material contract invariant to the actual implementation and its
-recorded discriminating test. Passing counts, line caps and frozen hashes alone
-are insufficient. Invocation/environment recovery is not an architecture
-REPLAN; request the smallest missing validation instead.
+For design, map material invariants to semantic owners, pinned source/evidence,
+and planned discriminators. Identify prerequisites and unresolved decisions;
+require enough evidence to choose a sound contract, not an implementation or
+executed implementation tests. ACCEPT freezes the design only.
 
-Check only applicable risks:
-1. Does the representation encode Bazel semantics rather than fixture output?
-2. Are identity, ownership, semantic equality, and invalidation complete?
-3. Are ordering, deduplication, diagnostics, and formatter behavior exact?
-4. Are named negative and lifecycle boundaries discriminatingly tested?
-5. Is semantic discovery DICE-owned with no direct filesystem or fresh graph?
-6. Does the patch activate only the named surface?
-7. If retained representation changed, are compact utilities appropriate?
-8. Does downstream validation cover every changed public/cross-crate boundary?
-9. Is any acceptance claim broader than the actual fixture/test set?
-10. For oracle work only, is every copied registry/module subtree, mutation,
-    manifest, expected field, and negative assertion necessary to discriminate
-    the claimed behavior?
-11. For oracle work only, has the fixture-growth checkpoint fired, and if so
-    was a bounded hygiene review completed before adding more fixture breadth?
-12. For daemon/input work, are request projections, observed inputs, source
-    certificates, final validation, provisional cleanup, and overlapping
-    sessions complete without fabricated filesystem snapshots?
-13. For retained/cache/async work, are lifetime class, publication, cutoff,
-    invalidation, eviction, cancellation, join, and shutdown release explicit?
-14. Does every fallback name its violated invariant, deletion condition, owner,
-    and permanence-prevention test?
-15. If a touched module crosses the complexity trigger, does the packet either
-    split it or justify one cohesive owner without mixing semantic,
-    presentation, persistence, and transport concerns?
-16. For a claimed hot-path improvement, do balanced measurements preserve
-    exact outputs/RPCs and meet the declared metric threshold?
+For final, map each material invariant to the actual change and recorded
+validation appropriate to the packet's tier (docs use source/structure checks).
+Reuse accepted design/source evidence; inspect the implementation delta and its
+proof. Counts, line caps and hashes alone do not establish semantics. An
+invocation failure needs the smallest missing validation, not architecture
+REPLAN. ACCEPT approves only the stated, evidenced scope.
+
+Check the packet's applicable invariants and inherited contracts. If a material
+risk is missing, consult the relevant sections of the plan-authoring guide's
+required record, complexity or performance gates; do not repeat its checklist.
+In particular, reject claims broader than their evidence, weakened assertions,
+unmodeled semantic inputs and owner bypasses. For oracle changes, verify that
+copied content and mutations discriminate the claimed behavior and preserve
+provenance; apply the skill's fixture-growth checkpoint when triggered.
 
 Return exactly one verdict:
 

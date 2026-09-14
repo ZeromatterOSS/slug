@@ -420,6 +420,38 @@ schedules FileWrite and later family projections just in time with their owning
 Stage 6/8 packets; only residual, not-yet-admitted action families may remain
 under M9.
 
+#### Per-family ActionKey feasibility checkpoint
+
+Before freezing a new family's execution/aquery implementation scope, fill one
+compact table from pinned Bazel source and the actual admitted configuration:
+
+| Fingerprint input (including conditional/tail fields) | Ordinary semantic producer | Bazel path-mapping behavior and effective mode | Exact bytes available? / evidence | Missing prerequisite |
+|---|---|---|---|---|
+| One row per distinct input source | Owner/key/value | Mapped, unmapped or path-independent, with source anchor | Established or unresolved; discriminator handle | None if proved; otherwise precise dependency |
+
+At Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
+`src/main/java/com/google/devtools/build/lib/analysis/actions/SpawnAction.java`
+`computeKey` fingerprints command lines and environment. In
+`actions/AbstractCommandLine.java`, `addToFingerprint` obtains arguments through
+`PathMapper.forActionKey(effectiveOutputPathsMode)`. Thus generated-path inputs
+can require exact configuration/output bytes currently deferred to M9; mapping
+may remove a dependency only when the actual action, encoding and effective
+mode prove it. Audit the family implementation, not just this base-class example.
+
+Reuse or add a discriminator across two configurations that change generated
+path spelling, holding unrelated semantics fixed where possible. Verify each
+relevant mapped/unmapped input and the resulting raw key bytes against Bazel.
+Path-independent families such as the accepted FileWrite discriminator need no
+invented output-identity dependency. No whole-M9 prerequisite is assumed.
+
+If required bytes lack an ordinary producer, block that family on the precise
+M9 input/identity prerequisite or obtain an independently reviewed, explicitly
+named compatibility exception with scope and retirement condition before
+activation. This checkpoint creates no exception. Stage 10's graph-local path
+correspondence is comparison-only: it cannot supply runtime fingerprint bytes.
+No oracle-generated production mapping, guessed token or silent key relaxation
+may bridge the gap. Record the result in bootstrap readiness before admission.
+
 ### 6.4C Generic Args/spawn/artifact-symlink category
 
 Selected architecture packet:
@@ -1038,6 +1070,19 @@ ran for this design; implementation and previously unrun gates remain unaccepted
 
 
 ## Execution-group successor (blocked on R2)
+
+Before freezing implementation scope, reconcile existing production-closure
+artifacts under [bootstrap readiness](./bootstrap-readiness.md#family-admission-and-completion-procedure).
+Record which producer/rule/action under `//app/slug_cli_v2:slug` demands named
+and/or automatic groups, with pins and evidence. The historical `cc_library`
+example below proves that rule's requirements, not its presence in bootstrap.
+If both modes are demanded, retain the shared complete owner and coupled
+semantics below. If demand is narrower, explicitly classify the remainder as
+deferred and preserve its guards; absence requires graph evidence. Unknown
+demand remains unresolved. Do not bypass a guard or truncate required semantics.
+Use a design checkpoint in the implementation packet if this reconciliation
+leaves a bounded contract; split design only for an unresolved ownership choice.
+The historical design-only selection below is evidence, not current scheduling.
 
 ### Rule execution-group runtime prerequisite: named-only REPLAN (2026-09-10)
 
