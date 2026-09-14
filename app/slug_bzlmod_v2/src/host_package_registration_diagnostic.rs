@@ -62,8 +62,9 @@ impl RepositoryPackageSourceError {
 fn lookup(out: &mut dyn fmt::Write, error: &ExternalRepositoryPackageLookupError) -> fmt::Result {
     match error {
         ExternalRepositoryPackageLookupError::PolicyInput(_) => out.write_str("PolicyInput"),
-        ExternalRepositoryPackageLookupError::RepositoryIgnore(_) => {
-            out.write_str("RepositoryIgnore")
+        ExternalRepositoryPackageLookupError::RepositoryIgnore(error) => {
+            out.write_str("RepositoryIgnore.")?;
+            error.write_registration_diagnostic(out)
         }
         ExternalRepositoryPackageLookupError::RepositoryListing(_) => {
             out.write_str("RepositoryListing")

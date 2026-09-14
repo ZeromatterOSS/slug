@@ -191,6 +191,9 @@ pub(crate) enum HostRepositoryIgnoreError {
     },
 }
 
+#[path = "repository_ignore_registration_diagnostic.rs"]
+mod registration_diagnostic;
+
 impl fmt::Display for HostRepositoryIgnoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

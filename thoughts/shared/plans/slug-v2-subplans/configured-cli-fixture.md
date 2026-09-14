@@ -117,7 +117,7 @@ fixture hashes, command, counts, status and supervisor receipt.
 |---|---|---|
 | F1 authentic input inventory | partial at a named semantic boundary; all 183 demanded metadata objects and the selected platforms, rules_shell, and `rules_cc@0.2.17` payloads/patches/notices are repository-owned and verified | resume demand-linked payload acquisition only after the current registration diagnostic is causal; no later payload demand is yet established |
 | F2 portable offline assembly | accepted by focused checkpoint evidence | 19 objects / 901,651 source bytes and 177 bundled metadata entries verify and assemble in a fresh root; missing, corrupt, and semantically mismatched patch inputs fail closed |
-| F3 configured source closure | blocked at `CanonicalPackage: Lookup package=@@protobuf+//bazel/private/toolchains/prebuilt error=RepositoryIgnore` after selecting `rules_cc@0.2.17` | extend the bounded borrowed projection through the typed repository-ignore error, then rerun the unchanged fresh-root proof to distinguish missing optional metadata from an unsupported ignore owner |
+| F3 configured source closure | blocked at `CanonicalPackage: Lookup package=@@protobuf+//bazel/private/toolchains/prebuilt error=RepositoryIgnore.RouteRepoFile` after selecting `rules_cc@0.2.17` | extend the bounded borrowed projection through the routed `REPO.bazel` error, then rerun the unchanged fresh-root proof to distinguish an absent optional file from evaluation/policy failure |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -169,6 +169,13 @@ package=@@protobuf+//bazel/private/toolchains/prebuilt error=RepositoryIgnore` i
 5.89 seconds with the same one-test and cleanup guarantees. This identifies the
 package and typed lookup owner, but not yet the repository-ignore variant or
 input; the immediate prerequisite is that final borrowed projection.
+
+The repository-ignore projection passed its 2 focused tests and preserved the
+package-source handoff tests. The same F3 run reached
+`RepositoryIgnore.RouteRepoFile` in 5.65 seconds with the same one-test and
+cleanup guarantees. This rules out `.bazelignore` handling and selects the
+smaller routed `REPO.bazel` diagnostic prerequisite; it still does not identify
+the source/evaluation leaf or accept F3.
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits
 atomic integration, followed by the demand-scoped Stage 6 execution-group
