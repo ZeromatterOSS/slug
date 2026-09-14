@@ -20,7 +20,7 @@ verification_command = "python3 tools/v2_oracle/configured_cli_fixture.py prove 
 
 [authentic]
 inventory_version = 1
-total_source_bytes = 7822792
+total_source_bytes = 7878817
 historical_probe_sha256 = "8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2"
 candidate_commit = "27e9e9c0c"
 candidate_patch_sha256 = "90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e"
@@ -204,6 +204,14 @@ source_url = "https://github.com/bazel-contrib/bazel_features/releases/download/
 kind = "archive"
 
 [[objects]]
+source = "mirror/github.com/bazelbuild/bazel-skylib/releases/download/1.8.2/bazel-skylib-1.8.2.tar.gz"
+destination = "mirror/github.com/bazelbuild/bazel-skylib/releases/download/1.8.2/bazel-skylib-1.8.2.tar.gz"
+sha256 = "6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446"
+size = 44667
+source_url = "https://github.com/bazelbuild/bazel-skylib/releases/download/1.8.2/bazel-skylib-1.8.2.tar.gz"
+kind = "archive"
+
+[[objects]]
 source = "licenses/platforms-LICENSE"
 destination = "licenses/platforms-LICENSE"
 sha256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
@@ -217,6 +225,14 @@ destination = "licenses/bazel_features-LICENSE"
 sha256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
 size = 11357
 source_url = "https://github.com/bazel-contrib/bazel_features/releases/download/v1.42.1/bazel_features-v1.42.1.tar.gz#bazel_features-1.42.1/LICENSE"
+kind = "license"
+
+[[objects]]
+source = "licenses/bazel_skylib-LICENSE"
+destination = "licenses/bazel_skylib-LICENSE"
+sha256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+size = 11358
+source_url = "https://github.com/bazelbuild/bazel-skylib/releases/download/1.8.2/bazel-skylib-1.8.2.tar.gz#LICENSE"
 kind = "license"
 
 [[objects]]

@@ -115,9 +115,9 @@ fixture hashes, command, counts, status and supervisor receipt.
 
 | Gate | Current state | Required evidence / successor |
 |---|---|---|
-| F1 authentic input inventory | partial at the next named payload; bazel_features 1.42.1 and protobuf 33.4 are repository-owned alongside the prior selected payloads and all 183 demanded metadata objects | add exact bazel_skylib 1.8.2 archive `6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446` plus notice, then resume the unchanged proof |
-| F2 portable offline assembly | accepted through the bazel_features checkpoint | 24 objects / 7,822,792 source bytes, inventory `0ad0ac33e4275d51db0ad436cf639709170363b9a41bf82026d6c9e30f88b928`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
-| F3 configured source closure | blocked by missing bazel_skylib 1.8.2 archive while loading `@@bazel_skylib+//lib:modules.bzl` during bazel_features extension evaluation | add only that demand-established authentic payload, then rerun once to name the next payload or semantic owner |
+| F1 authentic input inventory | accepted through the current demand frontier; bazel_skylib 1.8.2, bazel_features 1.42.1, protobuf 33.4, the prior selected payloads, and all 183 demanded metadata objects are repository-owned | retain exact provenance and add no payload until the unchanged proof names another demand |
+| F2 portable offline assembly | accepted through the bazel_skylib checkpoint | 26 objects / 7,878,817 source bytes, inventory `5800c9ed0df22c05229ddd908812304efa13e31609c5dd7377fd06d43d823818`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
+| F3 configured source closure | blocked by the fixed wall deadline during `RootCompute`; the same run revisits unchanged registry/module chains for every additive path epoch | project exact path demands from the opaque epoch, then rerun once to name configured closure, the next payload, or semantic owner |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -219,6 +219,22 @@ evidence. Pinned bazel_skylib 1.8.2 metadata supplies archive SHA-256
 `6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446`
 and no patch. This accepts typed route identity and establishes only that next
 payload acquisition.
+
+The bazel_skylib checkpoint verifies 26 objects / 7,878,817 source bytes at
+inventory SHA-256
+`5800c9ed0df22c05229ddd908812304efa13e31609c5dd7377fd06d43d823818`;
+all three focused fixture tests pass. The unchanged F3 proof selected one test
+but reached its 12-second wall deadline in `RootCompute`, with valid observer
+and complete cleanup evidence. Its latest sampled activity was
+`PathObservationKey`, after 80,997 starts, 80,985 finishes, 78,500 dependency
+checks, and 9,618 computes. A bounded scratch-only DICE trace independently
+completed 92,500 outcomes while still advancing through rules_cc loads. Each of
+184 registry-file keys, 157 discovered-module keys, and 156 module-source keys
+was visited 115 times as the injected path epoch grew. That confirms the
+previously recorded global epoch fanout and selects an exact-demand DICE
+projection; it does not establish a new payload demand, semantic loop, or F3
+acceptance.
+
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits
 atomic integration, followed by the demand-scoped Stage 6 execution-group
