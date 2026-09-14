@@ -790,6 +790,16 @@ pub struct DeclaredExecGroup {
 }
 
 impl DeclaredExecGroup {
+    pub fn new(
+        toolchains: Arc<[ToolchainTypeRequirement]>,
+        exec_compatible_with: Arc<[CanonicalLabel]>,
+    ) -> Self {
+        Self {
+            toolchains,
+            exec_compatible_with,
+        }
+    }
+
     pub fn toolchains(&self) -> &[ToolchainTypeRequirement] {
         &self.toolchains
     }

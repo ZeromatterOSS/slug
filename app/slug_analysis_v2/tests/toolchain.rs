@@ -8,17 +8,12 @@
  * above-listed licenses.
  */
 
-use std::collections::BTreeMap;
-
 use slug_analysis_v2::ConstraintSet;
 use slug_analysis_v2::ConstraintSetting;
 use slug_analysis_v2::ConstraintValue;
-use slug_analysis_v2::ExecGroup;
-use slug_analysis_v2::ExecGroupCollection;
 use slug_analysis_v2::ExecutionPlatform;
 use slug_analysis_v2::RegisteredToolchains;
 use slug_analysis_v2::RegisteredToolchainsKey;
-use slug_analysis_v2::ResolvedToolchainContext;
 use slug_analysis_v2::ToolchainResolutionError;
 use slug_analysis_v2::ToolchainResolutionRequest;
 use slug_analysis_v2::ToolchainTarget;
@@ -106,38 +101,6 @@ fn mandatory_toolchain_missing_reports_events() {
         err.events()
             .iter()
             .any(|event| event.contains("reject toolchain"))
-    );
-}
-
-#[test]
-fn exec_groups_carry_toolchain_types_exec_properties_and_contexts() {
-    let mut props = BTreeMap::new();
-    props.insert("container-image".to_owned(), "toolchain:v1".to_owned());
-    let group =
-        ExecGroup::new("compile", vec![toolchain_type()]).with_exec_properties(props.clone());
-    let mut groups = ExecGroupCollection::new(vec![group]);
-
-    let registered = RegisteredToolchains::new(
-        vec![toolchain("linux_toolchain", "linux")],
-        vec![platform("linux_exec", "linux")],
-    );
-    let resolution =
-        ToolchainResolutionRequest::new(toolchain_type(), ConstraintSet::default(), registered)
-            .resolve()
-            .unwrap();
-    let mut context = ResolvedToolchainContext::new();
-    context.insert(toolchain_type(), resolution);
-    groups.set_resolved_context("compile", context);
-
-    assert_eq!(groups.group("compile").unwrap().exec_properties(), &props);
-    assert_eq!(
-        groups
-            .resolved_context("compile")
-            .unwrap()
-            .selected_execution_platform()
-            .unwrap()
-            .to_string(),
-        "@@//platforms:linux_exec"
     );
 }
 

@@ -9,14 +9,11 @@
  */
 
 pub mod context;
-pub mod exec_groups;
 pub mod platform_constraints;
 pub mod registered;
 pub mod resolution;
 
 pub use context::ResolvedToolchainContext;
-pub use exec_groups::ExecGroup;
-pub use exec_groups::ExecGroupCollection;
 pub use platform_constraints::ConstraintSet;
 pub use platform_constraints::ConstraintSetting;
 pub use platform_constraints::ConstraintValue;

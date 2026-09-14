@@ -60,6 +60,14 @@ impl ExecutableArtifactProvenance {
                 .map(|_| Association::Subrule),
         }
     }
+
+    pub(crate) fn is_associated(
+        &self,
+        scope: &AnalysisActionCallScope,
+        artifact: &AnalysisArtifact,
+    ) -> bool {
+        self.association(scope, artifact).is_some()
+    }
 }
 
 fn retained_files_to_run_provider(value: &AnalysisValue) -> Option<FilesToRunProvider> {

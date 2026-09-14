@@ -172,6 +172,79 @@ async fn configured_action_conflicts_distinct_paths_do_not_share_or_reject() {
 }
 
 #[tokio::test]
+async fn configured_action_conflicts_cross_group_spawns_reject_before_publication() {
+    let mut epoch = BuildRootEpoch::base(5);
+    epoch.file(
+        "/workspace/MODULE.bazel",
+        "module(name = 'root')\nregister_execution_platforms('//:platform')\n",
+        5,
+    );
+    epoch.file(
+        "/workspace/defs.bzl",
+        r#"def _default(ctx):
+    out = ctx.actions.declare_file('shared.txt')
+    ctx.actions.run(outputs = [out], executable = 'tool')
+    return [DefaultInfo(files = depset([out]))]
+def _named(ctx):
+    out = ctx.actions.declare_file('shared.txt')
+    ctx.actions.run(outputs = [out], executable = 'tool', exec_group = 'named')
+    return [DefaultInfo(files = depset([out]))]
+default_rule = rule(implementation = _default)
+named_rule = rule(implementation = _named, exec_groups = {'named': exec_group()})
+"#,
+        5,
+    );
+    epoch.package(
+        "",
+        "load(':defs.bzl', 'default_rule', 'named_rule')\nplatform(name = 'platform')\ndefault_rule(name = 'left')\nnamed_rule(name = 'right')\n",
+        5,
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let host = HostConversionInputs::new(
+        Some(AutoCpuToken::K8),
+        Some(HostPathFlavor::Unix),
+        None,
+        Arc::from([]),
+        Arc::from([]),
+    )
+    .unwrap()
+    .with_action_environment_host(
+        slug_configuration_v2::native::host::ActionEnvironmentHost::without_environment(
+            slug_configuration_v2::native::host::ActionEnvironmentHostOs::Linux,
+        ),
+    );
+    let configuration = ConfigurationKey::from_slug(
+        SlugConfiguration::default_target(&host)
+            .unwrap()
+            .with_host_platform_label(&CanonicalLabel::parse("@@//.slug_test_host:host").unwrap()),
+    );
+    let key = BuildCommandRootKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        &[
+            TargetPattern::parse("//:left").unwrap(),
+            TargetPattern::parse("//:right").unwrap(),
+        ],
+        configuration,
+    )
+    .unwrap();
+    let mut transaction = build_root_transaction(&dice, epoch.build()).await;
+    let outcome = transaction.compute(&key).await.unwrap();
+    let PreparationOutcome::Complete(value) = outcome else {
+        panic!("cross-group conflict retained Needs")
+    };
+    let error = value.as_ref().as_ref().unwrap_err();
+    assert!(
+        matches!(
+            error.kind,
+            BuildCommandErrorKind::ActionClosure(
+                ConfiguredActionClosureError::UnsupportedEquivalence { .. }
+            )
+        ),
+        "{error:?}"
+    );
+}
+
+#[tokio::test]
 async fn configured_action_conflicts_concurrent_rootsets_restore_without_poisoning() {
     // OutputArtifactConflictTest new/overlapping roots and invalidation themes.
     // All concurrent requests use the same observed revision; old results are

@@ -69,7 +69,11 @@ mod command_configuration_tests {
 
     #[test]
     fn automatic_execution_groups_native_default_is_typed() {
-        assert!(!configuration().incompatible_auto_exec_groups().unwrap());
+        let base = configuration();
+        assert!(!base.incompatible_auto_exec_groups().unwrap());
+        let enabled = base.with_incompatible_auto_exec_groups(true);
+        assert!(enabled.incompatible_auto_exec_groups().unwrap());
+        assert_eq!(enabled.with_incompatible_auto_exec_groups(false), base);
     }
 
     fn mapping() -> RepositoryMapping {

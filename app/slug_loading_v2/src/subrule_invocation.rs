@@ -92,6 +92,13 @@ pub enum AnalysisSpawnInvocation<'v> {
     Shell(Value<'v>),
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum AnalysisToolchainRequest<'v> {
+    Omitted,
+    None,
+    Value(Value<'v>),
+}
+
 #[derive(Debug, Clone)]
 pub struct AnalysisSpawnRequest<'v> {
     pub scope: AnalysisActionCallScope,
@@ -109,7 +116,7 @@ pub struct AnalysisSpawnRequest<'v> {
     pub exec_group: Option<&'v str>,
     pub shadowed_action: Option<Value<'v>>,
     pub has_resource_set: bool,
-    pub toolchain: Option<Value<'v>>,
+    pub toolchain: AnalysisToolchainRequest<'v>,
 }
 
 pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
@@ -1122,12 +1129,15 @@ fn bind_resource_set(value: Option<Value<'_>>, operation: &str) -> anyhow::Resul
 fn bind_toolchain<'v>(
     value: Option<Value<'v>>,
     operation: &str,
-) -> anyhow::Result<Option<Value<'v>>> {
-    let Some(value) = value.filter(|value| !value.is_none()) else {
-        return Ok(None);
+) -> anyhow::Result<AnalysisToolchainRequest<'v>> {
+    let Some(value) = value else {
+        return Ok(AnalysisToolchainRequest::Omitted);
     };
+    if value.is_none() {
+        return Ok(AnalysisToolchainRequest::None);
+    }
     if value.unpack_str().is_some() || StarlarkLabel::from_value(value).is_some() {
-        return Ok(Some(value));
+        return Ok(AnalysisToolchainRequest::Value(value));
     }
     anyhow::bail!("ctx.actions.{operation} toolchain must be a Label, string, or None")
 }

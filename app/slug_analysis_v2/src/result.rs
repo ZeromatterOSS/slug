@@ -30,6 +30,7 @@ use slug_loading_v2::RuleCapability;
 use crate::configured_target::ConfiguredEdge;
 use crate::configured_target::ConfiguredEdgeKind;
 use crate::exec_group::ConfiguredExecGroup;
+use crate::execution_groups::ConfiguredExecGroupCollection;
 use crate::key::ConfigurationKind;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
@@ -535,8 +536,9 @@ impl ConfiguredActionOwnerContext {
                 .all(|constraint| seen_settings.insert(constraint.constraint_setting().clone())),
             "configured action platform has duplicate constraint setting",
         )?;
-        let exec_properties = merge_exec_properties(
+        let exec_properties = crate::execution_groups::effective_exec_properties(
             &platform_fact.exec_properties,
+            &exec_group,
             target_exec_properties,
             group_exec_properties,
         );
@@ -610,24 +612,6 @@ fn is_analysis_configured(key: &ConfiguredTargetKey) -> bool {
 
 fn ensure_action(condition: bool, message: &'static str) -> Result<(), String> {
     condition.then_some(()).ok_or_else(|| message.to_owned())
-}
-
-fn merge_exec_properties(
-    platform: &Arc<[(CompactString, CompactString)]>,
-    target: &BTreeMap<String, String>,
-    group: &BTreeMap<String, String>,
-) -> Arc<[(CompactString, CompactString)]> {
-    if target.is_empty() && group.is_empty() {
-        return platform.clone();
-    }
-    let mut merged = platform.iter().cloned().collect::<BTreeMap<_, _>>();
-    merged.extend(
-        target
-            .iter()
-            .chain(group)
-            .map(|(key, value)| (CompactString::from(key), CompactString::from(value))),
-    );
-    merged.into_iter().collect::<Vec<_>>().into()
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -780,7 +764,7 @@ pub struct ConfiguredNodeResult {
     edges: Arc<[ConfiguredEdge]>,
     diagnostics: Arc<[AnalysisDiagnostic]>,
     rule_capability: Option<RuleCapability>,
-    toolchain_topology: Option<ToolchainTopology>,
+    exec_groups: Option<ConfiguredExecGroupCollection>,
     platform_semantic_fact: Option<PlatformSemanticFact>,
     runfiles_packages: RunfilesPackageDepset,
 }
@@ -900,7 +884,7 @@ impl ConfiguredNodeResult {
             edges: Arc::from([]),
             diagnostics: Arc::from([]),
             rule_capability,
-            toolchain_topology: None,
+            exec_groups: None,
             platform_semantic_fact: None,
             runfiles_packages,
         }
@@ -929,7 +913,7 @@ impl ConfiguredNodeResult {
             edges: Arc::from([]),
             diagnostics: Arc::from([]),
             rule_capability,
-            toolchain_topology: None,
+            exec_groups: None,
             platform_semantic_fact: None,
             runfiles_packages,
         }
@@ -1027,7 +1011,13 @@ impl ConfiguredNodeResult {
     }
 
     pub fn toolchain_topology(&self) -> Option<&ToolchainTopology> {
-        self.toolchain_topology.as_ref()
+        self.exec_groups
+            .as_ref()
+            .map(ConfiguredExecGroupCollection::toolchain_topology)
+    }
+
+    pub fn exec_groups(&self) -> Option<&ConfiguredExecGroupCollection> {
+        self.exec_groups.as_ref()
     }
 
     pub fn platform_semantic_fact(&self) -> Option<&PlatformSemanticFact> {
@@ -1063,14 +1053,20 @@ impl ConfiguredNodeResult {
         self.actions = specs
             .into_iter()
             .map(|spec| {
-                let group = spec
-                    .exec_group()
-                    .map_or(ConfiguredExecGroup::Default, |name| {
-                        ConfiguredExecGroup::Named(CompactString::from(name))
-                    });
-                let context = by_group.get(&group).cloned().ok_or_else(|| {
-                    "configured action has no matching exec-group context".to_owned()
-                })?;
+                let context = match spec.exec_group() {
+                    None => by_group.get(&ConfiguredExecGroup::Default),
+                    Some(name) => by_group.iter().find_map(|(group, context)| match group {
+                        ConfiguredExecGroup::Named(group_name) if group_name == name => {
+                            Some(context)
+                        }
+                        ConfiguredExecGroup::Automatic(label) if label.to_string() == name => {
+                            Some(context)
+                        }
+                        _ => None,
+                    }),
+                }
+                .cloned()
+                .ok_or_else(|| "configured action has no matching exec-group context".to_owned())?;
                 Ok(ConfiguredAction { spec, context })
             })
             .collect::<Result<Vec<_>, String>>()?
@@ -1103,8 +1099,8 @@ impl ConfiguredNodeResult {
         self
     }
 
-    pub fn with_toolchain_topology(mut self, topology: ToolchainTopology) -> Self {
-        self.toolchain_topology = Some(topology);
+    pub fn with_exec_groups(mut self, exec_groups: ConfiguredExecGroupCollection) -> Self {
+        self.exec_groups = Some(exec_groups);
         self
     }
 

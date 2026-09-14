@@ -536,6 +536,24 @@ impl SlugConfiguration {
         self.core_bool("incompatible_auto_exec_groups")
     }
 
+    pub fn with_incompatible_auto_exec_groups(&self, enabled: bool) -> Self {
+        let mut options = self.0.options.to_vec();
+        let record = options
+            .iter_mut()
+            .find(|record| {
+                record.class_name == CORE_OPTIONS
+                    && record.canonical_name == "incompatible_auto_exec_groups"
+            })
+            .expect("automatic execution-group descriptor exists");
+        record.value = OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Bool(enabled)));
+        finish_configuration(
+            self.0.kind,
+            options.into(),
+            self.0.starlark_options.dupe(),
+            self.0.action_environment_host.dupe(),
+        )
+    }
+
     pub fn to_exec(&self) -> Result<Self, SlugConfigurationError> {
         if self.0.kind != SlugConfigurationKind::Target {
             return Err(SlugConfigurationError::ExecProjectionRequiresTarget {

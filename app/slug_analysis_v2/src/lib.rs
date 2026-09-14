@@ -16,6 +16,7 @@ mod configured_attribute;
 pub mod configured_target;
 pub mod dice;
 mod exec_group;
+mod execution_groups;
 mod files_to_run_spawn;
 pub mod key;
 pub mod result;
@@ -56,6 +57,8 @@ pub use dice::prepare_configured_node_analysis;
 #[doc(hidden)]
 pub use dice::prepare_configured_node_analysis_observed;
 pub use exec_group::ConfiguredExecGroup;
+pub use execution_groups::ConfiguredExecGroupCollection;
+pub use execution_groups::ConfiguredExecGroupRow;
 pub use key::ConfigurationChecksum;
 pub use key::ConfigurationKey;
 pub use key::ConfigurationKind;
@@ -84,8 +87,6 @@ pub use slug_loading_v2::LoadingPreparationOutcome as AnalysisPreparationOutcome
 pub use toolchains::ConstraintSet;
 pub use toolchains::ConstraintSetting;
 pub use toolchains::ConstraintValue;
-pub use toolchains::ExecGroup;
-pub use toolchains::ExecGroupCollection;
 pub use toolchains::ExecutionPlatform;
 pub use toolchains::RegisteredToolchains;
 pub use toolchains::RegisteredToolchainsKey;

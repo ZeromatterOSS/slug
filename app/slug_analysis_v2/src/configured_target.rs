@@ -66,6 +66,17 @@ impl ConfiguredAttributeDependency {
                 }
         )
     }
+
+    pub fn exec_group(&self) -> Option<&ConfiguredExecGroup> {
+        match self {
+            Self::Exec(group) => Some(group),
+            Self::Starlark {
+                exec_group: Some(group),
+                ..
+            } => Some(group),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]

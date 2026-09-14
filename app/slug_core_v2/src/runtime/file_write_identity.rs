@@ -63,6 +63,9 @@ impl FileWriteSemanticIdentity {
         encoder.field(0x0004, |field| match action.exec_group() {
             ConfiguredExecGroup::Default => field.field(0x0401, |_| {}),
             ConfiguredExecGroup::Named(name) => field.field(0x0402, |value| value.text(name)),
+            ConfiguredExecGroup::Automatic(label) => {
+                field.field(0x0403, |value| value.text(&label.to_string()))
+            }
         });
         let selected = action.execution_platform();
         encoder.field(0x0005, |field| configured_key(field, selected))?;

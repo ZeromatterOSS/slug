@@ -79,6 +79,7 @@ use slug_loading_v2::subrule_invocation::AnalysisEvaluationContext;
 use slug_loading_v2::subrule_invocation::AnalysisRunRequest;
 use slug_loading_v2::subrule_invocation::AnalysisSpawnInvocation;
 use slug_loading_v2::subrule_invocation::AnalysisSpawnRequest;
+use slug_loading_v2::subrule_invocation::AnalysisToolchainRequest;
 use slug_loading_v2::subrule_invocation::EvaluatorArgCallGen;
 use slug_loading_v2::subrule_invocation::EvaluatorArgsSnapshot;
 use slug_loading_v2::subrule_invocation::EvaluatorVectorArgGen;
@@ -121,6 +122,8 @@ use crate::analysis_value::materialize_runfiles;
 use crate::analysis_value::retained_runfiles;
 use crate::build_setting;
 use crate::configured_attribute::ResolvedRuleAttribute;
+use crate::exec_group::ConfiguredExecGroup;
+use crate::execution_groups::ConfiguredExecGroupCollection;
 use crate::files_to_run_spawn::ExecutableArtifactProvenance;
 use crate::files_to_run_spawn::executable_artifact_provenance;
 use crate::files_to_run_spawn::retained_invocation;
@@ -179,6 +182,7 @@ struct AnalysisContextGen<V> {
     fragments: V,
     #[trace(unsafe_ignore)]
     toolchain: Option<PreparedAnalysisToolchains>,
+    exec_groups: Option<PreparedAnalysisExecGroups>,
 }
 
 unsafe impl<'v> Coerce<AnalysisContextGen<Value<'v>>> for AnalysisContextGen<FrozenValue> {}
@@ -205,6 +209,7 @@ impl<'v> Freeze for AnalysisContext<'v> {
                 .transpose()?,
             fragments: self.fragments.freeze(freezer)?,
             toolchain: self.toolchain,
+            exec_groups: self.exec_groups,
         })
     }
 }
@@ -253,6 +258,12 @@ where
                 heap.alloc_simple(AnalysisToolchains {
                     token: self.token.clone(),
                     toolchains: toolchain,
+                })
+            }),
+            "exec_groups" => self.exec_groups.clone().map(|groups| {
+                heap.alloc_simple(AnalysisExecGroups {
+                    token: self.token.clone(),
+                    groups,
                 })
             }),
             "build_setting_value" => self.build_setting_value.map(|value| value.to_value()),
@@ -419,6 +430,17 @@ struct PreparedAnalysisToolchainRow {
 struct PreparedAnalysisToolchains {
     definition_source: Arc<BzlModuleIdentity>,
     rows: Arc<[PreparedAnalysisToolchainRow]>,
+}
+
+#[derive(Debug, Clone, Allocative)]
+struct PreparedAnalysisExecGroupRow {
+    name: CompactString,
+    toolchains: PreparedAnalysisToolchains,
+}
+
+#[derive(Debug, Clone, Allocative)]
+struct PreparedAnalysisExecGroups {
+    rows: Arc<[PreparedAnalysisExecGroupRow]>,
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
@@ -760,6 +782,86 @@ impl<'v> StarlarkValue<'v> for AnalysisToolchains {
     }
 }
 
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct AnalysisExecGroup {
+    #[allocative(skip)]
+    token: AnalysisCallToken,
+    toolchains: PreparedAnalysisToolchains,
+}
+
+impl fmt::Display for AnalysisExecGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<execution group>")
+    }
+}
+
+starlark::starlark_simple_value!(AnalysisExecGroup);
+
+#[starlark_value(type = "exec_group")]
+impl<'v> StarlarkValue<'v> for AnalysisExecGroup {
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        self.token
+            .require_active(attribute, "rule context execution group")
+            .ok()?;
+        match attribute {
+            "toolchains" => Some(heap.alloc_simple(AnalysisToolchains {
+                token: self.token.clone(),
+                toolchains: self.toolchains.clone(),
+            })),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct AnalysisExecGroups {
+    #[allocative(skip)]
+    token: AnalysisCallToken,
+    groups: PreparedAnalysisExecGroups,
+}
+
+impl fmt::Display for AnalysisExecGroups {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<ctx.exec_groups>")
+    }
+}
+
+starlark::starlark_simple_value!(AnalysisExecGroups);
+
+#[starlark_value(type = "exec_groups")]
+impl<'v> StarlarkValue<'v> for AnalysisExecGroups {
+    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        self.token
+            .require_active("[]", "rule context execution groups")?;
+        let name = index.unpack_str().ok_or_else(|| {
+            starlark::Error::new_other(anyhow::anyhow!("ctx.exec_groups indices must be strings"))
+        })?;
+        let row = self
+            .groups
+            .rows
+            .iter()
+            .find(|row| row.name == name)
+            .ok_or_else(|| {
+                starlark::Error::new_other(anyhow::anyhow!(
+                    "ctx.exec_groups does not contain execution group '{name}'"
+                ))
+            })?;
+        Ok(heap.alloc_simple(AnalysisExecGroup {
+            token: self.token.clone(),
+            toolchains: row.toolchains.clone(),
+        }))
+    }
+
+    fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
+        self.token
+            .require_active("in", "rule context execution groups")?;
+        let Some(name) = other.unpack_str() else {
+            return Ok(false);
+        };
+        Ok(self.groups.rows.iter().any(|row| row.name == name))
+    }
+}
+
 #[derive(Debug, Clone, Allocative)]
 struct AnalysisDependency {
     attribute: CompactString,
@@ -783,18 +885,15 @@ fn materialize_toolchain_info(
 }
 
 fn materialize_analysis_toolchains(
-    toolchain: PreparedToolchain,
+    action_context: &ConfiguredActionOwnerContext,
     definition_source: Arc<BzlModuleIdentity>,
+    materialized: &mut SmallMap<slug_identity_v2::CanonicalLabel, FrozenValue>,
     materializer: &mut AnalysisValueMaterializer<'_>,
 ) -> Result<PreparedAnalysisToolchains, String> {
-    let context = toolchain
-        .action_context
+    let rows = action_context
         .toolchain()
-        .expect("prepared toolchain retains its configured context");
-    let mut materialized = SmallMap::with_capacity(context.rows().len());
-    let rows = context
-        .rows()
-        .iter()
+        .into_iter()
+        .flat_map(|context| context.rows())
         .map(|row| {
             let info = row
                 .selected()
@@ -802,7 +901,7 @@ fn materialize_analysis_toolchains(
                     materialize_toolchain_info(
                         row.actual().label(),
                         selected.info(),
-                        &mut materialized,
+                        materialized,
                         materializer,
                     )
                 })
@@ -818,6 +917,89 @@ fn materialize_analysis_toolchains(
         definition_source,
         rows: rows.into(),
     })
+}
+
+fn exec_group_name(identity: &ConfiguredExecGroup) -> Option<CompactString> {
+    match identity {
+        ConfiguredExecGroup::Default => None,
+        ConfiguredExecGroup::Named(name) => Some(name.clone()),
+        ConfiguredExecGroup::Automatic(label) => Some(CompactString::from(label.to_string())),
+    }
+}
+
+fn materialize_execution_group_views(
+    groups: &ConfiguredExecGroupCollection,
+    definition_source: Arc<BzlModuleIdentity>,
+    materializer: &mut AnalysisValueMaterializer<'_>,
+) -> Result<
+    (
+        Option<PreparedAnalysisToolchains>,
+        Option<PreparedAnalysisExecGroups>,
+    ),
+    String,
+> {
+    let mut materialized = SmallMap::new();
+    let root = if groups.use_auto_exec_groups() {
+        let mut rows = Vec::new();
+        for requirement in groups.default_declared_requirements() {
+            let identity = ConfiguredExecGroup::Automatic(requirement.label().clone());
+            let row = groups.row(&identity).ok_or_else(|| {
+                format!(
+                    "automatic execution group for toolchain {} was not resolved",
+                    requirement.label()
+                )
+            })?;
+            rows.extend(
+                materialize_analysis_toolchains(
+                    row.action_context(),
+                    definition_source.clone(),
+                    &mut materialized,
+                    materializer,
+                )?
+                .rows
+                .iter()
+                .cloned(),
+            );
+        }
+        (!rows.is_empty()).then(|| PreparedAnalysisToolchains {
+            definition_source: definition_source.clone(),
+            rows: rows.into(),
+        })
+    } else {
+        let default = groups
+            .row(&ConfiguredExecGroup::Default)
+            .expect("configured execution groups retain Default");
+        default
+            .action_context()
+            .toolchain()
+            .map(|_| {
+                materialize_analysis_toolchains(
+                    default.action_context(),
+                    definition_source.clone(),
+                    &mut materialized,
+                    materializer,
+                )
+            })
+            .transpose()?
+    };
+    let rows = groups
+        .rows()
+        .iter()
+        .filter_map(|row| exec_group_name(row.identity()).map(|name| (name, row)))
+        .map(|(name, row)| {
+            Ok(PreparedAnalysisExecGroupRow {
+                name,
+                toolchains: materialize_analysis_toolchains(
+                    row.action_context(),
+                    definition_source.clone(),
+                    &mut materialized,
+                    materializer,
+                )?,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    let exec_groups = (!rows.is_empty()).then(|| PreparedAnalysisExecGroups { rows: rows.into() });
+    Ok((root, exec_groups))
 }
 
 #[cfg(test)]
@@ -864,9 +1046,144 @@ struct SynchronousAnalysisActionSink {
     typed_configuration: Result<Option<(HostPathFlavor, RetainedActionEnvironment)>, String>,
     executable_provenance: Arc<ExecutableArtifactProvenance>,
     execution_tags: CanonicalStringMap,
+    definition_source: Arc<BzlModuleIdentity>,
+    exec_groups: ConfiguredExecGroupCollection,
 }
 
 impl SynchronousAnalysisActionSink {
+    fn action_toolchain_label(
+        &self,
+        value: Value<'_>,
+        operation: &str,
+    ) -> anyhow::Result<slug_identity_v2::CanonicalLabel> {
+        if let Some(label) = starlark_label(value) {
+            return Ok(label);
+        }
+        let raw = value
+            .unpack_str()
+            .expect("toolchain binder admitted only labels and strings");
+        resolve_rule_definition_label(raw, &self.definition_source)
+            .map_err(|error| anyhow::anyhow!("ctx.actions.{operation} invalid toolchain: {error}"))
+    }
+
+    fn is_identifier(name: &str) -> bool {
+        let mut chars = name.chars();
+        chars
+            .next()
+            .is_some_and(|first| first == '_' || first.is_ascii_alphabetic())
+            && chars.all(|character| character == '_' || character.is_ascii_alphanumeric())
+    }
+
+    fn contains_unassociated_artifact(
+        &self,
+        value: &AnalysisValue,
+        scope: &AnalysisActionCallScope,
+    ) -> bool {
+        match value.kind() {
+            AnalysisValueKind::Artifact(artifact) => {
+                !self.executable_provenance.is_associated(scope, artifact)
+            }
+            AnalysisValueKind::List(values) | AnalysisValueKind::Tuple(values) => values
+                .iter()
+                .any(|value| self.contains_unassociated_artifact(value, scope)),
+            AnalysisValueKind::Depset(values) => values
+                .to_list()
+                .iter()
+                .any(|value| self.contains_unassociated_artifact(value, scope)),
+            _ => false,
+        }
+    }
+
+    fn omitted_toolchain_is_ambiguous(
+        &self,
+        request: &AnalysisSpawnRequest<'_>,
+    ) -> anyhow::Result<bool> {
+        let executable = match request.invocation {
+            AnalysisSpawnInvocation::Executable(value) => {
+                AnalysisArtifactValue::from_starlark(value).is_some_and(|file| {
+                    !self
+                        .executable_provenance
+                        .is_associated(&request.scope, file.artifact())
+                })
+            }
+            AnalysisSpawnInvocation::Shell(_) => false,
+        };
+        if executable {
+            return Ok(true);
+        }
+        let Some(tools) = request.tools.filter(|value| !value.is_none()) else {
+            return Ok(false);
+        };
+        let mut lowerer = AnalysisValueLowerer::default();
+        let tools = lowerer
+            .lower(tools, "ctx.actions.run tools")
+            .map_err(anyhow::Error::msg)?;
+        Ok(self.contains_unassociated_artifact(&tools, &request.scope))
+    }
+
+    fn selected_action_group(
+        &self,
+        request: &AnalysisSpawnRequest<'_>,
+        operation: &str,
+    ) -> anyhow::Result<ConfiguredExecGroup> {
+        let explicit = request
+            .exec_group
+            .map(|name| {
+                if !Self::is_identifier(name) {
+                    anyhow::bail!("ctx.actions.{operation} invalid exec_group '{name}'");
+                }
+                self.exec_groups
+                    .named(name)
+                    .map(|row| row.identity().clone())
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("ctx.actions.{operation} unknown execution group '{name}'")
+                    })
+            })
+            .transpose()?;
+        if !self.exec_groups.use_auto_exec_groups() {
+            return Ok(explicit.unwrap_or(ConfiguredExecGroup::Default));
+        }
+        match (explicit, request.toolchain) {
+            (Some(group), AnalysisToolchainRequest::Value(value)) => {
+                let label = self.action_toolchain_label(value, operation)?;
+                let row = self
+                    .exec_groups
+                    .row(&group)
+                    .expect("validated named execution group remains present");
+                if !row
+                    .requirements()
+                    .iter()
+                    .any(|requirement| requirement.label() == &label)
+                {
+                    anyhow::bail!(
+                        "ctx.actions.{operation} toolchain {label} is not a member of execution group '{}'",
+                        request.exec_group.expect("explicit group is present")
+                    );
+                }
+                Ok(group)
+            }
+            (Some(group), _) => Ok(group),
+            (None, AnalysisToolchainRequest::Value(value)) => {
+                let label = self.action_toolchain_label(value, operation)?;
+                let group = ConfiguredExecGroup::Automatic(label.clone());
+                self.exec_groups.row(&group).map(|_| group).ok_or_else(|| {
+                    anyhow::anyhow!("ctx.actions.{operation} unknown automatic toolchain {label}")
+                })
+            }
+            (None, AnalysisToolchainRequest::None) => Ok(ConfiguredExecGroup::Default),
+            (None, AnalysisToolchainRequest::Omitted) => {
+                if self.exec_groups.rows().len() > 1
+                    && self.omitted_toolchain_is_ambiguous(request)?
+                {
+                    anyhow::bail!(
+                        "ctx.actions.{operation} requires an explicit toolchain or None for an unassociated executable or tool under automatic execution groups"
+                    );
+                }
+                Ok(ConfiguredExecGroup::Default)
+            }
+        }
+    }
+
     fn owned_output(&self, value: Value<'_>, operation: &str) -> anyhow::Result<ActionOutput> {
         AnalysisArtifactValue::from_starlark(value)
             .and_then(|file| file.output_for_owner(&self.owner))
@@ -1020,6 +1337,7 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             AnalysisSpawnInvocation::Executable(_) => "run",
             AnalysisSpawnInvocation::Shell(_) => "run_shell",
         };
+        let selected_group = self.selected_action_group(&request, operation)?;
         let mut lowerer = AnalysisValueLowerer::default();
         let (command_line, has_arguments) = retained_command_line(request.arguments, &mut lowerer)?;
         let (path_flavor, configured_environment) = self.typed_configuration()?;
@@ -1052,8 +1370,8 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             &self.execution_tags,
             operation,
         )?;
-        validate_default_spawn_context(&request, operation)?;
-        let spec = SpawnSpec::new(
+        validate_supported_spawn_options(&request, operation)?;
+        let mut action = slug_build_api_v2::ActionSpec::spawn(SpawnSpec::new(
             invocation,
             command_line,
             inputs,
@@ -1064,8 +1382,11 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             execution_requirements,
             mnemonic,
             request.progress_message,
-        );
-        self.register(|actions| actions.register_spawn(spec))
+        ));
+        if let Some(name) = exec_group_name(&selected_group) {
+            action = action.with_exec_group(name);
+        }
+        self.register(|actions| actions.register_batch([action]).map(|range| range.start))
     }
 
     fn is_files_to_run_provider(&self, value: Value<'_>) -> bool {
@@ -1375,16 +1696,10 @@ fn retained_execution_requirements(
     Ok(CanonicalStringMap::from_pairs(pairs))
 }
 
-fn validate_default_spawn_context(
+fn validate_supported_spawn_options(
     request: &AnalysisSpawnRequest<'_>,
     operation: &str,
 ) -> anyhow::Result<()> {
-    if request.exec_group.is_some() {
-        anyhow::bail!("ctx.actions.{operation} named exec_group is not supported");
-    }
-    if request.toolchain.is_some_and(|value| !value.is_none()) {
-        anyhow::bail!("ctx.actions.{operation} nondefault toolchain selection is not supported");
-    }
     if request
         .shadowed_action
         .is_some_and(|value| !value.is_none())
@@ -1591,8 +1906,7 @@ pub(crate) fn evaluate_loaded_rule(
     dependencies: Vec<PreparedDependency>,
     resolved_attributes: Vec<ResolvedRuleAttribute>,
     configured_attributes: Vec<PreparedConfiguredAttribute>,
-    action_context: Arc<ConfiguredActionOwnerContext>,
-    toolchain: Option<PreparedToolchain>,
+    exec_groups: ConfiguredExecGroupCollection,
     runfiles_packages: RunfilesPackageDepset,
     print_handler: Option<&dyn PrintHandler>,
 ) -> Result<ConfiguredNodeResult, LoadedRuleError> {
@@ -1633,7 +1947,11 @@ pub(crate) fn evaluate_loaded_rule(
         None => None,
     };
 
-    let action_contexts = vec![action_context];
+    let action_contexts = exec_groups
+        .rows()
+        .iter()
+        .map(|row| row.action_context().clone())
+        .collect::<Vec<_>>();
     let actions = Arc::new(Mutex::new(CtxActions::new()));
     let module = Module::new();
     let needs_cpp_fragment = implementation
@@ -1715,8 +2033,10 @@ pub(crate) fn evaluate_loaded_rule(
         typed_configuration,
         executable_provenance,
         execution_tags,
+        definition_source: implementation.definition_source().clone(),
+        exec_groups: exec_groups.clone(),
     });
-    let (dependencies, executables, toolchain) = {
+    let (dependencies, executables, toolchain, prepared_exec_groups) = {
         let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
         let executables = implementation
             .schema()
@@ -1761,16 +2081,12 @@ pub(crate) fn evaluate_loaded_rule(
                 })
             })
             .collect::<Result<Arc<[_]>, String>>()?;
-        let toolchain = toolchain
-            .map(|toolchain| {
-                materialize_analysis_toolchains(
-                    toolchain,
-                    implementation.definition_source().clone(),
-                    &mut materializer,
-                )
-            })
-            .transpose()?;
-        (dependencies, executables, toolchain)
+        let (toolchain, prepared_exec_groups) = materialize_execution_group_views(
+            &exec_groups,
+            implementation.definition_source().clone(),
+            &mut materializer,
+        )?;
+        (dependencies, executables, toolchain, prepared_exec_groups)
     };
     let prepared_subrules = {
         let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
@@ -1840,6 +2156,7 @@ pub(crate) fn evaluate_loaded_rule(
             build_setting_value,
             fragments,
             toolchain,
+            exec_groups: prepared_exec_groups,
         });
         let result =
             evaluator.eval_function(implementation.frozen_value().to_value(), &[context], &[]);

@@ -36,6 +36,8 @@ use slug_analysis_v2::ConfiguredAttributeDependency;
 use slug_analysis_v2::ConfiguredEdge;
 use slug_analysis_v2::ConfiguredEdgeKind;
 use slug_analysis_v2::ConfiguredExecGroup;
+use slug_analysis_v2::ConfiguredExecGroupCollection;
+use slug_analysis_v2::ConfiguredExecGroupRow;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeResult;
@@ -473,6 +475,23 @@ fn default_action_context(
     )
 }
 
+fn with_default_exec_group(
+    result: ConfiguredNodeResult,
+    context: Arc<ConfiguredActionOwnerContext>,
+    topology: ToolchainTopology,
+) -> ConfiguredNodeResult {
+    let row = ConfiguredExecGroupRow::new(
+        ConfiguredExecGroup::Default,
+        Arc::from([]),
+        Arc::from([]),
+        context,
+    )
+    .unwrap();
+    let groups =
+        ConfiguredExecGroupCollection::new(vec![row], Arc::from([]), topology, false).unwrap();
+    result.with_exec_groups(groups)
+}
+
 fn publication_depset(marker: &str, nested: bool) -> AnalysisDepset {
     let artifact = AnalysisValue::artifact(AnalysisArtifact::Source(canonical(&format!(
         "@@//inputs:{marker}.txt"
@@ -621,7 +640,7 @@ fn file_write_result(
     let (context, topology) = default_action_context(&owner, platform_label);
     let providers =
         ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
-    ConfiguredNodeResult::new_rule(owner, providers, None, no_runfiles_packages())
+    let result = ConfiguredNodeResult::new_rule(owner, providers, None, no_runfiles_packages())
         .with_action_specs(
             vec![ActionSpec::new(
                 ActionKind::Write {
@@ -631,10 +650,10 @@ fn file_write_result(
                 "FileWrite",
                 vec![ActionOutput::new(output_path, ActionOutputKind::File)],
             )],
-            vec![context],
+            vec![context.clone()],
         )
-        .unwrap()
-        .with_toolchain_topology(topology)
+        .unwrap();
+    with_default_exec_group(result, context, topology)
 }
 
 fn only_file_write(result: &ConfiguredNodeResult) -> slug_analysis_v2::ConfiguredActionView<'_> {
@@ -1024,6 +1043,23 @@ fn toolchain_topology_is_ordered_role_checked_and_structurally_equal() {
         structural_configurations()[0].clone(),
     );
     let context = toolchain_context(&owner, &candidate, "topology");
+    let action_context = Arc::new(
+        ConfiguredActionOwnerContext::new(
+            owner,
+            ConfiguredExecGroup::Default,
+            candidate.clone(),
+            PlatformSemanticFact {
+                exec_properties: Arc::from([]),
+                missing_toolchain_error: None,
+            },
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            Vec::new(),
+            Some(context.clone()),
+            ConfiguredActionAspectProvenance::Absent,
+        )
+        .unwrap(),
+    );
     let topology = ToolchainTopology::new(vec![candidate.clone()], Some(context)).unwrap();
     assert_eq!(
         topology.toolchain().unwrap().execution_platform(),
@@ -1049,8 +1085,11 @@ fn toolchain_topology_is_ordered_role_checked_and_structurally_equal() {
         None,
         no_runfiles_packages(),
     );
-    let retained = ConfiguredNodeResult::new_rule(key, providers, None, no_runfiles_packages())
-        .with_toolchain_topology(topology.clone());
+    let retained = with_default_exec_group(
+        ConfiguredNodeResult::new_rule(key, providers, None, no_runfiles_packages()),
+        action_context,
+        topology.clone(),
+    );
     assert_ne!(plain, retained);
     assert_eq!(retained.toolchain_topology(), Some(&topology));
 }
@@ -1331,6 +1370,84 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
 }
 
 #[test]
+fn configured_action_specs_route_every_group_without_fallback() {
+    let owner = ConfiguredTargetKey::new(
+        canonical("@@//:all_groups"),
+        structural_configurations()[0].clone(),
+    );
+    let exec = structural_configurations()[1].clone();
+    let make = |group, platform: &str, marker: &str| {
+        action_context(
+            &owner,
+            group,
+            ConfiguredTargetKey::new(canonical(platform), exec.clone()),
+            &[],
+            &[],
+            &[],
+            marker,
+            Vec::new(),
+        )
+        .unwrap()
+    };
+    let default = make(ConfiguredExecGroup::Default, "@@//:p0", "default");
+    let named = make(
+        ConfiguredExecGroup::Named("named".into()),
+        "@@//:p1",
+        "named",
+    );
+    let automatic_label = canonical("@@//:toolchain_type");
+    let automatic = make(
+        ConfiguredExecGroup::Automatic(automatic_label.clone()),
+        "@@//:p2",
+        "automatic",
+    );
+    let action = |path: &str| {
+        ActionSpec::new(
+            ActionKind::Write {
+                content: path.to_owned(),
+                is_executable: false,
+            },
+            "FileWrite",
+            vec![ActionOutput::new(path, ActionOutputKind::File)],
+        )
+    };
+    let providers =
+        ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
+    let base = ConfiguredNodeResult::new_rule(owner, providers, None, no_runfiles_packages());
+    let result = base
+        .clone()
+        .with_action_specs(
+            vec![
+                action("default"),
+                action("named").with_exec_group("named"),
+                action("automatic").with_exec_group(automatic_label.to_string()),
+            ],
+            vec![default, named, automatic],
+        )
+        .unwrap();
+    assert_eq!(
+        result.actions()[0].context().exec_group(),
+        &ConfiguredExecGroup::Default
+    );
+    assert_eq!(
+        result.actions()[1].context().exec_group(),
+        &ConfiguredExecGroup::Named("named".into())
+    );
+    assert_eq!(
+        result.actions()[2].context().exec_group(),
+        &ConfiguredExecGroup::Automatic(automatic_label)
+    );
+    assert_eq!(
+        base.with_action_specs(
+            vec![action("missing").with_exec_group("@@//:missing")],
+            vec![result.actions()[0].context().clone()],
+        )
+        .unwrap_err(),
+        "configured action has no matching exec-group context"
+    );
+}
+
+#[test]
 fn configured_file_write_view_uses_retained_context_and_rejects_shapes() {
     let c0 = structural_configurations()[0].clone();
     let baseline = file_write_result(c0, "@@//:p0", "content-A", "path-A.txt");
@@ -1367,9 +1484,11 @@ fn configured_file_write_view_uses_retained_context_and_rejects_shapes() {
         canonical("@@//:unrelated"),
         structural_configurations()[1].clone(),
     );
-    let retained = baseline
-        .clone()
-        .with_toolchain_topology(ToolchainTopology::new(vec![unrelated], None).unwrap());
+    let retained = with_default_exec_group(
+        baseline.clone(),
+        only_file_write(&baseline).context().clone(),
+        ToolchainTopology::new(vec![unrelated], None).unwrap(),
+    );
     assert_eq!(
         only_file_write(&retained).execution_platform().label(),
         &canonical("@@//:p0")

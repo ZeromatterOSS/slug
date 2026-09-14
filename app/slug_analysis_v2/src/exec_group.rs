@@ -10,6 +10,7 @@
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use slug_identity_v2::CanonicalLabel;
 
 /// Semantic identity of an execution group shared by dependency transitions
 /// and action ownership.
@@ -17,4 +18,5 @@ use compact_str::CompactString;
 pub enum ConfiguredExecGroup {
     Default,
     Named(CompactString),
+    Automatic(CanonicalLabel),
 }
