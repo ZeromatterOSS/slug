@@ -1,102 +1,183 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7A-execution-group-order-replan-r1
-Status: ready; docs/source scheduling replan only
+Packet: WP-6-7A-selected-request-output-conflict-r2-reconcile-r1
+Status: ready; independent prerequisite-order design review ACCEPT
 
-## Result and contradiction
+## Result and owner
 
-Freeze an implementation-ready prerequisite order for the selected-toolchain
-request correction, configured-action output conflicts, and shared rule
-execution-group runtime. The bounded authentic F3 proof now reaches
-rules_java `toolchains/BUILD:138`, then rules_cc `cc_library.bzl:19`, and fails
-at the retained named execution-group target-invocation guard in 9.98 seconds.
-This directly disproves the former schedule assumption that F3 could complete
-before execution-group work.
+Reconcile the preserved selected-toolchain request and configured-action
+output-conflict candidate onto current `main`, close its missing evidence, and
+accept both owners atomically if every gate passes. The selected request keeps
+the parent's configuration plus a separate selected execution-platform
+preference. The root-set action-closure producer rejects incompatible outputs
+before execution or materialization and shares only source-established equal
+FileWrites through one validated execution view.
 
-The execution-group design already established that this selected rules_cc
-owner declares named `cpp_link` and `_use_auto_exec_groups=True`. Its complete
-runtime requires the selected-toolchain request correction. That correction
-exposed the cross-owner output-conflict prerequisite; both remain together in
-the unaccepted R2 candidate at `27e9e9c0c`, based on `97dffd5d4`. Canonical
-scheduling previously blocked R2 on F3, creating the cycle now proven by the
-authentic fixture.
+This combined checkpoint now precedes shared named/automatic execution groups.
+The authentic F3 proof confirms that rules_java toolchains selects rules_cc
+`cc_library`, whose retained declaration requires named `cpp_link` and
+`_use_auto_exec_groups=True`. F3 is not a semantic input to selected-request or
+root-set conflict correctness; replay it only after complete group activation.
 
-## Decision to produce
+Exact: the admitted selected implementation configuration/preference behavior,
+FileWrite sharing/conflict behavior and pre-execution consumer failures recorded
+in Stage 6. Slug-native: DICE keys, structural identities, closure ordering and
+error storage. Deferred: group activation and guard removal, other action-family
+equivalence, computed defaults, C++/Java behavior, configured aspects and exact
+configuration/output/ActionKey bytes.
 
-Choose and document one atomic sequence that breaks this acceptance cycle while
-preserving every semantic gate. Prefer an independently acceptable prerequisite
-checkpoint only when its focused owner and consumer evidence does not claim F3
-or shared group-runtime acceptance. Otherwise keep the combined candidate and
-name the exact non-F3 evidence that can accept it before group activation.
+## Recovery and cohesion
 
-The result must state:
+Create an isolated worktree/branch from the scheduling checkpoint on `main`.
+Apply only the app diff from `97dffd5d4..27e9e9c0c`; do not integrate
+`review-evidence/` or its embedded patch. The app-only binary diff applies cleanly
+at packet selection. Five files changed on both lines but have no textual merge
+conflict:
 
-- whether the current R2 candidate can be reconciled onto `main` and accepted
-  before F3 using its source/configuration/output-conflict/consumer gates;
-- which remaining baseline failures materially gate that acceptance, separating
-  the two already attributed failures from unexamined full-core failures;
-- the exact point at which the complete named and automatic group runtime can
-  remove the loading guard, and the F3 replay that follows it;
-- whether any candidate portion is independently cohesive. Do not split it only
-  to bypass an unmet gate;
-- the new active implementation packet, exact file allowlist, caps, commands,
-  review requirements, and observable stop.
+- `app/slug_analysis_v2/src/dice.rs`;
+- `app/slug_cli_v2/src/commands/build.rs`;
+- `app/slug_cli_v2/tests/cli.rs`;
+- `app/slug_core_v2/src/runtime/dice.rs`;
+- `app/slug_core_v2/src/runtime/mod.rs`.
 
-A second general execution-group audit, a new archive, or another unchanged F3
-run cannot answer this scheduling decision.
+Review those five semantically against landed registration diagnostics, daemon
+cleanup, observer, archive/file capture and path-shard work. Preserve current
+behavior from both lines. The selected-request change is conceptually cohesive,
+but this candidate's platform facts, owner identity, FileWrite identity,
+validated closure, execution projection and command consumers form one proof
+boundary. Splitting it now would activate an unvalidated collision path and
+invalidate its evidence. The CLI drain helper is proof infrastructure for those
+consumer gates, not a separate product checkpoint.
 
-## Evidence and authority
+## Exact app allowlist and limits
 
-Reuse these records rather than reconstructing them:
+Production and proof changes are limited to these 19 candidate files:
 
-- F3 fixture inventory SHA-256
-  `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`,
-  28 objects, 8,004,740 source bytes and 177 metadata entries;
-- the final F3 receipt: one selected/executed failed probe, native exit 1,
-  9.98 seconds, valid observer and complete cleanup, with 47,625 starts,
-  41,735 dependency checks and 7,432 computes;
-- Stage 6 sections `Rule execution-group runtime prerequisite: named-only
-  REPLAN` and the selected-toolchain/output-conflict owner contracts;
-- candidate commit `27e9e9c0c`, its `review-evidence/validation.txt`, original
-  patch SHA-256
-  `90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e`,
-  and the clean-base attribution recorded there;
-- Bazel 9.2 authority at local object
-  `8220c6198837d5c13d53fea211cf3282aa12408a` and the existing source/test
-  anchors already recorded in Stage 6.
+- `app/slug_analysis_v2/src/analysis_value.rs`;
+- `app/slug_analysis_v2/src/dice.rs`;
+- `app/slug_analysis_v2/src/key.rs`;
+- `app/slug_analysis_v2/src/result.rs`;
+- `app/slug_analysis_v2/src/starlark_rule.rs`;
+- `app/slug_analysis_v2/tests/configured_target.rs`;
+- `app/slug_analysis_v2/tests/starlark_rule.rs`;
+- `app/slug_build_api_v2/src/analysis_value.rs`;
+- `app/slug_build_api_v2/tests/analysis_value.rs`;
+- `app/slug_cli_v2/src/commands/build.rs`;
+- `app/slug_cli_v2/tests/cli.rs`;
+- `app/slug_core_v2/src/runtime/configured_action_closure.rs`;
+- `app/slug_core_v2/src/runtime/dice.rs`;
+- `app/slug_core_v2/src/runtime/file_write_identity.rs`;
+- `app/slug_core_v2/src/runtime/mod.rs`;
+- `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`;
+- `app/slug_core_v2/src/runtime/tests/configured_action_conflicts_tests.rs`;
+- `app/slug_reapi_v2/tests/reapi.rs`;
+- `app/slug_server_v2/src/reapi.rs`.
 
-The selected request, conflict, and execution-group semantics remain exact only
-for the admitted Bazel surfaces. DICE ownership, structural keys and publication
-boundaries remain Slug-native. Computed defaults, C++/Java rule behavior,
-configured aspects, broader action families, and exact configuration/output
-bytes remain deferred.
+Acceptance bookkeeping may update only this manifest, canonical status, the
+configured-fixture ledger, Stage 6's current owner/order record and bootstrap
+readiness. The preserved baseline is 757 production / 2,103 proof / 2,860 total
+gross Rust additions. Review at 900 production, 2,400 proof or 3,300 aggregate;
+these are scope triggers, not permission requests.
 
-## Scope, review, and validation
+The Stage 6 selected-request and configured-action closure contracts remain the
+complete representation, equality, publication, memory/lifetime and consumer
+authority. Add no key family, side registry/cache, command-side conflict scan,
+output suffix, fallback, lock across DICE awaits or broader action executor.
 
-Allowed edits are this manifest, canonical Live Status, the configured-fixture
-ledger, bootstrap readiness, and the relevant current Stage 4/6 owner sections.
-No Rust, fixture, harness, dependency, vendored source, branch integration, or
-runtime change is authorized. Keep additions under 240 text lines excluding
-this manifest replacement.
+## Required corrections and discriminators
 
-Inspect the preserved candidate and current `main` structurally; do not apply it
-in this packet. Reconcile all landed prerequisites and identify conflicts by
-file and owner. Read the plan-authoring guide and obtain independent design
-review because the decision changes cross-stage semantic acceptance order.
-Validation is source/structure inspection, `python3 scripts/v2_plan_status.py`,
-and `git diff --check`; no build, network access, daemon, materialization, or F3
-replay is needed.
+Preserve all existing focused candidate tests, then close these recorded gaps:
 
-Return `REPLAN` only if accepting any prerequisite before F3 would require a new
-semantic owner or weakening an existing gate. In that case name the exact owner
-and a bounded successor. Never erase group names, substitute the default
-platform, move the loading guard early, waive output conflicts, use a command
-side scan, or treat diagnostic progress as configured-source acceptance.
+1. Run the final dotted-property guard and raw-platform/message cutoff matrix,
+   including same-DICE A/B/A, unchanged Arc cutoff, cancellation/Need/error,
+   overlapping requests and both toolchain/no-toolchain constructor paths.
+2. Account for every Core library test in bounded partitions. For every candidate
+   failure, run the exact selector on unchanged current `main`. The two failures
+   previously reproduced on `97dffd5d4` are inherited only if current main and
+   the reconciled candidate still fail identically. Every other old full-Core
+   failure is unattributed and blocks acceptance until compared or corrected.
+3. Run the existing one-shot and stable-daemon conflict tests against rebuilt
+   executables. They must prove build/run/aquery exit 2, deterministic path and
+   owners, zero transport calls, unchanged outputs, repeated daemon failure,
+   restoration, owner-complete aquery and independent successful cquery. Change
+   their internal command deadline to 12 seconds; retain 15 seconds only as the
+   absolute outer kill ceiling.
+4. Add the missing positive common-boundary proof. Obtain the producer-validated
+   execution view from a real completed closure, lower it through
+   `FileWriteReapiPlan`, and prove two equal owner actions retain both semantic
+   and aquery owners while producing one REAPI plan. The existing standalone
+   owner-identity test is only a control.
+5. Rebuild and run direct REAPI/server consumers. Preserve current registration,
+   repository, observer, archive, path-observation and daemon behavior in the
+   five overlapping files.
+
+Failure must precede RPC/materialization and retain typed command errors. Cquery
+remains independent. Need, analysis failure and cancellation precedence remain
+unchanged; no partial validated closure or command success may publish.
+
+## Validation and acceptance
+
+Resolve the pinned toolchain with `rustup which --toolchain
+nightly-2025-09-14-x86_64-unknown-linux-gnu` for cargo, rustc, rustdoc and
+rustfmt. Compile each affected test target separately with `--no-run
+--message-format=json`; each preparation operation has a 60-second ceiling.
+Never run concurrent Cargo commands against one target directory.
+
+Compile serially from the candidate worktree, substituting the cargo path
+returned by the pinned `rustup which` command:
+
+```sh
+timeout 60s cargo test -p slug_analysis_v2 --tests --no-run --message-format=json
+timeout 60s cargo test -p slug_build_api_v2 --tests --no-run --message-format=json
+timeout 60s cargo test -p slug_core_v2 --lib --no-run --message-format=json
+timeout 60s cargo test -p slug_cli_v2 --test cli --no-run --message-format=json
+timeout 60s cargo test -p slug_reapi_v2 --tests --no-run --message-format=json
+timeout 60s cargo test -p slug_server_v2 --tests --no-run --message-format=json
+timeout 60s cargo check -p slug_query_v2 -p slug_server_v2 -p slug_cli_v2
+```
+
+Before execution, preflight exact nonignored selectors with
+`scripts/v2_test_preflight.py`; rebuilding invalidates that receipt. Run tests
+with a 12-second deadline and 15-second absolute ceiling. Required accounting:
+
+- all selected-toolchain request tests plus existing selected-toolchain,
+  root-toolchain, default-exec and rule-transition controls;
+- all configured-action conflict tests, including the positive common handoff;
+- complete `slug_analysis_v2` and `slug_build_api_v2` suites;
+- every `slug_core_v2` library test in bounded exact batches, with current-main
+  comparison for each failure;
+- the CLI drain control and the one-shot and stable-daemon consumer tests,
+  separately, with Unix-socket/loopback capability checked in their environment;
+- complete direct `slug_reapi_v2` tests and server/query/core compile dependents.
+
+For each produced executable, use the corresponding concrete forms below; exact
+names and batch membership enter the receipt:
+
+```sh
+python3 scripts/v2_test_preflight.py <executable> --exact <test> [<test> ...]
+timeout --kill-after=3s 12s <executable> --exact <test>
+timeout --kill-after=3s 12s <executable> <preflighted-filter>
+```
+
+Use the existing current-main worktree as the unchanged comparator and keep the
+candidate worktree isolated. Record executable, features, exact selected/pass/
+fail/ignored counts, elapsed time and attributed failure text. Run pinned
+`cargo fmt --all -- --check`, `git diff --check`, scope/growth checks and
+`python3 scripts/v2_plan_status.py`. Obtain independent final invariant review
+of the reconciled diff and evidence before integration. Commit and push `main`
+only after acceptance; preservation or scheduling commits do not accept R2.
+
+Return `REPLAN` only if reconciliation requires a new semantic owner/key family,
+broadens action-family equivalence, cannot preserve landed behavior, or the
+positive common handoff contradicts the validated-closure design. Correct
+ordinary invocation, selector, compile, test or in-scope implementation failures
+within this packet. Do not run F3 or remove the execution-group invocation guard.
 
 ## Immediate predecessor
 
-The package-attempt diagnostic projects the already-retained `LoadingError`
-through a borrowed bounded view. All 561 active loading tests pass, with one
-intentional ignored test. The authentic proof identifies the existing Stage 6
-runtime guard and no additional payload. This diagnostic checkpoint changes no
-loading, DICE, toolchain, action, or fixture semantics.
+The bounded package-attempt projection passes all 561 active loading tests. Its
+authentic F3 receipt selected one test and reached the named group guard in 9.98
+seconds with valid observer and cleanup evidence. Independent scheduling review
+ACCEPTS the order: combined R2 from non-F3 gates, complete shared group runtime,
+then F3. It also confirms the preserved app patch applies cleanly and that the
+combined candidate must remain atomic.

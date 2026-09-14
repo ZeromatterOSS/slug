@@ -29,16 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7A-execution-group-order-replan-r1
+Packet: WP-6-7A-selected-request-output-conflict-r2-reconcile-r1
 Status: ready
 
-Reconcile the prerequisite and acceptance order for the already designed
-selected-toolchain, output-conflict, and shared execution-group work, as
-specified by [current-packet.md](./slug-v2-subplans/current-packet.md). The
-bounded package-attempt projection makes the authentic F3 cause exact:
-rules_java toolchains invokes rules_cc `cc_library`, which reaches the retained
-named execution-group guard in 9.98 seconds. This proves the former queue order
-cannot complete F3 before execution-group work.
+Reconcile and complete the preserved selected-toolchain request and configured
+action output-conflict candidate on current `main`, as specified by
+[current-packet.md](./slug-v2-subplans/current-packet.md). Its complete non-F3
+owner and consumer gates now precede the shared named/automatic execution-group
+runtime; the unchanged F3 proof follows that runtime.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
@@ -56,9 +54,9 @@ Preservation is not integration. Do not activate it partially or weaken a gate.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Execution-group prerequisite-order replan | ready; authentic F3 confirms rules_cc named-group target invocation, while shared group runtime still requires the preserved selected-request/output-conflict work |
-| 2 | Combined selected-request/output-conflict R2 and shared execution-group runtime | ordering is the active decision; reconcile the preserved R2 candidate and reviewed designs without partial activation |
-| 3 | Authentic configured CLI fixture | F2 accepted through 28 objects; F3 is blocked on the confirmed named execution-group runtime owner, not another payload or diagnostic |
+| 1 | Combined selected-request/output-conflict R2 reconciliation | ready; reconcile the preserved app-only candidate, attribute all remaining affected-suite results, and pass actual consumer gates before acceptance |
+| 2 | Shared named/automatic execution-group runtime | blocked on combined R3; authentic F3 confirms rules_cc demands both selected modes |
+| 3 | Authentic configured CLI fixture | F2 accepted through 28 objects; replay F3 once after complete group activation |
 | 4 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
 | 5 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 6 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |

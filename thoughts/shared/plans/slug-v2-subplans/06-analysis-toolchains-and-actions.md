@@ -17,9 +17,11 @@ Those changes are not pending implementation.
 
 Combined selected-toolchain request/output-conflict R2 is preserved and
 unaccepted. [The fixture/gate ledger](./configured-cli-fixture.md) owns the
-remaining prerequisite and validation state. The detailed contracts below own
-semantics; the current manifest owns scheduling. Named/automatic execution groups
-remain blocked on complete combined acceptance.
+remaining validation state. The detailed contracts below own semantics; the
+current manifest owns scheduling. Authentic F3 now confirms that named
+execution-group target invocation is in the selected production closure. The
+combined R2 candidate must complete its non-F3 owner and consumer gates before
+the shared named/automatic runtime can activate; F3 follows that runtime.
 
 ### Analysis surface
 
@@ -1078,7 +1080,7 @@ hash/applicability remain verified. No Rust, build, test, replay or materializat
 ran for this design; implementation and previously unrun gates remain unaccepted.
 
 
-## Execution-group successor (blocked on R2)
+## Execution-group successor (after combined R2)
 
 Before freezing implementation scope, reconcile existing production-closure
 artifacts under [bootstrap readiness](./bootstrap-readiness.md#family-admission-and-completion-procedure).
@@ -1229,6 +1231,57 @@ computed defaults, C++/Java providers/actions, aspects and execution remain
 separate unsupported owners. The path-epoch performance issue is unchanged;
 do not restart checkout-wide replay, exceed the user's test limits, disable
 provenance or use a fresh graph to hide it.
+
+## Accepted F3/R2 prerequisite order (2026-09-14)
+
+The bounded package-attempt diagnostic exposed the authentic F3 terminal at
+rules_java `toolchains/BUILD:138` -> rules_cc `cc_library.bzl:19`:
+`target invocation for named execution-group semantics is unsupported`. The
+same proof selected and executed one test in 9.98 seconds with valid observer
+and cleanup evidence. This confirms both that the rules_cc owner is in the
+portable configured closure and that no further source payload can complete F3
+before group activation. The authenticated declaration already proves named
+`cpp_link` plus `_use_auto_exec_groups=True`; both modes remain one shared
+runtime obligation.
+
+The former order made complete F3 a prerequisite for combined R2, while the
+group runtime requires R2's selected-toolchain request correction. Break that
+cycle by accepting the combined selected-request/output-conflict candidate from
+its own complete non-F3 evidence, then implementing the reviewed shared group
+runtime, then replaying F3 once. F3 is evidence for production-closure demand
+and later configured-source completion; it is not an input to selected-request
+identity or root-set output-conflict correctness.
+
+Keep the preserved candidate atomic. The selected-request correction produces
+distinct A/B owners that can collide at one configured output, so the root-set
+validator is its required consumer-side completion rather than an adjacent
+feature. Reconcile the app-only diff from `97dffd5d4..27e9e9c0c` onto current
+`main`; exclude `review-evidence/`. That diff applies cleanly at this decision
+checkpoint. Five files have changes on both lines (`analysis_v2/src/dice.rs`,
+CLI build/tests, and Core dice/mod), with no textual merge conflict; semantic
+review and fresh proof remain mandatory.
+
+Combined acceptance requires every focused identity/resolution/conflict gate,
+current source/configuration/platform/property A/B/A and cancellation/cutoff,
+the one-shot and stable-daemon build/run/aquery pre-execution rejection proofs,
+positive shared execution-view/REAPI proof, and complete affected owner/direct
+dependent suites. The two recorded Core failures reproduced on clean
+`97dffd5d4` are baseline facts only for their exact selectors and environment.
+All other prior full-Core failures are unattributed: compare them with current
+`main`, correct candidate regressions, and never waive an unexamined result.
+Partition test execution under the standing limits rather than raising them.
+
+After combined acceptance, resume the complete shared named/automatic design
+recorded below. Remove the loading guard only when the configured-target-owned
+group collection supplies resolution, dependency/provider/property/action
+consumers atomically. Computed defaults and C++/Java semantics remain separate
+later boundaries. Do not run F3 again before that guard is lawfully replaced.
+
+Independent prerequisite-order design review returns `ACCEPT` for this sequence
+and the atomic reconciliation packet. It does not accept candidate
+`27e9e9c0c`. The review additionally requires the unrun real CLI consumer gates,
+complete current-main/candidate Core attribution, a 12-second internal command
+deadline, and a positive producer-validated closure-to-REAPI sharing proof.
 
 
 ## Historical evidence

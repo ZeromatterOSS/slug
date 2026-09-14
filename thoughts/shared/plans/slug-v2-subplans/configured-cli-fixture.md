@@ -119,8 +119,8 @@ fixture hashes, command, counts, status and supervisor receipt.
 | F2 portable offline assembly | accepted through the rules_java checkpoint | 28 objects / 8,004,740 source bytes, inventory `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
 | F3 configured source closure | blocked at rules_cc `cc_library` named execution-group target invocation after the bounded package-attempt projection exposed the retained loading message in 9.98 seconds | reconcile the selected-request/output-conflict and shared execution-group prerequisite order, then implement the complete admitted runtime before replaying F3 |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
-| R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
-| R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
+| R1 combined semantic gates | R2 preserved, not accepted | reconcile its app-only diff onto current main; pass focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A gates |
+| R2 production consumer gates | pending R1 and complete baseline attribution | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization, positive shared execution-view/REAPI proof and partitioned affected suites; cquery remains independent |
 | R3 positive sharing and closure | pending R1 | common execution-view/REAPI emits one representative; aquery retains all owners |
 | R4 owner/dependent regression and review | incomplete | partitioned full required owner/dependent suites, all failures attributed, independent invariant-to-evidence review |
 
@@ -138,9 +138,11 @@ suite execution with exact test accounting, rather than raise the user's limit.
 Required acceptance is unchanged when a suite is partitioned. Record base and
 candidate revisions/features/environment, exact selected count, command and exit.
 
-Only successful F1–F3 acceptance selects recovery of combined R2 on an isolated
-worktree. A diagnostic naming a missing/unsupported producer is useful evidence,
-but never F3 acceptance.
+Recover combined R2 on an isolated worktree before shared group activation. Its
+acceptance uses the complete non-F3 owner and consumer gates recorded in Stage 6;
+F3 now follows the group runtime because its authentic closure reaches that
+guard. A diagnostic naming the owner is useful demand evidence, but never F3
+acceptance.
 
 The September 14 fresh-root checkpoint verified fixture inventory SHA-256
 `f4d6a54ff985fe03a5f489613a0f782422bb69fef5b12b1cc13640c96f925a2d`,
