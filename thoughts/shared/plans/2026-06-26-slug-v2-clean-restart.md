@@ -29,14 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-6-7A-selected-request-output-conflict-r2-reconcile-r1
-Status: ready
+Packet: WP-4-6-7A-r2-execution-group-combined-r1
+Status: ready; Phase A contract freeze
 
-Reconcile and complete the preserved selected-toolchain request and configured
-action output-conflict candidate on current `main`, as specified by
-[current-packet.md](./slug-v2-subplans/current-packet.md). Its complete non-F3
-owner and consumer gates now precede the shared named/automatic execution-group
-runtime; the unchanged F3 proof follows that runtime.
+Freeze the complete named/automatic execution-group contract against the
+reconciled but unaccepted R2 selected-request/output-conflict base, implement the
+combined stack, and accept it atomically as specified by
+[current-packet.md](./slug-v2-subplans/current-packet.md). The unchanged F3 proof
+follows complete group activation.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
@@ -45,18 +45,19 @@ are historical, not pending work. The partition change preserves the sole full
 accepted epoch and exact values; direct-epoch DICE callers retain their existing
 lookup path.
 
-The complete selected-request/output-conflict R2 candidate remains unaccepted.
-It is durably preserved at `27e9e9c0c` on `review/output-conflict-r2`, based on
-`97dffd5d4`, with original patch and validation receipt in `review-evidence/`.
-Preservation is not integration. Do not activate it partially or weaken a gate.
+The reconciled selected-request/output-conflict R2 candidate remains unaccepted
+at local commit `f3c90ea46` on
+`integration/selected-request-output-conflict-r2`, based on `2b3fedf76`. The
+older source remains at `27e9e9c0c` on `review/output-conflict-r2`, based on
+`97dffd5d4`. Preservation is not integration. Do not activate either candidate
+partially or integrate `review-evidence/`.
 
 ### Ready and blocked queue
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Combined selected-request/output-conflict R2 reconciliation | ready; reconcile the preserved app-only candidate, attribute all remaining affected-suite results, and pass actual consumer gates before acceptance |
-| 2 | Shared named/automatic execution-group runtime | blocked on combined R3; authentic F3 confirms rules_cc demands both selected modes |
-| 3 | Authentic configured CLI fixture | F2 accepted through 28 objects; replay F3 once after complete group activation |
+| 1 | Combined R2-based named/automatic execution-group runtime | ready; freeze the configured-target-owned contract against reconciled R2, implement on that branch, and pass joint gates before atomic acceptance |
+| 2 | Authentic configured CLI fixture | F2 accepted through 28 objects; replay F3 once after combined R2/group activation |
 | 4 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
 | 5 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 6 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |

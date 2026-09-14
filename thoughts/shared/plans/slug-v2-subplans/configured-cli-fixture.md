@@ -117,9 +117,9 @@ fixture hashes, command, counts, status and supervisor receipt.
 |---|---|---|
 | F1 authentic input inventory | partial with every payload demanded so far repository-owned, including rules_java 9.1.0 and all 183 demanded metadata objects | attribute the current bounded deadline before acquiring any further payload; catalog membership does not establish demand |
 | F2 portable offline assembly | accepted through the rules_java checkpoint | 28 objects / 8,004,740 source bytes, inventory `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
-| F3 configured source closure | blocked at rules_cc `cc_library` named execution-group target invocation after the bounded package-attempt projection exposed the retained loading message in 9.98 seconds | reconcile the selected-request/output-conflict and shared execution-group prerequisite order, then implement the complete admitted runtime before replaying F3 |
+| F3 configured source closure | blocked at rules_cc `cc_library` named execution-group target invocation after the bounded package-attempt projection exposed the retained loading message in 9.98 seconds | freeze and implement the complete shared group runtime on the unaccepted reconciled R2 base, accept both jointly, then replay F3 |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
-| R1 combined semantic gates | R2 preserved, not accepted | reconcile its app-only diff onto current main; pass focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A gates |
+| R1 combined semantic gates | reconciled R2 preserved at local `f3c90ea46`, not accepted; focused nonconsumer gates pass, real CLI consumers traverse the group prerequisite | retain it as the group implementation base; rerun affected selected-request, root-set conflict/sharing, CLI and direct-consumer gates for joint atomic acceptance |
 | R2 production consumer gates | pending R1 and complete baseline attribution | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization, positive shared execution-view/REAPI proof and partitioned affected suites; cquery remains independent |
 | R3 positive sharing and closure | pending R1 | common execution-view/REAPI emits one representative; aquery retains all owners |
 | R4 owner/dependent regression and review | incomplete | partitioned full required owner/dependent suites, all failures attributed, independent invariant-to-evidence review |
@@ -318,11 +318,11 @@ recorded 47,625 starts and finishes, 41,735 dependency checks and finishes, and
 `@@rules_cc+//cc:cc_library.bzl:19`, where target invocation fails with
 `named execution-group semantics is unsupported`. This confirms the existing
 Stage 6 shared execution-group semantic owner and establishes no new archive
-demand. It also invalidates the former schedule assumption that F3 could accept
-before that runtime; prerequisite ordering must be reconciled without partially
-landing the preserved selected-request/output-conflict candidate.
+demand. The later reconciled R2 trial also showed its real CLI consumers enter
+this builtin registration boundary. Independent review therefore selects
+complete groups on top of unaccepted R2, followed by joint atomic acceptance
+and F3. Neither owner may land alone.
 
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
-before validating; preservation metadata never ships. R1–R4 completion permits
-atomic integration, followed by the demand-scoped Stage 6 execution-group
-successor in canonical Live Status.
+before validating; preservation metadata never ships. R1–R4 completion now
+requires the combined R2/group stack and its joint gates.
