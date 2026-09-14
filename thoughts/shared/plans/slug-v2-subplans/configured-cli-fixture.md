@@ -115,9 +115,9 @@ fixture hashes, command, counts, status and supervisor receipt.
 
 | Gate | Current state | Required evidence / successor |
 |---|---|---|
-| F1 authentic input inventory | accepted through the current demand frontier; bazel_skylib 1.8.2, bazel_features 1.42.1, protobuf 33.4, the prior selected payloads, and all 183 demanded metadata objects are repository-owned | retain exact provenance and add no payload until the unchanged proof names another demand |
+| F1 authentic input inventory | partial at the next named payload; bazel_skylib 1.8.2, bazel_features 1.42.1, protobuf 33.4, the prior selected payloads, and all 183 demanded metadata objects are repository-owned | add exact rules_java 9.1.0 archive `4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f` plus notice, then resume the unchanged proof |
 | F2 portable offline assembly | accepted through the bazel_skylib checkpoint | 26 objects / 7,878,817 source bytes, inventory `5800c9ed0df22c05229ddd908812304efa13e31609c5dd7377fd06d43d823818`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
-| F3 configured source closure | blocked by the fixed wall deadline during `RootCompute`; the same run revisits unchanged registry/module chains for every additive path epoch | project exact path demands from the opaque epoch, then rerun once to name configured closure, the next payload, or semantic owner |
+| F3 configured source closure | blocked by missing rules_java 9.1.0 archive while loading `@@rules_java+//toolchains/REPO.bazel` | add only that demand-established authentic payload, then rerun once to name configured closure, the next payload, or semantic owner |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -234,6 +234,29 @@ was visited 115 times as the injected path epoch grew. That confirms the
 previously recorded global epoch fanout and selects an exact-demand DICE
 projection; it does not establish a new payload demand, semantic loop, or F3
 acceptance.
+
+A scratch exact-demand projection preserved completed path-key evaluations but left
+the singleton epoch as one invalidation source: a post-change trace still
+revisited all 184 registry-file, 157 discovered-module, and 156 module-source
+keys 115 times. Native injection now derives 64 fixed DICE partitions from the
+sole full `PathObservationEpoch`; every attempt updates all partitions, so
+removal clears stale entries while only changed partitions invalidate. Direct
+epoch callers retain the full-epoch lookup path. Focused tests cover
+unrelated addition, exact change, removal, A/B/A restoration, and retained
+provenance; the workspace suite passes 46/46, plus focused bzlmod source and Core
+epoch-association tests. The observer harness compiled in 48.22 seconds after
+bounded dependency compilation.
+
+With partitioned injection, the unchanged F3 run selected and executed one test
+and reached a typed terminal in 2.96 seconds, with valid observer and complete
+cleanup evidence. It named `@@rules_java+//toolchains/REPO.bazel` with the
+selected-registry archive capture failure. Pinned rules_java 9.1.0 metadata
+supplies URL
+`https://github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz`,
+empty strip prefix, and archive SHA-256
+`4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f`.
+This accepts the bounded path-fanout correction and establishes only that next
+payload acquisition; F3 remains incomplete.
 
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits

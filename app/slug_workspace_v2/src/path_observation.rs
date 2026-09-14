@@ -8,9 +8,12 @@
  */
 
 use std::cmp::Ordering;
+use std::collections::hash_map::DefaultHasher;
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
@@ -806,6 +809,61 @@ impl InjectedKey for PathObservationEpochKey {
     }
 }
 
+// This count is an in-memory scheduling choice, not persisted identity. It
+// bounds injected-key overhead while distributing the current bootstrap
+// closure's path demands finely enough that unrelated additions stay cold.
+const PATH_OBSERVATION_SHARD_COUNT: usize = 64;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub struct PathObservationShardKey(u8);
+
+impl PathObservationShardKey {
+    fn for_demand(demand: &PathObservationDemand) -> Self {
+        let mut hasher = DefaultHasher::new();
+        demand.hash(&mut hasher);
+        Self((hasher.finish() as usize % PATH_OBSERVATION_SHARD_COUNT) as u8)
+    }
+}
+
+impl fmt::Display for PathObservationShardKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "path-observation-shard:{}", self.0)
+    }
+}
+
+impl InjectedKey for PathObservationShardKey {
+    type Value = PathObservationEpoch;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[doc(hidden)]
+pub fn path_observation_shards(
+    epoch: &PathObservationEpoch,
+) -> Vec<(PathObservationShardKey, PathObservationEpoch)> {
+    let mut shards = (0..PATH_OBSERVATION_SHARD_COUNT)
+        .map(|_| Vec::new())
+        .collect::<Vec<_>>();
+    for (demand, result) in epoch.observations() {
+        shards[usize::from(PathObservationShardKey::for_demand(demand).0)]
+            .push((demand.dupe(), result.dupe()));
+    }
+    shards
+        .into_iter()
+        .enumerate()
+        .map(|(index, entries)| {
+            (
+                PathObservationShardKey(index as u8),
+                PathObservationEpoch::from_shared(entries)
+                    .expect("a partition of a valid path epoch remains valid"),
+            )
+        })
+        .collect()
+}
+
 /// The transient DICE projection for one exact observation demand.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub struct PathObservationKey {
@@ -843,6 +901,15 @@ impl Key for PathObservationKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if let Ok(shard) = ctx
+            .compute(&PathObservationShardKey::for_demand(&self.demand))
+            .await
+        {
+            return match shard.get(&self.demand) {
+                Some(result) => PathOutcome::Complete(result.dupe()),
+                None => PathOutcome::Need(NeedPathObservations::singleton(self.demand.dupe())),
+            };
+        }
         let epoch = match ctx.compute(&PathObservationEpochKey).await {
             Ok(epoch) => epoch,
             Err(_) => {
@@ -877,12 +944,17 @@ mod tests {
     #[cfg(unix)]
     use std::path::PathBuf;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
 
+    use dice::ActivationData;
+    use dice::ActivationTracker;
     use dice::DetectCycles;
     use dice::Dice;
     use dice::DynKey;
     use dice::InjectedKey;
     use dice::Key;
+    use dice::UserComputationData;
     use dupe::Dupe;
 
     use super::NeedPathObservations;
@@ -904,9 +976,11 @@ mod tests {
     use super::PathObservationNamespace;
     use super::PathObservationOperation;
     use super::PathObservationResult;
+    use super::PathObservationShardKey;
     use super::PathOperationResult;
     use super::PathOutcome;
     use super::WindowsOptionPathLongNameOutcome;
+    use super::path_observation_shards;
 
     fn path(value: &str) -> NormalizedAbsolutePath {
         NormalizedAbsolutePath::new(value).unwrap()
@@ -1451,6 +1525,151 @@ mod tests {
                     ) if bytes.as_ref() == b"changed"
                 )
         ));
+    }
+
+    #[derive(Default)]
+    struct PathObservationEvaluationTracker {
+        evaluations: AtomicUsize,
+    }
+
+    impl ActivationTracker for PathObservationEvaluationTracker {
+        fn key_activated(
+            &self,
+            key: &DynKey,
+            _dependencies: &mut dyn Iterator<Item = &DynKey>,
+            activation: ActivationData,
+        ) {
+            if key.downcast_ref::<PathObservationKey>().is_some()
+                && matches!(activation, ActivationData::Evaluated(_))
+            {
+                self.evaluations.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn partitioned_epoch_add_change_remove_and_restore_preserve_exact_path_values() {
+        let retained = demand(
+            PathObservationNamespace::Host,
+            "/workspace/retained",
+            PathObservationOperation::FileBytes,
+        );
+        let added = demand(
+            PathObservationNamespace::Host,
+            "/workspace/added",
+            PathObservationOperation::FileBytes,
+        );
+        let retained_result = file_bytes(b"retained");
+        let added_result = file_bytes(b"added");
+        assert_ne!(
+            PathObservationShardKey::for_demand(&retained),
+            PathObservationShardKey::for_demand(&added)
+        );
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(PathObservationEvaluationTracker::default());
+        let mut updater = dice.updater_with_data(UserComputationData {
+            activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        });
+        let first_epoch =
+            PathObservationEpoch::new([(retained.dupe(), retained_result.clone())]).unwrap();
+        updater
+            .changed_to(path_observation_shards(&first_epoch))
+            .unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, first_epoch)])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let first = transaction
+            .compute(&PathObservationKey::new(retained.dupe()))
+            .await
+            .unwrap();
+        assert!(matches!(
+            first,
+            PathOutcome::Complete(result) if result.as_ref() == &retained_result
+        ));
+        assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 1);
+
+        let mut updater = transaction.into_updater();
+        let appended_epoch = PathObservationEpoch::new([
+            (retained.dupe(), retained_result.clone()),
+            (added.dupe(), added_result.clone()),
+        ])
+        .unwrap();
+        updater
+            .changed_to(path_observation_shards(&appended_epoch))
+            .unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, appended_epoch)])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let retained_again = transaction
+            .compute(&PathObservationKey::new(retained.dupe()))
+            .await
+            .unwrap();
+        assert!(matches!(
+            retained_again,
+            PathOutcome::Complete(result) if result.as_ref() == &retained_result
+        ));
+        assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 1);
+
+        let added_value = transaction
+            .compute(&PathObservationKey::new(added.dupe()))
+            .await
+            .unwrap();
+        assert!(matches!(
+            added_value,
+            PathOutcome::Complete(result) if result.as_ref() == &added_result
+        ));
+        assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 2);
+
+        let changed_result = file_bytes(b"changed");
+        let changed_epoch = PathObservationEpoch::new([
+            (retained.dupe(), changed_result.clone()),
+            (added.dupe(), added_result.clone()),
+        ])
+        .unwrap();
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(path_observation_shards(&changed_epoch))
+            .unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, changed_epoch)])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let changed = transaction
+            .compute(&PathObservationKey::new(retained.dupe()))
+            .await
+            .unwrap();
+        assert!(matches!(
+            changed,
+            PathOutcome::Complete(result) if result.as_ref() == &changed_result
+        ));
+
+        let restored_epoch =
+            PathObservationEpoch::new([(retained.dupe(), retained_result.clone())]).unwrap();
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(path_observation_shards(&restored_epoch))
+            .unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, restored_epoch)])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let restored = transaction
+            .compute(&PathObservationKey::new(retained))
+            .await
+            .unwrap();
+        assert!(matches!(
+            restored,
+            PathOutcome::Complete(result) if result.as_ref() == &retained_result
+        ));
+        let removed = transaction
+            .compute(&PathObservationKey::new(added))
+            .await
+            .unwrap();
+        assert!(matches!(removed, PathOutcome::Need(_)));
+        assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 5);
     }
 
     #[tokio::test]

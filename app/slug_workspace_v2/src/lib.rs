@@ -46,10 +46,14 @@ pub use path_observation::PathObservationKey;
 pub use path_observation::PathObservationNamespace;
 pub use path_observation::PathObservationOperation;
 pub use path_observation::PathObservationResult;
+#[doc(hidden)]
+pub use path_observation::PathObservationShardKey;
 pub use path_observation::PathOperationResult;
 pub use path_observation::PathOutcome;
 pub use path_observation::PathResult;
 pub use path_observation::WindowsOptionPathLongNameOutcome;
+#[doc(hidden)]
+pub use path_observation::path_observation_shards;
 #[doc(hidden)]
 pub use path_resolution::ObservedPathDirectoryListing;
 #[doc(hidden)]

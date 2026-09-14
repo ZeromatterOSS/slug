@@ -36,6 +36,7 @@ use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOutcome;
+use slug_workspace_v2::path_observation_shards;
 
 const MAX_ATTEMPTS: usize = 8;
 
@@ -480,6 +481,9 @@ impl RequestRevisionRuntime {
         drop(selected_updater);
         let merged_epoch = replace_certificate_observations(full_epoch, certificate, &observed)?;
         let mut updater = self.updater();
+        updater
+            .changed_to(path_observation_shards(&merged_epoch))
+            .map_err(|error| RequestRevisionError::Injection(error.to_string()))?;
         updater
             .changed_to(vec![(PathObservationEpochKey, merged_epoch.clone())])
             .map_err(|error| RequestRevisionError::Injection(error.to_string()))?;

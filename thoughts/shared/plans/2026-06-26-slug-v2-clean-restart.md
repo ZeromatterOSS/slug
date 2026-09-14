@@ -29,21 +29,21 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7A-path-observation-projection
+Packet: WP-7A-authentic-rules-java-payload
 Status: ready
 
-Project each exact path observation from the opaque injected epoch, as specified
-by [current-packet.md](./slug-v2-subplans/current-packet.md). The bazel_skylib
-payload checkpoint is accepted through F1/F2, and the same F3 run now reaches
-the 12-second wall deadline in `RootCompute`. A bounded trace attributes the
-boundary to the already recorded global path-epoch invalidation fanout.
+Add the exact demand-established rules_java 9.1.0 archive and notice to the
+authentic offline fixture, as specified by
+[current-packet.md](./slug-v2-subplans/current-packet.md). Partitioned native
+path-epoch injection clears the measured retry fanout, and the same F3 run now
+names `@@rules_java+//toolchains/REPO.bazel` in 2.96 seconds.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
 observation diagnostics at `ac6140f41`. Their old implementation checkpoints
-are historical, not pending work. The deadline does not establish another
-source demand or semantic loop; the projection packet owns only the measured
-additive-epoch invalidation fanout.
+are historical, not pending work. The partition change preserves the sole full
+accepted epoch and exact values; direct-epoch DICE callers retain their existing
+lookup path.
 
 The complete selected-request/output-conflict R2 candidate remains unaccepted.
 It is durably preserved at `27e9e9c0c` on `review/output-conflict-r2`, based on
@@ -54,8 +54,8 @@ Preservation is not integration. Do not activate it partially or weaken a gate.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Exact-demand path observation projection | ready; authentic F3 reaches its fixed deadline after revisiting the unchanged registry/module graph for every additive path epoch |
-| 2 | Authentic configured CLI fixture | F1/F2 accepted through the current demand frontier; F3 blocked on removing measured path-epoch fanout and whatever boundary the unchanged rerun names; [fixture ledger](./slug-v2-subplans/configured-cli-fixture.md) owns the receipt |
+| 1 | Authentic rules_java 9.1.0 payload | ready; partitioned path injection is accepted and the same F3 run names `@@rules_java+//toolchains/REPO.bazel` plus its pinned archive |
+| 2 | Authentic configured CLI fixture | F2 accepted; F1/F3 blocked on the demand-established rules_java payload and whatever boundary the unchanged rerun names; [fixture ledger](./slug-v2-subplans/configured-cli-fixture.md) owns the receipt |
 | 3 | Combined selected-request/output-conflict R2 | blocked on complete fixture and outstanding baseline attribution; [Stage 6](./slug-v2-subplans/06-analysis-toolchains-and-actions.md) owns semantics and gate ledger |
 | 4 | Bootstrap-demanded execution-group support | blocked on R2; reconcile existing closure artifacts and record named/automatic demand before freezing scope; reuse Stage 6's pinned source matrix |
 | 5 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |

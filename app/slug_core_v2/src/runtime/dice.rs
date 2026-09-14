@@ -194,6 +194,7 @@ use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
+use slug_workspace_v2::path_observation_shards;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -8187,6 +8188,9 @@ fn inject_native_demand_snapshot(
             repository_results,
         )])
         .context("injecting complete repository workset")?;
+    updater
+        .changed_to(path_observation_shards(&path_observations))
+        .context("injecting sharded path workset")?;
     updater
         .changed_to(vec![(PathObservationEpochKey, path_observations)])
         .context("injecting complete path workset")
