@@ -27,6 +27,10 @@ rules_cc 0.2.17
   Source: https://github.com/bazelbuild/rules_cc/releases/tag/0.2.17
   License: Apache License 2.0, copied as licenses/rules_cc-LICENSE
 
+rules_java 9.1.0
+  Source: https://github.com/bazelbuild/rules_java/releases/tag/9.1.0
+  License: Apache License 2.0, copied as licenses/rules_java-LICENSE
+
 rules_shell 0.6.1
   Source: https://github.com/bazelbuild/rules_shell/releases/tag/v0.6.1
   License: Apache License 2.0, copied as licenses/rules_shell-LICENSE

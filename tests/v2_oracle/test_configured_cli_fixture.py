@@ -23,19 +23,19 @@ def _copy_fixture(tmp_path: Path) -> Path:
 
 def test_authentic_fixture_verifies_and_assembles_offline(tmp_path: Path) -> None:
     verified = verify_fixture()
-    assert len(verified.objects) == 26
+    assert len(verified.objects) == 28
     assert len(verified.registry_entries) == 177
-    assert verified.total_bytes == 7_878_817
+    assert verified.total_bytes == 8_004_740
     assert (
         verified.inventory_sha256
-        == "5800c9ed0df22c05229ddd908812304efa13e31609c5dd7377fd06d43d823818"
+        == "4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f"
     )
 
     destination = tmp_path / "assembled"
     receipt = assemble(destination)
-    assert receipt["object_count"] == 26
+    assert receipt["object_count"] == 28
     assert receipt["registry_metadata_count"] == 177
-    assert receipt["source_bytes"] == 7_878_817
+    assert receipt["source_bytes"] == 8_004_740
     assert receipt["inventory_sha256"] == verified.inventory_sha256
     assert "local_path_override" not in (destination / "workspace/MODULE.bazel").read_text()
     assert (destination / "workspace/BUILD.bazel").read_text().endswith(
@@ -60,6 +60,10 @@ def test_authentic_fixture_verifies_and_assembles_offline(tmp_path: Path) -> Non
     assert (
         destination
         / "mirror/github.com/bazelbuild/bazel-skylib/releases/download/1.8.2/bazel-skylib-1.8.2.tar.gz"
+    ).is_file()
+    assert (
+        destination
+        / "mirror/github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz"
     ).is_file()
     assert json.loads((destination / "inventory.json").read_text()) == receipt
     with pytest.raises(FixtureError, match="already exists"):

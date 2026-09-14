@@ -20,7 +20,7 @@ verification_command = "python3 tools/v2_oracle/configured_cli_fixture.py prove 
 
 [authentic]
 inventory_version = 1
-total_source_bytes = 7878817
+total_source_bytes = 8004740
 historical_probe_sha256 = "8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2"
 candidate_commit = "27e9e9c0c"
 candidate_patch_sha256 = "90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e"
@@ -212,6 +212,14 @@ source_url = "https://github.com/bazelbuild/bazel-skylib/releases/download/1.8.2
 kind = "archive"
 
 [[objects]]
+source = "mirror/github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz"
+destination = "mirror/github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz"
+sha256 = "4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f"
+size = 114566
+source_url = "https://github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz"
+kind = "archive"
+
+[[objects]]
 source = "licenses/platforms-LICENSE"
 destination = "licenses/platforms-LICENSE"
 sha256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
@@ -241,6 +249,14 @@ destination = "licenses/protobuf-LICENSE"
 sha256 = "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d"
 size = 1732
 source_url = "https://github.com/protocolbuffers/protobuf/releases/download/v33.4/protobuf-33.4.bazel.tar.gz#protobuf-33.4/LICENSE"
+kind = "license"
+
+[[objects]]
+source = "licenses/rules_java-LICENSE"
+destination = "licenses/rules_java-LICENSE"
+sha256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+size = 11357
+source_url = "https://github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz#LICENSE"
 kind = "license"
 
 [[objects]]

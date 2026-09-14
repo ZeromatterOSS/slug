@@ -115,9 +115,9 @@ fixture hashes, command, counts, status and supervisor receipt.
 
 | Gate | Current state | Required evidence / successor |
 |---|---|---|
-| F1 authentic input inventory | partial at the next named payload; bazel_skylib 1.8.2, bazel_features 1.42.1, protobuf 33.4, the prior selected payloads, and all 183 demanded metadata objects are repository-owned | add exact rules_java 9.1.0 archive `4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f` plus notice, then resume the unchanged proof |
-| F2 portable offline assembly | accepted through the bazel_skylib checkpoint | 26 objects / 7,878,817 source bytes, inventory `5800c9ed0df22c05229ddd908812304efa13e31609c5dd7377fd06d43d823818`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
-| F3 configured source closure | blocked by missing rules_java 9.1.0 archive while loading `@@rules_java+//toolchains/REPO.bazel` | add only that demand-established authentic payload, then rerun once to name configured closure, the next payload, or semantic owner |
+| F1 authentic input inventory | partial with every payload demanded so far repository-owned, including rules_java 9.1.0 and all 183 demanded metadata objects | attribute the current bounded deadline before acquiring any further payload; catalog membership does not establish demand |
+| F2 portable offline assembly | accepted through the rules_java checkpoint | 28 objects / 8,004,740 source bytes, inventory `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
+| F3 configured source closure | blocked by a 12-second wall deadline after rules_java entered the fixture; latest sampled activity was `HostCanonicalSelectedModuleDefinitionObservationKey` | run a bounded causal fanout diagnostic, correct only a measured scheduling owner if required, then rerun once to name configured closure, a payload, or a semantic owner |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -257,6 +257,23 @@ empty strip prefix, and archive SHA-256
 `4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f`.
 This accepts the bounded path-fanout correction and establishes only that next
 payload acquisition; F3 remains incomplete.
+
+The rules_java checkpoint verifies 28 objects / 8,004,740 source bytes at
+inventory SHA-256
+`4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`;
+all three focused fixture tests pass, including fresh-root offline assembly and
+negative input/patch checks. The pinned archive matches SHA-256
+`4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f`
+and its copied Apache license matches the manifest.
+
+The one allowed unchanged F3 rerun selected one test and reached its 12-second
+wall deadline with valid observer and complete cleanup evidence. The observer
+recorded 53,789 starts, 53,774 finishes, 47,326 dependency checks, 47,316
+dependency-check finishes, 7,553 computes, and 7,548 compute finishes. Latest
+sampled activity was `HostCanonicalSelectedModuleDefinitionObservationKey` in
+the root-compute phase. This names no later archive and is not evidence of a
+semantic loop. A bounded causal fanout diagnostic is the immediate prerequisite;
+acquire no further payload until the same proof names it.
 
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits

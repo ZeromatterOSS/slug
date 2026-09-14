@@ -1,76 +1,71 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7A-authentic-rules-java-payload
+Packet: WP-7A-host-module-definition-fanout-diagnostic
 Status: ready
 
 ## Result and owner
 
-Add the exact rules_java 9.1.0 payload demanded while the authentic configured
-CLI proof loads `@@rules_java+//toolchains/REPO.bazel`. Stage 1 owns fixture
-assembly and Stage 5 owns the accepted selected-registry demand diagnostic;
-Stage 6 semantics remain unchanged. Use
-[configured-cli-fixture.md](./configured-cli-fixture.md) for the preserved
-F1/F2 checkpoint and exact F3 blocker receipt.
+Attribute the bounded authentic configured-CLI deadline that appeared after the
+exact rules_java 9.1.0 payload entered the offline fixture. The latest observer
+sample was `HostCanonicalSelectedModuleDefinitionObservationKey`; that sample
+locates investigation and does not yet prove this key is the invalidation owner.
+Stage 1 owns fixture evidence, Stage 5 owns selected-module observation, and
+DICE scheduling changes belong to the natural injected-state owner.
 
-Exact: archive URL, SHA-256, empty strip prefix, verbatim bytes, and upstream
-notice. Deferred: any later payload demand, source producer, or unsupported
-semantic owner exposed after this archive is present.
+Exact: the 28-object fixture, the one-test supervisor receipt, dependency and
+compute counts, and any measured repeated key families. Deferred: another
+payload, semantic implementation, or cache projection until causal evidence
+selects it.
 
 ## Scope
 
 Allowed changes:
 
-- `tests/v2_oracle/fixtures/configured-cli-authentic/` for the exact rules_java
-  archive, copied license, notice, and manifest rows;
-- `tests/v2_oracle/test_configured_cli_fixture.py` only for updated fixed
-  inventory counts/hash and meaningful corruption validation;
-- this manifest, canonical status, and the configured-fixture gate ledger at a
-  genuine acceptance or newly named blocker.
+- bounded scratch-only DICE tracing or counters sufficient to attribute repeated
+  computation without changing production results;
+- the smallest production scheduling/invalidation owner selected by that trace,
+  with exact focused add/change/remove and warm-reuse coverage;
+- this manifest, canonical status, and the configured-fixture gate ledger when
+  a corrected proof names the next boundary.
 
 Start with these evidence handles:
 
-- bundled rules_java 9.1.0 BCR `source.json`: URL
-  `https://github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz`,
-  empty strip prefix, and archive SHA-256
-  `4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f`;
-- accepted terminal demand: `@@rules_java+//toolchains` `REPO.bazel`, with
-  selected-registry materialization transport failure;
-- [F3 invocation contract](./configured-cli-fixture.md#f3-invocation-contract):
-  rerun the same portable proof after the focused fixture checks pass.
+- accepted fixture inventory SHA-256
+  `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`,
+  28 objects, 8,004,740 source bytes, and 177 bundled metadata entries;
+- unchanged F3 receipt: one selected test, 12.01-second wall deadline, valid
+  observer and complete cleanup, with 53,789 starts, 53,774 finishes, 47,326
+  dependency checks, and 7,553 computes;
+- latest sampled key `HostCanonicalSelectedModuleDefinitionObservationKey` and
+  the accepted 64-way native path-observation partitioning predecessor.
 
-No production Rust, route selection, DICE key, source policy, toolchain, or R2
-semantic change belongs in this packet. Do not add another rules_java version
-or any catalog-declared archive that the proof did not demand. Preserve the
-16 MiB fixture cap and fail-closed hash/assembly behavior.
+Do not infer a loop or invalidation owner from the final sample alone. Do not
+raise the 12-second deadline, acquire another archive, widen fixture semantics,
+or change module selection/loading behavior. Preserve the sole accepted full
+observation snapshots and exact values.
 
 ## Work and validation
 
-1. Acquire the exact pinned archive from its BCR URL, verify SHA-256 before
-   installation, and copy its upstream license with provenance.
-2. Add archive/license manifest rows, update total bytes and fixed inventory
-   identity, and prove fresh-root offline assembly plus corruption rejection.
-3. Rerun the unchanged authentic F3 proof once. Record configured closure, the
-   next exact demanded input, or the exact unsupported semantic owner.
+1. Reproduce only through bounded scratch instrumentation and count repeated key
+   families, changed dependencies, and retry epochs after rules_java loads.
+2. If the evidence selects a global injected dependency or another scheduling
+   owner, implement the smallest projection at that owner and prove exact
+   add/change/remove, A/B/A restoration, unrelated warm reuse, and stale-value
+   clearing. If it selects a semantic owner, stop with that typed prerequisite.
+3. Run focused owner/dependent tests under the existing limits, compile the
+   observer harness separately, and rerun the unchanged authentic F3 proof once.
+   Record configured closure, the next exact demand, or the next typed owner.
 
 Invocation/compiler/test-selection corrections within this contract use the
-orchestration skill. New source semantics, provenance mismatch, or a different
-selected URL selects a smaller prerequisite rather than widening this packet.
-Preserve the F1/F2 fixture checkpoint and acquire no further payload until the
-same proof names its demand.
+orchestration skill. A provenance mismatch or unbounded trace selects a smaller
+diagnostic correction rather than wider work.
 
 ## Immediate predecessor and durable candidate
 
-The native command now derives 64 fixed injected partitions from the sole full
-`PathObservationEpoch`. Exact-demand lookup uses its partition and direct-epoch
-callers retain the full-epoch lookup path. Add/change/remove and A/B/A tests
-preserve exact results and stale-partition clearing. The workspace suite passes
-46/46; focused bzlmod source observation and Core epoch-association tests pass.
-The observer harness compiled in 48.22 seconds after bounded dependency checks.
-
-The unchanged F3 proof selected and executed one test in 2.96 seconds with
-valid observer and complete cleanup evidence, down from the prior 12-second
-deadline. It named the rules_java 9.1.0 archive while loading
-`@@rules_java+//toolchains/REPO.bazel`. No configured closure is accepted yet.
+The exact rules_java 9.1.0 archive and copied Apache license are repository-owned
+and manifest-verified. The focused fixture suite passes 3/3, including fresh-root
+offline assembly and corruption rejection. The unchanged proof then reached the
+deadline described above and named no new input.
 
 R2 snapshot: branch `review/output-conflict-r2`, commit `27e9e9c0c`,
 base `97dffd5d4`, original patch SHA-256
