@@ -1283,6 +1283,33 @@ and the atomic reconciliation packet. It does not accept candidate
 complete current-main/candidate Core attribution, a 12-second internal command
 deadline, and a positive producer-validated closure-to-REAPI sharing proof.
 
+## R2/group joint-acceptance correction (2026-09-14)
+
+The reconciled trial invalidates the preceding R2-before-groups sequence. R2's
+focused Analysis and Build API suites pass, all 329 active Core tests are
+accounted with every nonpass compared exactly to current main, direct REAPI and
+server consumers pass, and compile dependents pass. The required real CLI
+one-shot, stable-daemon and positive closure-to-REAPI tests nevertheless enter
+builtin `bazel_tools` transitive registration before reaching their R2 command
+assertions. That path requires the retained named/automatic execution-group
+declarations. Matching 12-second timeouts on current main are resource gates,
+not semantic acceptance evidence.
+
+Independent correction review returns `REVISE`. Complete group runtime cannot
+land first on current main because it consumes R2's selected-platform request
+identity and successful analysis must pass through R2's root-set closure
+validator. Preserve reconciled R2 commit `f3c90ea46` unaccepted, freeze the
+complete group contract against it, implement on top of it, and accept R2 plus
+groups atomically after joint gates. Only then replay F3. The loading guard stays
+until group resolution, transitions, providers, properties and action routing
+are complete; no partial R2 or group behavior reaches main.
+
+The 13 identical current-main/candidate Core assertions are attributable
+baseline outcomes. Seven identical exact timeouts remain open and must receive
+bounded discriminating proof. The attempted minimal local-module overrides
+were reverted: they only bypassed authentic module sources and advanced to the
+first missing autoload, so they provide no acceptance evidence.
+
 
 ## Historical evidence
 
