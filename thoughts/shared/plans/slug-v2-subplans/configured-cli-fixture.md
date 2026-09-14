@@ -115,9 +115,9 @@ fixture hashes, command, counts, status and supervisor receipt.
 
 | Gate | Current state | Required evidence / successor |
 |---|---|---|
-| F1 authentic input inventory | partial at a named diagnostic boundary; bazel_features 1.42.1 and protobuf 33.4 are repository-owned alongside the prior selected payloads and all 183 demanded metadata objects | retain the typed external `.bzl` route error before acquiring any later payload; the next archive demand is not yet visible |
+| F1 authentic input inventory | partial at the next named payload; bazel_features 1.42.1 and protobuf 33.4 are repository-owned alongside the prior selected payloads and all 183 demanded metadata objects | add exact bazel_skylib 1.8.2 archive `6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446` plus notice, then resume the unchanged proof |
 | F2 portable offline assembly | accepted through the bazel_features checkpoint | 24 objects / 7,822,792 source bytes, inventory `0ad0ac33e4275d51db0ad436cf639709170363b9a41bf82026d6c9e30f88b928`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
-| F3 configured source closure | blocked by a preformatted recursive `ExternalBzlModuleError::Route` that reaches the output limit while resolving `@@bazel_features++version_extension+bazel_features_globals` | retain the typed route error and traverse the existing bounded route diagnostic; no later payload acquisition is established yet |
+| F3 configured source closure | blocked by missing bazel_skylib 1.8.2 archive while loading `@@bazel_skylib+//lib:modules.bzl` during bazel_features extension evaluation | add only that demand-established authentic payload, then rerun once to name the next payload or semantic owner |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -210,6 +210,15 @@ but `ExternalBzlModuleError::Route` had flattened its typed load-route error int
 a recursive string. The bounded renderer stopped at its output limit before the
 cause. This selects typed route-error retention as the next prerequisite and
 does not establish another payload demand.
+
+Typed external route retention then passed the 11-test diagnostic slice and the
+natural recursive route test; the observer harness compiled in 40.12 seconds.
+The same F3 run traversed the generated bazel_features repository and named
+`@@bazel_skylib+//lib:modules.bzl` in 9.36 seconds with valid one-test and cleanup
+evidence. Pinned bazel_skylib 1.8.2 metadata supplies archive SHA-256
+`6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446`
+and no patch. This accepts typed route identity and establishes only that next
+payload acquisition.
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits
 atomic integration, followed by the demand-scoped Stage 6 execution-group

@@ -100,6 +100,7 @@ use starlark::syntax::StringEncoding;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::HostCanonicalRepositoryLoadRouteError;
 use crate::HostCanonicalRepositoryLoadRouteKey;
 use crate::HostCanonicalRepositoryLoadRouteObservationKey;
 use crate::HostRootRepositoryLoadRouteError;
@@ -1818,7 +1819,7 @@ pub(crate) enum ExternalBzlModuleError {
     Route {
         source: CanonicalLabel,
         load: Arc<str>,
-        message: Arc<str>,
+        error: ExternalBzlRouteError,
     },
     Absent {
         label: CanonicalLabel,
@@ -1850,6 +1851,13 @@ pub(crate) enum ExternalBzlModuleError {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum ExternalBzlRouteError {
+    Compute(Arc<str>),
+    Observation(Arc<str>),
+    Load(Box<HostCanonicalRepositoryLoadRouteError>),
+}
+
 impl fmt::Display for ExternalBzlModuleError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -1861,8 +1869,19 @@ impl fmt::Display for ExternalBzlModuleError {
             Self::Route {
                 source,
                 load,
-                message,
-            } => write!(f, "resolving `{load}` from {source}: {message}"),
+                error,
+            } => {
+                write!(f, "resolving `{load}` from {source}: ")?;
+                match error {
+                    ExternalBzlRouteError::Compute(message) => {
+                        write!(f, "route computation failed: {message}")
+                    }
+                    ExternalBzlRouteError::Observation(message) => {
+                        write!(f, "route observation failed: {message}")
+                    }
+                    ExternalBzlRouteError::Load(error) => error.fmt(f),
+                }
+            }
             Self::Absent { label } => write!(f, "cannot load '{label}': no such file"),
             Self::Encoding { label } => {
                 write!(
@@ -4563,14 +4582,14 @@ fn external_runfiles_repository_mapping(
 fn external_load_resolution_error(
     source: CanonicalLabel,
     load: &str,
-    message: impl Into<Arc<str>>,
+    error: ExternalBzlRouteError,
     observations: PathObservationEpoch,
 ) -> ExternalBzlDriverOutcome {
     external_bzl_complete(
         Err(ExternalBzlModuleError::Route {
             source,
             load: Arc::from(load),
-            message: message.into(),
+            error,
         }),
         observations,
     )
@@ -4601,7 +4620,7 @@ async fn compute_canonical_external_child_input(
             Err(error) => ControlFlow::Break(external_load_resolution_error(
                 source,
                 load,
-                Arc::from(format!("{error:?}")),
+                ExternalBzlRouteError::Compute(Arc::from(format!("{error:?}"))),
                 observations,
             )),
             Ok(SourcePreparationOutcome::Need(need)) => {
@@ -4612,7 +4631,7 @@ async fn compute_canonical_external_child_input(
                 Err(error) => ControlFlow::Break(external_load_resolution_error(
                     source,
                     load,
-                    Arc::from(error.to_string()),
+                    ExternalBzlRouteError::Load(Box::new(error.clone())),
                     observations,
                 )),
             },
@@ -4626,7 +4645,7 @@ async fn compute_canonical_external_child_input(
             Err(error) => ControlFlow::Break(external_load_resolution_error(
                 source,
                 load,
-                Arc::from(format!("{error:?}")),
+                ExternalBzlRouteError::Compute(Arc::from(format!("{error:?}"))),
                 observations,
             )),
             Ok(SourcePreparationOutcome::Need(need)) => {
@@ -4636,7 +4655,7 @@ async fn compute_canonical_external_child_input(
                 ControlFlow::Break(external_load_resolution_error(
                     source,
                     load,
-                    Arc::from(format!("{error:?}")),
+                    ExternalBzlRouteError::Observation(Arc::from(format!("{error:?}"))),
                     observations,
                 ))
             }
@@ -4655,7 +4674,7 @@ async fn compute_canonical_external_child_input(
                     Err(error) => ControlFlow::Break(external_load_resolution_error(
                         source,
                         load,
-                        Arc::from(error.to_string()),
+                        ExternalBzlRouteError::Load(Box::new(error.clone())),
                         observations,
                     )),
                 }

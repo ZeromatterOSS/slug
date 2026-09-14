@@ -7,6 +7,7 @@ use slug_identity_v2::CanonicalLabel;
 use crate::ModuleRegistrationExpansionError;
 use crate::ModuleRegistrationExpansionErrorKind as Registration;
 use crate::bzl_module::ExternalBzlModuleError;
+use crate::bzl_module::ExternalBzlRouteError;
 use crate::bzl_module::HostBzlModuleError;
 use crate::bzl_module::RepositoryPackageLoadDiagnostic;
 use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteError;
@@ -270,7 +271,14 @@ fn walk(out: &mut Buffer, mut node: Node<'_>) -> fmt::Result {
                 match error {
                     E::Child { raw_load, error, .. } => { write!(out, "Child {raw_load}: ")?; Node::ExternalBzl(error) }
                     E::SourceCompute { message, .. } => return write!(out, "SourceCompute: {message}"),
-                    E::Route { message, .. } => return write!(out, "Route: {message}"),
+                    E::Route { error, .. } => {
+                        out.write_str("Route: ")?;
+                        match error {
+                            ExternalBzlRouteError::Compute(_) => return out.write_str("Compute"),
+                            ExternalBzlRouteError::Observation(_) => return out.write_str("Observation"),
+                            ExternalBzlRouteError::Load(error) => Node::Load(error),
+                        }
+                    }
                     E::Parse { message, .. } => return write!(out, "Parse: {message}"),
                     E::Evaluation { message, .. } => return write!(out, "Evaluation: {message}"),
                     E::Freeze { message, .. } => return write!(out, "Freeze: {message}"),

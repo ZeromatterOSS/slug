@@ -112,6 +112,7 @@ pub(crate) mod tests {
     use crate::bzl_module::ExternalBzlModuleError;
     use crate::bzl_module::ExternalBzlModuleEvalKey;
     use crate::bzl_module::ExternalBzlModuleObservationKey;
+    use crate::bzl_module::ExternalBzlRouteError;
     use crate::bzl_module::ObservedExternalBzlModule;
     use crate::bzl_module::RepositoryBzlLabel;
     use crate::canonical_repository_load_route::*;
@@ -3113,11 +3114,16 @@ ext=module_extension(implementation=impl)
         let SourcePreparationOutcome::Complete(Ok(parent)) = parent else {
             panic!("recursive route error must complete: {parent:?}")
         };
+        let parent_error = parent.result().as_ref().as_ref().unwrap_err();
+        assert_eq!(
+            parent_error.to_string().contains("effect failed"),
+            effect_error
+        );
         let ExternalBzlModuleError::Route {
             source,
             load,
-            message,
-        } = parent.result().as_ref().as_ref().unwrap_err()
+            error,
+        } = parent_error
         else {
             panic!("recursive failure must be reported at the load route")
         };
@@ -3129,7 +3135,10 @@ ext=module_extension(implementation=impl)
             )
         );
         assert_eq!(load.as_ref(), "@broken//:defs.bzl");
-        assert_eq!(message.contains("effect failed"), effect_error);
+        let ExternalBzlRouteError::Load(error) = error else {
+            panic!("recursive route failure must retain its typed load error")
+        };
+        assert_eq!(error.is_effect_error(), effect_error);
         let child = tx
             .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),

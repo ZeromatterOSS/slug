@@ -1,53 +1,54 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7A-external-bzl-route-identity
+Packet: WP-7A-authentic-bazel-skylib-payload
 Status: ready
 
 ## Result and owner
 
-Retain the typed `HostCanonicalRepositoryLoadRouteError` when external `.bzl`
-resolution fails instead of flattening it into `Arc<str>`. Stage 5 owns loading
-error identity and bounded diagnostic traversal; loading and Stage 6 semantics
-remain unchanged. Use
+Add the exact bazel_skylib 1.8.2 payload demanded while the authentic configured
+CLI proof loads `@@bazel_skylib+//lib:modules.bzl` during bazel_features extension
+evaluation. Stage 1 owns fixture assembly and Stage 5 owns the accepted demand
+diagnostic; Stage 6 semantics remain unchanged. Use
 [configured-cli-fixture.md](./configured-cli-fixture.md) for the preserved F1/F2
 checkpoint and the exact F3 blocker receipt.
 
-Slug-native: typed error identity and bounded borrowed traversal. Deferred: any
-later payload demand, new source producer, or unsupported semantic owner exposed
-after the causal route error becomes visible.
+Exact: archive URL, SHA-256, strip prefix, verbatim bytes, and upstream notice.
+Deferred: any later payload demand, new source producer, or unsupported semantic
+owner exposed after this archive is present.
 
 ## Scope
 
 Allowed changes:
 
-- `app/slug_loading_v2/src/bzl_module.rs` for typed external route-error
-  retention and equality;
-- `app/slug_loading_v2/src/registration_diagnostic.rs` and focused tests to
-  traverse the retained route error through the accepted bounded owner;
+- `tests/v2_oracle/fixtures/configured-cli-authentic/` for the exact
+  bazel_skylib archive, copied license, notice, and manifest rows;
+- `tests/v2_oracle/test_configured_cli_fixture.py` only for updated fixed
+  inventory counts/hash and meaningful corruption validation;
 - this manifest, canonical status, and the configured-fixture gate ledger at a
   genuine acceptance or newly named blocker.
 
 Start with these evidence handles:
 
-- `external_load_resolution_error` and its four call sites: two typed route
-  errors and two infrastructure/frontier errors currently flattened to text;
-- existing `Node::Load` bounded traversal in `registration_diagnostic.rs`;
+- bazel_skylib 1.8.2 BCR `source.json`: URL, empty strip prefix, and integrity
+  already verified in the deterministic metadata bundle;
+- accepted terminal demand: `@@bazel_skylib+//lib:modules.bzl` with selected
+  registry materialization transport failure;
 - [F3 invocation contract](./configured-cli-fixture.md#f3-invocation-contract):
   rerun the same portable proof after the focused diagnostic checks pass.
 
-No route selection, DICE-key, source-policy, toolchain, or R2 semantic change
-belongs in this packet. Preserve infrastructure failures as bounded scalar
-leaves and the existing full `Display` behavior for ordinary callers.
+No production Rust, route selection, DICE-key, source-policy, toolchain, or R2
+semantic change belongs in this packet. Do not add other bazel_skylib versions
+or catalog-declared archives. Preserve the 16 MiB fixture cap and fail-closed
+hash/assembly behavior.
 
 ## Work and validation
 
-1. Introduce a typed external route-error carrier that retains successful
-   `HostCanonicalRepositoryLoadRouteError` values and classifies compute/frontier
-   infrastructure without recursive formatting.
-2. Route the typed load failure into the existing iterative bounded traversal;
-   prove equality, poison resistance, output bounds, and natural route behavior.
-3. Compile and run focused owner/dependent checks, then rerun the unchanged F3
-   proof once to record its next exact demand or semantic owner.
+1. Acquire the exact pinned archive from its BCR URL, verify SHA-256 before
+   installation, and copy its upstream license with provenance.
+2. Add archive/license manifest rows, update total bytes and fixed inventory
+   identity, and prove fresh-root offline assembly plus corruption rejection.
+3. Rerun the unchanged authentic F3 proof once. Record configured closure, the
+   next exact demanded input, or the exact unsupported semantic owner.
 
 Invocation/compiler/test-selection corrections within this contract use the
 orchestration skill. New source semantics, provenance mismatch, or a different
@@ -57,13 +58,12 @@ the same proof names its demand.
 
 ## Immediate predecessor and durable candidate
 
-The bazel_features checkpoint verified 24 objects / 7,822,792 bytes at inventory
-SHA-256 `0ad0ac33e4275d51db0ad436cf639709170363b9a41bf82026d6c9e30f88b928`
-and passed all 3 fixture tests. The same F3 run selected/executed one test with
-valid observer/cleanup evidence and reached generated repo
-`@@bazel_features++version_extension+bazel_features_globals` in 9.29 seconds.
-Its preformatted route error exhausted the bounded diagnostic before naming the
-cause; typed retention is the immediate prerequisite.
+Typed external route retention passed the 11-test diagnostic slice and natural
+recursive route test; the observer harness compiled in 40.12 seconds. The same
+F3 run selected/executed one test with valid observer/cleanup evidence and named
+the bazel_skylib 1.8.2 payload in 9.36 seconds. Its pinned archive SHA-256 is
+`6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446`;
+typed route identity is accepted and F1/F3 depend on adding that exact payload.
 
 R2 snapshot: branch `review/output-conflict-r2`, commit `27e9e9c0c`,
 base `97dffd5d4`, original patch SHA-256

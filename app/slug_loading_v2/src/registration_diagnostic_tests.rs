@@ -476,9 +476,9 @@ fn registration_diagnostic_recursive_bzl_cause_and_depth() {
             E::Route {
                 source: label.clone(),
                 load: "load".into(),
-                message: "cause".into(),
+                error: ExternalBzlRouteError::Compute("cause".into()),
             },
-            "Route: cause",
+            "Route: Compute",
         ),
         (
             E::Absent {
