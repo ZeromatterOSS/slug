@@ -1,82 +1,71 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7A-route-repo-file-diagnostic
+Packet: WP-7A-authentic-protobuf-payload
 Status: ready
 
 ## Result and owner
 
-Replace the terminal `error=RepositoryIgnore.RouteRepoFile` for
-`@@protobuf+//bazel/private/toolchains/prebuilt` in the authentic configured CLI
-proof with a bounded causal projection of `HostRouteRepoFileError`. Stage 5 owns
-the source diagnostic boundary; fixture and Stage 6 semantics remain unchanged.
-Use
+Add the exact protobuf 33.4 payload demanded while the authentic configured CLI
+proof reads `REPO.bazel` for `@@protobuf+//bazel/private/toolchains/prebuilt`.
+Stage 1 owns fixture assembly and Stage 5 owns the accepted demand diagnostic;
+Stage 6 semantics remain unchanged. Use
 [configured-cli-fixture.md](./configured-cli-fixture.md) for the preserved F1/F2
 checkpoint and the exact F3 blocker receipt.
 
-Slug-native: bounded borrowed diagnostic rendering and its poison/overflow
-behavior. Exact/deferred: upstream semantics, new source producers, toolchain
-registration behavior, and any later payload demand exposed by the causal error.
+Exact: archive URL, SHA-256, strip prefix, verbatim bytes, and upstream notice.
+Deferred: any later payload demand, new source producer, or unsupported semantic
+owner exposed after this archive is present.
 
 ## Scope
 
 Allowed changes:
 
-- `app/slug_bzlmod_v2/src/repo_file.rs` and a focused diagnostic module/test for
-  the typed routed `REPO.bazel` error projection;
-- existing repository-source observation rendering only to reuse bounded source
-  and observation leaves without changing semantics;
-- `app/slug_bzlmod_v2/src/repository_ignore_registration_diagnostic.rs` and
-  focused tests only to consume the routed `REPO.bazel` projection;
+- `tests/v2_oracle/fixtures/configured-cli-authentic/` for the exact protobuf
+  archive, copied license, notice, and manifest rows;
+- `tests/v2_oracle/test_configured_cli_fixture.py` only for updated fixed
+  inventory counts/hash and meaningful corruption validation;
 - this manifest, canonical status, and the configured-fixture gate ledger at a
   genuine acceptance or newly named blocker.
 
 Start with these evidence handles:
 
-- `app/slug_bzlmod_v2/src/repo_file.rs`: private `HostRouteRepoFileError`
-  variants and routed optional `REPO.bazel` source/evaluation stages;
-- `app/slug_bzlmod_v2/src/source_preparation/repository_source_observation/registration_diagnostic.rs`:
-  existing bounded request/source observation rendering;
-- the accepted `HostRepositoryIgnoreError::RouteRepoFile` handoff in
-  `app/slug_bzlmod_v2/src/repository_ignore_registration_diagnostic.rs`;
+- protobuf 33.4 BCR `source.json`: URL, strip prefix, and integrity already
+  verified in the deterministic metadata bundle;
+- accepted terminal diagnostic: `RouteRepoFile.SourceObservation.CanonicalRequest:
+  Request.Materialization path=hex:5245504f2e62617a656c kind=Transport`;
 - [F3 invocation contract](./configured-cli-fixture.md#f3-invocation-contract):
   rerun the same portable proof after the focused diagnostic checks pass.
 
-No loading, DICE-key, registration, source-policy, toolchain, or R2 semantic
-change belongs in this packet. Do not render an unbounded recursive `Display`
-chain into the diagnostic. Preserve the existing fixed-capacity ASCII output,
-poison resistance, and deterministic incomplete/truncated classifications.
+No production Rust, loading, DICE-key, registration, source-policy, toolchain,
+or R2 semantic change belongs in this packet. Do not add other protobuf versions
+or catalog-declared archives. Preserve the fixture byte cap and fail-closed
+hash/assembly behavior.
 
 ## Work and validation
 
-1. Add the smallest borrowed projection needed for `HostRouteRepoFileError`;
-   render variant identity and bounded safe scalar context without cloning,
-   recursive allocation, or semantic evaluation.
-2. Reuse the existing bounded source-observation/request rendering for routed
-   routed source failures. Replace only the generic `RouteRepoFile` leaf in the
-   accepted repository-ignore handoff. Prove natural errors are causal,
-   poison-free, deterministic, and bounded.
-3. Run focused owner/dependent checks within 12/15 seconds per test process.
-   Compile the observer harness separately within 60 seconds, then rerun the
-   unchanged authentic fresh-root F3 proof once.
-4. Record one terminal receipt: configured closure, an exact demanded input, or
-   an exact unsupported semantic owner. If the projection itself cannot remain
-   bounded and borrowed, stop with that implementation blocker.
+1. Acquire the exact pinned archive from the BCR URL, verify SHA-256 before
+   installation, and copy its upstream license with provenance. Do not read a
+   personal cache or use implicit runtime network fallback.
+2. Add archive/license manifest rows, update total bytes and fixed inventory
+   identity, and prove fresh-root offline assembly plus corruption rejection.
+3. Rerun the unchanged authentic F3 proof once. Record configured closure, the
+   next exact demanded input, or the exact unsupported semantic owner.
 
 Invocation/compiler/test-selection corrections within this contract use the
-orchestration skill. New source semantics or evidence contradicting the bounded
-diagnostic design selects a smaller prerequisite rather than widening this
-packet. Preserve the F1/F2 fixture checkpoint and do not acquire another payload
-until the same proof names its demand.
+orchestration skill. New source semantics, provenance mismatch, or a different
+selected URL selects a smaller prerequisite rather than widening this packet.
+Preserve the F1/F2 fixture checkpoint and do not acquire another payload until
+the same proof names its demand.
 
 ## Immediate predecessor and durable candidate
 
-The repository-ignore projection passed its 2 focused tests and preserved the
-package-source handoff tests. The same F3 run selected/executed one test with
-valid observer and cleanup evidence, then reached `CanonicalPackage: Lookup
-package=@@protobuf+//bazel/private/toolchains/prebuilt
-error=RepositoryIgnore.RouteRepoFile` in 5.65 seconds. The ignore projection is
-accepted; F3 remains blocked until the route error names its exact source or
-evaluation leaf.
+The routed `REPO.bazel` projection passed 2 focused tests and preserved the
+repository-ignore handoff tests. The same F3 run selected/executed one test with
+valid observer and cleanup evidence, then named the protobuf 33.4 archive capture
+while reading `REPO.bazel` in 5.61 seconds. Its pinned SHA-256 is
+`687e98a471973b5c5fd711750c40b8b82c0ade33f649db65e00b290f29345a2b` and
+strip prefix is `protobuf-33.4`. The diagnostic chain is accepted; F1/F3 now
+depend on adding this exact payload.
 
 R2 snapshot: branch `review/output-conflict-r2`, commit `27e9e9c0c`,
 base `97dffd5d4`, original patch SHA-256

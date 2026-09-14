@@ -115,9 +115,9 @@ fixture hashes, command, counts, status and supervisor receipt.
 
 | Gate | Current state | Required evidence / successor |
 |---|---|---|
-| F1 authentic input inventory | partial at a named semantic boundary; all 183 demanded metadata objects and the selected platforms, rules_shell, and `rules_cc@0.2.17` payloads/patches/notices are repository-owned and verified | resume demand-linked payload acquisition only after the current registration diagnostic is causal; no later payload demand is yet established |
+| F1 authentic input inventory | partial at the next named payload; all 183 demanded metadata objects and the selected platforms, rules_shell, and `rules_cc@0.2.17` payloads/patches/notices are repository-owned and verified | add exact protobuf 33.4 archive `687e98a471973b5c5fd711750c40b8b82c0ade33f649db65e00b290f29345a2b` from its pinned BCR URL plus notice, then resume the unchanged demand proof |
 | F2 portable offline assembly | accepted by focused checkpoint evidence | 19 objects / 901,651 source bytes and 177 bundled metadata entries verify and assemble in a fresh root; missing, corrupt, and semantically mismatched patch inputs fail closed |
-| F3 configured source closure | blocked at `CanonicalPackage: Lookup package=@@protobuf+//bazel/private/toolchains/prebuilt error=RepositoryIgnore.RouteRepoFile` after selecting `rules_cc@0.2.17` | extend the bounded borrowed projection through the routed `REPO.bazel` error, then rerun the unchanged fresh-root proof to distinguish an absent optional file from evaluation/policy failure |
+| F3 configured source closure | blocked by missing protobuf 33.4 archive while reading `REPO.bazel` for `@@protobuf+//bazel/private/toolchains/prebuilt` | add only that demand-established authentic payload, then rerun once to name the next payload or semantic owner |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -176,6 +176,18 @@ package-source handoff tests. The same F3 run reached
 cleanup guarantees. This rules out `.bazelignore` handling and selects the
 smaller routed `REPO.bazel` diagnostic prerequisite; it still does not identify
 the source/evaluation leaf or accept F3.
+
+The routed `REPO.bazel` projection then passed its 2 focused tests and preserved
+the repository-ignore handoff tests. The same F3 run reached
+`RouteRepoFile.SourceObservation.CanonicalRequest:
+Request.Materialization path=hex:5245504f2e62617a656c kind=Transport` in 5.61
+seconds; the bounded message named the failed selected-registry archive capture.
+Pinned protobuf 33.4 `source.json` supplies URL
+`https://github.com/protocolbuffers/protobuf/releases/download/v33.4/protobuf-33.4.bazel.tar.gz`,
+strip prefix `protobuf-33.4`, and SHA-256
+`687e98a471973b5c5fd711750c40b8b82c0ade33f649db65e00b290f29345a2b`.
+This establishes the next authentic payload demand and accepts the diagnostic
+chain; it remains F3 blocker evidence until the archive is repository-owned.
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits
 atomic integration, followed by the demand-scoped Stage 6 execution-group

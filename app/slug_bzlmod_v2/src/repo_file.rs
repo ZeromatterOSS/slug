@@ -976,6 +976,9 @@ pub(crate) enum HostRouteRepoFileError {
     Evaluation(HostRepoFileError),
 }
 
+#[path = "repo_file_registration_diagnostic.rs"]
+mod registration_diagnostic;
+
 impl fmt::Display for HostRouteRepoFileError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

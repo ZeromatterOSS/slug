@@ -13,8 +13,14 @@ impl HostRepositoryIgnoreError {
     pub(crate) fn write_registration_diagnostic(&self, out: &mut dyn fmt::Write) -> fmt::Result {
         match self {
             Self::RepoFile(_) => out.write_str("RepoFile"),
-            Self::RouteRepoFile(_) => out.write_str("RouteRepoFile"),
-            Self::NonregistryRepoFile(_) => out.write_str("NonregistryRepoFile"),
+            Self::RouteRepoFile(error) => {
+                out.write_str("RouteRepoFile.")?;
+                error.write_registration_diagnostic(out)
+            }
+            Self::NonregistryRepoFile(error) => {
+                out.write_str("NonregistryRepoFile.")?;
+                error.write_registration_diagnostic(out)
+            }
             Self::PolicyProjection(_) => out.write_str("PolicyProjection"),
             Self::RepositoryListing(_) => out.write_str("RepositoryListing"),
             Self::BuiltinMetadata { actual } => {
