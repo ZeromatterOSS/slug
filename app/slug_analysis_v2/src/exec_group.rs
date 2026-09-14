@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use std::sync::Arc;
+
 use allocative::Allocative;
 use compact_str::CompactString;
 use slug_identity_v2::CanonicalLabel;
@@ -18,5 +20,11 @@ use slug_identity_v2::CanonicalLabel;
 pub enum ConfiguredExecGroup {
     Default,
     Named(CompactString),
-    Automatic(CanonicalLabel),
+    Automatic(Arc<CanonicalLabel>),
+}
+
+impl ConfiguredExecGroup {
+    pub fn automatic(label: CanonicalLabel) -> Self {
+        Self::Automatic(Arc::new(label))
+    }
 }

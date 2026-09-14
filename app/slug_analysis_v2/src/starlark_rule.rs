@@ -942,7 +942,7 @@ fn materialize_execution_group_views(
     let root = if groups.use_auto_exec_groups() {
         let mut rows = Vec::new();
         for requirement in groups.default_declared_requirements() {
-            let identity = ConfiguredExecGroup::Automatic(requirement.label().clone());
+            let identity = ConfiguredExecGroup::automatic(requirement.label().clone());
             let row = groups.row(&identity).ok_or_else(|| {
                 format!(
                     "automatic execution group for toolchain {} was not resolved",
@@ -1165,7 +1165,7 @@ impl SynchronousAnalysisActionSink {
             (Some(group), _) => Ok(group),
             (None, AnalysisToolchainRequest::Value(value)) => {
                 let label = self.action_toolchain_label(value, operation)?;
-                let group = ConfiguredExecGroup::Automatic(label.clone());
+                let group = ConfiguredExecGroup::automatic(label.clone());
                 self.exec_groups.row(&group).map(|_| group).ok_or_else(|| {
                     anyhow::anyhow!("ctx.actions.{operation} unknown automatic toolchain {label}")
                 })

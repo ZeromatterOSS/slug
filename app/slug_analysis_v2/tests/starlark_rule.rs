@@ -3711,7 +3711,7 @@ async fn automatic_exec_group_projects_default_labels_from_automatic_rows_and_in
     );
     assert!(
         groups
-            .row(&ConfiguredExecGroup::Automatic(
+            .row(&ConfiguredExecGroup::automatic(
                 CanonicalLabel::parse("@@//:compile_alias").unwrap()
             ))
             .is_some()
@@ -3813,7 +3813,7 @@ async fn automatic_exec_group_routes_run_and_run_shell_across_the_complete_param
             .unwrap();
         assert_eq!(
             result.actions()[0].context().exec_group(),
-            &ConfiguredExecGroup::Automatic(CanonicalLabel::parse("@@//:compile_alias").unwrap())
+            &ConfiguredExecGroup::automatic(CanonicalLabel::parse("@@//:compile_alias").unwrap())
         );
     }
     for name in [
@@ -4068,7 +4068,7 @@ async fn configured_action_context_distinguishes_default_named_and_automatic_gro
         [
             ConfiguredExecGroup::Default,
             ConfiguredExecGroup::Named("named".into()),
-            ConfiguredExecGroup::Automatic(CanonicalLabel::parse("@@//:compile_alias").unwrap()),
+            ConfiguredExecGroup::automatic(CanonicalLabel::parse("@@//:compile_alias").unwrap()),
         ]
     );
 }

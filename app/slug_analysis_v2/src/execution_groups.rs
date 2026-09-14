@@ -194,7 +194,7 @@ pub(crate) fn normalize_execution_groups(
     if use_auto_exec_groups {
         rows.extend(default_requirements.iter().cloned().map(|requirement| {
             NormalizedExecGroupRow {
-                identity: ConfiguredExecGroup::Automatic(requirement.label().clone()),
+                identity: ConfiguredExecGroup::automatic(requirement.label().clone()),
                 requirements: Arc::from([requirement]),
                 constraints: normalize_constraints(default_constraints.iter().cloned()),
                 target_exec_properties: BTreeMap::new(),
@@ -434,7 +434,7 @@ mod tests {
         assert_eq!(normalized.rows().len(), 4);
         assert_eq!(
             normalized.rows()[2].identity(),
-            &ConfiguredExecGroup::Automatic(label("@@//tc:one"))
+            &ConfiguredExecGroup::automatic(label("@@//tc:one"))
         );
     }
 

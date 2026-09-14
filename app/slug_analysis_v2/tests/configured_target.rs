@@ -1397,7 +1397,7 @@ fn configured_action_specs_route_every_group_without_fallback() {
     );
     let automatic_label = canonical("@@//:toolchain_type");
     let automatic = make(
-        ConfiguredExecGroup::Automatic(automatic_label.clone()),
+        ConfiguredExecGroup::automatic(automatic_label.clone()),
         "@@//:p2",
         "automatic",
     );
@@ -1435,7 +1435,7 @@ fn configured_action_specs_route_every_group_without_fallback() {
     );
     assert_eq!(
         result.actions()[2].context().exec_group(),
-        &ConfiguredExecGroup::Automatic(automatic_label)
+        &ConfiguredExecGroup::automatic(automatic_label)
     );
     assert_eq!(
         base.with_action_specs(
