@@ -117,7 +117,7 @@ fixture hashes, command, counts, status and supervisor receipt.
 |---|---|---|
 | F1 authentic input inventory | partial with every payload demanded so far repository-owned, including rules_java 9.1.0 and all 183 demanded metadata objects | attribute the current bounded deadline before acquiring any further payload; catalog membership does not establish demand |
 | F2 portable offline assembly | accepted through the rules_java checkpoint | 28 objects / 8,004,740 source bytes, inventory `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
-| F3 configured source closure | blocked by a 12-second wall deadline after rules_java entered the fixture; latest sampled activity was `HostCanonicalSelectedModuleDefinitionObservationKey` | run a bounded causal fanout diagnostic, correct only a measured scheduling owner if required, then rerun once to name configured closure, a payload, or a semantic owner |
+| F3 configured source closure | blocked at `CanonicalPackage: Attempt.Loading` after sibling `.bzl` preparation needs were batched and the proof reached a typed terminal in 9.87 seconds | project the bounded package-attempt loading cause, then rerun once to name configured closure, a payload, or a semantic owner |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -274,6 +274,31 @@ sampled activity was `HostCanonicalSelectedModuleDefinitionObservationKey` in
 the root-compute phase. This names no later archive and is not evidence of a
 semantic loop. A bounded causal fanout diagnostic is the immediate prerequisite;
 acquire no further payload until the same proof names it.
+
+Scratch observer counters then disproved the final sampled host-definition key
+as the principal owner: it computed 13 times, while `PathObservationKey`
+computed 1,820 times and `ExternalBzlModuleObservationKey` 1,726 times. A
+bounded per-identity snapshot recorded 1,664 external-module computations over
+135 identities; 129 identities repeated for 1,529 extra computations, led by
+`@@rules_cc+//cc:cc_library.bzl` at 177. A source-syntax cache experiment left
+the proof at the same 12-second deadline and was fully reverted.
+
+The selected loading owner was the external-child loop, which returned the
+first preparation need even though `SourcePreparationNeeds` already supports
+unions. It now collects independent sibling needs into one frontier, retains
+the first incompatible union as a typed terminal, and still stops immediately
+at the first decisive semantic or observation error. The complete loading suite
+passes 560/560 with one intentional ignored test in 1.17 seconds; the focused
+external-Bzl slice passes 30/30, including sibling need collection and decisive
+prefix behavior. The final observer harness compiled in 17.25 seconds.
+
+The final unchanged F3 proof selected and executed one test and reached a typed
+terminal in 9.87 seconds, with valid observer and complete cleanup evidence. It
+recorded 45,130 starts, 39,240 dependency checks, and 7,434 computes. The error
+is `toolchains registration row 7: CanonicalPackage: Attempt.Loading`; this is a
+bounded diagnostic leaf, not F3 acceptance or authority for another payload.
+The immediate prerequisite is the existing package-attempt loading error's
+typed projection.
 
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits

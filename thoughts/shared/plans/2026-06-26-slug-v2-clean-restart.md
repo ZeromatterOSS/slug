@@ -29,15 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7A-host-module-definition-fanout-diagnostic
+Packet: WP-7A-repository-package-attempt-diagnostic
 Status: ready
 
-Measure the new bounded F3 deadline after the exact rules_java 9.1.0 archive
-entered the authentic offline fixture, as specified by
-[current-packet.md](./slug-v2-subplans/current-packet.md). The fixture now
-verifies 28 objects / 8,004,740 bytes, while the one allowed proof reached its
-12-second wall deadline with latest sampled activity in
-`HostCanonicalSelectedModuleDefinitionObservationKey`.
+Project the typed loading cause now hidden behind
+`CanonicalPackage: Attempt.Loading`, as specified by
+[current-packet.md](./slug-v2-subplans/current-packet.md). External `.bzl`
+children now union independent preparation needs in one frontier while retaining
+the first decisive semantic failure. The final F3 run reaches the package
+terminal in 9.87 seconds.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
@@ -55,8 +55,8 @@ Preservation is not integration. Do not activate it partially or weaken a gate.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Host module-definition fanout diagnostic | ready; the rules_java payload is accepted and its single F3 rerun reached the wall deadline with valid observer evidence rather than naming another input |
-| 2 | Authentic configured CLI fixture | F2 accepted through 28 objects; F1/F3 blocked on bounded attribution of the new deadline and whatever boundary the corrected unchanged proof names; [fixture ledger](./slug-v2-subplans/configured-cli-fixture.md) owns the receipt |
+| 1 | Repository package-attempt diagnostic | ready; sibling preparation needs are batched and the same F3 proof reaches `CanonicalPackage: Attempt.Loading` within the deadline |
+| 2 | Authentic configured CLI fixture | F2 accepted through 28 objects; F1/F3 blocked on the typed package-loading cause and whatever exact boundary its projection names; [fixture ledger](./slug-v2-subplans/configured-cli-fixture.md) owns the receipt |
 | 3 | Combined selected-request/output-conflict R2 | blocked on complete fixture and outstanding baseline attribution; [Stage 6](./slug-v2-subplans/06-analysis-toolchains-and-actions.md) owns semantics and gate ledger |
 | 4 | Bootstrap-demanded execution-group support | blocked on R2; reconcile existing closure artifacts and record named/automatic demand before freezing scope; reuse Stage 6's pinned source matrix |
 | 5 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |

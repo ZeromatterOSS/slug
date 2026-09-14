@@ -74,6 +74,8 @@ use slug_bzlmod_v2::RootPackageSourceKey;
 use slug_bzlmod_v2::RootPackageSourceObservationKey;
 use slug_bzlmod_v2::RootRepositoryBzlLoadRoute;
 use slug_bzlmod_v2::RootRepositoryRoute;
+use slug_bzlmod_v2::SourcePreparationNeeds;
+use slug_bzlmod_v2::SourcePreparationNeedsError;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_bzlmod_v2::host_repository_relative_path;
 use slug_events_v2::CaptureEvaluationEvents;
@@ -1840,6 +1842,10 @@ pub(crate) enum ExternalBzlModuleError {
         canonical_label: CanonicalLabel,
         error: Arc<ExternalBzlModuleError>,
     },
+    IncompatibleNeeds {
+        label: CanonicalLabel,
+        message: Arc<str>,
+    },
     Cycle(ExternalBzlLoadCycle),
     Evaluation {
         label: CanonicalLabel,
@@ -1896,6 +1902,12 @@ impl fmt::Display for ExternalBzlModuleError {
             Self::Child {
                 raw_load, error, ..
             } => write!(f, "loading `{raw_load}`: {error}"),
+            Self::IncompatibleNeeds { label, message } => {
+                write!(
+                    f,
+                    "loading dependencies of {label}: incompatible requests: {message}"
+                )
+            }
             Self::Cycle(_) => f.write_str("cycle detected in extension files"),
             Self::Evaluation { label, message } => write!(f, "evaluating {label}: {message}"),
             Self::Freeze { label, message } => write!(f, "freezing {label}: {message}"),
@@ -1918,6 +1930,7 @@ impl ExternalBzlModuleError {
             | Self::Encoding { .. }
             | Self::Parse { .. }
             | Self::LoadLabel { .. }
+            | Self::IncompatibleNeeds { .. }
             | Self::Evaluation { .. }
             | Self::Freeze { .. } => None,
         }
@@ -1934,6 +1947,7 @@ impl ExternalBzlModuleError {
             | Self::Encoding { .. }
             | Self::Parse { .. }
             | Self::LoadLabel { .. }
+            | Self::IncompatibleNeeds { .. }
             | Self::Cycle(_)
             | Self::Evaluation { .. }
             | Self::Freeze { .. } => None,
@@ -4579,6 +4593,43 @@ fn external_runfiles_repository_mapping(
     ))
 }
 
+fn accumulate_external_bzl_need(
+    needs: &mut Option<SourcePreparationNeeds>,
+    need: SourcePreparationNeeds,
+    first_failure: &mut Option<ExternalBzlDriverOutcome>,
+    key: &ExternalBzlModuleEvalKey,
+    observations: &PathObservationEpoch,
+) {
+    if let Err(error) = try_accumulate_external_bzl_need(needs, need) {
+        first_failure.get_or_insert_with(|| {
+            external_bzl_complete(
+                Err(ExternalBzlModuleError::IncompatibleNeeds {
+                    label: key.canonical_label(),
+                    message: format!("{error:?}").into(),
+                }),
+                observations.dupe(),
+            )
+        });
+    }
+}
+
+fn try_accumulate_external_bzl_need(
+    needs: &mut Option<SourcePreparationNeeds>,
+    need: SourcePreparationNeeds,
+) -> Result<(), SourcePreparationNeedsError> {
+    *needs = match needs.take() {
+        None => Some(need),
+        Some(current) => match current.try_union(&need) {
+            Ok(union) => Some(union),
+            Err(error) => {
+                *needs = Some(current);
+                return Err(error);
+            }
+        },
+    };
+    Ok(())
+}
+
 fn external_load_resolution_error(
     source: CanonicalLabel,
     load: &str,
@@ -4835,6 +4886,8 @@ async fn compute_external_bzl_children(
     mut observations: PathObservationEpoch,
 ) -> ControlFlow<ExternalBzlDriverOutcome, (Vec<(String, FrozenBzlModule)>, PathObservationEpoch)> {
     let mut loaded_modules = Vec::with_capacity(loads.len());
+    let mut needs: Option<SourcePreparationNeeds> = None;
+    let mut first_failure = None;
     for load in loads {
         let (raw_load, resolved, incoming) = match load {
             ExternalBzlChildLoad::Resolved(raw_load, resolved) => {
@@ -4848,12 +4901,24 @@ async fn compute_external_bzl_children(
                     key.canonical_label(),
                     mode,
                     &raw_load,
-                    observations,
+                    observations.dupe(),
                 )
                 .await
                 {
                     ControlFlow::Continue(resolved) => resolved,
-                    ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+                    ControlFlow::Break(SourcePreparationOutcome::Need(need)) => {
+                        accumulate_external_bzl_need(
+                            &mut needs,
+                            need,
+                            &mut first_failure,
+                            key,
+                            &observations,
+                        );
+                        continue;
+                    }
+                    ControlFlow::Break(outcome) => {
+                        return ControlFlow::Break(outcome);
+                    }
                 };
                 (raw_load, resolved, incoming)
             }
@@ -4870,7 +4935,14 @@ async fn compute_external_bzl_children(
         .await
         {
             SourcePreparationOutcome::Need(need) => {
-                return ControlFlow::Break(SourcePreparationOutcome::Need(need));
+                accumulate_external_bzl_need(
+                    &mut needs,
+                    need,
+                    &mut first_failure,
+                    key,
+                    &observations,
+                );
+                continue;
             }
             SourcePreparationOutcome::Complete(Err(error)) => {
                 return ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)));
@@ -4901,15 +4973,28 @@ async fn compute_external_bzl_children(
                     ));
                 }
                 ExternalBzlModuleMode::Observed => {
-                    return ControlFlow::Break(
-                        complete_observed_external_bzl_cycle(
-                            ctx,
-                            &key.cycle_identity(),
-                            &cycle,
-                            observations,
-                        )
-                        .await,
-                    );
+                    match complete_observed_external_bzl_cycle(
+                        ctx,
+                        &key.cycle_identity(),
+                        &cycle,
+                        observations.dupe(),
+                    )
+                    .await
+                    {
+                        SourcePreparationOutcome::Need(need) => {
+                            accumulate_external_bzl_need(
+                                &mut needs,
+                                need,
+                                &mut first_failure,
+                                key,
+                                &observations,
+                            );
+                            continue;
+                        }
+                        outcome => {
+                            return ControlFlow::Break(outcome);
+                        }
+                    }
                 }
             },
         };
@@ -4940,6 +5025,12 @@ async fn compute_external_bzl_children(
                 ));
             }
         }
+    }
+    if let Some(failure) = first_failure {
+        return ControlFlow::Break(failure);
+    }
+    if let Some(need) = needs {
+        return ControlFlow::Break(SourcePreparationOutcome::Need(need));
     }
     ControlFlow::Continue((loaded_modules, observations))
 }
@@ -7810,6 +7901,7 @@ mod module_extension_definition_loading_tests {
     use slug_bzlmod_v2::RootModuleEnvironmentPolicyKey;
     use slug_bzlmod_v2::RootPackagePolicyInputs;
     use slug_events_v2::EventBatch;
+    use slug_workspace_v2::NeedPathObservations;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
@@ -7855,6 +7947,32 @@ mod module_extension_definition_loading_tests {
             admitted_builtin_external_repository_load(&admitted),
             Some("@rules_cc//cc/toolchains:toolchain_config_utils.bzl")
         );
+    }
+
+    #[test]
+    fn external_bzl_child_frontier_accumulates_sibling_path_needs() {
+        let demand = |name: &str| {
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}")).unwrap(),
+                PathObservationOperation::FileBytes,
+            )
+        };
+        let first = demand("first.bzl");
+        let second = demand("second.bzl");
+        let mut needs = None;
+        for path in [first.clone(), second.clone(), first.clone()] {
+            try_accumulate_external_bzl_need(
+                &mut needs,
+                SourcePreparationNeeds::path(NeedPathObservations::singleton(path)),
+            )
+            .unwrap();
+        }
+        let paths = needs.unwrap();
+        let paths = paths.path_observations().unwrap().demands();
+        assert_eq!(paths.len(), 2);
+        assert!(paths.contains(&first));
+        assert!(paths.contains(&second));
     }
 
     #[test]

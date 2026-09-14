@@ -290,6 +290,8 @@ fn registration_diagnostic_root_bzl_cause_and_boundaries() {
         (ExternalBzlModuleError::Cycle(ExternalBzlLoadCycle { path: Arc::from([]), keys: Arc::from([]) }), "Cycle"),
         (ExternalBzlModuleError::Source { label: label.clone(), error: slug_bzlmod_v2::RepositorySourceFileError::InvalidRepoRelativePath {
             requested_path: Arc::new(std::path::PathBuf::from("POISON")) } }, "[diagnostic incomplete: Source]"),
+        (ExternalBzlModuleError::IncompatibleNeeds { label: label.clone(), message: "CAUSE".into() },
+            "IncompatibleNeeds: CAUSE"),
         (ExternalBzlModuleError::LoadLabel { source: label, error: ExternalLoadLabelError::Invalid {
             load: "POISON".into(), message: "POISON".into() } }, "[diagnostic incomplete: LoadLabel]"),
     ] {

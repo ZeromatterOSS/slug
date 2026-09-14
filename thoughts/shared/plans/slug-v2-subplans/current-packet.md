@@ -1,71 +1,70 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7A-host-module-definition-fanout-diagnostic
+Packet: WP-7A-repository-package-attempt-diagnostic
 Status: ready
 
 ## Result and owner
 
-Attribute the bounded authentic configured-CLI deadline that appeared after the
-exact rules_java 9.1.0 payload entered the offline fixture. The latest observer
-sample was `HostCanonicalSelectedModuleDefinitionObservationKey`; that sample
-locates investigation and does not yet prove this key is the invalidation owner.
-Stage 1 owns fixture evidence, Stage 5 owns selected-module observation, and
-DICE scheduling changes belong to the natural injected-state owner.
+Project the typed package-loading cause hidden by the authentic configured-CLI
+terminal `CanonicalPackage: Attempt.Loading`. The repository package loader
+already retains `HostPackageAttemptError::Loading`; its bounded registration
+diagnostic currently emits only the variant name. Stage 5 owns this diagnostic
+projection. Package evaluation and Stage 6 toolchain semantics remain unchanged.
 
-Exact: the 28-object fixture, the one-test supervisor receipt, dependency and
-compute counts, and any measured repeated key families. Deferred: another
-payload, semantic implementation, or cache projection until causal evidence
-selects it.
+Exact: the retained loading error variant, bounded message content, recursive
+registration prefix, and the next unchanged F3 terminal. Deferred: any source
+payload or semantic correction until this projection names it.
 
 ## Scope
 
 Allowed changes:
 
-- bounded scratch-only DICE tracing or counters sufficient to attribute repeated
-  computation without changing production results;
-- the smallest production scheduling/invalidation owner selected by that trace,
-  with exact focused add/change/remove and warm-reuse coverage;
-- this manifest, canonical status, and the configured-fixture gate ledger when
-  a corrected proof names the next boundary.
+- `app/slug_loading_v2/src/bzl_module.rs` only if a borrowed accessor is needed
+  for the already-retained `HostPackageAttemptError::Loading` value;
+- `app/slug_loading_v2/src/registration_diagnostic.rs` and focused tests for the
+  compact exhaustive package-attempt loading projection;
+- this manifest, canonical status, and the configured-fixture ledger after the
+  unchanged proof names its next exact boundary.
 
 Start with these evidence handles:
 
 - accepted fixture inventory SHA-256
   `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`,
   28 objects, 8,004,740 source bytes, and 177 bundled metadata entries;
-- unchanged F3 receipt: one selected test, 12.01-second wall deadline, valid
-  observer and complete cleanup, with 53,789 starts, 53,774 finishes, 47,326
-  dependency checks, and 7,553 computes;
-- latest sampled key `HostCanonicalSelectedModuleDefinitionObservationKey` and
-  the accepted 64-way native path-observation partitioning predecessor.
+- final F3 receipt: one selected/executed test, typed terminal in 9.87 seconds,
+  valid observer and complete cleanup, with 45,130 starts, 39,240 dependency
+  checks, and 7,434 computes;
+- terminal text `toolchains registration row 7: CanonicalPackage:
+  Attempt.Loading` and `RepositoryPackageLoadDiagnostic::Leaf` as its natural
+  projection handoff.
 
-Do not infer a loop or invalidation owner from the final sample alone. Do not
-raise the 12-second deadline, acquire another archive, widen fixture semantics,
-or change module selection/loading behavior. Preserve the sole accepted full
-observation snapshots and exact values.
+Do not change loading behavior, source selection, package evaluation, toolchain
+semantics, DICE keys, or fixture contents. Keep the renderer bounded and avoid
+recursive `Debug` formatting or success-predecessor traversal. Do not acquire
+another archive until the projected cause names one.
 
 ## Work and validation
 
-1. Reproduce only through bounded scratch instrumentation and count repeated key
-   families, changed dependencies, and retry epochs after rules_java loads.
-2. If the evidence selects a global injected dependency or another scheduling
-   owner, implement the smallest projection at that owner and prove exact
-   add/change/remove, A/B/A restoration, unrelated warm reuse, and stale-value
-   clearing. If it selects a semantic owner, stop with that typed prerequisite.
-3. Run focused owner/dependent tests under the existing limits, compile the
-   observer harness separately, and rerun the unchanged authentic F3 proof once.
-   Record configured closure, the next exact demand, or the next typed owner.
+1. Expose only the bounded retained loading cause needed by the diagnostic and
+   render it under `Attempt.Loading`, preserving label escaping and output caps.
+2. Add focused natural and constructed tests for exact text, nested registration
+   prefixes, depth/output bounds, ownership, and writer failure where applicable.
+3. Run the focused diagnostic and loading dependent slices under the existing
+   limits, compile the observer harness separately, and rerun the unchanged F3
+   proof once. Record configured closure, the next demand, or typed owner.
 
 Invocation/compiler/test-selection corrections within this contract use the
-orchestration skill. A provenance mismatch or unbounded trace selects a smaller
-diagnostic correction rather than wider work.
+orchestration skill. If the retained value lacks a safe bounded projection,
+stop at the smaller accessor/typing prerequisite rather than flattening it.
 
 ## Immediate predecessor and durable candidate
 
-The exact rules_java 9.1.0 archive and copied Apache license are repository-owned
-and manifest-verified. The focused fixture suite passes 3/3, including fresh-root
-offline assembly and corruption rejection. The unchanged proof then reached the
-deadline described above and named no new input.
+Bounded scratch tracing measured 1,664 external `.bzl` computations across 135
+identities, including 1,529 repeats. The rejected exact-source syntax cache did
+not improve the deadline and was reverted. External child loading now unions
+independent `SourcePreparationNeeds`, preserves typed incompatible unions, and
+stops at the first decisive semantic failure. The loading suite passes 560/560
+with one intentional ignored test; the final proof reaches the terminal above.
 
 R2 snapshot: branch `review/output-conflict-r2`, commit `27e9e9c0c`,
 base `97dffd5d4`, original patch SHA-256

@@ -293,6 +293,9 @@ fn walk(out: &mut Buffer, mut node: Node<'_>) -> fmt::Result {
                         return error.write_registration_diagnostic(out);
                     }
                     E::LoadLabel { .. } => return out.incomplete("LoadLabel"),
+                    E::IncompatibleNeeds { message, .. } => {
+                        return write!(out, "IncompatibleNeeds: {message}");
+                    }
                 }
             }
         };

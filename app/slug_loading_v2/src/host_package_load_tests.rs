@@ -85,6 +85,7 @@ use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
+use slug_workspace_v2::path_observation_shards;
 use starlark::environment::FrozenModule;
 use starlark::environment::Globals;
 use starlark::environment::Module;
@@ -570,6 +571,7 @@ async fn transaction_with_policy(
         user_data.data.set(ForceRootPackageObservationOuter(error));
     }
     let mut updater = dice.updater_with_data(user_data);
+    updater.changed_to(path_observation_shards(&epoch)).unwrap();
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
@@ -2844,7 +2846,7 @@ async fn observed_external_bzl_terminals_keep_decisive_prefixes_and_stop_childre
     assert_same_epoch_arcs(&retained, &first);
 }
 #[tokio::test]
-async fn observed_external_bzl_child_positions_stop_at_need_or_semantic() {
+async fn observed_external_bzl_child_positions_collect_needs_and_stop_at_first_semantic() {
     const PARENT: &[u8] =
         b"load(\":a.bzl\", \"A\")\nload(\":b.bzl\", \"B\")\nload(\":c.bzl\", \"C\")\n";
     const CHILDREN: [(&str, &[u8]); 3] = [
@@ -2876,12 +2878,19 @@ async fn observed_external_bzl_child_positions_stop_at_need_or_semantic() {
             .compute(&observed_external_bzl_key(route, "", "parent.bzl"))
             .await
             .unwrap();
-        assert!(matches!(value, LoadingPreparationOutcome::Need(_)));
+        let LoadingPreparationOutcome::Need(needs) = value else {
+            panic!("missing child did not produce a preparation frontier")
+        };
+        assert!(
+            needs
+                .path_observations()
+                .is_some_and(|paths| !paths.demands().is_empty())
+        );
         let activations = tracker.take();
         assert!(
-            CHILDREN[position + 1..]
+            CHILDREN
                 .iter()
-                .all(|(name, _)| { activations.iter().all(|entry| !entry.key.contains(name)) })
+                .all(|(name, _)| { activations.iter().any(|entry| entry.key.contains(name)) })
         );
         let mut semantic_files = vec![("parent.bzl", PARENT)];
         semantic_files.extend(CHILDREN.iter().copied());
