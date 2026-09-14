@@ -20,7 +20,7 @@ verification_command = "python3 tools/v2_oracle/configured_cli_fixture.py prove 
 
 [authentic]
 inventory_version = 1
-total_source_bytes = 7793087
+total_source_bytes = 7822792
 historical_probe_sha256 = "8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2"
 candidate_commit = "27e9e9c0c"
 candidate_patch_sha256 = "90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e"
@@ -38,6 +38,13 @@ member = "rules_cc-0.2.17/MODULE.bazel"
 patch = "registry/modules/rules_cc/0.2.17/patches/module_dot_bazel_version.patch"
 expected = "modules/rules_cc/0.2.17/MODULE.bazel"
 preimage_sha256 = "923381d234e38513078c4301ee419ad4c73dc9f312d007260b691ac2833689a9"
+
+[[patch_checks]]
+archive = "mirror/github.com/bazel-contrib/bazel_features/releases/download/v1.42.1/bazel_features-v1.42.1.tar.gz"
+member = "bazel_features-1.42.1/MODULE.bazel"
+patch = "registry/modules/bazel_features/1.42.1/patches/module_dot_bazel_version.patch"
+expected = "modules/bazel_features/1.42.1/MODULE.bazel"
+preimage_sha256 = "fba87a4b74184f64d62fb8f858ad6e5a6ddc743e31f96001bd30fa3975f42242"
 
 [registry_bundle]
 archive = "registry-metadata.tar"
@@ -141,6 +148,14 @@ source_url = "https://bcr.bazel.build/modules/rules_cc/0.2.17/patches/module_dot
 kind = "patch"
 
 [[objects]]
+source = "registry/modules/bazel_features/1.42.1/patches/module_dot_bazel_version.patch"
+destination = "registry/modules/bazel_features/1.42.1/patches/module_dot_bazel_version.patch"
+sha256 = "b69c27e64c4ac5043a3f254d88ef2d8383bbfaefd20881a24ed5b6eb13d4b818"
+size = 270
+source_url = "https://bcr.bazel.build/modules/bazel_features/1.42.1/patches/module_dot_bazel_version.patch"
+kind = "patch"
+
+[[objects]]
 source = "registry/modules/rules_shell/0.6.1/patches/module_dot_bazel_version.patch"
 destination = "registry/modules/rules_shell/0.6.1/patches/module_dot_bazel_version.patch"
 sha256 = "5f0700eaa9a33770aae4ae8b06bec8e433f518eb50711378c8cd3a5d7854ff2d"
@@ -181,11 +196,27 @@ source_url = "https://github.com/protocolbuffers/protobuf/releases/download/v33.
 kind = "archive"
 
 [[objects]]
+source = "mirror/github.com/bazel-contrib/bazel_features/releases/download/v1.42.1/bazel_features-v1.42.1.tar.gz"
+destination = "mirror/github.com/bazel-contrib/bazel_features/releases/download/v1.42.1/bazel_features-v1.42.1.tar.gz"
+sha256 = "8189bac9a6bf9cc155a854c4cbebfebf58b9ca7a2d0a67645f7d0c1f83c523ac"
+size = 18078
+source_url = "https://github.com/bazel-contrib/bazel_features/releases/download/v1.42.1/bazel_features-v1.42.1.tar.gz"
+kind = "archive"
+
+[[objects]]
 source = "licenses/platforms-LICENSE"
 destination = "licenses/platforms-LICENSE"
 sha256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
 size = 11357
 source_url = "https://github.com/bazelbuild/platforms/releases/download/1.0.0/platforms-1.0.0.tar.gz#LICENSE"
+kind = "license"
+
+[[objects]]
+source = "licenses/bazel_features-LICENSE"
+destination = "licenses/bazel_features-LICENSE"
+sha256 = "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+size = 11357
+source_url = "https://github.com/bazel-contrib/bazel_features/releases/download/v1.42.1/bazel_features-v1.42.1.tar.gz#bazel_features-1.42.1/LICENSE"
 kind = "license"
 
 [[objects]]

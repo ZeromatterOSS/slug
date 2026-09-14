@@ -7,6 +7,10 @@ registry-metadata.tar
   registry-metadata.json records each object's demand order, source URL, size,
   and SHA-256. The metadata has no executable payload content.
 
+bazel_features 1.42.1
+  Source: https://github.com/bazel-contrib/bazel_features/releases/tag/v1.42.1
+  License: Apache License 2.0, copied as licenses/bazel_features-LICENSE
+
 platforms 1.0.0
   Source: https://github.com/bazelbuild/platforms/releases/tag/1.0.0
   License: Apache License 2.0, copied as licenses/platforms-LICENSE

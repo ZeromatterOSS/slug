@@ -29,14 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7A-authentic-bazel-features-payload
+Packet: WP-7A-external-bzl-route-identity
 Status: ready
 
-Add the exact demand-established bazel_features 1.42.1 archive, BCR patch, and
-notice to the authentic offline fixture, as specified by
-[current-packet.md](./slug-v2-subplans/current-packet.md). The protobuf payload
-checkpoint is accepted; F1 remains partial until the unchanged proof names its
-successor.
+Retain the typed canonical load-route error across external `.bzl` resolution,
+as specified by [current-packet.md](./slug-v2-subplans/current-packet.md). The
+bazel_features payload checkpoint is accepted; its successor currently reaches
+the diagnostic output limit because the typed route error was flattened into a
+recursive string.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
@@ -53,7 +53,7 @@ Preservation is not integration. Do not activate it partially or weaken a gate.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Authentic bazel_features 1.42.1 payload | ready; protobuf payload accepted and same F3 run now names `@@bazel_features+//:features.bzl` plus its pinned archive and patch |
+| 1 | External `.bzl` route error identity | ready; bazel_features payload accepted and same F3 run reaches a generated repo but loses the cause to a recursive preformatted route error |
 | 2 | Authentic configured CLI fixture | F2 accepted; F1/F3 blocked on the causal diagnostic and any demand or semantic owner it names; [fixture ledger](./slug-v2-subplans/configured-cli-fixture.md) owns the receipt |
 | 3 | Combined selected-request/output-conflict R2 | blocked on complete fixture and outstanding baseline attribution; [Stage 6](./slug-v2-subplans/06-analysis-toolchains-and-actions.md) owns semantics and gate ledger |
 | 4 | Bootstrap-demanded execution-group support | blocked on R2; reconcile existing closure artifacts and record named/automatic demand before freezing scope; reuse Stage 6's pinned source matrix |

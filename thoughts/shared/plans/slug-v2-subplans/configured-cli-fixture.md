@@ -115,9 +115,9 @@ fixture hashes, command, counts, status and supervisor receipt.
 
 | Gate | Current state | Required evidence / successor |
 |---|---|---|
-| F1 authentic input inventory | partial at the next named payload; protobuf 33.4 is now repository-owned alongside the prior selected payloads and all 183 demanded metadata objects | add exact bazel_features 1.42.1 archive `8189bac9a6bf9cc155a854c4cbebfebf58b9ca7a2d0a67645f7d0c1f83c523ac`, BCR patch `b69c27e64c4ac5043a3f254d88ef2d8383bbfaefd20881a24ed5b6eb13d4b818`, and notice, then resume the unchanged proof |
-| F2 portable offline assembly | accepted through the protobuf checkpoint | 21 objects / 7,793,087 source bytes, inventory `57a78210ed99a85f7461bef726e8153174ad10d62a64a0f65b263fb696f126fd`, and 177 bundled metadata entries verify and assemble in a fresh root; negative checks remain green |
-| F3 configured source closure | blocked by missing bazel_features 1.42.1 archive while loading `@@bazel_features+//:features.bzl` from protobuf's prebuilt-toolchain package | add only that demand-established authentic payload/patch, then rerun once to name the next payload or semantic owner |
+| F1 authentic input inventory | partial at a named diagnostic boundary; bazel_features 1.42.1 and protobuf 33.4 are repository-owned alongside the prior selected payloads and all 183 demanded metadata objects | retain the typed external `.bzl` route error before acquiring any later payload; the next archive demand is not yet visible |
+| F2 portable offline assembly | accepted through the bazel_features checkpoint | 24 objects / 7,822,792 source bytes, inventory `0ad0ac33e4275d51db0ad436cf639709170363b9a41bf82026d6c9e30f88b928`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
+| F3 configured source closure | blocked by a preformatted recursive `ExternalBzlModuleError::Route` that reaches the output limit while resolving `@@bazel_features++version_extension+bazel_features_globals` | retain the typed route error and traverse the existing bounded route diagnostic; no later payload acquisition is established yet |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -200,6 +200,16 @@ metadata supplies archive SHA-256
 and patch SHA-256
 `b69c27e64c4ac5043a3f254d88ef2d8383bbfaefd20881a24ed5b6eb13d4b818`.
 That payload/patch is the only next acquisition established by this receipt.
+
+The bazel_features checkpoint verified 24 objects / 7,822,792 bytes at inventory
+SHA-256 `0ad0ac33e4275d51db0ad436cf639709170363b9a41bf82026d6c9e30f88b928`
+and passed all 3 focused fixture tests, including the new BCR patch equivalence.
+The same F3 run advanced to generated repository
+`@@bazel_features++version_extension+bazel_features_globals` in 9.29 seconds,
+but `ExternalBzlModuleError::Route` had flattened its typed load-route error into
+a recursive string. The bounded renderer stopped at its output limit before the
+cause. This selects typed route-error retention as the next prerequisite and
+does not establish another payload demand.
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits
 atomic integration, followed by the demand-scoped Stage 6 execution-group
