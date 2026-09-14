@@ -42,6 +42,29 @@ sharing equivalence; Stage 7 owns projection and execution, not a second
 output-conflict checker. Keep one semantic action source and independently
 verified query and REAPI projections.
 
+### Reusable cache core and bootstrap scope
+
+[Stage 11](./11-bazel-compatible-cache-library.md) owns the reusable cache
+library contract. Establish its boundary while implementing the demanded M7A
+transfers and cache operations: protocol types, digest verification, CAS and AC
+clients have no dependency on Slug analysis, DICE, CLI or daemon types. Stage 7
+retains Slug action lowering, execution scheduling, source-certificate checks
+and requested-output publication. The same core serves bootstrap and external
+consumers; Slug callers supply resolved, validated semantic inputs.
+
+Use the existing `slug_reapi_v2` code as extraction input. M7A proves the
+dependency boundary and the cache operations used by the bootstrap closure.
+Generate protocol bindings from pinned upstream sources, and implement bounded
+batching/ByteStream transfers when required by toolchain and compiler artifacts.
+Transport buffers are bounded; artifact size must not dictate retained graph
+memory. Full external cache-only write coverage, direct Bazel disk-cache
+interoperability, packaging and bindings belong to Stage 11 release gates after
+M8. Backend isolation remains supplied through REAPI.
+
+Exact ActionKey projection is a separate Stage 6/8 inspection admission.
+Execution requires exact REAPI/CAS bytes for Slug's actual graph and complete
+semantic provenance, regardless of whether that inspection projection exists.
+
 ## V1 Extraction Candidates
 
 - Plan 34 design and NativeLink smoke harness in
@@ -156,8 +179,10 @@ import mode, oracle, and validation.
   and `slug-v1-archive:tests/plan31/test_persistent_re_action_cache.py`, but let
   Stage 3 own V2 output/cache layout.
 - Remote AC replay must survive Slug restart and local persistent AC deletion.
-- Local durable AC replay must prove SQLite AC short-circuited remote lookup,
-  without `CacheQuery` or `Re` evidence.
+- Local durable AC replay must identify its admitted backend and prove it
+  short-circuited remote lookup, without `CacheQuery` or `Re` evidence. A Slug
+  private index has no Bazel disk-cache compatibility claim. Stage 11 owns the
+  direct Bazel `--disk_cache` layout and interoperability gate after M8.
 - Stale local AC and orphaned remote AC entries must re-execute through REAPI
   with zero direct-local fallback.
 

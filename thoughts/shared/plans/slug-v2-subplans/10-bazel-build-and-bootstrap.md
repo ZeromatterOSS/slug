@@ -20,13 +20,23 @@ This stage has two tracks with different gates:
 The bounded M2, M5, and M6 slices are accepted prerequisites but do not alone
 cover the bootstrap action set. Conversely, M8 does not wait for M7B run/test/
 BEP, unrelated public-ruleset, or command-format breadth. M9 exact Bazel
-configuration/output identity bytes are not a bootstrap prerequisite. Per-family ActionKey admission and the typed comparison contract
-below remain mandatory. [Bootstrap readiness](./bootstrap-readiness.md) ties
+configuration/output identity and unadmitted exact ActionKey bytes are not
+bootstrap prerequisites. Per-family compatibility classification and the typed
+comparison contract below are mandatory. [Bootstrap readiness](./bootstrap-readiness.md) ties
 these prerequisites to the finite production inventory and records open gates.
 
 A Bazel-built `slug` binary is not self-hosting evidence. A passing self-build
 is not enough unless the stage1/stage2 action graphs and declared output
 manifests reach the fixed point below.
+
+The first product milestone is Linux self-hosting through the ordinary REAPI
+boundary, with pinned platform/toolchain inputs and the selected local actiond
+or hosted executor. Stage 7 establishes the reusable cache core while implementing
+bootstrap execution. Standalone library packaging, direct Bazel disk-cache
+interoperability, language bindings and mixed-language repository breadth are
+post-bootstrap work under [Stage 11](./11-bazel-compatible-cache-library.md)
+and Stage 8. Reconcile extracted crate/proto dependencies in the production
+inventory before the fixed-point gate.
 
 ## Source and Version Policy
 
@@ -270,18 +280,16 @@ or basename heuristic to infer that arbitrary content is a generated path.
 An unmodeled occurrence is an unsupported comparison and blocks that family;
 it is not silently normalized or declared semantically unequal.
 
-The [Stage 6 feasibility checkpoint](./06-analysis-toolchains-and-actions.md#per-family-actionkey-feasibility-checkpoint)
-must establish runtime fingerprint inputs before family scope is frozen. This
-comparison-only path correspondence cannot produce missing exact ActionKey bytes.
-
-Preserve every accepted exact per-family Bazel ActionKey byte. The current
-executable/aquery FileWrite family alone retains its named Slug-native token
-exception until its exact projection lands. Configured-only Spawn, ArgsWrite,
-symlink and runfiles-support declarations are not additional exceptions:
-execution/aquery admission requires their exact projections. A future exception
-requires an explicit compatibility decision naming its family and retirement
-condition. M9 defers configuration/output identity bytes and only residual
-unadmitted ActionKey families, not already accepted exact projections.
+Each family has an explicit ActionKey classification in bootstrap readiness.
+Preserve every accepted exact projection byte. For Slug-native or
+unsupported/deferred ActionKey fields, the comparator schema names the precise
+family/field allowance and reports it in comparison evidence; undeclared
+omissions or unclassified fields fail closed. These allowances apply only to ActionKey
+inspection, never to argv, environment, inputs, outputs or other action facts.
+Exact projection work uses the
+[Stage 6 feasibility checkpoint](./06-analysis-toolchains-and-actions.md#per-family-actionkey-feasibility-checkpoint).
+Comparison-only path correspondence cannot produce runtime fingerprint bytes.
+M9 owns unadmitted exact projections and exact configuration/output identity.
 
 Do not normalize mnemonics, owner labels, selected platforms/properties,
 non-path argv/env/paramfile bytes, logical FileWrite content, artifact relative
@@ -312,6 +320,9 @@ consistent configured-root change matches in artifact fields, typed argv/env
 slots and encoded paramfile paths, while near-match literals, logical content,
 changed suffixes, quoting, argument order, different owner/configuration edges,
 missing artifacts and accepted exact ActionKey changes remain discriminating.
+Prove that only declared family/ActionKey allowances match, and that unknown
+families, an exact field becoming absent, and allowances applied to semantic
+fields fail. Report deferred fields without claiming whole-record byte parity.
 Prove malformed or ambiguous mappings fail closed, and stage1/stage2 path,
 mode, symlink, content and digest changes fail outside the named build-info rule.
 

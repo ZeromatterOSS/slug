@@ -329,8 +329,8 @@ Compatibility classification:
 - private Rust rows, compact identities, and added explain fields are
   **Slug-native**; and
 - exact configuration checksum and configured output token remain
-  **deferred to M9**; exact Bazel ActionKey projections are **exact per admitted
-  action family** under 6.4B.
+  **deferred to M9**; Bazel ActionKey projections are independently classified
+  per family under 6.4B, with unadmitted exact projections deferred to M9.
 
 Use the Stage 1 provider, action-conflict, aquery-topology, and toolchain
 fixture backlog before implementation. This section freezes a future owner
@@ -342,8 +342,18 @@ widen the active M7 packet.
 An exact Bazel ActionKey is a derived compatibility projection of the retained
 configured-action row plus immutable owner context. It is not the action's
 structural semantic identity, a new action graph, a configured-output token, or
-the REAPI Action digest. Historical M9 ActionKey deferrals below are superseded
-by this current contract; configuration checksum and output identity stay M9.
+the REAPI Action digest. Exact projection admission is independent of functional
+execution admission. M7A requires complete semantic inputs, structural
+invalidation, validated requested-root output ownership, discriminating aquery
+comparison, and canonical REAPI projection for each demanded family. Exact
+ActionKey bytes are not an M7A or M8 prerequisite. Configuration checksum,
+output identity and unadmitted exact ActionKey projections belong to M9.
+
+Every family records separate semantic, aquery-field and REAPI classifications
+in bootstrap readiness. Preserve accepted exact projections byte-for-byte.
+An unadmitted ActionKey field is explicitly unsupported/deferred or has a named
+Slug-native token contract; it must never be presented as an exact Bazel key.
+Missing semantic execution inputs still block action admission.
 
 Mirror Zabel's byte-feeding approach, but reverify every field and order against
 Bazel 9.2 source and fresh discriminating oracle evidence:
@@ -369,8 +379,8 @@ compressed GUIDs, executable bit, and exact logical content; reproduce Bazel's
 Java compression threshold and deterministic `GZIPOutputStream` bytes; and
 retain the accepted discriminator that content and platform affect ActionKey
 while declared output path, owner configuration token, and output-root spelling
-do not. Each M7A/M7B action family receives the same just-in-time source audit
-and exact projection alongside semantic activation.
+do not. Each selected exact projection receives this source audit and its own
+discriminating proof before the exact inspection surface is admitted.
 
 Reviewed Zabel donor commit
 `c7298478e2e56262a2f438e9c065325744c9f0fc` supplies bounded leaf and test
@@ -400,11 +410,13 @@ ConfiguredAction + immutable owner context
 
 There is no direct ActionKey-to-ActionDigest mapping. Exact Bazel ActionKey
 reproduction alone is insufficient for Bazel local-cache or remote-cache
-interoperability. It is nevertheless a necessary input to any future Bazel
-local ActionCache reader/writer. That work requires a separate packet covering
+interoperability. Bazel's internal incremental ActionCache is a separate,
+deferred surface whose reader/writer would also require
 cache-record versioning and namespace, discovered inputs, environment and
 execution metadata, output validation, and stale-entry behavior before the
-exact key may be used for lookup or publication.
+exact key may be used for lookup or publication. The reusable library targets
+remote caches and Bazel `--disk_cache`, both using REAPI Action digests;
+[Stage 11](./11-bazel-compatible-cache-library.md) owns that contract.
 
 Compute the projection on demand in request/phase scratch unless measured reuse
 and invalidation justify a DICE projection. Do not retain a second semantic
@@ -415,15 +427,13 @@ semantic vectors pass. Buck2 fast hashers and `strong_hash` remain useful in
 their existing domains but do not implement Bazel's SHA-256 fingerprint
 protocol.
 
-This contract does not displace the active M7 source-observation packet. It
-schedules FileWrite and later family projections just in time with their owning
-Stage 6/8 packets; only residual, not-yet-admitted action families may remain
-under M9.
+Canonical scheduling selects exact projection work under M9. Functional
+bootstrap admission uses the semantic and REAPI gates above.
 
 #### Per-family ActionKey feasibility checkpoint
 
-Before freezing a new family's execution/aquery implementation scope, fill one
-compact table from pinned Bazel source and the actual admitted configuration:
+Before freezing an exact ActionKey projection implementation, fill one compact
+table from pinned Bazel source and the actual admitted configuration:
 
 | Fingerprint input (including conditional/tail fields) | Ordinary semantic producer | Bazel path-mapping behavior and effective mode | Exact bytes available? / evidence | Missing prerequisite |
 |---|---|---|---|---|
@@ -444,13 +454,12 @@ relevant mapped/unmapped input and the resulting raw key bytes against Bazel.
 Path-independent families such as the accepted FileWrite discriminator need no
 invented output-identity dependency. No whole-M9 prerequisite is assumed.
 
-If required bytes lack an ordinary producer, block that family on the precise
-M9 input/identity prerequisite or obtain an independently reviewed, explicitly
-named compatibility exception with scope and retirement condition before
-activation. This checkpoint creates no exception. Stage 10's graph-local path
-correspondence is comparison-only: it cannot supply runtime fingerprint bytes.
-No oracle-generated production mapping, guessed token or silent key relaxation
-may bridge the gap. Record the result in bootstrap readiness before admission.
+If fingerprint bytes lack an ordinary producer, defer the exact projection and
+record its precise M9 prerequisite. Functional family admission remains governed
+by complete semantic inputs and the separate aquery/REAPI gates. Stage 10's
+graph-local path correspondence is comparison-only and cannot supply runtime
+fingerprint bytes. No oracle-generated production mapping or guessed token may
+serve as an exact key. Record projection availability per family in readiness.
 
 ### 6.4C Generic Args/spawn/artifact-symlink category
 

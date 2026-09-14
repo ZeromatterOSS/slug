@@ -40,11 +40,12 @@ unobserved action families cannot be declared unnecessary by assumption.
 | Named/automatic execution groups | Bootstrap demand unresolved. Stage 6's pinned rules_cc 0.2.17 example establishes semantics, not membership in the production closure | Stages 4/5/6 | Demand record naming producer/rule/action, named/automatic mode, configuration/toolchain pins and evidence artifact; complete shared owner if both modes are demanded, explicit remainder classification if narrower |
 | Requested-root output conflict freedom | Preserved R2 `ValidatedActionClosure` design; not applied. Stage 6 “Configured-action closure integrity contract” | Stage 6/Core | Completed root-set validation before build/aquery/Run success; cold/warm A+B conflicts produce no execution or materialization even if A and B separately succeed |
 | FileWrite | Accepted bounded aquery/REAPI handoff, Stage 7 canonical FileWrite projection and M5/M6 evidence. Its exact ActionKey projection remains queued | Stages 6/8/7 | Preserve accepted content/platform/protobuf/cache proof and named Slug-native token exception; land exact projection when separately selected |
-| Spawn: compiler, linker, proc-macro/build-script and generated-source tool invocations | Configured common non-callback Spawn/FilesToRun expansion accepted (`bfe6f2690`, `21db5d7b8`); broader aquery/REAPI activation open | Stages 6/8/7 | Source-derived invocation/tool/env/input/output semantics for observed production actions, exact per-family ActionKey, same-owner aquery and REAPI projections |
-| ArgsWrite / paramfiles | Configured vector Args/param-file ownership accepted (`a01a23fe7`); execution/aquery family admission open | Stages 6/8/7 | Exact encoding/content/order and ActionKey, declared input-tree placement and CAS bytes; typed comparator provenance for generated paths |
-| Symlink and runfiles-support action families | Typed symlink declarations, runfiles and four support actions/FilesToRun expansion are configured-only admission (`f346c209a`, `f46a009a0`, `21db5d7b8`); execution/aquery open | Stages 6/8/7 | Inventory names each family actually required by production tools; admit its exact projection, outputs/runfiles semantics and remote execution, or prove absence from this closure |
+| Spawn: compiler, linker, proc-macro/build-script and generated-source tool invocations | Configured common non-callback Spawn/FilesToRun expansion accepted (`bfe6f2690`, `21db5d7b8`); broader aquery/REAPI activation open; exact ActionKey deferred | Stages 6/8/7 | Source-derived invocation/tool/env/input/output semantics for observed production actions, structural invalidation, classified aquery fields and same-owner REAPI projection |
+| ArgsWrite / paramfiles | Configured vector Args/param-file ownership accepted (`a01a23fe7`); execution/aquery family admission open; exact ActionKey deferred | Stages 6/8/7 | Exact encoding/content/order, declared input-tree placement and CAS bytes; typed comparator provenance for generated paths and classified ActionKey field |
+| Symlink and runfiles-support action families | Typed symlink declarations, runfiles and four support actions/FilesToRun expansion are configured-only admission (`f346c209a`, `f46a009a0`, `21db5d7b8`); execution/aquery open; exact ActionKeys deferred | Stages 6/8/7 | Inventory names each required family; admit its semantic aquery/REAPI projections and outputs/runfiles behavior with explicit ActionKey classification, or prove absence from this closure |
 | Ordinary source/generated/tree input transfer and output materialization | Bounded FileWrite inline input accepted; ordinary source/generated trees and broader materializer remain open | Stages 6/7 | Exact Directory topology/content/digests, declared output ownership/type/mode/symlinks, generated-output consumer/reupload and missing/corrupt data behavior; validated-root-only publication |
-| Per-family graph/comparator coverage | Bounded FileWrite text/literal/deps admission accepted; production action graph comparison open | Stages 6/8/10 | Matched focused per-family graphs and selected formats, per-family exact ActionKeys except named FileWrite exception, typed argv/env/paramfile path correspondence and discriminating negatives under Stage 10's comparison contract |
+| Per-family graph/comparator coverage | Bounded FileWrite text/literal/deps admission accepted; production action graph comparison open | Stages 6/8/10 | Matched focused per-family graphs and selected formats, preserved accepted exact ActionKeys, explicit per-family deferred/native key allowances, typed argv/env/paramfile path correspondence and discriminating negatives |
+| Shared cache core used by bootstrap | Open; `slug_reapi_v2` contains protocol/cache code and Slug graph dependencies | Stages 7/11 | Graph-independent protocol/CAS/AC boundary consumed by Slug, exact digests and bounded transfers for demanded artifacts; standalone release and direct disk interoperability are post-M8 |
 | Production REAPI execution/cache proof | Slug M6 accepted only bounded FileWrite on retained Linux NativeLink; Bazel BuildBuddy developer proofs do not widen Slug admission | Stage 7 | Required production families execute with exact upload/AC/output evidence and zero direct-local build actions; selected backend/capabilities and lifecycle evidence only |
 | Stage0/1/2 bootstrap fixed point | Open; developer-built binary alone is not self-hosting | Stage 10 | Stage1 binary actually launches stage2; independent miss execution and separate replay proof, graph equality and exact output manifests/digests except named build-info normalization |
 
@@ -65,15 +66,15 @@ unobserved action families cannot be declared unnecessary by assumption.
    activation. Bundle one behavior family's source/oracle/implementation/proof
    where the guide allows; do not require the entire Stage 7 backend or Stage 8
    formatter catalogs first.
-3. Each observed family has an explicit exact/Slug-native/deferred record. The
-   currently accepted FileWrite token is the only named executable/aquery
-   ActionKey exception. All newly activated families need exact source-derived
-   ActionKeys; configured-only declarations are not grandfathered. The packet
-   completes the [Stage 6 ActionKey feasibility checkpoint](./06-analysis-toolchains-and-actions.md#per-family-actionkey-feasibility-checkpoint)
-   before freezing scope: input producer, effective path mapping, exact-byte
-   availability and configuration discriminator. Unavailable bytes require a
-   precise prerequisite or a reviewed named exception decision; comparison-only
-   path correspondence cannot satisfy runtime key production.
+3. Each observed family records semantic, aquery-field and REAPI compatibility
+   separately. Exact ActionKey projection is not a functional admission gate.
+   Preserve accepted exact projections and classify unavailable keys as
+   unsupported/deferred, or define a named Slug-native token under Stage 8.
+   The comparator allows only those declared family/field differences. Complete
+   semantic inputs, structural invalidation, output ownership and exact REAPI
+   bytes remain mandatory. Exact projection packets use the
+   [Stage 6 ActionKey feasibility checkpoint](./06-analysis-toolchains-and-actions.md#per-family-actionkey-feasibility-checkpoint)
+   under M9; comparison-only path correspondence cannot supply runtime keys.
 4. Mark a row accepted only with a reachable discriminating proof and coverage
    of its requested production consumers. An “absent from bootstrap” result
    needs the reconciled graph evidence, not an unsupported runtime guard. New

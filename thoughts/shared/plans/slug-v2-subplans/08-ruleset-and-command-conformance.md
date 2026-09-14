@@ -3,8 +3,9 @@
 ## Goal
 
 First prove Slug V2 exposes Bazel 9's loading, configured-target, and action
-graphs through `query`, `cquery`, and `aquery`. After exact action-query parity,
-prove modern rulesets and execution-oriented commands on those same graphs.
+graphs through `query`, `cquery`, and `aquery`. Prove modern rulesets and
+execution-oriented commands on those same graphs using per-field compatibility
+classification and discriminating semantic action comparisons.
 
 ## Scope
 
@@ -158,15 +159,20 @@ immutable configured-action row and owner context; it must not derive a key
 from formatter text, Slug's structural action identity, or the REAPI Action
 digest.
 
-The accepted executable/aquery FileWrite slice is the named current exception:
-it retains an explicitly Slug-native token until its exact projection packet
-lands. Configured-only Spawn, ArgsWrite, symlink and runfiles-support declarations
-do not confer an executor/aquery exception. Every newly admitted
-family must pair its semantic activation with the exact per-family
-projection. If any source-derived fingerprint input is unavailable, the
-projection is unsupported and fails closed; no zero, hard-coded, or opaque
-fallback is admitted. Record the projection class per family in the bootstrap
-readiness matrix.
+Functional action admission and exact ActionKey admission are separate gates.
+Each bootstrap family requires complete semantic input/owner facts, structural
+invalidation, validated requested-root output ownership, a discriminating action
+graph comparison, and canonical Stage 7 REAPI projection. Exact ActionKey output
+is not an execution or bootstrap prerequisite.
+
+Record every family's ActionKey field as exact, Slug-native, or
+unsupported/deferred in bootstrap readiness. FileWrite has an admitted
+Slug-native token. A new Slug-native token requires an explicit field/domain
+contract; an unsupported projection must have a documented omission or targeted
+unsupported-format diagnostic. A command requesting exact keys fails explicitly
+when a selected family's projection is unavailable. No zero, guessed, or opaque
+value may be presented as an exact Bazel ActionKey. Unadmitted exact projections
+and their missing fingerprint producers are M9 work.
 Bootstrap comparison preserves every accepted exact projection byte; it cannot
 blanket-normalize ActionKey fields. Exact ActionKey output is a parity and
 inspection surface, not evidence that Bazel local-cache or remote-cache entries
@@ -195,6 +201,12 @@ observable bootstrap closure:
   as that closure passes its focused Bazel 9.2 and REAPI fixtures; and
 - **M7B** resumes `run`, `test`, BEP, unrelated public rulesets, query/action
   formats, and command breadth not required by the accepted bootstrap closure.
+
+After M8, the standalone remote/disk cache library milestone in
+[Stage 11](./11-bazel-compatible-cache-library.md) precedes mixed-language
+repository breadth. C/C++ and Python work enters M7A only when demanded by
+Slug's own production closure. Exact ActionKey inspection remains independent
+of these functional ruleset gates.
 
 Do not delay M8 for M7B completeness, and do not hide an M7A semantic gap in a
 bootstrap-only command, precomputed graph, Cargo/Bazel delegation, or local

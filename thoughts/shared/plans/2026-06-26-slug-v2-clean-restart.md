@@ -19,12 +19,13 @@ never selects work. This compaction changes no accepted compatibility surface.
 | M2: analysis graph | accepted, Slug-native identity | recursive configured graph; exact configuration/output bytes remain M9 |
 | M3: query | accepted | 16 default functions and admitted text formats, including `attr()` through `ed38f82a`; Sky Query/non-text breadth deferred |
 | M4: cquery | accepted | shared configured graph, structural/null identity, admitted topology/formats, error and daemon lifecycle behavior |
-| M5: aquery | accepted, bounded FileWrite | owner-complete configured graph and admitted literal/deps output; FileWrite identity/order remain named Slug-native exceptions; new family projections require exact ActionKeys |
+| M5: aquery | accepted, bounded FileWrite | owner-complete configured graph and admitted literal/deps output; per-family ActionKey fields have independent exact/Slug-native/deferred classifications |
 | M6: execution/caching | accepted, bounded FileWrite | sole resolved semantic input, canonical REAPI SHA-256, selected platform and daemon restoration; zero direct-local actions |
 | M7A: bootstrap-critical breadth | partial; current milestone | authentic configured fixture, combined selected-request/conflict acceptance, execution groups and only the remaining bootstrap closure capabilities |
 | M8: bootstrap | blocked on M7A | Bazel developer graph and BuildBuddy cache/RBE gates accepted; CI not admitted; Stage 10.3/10.4 self-hosting remains unproved |
-| M7B: remaining breadth | deferred until M8 | run/test/BEP, unrelated rulesets, extra formats and product extensions not demanded by bootstrap |
-| M9: exact configuration/output bytes | deferred until functional bootstrap | retain four-domain evidence `f00e99db`; only residual unadmitted ActionKey families deferred here |
+| Cache library release | deferred until M8 | Stage 11 standalone Rust consumer, remote AC/CAS and Bazel disk-cache interoperability; bootstrap establishes the shared core |
+| M7B: remaining breadth | deferred until M8; mixed-language repository follows cache library release | run/test/BEP, unrelated rulesets, extra formats and product extensions not demanded by bootstrap |
+| M9: exact identity/inspection bytes | deferred until functional bootstrap | retain four-domain evidence `f00e99db`; exact configuration/output bytes and unadmitted exact ActionKey projections |
 
 ### Current packet
 
@@ -55,9 +56,10 @@ Preservation is not integration. Do not activate it partially or weaken a gate.
 | 1 | Authentic configured CLI fixture | ready; [source/fixture contract](./slug-v2-subplans/configured-cli-fixture.md) separates portable inputs from diagnostic demand evidence |
 | 2 | Combined selected-request/output-conflict R2 | blocked on complete fixture and outstanding baseline attribution; [Stage 6](./slug-v2-subplans/06-analysis-toolchains-and-actions.md) owns semantics and gate ledger |
 | 3 | Bootstrap-demanded execution-group support | blocked on R2; reconcile existing closure artifacts and record named/automatic demand before freezing scope; reuse Stage 6's pinned source matrix |
-| 4 | Remaining M7A action/input-tree/REAPI capabilities | select only demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) |
+| 4 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
 | 5 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
-| 6 | M7B, then M9 | preserve current deferred classification |
+| 6 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
+| 7 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |
 
 Tests retain the user's 12-second deadline/15-second absolute ceiling.
 Compile/preparation is separate and bounded to 60 seconds; split/check smaller
@@ -82,8 +84,8 @@ It is not evidence of a semantic loop or authority for checkout-wide replay.
   `~/.bazelrc` for BuildBuddy authentication. Agents and inspection tools must
   never read or copy its contents, and credentials or derived secret material
   must never enter this checkout, logs intended for commit, or Git history.
-- Slug-local sandbox implementation is deferred until after analysis, exact
-  `aquery`, remote execution, and cache correctness. Backend isolation supplied
+- Slug-local sandbox implementation is deferred until after analysis, admitted
+  `aquery` semantics, remote execution, and cache correctness. Backend isolation supplied
   by BuildBuddy or actiond does not count as a Slug sandbox implementation.
 - Progress is demonstrated by a vertical Bazel-shaped build, not by independent
   identity, parser, DICE-shaped, action, or REAPI data models. A wrapper trait
@@ -102,7 +104,14 @@ It is not evidence of a semantic loop or authority for checkout-wide replay.
 ## Current Milestone Overlay
 
 Stages are ownership boundaries, not execution order. Preserve
-**M7A → M8 → M7B → M9**. The finite bootstrap readiness matrix owns the
+**M7A → M8 → cache library release → M7B → M9**. Linux self-hosting is the first
+product milestone. Establish the graph-independent cache core within demanded
+M7A execution work; standalone packaging, direct Bazel disk-cache compatibility,
+C/Python bindings and mixed-language breadth are post-bootstrap work.
+Exact Bazel ActionKeys do not gate functional action admission or self-hosting.
+Preserve accepted exact fields, complete semantic identity/invalidation and
+exact REAPI/CAS digests; classify each unadmitted inspection field explicitly.
+The finite bootstrap readiness matrix owns the
 capability-to-target/evidence mapping. Stage 10 comparison uses ordinary graph
 owners; no bootstrap-only path, precomputed runtime graph or hidden Cargo/Bazel
 executor is admitted.
@@ -119,9 +128,10 @@ executor is admitted.
 | 5 | [05-bzlmod-and-repository-graph.md](./slug-v2-subplans/05-bzlmod-and-repository-graph.md) | Parallel after Stage 3 basics | Starlark-evaluated `MODULE.bazel`, registry, repo mapping, extensions, repo specs, and lockfile policy are DICE-owned. |
 | 6 | [06-analysis-toolchains-and-actions.md](./slug-v2-subplans/06-analysis-toolchains-and-actions.md) | Parallel after Stages 4/5 | Configured-target analysis, toolchains, providers, depsets, and action declarations pass focused oracle fixtures. |
 | 7 | [07-reapi-native-execution.md](./slug-v2-subplans/07-reapi-native-execution.md) | Parallel with synthetic actions, then after Stage 6 | Shell and ruleset actions execute through REAPI with upload, AC, materialization, and zero direct-local proof. |
-| 8 | [08-ruleset-and-command-conformance.md](./slug-v2-subplans/08-ruleset-and-command-conformance.md) | Query after loading/analysis; execution commands after aquery | `query`, `cquery`, and exact `aquery` pass before ruleset, run, test, and BEP breadth. |
+| 8 | [08-ruleset-and-command-conformance.md](./slug-v2-subplans/08-ruleset-and-command-conformance.md) | Query after loading/analysis; execution commands after admitted aquery semantics | `query`, `cquery`, and classified `aquery` comparisons pass before the corresponding ruleset, run, test, and BEP breadth. |
 | 9 | [09-v1-extraction-ledger.md](./slug-v2-subplans/09-v1-extraction-ledger.md) | Continuous | Every V1 or Buck2-derived extraction has an owner, oracle proof, and cleanup decision. |
-| 10 | [10-bazel-build-and-bootstrap.md](./slug-v2-subplans/10-bazel-build-and-bootstrap.md) | Bazel developer graph may start now; self-hosting follows exact aquery and execution | Bazel 9 builds/tests Slug through BuildBuddy, then Slug reaches a stage1/stage2 self-build fixed point. |
+| 10 | [10-bazel-build-and-bootstrap.md](./slug-v2-subplans/10-bazel-build-and-bootstrap.md) | Bazel developer graph may start now; self-hosting follows classified aquery comparison and execution | Bazel 9 builds/tests Slug through BuildBuddy, then Slug reaches a stage1/stage2 self-build fixed point. |
+| 11 | [11-bazel-compatible-cache-library.md](./slug-v2-subplans/11-bazel-compatible-cache-library.md) | Core boundary with M7A execution; standalone release after M8 | Slug consumes a graph-independent cache core; external Rust applications share remote and Bazel disk caches. |
 
 ## Supporting contracts
 
