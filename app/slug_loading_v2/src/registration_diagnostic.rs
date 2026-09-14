@@ -169,6 +169,9 @@ fn render(out: &mut Buffer, error: &ModuleRegistrationExpansionError) -> fmt::Re
             out.write_str("CanonicalPackage: ")?;
             match error.registration_diagnostic() {
                 RepositoryPackageLoadDiagnostic::Leaf(error) => return error.write(out),
+                RepositoryPackageLoadDiagnostic::AttemptLoading(error) => {
+                    return write!(out, "Attempt.Loading: {error}");
+                }
                 RepositoryPackageLoadDiagnostic::Bzl { raw_load, canonical_label, error } => {
                     write!(out, "Bzl {raw_load} ")?;
                     out.label(canonical_label)?;

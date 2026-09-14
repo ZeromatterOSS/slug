@@ -29,15 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7A-repository-package-attempt-diagnostic
+Packet: WP-7A-execution-group-order-replan-r1
 Status: ready
 
-Project the typed loading cause now hidden behind
-`CanonicalPackage: Attempt.Loading`, as specified by
-[current-packet.md](./slug-v2-subplans/current-packet.md). External `.bzl`
-children now union independent preparation needs in one frontier while retaining
-the first decisive semantic failure. The final F3 run reaches the package
-terminal in 9.87 seconds.
+Reconcile the prerequisite and acceptance order for the already designed
+selected-toolchain, output-conflict, and shared execution-group work, as
+specified by [current-packet.md](./slug-v2-subplans/current-packet.md). The
+bounded package-attempt projection makes the authentic F3 cause exact:
+rules_java toolchains invokes rules_cc `cc_library`, which reaches the retained
+named execution-group guard in 9.98 seconds. This proves the former queue order
+cannot complete F3 before execution-group work.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
@@ -55,14 +56,13 @@ Preservation is not integration. Do not activate it partially or weaken a gate.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Repository package-attempt diagnostic | ready; sibling preparation needs are batched and the same F3 proof reaches `CanonicalPackage: Attempt.Loading` within the deadline |
-| 2 | Authentic configured CLI fixture | F2 accepted through 28 objects; F1/F3 blocked on the typed package-loading cause and whatever exact boundary its projection names; [fixture ledger](./slug-v2-subplans/configured-cli-fixture.md) owns the receipt |
-| 3 | Combined selected-request/output-conflict R2 | blocked on complete fixture and outstanding baseline attribution; [Stage 6](./slug-v2-subplans/06-analysis-toolchains-and-actions.md) owns semantics and gate ledger |
-| 4 | Bootstrap-demanded execution-group support | blocked on R2; reconcile existing closure artifacts and record named/automatic demand before freezing scope; reuse Stage 6's pinned source matrix |
-| 5 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
-| 6 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
-| 7 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
-| 8 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |
+| 1 | Execution-group prerequisite-order replan | ready; authentic F3 confirms rules_cc named-group target invocation, while shared group runtime still requires the preserved selected-request/output-conflict work |
+| 2 | Combined selected-request/output-conflict R2 and shared execution-group runtime | ordering is the active decision; reconcile the preserved R2 candidate and reviewed designs without partial activation |
+| 3 | Authentic configured CLI fixture | F2 accepted through 28 objects; F3 is blocked on the confirmed named execution-group runtime owner, not another payload or diagnostic |
+| 4 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
+| 5 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
+| 6 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
+| 7 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |
 
 Tests retain the user's 12-second deadline/15-second absolute ceiling.
 Compile/preparation is separate and bounded to 60 seconds; split/check smaller

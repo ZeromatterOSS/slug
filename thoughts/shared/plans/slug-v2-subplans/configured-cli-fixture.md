@@ -117,7 +117,7 @@ fixture hashes, command, counts, status and supervisor receipt.
 |---|---|---|
 | F1 authentic input inventory | partial with every payload demanded so far repository-owned, including rules_java 9.1.0 and all 183 demanded metadata objects | attribute the current bounded deadline before acquiring any further payload; catalog membership does not establish demand |
 | F2 portable offline assembly | accepted through the rules_java checkpoint | 28 objects / 8,004,740 source bytes, inventory `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
-| F3 configured source closure | blocked at `CanonicalPackage: Attempt.Loading` after sibling `.bzl` preparation needs were batched and the proof reached a typed terminal in 9.87 seconds | project the bounded package-attempt loading cause, then rerun once to name configured closure, a payload, or a semantic owner |
+| F3 configured source closure | blocked at rules_cc `cc_library` named execution-group target invocation after the bounded package-attempt projection exposed the retained loading message in 9.98 seconds | reconcile the selected-request/output-conflict and shared execution-group prerequisite order, then implement the complete admitted runtime before replaying F3 |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 preserved, not accepted | focused selected-request, root-set conflict/sharing, raw-platform identity, concurrency and A/B/A on integrated candidate |
 | R2 production consumer gates | pending F2/F3/R1 | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization; cquery remains independent |
@@ -299,6 +299,26 @@ is `toolchains registration row 7: CanonicalPackage: Attempt.Loading`; this is a
 bounded diagnostic leaf, not F3 acceptance or authority for another payload.
 The immediate prerequisite is the existing package-attempt loading error's
 typed projection.
+
+The bounded borrowed projection now renders the retained `LoadingError` under
+`Attempt.Loading` without changing package evaluation or equality. Its focused
+diagnostic test covers exact nested text, escaping, ownership and the 3,072-byte
+output bound; the complete loading suite passes 561 active tests with one
+intentional ignored test in 1.24 seconds. The observer harness completed its
+final compile slice in 23.35 seconds.
+
+The unchanged F3 proof then selected and executed exactly one test and reached
+the same package in 9.98 seconds. Native publication exited 1, the probe failed
+as expected, observer evidence was valid, and cleanup completed. The observer
+recorded 47,625 starts and finishes, 41,735 dependency checks and finishes, and
+7,432 computes and finishes. The exact terminal is rules_java
+`@@rules_java+//toolchains:BUILD:138` calling
+`@@rules_cc+//cc:cc_library.bzl:19`, where target invocation fails with
+`named execution-group semantics is unsupported`. This confirms the existing
+Stage 6 shared execution-group semantic owner and establishes no new archive
+demand. It also invalidates the former schedule assumption that F3 could accept
+before that runtime; prerequisite ordering must be reconciled without partially
+landing the preserved selected-request/output-conflict candidate.
 
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion permits

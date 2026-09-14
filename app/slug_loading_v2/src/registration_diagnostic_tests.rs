@@ -260,6 +260,33 @@ async fn registration_diagnostic_route_leaves_and_incomplete_boundaries() {
 }
 
 #[test]
+fn registration_diagnostic_repository_package_attempt_loading_cause() {
+    use crate::bzl_module::RepositoryPackageLoadError;
+
+    let render = |message: &str| {
+        ModuleRegistrationExpansionError::diagnostic_test(Registration::CanonicalPackage(
+            RepositoryPackageLoadError::diagnostic_test_attempt_loading(message),
+        ))
+        .diagnostic()
+        .to_string()
+    };
+    assert_eq!(
+        render("loading CAUSE"),
+        "toolchains registration row 3: CanonicalPackage: Attempt.Loading: loading CAUSE"
+    );
+    assert_eq!(
+        render("quoted \"cause\"\nnext"),
+        "toolchains registration row 3: CanonicalPackage: Attempt.Loading: quoted \"cause\"\\nnext"
+    );
+
+    let long = format!("{}POISON", "CAUSE".repeat(1024));
+    let bounded = render(&long);
+    assert!(bounded.len() <= LIMIT);
+    assert!(bounded.ends_with(OUTPUT_STOP));
+    assert!(!bounded.contains("POISON"));
+}
+
+#[test]
 #[rustfmt::skip]
 fn registration_diagnostic_root_bzl_cause_and_boundaries() {
     use crate::bzl_module::{HostRootBzlLabel, HostLoadLabelError, HostSourceInputError, ExternalLoadLabelError};

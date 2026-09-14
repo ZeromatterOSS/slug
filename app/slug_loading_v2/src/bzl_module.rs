@@ -2242,6 +2242,7 @@ pub struct RepositoryPackageLoadError {
 
 pub(crate) enum RepositoryPackageLoadDiagnostic<'a> {
     Leaf(RepositoryPackageLoadDiagnosticLeaf<'a>),
+    AttemptLoading(&'a LoadingError),
     Bzl {
         raw_load: &'a str,
         canonical_label: &'a CanonicalLabel,
@@ -2330,6 +2331,9 @@ impl RepositoryPackageLoadError {
 
     pub(crate) fn registration_diagnostic(&self) -> RepositoryPackageLoadDiagnostic<'_> {
         match &self.inner {
+            RepositoryPackageLoadErrorInner::Attempt(HostPackageAttemptError::Loading(error)) => {
+                RepositoryPackageLoadDiagnostic::AttemptLoading(error)
+            }
             RepositoryPackageLoadErrorInner::Bzl {
                 raw_load,
                 canonical_label,
@@ -2344,6 +2348,13 @@ impl RepositoryPackageLoadError {
                 RepositoryPackageLoadDiagnostic::Leaf(RepositoryPackageLoadDiagnosticLeaf(inner))
             }
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn diagnostic_test_attempt_loading(message: impl Into<String>) -> Self {
+        Self::new(RepositoryPackageLoadErrorInner::Attempt(
+            HostPackageAttemptError::Loading(LoadingError::new(message)),
+        ))
     }
 }
 

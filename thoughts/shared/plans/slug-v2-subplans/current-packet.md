@@ -1,74 +1,102 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7A-repository-package-attempt-diagnostic
-Status: ready
+Packet: WP-7A-execution-group-order-replan-r1
+Status: ready; docs/source scheduling replan only
 
-## Result and owner
+## Result and contradiction
 
-Project the typed package-loading cause hidden by the authentic configured-CLI
-terminal `CanonicalPackage: Attempt.Loading`. The repository package loader
-already retains `HostPackageAttemptError::Loading`; its bounded registration
-diagnostic currently emits only the variant name. Stage 5 owns this diagnostic
-projection. Package evaluation and Stage 6 toolchain semantics remain unchanged.
+Freeze an implementation-ready prerequisite order for the selected-toolchain
+request correction, configured-action output conflicts, and shared rule
+execution-group runtime. The bounded authentic F3 proof now reaches
+rules_java `toolchains/BUILD:138`, then rules_cc `cc_library.bzl:19`, and fails
+at the retained named execution-group target-invocation guard in 9.98 seconds.
+This directly disproves the former schedule assumption that F3 could complete
+before execution-group work.
 
-Exact: the retained loading error variant, bounded message content, recursive
-registration prefix, and the next unchanged F3 terminal. Deferred: any source
-payload or semantic correction until this projection names it.
+The execution-group design already established that this selected rules_cc
+owner declares named `cpp_link` and `_use_auto_exec_groups=True`. Its complete
+runtime requires the selected-toolchain request correction. That correction
+exposed the cross-owner output-conflict prerequisite; both remain together in
+the unaccepted R2 candidate at `27e9e9c0c`, based on `97dffd5d4`. Canonical
+scheduling previously blocked R2 on F3, creating the cycle now proven by the
+authentic fixture.
 
-## Scope
+## Decision to produce
 
-Allowed changes:
+Choose and document one atomic sequence that breaks this acceptance cycle while
+preserving every semantic gate. Prefer an independently acceptable prerequisite
+checkpoint only when its focused owner and consumer evidence does not claim F3
+or shared group-runtime acceptance. Otherwise keep the combined candidate and
+name the exact non-F3 evidence that can accept it before group activation.
 
-- `app/slug_loading_v2/src/bzl_module.rs` only if a borrowed accessor is needed
-  for the already-retained `HostPackageAttemptError::Loading` value;
-- `app/slug_loading_v2/src/registration_diagnostic.rs` and focused tests for the
-  compact exhaustive package-attempt loading projection;
-- this manifest, canonical status, and the configured-fixture ledger after the
-  unchanged proof names its next exact boundary.
+The result must state:
 
-Start with these evidence handles:
+- whether the current R2 candidate can be reconciled onto `main` and accepted
+  before F3 using its source/configuration/output-conflict/consumer gates;
+- which remaining baseline failures materially gate that acceptance, separating
+  the two already attributed failures from unexamined full-core failures;
+- the exact point at which the complete named and automatic group runtime can
+  remove the loading guard, and the F3 replay that follows it;
+- whether any candidate portion is independently cohesive. Do not split it only
+  to bypass an unmet gate;
+- the new active implementation packet, exact file allowlist, caps, commands,
+  review requirements, and observable stop.
 
-- accepted fixture inventory SHA-256
+A second general execution-group audit, a new archive, or another unchanged F3
+run cannot answer this scheduling decision.
+
+## Evidence and authority
+
+Reuse these records rather than reconstructing them:
+
+- F3 fixture inventory SHA-256
   `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`,
-  28 objects, 8,004,740 source bytes, and 177 bundled metadata entries;
-- final F3 receipt: one selected/executed test, typed terminal in 9.87 seconds,
-  valid observer and complete cleanup, with 45,130 starts, 39,240 dependency
-  checks, and 7,434 computes;
-- terminal text `toolchains registration row 7: CanonicalPackage:
-  Attempt.Loading` and `RepositoryPackageLoadDiagnostic::Leaf` as its natural
-  projection handoff.
+  28 objects, 8,004,740 source bytes and 177 metadata entries;
+- the final F3 receipt: one selected/executed failed probe, native exit 1,
+  9.98 seconds, valid observer and complete cleanup, with 47,625 starts,
+  41,735 dependency checks and 7,432 computes;
+- Stage 6 sections `Rule execution-group runtime prerequisite: named-only
+  REPLAN` and the selected-toolchain/output-conflict owner contracts;
+- candidate commit `27e9e9c0c`, its `review-evidence/validation.txt`, original
+  patch SHA-256
+  `90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e`,
+  and the clean-base attribution recorded there;
+- Bazel 9.2 authority at local object
+  `8220c6198837d5c13d53fea211cf3282aa12408a` and the existing source/test
+  anchors already recorded in Stage 6.
 
-Do not change loading behavior, source selection, package evaluation, toolchain
-semantics, DICE keys, or fixture contents. Keep the renderer bounded and avoid
-recursive `Debug` formatting or success-predecessor traversal. Do not acquire
-another archive until the projected cause names one.
+The selected request, conflict, and execution-group semantics remain exact only
+for the admitted Bazel surfaces. DICE ownership, structural keys and publication
+boundaries remain Slug-native. Computed defaults, C++/Java rule behavior,
+configured aspects, broader action families, and exact configuration/output
+bytes remain deferred.
 
-## Work and validation
+## Scope, review, and validation
 
-1. Expose only the bounded retained loading cause needed by the diagnostic and
-   render it under `Attempt.Loading`, preserving label escaping and output caps.
-2. Add focused natural and constructed tests for exact text, nested registration
-   prefixes, depth/output bounds, ownership, and writer failure where applicable.
-3. Run the focused diagnostic and loading dependent slices under the existing
-   limits, compile the observer harness separately, and rerun the unchanged F3
-   proof once. Record configured closure, the next demand, or typed owner.
+Allowed edits are this manifest, canonical Live Status, the configured-fixture
+ledger, bootstrap readiness, and the relevant current Stage 4/6 owner sections.
+No Rust, fixture, harness, dependency, vendored source, branch integration, or
+runtime change is authorized. Keep additions under 240 text lines excluding
+this manifest replacement.
 
-Invocation/compiler/test-selection corrections within this contract use the
-orchestration skill. If the retained value lacks a safe bounded projection,
-stop at the smaller accessor/typing prerequisite rather than flattening it.
+Inspect the preserved candidate and current `main` structurally; do not apply it
+in this packet. Reconcile all landed prerequisites and identify conflicts by
+file and owner. Read the plan-authoring guide and obtain independent design
+review because the decision changes cross-stage semantic acceptance order.
+Validation is source/structure inspection, `python3 scripts/v2_plan_status.py`,
+and `git diff --check`; no build, network access, daemon, materialization, or F3
+replay is needed.
 
-## Immediate predecessor and durable candidate
+Return `REPLAN` only if accepting any prerequisite before F3 would require a new
+semantic owner or weakening an existing gate. In that case name the exact owner
+and a bounded successor. Never erase group names, substitute the default
+platform, move the loading guard early, waive output conflicts, use a command
+side scan, or treat diagnostic progress as configured-source acceptance.
 
-Bounded scratch tracing measured 1,664 external `.bzl` computations across 135
-identities, including 1,529 repeats. The rejected exact-source syntax cache did
-not improve the deadline and was reverted. External child loading now unions
-independent `SourcePreparationNeeds`, preserves typed incompatible unions, and
-stops at the first decisive semantic failure. The loading suite passes 560/560
-with one intentional ignored test; the final proof reaches the terminal above.
+## Immediate predecessor
 
-R2 snapshot: branch `review/output-conflict-r2`, commit `27e9e9c0c`,
-base `97dffd5d4`, original patch SHA-256
-`90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e`.
-`git show 27e9e9c0c:review-evidence/validation.txt` retrieves the original receipt.
-The snapshot must incorporate relevant landed prerequisites before new evidence;
-its preservation metadata never enters production integration.
+The package-attempt diagnostic projects the already-retained `LoadingError`
+through a borrowed bounded view. All 561 active loading tests pass, with one
+intentional ignored test. The authentic proof identifies the existing Stage 6
+runtime guard and no additional payload. This diagnostic checkpoint changes no
+loading, DICE, toolchain, action, or fixture semantics.
