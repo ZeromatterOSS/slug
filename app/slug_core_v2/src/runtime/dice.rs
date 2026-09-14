@@ -199,6 +199,8 @@ use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 use super::RuntimeMode;
+use super::configured_action_closure::ConfiguredActionClosureError;
+use super::configured_action_closure::ValidatedActionClosure;
 use super::demands::SelectedWorkspaceDemands;
 use super::demands::WorkspaceDemandOwner;
 use super::events::AcceptedCommand;
@@ -2962,7 +2964,7 @@ enum BuildCommandRequestError {
 pub struct BuildCommandEvaluation {
     anchor: RootModuleLoadingAnchor,
     targets: Arc<[BuildRequestedTarget]>,
-    action_closure: Arc<[Arc<ConfiguredNodeResult>]>,
+    action_closure: ValidatedActionClosure,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -2988,6 +2990,9 @@ impl<'a> ResolvedFileWriteSemanticView<'a> {
     }
     pub fn platform_fact(&self) -> &'a slug_analysis_v2::PlatformSemanticFact {
         self.action.platform_fact()
+    }
+    pub fn raw_platform_fact(&self) -> &'a slug_analysis_v2::PlatformSemanticFact {
+        self.action.raw_platform_fact()
     }
     pub fn platform_constraints(&self) -> &'a [ConfiguredActionPlatformConstraint] {
         self.action.platform_constraints()
@@ -3070,15 +3075,15 @@ enum BuildCommandErrorKind {
         pattern: Arc<str>,
     },
     Infrastructure(Arc<str>),
+    ActionClosure(ConfiguredActionClosureError),
 }
 
 type BuildCommandOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
     Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
 >;
 
-type BuildActionClosureOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
-    Result<Arc<[Arc<ConfiguredNodeResult>]>, BuildCommandError>,
->;
+type BuildActionClosureOutcome =
+    slug_bzlmod_v2::SourcePreparationOutcome<Result<ValidatedActionClosure, BuildCommandError>>;
 type BuildActionAnalysisOutcome =
     slug_bzlmod_v2::SourcePreparationOutcome<Arc<Result<Arc<ConfiguredNodeResult>, AnalysisError>>>;
 type BuildActionFrontierOutcome =
@@ -3287,7 +3292,7 @@ impl BuildCommandEvaluation {
     }
 
     pub fn analyses(&self) -> impl Iterator<Item = &ConfiguredNodeResult> {
-        self.action_closure.iter().map(Arc::as_ref)
+        self.action_closure.owners().iter().map(Arc::as_ref)
     }
 
     fn sole_requested_analysis(&self) -> Result<&ConfiguredNodeResult, &'static str> {
@@ -3311,6 +3316,27 @@ impl BuildCommandEvaluation {
         &self,
     ) -> Result<Vec<ResolvedFileWriteSemanticView<'_>>, &'static str> {
         self.resolved_file_write_semantic_views_for_owners(self.analyses())
+    }
+
+    /// The producer-validated execution projection; semantic/aquery views stay
+    /// owner-complete even when equal scalar writes share execution.
+    pub fn resolved_file_write_execution_views_in_closure(
+        &self,
+    ) -> Result<Vec<ResolvedFileWriteSemanticView<'_>>, &'static str> {
+        let mut views = Vec::new();
+        for (owner_index, owner) in self.action_closure.owners().iter().enumerate() {
+            for (action_index, action) in owner.configured_file_write_actions()?.enumerate() {
+                if self
+                    .action_closure
+                    .execution_representative(owner_index, action_index)
+                {
+                    views.push(ResolvedFileWriteSemanticView::from_configured_action(
+                        action,
+                    ));
+                }
+            }
+        }
+        Ok(views)
     }
 
     fn resolved_file_write_semantic_views_for_owners<'a>(
@@ -3399,6 +3425,7 @@ impl BuildCommandEvaluation {
         }
         if self
             .action_closure
+            .owners()
             .iter()
             .map(|node| node.actions().len())
             .sum::<usize>()
@@ -3720,6 +3747,10 @@ impl BuildCommandError {
             BuildCommandErrorKind::RepositoryPackage(error) if error.is_unsupported_feature() => {
                 ("unsupported_feature", 7)
             }
+            BuildCommandErrorKind::ActionClosure(
+                ConfiguredActionClosureError::UnsupportedEquivalence { .. },
+            ) => ("unsupported_action_equivalence", 2),
+            BuildCommandErrorKind::ActionClosure(_) => ("configured_action_conflict", 2),
             _ => ("build_runtime_error", 2),
         }
     }
@@ -3775,9 +3806,54 @@ impl fmt::Display for BuildCommandError {
                 f,
                 "all-target package patterns are not supported before shared expansion: {pattern}"
             ),
+            BuildCommandErrorKind::ActionClosure(error) => match error {
+                ConfiguredActionClosureError::OutputConflict {
+                    path,
+                    first_owner,
+                    second_owner,
+                } => write!(
+                    f,
+                    "configured action output conflict at {path}: {} versus {}",
+                    action_conflict_owner(first_owner),
+                    action_conflict_owner(second_owner),
+                ),
+                ConfiguredActionClosureError::OutputPrefixConflict {
+                    path,
+                    first_owner,
+                    second_owner,
+                } => write!(
+                    f,
+                    "configured action output prefix conflict at {path}: {} versus {}",
+                    action_conflict_owner(first_owner),
+                    action_conflict_owner(second_owner),
+                ),
+                ConfiguredActionClosureError::UnsupportedEquivalence {
+                    path,
+                    first_owner,
+                    second_owner,
+                } => write!(
+                    f,
+                    "configured action output requires unsupported equivalence at {path}: {} versus {}",
+                    action_conflict_owner(first_owner),
+                    action_conflict_owner(second_owner),
+                ),
+                ConfiguredActionClosureError::InvalidOutputRoot => {
+                    f.write_str("configured action output has an invalid structural root")
+                }
+            },
             BuildCommandErrorKind::Infrastructure(error) => f.write_str(error),
         }
     }
+}
+
+fn action_conflict_owner(owner: &ConfiguredTargetKey) -> String {
+    let mut display = owner.stable_serialize();
+    if let Some(preference) = owner.toolchain_execution_platform() {
+        display.push_str(" {toolchain_execution_platform=");
+        display.push_str(&preference.to_string());
+        display.push('}');
+    }
+    display
 }
 
 impl fmt::Debug for BuildCommandError {
@@ -4018,7 +4094,7 @@ async fn compute_singleton_package_all(
                     completion: BuildTargetCompletion::LoadedOnly,
                     source_certificate: None,
                 }]),
-                action_closure: Arc::from([]),
+                action_closure: ValidatedActionClosure::empty(),
             }),
             observations,
         ),
@@ -4392,9 +4468,9 @@ async fn compute_build_action_closure(
         frontier = next;
     }
 
-    Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(
-        closure.into(),
-    )))
+    let closure = ValidatedActionClosure::new(closure.into())
+        .map_err(|error| BuildCommandError::new(BuildCommandErrorKind::ActionClosure(error)));
+    Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(closure))
 }
 
 async fn compute_build_branch(
@@ -5462,7 +5538,7 @@ async fn compute_external_single_observed(
             result: Arc::new(result.map(|target| BuildCommandEvaluation {
                 anchor,
                 targets: Arc::from([target]),
-                action_closure: Arc::from([]),
+                action_closure: ValidatedActionClosure::empty(),
             })),
             observations,
             aggregate_source_certificate: None,
@@ -12558,7 +12634,150 @@ ordinary_rule(
         crate::runtime::FileWriteSemanticIdentity::from_resolved(&views[0]).unwrap()
     }
 
+    #[tokio::test]
+    async fn selected_toolchain_request_closure_resolves_implementation_action_platform() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let key = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            &[TargetPattern::parse("//:write").unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let replacements = [
+            (
+                "register_execution_platforms(\"//:platform\")",
+                "register_execution_platforms(\"//:platform_alt\", \"//:platform\")",
+            ),
+            (
+                "platform(name = \"platform_alt\", constraint_values = [\":value\"]",
+                "platform(name = \"platform_alt\", constraint_values = []",
+            ),
+            (
+                "toolchain = \":implementation\")",
+                "toolchain = \":implementation\", exec_compatible_with = [\":value\"])",
+            ),
+            (
+                "def _toolchain(ctx):",
+                "def _toolchain(ctx):\n    out = ctx.actions.declare_file(\"implementation.txt\")\n    ctx.actions.write(out, \"implementation\")",
+            ),
+        ];
+        let mut identities = Vec::new();
+        for (revision, setting) in [(70, "setting_a"), (71, "setting_b"), (72, "setting_a")] {
+            let mut transaction = build_root_transaction(
+                &dice,
+                resolved_write_epoch(revision, setting, &replacements),
+            )
+            .await;
+            let outcome = transaction.compute(&key).await.unwrap();
+            let views = complete_build_evaluation(&outcome)
+                .resolved_file_write_semantic_views_in_closure()
+                .unwrap();
+            let implementation = views
+                .iter()
+                .find(|view| view.action().owner().label().to_string() == "@@//:implementation")
+                .unwrap();
+            assert_eq!(
+                implementation.action().owner().configuration().kind(),
+                slug_analysis_v2::ConfigurationKind::Target
+            );
+            assert_eq!(
+                implementation
+                    .action()
+                    .owner()
+                    .toolchain_execution_platform()
+                    .unwrap()
+                    .to_string(),
+                "@@//:platform"
+            );
+            assert_eq!(
+                implementation
+                    .action()
+                    .execution_platform()
+                    .label()
+                    .to_string(),
+                "@@//:platform"
+            );
+            identities.push(
+                crate::runtime::FileWriteSemanticIdentity::from_resolved(implementation).unwrap(),
+            );
+        }
+        assert_ne!(identities[0], identities[1]);
+        assert_eq!(identities[0], identities[2]);
+    }
+
+    #[tokio::test]
+    async fn selected_toolchain_request_conflicting_outputs_require_preexecution_rejection() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut epoch = BuildRootEpoch::base(80);
+        epoch.file("/workspace/MODULE.bazel", "module(name = 'root')\nregister_execution_platforms('//:pa', '//:pb')\nregister_toolchains('//:ta', '//:tb', '//:la', '//:lb')\n", 80);
+        epoch.file(
+            "/workspace/defs.bzl",
+            r#"def _empty(ctx): return []
+root = rule(implementation = _empty, attrs = {"deps": attr.label_list()})
+parent_a = rule(implementation = _empty, toolchains = ["//:a"])
+parent_b = rule(implementation = _empty, toolchains = ["//:b"])
+def _leaf(ctx): return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+leaf = rule(implementation = _leaf, attrs = {"marker": attr.string()})
+def _impl(ctx):
+    out = ctx.actions.declare_file("implementation.txt")
+    ctx.actions.write(out, ctx.toolchains["//:leaf_type"].marker)
+    return [platform_common.ToolchainInfo()]
+impl = rule(implementation = _impl, toolchains = ["//:leaf_type"])
+"#,
+            80,
+        );
+        epoch.package("", r#"load(":defs.bzl", "root", "parent_a", "parent_b", "impl", "leaf")
+constraint_setting(name = "setting")
+constraint_value(name = "va", constraint_setting = ":setting")
+constraint_value(name = "vb", constraint_setting = ":setting")
+platform(name = "pa", constraint_values = [":va"])
+platform(name = "pb", constraint_values = [":vb"])
+toolchain_type(name = "a")
+toolchain_type(name = "b")
+toolchain_type(name = "leaf_type")
+impl(name = "implementation")
+leaf(name = "leaf_a", marker = "A")
+leaf(name = "leaf_b", marker = "B")
+toolchain(name = "ta", toolchain_type = ":a", toolchain = ":implementation", exec_compatible_with = [":va"])
+toolchain(name = "tb", toolchain_type = ":b", toolchain = ":implementation", exec_compatible_with = [":vb"])
+toolchain(name = "la", toolchain_type = ":leaf_type", toolchain = ":leaf_a", exec_compatible_with = [":va"])
+toolchain(name = "lb", toolchain_type = ":leaf_type", toolchain = ":leaf_b", exec_compatible_with = [":vb"])
+parent_a(name = "parent_a")
+parent_b(name = "parent_b")
+root(name = "root", deps = [":parent_a", ":parent_b"])
+"#, 80);
+        let key = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            &[TargetPattern::parse("//:root").unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let mut transaction = build_root_transaction(&dice, epoch.build()).await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) = outcome else {
+            panic!("conflicting closure retained Needs")
+        };
+        let error = value.as_ref().as_ref().unwrap_err();
+        assert!(matches!(
+            error.kind,
+            BuildCommandErrorKind::ActionClosure(ConfiguredActionClosureError::OutputConflict {
+                ref path,
+                ..
+            }) if path.as_ref() == "implementation.txt"
+        ));
+        assert_eq!(error.terminal_error(), ("configured_action_conflict", 2));
+        assert!(
+            error
+                .to_string()
+                .contains("configured action output conflict")
+        );
+    }
+
     mod build_command_tests {
         include!("tests/build_command_tests.rs");
+    }
+
+    mod configured_action_conflicts_tests {
+        include!("tests/configured_action_conflicts_tests.rs");
     }
 }

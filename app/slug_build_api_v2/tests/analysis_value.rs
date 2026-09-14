@@ -43,6 +43,45 @@ fn label(value: &str) -> CanonicalLabel {
     CanonicalLabel::parse(value).unwrap()
 }
 
+#[test]
+fn selected_toolchain_request_retained_owner_and_artifact_identity() {
+    let ordinary = AnalysisConfiguredTargetKey::new(label("@@//:impl"), vec![1, 2, 3]);
+    let a = ordinary
+        .clone()
+        .with_toolchain_execution_platform(Arc::new(label("@@//:a")));
+    let b = ordinary
+        .clone()
+        .with_toolchain_execution_platform(Arc::new(label("@@//:b")));
+    let a_again = ordinary
+        .clone()
+        .with_toolchain_execution_platform(Arc::new(label("@@//:a")));
+    assert_eq!(size_of::<AnalysisConfiguredTargetKey>(), size_of::<usize>());
+    assert_eq!(
+        a, a_again,
+        "identity compares label contents, not Arc pointers"
+    );
+    assert_ne!(ordinary, a);
+    assert_ne!(a, b);
+    assert_eq!(ordinary.configuration(), a.configuration());
+    let artifact = |owner| {
+        AnalysisValue::artifact(AnalysisArtifact::Derived {
+            owner,
+            output: ActionOutput::new("same.out", ActionOutputKind::File),
+        })
+    };
+    let values = [ordinary, a.clone(), b].map(artifact);
+    for (i, value) in values.iter().enumerate() {
+        for (j, other) in values.iter().enumerate() {
+            assert_eq!(value == other, i == j);
+            assert_eq!(hash(value) == hash(other), i == j);
+        }
+    }
+    assert_eq!(values[1], artifact(a_again));
+    let provider = |value| toolchain([("file", value)]);
+    assert_ne!(provider(values[0].clone()), provider(values[1].clone()));
+    assert_eq!(provider(values[1].clone()), provider(artifact(a)));
+}
+
 fn hash(value: &AnalysisValue) -> u64 {
     let mut hasher = DefaultHasher::new();
     value.hash(&mut hasher);

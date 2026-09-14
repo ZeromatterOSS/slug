@@ -79,6 +79,18 @@ use starlark::values::tuple::TupleRef;
 use starlark_map::small_map::SmallMap;
 
 use crate::key::ConfiguredNodeKey;
+use crate::key::ConfiguredTargetKey;
+
+pub(crate) fn analysis_configured_key(key: &ConfiguredTargetKey) -> AnalysisConfiguredTargetKey {
+    let value = AnalysisConfiguredTargetKey::new(
+        key.label().clone(),
+        key.configuration().complete_identity_bytes(),
+    );
+    match key.toolchain_execution_platform() {
+        Some(platform) => value.with_toolchain_execution_platform(platform.clone()),
+        None => value,
+    }
+}
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct BuiltinProviderView {
@@ -801,10 +813,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
                 ))));
         };
         self.target(&ConfiguredTargetValue::new(
-            AnalysisConfiguredTargetKey::new(
-                configured.label().clone(),
-                configured.configuration().complete_identity_bytes(),
-            ),
+            analysis_configured_key(configured),
             providers,
         ))
     }
@@ -816,13 +825,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
     ) -> Result<FrozenValue, String> {
         let identity = key.configured_target().map_or_else(
             || AnalysisTargetIdentity::null(key.label().clone()),
-            |configured| {
-                AnalysisConfiguredTargetKey::new(
-                    configured.label().clone(),
-                    configured.configuration().complete_identity_bytes(),
-                )
-                .into()
-            },
+            |configured| analysis_configured_key(configured).into(),
         );
         self.target(&ConfiguredTargetValue::new(identity, providers))
     }

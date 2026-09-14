@@ -2563,6 +2563,507 @@ request(name = "request", marker = "request")
 }
 
 #[tokio::test]
+async fn selected_toolchain_request_keeps_parent_options_and_nonfirst_platform() {
+    // Bazel 9.2 DependencyProducer:161-176 and keepParentToolchainContext:
+    // a direct toolchain edge preserves configuration and separately prefers B.
+    let workspace = scratch();
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        TOPOLOGY_MODULE.replace("\"//:first_toolchain\", ", ""),
+    )
+    .unwrap();
+    fs::write(workspace.join("BUILD.bazel"), TOPOLOGY_BUILD).unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        TOOLCHAIN_DEFS.replace(
+            "    print(\"SECOND_LOCAL\")",
+            "    out = ctx.actions.declare_file(\"implementation.out\")\n    ctx.actions.write(out, \"implementation\")",
+        ),
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let option = CanonicalLabel::parse("@@//:target_only").unwrap();
+    let configuration = test_configuration().with_starlark_option(StarlarkOption::string(
+        option.clone(),
+        "retained",
+        StarlarkOptionScope::Target,
+    ));
+    let parent = root_target_request_with_configuration(
+        &dice,
+        &workspace,
+        "@@//:request",
+        configuration.clone(),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    let selected = selected_toolchain(&parent).implementation();
+    assert!(
+        selected.configuration() == &configuration,
+        "direct toolchain edge must preserve parent configuration"
+    );
+    assert_eq!(
+        selected
+            .configuration()
+            .starlark_option(&option)
+            .unwrap()
+            .value()
+            .as_str(),
+        Some("retained")
+    );
+    let implementation = analyze_request_typed(&dice, &workspace, selected, None, false)
+        .await
+        .unwrap();
+    assert_eq!(implementation.actions().len(), 1);
+    assert_eq!(
+        implementation.actions()[0]
+            .context()
+            .execution_platform()
+            .unwrap()
+            .label()
+            .to_string(),
+        "@@//:second_platform"
+    );
+    assert_eq!(implementation.actions()[0].context().owner(), selected);
+}
+
+fn selected_request_workspace() -> PathBuf {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), TOPOLOGY_MODULE).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), TOPOLOGY_BUILD).unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        TOOLCHAIN_DEFS.replace(
+            "    print(\"FIRST_LOCAL\")",
+            "    out = ctx.actions.declare_file(\"implementation.out\")\n    ctx.actions.write(out, \"implementation\")",
+        ),
+    ).unwrap();
+    workspace
+}
+
+fn selected_request_key(target: &str, preference: Option<&str>) -> ConfiguredTargetKey {
+    let key =
+        ConfiguredTargetKey::new(CanonicalLabel::parse(target).unwrap(), test_configuration());
+    match preference {
+        Some(label) => {
+            key.with_toolchain_execution_platform(Arc::new(CanonicalLabel::parse(label).unwrap()))
+        }
+        None => key,
+    }
+}
+
+fn selected_request_platform(result: &ConfiguredNodeResult) -> String {
+    result.actions()[0]
+        .context()
+        .execution_platform()
+        .unwrap()
+        .label()
+        .to_string()
+}
+
+#[tokio::test]
+async fn selected_toolchain_request_interleaves_full_keys_and_restores_source_properties() {
+    let workspace = selected_request_workspace();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let keys = [
+        None,
+        Some("@@//:first_platform"),
+        Some("@@//:second_platform"),
+    ]
+    .map(|preference| selected_request_key("@@//:first_impl", preference));
+    let mut results = Vec::new();
+    for (index, key) in keys.iter().enumerate() {
+        let result = analyze_request_typed(&dice, &workspace, key, None, false)
+            .await
+            .unwrap();
+        assert!(result.configured_target_key().unwrap() == key);
+        assert_eq!(
+            selected_request_platform(&result),
+            if index == 2 {
+                "@@//:second_platform"
+            } else {
+                "@@//:first_platform"
+            }
+        );
+        results.push(result);
+    }
+    assert!(
+        results[0] != results[1],
+        "same platform does not erase owner preference"
+    );
+    let tracker = Arc::new(AnalysisTracker::default());
+    let restored = analyze_request_typed(&dice, &workspace, &keys[1], Some(tracker.clone()), false)
+        .await
+        .unwrap();
+    assert!(restored == results[1]);
+    assert!(
+        tracker
+            .take()
+            .iter()
+            .all(|event| event.kind == EventKind::Reused)
+    );
+    let (a, b) = tokio::join!(
+        analyze_request_typed(&dice, &workspace, &keys[1], None, false),
+        analyze_request_typed(&dice, &workspace, &keys[2], None, false),
+    );
+    assert!(a.unwrap() == results[1]);
+    assert!(b.unwrap() == results[2]);
+    for (file, original, edited) in [
+        (
+            "BUILD.bazel",
+            TOPOLOGY_BUILD.to_owned(),
+            TOPOLOGY_BUILD.replace("\"a\": \"first\"", "\"a\": \"edited\""),
+        ),
+        (
+            "defs.bzl",
+            fs::read_to_string(workspace.join("defs.bzl")).unwrap(),
+            fs::read_to_string(workspace.join("defs.bzl"))
+                .unwrap()
+                .replace("\"implementation\"", "\"edited\""),
+        ),
+    ] {
+        fs::write(workspace.join(file), edited).unwrap();
+        let changed = analyze_request_typed(&dice, &workspace, &keys[1], None, false)
+            .await
+            .unwrap();
+        assert!(
+            changed != results[1],
+            "{file} must invalidate preferred owner"
+        );
+        fs::write(workspace.join(file), original).unwrap();
+        let restored = analyze_request_typed(&dice, &workspace, &keys[1], None, false)
+            .await
+            .unwrap();
+        assert!(
+            restored == results[1],
+            "{file} A/B/A restores structural result"
+        );
+    }
+}
+
+#[tokio::test]
+async fn selected_toolchain_request_clears_ordinary_edges_and_alias_actual() {
+    let workspace = selected_request_workspace();
+    let defs = fs::read_to_string(workspace.join("defs.bzl")).unwrap().replacen(
+        "attrs = {\"marker\": attr.string(mandatory = True)})",
+        "attrs = {\"marker\": attr.string(mandatory = True), \"dep\": attr.label(default = \":second_impl\"), \"tool\": attr.label(default = \":second_impl\", cfg = \"exec\")})",
+        1,
+    );
+    fs::write(workspace.join("defs.bzl"), defs).unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        format!("{TOPOLOGY_BUILD}alias(name = \"impl_alias\", actual = \":first_impl\")\n"),
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = selected_request_key("@@//:first_impl", Some("@@//:second_platform"));
+    let result = analyze_request_typed(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    for (name, kind) in [
+        ("dep", slug_analysis_v2::ConfigurationKind::Target),
+        ("tool", slug_analysis_v2::ConfigurationKind::Exec),
+    ] {
+        let child = result
+            .edges()
+            .iter()
+            .find_map(|edge| match edge.kind() {
+                ConfiguredEdgeKind::Attribute { attribute, .. } if attribute == name => {
+                    edge.target().configured_target()
+                }
+                _ => None,
+            })
+            .unwrap();
+        assert!(child.toolchain_execution_platform().is_none());
+        assert_eq!(child.configuration().kind(), kind);
+    }
+    let alias = analyze_request_typed(
+        &dice,
+        &workspace,
+        &selected_request_key("@@//:impl_alias", Some("@@//:second_platform")),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    let actual = alias.actual_configured_target().unwrap();
+    assert!(actual.toolchain_execution_platform().is_none());
+    assert_eq!(actual.label().to_string(), "@@//:first_impl");
+    let direct = analyze_request_typed(&dice, &workspace, actual, None, false)
+        .await
+        .unwrap();
+    assert_eq!(selected_request_platform(&direct), "@@//:first_platform");
+}
+
+#[tokio::test]
+async fn selected_toolchain_request_preserves_preference_through_incoming_transition() {
+    let workspace = selected_request_workspace();
+    let defs = fs::read_to_string(workspace.join("defs.bzl")).unwrap();
+    fs::write(workspace.join("defs.bzl"), format!(
+        "{defs}\ndef _change(settings, attr): return {{\"//command_line_option:platforms\": [\"//:first_platform\"]}}\nchanged = rule(implementation = _first, attrs = {{\"marker\": attr.string()}}, cfg = transition(implementation = _change, inputs = [], outputs = [\"//command_line_option:platforms\"]))\n"
+    )).unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        format!(
+            "{TOPOLOGY_BUILD}\nload(\":defs.bzl\", \"changed\")\nchanged(name = \"changed\")\n"
+        ),
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = selected_request_key("@@//:changed", Some("@@//:second_platform"));
+    let result = analyze_request_typed(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    let actual = result.actual_configured_target().unwrap();
+    assert!(actual.configuration() != key.configuration());
+    assert_eq!(
+        actual.toolchain_execution_platform(),
+        key.toolchain_execution_platform()
+    );
+    let actual_result = analyze_request_typed(&dice, &workspace, actual, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        selected_request_platform(&actual_result),
+        "@@//:second_platform"
+    );
+}
+
+#[tokio::test]
+async fn selected_toolchain_request_selection_priority_fallback_and_alias_lookup() {
+    let workspace = selected_request_workspace();
+    let defs = fs::read_to_string(workspace.join("defs.bzl")).unwrap();
+    fs::write(workspace.join("defs.bzl"), format!("{defs}\noptional = rule(implementation = _first, attrs = {{\"marker\": attr.string()}}, toolchains = [config_common.toolchain_type(\"//:type\", mandatory = False)])\n")).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), format!("{TOPOLOGY_BUILD}\nload(\":defs.bzl\", \"optional\")\noptional(name = \"optional\")\nalias(name = \"platform_alias\", actual = \":second_platform\")\n")).unwrap();
+    // Only A has a registered matching implementation. B is still suitable
+    // for optional requirements, so a preference outranks greater coverage.
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        TOPOLOGY_MODULE.replace(", \"//:second_toolchain\"", ""),
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    for (target, preference, expected) in [
+        ("optional", "@@//:second_platform", "@@//:second_platform"),
+        ("request", "@@//:second_platform", "@@//:first_platform"),
+        ("optional", "@@//:does_not_exist", "@@//:first_platform"),
+    ] {
+        let key = selected_request_key(&format!("@@//:{target}"), Some(preference));
+        let result = analyze_request_typed(&dice, &workspace, &key, None, false)
+            .await
+            .unwrap();
+        assert_eq!(selected_request_platform(&result), expected);
+        if target == "optional" && preference == "@@//:second_platform" {
+            assert!(
+                result
+                    .toolchain_topology()
+                    .unwrap()
+                    .toolchain()
+                    .unwrap()
+                    .rows()[0]
+                    .selected()
+                    .is_none()
+            );
+        }
+    }
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        TOPOLOGY_MODULE.replace("//:second_platform", "//:platform_alias"),
+    )
+    .unwrap();
+    for (preference, expected) in [
+        ("@@//:platform_alias", "@@//:second_platform"),
+        ("@@//:second_platform", "@@//:first_platform"),
+    ] {
+        let result = analyze_request_typed(
+            &dice,
+            &workspace,
+            &selected_request_key("@@//:first_impl", Some(preference)),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            selected_request_platform(&result),
+            expected,
+            "registered alias lookup: {preference}"
+        );
+    }
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = 'root')\nregister_execution_platforms('//:second_platform')\n",
+    )
+    .unwrap();
+    let error = analyze_request_typed(
+        &dice,
+        &workspace,
+        &selected_request_key("@@//:request", Some("@@//:second_platform")),
+        None,
+        false,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        error.to_string().contains("no compatible toolchain"),
+        "{error}"
+    );
+    fs::write(workspace.join("MODULE.bazel"), TOPOLOGY_MODULE).unwrap();
+    assert!(
+        analyze_request_typed(
+            &dice,
+            &workspace,
+            &selected_request_key("@@//:request", Some("@@//:second_platform")),
+            None,
+            false
+        )
+        .await
+        .is_ok()
+    );
+}
+
+#[tokio::test]
+async fn selected_toolchain_request_known_target_outside_registration_empty_and_optional() {
+    let workspace = selected_request_workspace();
+    let defs = fs::read_to_string(workspace.join("defs.bzl")).unwrap();
+    fs::write(workspace.join("defs.bzl"), format!(r#"{defs}
+def _target(settings, attr): return {{"//command_line_option:platforms": ["//:unregistered"]}}
+target_cfg = transition(implementation = _target, inputs = [], outputs = ["//command_line_option:platforms"])
+empty_target = rule(implementation = _first, attrs = {{"marker": attr.string()}}, cfg = target_cfg)
+optional_target = rule(implementation = _first, attrs = {{"marker": attr.string()}}, cfg = target_cfg, toolchains = [config_common.toolchain_type("//:type", mandatory = False)])
+"#)).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), format!("{TOPOLOGY_BUILD}\nload(\":defs.bzl\", \"empty_target\", \"optional_target\")\nplatform(name = \"unregistered\")\nempty_target(name = \"empty_target\")\noptional_target(name = \"optional_target\")\n")).unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    for target in ["empty_target", "optional_target"] {
+        let key = selected_request_key(&format!("@@//:{target}"), Some("@@//:unregistered"));
+        let result = analyze_request_typed(&dice, &workspace, &key, None, false)
+            .await
+            .unwrap();
+        let actual = result.actual_configured_target().unwrap();
+        let result = analyze_request_typed(&dice, &workspace, actual, None, false)
+            .await
+            .unwrap();
+        assert_eq!(selected_request_platform(&result), "@@//:unregistered");
+        let topology = result.toolchain_topology().unwrap();
+        assert!(
+            !topology
+                .candidate_execution_platforms()
+                .iter()
+                .any(|key| key.label().to_string() == "@@//:unregistered")
+        );
+        if target == "optional_target" {
+            assert!(topology.toolchain().unwrap().rows()[0].selected().is_none());
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn selected_toolchain_request_observed_need_cancellation_and_error_recover() {
+    let workspace = selected_request_workspace();
+    let defs = fs::read_to_string(workspace.join("defs.bzl")).unwrap().replacen(
+        "attrs = {\"marker\": attr.string(mandatory = True)})",
+        "attrs = {\"marker\": attr.string(mandatory = True), \"dep\": attr.label(default = \"//late:dep\")})", 1,
+    );
+    fs::write(workspace.join("defs.bzl"), &defs).unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = selected_request_key("@@//:first_impl", Some("@@//:second_platform"));
+    let observed = ConfiguredNodeAnalysisObservationKey::new(
+        NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+        key.clone(),
+    )
+    .unwrap();
+    let mut updater = dice.updater_with_data(UserComputationData {
+        cycle_detector: Some(analysis_cycle_detector()),
+        ..Default::default()
+    });
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+    let mut transaction = updater.commit().await;
+    assert!(
+        matches!(
+            transaction.compute(&observed).await.unwrap(),
+            AnalysisPreparationOutcome::Need(_)
+        ),
+        "missing child observations cannot publish a partial preferred owner"
+    );
+    drop(transaction);
+    fs::create_dir(workspace.join("late")).unwrap();
+    fs::write(workspace.join("late/BUILD.bazel"), "load(\"//:defs.bzl\", \"second_impl\")\nsecond_impl(name = \"dep\", marker = \"dep\", visibility = [\"//visibility:public\"])\n").unwrap();
+    let (reached, reached_rx) = std::sync::mpsc::sync_channel(1);
+    let (release, release_rx) = std::sync::mpsc::sync_channel(1);
+    let tracker = Arc::new(RootActivationTracker::with_loading_gate(
+        "//late", reached, release_rx,
+    ));
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker.clone()),
+        cycle_detector: Some(analysis_cycle_detector()),
+        ..Default::default()
+    });
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+    let mut transaction = updater.commit().await;
+    let observed_task = observed.clone();
+    let task = tokio::spawn(async move { transaction.compute(&observed_task).await });
+    tokio::task::spawn_blocking(move || {
+        reached_rx
+            .recv_timeout(std::time::Duration::from_secs(3))
+            .unwrap()
+    })
+    .await
+    .unwrap();
+    let (events, batches, _) = tracker.take();
+    assert!(
+        events
+            .iter()
+            .all(|(identity, _)| !identity.starts_with("resolved/@@//:first_impl"))
+    );
+    assert!(
+        batches
+            .iter()
+            .all(|(identity, _)| !identity.contains("first_impl"))
+    );
+    task.abort();
+    release.send(()).unwrap();
+    assert!(task.await.unwrap_err().is_cancelled());
+    for broken in [false, true, false] {
+        fs::write(
+            workspace.join("defs.bzl"),
+            if broken {
+                defs.replace(
+                    "    out = ctx.actions.declare_file",
+                    "    fail(\"preferred-owner-error\")\n    out = ctx.actions.declare_file",
+                )
+            } else {
+                defs.clone()
+            },
+        )
+        .unwrap();
+        let mut updater = dice.updater_with_data(UserComputationData {
+            cycle_detector: Some(analysis_cycle_detector()),
+            ..Default::default()
+        });
+        inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+        let mut transaction = updater.commit().await;
+        let AnalysisPreparationOutcome::Complete(Ok(value)) =
+            transaction.compute(&observed).await.unwrap()
+        else {
+            panic!("expected terminal observed analysis after supplying inputs")
+        };
+        let result = value.as_ref().as_ref();
+        if broken {
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("preferred-owner-error")
+            );
+        } else {
+            let result = result.unwrap();
+            assert!(result.configured_target_key().unwrap() == &key);
+            assert_eq!(selected_request_platform(result), "@@//:second_platform");
+        }
+    }
+}
+
+#[tokio::test]
 async fn selected_toolchain_accepts_declared_actions_and_default_outputs() {
     let workspace = scratch();
     let defs = format!(
@@ -2624,23 +3125,14 @@ async fn selected_toolchain_accepts_declared_actions_and_default_outputs() {
     let selected = selected_toolchain(&result).implementation().clone();
     assert_eq!(
         selected.configuration().kind(),
-        slug_analysis_v2::ConfigurationKind::Exec
+        slug_analysis_v2::ConfigurationKind::Target
     );
-    assert_eq!(
-        selected.configuration(),
-        result
-            .toolchain_topology()
-            .unwrap()
-            .toolchain()
-            .unwrap()
-            .execution_platform()
-            .configuration()
-    );
+    assert!(selected.configuration() == result.configured_target_key().unwrap().configuration());
     assert!(
         selected
             .configuration()
             .starlark_option(&target_only)
-            .is_none()
+            .is_some()
     );
     assert_eq!(
         selected
@@ -2651,15 +3143,10 @@ async fn selected_toolchain_accepts_declared_actions_and_default_outputs() {
             .as_str(),
         Some("exec")
     );
-    let selected_result = root_target_request_with_configuration(
-        &dice,
-        &workspace,
-        &selected.label().to_string(),
-        selected.configuration().clone(),
-        tracker(),
-    )
-    .await
-    .unwrap();
+    let selected_result =
+        analyze_request_typed(&dice, &workspace, &selected, Some(tracker()), false)
+            .await
+            .unwrap();
     assert_eq!(selected_result.actions().len(), 1);
     assert_eq!(
         provider_value(
@@ -7113,7 +7600,7 @@ async fn analyze_node_request_typed_with_epoch(
     let analysis_key = match &node {
         ConfiguredNodeKey::Configured(key) => match prepare_configured_node_analysis(
             &mut transaction,
-            workspace_identity,
+            workspace_identity.clone(),
             key.label().clone(),
             key.configuration().clone(),
         )
@@ -7124,7 +7611,13 @@ async fn analyze_node_request_typed_with_epoch(
                     "configured target analysis retained Needs during preparation",
                 ));
             }
-            AnalysisPreparationOutcome::Complete(Ok(key)) => key,
+            AnalysisPreparationOutcome::Complete(Ok(prepared)) => {
+                if matches!(prepared.node(), ConfiguredNodeKey::Configured(_)) {
+                    ConfiguredNodeAnalysisKey::new(workspace_identity, node.clone())?
+                } else {
+                    prepared
+                }
+            }
             AnalysisPreparationOutcome::Complete(Err(error)) => return Err(error),
         },
         ConfiguredNodeKey::Null(_) => ConfiguredNodeAnalysisKey::new(workspace_identity, node)?,

@@ -162,12 +162,14 @@ impl ConfiguredToolchainContextRow {
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct ToolchainTopology {
     candidate_execution_platforms: Arc<[ConfiguredTargetKey]>,
+    known_preferred_execution_platform: Option<ConfiguredTargetKey>,
     toolchain: Option<Arc<ConfiguredActionToolchainContext>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct PlatformSemanticFact {
     pub exec_properties: Arc<[(CompactString, CompactString)]>,
+    pub missing_toolchain_error: Option<Arc<str>>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -260,6 +262,7 @@ impl ConfiguredToolchainResolutionRow {
 pub struct ConfiguredToolchainResolution {
     target_platform: Arc<ConfiguredPlatform>,
     execution_platform: Arc<ConfiguredPlatform>,
+    known_preferred_execution_platform: Option<ConfiguredTargetKey>,
     rows: Arc<[ConfiguredToolchainResolutionRow]>,
 }
 
@@ -267,11 +270,13 @@ impl ConfiguredToolchainResolution {
     pub(crate) fn new(
         target_platform: Arc<ConfiguredPlatform>,
         execution_platform: Arc<ConfiguredPlatform>,
+        known_preferred_execution_platform: Option<ConfiguredTargetKey>,
         rows: Arc<[ConfiguredToolchainResolutionRow]>,
     ) -> Self {
         Self {
             target_platform,
             execution_platform,
+            known_preferred_execution_platform,
             rows,
         }
     }
@@ -282,6 +287,10 @@ impl ConfiguredToolchainResolution {
 
     pub fn execution_platform(&self) -> &Arc<ConfiguredPlatform> {
         &self.execution_platform
+    }
+
+    pub fn known_preferred_execution_platform(&self) -> Option<&ConfiguredTargetKey> {
+        self.known_preferred_execution_platform.as_ref()
     }
 
     pub fn rows(&self) -> &[ConfiguredToolchainResolutionRow] {
@@ -357,10 +366,14 @@ impl ConfiguredActionToolchainContext {
                     && is_analysis_configured(&row.actual)
                     && (!row.mandatory || row.selected.is_some())
                     && row.selected.as_ref().is_none_or(|selected| {
-                        selected.implementation.configuration()
-                            == execution_platform.configuration()
-                            && selected.actual_implementation.configuration()
-                                == execution_platform.configuration()
+                        selected.implementation.configuration() == row.requested.configuration()
+                            && selected
+                                .implementation
+                                .toolchain_execution_platform()
+                                .is_some_and(|platform| {
+                                    platform.as_ref() == execution_platform.label()
+                                })
+                            && is_analysis_configured(&selected.actual_implementation)
                             && selected.info.identity().is_builtin("ToolchainInfo")
                     })
             }),
@@ -436,6 +449,7 @@ pub struct ConfiguredActionOwnerContext {
     exec_group: ConfiguredExecGroup,
     execution_platform: Option<ConfiguredTargetKey>,
     platform_fact: Option<PlatformSemanticFact>,
+    raw_platform_fact: Option<PlatformSemanticFact>,
     platform_constraints: Arc<[ConfiguredActionPlatformConstraint]>,
     toolchain: Option<Arc<ConfiguredActionToolchainContext>>,
     aspect: ConfiguredActionAspectProvenance,
@@ -452,6 +466,7 @@ impl ConfiguredActionOwnerContext {
             exec_group: ConfiguredExecGroup::Default,
             execution_platform: None,
             platform_fact: None,
+            raw_platform_fact: None,
             platform_constraints: Arc::new([]),
             toolchain: None,
             aspect: ConfiguredActionAspectProvenance::Absent,
@@ -529,7 +544,11 @@ impl ConfiguredActionOwnerContext {
             owner,
             exec_group,
             execution_platform: Some(execution_platform),
-            platform_fact: Some(PlatformSemanticFact { exec_properties }),
+            raw_platform_fact: Some(platform_fact.clone()),
+            platform_fact: Some(PlatformSemanticFact {
+                exec_properties,
+                missing_toolchain_error: platform_fact.missing_toolchain_error,
+            }),
             platform_constraints: platform_constraints.into(),
             toolchain,
             aspect,
@@ -563,6 +582,10 @@ impl ConfiguredActionOwnerContext {
 
     pub fn platform_fact(&self) -> Option<&PlatformSemanticFact> {
         self.platform_fact.as_ref()
+    }
+
+    pub fn raw_platform_fact(&self) -> Option<&PlatformSemanticFact> {
+        self.raw_platform_fact.as_ref()
     }
 
     pub fn platform_constraints(&self) -> &[ConfiguredActionPlatformConstraint] {
@@ -661,6 +684,13 @@ impl<'a> ConfiguredActionView<'a> {
             .expect("configured action view validates a selected platform")
     }
 
+    pub fn raw_platform_fact(&self) -> &'a PlatformSemanticFact {
+        self.0
+            .context
+            .raw_platform_fact()
+            .expect("configured action view validates a selected platform")
+    }
+
     pub fn platform_constraints(&self) -> &'a [ConfiguredActionPlatformConstraint] {
         self.0.context.platform_constraints()
     }
@@ -687,25 +717,51 @@ impl ToolchainTopology {
         candidate_execution_platforms: Vec<ConfiguredTargetKey>,
         toolchain: Option<Arc<ConfiguredActionToolchainContext>>,
     ) -> Result<Self, String> {
+        Self::new_with_known_preferred_execution_platform(
+            candidate_execution_platforms,
+            None,
+            toolchain,
+        )
+    }
+
+    pub(crate) fn new_with_known_preferred_execution_platform(
+        candidate_execution_platforms: Vec<ConfiguredTargetKey>,
+        known_preferred_execution_platform: Option<ConfiguredTargetKey>,
+        toolchain: Option<Arc<ConfiguredActionToolchainContext>>,
+    ) -> Result<Self, String> {
         if candidate_execution_platforms
             .iter()
             .any(|candidate| candidate.configuration().kind() != ConfigurationKind::Exec)
         {
             return Err("candidate execution platforms require exec configuration".to_owned());
         }
+        if known_preferred_execution_platform
+            .as_ref()
+            .is_some_and(|platform| platform.configuration().kind() != ConfigurationKind::Exec)
+        {
+            return Err(
+                "known preferred execution platform requires exec configuration".to_owned(),
+            );
+        }
         if let Some(toolchain) = &toolchain
             && !candidate_execution_platforms.contains(toolchain.execution_platform())
+            && known_preferred_execution_platform.as_ref() != Some(toolchain.execution_platform())
         {
             return Err("selected execution platform is not a candidate".to_owned());
         }
         Ok(Self {
             candidate_execution_platforms: candidate_execution_platforms.into(),
+            known_preferred_execution_platform,
             toolchain,
         })
     }
 
     pub fn candidate_execution_platforms(&self) -> &[ConfiguredTargetKey] {
         &self.candidate_execution_platforms
+    }
+
+    pub fn known_preferred_execution_platform(&self) -> Option<&ConfiguredTargetKey> {
+        self.known_preferred_execution_platform.as_ref()
     }
 
     pub fn toolchain(&self) -> Option<&Arc<ConfiguredActionToolchainContext>> {

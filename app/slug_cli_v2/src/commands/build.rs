@@ -249,7 +249,7 @@ fn run_reapi_build(
 
         if file_write_actions > 0 {
             let views = evaluation
-                .resolved_file_write_semantic_views_in_closure()
+                .resolved_file_write_execution_views_in_closure()
                 .map_err(str::to_owned)?;
             for view in views {
                 let configuration = view

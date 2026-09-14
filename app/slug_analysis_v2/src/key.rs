@@ -237,6 +237,7 @@ pub struct ConfiguredTargetKey {
     label: CanonicalLabel,
     configuration: ConfigurationKey,
     should_apply_rule_transition: bool,
+    toolchain_execution_platform: Option<Arc<CanonicalLabel>>,
 }
 
 impl ConfiguredTargetKey {
@@ -245,6 +246,7 @@ impl ConfiguredTargetKey {
             label,
             configuration,
             should_apply_rule_transition: true,
+            toolchain_execution_platform: None,
         }
     }
 
@@ -256,7 +258,18 @@ impl ConfiguredTargetKey {
             label,
             configuration,
             should_apply_rule_transition: false,
+            toolchain_execution_platform: None,
         }
+    }
+
+    /// Adds the execution-platform preference carried only by a direct
+    /// selected-toolchain implementation edge.
+    pub fn with_toolchain_execution_platform(
+        mut self,
+        toolchain_execution_platform: Arc<CanonicalLabel>,
+    ) -> Self {
+        self.toolchain_execution_platform = Some(toolchain_execution_platform);
+        self
     }
 
     pub fn label(&self) -> &CanonicalLabel {
@@ -269,6 +282,10 @@ impl ConfiguredTargetKey {
 
     pub(crate) fn should_apply_rule_transition(&self) -> bool {
         self.should_apply_rule_transition
+    }
+
+    pub fn toolchain_execution_platform(&self) -> Option<&Arc<CanonicalLabel>> {
+        self.toolchain_execution_platform.as_ref()
     }
 
     pub fn stable_serialize(&self) -> String {
@@ -359,10 +376,14 @@ mod tests {
         };
         assert_ne!(hash(&applying), hash(&skipped));
         let retained_size = std::mem::size_of::<ConfiguredTargetKey>();
-        let two_field_size = std::mem::size_of::<(CanonicalLabel, ConfigurationKey)>();
+        let identity_fields_size = std::mem::size_of::<(
+            CanonicalLabel,
+            ConfigurationKey,
+            Option<Arc<CanonicalLabel>>,
+        )>();
         assert!(
-            retained_size <= two_field_size + std::mem::align_of::<ConfiguredTargetKey>(),
-            "transition bit inflated key unexpectedly: {two_field_size} -> {retained_size}"
+            retained_size <= identity_fields_size + std::mem::align_of::<ConfiguredTargetKey>(),
+            "transition bit inflated key unexpectedly: {identity_fields_size} -> {retained_size}"
         );
     }
 }

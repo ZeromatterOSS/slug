@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+mod configured_action_closure;
 mod configured_output;
 mod demands;
 pub mod dice;

@@ -917,12 +917,14 @@ async fn resolved_file_write_view_borrows_immutable_owner_context_without_closur
     let without_platform = BuildCommandEvaluation {
         anchor: base.anchor.clone(),
         targets: base.targets.clone(),
-        action_closure: base
-            .action_closure
-            .iter()
-            .filter(|node| node.kind() != &ConfiguredNodeKind::Platform)
-            .cloned()
-            .collect(),
+        action_closure: super::ValidatedActionClosure::new(
+            base.action_closure
+                .iter()
+                .filter(|node| node.kind() != &ConfiguredNodeKind::Platform)
+                .cloned()
+                .collect(),
+        )
+        .unwrap(),
     };
     let retained = without_platform
         .resolved_file_write_semantic_views()

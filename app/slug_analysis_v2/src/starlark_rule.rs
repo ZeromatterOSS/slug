@@ -1677,10 +1677,7 @@ pub(crate) fn evaluate_loaded_rule(
     } else {
         FrozenValue::new_none()
     };
-    let retained_owner = AnalysisConfiguredTargetKey::new(
-        key.label().clone(),
-        key.configuration().complete_identity_bytes(),
-    );
+    let retained_owner = crate::analysis_value::analysis_configured_key(&key);
     let typed_configuration = key
         .configuration()
         .slug_configuration()

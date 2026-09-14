@@ -245,10 +245,11 @@ impl Hash for AnalysisNumber {
 #[derive(Debug, Clone, Dupe, Eq, PartialEq, Hash, Allocative)]
 pub struct AnalysisConfiguredTargetKey(Arc<AnalysisConfiguredTargetKeyData>);
 
-#[derive(Debug, Eq, PartialEq, Hash, Allocative)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 struct AnalysisConfiguredTargetKeyData {
     label: CanonicalLabel,
     configuration: Arc<[u8]>,
+    toolchain_execution_platform: Option<Arc<CanonicalLabel>>,
 }
 
 impl AnalysisConfiguredTargetKey {
@@ -256,7 +257,17 @@ impl AnalysisConfiguredTargetKey {
         Self(Arc::new(AnalysisConfiguredTargetKeyData {
             label,
             configuration: configuration.into(),
+            toolchain_execution_platform: None,
         }))
+    }
+
+    pub fn with_toolchain_execution_platform(
+        mut self,
+        toolchain_execution_platform: Arc<CanonicalLabel>,
+    ) -> Self {
+        Arc::make_mut(&mut self.0).toolchain_execution_platform =
+            Some(toolchain_execution_platform);
+        self
     }
 
     pub fn label(&self) -> &CanonicalLabel {
@@ -265,6 +276,10 @@ impl AnalysisConfiguredTargetKey {
 
     pub fn configuration(&self) -> &[u8] {
         &self.0.configuration
+    }
+
+    pub fn toolchain_execution_platform(&self) -> Option<&Arc<CanonicalLabel>> {
+        self.0.toolchain_execution_platform.as_ref()
     }
 }
 

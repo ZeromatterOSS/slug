@@ -301,8 +301,9 @@ fn toolchain_context(
 ) -> Arc<ConfiguredActionToolchainContext> {
     let implementation = ConfiguredTargetKey::new(
         canonical("@@//:implementation"),
-        platform.configuration().clone(),
-    );
+        owner.configuration().clone(),
+    )
+    .with_toolchain_execution_platform(Arc::new(platform.label().clone()));
     let selection = ConfiguredToolchainSelection::new(
         canonical("@@//:toolchain"),
         implementation.clone(),
@@ -359,8 +360,9 @@ fn aliased_payload_context(shared: bool) -> Arc<ConfiguredActionToolchainContext
         .map(|(index, depset)| {
             let implementation = ConfiguredTargetKey::new(
                 canonical(&format!("@@//:implementation_{index}")),
-                exec.clone(),
-            );
+                target.clone(),
+            )
+            .with_toolchain_execution_platform(Arc::new(platform.label().clone()));
             let nested = ProviderCollection::new(vec![
                 ProviderValue::DefaultInfo(DefaultInfo::empty()),
                 ProviderValue::Occurrence(ProviderOccurrence::new(
@@ -456,6 +458,7 @@ fn default_action_context(
         platform.clone(),
         PlatformSemanticFact {
             exec_properties: Arc::from([]),
+            missing_toolchain_error: None,
         },
         &BTreeMap::new(),
         &BTreeMap::new(),
@@ -597,6 +600,7 @@ fn action_context(
                 .map(|(key, value)| ((*key).into(), (*value).into()))
                 .collect::<Vec<_>>()
                 .into(),
+            missing_toolchain_error: None,
         },
         &properties(target_properties),
         &properties(group_properties),
@@ -639,6 +643,42 @@ fn only_file_write(result: &ConfiguredNodeResult) -> slug_analysis_v2::Configure
         .unwrap()
         .next()
         .unwrap()
+}
+
+#[test]
+fn selected_toolchain_request_keys_keep_configuration_and_distinct_structural_identity() {
+    let ordinary = ConfiguredTargetKey::new(
+        canonical("@@//:impl"),
+        structural_configurations()[0].clone(),
+    );
+    let a = ordinary
+        .clone()
+        .with_toolchain_execution_platform(Arc::new(canonical("@@//:a")));
+    let b = ordinary
+        .clone()
+        .with_toolchain_execution_platform(Arc::new(canonical("@@//:b")));
+    let a_again = ordinary
+        .clone()
+        .with_toolchain_execution_platform(Arc::new(canonical("@@//:a")));
+    let keys = [ordinary.clone(), a.clone(), b];
+    let mut ordered = std::collections::BTreeSet::new();
+    let mut hashed = std::collections::HashSet::new();
+    for key in keys {
+        assert!(key.configuration() == ordinary.configuration());
+        assert_eq!(key.stable_serialize(), ordinary.stable_serialize());
+        assert_eq!(
+            key.configuration().complete_identity_bytes(),
+            ordinary.configuration().complete_identity_bytes()
+        );
+        ordered.insert(key.clone());
+        hashed.insert(key);
+    }
+    assert_eq!(ordered.len(), 3);
+    assert_eq!(hashed.len(), 3);
+    assert!(a == a_again);
+    assert!(!ordered.insert(a_again.clone()));
+    assert!(!hashed.insert(a_again));
+    assert!(ordinary.toolchain_execution_platform().is_none());
 }
 
 #[test]
@@ -1138,6 +1178,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
             platform("@@//:p0"),
             PlatformSemanticFact {
                 exec_properties: Arc::from([]),
+                missing_toolchain_error: None,
             },
             &BTreeMap::new(),
             &BTreeMap::new(),
@@ -1167,6 +1208,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
         platform("@@//:p0"),
         PlatformSemanticFact {
             exec_properties: Arc::from([]),
+            missing_toolchain_error: None,
         },
         &BTreeMap::new(),
         &BTreeMap::new(),

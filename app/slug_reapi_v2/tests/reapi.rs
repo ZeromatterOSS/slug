@@ -243,7 +243,8 @@ fn configured_file_write_reapi_plan_reads_retained_platform_properties() {
     let label = |value| CanonicalLabel::parse(value).unwrap();
     let owner = ConfiguredTargetKey::new(label("@@//:write"), target.clone());
     let platform = ConfiguredTargetKey::new(label("@@//:platform"), exec.clone());
-    let implementation = ConfiguredTargetKey::new(label("@@//:implementation"), exec);
+    let implementation = ConfiguredTargetKey::new(label("@@//:implementation"), target.clone())
+        .with_toolchain_execution_platform(Arc::new(platform.label().clone()));
     let selected = ConfiguredToolchainSelection::new(
         label("@@//:toolchain"),
         implementation.clone(),
@@ -275,6 +276,7 @@ fn configured_file_write_reapi_plan_reads_retained_platform_properties() {
                     ("a".into(), "first".into()),
                     ("z".into(), "last".into()),
                 ]),
+                missing_toolchain_error: None,
             },
             &BTreeMap::new(),
             &BTreeMap::new(),
@@ -332,6 +334,89 @@ fn configured_file_write_reapi_plan_reads_retained_platform_properties() {
         ])
     );
     assert!(Arc::ptr_eq(view.action().context(), &context));
+}
+
+#[test]
+fn selected_toolchain_request_reapi_payload_is_not_owner_identity() {
+    let host = HostConversionInputs::new(
+        Some(AutoCpuToken::K8),
+        Some(HostPathFlavor::Unix),
+        None,
+        Arc::from([]),
+        Arc::from([]),
+    )
+    .unwrap();
+    let target = ConfigurationKey::from_slug(SlugConfiguration::default_target(&host).unwrap());
+    let exec = ConfigurationKey::from_slug(SlugConfiguration::default_exec(&host).unwrap());
+    let label = |value| CanonicalLabel::parse(value).unwrap();
+    let ordinary = ConfiguredTargetKey::new(label("@@//:implementation"), target);
+    let mut identities = Vec::new();
+    let mut payloads = Vec::new();
+    for preference in [None, Some("@@//:a"), Some("@@//:b")] {
+        let owner = match preference {
+            None => ordinary.clone(),
+            Some(value) => ordinary
+                .clone()
+                .with_toolchain_execution_platform(Arc::new(label(value))),
+        };
+        let context = Arc::new(
+            ConfiguredActionOwnerContext::new(
+                owner.clone(),
+                ConfiguredExecGroup::Default,
+                ConfiguredTargetKey::new(label("@@//:platform"), exec.clone()),
+                PlatformSemanticFact {
+                    exec_properties: Arc::from([]),
+                    missing_toolchain_error: None,
+                },
+                &BTreeMap::new(),
+                &BTreeMap::new(),
+                vec![],
+                None,
+                ConfiguredActionAspectProvenance::Absent,
+            )
+            .unwrap(),
+        );
+        let result = ConfiguredNodeResult::new_rule(
+            owner.clone(),
+            ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())])
+                .unwrap(),
+            None,
+            RunfilesPackageDepset::empty(),
+        )
+        .with_action_specs(
+            vec![ActionSpec::new(
+                ActionKind::Write {
+                    content: "same".to_owned(),
+                    is_executable: false,
+                },
+                "FileWrite",
+                vec![ActionOutput::new("same.txt", ActionOutputKind::File)],
+            )],
+            vec![context],
+        )
+        .unwrap();
+        let action = result
+            .configured_file_write_actions()
+            .unwrap()
+            .next()
+            .unwrap();
+        let view =
+            slug_core_v2::runtime::ResolvedFileWriteSemanticView::from_configured_action(action);
+        assert!(view.action().owner() == &owner);
+        identities
+            .push(slug_core_v2::runtime::FileWriteSemanticIdentity::from_resolved(&view).unwrap());
+        payloads.push(
+            FileWriteReapiPlan::from_resolved(&view, &BTreeMap::new())
+                .unwrap()
+                .identity()
+                .clone(),
+        );
+    }
+    assert_ne!(identities[0], identities[1]);
+    assert_ne!(identities[1], identities[2]);
+    assert_ne!(identities[0], identities[2]);
+    assert_eq!(payloads[0], payloads[1]);
+    assert_eq!(payloads[1], payloads[2]);
 }
 
 #[test]

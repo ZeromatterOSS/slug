@@ -5231,6 +5231,433 @@ root_rule(name = "root", deps = [":left", ":right"])
     );
 }
 
+mod configured_action_conflicts {
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+
+    use super::*;
+
+    // Pinned Bazel 8220c619: OutputArtifactConflictTest invalidated/new-target/
+    // repeated/unused-action themes; Actions.canBeShared; CqueryCommand disables
+    // conflict checking. Reuse core's configured_test_module/local platforms
+    // scaffold so host-platform discovery does not require an archive download.
+    const BUILD: &str = r#"load(":defs.bzl", "toolchain_impl", "writer", "root_rule")
+platform(name = "platform")
+toolchain_type(name = "kind")
+toolchain_impl(name = "implementation")
+toolchain(name = "registration", toolchain_type = ":kind", toolchain = ":implementation")
+writer(name = "writer_a", content = "same")
+writer(name = "writer_b", content = "same")
+root_rule(name = "root", deps = [":writer_a", ":writer_b"])
+"#;
+
+    fn workspace() -> std::path::PathBuf {
+        let workspace = scratch("configured-action-conflicts");
+        write(
+            workspace.join("MODULE.bazel"),
+            "module(name = 'conflicts')\nregister_execution_platforms('//:platform')\nregister_toolchains('//:registration')\nbazel_dep(name = 'platforms', version = '1.0.0')\nlocal_path_override(module_name = 'platforms', path = '.slug_test_builtin/platforms')\n",
+        );
+        let platforms = workspace.join(".slug_test_builtin/platforms");
+        write(
+            platforms.join("MODULE.bazel"),
+            "module(name = 'platforms', version = '1.0.0')\n",
+        );
+        write(
+            platforms.join("host/BUILD.bazel"),
+            "exports_files(['constraints.bzl'])\nplatform(name = 'host')\n",
+        );
+        write(
+            platforms.join("host/constraints.bzl"),
+            "HOST_CONSTRAINTS = []\n",
+        );
+        write(workspace.join("BUILD.bazel"), BUILD);
+        write(
+            workspace.join("defs.bzl"),
+            r##"def _toolchain(ctx): return [platform_common.ToolchainInfo()]
+toolchain_impl = rule(implementation = _toolchain)
+def _writer(ctx):
+    out = ctx.actions.declare_file("shared.txt")
+    ctx.actions.write(out, ctx.attr.content)
+    return [DefaultInfo()]
+writer = rule(implementation = _writer, attrs = {"content": attr.string()}, toolchains = ["//:kind"])
+def _root(ctx):
+    out = ctx.actions.declare_file("runner.sh")
+    ctx.actions.write(out, "#!/bin/sh\nexit 0\n", is_executable = True)
+    return [DefaultInfo(executable = out)]
+root_rule = rule(implementation = _root, executable = True, attrs = {"deps": attr.label_list()}, toolchains = ["//:kind"])
+"##,
+        );
+        workspace
+    }
+
+    fn run(
+        workspace: &std::path::Path,
+        output_base: Option<&str>,
+        args: &[&str],
+    ) -> std::process::Output {
+        let mut command = slug();
+        command.current_dir(workspace);
+        if let Some(output_base) = output_base {
+            command.arg(output_base);
+        }
+        let child = command
+            .args(args)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        bounded_output(child, args)
+    }
+
+    const OUTPUT_LIMIT: usize = 8192;
+
+    fn drain_output(
+        mut pipe: impl std::io::Read + Send + 'static,
+    ) -> std::thread::JoinHandle<(Vec<u8>, usize)> {
+        std::thread::spawn(move || {
+            let mut retained = Vec::new();
+            let mut total = 0;
+            let mut buffer = [0; 4096];
+            loop {
+                let count = pipe.read(&mut buffer).unwrap();
+                if count == 0 {
+                    break;
+                }
+                total += count;
+                let keep = count.min(OUTPUT_LIMIT - retained.len());
+                retained.extend_from_slice(&buffer[..keep]);
+            }
+            (retained, total)
+        })
+    }
+
+    fn bounded_output(mut child: std::process::Child, args: &[&str]) -> std::process::Output {
+        // Drain both pipes while the child runs. Waiting first can deadlock as
+        // soon as a diagnostic fills the OS pipe buffer. The CLI's daemon spawn
+        // redirects all stdio to null, so it does not retain these pipe handles.
+        let stdout = drain_output(child.stdout.take().unwrap());
+        let stderr = drain_output(child.stderr.take().unwrap());
+        let started = std::time::Instant::now();
+        let mut timed_out = false;
+        let status = loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                break status;
+            }
+            if started.elapsed() > std::time::Duration::from_secs(12) {
+                timed_out = true;
+                let _ = child.kill();
+                break child.wait().unwrap();
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        };
+        let (stdout, stdout_len) = stdout.join().unwrap();
+        let (stderr, stderr_len) = stderr.join().unwrap();
+        assert!(
+            !timed_out,
+            "bounded CLI command timed out: {args:?}; status={status}; stdout={stdout_len} bytes, stderr={stderr_len} bytes"
+        );
+        assert!(
+            stdout_len <= OUTPUT_LIMIT && stderr_len <= OUTPUT_LIMIT,
+            "CLI output limit exceeded: {args:?}; status={status}; stdout={stdout_len} bytes, stderr={stderr_len} bytes; stderr prefix={}",
+            String::from_utf8_lossy(&stderr[..stderr.len().min(1024)])
+        );
+        std::process::Output {
+            status,
+            stdout,
+            stderr,
+        }
+    }
+
+    #[test]
+    fn output_drainers_consume_beyond_retained_limit() {
+        // More than ordinary OS pipe capacity on each stream; no Slug process,
+        // registry, daemon or external command is needed for the drain contract.
+        let bytes = vec![b'x'; OUTPUT_LIMIT * 32];
+        let stdout = drain_output(std::io::Cursor::new(bytes.clone()));
+        let stderr = drain_output(std::io::Cursor::new(bytes));
+        for reader in [stdout, stderr] {
+            let (retained, total) = reader.join().unwrap();
+            assert_eq!(retained, vec![b'x'; OUTPUT_LIMIT]);
+            assert_eq!(total, OUTPUT_LIMIT * 32);
+        }
+    }
+
+    struct TransportProbe {
+        flag: String,
+        calls: Arc<AtomicUsize>,
+        stop: Arc<AtomicBool>,
+        thread: Option<std::thread::JoinHandle<()>>,
+    }
+
+    impl TransportProbe {
+        fn new() -> Self {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let flag = format!(
+                "--remote_executor=grpc://{}",
+                listener.local_addr().unwrap()
+            );
+            let calls = Arc::new(AtomicUsize::new(0));
+            let stop = Arc::new(AtomicBool::new(false));
+            let observed_calls = calls.clone();
+            let stopped = stop.clone();
+            let thread = std::thread::spawn(move || {
+                loop {
+                    match listener.accept() {
+                        Ok((socket, _)) => {
+                            observed_calls.fetch_add(1, Ordering::Relaxed);
+                            // Close accidental attempts immediately, so a regression
+                            // reports a count instead of stalling in an h2 handshake.
+                            drop(socket);
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            if stopped.load(Ordering::Relaxed) {
+                                break;
+                            }
+                            std::thread::sleep(std::time::Duration::from_millis(2));
+                        }
+                        Err(error) => panic!("transport probe failed: {error}"),
+                    }
+                }
+            });
+            Self {
+                flag,
+                calls,
+                stop,
+                thread: Some(thread),
+            }
+        }
+
+        fn assert_unused(mut self) {
+            self.stop.store(true, Ordering::Relaxed);
+            // Drain queued attempts before asserting, not merely the count
+            // observed when the child process happened to exit.
+            self.thread.take().unwrap().join().unwrap();
+            assert_eq!(self.calls.load(Ordering::Relaxed), 0);
+        }
+    }
+
+    impl Drop for TransportProbe {
+        fn drop(&mut self) {
+            self.stop.store(true, Ordering::Relaxed);
+            if let Some(thread) = self.thread.take() {
+                thread.join().unwrap();
+            }
+        }
+    }
+
+    fn sentinel_outputs(workspace: &std::path::Path) -> std::path::PathBuf {
+        let request = BuildRequest::parse(&["//:root"]).unwrap();
+        let accepted = evaluate_workspace_build_command_with_bzlmod_inputs(
+            workspace,
+            &request.targets,
+            request.bzlmod_policy,
+            normalize_bzlmod_environment_value(None).unwrap(),
+            request.lockfile_mode,
+            &request.registry_urls,
+            Default::default(),
+        )
+        .unwrap();
+        let mut output_root = None;
+        let projected = accepted.project(|terminal| {
+            let evaluation = terminal.as_ref().as_ref().unwrap();
+            let configuration = evaluation
+                .analyses()
+                .next()
+                .unwrap()
+                .configured_target_key()
+                .unwrap()
+                .configuration()
+                .slug_configuration()
+                .unwrap();
+            output_root = Some(slug_core_v2::runtime::configured_output_root(
+                workspace,
+                configuration,
+            ));
+            TerminalOutput::new(0, String::new(), String::new())
+        });
+        assert_eq!(projected.publish().into_parts().1, 0);
+        let output_root = output_root.unwrap();
+        write(output_root.join("shared.txt"), "previous shared output");
+        write(output_root.join("runner.sh"), "previous executable output");
+        output_root
+    }
+
+    fn assert_outputs_unchanged(output_root: &std::path::Path) {
+        assert_eq!(
+            std::fs::read(output_root.join("shared.txt")).unwrap(),
+            b"previous shared output"
+        );
+        assert_eq!(
+            std::fs::read(output_root.join("runner.sh")).unwrap(),
+            b"previous executable output"
+        );
+        assert_eq!(std::fs::read_dir(output_root).unwrap().count(), 2);
+    }
+
+    fn aquery(workspace: &std::path::Path, base: Option<&str>) -> Vec<u8> {
+        let output = run(workspace, base, &["aquery", "deps(//:root)"]);
+        assert!(output.status.success(), "{output:?}");
+        assert!(output.stderr.is_empty(), "{output:?}");
+        let text = String::from_utf8_lossy(&output.stdout);
+        for owner in ["root", "writer_a", "writer_b"] {
+            assert_eq!(
+                text.matches(&format!("  Target: //:{owner}\n")).count(),
+                1,
+                "{text}"
+            );
+        }
+        assert_eq!(text.matches("action '").count(), 3, "{text}");
+        output.stdout
+    }
+
+    fn reject_commands(workspace: &std::path::Path, base: Option<&str>, probe: &TransportProbe) {
+        for args in [
+            vec!["build", "//:root", probe.flag.as_str()],
+            vec!["run", "//:root", probe.flag.as_str()],
+            vec!["aquery", "//:root"],
+            vec!["aquery", "deps(//:root)"],
+        ] {
+            let output = run(workspace, base, &args);
+            assert_eq!(output.status.code(), Some(2), "{args:?}: {output:?}");
+            assert!(output.stdout.is_empty(), "{args:?}: {output:?}");
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let category = if args[0] == "aquery" {
+                "aquery_runtime_error"
+            } else {
+                "configured_action_conflict"
+            };
+            for fragment in [
+                category,
+                "configured action output conflict",
+                "shared.txt",
+                "writer_a",
+                "writer_b",
+            ] {
+                assert!(stderr.contains(fragment), "{args:?}: {stderr}");
+            }
+            assert!(!stderr.contains("transport"), "{stderr}");
+        }
+        assert_eq!(probe.calls.load(Ordering::Relaxed), 0);
+        let cquery = run(workspace, base, &["cquery", "deps(//:root)"]);
+        assert!(cquery.status.success(), "{cquery:?}");
+        let labels = String::from_utf8_lossy(&cquery.stdout);
+        assert!(
+            labels.contains("//:writer_a ") && labels.contains("//:writer_b "),
+            "{labels}"
+        );
+    }
+
+    #[test]
+    fn one_shot_rejects_unused_conflicts_before_transport_and_output_changes() {
+        let workspace = workspace();
+        let outputs = sentinel_outputs(&workspace);
+        let baseline = aquery(&workspace, None);
+        let probe = TransportProbe::new();
+        write(
+            workspace.join("BUILD.bazel"),
+            &BUILD.replace(
+                "writer_b\", content = \"same",
+                "writer_b\", content = \"different",
+            ),
+        );
+        reject_commands(&workspace, None, &probe);
+        assert_outputs_unchanged(&outputs);
+        write(workspace.join("BUILD.bazel"), BUILD);
+        assert_eq!(aquery(&workspace, None), baseline);
+        assert_outputs_unchanged(&outputs);
+        probe.assert_unused();
+    }
+
+    #[test]
+    fn validated_shared_closure_lowers_one_reapi_plan_and_keeps_aquery_owners() {
+        let workspace = workspace();
+        let request = BuildRequest::parse(&["//:root"]).unwrap();
+        let accepted = evaluate_workspace_build_command_with_bzlmod_inputs(
+            &workspace,
+            &request.targets,
+            request.bzlmod_policy,
+            normalize_bzlmod_environment_value(None).unwrap(),
+            request.lockfile_mode,
+            &request.registry_urls,
+            Default::default(),
+        )
+        .unwrap();
+        let projected = accepted.project(|terminal| {
+            let evaluation = terminal.as_ref().as_ref().unwrap();
+            let semantic = evaluation
+                .resolved_file_write_semantic_views_in_closure()
+                .unwrap();
+            let shared_semantic = semantic
+                .iter()
+                .filter(|view| view.action().output().path() == "shared.txt")
+                .collect::<Vec<_>>();
+            assert_eq!(shared_semantic.len(), 2);
+            assert_ne!(
+                shared_semantic[0].action().owner(),
+                shared_semantic[1].action().owner()
+            );
+
+            let execution = evaluation
+                .resolved_file_write_execution_views_in_closure()
+                .unwrap();
+            let shared_execution = execution
+                .iter()
+                .filter(|view| view.action().output().path() == "shared.txt")
+                .collect::<Vec<_>>();
+            assert_eq!(shared_execution.len(), 1);
+            let plan = slug_reapi_v2::FileWriteReapiPlan::from_resolved(
+                shared_execution[0],
+                &std::collections::BTreeMap::new(),
+            )
+            .unwrap();
+            assert_eq!(plan.command().output_files, ["shared.txt"]);
+            TerminalOutput::new(0, String::new(), String::new())
+        });
+        assert_eq!(projected.publish().into_parts().1, 0);
+
+        let output = aquery(&workspace, None);
+        assert!(String::from_utf8_lossy(&output).contains("shared.txt"));
+    }
+
+    #[test]
+    fn stable_daemon_restores_sharing_after_repeated_conflicts() {
+        let workspace = workspace();
+        let outputs = sentinel_outputs(&workspace);
+        let output_base = scratch("configured-action-conflicts-daemon");
+        let _cleanup = DaemonCleanup(output_base.clone());
+        let base = format!("--output_base={}", output_base.display());
+        let baseline = aquery(&workspace, Some(&base));
+        let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+        let probe = TransportProbe::new();
+        write(
+            workspace.join("BUILD.bazel"),
+            &BUILD.replace(
+                "writer_b\", content = \"same",
+                "writer_b\", content = \"different",
+            ),
+        );
+        for _ in 0..2 {
+            reject_commands(&workspace, Some(&base), &probe);
+            assert_outputs_unchanged(&outputs);
+            assert_eq!(
+                std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+                pid
+            );
+        }
+        write(workspace.join("BUILD.bazel"), BUILD);
+        assert_eq!(aquery(&workspace, Some(&base)), baseline);
+        assert_eq!(
+            std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+            pid
+        );
+        assert_outputs_unchanged(&outputs);
+        probe.assert_unused();
+    }
+}
+
 #[test]
 fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
     let workspace = scratch("command-module-overrides");

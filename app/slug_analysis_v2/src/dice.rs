@@ -24,7 +24,6 @@ use dupe::Dupe;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
-use slug_build_api_v2::AnalysisConfiguredTargetKey;
 use slug_build_api_v2::AnalysisTargetIdentity;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::ConfiguredTargetValue;
@@ -225,6 +224,7 @@ pub struct ConfiguredToolchainResolutionKey {
     workspace: NormalizedAbsolutePath,
     configuration: ConfigurationKey,
     requirements: Arc<[ToolchainTypeRequirement]>,
+    toolchain_execution_platform: Option<Arc<CanonicalLabel>>,
 }
 
 #[doc(hidden)]
@@ -320,7 +320,16 @@ impl ConfiguredToolchainResolutionKey {
             workspace,
             configuration,
             requirements,
+            toolchain_execution_platform: None,
         })
+    }
+
+    pub fn with_toolchain_execution_platform(
+        mut self,
+        toolchain_execution_platform: Arc<CanonicalLabel>,
+    ) -> Self {
+        self.toolchain_execution_platform = Some(toolchain_execution_platform);
+        self
     }
 
     pub fn workspace(&self) -> &NormalizedAbsolutePath {
@@ -333,6 +342,10 @@ impl ConfiguredToolchainResolutionKey {
 
     pub fn requirements(&self) -> &[ToolchainTypeRequirement] {
         &self.requirements
+    }
+
+    pub fn toolchain_execution_platform(&self) -> Option<&Arc<CanonicalLabel>> {
+        self.toolchain_execution_platform.as_ref()
     }
 }
 
@@ -350,12 +363,26 @@ impl ConfiguredToolchainResolutionObservationKey {
         self.0.workspace()
     }
 
+    pub fn with_toolchain_execution_platform(
+        mut self,
+        toolchain_execution_platform: Arc<CanonicalLabel>,
+    ) -> Self {
+        self.0 = self
+            .0
+            .with_toolchain_execution_platform(toolchain_execution_platform);
+        self
+    }
+
     pub fn configuration(&self) -> &ConfigurationKey {
         self.0.configuration()
     }
 
     pub fn requirements(&self) -> &[ToolchainTypeRequirement] {
         self.0.requirements()
+    }
+
+    pub fn toolchain_execution_platform(&self) -> Option<&Arc<CanonicalLabel>> {
+        self.0.toolchain_execution_platform()
     }
 }
 
@@ -1449,6 +1476,37 @@ async fn prepare_configured_rule_attributes(
     analysis_semantic_complete(resolved.map(|values| (values, conditions.packages)))
 }
 
+fn target_exec_properties(
+    attributes: &[ResolvedRuleAttribute],
+) -> Result<BTreeMap<String, String>, AnalysisError> {
+    let attribute = attributes
+        .iter()
+        .find(|attribute| attribute.declaration_name == "exec_properties")
+        .ok_or_else(|| AnalysisError::new("missing resolved target exec_properties"))?;
+    let CoercedAttributeValue::StringDict(values) = &attribute.value else {
+        return Err(AnalysisError::new(
+            "invalid resolved target exec_properties",
+        ));
+    };
+    // ExecGroupCollection.java:185-215 assigns dotted keys to named groups,
+    // never to the default group. That group surface remains unadmitted here.
+    if values.iter().any(|(key, _)| key.contains('.')) {
+        return Err(AnalysisError::new(
+            "group-qualified target exec_properties are unsupported",
+        ));
+    }
+    let properties: BTreeMap<_, _> = values
+        .iter()
+        .map(|(key, value)| (key.to_string(), value.to_string()))
+        .collect();
+    if properties.len() != values.len() {
+        return Err(AnalysisError::new(
+            "duplicate resolved target exec_properties",
+        ));
+    }
+    Ok(properties)
+}
+
 async fn root_declared_dependency_keys(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
@@ -1778,6 +1836,10 @@ async fn rule_transition_delegate(
             first.clone(),
         )
     };
+    let delegated = match configured_target.toolchain_execution_platform() {
+        Some(platform) => delegated.with_toolchain_execution_platform(platform.clone()),
+        None => delegated,
+    };
     analysis_semantic_complete(Ok(Some(delegated)))
 }
 
@@ -1973,13 +2035,6 @@ fn native_configured_result(
     )
 }
 
-fn analysis_configured_key(key: &ConfiguredTargetKey) -> AnalysisConfiguredTargetKey {
-    AnalysisConfiguredTargetKey::new(
-        key.label().clone(),
-        key.configuration().complete_identity_bytes(),
-    )
-}
-
 fn configured_dependency_file_path(result: &ConfiguredNodeResult) -> String {
     let label = result.key().label();
     let package = label.package().package().as_str();
@@ -2011,7 +2066,7 @@ fn configured_target_analysis_value(
 ) -> Result<AnalysisValue, AnalysisError> {
     let identity = result.actual_configured_target().map_or_else(
         || AnalysisTargetIdentity::null(result.key().label().clone()),
-        |key| AnalysisTargetIdentity::from(analysis_configured_key(key)),
+        |key| AnalysisTargetIdentity::from(crate::analysis_value::analysis_configured_key(key)),
     );
     Ok(AnalysisValue::configured_target(
         ConfiguredTargetValue::new(identity, materialized_target_providers(result)?),
@@ -2020,7 +2075,7 @@ fn configured_target_analysis_value(
 
 fn derived_artifact(owner: &ConfiguredTargetKey, path: impl Into<String>) -> AnalysisArtifact {
     AnalysisArtifact::Derived {
-        owner: analysis_configured_key(owner),
+        owner: crate::analysis_value::analysis_configured_key(owner),
         output: ActionOutput::new(path, ActionOutputKind::File),
     }
 }
@@ -2191,6 +2246,7 @@ fn finish_analysis<T>(
     computed: &SmallMap<ConfiguredNodeKey, T>,
     selector_packages: &[ConfiguredNodeKey],
     candidate_execution_platforms: Option<Vec<ConfiguredTargetKey>>,
+    known_preferred_execution_platform: Option<ConfiguredTargetKey>,
     action_context: Arc<ConfiguredActionOwnerContext>,
     toolchain: Option<PreparedToolchain>,
     capture_events: bool,
@@ -2415,8 +2471,12 @@ where
     );
     *event_batch = print_capture.map(AnalysisPrintCapture::into_batch);
     let toolchain_topology = candidate_execution_platforms.map(|candidates| {
-        ToolchainTopology::new(candidates, toolchain_context)
-            .expect("selected execution platform came from the candidate sequence")
+        ToolchainTopology::new_with_known_preferred_execution_platform(
+            candidates,
+            known_preferred_execution_platform,
+            toolchain_context,
+        )
+        .expect("selected execution platform came from a candidate or known preference")
     });
     value
         .map_err(AnalysisError::from_loaded_rule_error)
@@ -2511,6 +2571,26 @@ fn platform_semantic_fact(
             }
             Ok(PlatformSemanticFact {
                 exec_properties: values.into(),
+                missing_toolchain_error: match &attrs
+                    .get("missing_toolchain_error")
+                    .ok_or_else(|| {
+                        AnalysisError::new(format!(
+                            "platform {label} has no missing_toolchain_error fact"
+                        ))
+                    })?
+                    .1
+                    .value
+                {
+                    CoercedAttributeValue::String(value) if !value.is_empty() => {
+                        Some(Arc::from(value.as_str()))
+                    }
+                    CoercedAttributeValue::String(_) => None,
+                    _ => {
+                        return Err(AnalysisError::new(format!(
+                            "platform {label} has invalid missing_toolchain_error fact"
+                        )));
+                    }
+                },
             })
         }
         _ => Err(AnalysisError::new(format!(
@@ -2697,12 +2777,11 @@ async fn compute_actual_child(
     if requested.configured_target_key() == Some(actual) {
         return LoadingPreparationOutcome::Complete(Ok(Arc::new(Ok(requested))));
     }
-    compute_configured_child(
+    compute_configured_node_child(
         ctx,
         mode,
         workspace,
-        actual.label().clone(),
-        actual.configuration().clone(),
+        ConfiguredNodeKey::configured(actual.clone()),
     )
     .await
 }
@@ -2712,12 +2791,11 @@ async fn observed_configured_result(
     workspace: &NormalizedAbsolutePath,
     key: &ConfiguredTargetKey,
 ) -> AnalysisSemanticOutcome<Arc<ConfiguredNodeResult>> {
-    let outcome = compute_configured_child(
+    let outcome = compute_configured_node_child(
         ctx,
         ConfiguredAnalysisMode::Observed,
         workspace.dupe(),
-        key.label().clone(),
-        key.configuration().clone(),
+        ConfiguredNodeKey::configured(key.clone()),
     )
     .await;
     match outcome {
@@ -3536,8 +3614,10 @@ async fn prepare_selected_toolchain_context(
     workspace: &NormalizedAbsolutePath,
     owner: &ConfiguredTargetKey,
     resolution: &ConfiguredToolchainResolution,
+    target_exec_properties: &BTreeMap<String, String>,
 ) -> PreparedToolchainOutcome {
     let execution_platform = resolution.execution_platform().actual().clone();
+    let toolchain_execution_platform = Arc::new(execution_platform.label().clone());
     if execution_platform.configuration().kind() != ConfigurationKind::Exec {
         return toolchain_outcome(Err(AnalysisError::message(
             "selected toolchain implementation requires exec configuration",
@@ -3551,12 +3631,10 @@ async fn prepare_selected_toolchain_context(
             row.implementation().map(|implementation| {
                 let key = ConfiguredNodeAnalysisKey::new(
                     workspace.dupe(),
-                    ConfiguredTargetKey::new(
-                        implementation.clone(),
-                        execution_platform.configuration().clone(),
-                    ),
+                    ConfiguredTargetKey::new(implementation.clone(), owner.configuration().clone())
+                        .with_toolchain_execution_platform(toolchain_execution_platform.clone()),
                 )
-                .expect("selected implementation inherits structural exec configuration");
+                .expect("selected implementation retains the owner's structural configuration");
                 (index, key)
             })
         })
@@ -3648,10 +3726,9 @@ async fn prepare_selected_toolchain_context(
                         "selected toolchain implementation does not provide ToolchainInfo: {implementation}"
                     ))));
                 };
-                let requested_implementation = ConfiguredTargetKey::new(
-                    implementation.clone(),
-                    execution_platform.configuration().clone(),
-                );
+                let requested_implementation =
+                    ConfiguredTargetKey::new(implementation.clone(), owner.configuration().clone())
+                        .with_toolchain_execution_platform(toolchain_execution_platform.clone());
                 let actual_implementation = result
                     .actual_configured_target()
                     .cloned()
@@ -3689,7 +3766,7 @@ async fn prepare_selected_toolchain_context(
         ConfiguredExecGroup::Default,
         execution_platform,
         resolution.execution_platform().fact().clone(),
-        &BTreeMap::new(),
+        target_exec_properties,
         &BTreeMap::new(),
         resolution.execution_platform().constraints().to_vec(),
         Some(toolchain),
@@ -4063,6 +4140,7 @@ async fn compute_configured_toolchain_resolution(
         })
         .await;
     let mut platforms = Vec::with_capacity(candidate_outcomes.len());
+    let mut resolved_host_platform = None;
     let mut seen = SmallMap::with_capacity(candidate_outcomes.len());
     let mut need = None;
     let mut outer = None;
@@ -4083,6 +4161,9 @@ async fn compute_configured_toolchain_resolution(
                 semantic = Some(error)
             }
             LoadingPreparationOutcome::Complete(Ok(Ok(platform))) => {
+                if index + 1 == candidate_labels.len() {
+                    resolved_host_platform = Some(platform.dupe());
+                }
                 if let Some(previous) = seen.get(platform.actual()) {
                     if index + 1 == candidate_labels.len() {
                         continue;
@@ -4110,6 +4191,54 @@ async fn compute_configured_toolchain_resolution(
     if let Some(error) = semantic {
         return analysis_semantic_complete(Err(error));
     }
+    let known_preferred_execution_platform = match key.toolchain_execution_platform() {
+        Some(preference) => {
+            if target_platform.actual().label() == preference.as_ref() {
+                let configuration = match structural.to_exec_for_platform(preference) {
+                    Ok(configuration) => ConfigurationKey::from_slug(configuration),
+                    Err(error) => {
+                        return analysis_semantic_complete(Err(AnalysisError::message(
+                            error.to_string(),
+                        )));
+                    }
+                };
+                match resolution_platform(
+                    ctx,
+                    key.workspace.dupe(),
+                    ConfiguredTargetKey::new((**preference).clone(), configuration),
+                )
+                .await
+                {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return LoadingPreparationOutcome::Need(need);
+                    }
+                    LoadingPreparationOutcome::Complete(Err(error)) => {
+                        return LoadingPreparationOutcome::Complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                        return analysis_semantic_complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Ok(platform))) => Some(platform),
+                }
+            } else if resolved_host_platform
+                .as_ref()
+                .is_some_and(|platform| platform.actual().label() == preference.as_ref())
+            {
+                resolved_host_platform
+            } else if let Some(platform) = platforms
+                .iter()
+                .find(|platform| platform.requested().label() == preference.as_ref())
+            {
+                Some(platform.dupe())
+            } else {
+                None
+            }
+        }
+        None => None,
+    };
+    let known_preferred_execution_platform_key = known_preferred_execution_platform
+        .as_ref()
+        .map(|platform| platform.actual().clone());
     let selected_empty = platforms
         .first()
         .cloned()
@@ -4117,7 +4246,8 @@ async fn compute_configured_toolchain_resolution(
     if key.requirements.is_empty() {
         return analysis_semantic_complete(Ok(Arc::new(ConfiguredToolchainResolution::new(
             target_platform,
-            selected_empty,
+            known_preferred_execution_platform.unwrap_or(selected_empty),
+            known_preferred_execution_platform_key,
             Arc::from([]),
         ))));
     }
@@ -4308,8 +4438,32 @@ async fn compute_configured_toolchain_resolution(
         .cloned()
         .map(|actual| (actual, false))
         .collect::<SmallMap<_, _>>();
-    let mut selected = None;
+    let preferred_is_candidate =
+        known_preferred_execution_platform
+            .as_ref()
+            .is_some_and(|preferred| {
+                platforms
+                    .iter()
+                    .any(|platform| platform.actual() == preferred.actual())
+            });
+    let outside_optional_preference = !preferred_is_candidate
+        && known_preferred_execution_platform.is_some()
+        && groups.values().all(|(mandatory, _)| !mandatory);
+    let mut selected = if outside_optional_preference {
+        Some((
+            known_preferred_execution_platform
+                .clone()
+                .expect("checked preferred platform"),
+            0,
+            groups.clone(),
+        ))
+    } else {
+        None
+    };
     for platform in &platforms {
+        if outside_optional_preference {
+            continue;
+        }
         let mut selected_groups = groups.clone();
         let mut coverage = 0usize;
         for (actual_type, group) in selected_groups.iter_mut() {
@@ -4373,6 +4527,13 @@ async fn compute_configured_toolchain_resolution(
         {
             continue;
         }
+        if known_preferred_execution_platform
+            .as_ref()
+            .is_some_and(|preference| platform.actual() == preference.actual())
+        {
+            selected = Some((platform.clone(), coverage, selected_groups));
+            break;
+        }
         if selected
             .as_ref()
             .is_none_or(|(_, best, _)| coverage > *best)
@@ -4425,6 +4586,7 @@ async fn compute_configured_toolchain_resolution(
     analysis_semantic_complete(Ok(Arc::new(ConfiguredToolchainResolution::new(
         target_platform,
         execution_platform,
+        known_preferred_execution_platform_key,
         rows,
     ))))
 }
@@ -4523,6 +4685,47 @@ impl fmt::Display for ConfiguredToolchainResolutionObservationKey {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn target_exec_properties_requires_resolved_string_dict() {
+        let attribute = |value| ResolvedRuleAttribute {
+            declaration_name: "exec_properties".into(),
+            kind: AttributeKind::StringDict,
+            sequence: false,
+            value,
+        };
+        assert!(target_exec_properties(&[]).is_err());
+        assert!(
+            target_exec_properties(&[attribute(CoercedAttributeValue::StringDict(Arc::from([(
+                "compile.cpu".into(),
+                "masked".into()
+            ),])))])
+            .is_err()
+        );
+        assert!(
+            target_exec_properties(&[attribute(CoercedAttributeValue::Boolean(false))]).is_err()
+        );
+        assert!(
+            target_exec_properties(&[attribute(CoercedAttributeValue::StringDict(Arc::from([
+                ("cpu".into(), "a".into()),
+                ("cpu".into(), "b".into()),
+            ])))])
+            .is_err()
+        );
+        assert!(
+            target_exec_properties(&[attribute(CoercedAttributeValue::StringDict(Arc::from([])))])
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            target_exec_properties(&[attribute(CoercedAttributeValue::StringDict(Arc::from([(
+                "cpu".into(),
+                "masked".into()
+            ),])))])
+            .unwrap(),
+            BTreeMap::from([("cpu".to_owned(), "masked".to_owned())])
+        );
+    }
 
     fn runfiles_metadata(package: &str) -> Arc<slug_build_api_v2::RunfilesPackageMetadata> {
         Arc::new(slug_build_api_v2::RunfilesPackageMetadata::new(
@@ -5631,6 +5834,10 @@ impl ConfiguredNodeAnalysisKey {
             }
             LoadingPreparationOutcome::Complete(Ok(Ok(values))) => values,
         };
+        let target_exec_properties = match target_exec_properties(&resolved_attributes) {
+            Ok(properties) => properties,
+            Err(error) => return root_analysis_driver_complete(Err(error)),
+        };
         let structural_configuration = configured_target
             .configuration()
             .slug_configuration()
@@ -5723,7 +5930,10 @@ impl ConfiguredNodeAnalysisKey {
             configured_target.configuration().clone(),
             requirements,
         ) {
-            Ok(key) => key,
+            Ok(key) => match configured_target.toolchain_execution_platform() {
+                Some(platform) => key.with_toolchain_execution_platform(platform.clone()),
+                None => key,
+            },
             Err(error) => return root_analysis_driver_complete(Err(error)),
         };
         let resolution = match mode {
@@ -5783,6 +5993,8 @@ impl ConfiguredNodeAnalysisKey {
             LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
         };
         let selected_platform = resolution.execution_platform();
+        let known_preferred_execution_platform =
+            resolution.known_preferred_execution_platform().cloned();
         let mut prepared = if has_exec_dependency {
             let exec_configuration = match structural_configuration
                 .to_exec_for_platform(selected_platform.actual().label())
@@ -5902,6 +6114,7 @@ impl ConfiguredNodeAnalysisKey {
                     &self.workspace,
                     configured_target,
                     &resolution,
+                    &target_exec_properties,
                 )
                 .await
                 {
@@ -5988,7 +6201,7 @@ impl ConfiguredNodeAnalysisKey {
                 ConfiguredExecGroup::Default,
                 selected_platform.actual().clone(),
                 selected_platform.fact().clone(),
-                &BTreeMap::new(),
+                &target_exec_properties,
                 &BTreeMap::new(),
                 selected_platform.constraints().to_vec(),
                 None,
@@ -6054,6 +6267,7 @@ impl ConfiguredNodeAnalysisKey {
             &computed,
             &selector_packages,
             candidate_execution_platforms,
+            known_preferred_execution_platform,
             action_context,
             prepared_toolchain,
             capture_events,
