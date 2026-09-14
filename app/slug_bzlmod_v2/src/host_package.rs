@@ -1138,6 +1138,9 @@ pub struct RepositoryPackageSourceError {
     inner: RepositoryPackageSourceErrorInner,
 }
 
+#[path = "host_package_registration_diagnostic.rs"]
+mod registration_diagnostic;
+
 impl RepositoryPackageSourceError {
     fn new(inner: RepositoryPackageSourceErrorInner) -> Self {
         Self { inner }

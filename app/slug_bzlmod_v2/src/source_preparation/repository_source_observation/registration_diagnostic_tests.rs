@@ -30,7 +30,7 @@ fn render_kind(kind: HostRepositorySourceObservationErrorKind) -> String {
 
 fn render_request(error: RepositorySourceFileError) -> String {
     let mut text = String::new();
-    request(&mut text, &error).unwrap();
+    error.write_registration_diagnostic(&mut text).unwrap();
     text
 }
 

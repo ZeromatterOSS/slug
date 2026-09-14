@@ -2222,11 +2222,7 @@ impl RepositoryPackageLoadDiagnosticLeaf<'_> {
     pub(crate) fn write(&self, out: &mut dyn fmt::Write) -> fmt::Result {
         match self.0 {
             RepositoryPackageLoadErrorInner::Source { error } => {
-                out.write_str(if error.is_unsupported_feature() {
-                    "Source.Unsupported"
-                } else {
-                    "Source"
-                })
+                error.write_registration_diagnostic(out)
             }
             RepositoryPackageLoadErrorInner::SourceCompute {
                 canonical_repo,

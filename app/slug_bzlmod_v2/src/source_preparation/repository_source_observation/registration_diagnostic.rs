@@ -36,6 +36,14 @@ impl HostRepositorySourceObservationError {
     }
 }
 
+impl RepositorySourceFileError {
+    /// Stream only bounded causal fields. The caller owns escaping and its budget.
+    #[doc(hidden)]
+    pub fn write_registration_diagnostic(&self, out: &mut dyn fmt::Write) -> fmt::Result {
+        request(out, self)
+    }
+}
+
 fn source_class(
     out: &mut dyn fmt::Write,
     input: &HostRepositorySourceObservationInput,
