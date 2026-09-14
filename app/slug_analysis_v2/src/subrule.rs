@@ -192,7 +192,9 @@ pub(crate) fn configured_dependency_rows(
                 kind: attribute.kind(),
                 labels,
                 hidden: attribute.is_hidden(),
-                dependency: if attribute.exec_configuration() {
+                dependency: if let Some(group) = attribute.exec_group() {
+                    ConfiguredAttributeDependency::Exec(ConfiguredExecGroup::Named(group.clone()))
+                } else if attribute.exec_configuration() {
                     ConfiguredAttributeDependency::Exec(ConfiguredExecGroup::Default)
                 } else {
                     ConfiguredAttributeDependency::Target

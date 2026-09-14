@@ -273,6 +273,7 @@ impl AttributePropertyFlags {
 pub enum AttributeDependencyConfiguration {
     Target,
     Exec,
+    ExecGroup(CompactString),
     Starlark(TransitionDefinition),
 }
 
@@ -485,9 +486,9 @@ impl AttributeSchema {
     pub fn transition(&self) -> Option<&TransitionDefinition> {
         match &self.dependency_configuration {
             AttributeDependencyConfiguration::Starlark(transition) => Some(transition),
-            AttributeDependencyConfiguration::Target | AttributeDependencyConfiguration::Exec => {
-                None
-            }
+            AttributeDependencyConfiguration::Target
+            | AttributeDependencyConfiguration::Exec
+            | AttributeDependencyConfiguration::ExecGroup(_) => None,
         }
     }
     pub(crate) fn with_dependency_configuration(

@@ -67,6 +67,11 @@ mod command_configuration_tests {
         .unwrap()
     }
 
+    #[test]
+    fn automatic_execution_groups_native_default_is_typed() {
+        assert!(!configuration().incompatible_auto_exec_groups().unwrap());
+    }
+
     fn mapping() -> RepositoryMapping {
         let mut mapping = RepositoryMapping::new(RepositoryMappingId::new("command-test").unwrap());
         mapping.insert(

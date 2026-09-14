@@ -784,8 +784,19 @@ pub struct ToolchainTypeRequirement {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct DeclaredExecGroup {
+pub struct DeclaredExecGroup {
     toolchains: Arc<[ToolchainTypeRequirement]>,
+    exec_compatible_with: Arc<[CanonicalLabel]>,
+}
+
+impl DeclaredExecGroup {
+    pub fn toolchains(&self) -> &[ToolchainTypeRequirement] {
+        &self.toolchains
+    }
+
+    pub fn exec_compatible_with(&self) -> &[CanonicalLabel] {
+        &self.exec_compatible_with
+    }
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
@@ -859,6 +870,7 @@ pub struct StarlarkRuleImplementation {
     source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
     dependencies: Arc<[CanonicalLabel]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
+    declared_exec_groups: Arc<[(CompactString, DeclaredExecGroup)]>,
     advertised_providers: Arc<[ProviderIdentity]>,
     required_fragments: Arc<[CompactString]>,
     attached_subrules: AttachedSubrules,
@@ -882,6 +894,7 @@ impl PartialEq for StarlarkRuleImplementation {
             && self.definition_source == other.definition_source
             && self.source_identities_by_filename == other.source_identities_by_filename
             && self.required_toolchains == other.required_toolchains
+            && self.declared_exec_groups == other.declared_exec_groups
             && self.advertised_providers == other.advertised_providers
             && self.required_fragments == other.required_fragments
             && self.attached_subrules == other.attached_subrules
@@ -920,6 +933,10 @@ impl StarlarkRuleImplementation {
     /// These are loading-only retained metadata, not ordinary dependencies.
     pub fn required_toolchains(&self) -> &[ToolchainTypeRequirement] {
         &self.required_toolchains
+    }
+
+    pub fn declared_exec_groups(&self) -> &[(CompactString, DeclaredExecGroup)] {
+        &self.declared_exec_groups
     }
 
     pub fn advertised_providers(&self) -> &[ProviderIdentity] {
@@ -1706,6 +1723,7 @@ impl PackageRecorder {
         definition_source: Arc<BzlModuleIdentity>,
         source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
         required_toolchains: Arc<[ToolchainTypeRequirement]>,
+        declared_exec_groups: Arc<[(CompactString, DeclaredExecGroup)]>,
         advertised_providers: Arc<[ProviderIdentity]>,
         required_fragments: Arc<[CompactString]>,
         attached_subrules: AttachedSubrules,
@@ -1746,6 +1764,7 @@ impl PackageRecorder {
                 source_identities_by_filename,
                 dependencies: dependencies.into(),
                 required_toolchains,
+                declared_exec_groups,
                 advertised_providers,
                 required_fragments,
                 attached_subrules,
@@ -7633,11 +7652,6 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 "a target declared by rule() requires a string `name`"
             ))
         })?;
-        if self.declared_exec_groups.is_some() || self.named_exec_transition_attributes.is_some() {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
-                "target invocation for named execution-group semantics is unsupported"
-            )));
-        }
         if self.initializer.is_some() {
             return Err(starlark::Error::new_other(anyhow::anyhow!(
                 "target invocation for rule initializer is unsupported"
@@ -7668,6 +7682,10 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         let definition_source = self.definition_source.clone();
         let source_identities_by_filename = self.source_identities_by_filename.clone();
         let required_toolchains = self.required_toolchains.clone();
+        let declared_exec_groups = self
+            .declared_exec_groups
+            .clone()
+            .unwrap_or_else(|| Arc::from([]));
         let advertised_providers = self.advertised_providers.clone();
         let required_fragments = self.required_fragments.clone();
         let attached_subrules = self.attached_subrules.clone();
@@ -7707,7 +7725,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 let mut schema = Vec::with_capacity(self.schema.len());
                 let mut values = Vec::with_capacity(self.schema.len());
                 let mut generated = Vec::new();
-                for declaration in self.schema.iter() {
+                for (schema_index, declaration) in self.schema.iter().enumerate() {
                     let builtin = declaration.builtin;
                     let attribute_schema = if builtin {
                         AttributeSchema::builtin(
@@ -7725,11 +7743,21 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     } else {
                         let dependency_configuration = match (
                             declaration.exec_configuration,
+                            self.named_exec_transition_attributes
+                                .as_deref()
+                                .and_then(|attributes| {
+                                    attributes.iter().find_map(|(index, group)| {
+                                        (*index as usize == schema_index).then_some(group)
+                                    })
+                                }),
                             declaration.transition.as_ref(),
                         ) {
-                            (false, None) => AttributeDependencyConfiguration::Target,
-                            (true, None) => AttributeDependencyConfiguration::Exec,
-                            (false, Some(transition)) => {
+                            (false, None, None) => AttributeDependencyConfiguration::Target,
+                            (true, None, None) => AttributeDependencyConfiguration::Exec,
+                            (false, Some(group), None) => {
+                                AttributeDependencyConfiguration::ExecGroup(group.clone())
+                            }
+                            (false, None, Some(transition)) => {
                                 AttributeDependencyConfiguration::Starlark(
                                     LoadingTransitionDefinition::new(
                                         transition.implementation,
@@ -7740,8 +7768,8 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                                     ),
                                 )
                             }
-                            (true, Some(_)) => anyhow::bail!(
-                                "attribute '{}' cannot combine cfg='exec' with a Starlark transition",
+                            _ => anyhow::bail!(
+                                "attribute '{}' has conflicting dependency transitions",
                                 declaration.name
                             ),
                         };
@@ -7939,6 +7967,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     definition_source,
                     source_identities_by_filename,
                     required_toolchains,
+                    declared_exec_groups,
                     advertised_providers,
                     required_fragments,
                     attached_subrules,
@@ -9794,11 +9823,11 @@ fn bzl_only_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] exec_compatible_with: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<StarlarkDeclaredExecGroup> {
-        if exec_compatible_with.is_some_and(|constraints| !constraints.items.is_empty()) {
-            anyhow::bail!("nonempty exec_compatible_with is unsupported");
-        }
+        let context = BzlEvaluationContext::from_evaluator(eval)?;
+        let source = context.source_identity_for_call(eval)?;
         Ok(StarlarkDeclaredExecGroup(DeclaredExecGroup {
             toolchains: toolchain_requirements(toolchains, eval)?,
+            exec_compatible_with: aspect_exec_compatible_with(exec_compatible_with, source)?,
         }))
     }
 
@@ -10193,7 +10222,7 @@ mod module_extension_definition_tests {
     }
 
     #[test]
-    fn exec_group_declarations_are_sparse_bzl_only_and_fail_closed() {
+    fn exec_group_declarations_retain_constraints_and_named_transitions() {
         assert_eq!(
             (
                 std::mem::size_of::<StarlarkExecTransition>(),
@@ -10203,7 +10232,7 @@ mod module_extension_definition_tests {
                 std::mem::size_of::<RuleDefinition<'static>>(),
                 std::mem::size_of::<FrozenRuleDefinition>(),
             ),
-            (24, 16, 16, 16, 376, 344)
+            (24, 32, 16, 16, 376, 344)
         );
         let source = concat!(
             "def impl(ctx): fail('implementation stayed lazy')\n",
@@ -10211,7 +10240,7 @@ mod module_extension_definition_tests {
             "default_exec = attr.label(cfg = config.exec())\n",
             "default_none = attr.label(cfg = config.exec(exec_group = None))\n",
             "cpp = exec_group(toolchains = [config_common.toolchain_type('//:one', mandatory = False), '//:two'])\n",
-            "test_group = exec_group(exec_compatible_with = [])\n",
+            "test_group = exec_group(exec_compatible_with = ['//:constraint'])\n",
             "binary = rule(implementation = impl, attrs = {'dep': named}, exec_groups = {'cpp_link': cpp} | {})\n",
             "test_rule = rule(implementation = impl, attrs = {'dep': named}, exec_groups = {'cpp_link': cpp, 'default': test_group, 'test': test_group})\n",
             "library = rule(implementation = impl, exec_groups = {'cpp_link': cpp})\n",
@@ -10244,6 +10273,10 @@ mod module_extension_definition_tests {
             );
             assert!(!groups[0].1.toolchains[0].mandatory());
             assert_eq!(groups[0].1.toolchains[1].label().target().as_str(), "two");
+            assert_eq!(
+                groups[2].1.exec_compatible_with[0].target().as_str(),
+                "constraint"
+            );
             let [(index, group)] = rule.named_exec_transition_attributes.as_deref().unwrap() else {
                 panic!("named transition was not retained sparsely")
             };
@@ -10286,7 +10319,6 @@ mod module_extension_definition_tests {
         }
         let prelude = concat!("def impl(ctx): pass\n", "G = exec_group()\n",);
         for invalid in [
-            "X = exec_group(exec_compatible_with = ['//:constraint'])\n",
             "X = exec_group(toolchains = [1])\n",
             "X = config.exec(exec_group = 1)\n",
             "X = rule(implementation = impl, exec_groups = [])\n",

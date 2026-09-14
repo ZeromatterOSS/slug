@@ -1560,6 +1560,18 @@ async fn root_declared_dependency_keys(
                     ConfiguredAttributeDependency::Exec(ConfiguredExecGroup::Default),
                 )
             }
+            AttributeDependencyConfiguration::ExecGroup(group) => {
+                let Some(configuration) = exec_configuration else {
+                    return analysis_semantic_complete(Err(AnalysisError::new(format!(
+                        "internal error: named exec dependency `{}` was prepared before execution-platform selection",
+                        value.declaration_name
+                    ))));
+                };
+                (
+                    configuration.clone(),
+                    ConfiguredAttributeDependency::Exec(ConfiguredExecGroup::Named(group.clone())),
+                )
+            }
             AttributeDependencyConfiguration::Starlark(transition) => {
                 let configuration = match configured_dependency_configuration(
                     ctx,

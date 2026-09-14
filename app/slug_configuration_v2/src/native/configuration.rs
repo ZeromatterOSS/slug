@@ -531,6 +531,11 @@ impl SlugConfiguration {
         self.0.kind
     }
 
+    /// Native fallback for rules that do not declare `_use_auto_exec_groups`.
+    pub fn incompatible_auto_exec_groups(&self) -> Result<bool, SlugConfigurationError> {
+        self.core_bool("incompatible_auto_exec_groups")
+    }
+
     pub fn to_exec(&self) -> Result<Self, SlugConfigurationError> {
         if self.0.kind != SlugConfigurationKind::Target {
             return Err(SlugConfigurationError::ExecProjectionRequiresTarget {

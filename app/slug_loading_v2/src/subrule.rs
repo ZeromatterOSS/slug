@@ -269,6 +269,7 @@ pub struct ConfiguredDependencyAttribute<'a> {
     allowed_rule_classes: Option<&'a Arc<[CompactString]>>,
     executable: bool,
     exec_configuration: bool,
+    exec_group: Option<&'a CompactString>,
     required_providers: &'a [Arc<[ProviderIdentity]>],
 }
 
@@ -292,6 +293,10 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
                 schema.dependency_configuration(),
                 AttributeDependencyConfiguration::Exec
             ),
+            exec_group: match schema.dependency_configuration() {
+                AttributeDependencyConfiguration::ExecGroup(group) => Some(group),
+                _ => None,
+            },
             required_providers: &attribute.required_providers,
         }
     }
@@ -319,6 +324,7 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
             allowed_rule_classes: attribute.rule_class_admissibility.classes(),
             executable: attribute.executable,
             exec_configuration: attribute.exec_configuration,
+            exec_group: None,
             required_providers: &attribute.required_providers,
         }
     }
@@ -361,6 +367,10 @@ impl<'a> ConfiguredDependencyAttribute<'a> {
 
     pub fn exec_configuration(self) -> bool {
         self.exec_configuration
+    }
+
+    pub fn exec_group(self) -> Option<&'a CompactString> {
+        self.exec_group
     }
 
     pub fn required_providers(self) -> &'a [Arc<[ProviderIdentity]>] {

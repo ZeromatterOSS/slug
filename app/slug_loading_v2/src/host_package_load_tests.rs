@@ -143,6 +143,7 @@ use crate::PackageTargetKind;
 use crate::RootPackageLoadKey;
 use crate::TestRuleKind;
 use crate::attrs::AllowedAttributeValues;
+use crate::attrs::AttributeDependencyConfiguration;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::cycle_detector::bzl_load_cycle_detector;
 use crate::package::AspectAttributePropagationEdge;
@@ -1879,15 +1880,12 @@ async fn rule_computed_default_reexport_rejects_before_recording_and_restores() 
 }
 
 #[tokio::test]
-async fn exec_group_reexports_reject_before_recording_and_restore() {
+async fn exec_group_reexports_publish_complete_target_semantics_and_restore() {
     const A: &str = concat!(
         "def _impl(ctx): fail('implementation stayed lazy')\n",
-        "def _computed(name, tags): fail('computed default stayed lazy')\n",
-        "def _init(name, **kwargs): fail('initializer stayed lazy')\n",
-        "_cpp = exec_group(toolchains = ['//:one'])\n",
+        "_cpp = exec_group(toolchains = ['//:one'], exec_compatible_with = ['//:constraint'])\n",
         "_test = exec_group()\n",
         "probe = rule(implementation = _impl, attrs = {'dep': attr.label(cfg = config.exec(exec_group = 'test')), 'out': attr.output()}, exec_groups = {'cpp_link': _cpp, 'test': _test})\n",
-        "both = rule(implementation = _impl, initializer = _init, attrs = {'dep': attr.label(default = _computed)}, exec_groups = {'cpp_link': _cpp})\n",
     );
     const B: &str = concat!(
         "def _impl(ctx): fail('implementation stayed lazy')\n",
@@ -1898,29 +1896,46 @@ async fn exec_group_reexports_reject_before_recording_and_restore() {
         "probe = rule(implementation = _impl, attrs = {'dep': attr.label(cfg = config.exec(exec_group = 'other'))})\n",
     );
     const REEXPORT: &str = "load(':defs.bzl', _probe = 'probe')\nprobe = _probe\n";
-    const BAD_BUILD: &str = concat!(
+    const BUILD: &str = concat!(
         "load(':reexport.bzl', 'probe')\n",
-        "probe(name = 'bad', out = ['not an output'], unknown = 1)\n",
-        "filegroup(name = 'must_not_publish')\n",
+        "probe(name = 'subject', visibility = ['//visibility:public'])\n",
     );
-    const ERROR: &str = "target invocation for named execution-group semantics is unsupported";
+    let assert_group = |outcome: &HostPackageOutcome, expected: &str, group_count: usize| {
+        let LoadingPreparationOutcome::Complete(value) = outcome else {
+            panic!("complete Host source epoch returned Need")
+        };
+        let package = value.as_ref().as_ref().unwrap();
+        let target = package
+            .targets
+            .iter()
+            .find(|target| target.name == "subject")
+            .unwrap();
+        let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
+            panic!("expected Starlark target")
+        };
+        let dep = rule
+            .schema()
+            .iter()
+            .find(|attribute| attribute.declaration_name() == "dep")
+            .unwrap();
+        let AttributeDependencyConfiguration::ExecGroup(group) = dep.dependency_configuration()
+        else {
+            panic!("expected retained named execution transition")
+        };
+        assert_eq!(group, expected);
+        assert_eq!(rule.declared_exec_groups().len(), group_count);
+    };
     let dice = Dice::builder().build(DetectCycles::Enabled);
-    for (source, build, variant, error) in [
-        (A, BAD_BUILD, 301, Some(ERROR)),
-        (
-            B,
-            "load(':defs.bzl', 'probe')\nprobe(name = 'clean')\n",
-            302,
-            None,
-        ),
-        (C, BAD_BUILD, 303, Some(ERROR)),
-        (A, BAD_BUILD, 304, Some(ERROR)),
+    for (source, variant, expected, group_count) in [
+        (A, 301, "test", 2),
+        (C, 303, "other", 0),
+        (A, 304, "test", 2),
     ] {
         let outcome = compute_package(
             &dice,
             EpochBuilder::workspace_sources(
                 "print('ROOT')\n",
-                build,
+                BUILD,
                 &[("defs.bzl", source), ("reexport.bzl", REEXPORT)],
                 variant,
             )
@@ -1928,35 +1943,108 @@ async fn exec_group_reexports_reject_before_recording_and_restore() {
             package_policy(),
         )
         .await;
-        if let Some(error) = error {
-            assert!(terminal_error(&outcome).contains(error));
-        } else {
-            assert_eq!(target_names(&outcome), ["clean"]);
+        assert_group(&outcome, expected, group_count);
+        if source == A {
+            let LoadingPreparationOutcome::Complete(value) = &outcome else {
+                unreachable!()
+            };
+            let package = value.as_ref().as_ref().unwrap();
+            let PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+                unreachable!()
+            };
+            let cpp = &rule.declared_exec_groups()[0].1;
+            assert_eq!(cpp.toolchains()[0].label().target().as_str(), "one");
+            assert_eq!(
+                cpp.exec_compatible_with()[0].target().as_str(),
+                "constraint"
+            );
         }
     }
-    let precedence = compute_package(
+    let clean = compute_package(
         &dice,
         EpochBuilder::workspace_sources(
             "print('ROOT')\n",
-            "load(':defs.bzl', 'both')\nboth(name = 'bad')\n",
-            &[("defs.bzl", A)],
+            BUILD,
+            &[("defs.bzl", B), ("reexport.bzl", REEXPORT)],
             305,
         )
         .build(),
         package_policy(),
     )
     .await;
-    assert!(terminal_error(&precedence).contains(ERROR));
+    assert_eq!(target_names(&clean), ["subject"]);
     let external = load_repository_package_fixture(
         &[
-            ("BUILD.bazel", BAD_BUILD.as_bytes()),
+            ("BUILD.bazel", BUILD.as_bytes()),
             ("defs.bzl", A.as_bytes()),
             ("reexport.bzl", REEXPORT.as_bytes()),
         ],
         306,
     )
     .await;
-    assert!(repository_package_error(&external).contains(ERROR));
+    let package = repository_package_terminal(&external);
+    let PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+        panic!("expected external Starlark target")
+    };
+    assert_eq!(rule.declared_exec_groups().len(), 2);
+}
+
+#[tokio::test]
+async fn rules_cc_exec_groups_retain_named_and_automatic_policy() {
+    const DEFS: &str = concat!(
+        "def _impl(ctx): fail('rules_cc implementation stayed lazy')\n",
+        "_cc = '//:cc_toolchain_type'\n",
+        "cc_library = rule(\n",
+        "    implementation = _impl,\n",
+        "    attrs = {\n",
+        "        '_use_auto_exec_groups': attr.bool(default = True),\n",
+        "        '_impl_delegate': attr.label(cfg = 'exec'),\n",
+        "    },\n",
+        "    toolchains = [_cc],\n",
+        "    exec_groups = {'cpp_link': exec_group(toolchains = [_cc])},\n",
+        ")\n",
+    );
+    let outcome = compute_package(
+        &Dice::builder().build(DetectCycles::Enabled),
+        EpochBuilder::workspace_sources(
+            "print('ROOT')\n",
+            "load(':cc_library.bzl', 'cc_library')\ncc_library(name = 'subject')\n",
+            &[("cc_library.bzl", DEFS)],
+            307,
+        )
+        .build(),
+        package_policy(),
+    )
+    .await;
+    let LoadingPreparationOutcome::Complete(value) = &outcome else {
+        panic!("complete Host source epoch returned Need")
+    };
+    let package = value.as_ref().as_ref().unwrap();
+    let PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+        panic!("expected rules_cc Starlark target")
+    };
+    assert_eq!(
+        rule.required_toolchains()[0].label().target().as_str(),
+        "cc_toolchain_type"
+    );
+    let [(name, group)] = rule.declared_exec_groups() else {
+        panic!("expected one named execution group")
+    };
+    assert_eq!(name, "cpp_link");
+    assert_eq!(
+        group.toolchains()[0].label(),
+        rule.required_toolchains()[0].label()
+    );
+    let policy = rule
+        .schema()
+        .iter()
+        .find(|attribute| attribute.declaration_name() == "_use_auto_exec_groups")
+        .unwrap();
+    assert_eq!(policy.kind(), AttributeKind::Boolean);
+    assert_eq!(
+        policy.default(),
+        Some(&CoercedAttributeValue::Boolean(true))
+    );
 }
 
 #[tokio::test]
