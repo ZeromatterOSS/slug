@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-configured-conflict-path-merge-injection-handoff-audit-r1
-Status: proof-coverage recovery accepted; Core proof pending
+Packet: WP-4-7A-configured-conflict-path-shard-dice-event-audit-r1
+Status: design accepted; diagnostic execution pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -42,28 +42,24 @@ in changed shards. Maxima were 18 changed shards and 112 prior residents; the
 exposure buckets were `[49, 124, 21, 15, 0]`. All observer, arithmetic,
 PID/reap, output and cleanup gates passed.
 
-Independent result review accepts these only as potential exposures before a
-later injection. The active docs-first successor audits their handoff to the
-next successfully committed DICE transaction after `guard.inject_attempt` in
-`drive_command`. One aggregate pending exposure slot may record produced and
-committed counts, committed exposure total/maximum and fixed buckets, with
-explicit overwrite/unmatched/overflow and reserved state. A positive result
-means only that potential exposure reached a committed injection transaction.
-The serialized producer publishes its marker last and the consumer clears the
-pending value/marker before committing its count last, so every partial cutoff
-is invalid. One exact helper proof and one same-selector replay remain subject to
-independent design review and existing 12/15-second bounds. No path, shard,
-identity or semantic behavior may cross the boundary.
-Independent design rereview returned `ACCEPT` for marker-last production,
-pending-clear/count-last consumption and serialized cutoff ownership.
-The sole replay produced coherent handoff data, but result review rejected
-acceptance: the frozen production diff is 133 rather than 130 gross lines, and
-the Core proof omitted bucket boundaries 7/31/127 plus required partial consume
-states. Preserve every executed hash and do not replay the CLI. A bounded
-recovery may correct the cap to 133 and add/run only the missing exact Core proof
-coverage before rereviewing the same result.
-Independent recovery review returned `ACCEPT` for the 133-line correction,
-proof-only scope, frozen replay and no-CLI-replay stop.
+The accepted merge-to-commit audit then recorded 218 produced and committed
+handoffs, 1,591 total potentially exposed prior residents, maximum 85 and
+buckets `[52, 125, 24, 17, 0]` at a valid `RootCompute` cutoff. Its corrected
+133-line production cap and augmented 109/140 proof passed independent
+rereview without another CLI replay. That result proves only that aggregate
+potential exposure reached successful injection commits.
+
+The active docs-first successor arms an aggregate window after each matched
+successful commit and counts only the six existing DICE event variants for the
+exact static `PathObservationShardKey` tag until the next installed merge
+closes the window. Words 51--63 retain produced/committed/closed lifecycle
+counts, six filtered event counters, pending/active markers and sticky state.
+One exact production-helper proof and one same-selector replay remain subject
+to independent design review and existing 12/15-second bounds. Even a positive
+result cannot establish per-merge attribution, invalidation, causal
+recomputation, cost or avoidable work.
+Independent design review returned `ACCEPT` for the corrected partial-cutoff
+ordering and concurrent filtered-to-global counter bounds.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

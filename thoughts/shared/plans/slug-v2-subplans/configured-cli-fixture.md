@@ -485,26 +485,20 @@ residents; buckets were `[49, 124, 21, 15, 0]`. Observer, arithmetic, PID/reap,
 output and cleanup gates passed. Independent review accepts these only as
 potential exposures before later injection.
 
-The selected successor is one docs-first aggregate handoff audit from an
-installed merge to the next successfully committed transaction after
-`inject_attempt`. It may retain one pending exposure integer and publish only
-produced/committed counts, committed total/maximum and five buckets with
-overwrite/unmatched/overflow flags. Even a positive result proves only that
-potential exposure reached a committed injection transaction. The same exact
-selector may run once after its exact helper proof, supervisor self-check,
-hashes and independent design review; the other nine selectors and F3 remain
-stopped.
+The accepted handoff replay matched 218 installed merges to 218 successful
+injection commits, carrying 1,591 total potential prior exposure, maximum 85
+and buckets `[52, 125, 24, 17, 0]`. Its corrected 133-line production cap and
+recovered 109/140 exact proof passed independent rereview without another CLI
+replay. This establishes only aggregate delivery to commit.
 
-The serialized producer publishes its pending marker last; the consumer zeros
-the pending value and marker before committing its count last. Exact proof and
-decoder self-checks must reject every partial handoff cutoff.
-Independent design rereview returned `ACCEPT` for marker-last production,
-pending-clear/count-last consumption and serialized cutoff ownership.
-
-The sole handoff replay is frozen and arithmetically coherent, but result review
-rejected acceptance because the production cap was miscounted at 130 instead of
-133 and the Core proof omitted bucket upper boundaries and partial consumer
-states. A recovery may augment and rerun only that exact Core proof. Preserve
-all replay hashes and do not rerun this CLI selector, its siblings or F3.
-Independent recovery review returned `ACCEPT` for this proof-only amendment and
-its frozen replay boundary.
+The selected successor is one docs-first armed-window event audit. A matched
+commit arms observation until the next installed merge, and only the six
+existing DICE event variants for exact tag `PathObservationShardKey` are
+counted. Words 51--63 retain lifecycle counts, six filtered counters,
+pending/active markers and sticky state. The same exact selector may run once
+after its exact production-helper proof, supervisor self-check, hashes and
+independent design review; the other nine selectors and F3 remain stopped.
+Even positive counts prove no per-merge attribution, invalidation, causality or
+cost.
+Independent design review returned `ACCEPT` for the corrected lifecycle
+publication order and per-category filtered-to-global bounds.

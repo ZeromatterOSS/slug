@@ -9139,24 +9139,20 @@ were 18 changed shards and 112 prior residents; buckets were
 `[49, 124, 21, 15, 0]`. Independent review accepts no DICE invalidation,
 checking, recomputation or cost conclusion.
 
-The selected docs-first successor audits only the aggregate handoff from an
-installed path merge to the next successfully committed injection transaction.
-One pending exposure integer may publish produced/committed counts, committed
-total/maximum and five buckets with overwrite/unmatched/overflow flags. A
-positive result means only that potential exposure reached the commit. One
-exact helper proof and one same-selector replay require independent design
-review; no path, shard, identity or semantic change is authorized.
+The accepted aggregate handoff replay matched 218 installed path merges to 218
+successful injection commits. It carried 1,591 total potentially exposed prior
+residents, maximum 85 and buckets `[52, 125, 24, 17, 0]` at a valid
+`RootCompute` cutoff. The executed 133-line production diagnostic and recovered
+109/140 exact proof passed independent rereview without another CLI replay.
+This proves only that potential exposure reached successful commits.
 
-The serialized handoff must publish its producer marker last, then consume by
-zeroing pending value/marker before committing the consumer count last. Exact
-proof and decoder self-checks reject every partial producer/consumer cutoff.
-Independent design rereview returned `ACCEPT` for marker-last production,
-pending-clear/count-last consumption and serialized cutoff ownership.
-
-The sole handoff replay produced coherent aggregate data, but result review
-rejected acceptance because the frozen production diff is 133 rather than 130
-gross lines and the Core proof omitted three upper bucket boundaries and
-partial consumer states. Preserve all executed hashes, correct the cap to 133,
-and add/run only the missing exact Core proof coverage. The CLI may not replay.
-Independent recovery review returned `ACCEPT` for this proof-only amendment and
-its frozen replay boundary.
+The selected docs-first successor is one aggregate armed-window event audit.
+After a committed installed-merge handoff, count only the six existing DICE
+event variants for exact static tag `PathObservationShardKey`; close that window
+at the next installed merge. Publish only produced/committed/closed lifecycle
+counts, the six filtered counters, pending/active markers and overflow/reserved
+state in words 51--63. One exact production-helper proof and one same-selector
+replay require independent design review. Even positive counts prove no
+per-merge event attribution, invalidation, causal recomputation or cost.
+Independent design review returned `ACCEPT` for the corrected lifecycle
+publication order and per-category filtered-to-global bounds.
