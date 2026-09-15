@@ -14,6 +14,8 @@ use allocative::Allocative;
 use compact_str::CompactString;
 use slug_identity_v2::CanonicalLabel;
 
+pub(crate) const DEFAULT_EXEC_GROUP_NAME: &str = "default-exec-group";
+
 /// Semantic identity of an execution group shared by dependency transitions
 /// and action ownership.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -26,5 +28,19 @@ pub enum ConfiguredExecGroup {
 impl ConfiguredExecGroup {
     pub fn automatic(label: CanonicalLabel) -> Self {
         Self::Automatic(Arc::new(label))
+    }
+
+    pub(crate) fn runtime_name(&self) -> CompactString {
+        match self {
+            Self::Default => CompactString::new(DEFAULT_EXEC_GROUP_NAME),
+            Self::Named(name) => name.clone(),
+            Self::Automatic(label) => {
+                let canonical = label.to_string();
+                canonical
+                    .strip_prefix("@@//")
+                    .map(|root| CompactString::from(format!("//{root}")))
+                    .unwrap_or_else(|| CompactString::from(canonical))
+            }
+        }
     }
 }

@@ -3708,6 +3708,7 @@ tc(name = 'link_impl', marker = 'link')
 toolchain(name = 'compile_tc', toolchain_type = ':compile_type', toolchain = ':compile_impl', exec_compatible_with = [':compile'])
 toolchain(name = 'link_tc', toolchain_type = ':link_type', toolchain = ':link_impl', exec_compatible_with = [':link'])
 action_tool(name = 'action_tool')
+action_tool(name = 'plain_tool')
 probe(name = 'request')
 "#,
     )
@@ -3781,7 +3782,7 @@ async fn automatic_exec_group_projects_default_labels_from_automatic_rows_and_in
         r#"    declared = ctx.toolchains['//:compile_alias']
     actual = ctx.toolchains['//:compile_type']
     if declared.marker != 'compile' or declared != actual: fail('automatic alias projection')
-    if ctx.exec_groups['@@//:compile_alias'].toolchains['//:compile_type'].marker != 'compile': fail('automatic view')
+    if ctx.exec_groups['//:compile_alias'].toolchains['//:compile_type'].marker != 'compile': fail('automatic view')
     if ctx.exec_groups['link_group'].toolchains['//:link_type'].marker != 'link': fail('named view')
     return [ProbeInfo(value = declared.marker)]"#,
     );
@@ -3822,11 +3823,11 @@ async fn automatic_exec_group_routes_run_and_run_shell_across_the_complete_param
         &workspace,
         r#"rule(
     implementation = _probe,
-    attrs = {'mode': attr.string(), 'dep': attr.label(default = '//:action_tool', executable = True, cfg = 'exec')},
+    attrs = {'mode': attr.string(), 'dep': attr.label(default = '//:action_tool', executable = True, cfg = 'exec'), 'plain': attr.label(default = '//:plain_tool', cfg = 'exec')},
     toolchains = ['//:compile_alias'],
     exec_groups = {'compile_named': exec_group(toolchains = ['//:compile_alias'])},
 )"#,
-        r#"    out = ctx.actions.declare_file(ctx.attr.mode + '.out')
+        r#"    out = ctx.actions.declare_file('result.out')
     tool = ctx.actions.declare_file(ctx.attr.mode + '.tool')
     mode = ctx.attr.mode
     if mode == 'run_auto':
@@ -3849,8 +3850,14 @@ async fn automatic_exec_group_routes_run_and_run_shell_across_the_complete_param
         ctx.actions.run_shell(outputs = [out], command = 'echo', tools = [ctx.executable.dep])
     elif mode == 'recognized_nested_tool':
         ctx.actions.run_shell(outputs = [out], command = 'echo', tools = depset([ctx.executable.dep]))
+    elif mode == 'recognized_opaque_tool':
+        ctx.actions.run_shell(outputs = [out], command = 'echo', tools = [depset([ctx.executable.dep])])
     elif mode == 'provider_exec':
         ctx.actions.run(outputs = [out], executable = ctx.attr.dep[DefaultInfo].files_to_run)
+    elif mode == 'unassociated_file':
+        ctx.actions.run(outputs = [out], executable = ctx.attr.plain[DefaultInfo].files_to_run.executable)
+    elif mode == 'unassociated_provider':
+        ctx.actions.run(outputs = [out], executable = ctx.attr.plain[DefaultInfo].files_to_run)
     elif mode == 'actual_type':
         ctx.actions.run(outputs = [out], executable = 'tool', toolchain = '//:compile_type')
     elif mode == 'named_match':
@@ -3860,11 +3867,17 @@ async fn automatic_exec_group_routes_run_and_run_shell_across_the_complete_param
     elif mode == 'unknown_group':
         ctx.actions.run(outputs = [out], executable = 'tool', exec_group = 'missing')
     elif mode == 'invalid_group':
+        ctx.actions.run(outputs = [out], executable = 'tool', exec_group = '//:compile_alias')
+    elif mode == 'absent_invalid_group':
         ctx.actions.run(outputs = [out], executable = 'tool', exec_group = '@@//:compile_alias')
     elif mode == 'off_toolchain':
         ctx.actions.run(outputs = [out], executable = 'tool', toolchain = '//:missing')
     elif mode == 'off_named_mismatch':
         ctx.actions.run(outputs = [out], executable = 'tool', exec_group = 'compile_named', toolchain = '//:link_type')
+    elif mode == 'off_malformed_toolchain':
+        ctx.actions.run(outputs = [out], executable = 'tool', toolchain = 'bad:label')
+    elif mode == 'invalid_tools_malformed_toolchain':
+        ctx.actions.run(outputs = [out], executable = 'tool', tools = [1], toolchain = 'bad:label')
     return [DefaultInfo(files = depset([out]))]"#,
     );
     let build = workspace.join("BUILD.bazel");
@@ -3882,14 +3895,20 @@ async fn automatic_exec_group_routes_run_and_run_shell_across_the_complete_param
             "recognized_exec",
             "recognized_tool",
             "recognized_nested_tool",
+            "recognized_opaque_tool",
             "provider_exec",
+            "unassociated_file",
+            "unassociated_provider",
             "actual_type",
             "named_match",
             "named_mismatch",
             "unknown_group",
             "invalid_group",
+            "absent_invalid_group",
             "off_toolchain",
             "off_named_mismatch",
+            "off_malformed_toolchain",
+            "invalid_tools_malformed_toolchain",
         ]
         .into_iter()
         .map(|mode| format!("probe(name = '{mode}', mode = '{mode}')"))
@@ -3940,10 +3959,31 @@ async fn automatic_exec_group_routes_run_and_run_shell_across_the_complete_param
             "omitted_nested_tool",
             "requires an explicit toolchain or None",
         ),
+        (
+            "recognized_opaque_tool",
+            "requires an explicit toolchain or None",
+        ),
+        (
+            "unassociated_file",
+            "requires an explicit toolchain or None",
+        ),
+        (
+            "unassociated_provider",
+            "requires an explicit toolchain or None",
+        ),
         ("actual_type", "unknown automatic toolchain"),
         ("named_mismatch", "is not a member of execution group"),
         ("unknown_group", "unknown execution group 'missing'"),
-        ("invalid_group", "invalid exec_group '@@//:compile_alias'"),
+        ("invalid_group", "invalid exec_group '//:compile_alias'"),
+        (
+            "absent_invalid_group",
+            "unknown execution group '@@//:compile_alias'",
+        ),
+        ("off_malformed_toolchain", "invalid toolchain"),
+        (
+            "invalid_tools_malformed_toolchain",
+            "tools entries must be Files",
+        ),
     ] {
         let error = analyze_request(&dice, &workspace, &request(name, true), None, false)
             .await
@@ -3989,6 +4029,232 @@ async fn automatic_exec_group_routes_run_and_run_shell_across_the_complete_param
         off_named.actions()[0].context().exec_group(),
         &ConfiguredExecGroup::Named("compile_named".into())
     );
+}
+
+#[tokio::test]
+async fn automatic_action_group_validation_preserves_existence_and_name_precedence() {
+    let workspace = scratch();
+    write_execution_group_fixture(
+        &workspace,
+        r#"rule(
+    implementation = _probe,
+    attrs = {'mode': attr.string(), '_use_auto_exec_groups': attr.bool(default = True)},
+    toolchains = ['//:compile_alias'],
+    exec_groups = {'named': exec_group()},
+)"#,
+        r#"    out = ctx.actions.declare_file('result.out')
+    ctx.actions.run(outputs = [out], executable = 'tool', exec_group = ctx.attr.mode)
+    return [DefaultInfo(files = depset([out]))]"#,
+    );
+    let build = workspace.join("BUILD.bazel");
+    fs::write(
+        &build,
+        fs::read_to_string(&build).unwrap().replace(
+            "probe(name = 'request')",
+            "probe(name = 'named', mode = 'named')\nprobe(name = 'automatic', mode = '//:compile_alias')\nprobe(name = 'absent', mode = '@@//:compile_alias')",
+        ),
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = |name: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{name}")).unwrap(),
+            execution_group_configuration(false),
+        )
+    };
+    analyze_request(&dice, &workspace, &key("named"), None, false)
+        .await
+        .unwrap();
+    let automatic = analyze_request(&dice, &workspace, &key("automatic"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        automatic.contains("invalid exec_group '//:compile_alias'"),
+        "{automatic}"
+    );
+    let absent = analyze_request(&dice, &workspace, &key("absent"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        absent.contains("unknown execution group '@@//:compile_alias'"),
+        "{absent}"
+    );
+}
+
+#[tokio::test]
+async fn automatic_action_toolchain_strings_use_target_package_and_repository_mapping() {
+    let workspace = scratch();
+    for package in ["rules", "target"] {
+        fs::create_dir_all(workspace.join(package)).unwrap();
+    }
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = 'root')\nregister_execution_platforms('//:platform')\nregister_toolchains('//rules:def_tc', '//target:target_tc')\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "platform(name = 'platform')\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("rules/defs.bzl"),
+        r#"def _tc(ctx): return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+tc = rule(implementation = _tc, attrs = {'marker': attr.string()})
+def _probe(ctx):
+    if ctx.toolchains[':def_type'].marker != 'definition': fail('definition context')
+    out = ctx.actions.declare_file(ctx.attr.mode + '.out')
+    requested = ':target_type' if ctx.attr.mode == 'relative' else '@root//target:target_type'
+    ctx.actions.run(outputs = [out], executable = 'runner', toolchain = requested)
+    return [DefaultInfo(files = depset([out]))]
+probe = rule(
+    implementation = _probe,
+    attrs = {'mode': attr.string(), '_use_auto_exec_groups': attr.bool(default = True)},
+    toolchains = [':def_type', '//target:target_type'],
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("rules/BUILD.bazel"),
+        r#"load(':defs.bzl', 'tc')
+toolchain_type(name = 'def_type')
+tc(name = 'def_impl', marker = 'definition')
+toolchain(name = 'def_tc', toolchain_type = ':def_type', toolchain = ':def_impl')
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("target/BUILD.bazel"),
+        r#"load('//rules:defs.bzl', 'probe', 'tc')
+toolchain_type(name = 'target_type')
+tc(name = 'target_impl', marker = 'target')
+toolchain(name = 'target_tc', toolchain_type = ':target_type', toolchain = ':target_impl')
+probe(name = 'relative', mode = 'relative')
+probe(name = 'apparent', mode = 'apparent')
+"#,
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for (name, expected) in [
+        ("relative", "@@//target:target_type"),
+        ("apparent", "@@//target:target_type"),
+    ] {
+        let result = root_target_request_with_configuration(
+            &dice,
+            &workspace,
+            &format!("@@//target:{name}"),
+            execution_group_configuration(false),
+            Arc::new(RootActivationTracker::default()),
+        )
+        .await
+        .unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert_eq!(
+            result.actions().last().unwrap().context().exec_group(),
+            &ConfiguredExecGroup::automatic(CanonicalLabel::parse(expected).unwrap())
+        );
+    }
+}
+
+#[tokio::test]
+async fn subrule_action_group_and_toolchain_parameters_preserve_bazel_override_boundary() {
+    let workspace = scratch();
+    write_execution_group_fixture(
+        &workspace,
+        r#"rule(
+    implementation = _probe,
+    attrs = {'mode': attr.string(), '_use_auto_exec_groups': attr.bool(default = True)},
+    toolchains = ['//:compile_alias'],
+    exec_groups = {'named': exec_group()},
+    subrules = [_sub],
+)"#,
+        r#"    out = _sub(ctx.attr.mode)
+    return [DefaultInfo(files = depset([out]))]"#,
+    );
+    let definitions = workspace.join("defs.bzl");
+    let source = fs::read_to_string(&definitions).unwrap();
+    fs::write(
+        &definitions,
+        source.replace(
+            "def _probe(ctx):",
+            r#"def _sub_impl(ctx, mode, **kwargs):
+    out = ctx.actions.declare_file(mode + '.out')
+    if mode == 'none_group':
+        ctx.actions.run(outputs = [out], executable = 'runner', exec_group = None)
+    elif mode == 'group':
+        ctx.actions.run(outputs = [out], executable = 'runner', exec_group = 'named')
+    elif mode == 'toolchain_none':
+        ctx.actions.run(outputs = [out], executable = 'runner', toolchain = None)
+    elif mode == 'both':
+        ctx.actions.run(outputs = [out], executable = 'runner', exec_group = 'named', toolchain = None)
+    elif mode == 'file':
+        ctx.actions.run(outputs = [out], executable = kwargs['_exec'].executable)
+    elif mode == 'provider':
+        ctx.actions.run(outputs = [out], executable = kwargs['_exec'])
+    else:
+        ctx.actions.run(outputs = [out], executable = 'runner')
+    return out
+
+_sub = subrule(
+    implementation = _sub_impl,
+    attrs = {'_exec': attr.label(default = '//:action_tool', cfg = 'exec', executable = True)},
+)
+
+def _probe(ctx):"#,
+        ),
+    )
+    .unwrap();
+    let build = workspace.join("BUILD.bazel");
+    fs::write(
+        &build,
+        fs::read_to_string(&build).unwrap().replace(
+            "probe(name = 'request')",
+            &[
+                "omitted",
+                "none_group",
+                "group",
+                "toolchain_none",
+                "both",
+                "file",
+                "provider",
+            ]
+            .into_iter()
+            .map(|mode| format!("probe(name = '{mode}', mode = '{mode}')"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        ),
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = |name: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{name}")).unwrap(),
+            execution_group_configuration(false),
+        )
+    };
+    for name in ["omitted", "none_group", "provider"] {
+        let result = analyze_request(&dice, &workspace, &key(name), None, false)
+            .await
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert_eq!(
+            result.actions().last().unwrap().context().exec_group(),
+            &ConfiguredExecGroup::Default
+        );
+    }
+    for (name, expected) in [
+        ("group", "exec_group must be None in a subrule"),
+        (
+            "toolchain_none",
+            "toolchain may not be supplied in a subrule",
+        ),
+        ("both", "exec_group must be None in a subrule"),
+        ("file", "expected FilesToRunProvider, got File"),
+    ] {
+        let error = analyze_request(&dice, &workspace, &key(name), None, false)
+            .await
+            .unwrap_err();
+        assert!(error.contains(expected), "{name}: {error}");
+    }
 }
 
 #[tokio::test]

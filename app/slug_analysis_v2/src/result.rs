@@ -1059,7 +1059,7 @@ impl ConfiguredNodeResult {
                         ConfiguredExecGroup::Named(group_name) if group_name == name => {
                             Some(context)
                         }
-                        ConfiguredExecGroup::Automatic(label) if label.to_string() == name => {
+                        ConfiguredExecGroup::Automatic(_) if group.runtime_name() == name => {
                             Some(context)
                         }
                         _ => None,

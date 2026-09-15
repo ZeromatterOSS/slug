@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use slug_build_api_v2::RunfilesPackageMetadata;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_loading_v2::CoercedAttributeValue;
@@ -22,6 +23,7 @@ use slug_loading_v2::package::ToolchainTypeRequirement;
 
 use crate::configured_attribute::ResolvedRuleAttribute;
 use crate::exec_group::ConfiguredExecGroup;
+use crate::exec_group::DEFAULT_EXEC_GROUP_NAME;
 use crate::result::ConfiguredActionOwnerContext;
 use crate::result::RunfilesPackageClosureRow;
 use crate::result::ToolchainTopology;
@@ -89,31 +91,70 @@ fn normalize_constraints(
     values.into()
 }
 
-const DEFAULT_EXEC_GROUP_NAME: &str = "default-exec-group";
+pub(crate) fn parse_target_context_label(
+    spelling: &str,
+    package: &RunfilesPackageMetadata,
+) -> Result<CanonicalLabel, String> {
+    CanonicalLabel::parse_with_package_context(spelling, package.package(), |requested| {
+        if requested.is_empty() {
+            return Ok(CanonicalRepoName::root());
+        }
+        let mut matches = package
+            .mapping()
+            .entries()
+            .iter()
+            .filter(|(apparent, _)| apparent.as_str() == requested);
+        let canonical = matches
+            .next()
+            .ok_or_else(|| format!("unknown apparent repository '@{requested}'"))?;
+        if matches.next().is_some() {
+            return Err(format!(
+                "repository mapping for '@{requested}' is ambiguous"
+            ));
+        }
+        Ok(canonical.1.clone())
+    })
+}
 
 fn automatic_group_identity(
     spelling: &str,
-    target: &CanonicalLabel,
+    package: &RunfilesPackageMetadata,
     default_requirements: &[ToolchainTypeRequirement],
 ) -> Option<ConfiguredExecGroup> {
-    let label =
-        CanonicalLabel::parse_with_package_context(spelling, target.package(), |requested| {
-            if requested.is_empty() {
-                Ok(CanonicalRepoName::root())
-            } else {
-                Err(format!("unknown apparent repository '@{requested}'"))
-            }
-        })
-        .ok()?;
+    let label = parse_target_context_label(spelling, package).ok()?;
     default_requirements
         .iter()
         .any(|requirement| requirement.label() == &label)
         .then(|| ConfiguredExecGroup::automatic(label))
 }
 
-fn qualified_group_identity(
+fn is_identifier(name: &str) -> bool {
+    let mut chars = name.chars();
+    chars
+        .next()
+        .is_some_and(|first| first == '_' || first.is_ascii_alphabetic())
+        && chars.all(|character| character == '_' || character.is_ascii_alphanumeric())
+}
+
+fn constraint_group_identity(
     spelling: &str,
-    target: &CanonicalLabel,
+    package: &RunfilesPackageMetadata,
+    declared_names: &BTreeSet<&str>,
+    default_requirements: &[ToolchainTypeRequirement],
+    use_auto_exec_groups: bool,
+) -> Option<ConfiguredExecGroup> {
+    if is_identifier(spelling) {
+        return declared_names
+            .contains(spelling)
+            .then(|| ConfiguredExecGroup::Named(CompactString::from(spelling)));
+    }
+    use_auto_exec_groups
+        .then(|| automatic_group_identity(spelling, package, default_requirements))
+        .flatten()
+}
+
+fn property_group_identity(
+    spelling: &str,
     declared_names: &BTreeSet<&str>,
     default_requirements: &[ToolchainTypeRequirement],
     use_auto_exec_groups: bool,
@@ -124,28 +165,19 @@ fn qualified_group_identity(
     if declared_names.contains(spelling) {
         return Some(ConfiguredExecGroup::Named(CompactString::from(spelling)));
     }
-    use_auto_exec_groups
-        .then(|| automatic_group_identity(spelling, target, default_requirements))
-        .flatten()
+    use_auto_exec_groups.then_some(())?;
+    default_requirements.iter().find_map(|requirement| {
+        let identity = ConfiguredExecGroup::automatic(requirement.label().clone());
+        (identity.runtime_name() == spelling).then_some(identity)
+    })
 }
 
 fn platform_group_prefix_matches(prefix: &str, group: &ConfiguredExecGroup) -> bool {
-    match group {
-        ConfiguredExecGroup::Default => prefix == DEFAULT_EXEC_GROUP_NAME,
-        ConfiguredExecGroup::Named(name) => prefix == name,
-        ConfiguredExecGroup::Automatic(label) => {
-            if prefix == label.to_string() {
-                return true;
-            }
-            let package = label.package().package().as_str();
-            let short = format!("//{package}:{}", label.target());
-            prefix == short || (label.package().repo().is_root() && prefix == format!("@{short}"))
-        }
-    }
+    group.runtime_name() == prefix
 }
 
 pub(crate) fn normalize_execution_groups(
-    target: &CanonicalLabel,
+    package: &RunfilesPackageMetadata,
     default_requirements: &[ToolchainTypeRequirement],
     declarations: &[(CompactString, DeclaredExecGroup)],
     attributes: &[ResolvedRuleAttribute],
@@ -179,9 +211,9 @@ pub(crate) fn normalize_execution_groups(
     };
     let mut constraints_by_group = BTreeMap::new();
     for (name, constraints) in target_group_constraints.iter() {
-        let Some(identity) = qualified_group_identity(
+        let Some(identity) = constraint_group_identity(
             name,
-            target,
+            package,
             &declared_names,
             default_requirements,
             use_auto_exec_groups,
@@ -203,9 +235,8 @@ pub(crate) fn normalize_execution_groups(
         BTreeMap::new();
     for (key, value) in raw_properties.iter() {
         if let Some((group, property)) = key.split_once('.') {
-            let Some(identity) = qualified_group_identity(
+            let Some(identity) = property_group_identity(
                 group,
-                target,
                 &declared_names,
                 default_requirements,
                 use_auto_exec_groups,
@@ -214,11 +245,6 @@ pub(crate) fn normalize_execution_groups(
                     "exec_properties names unknown execution group '{group}'"
                 ));
             };
-            if property.is_empty() {
-                return Err(format!(
-                    "exec_properties has empty property for group '{group}'"
-                ));
-            }
             group_properties
                 .entry(identity)
                 .or_default()
@@ -449,6 +475,12 @@ impl ConfiguredExecGroupCollection {
         self.row(&ConfiguredExecGroup::Named(CompactString::from(name)))
     }
 
+    pub fn runtime_named(&self, name: &str) -> Option<&ConfiguredExecGroupRow> {
+        self.rows
+            .iter()
+            .find(|row| row.identity().runtime_name() == name)
+    }
+
     pub fn default_declared_requirements(&self) -> &[ToolchainTypeRequirement] {
         &self.default_declared_requirements
     }
@@ -464,6 +496,8 @@ impl ConfiguredExecGroupCollection {
 
 #[cfg(test)]
 mod tests {
+    use slug_build_api_v2::RunfilesRepositoryMapping;
+    use slug_identity_v2::ApparentRepoName;
     use slug_loading_v2::AttributeKind;
 
     use super::*;
@@ -474,6 +508,13 @@ mod tests {
 
     fn requirement(value: &str) -> ToolchainTypeRequirement {
         ToolchainTypeRequirement::new(label(value), true)
+    }
+
+    fn package(value: &str) -> RunfilesPackageMetadata {
+        RunfilesPackageMetadata::new(
+            label(value).package().clone(),
+            Arc::new(RunfilesRepositoryMapping::empty()),
+        )
     }
 
     fn attribute(
@@ -509,7 +550,7 @@ mod tests {
             ),
         ];
         let normalized = normalize_execution_groups(
-            &label("@@//:request"),
+            &package("@@//:request"),
             &default,
             &declarations,
             &attributes,
@@ -548,7 +589,7 @@ mod tests {
             )])),
         )];
         assert!(
-            normalize_execution_groups(&label("@@//:request"), &[], &declarations, &bad, false,)
+            normalize_execution_groups(&package("@@//:request"), &[], &declarations, &bad, false,)
                 .is_err()
         );
         let platform = Arc::from([
@@ -571,11 +612,21 @@ mod tests {
     }
 
     #[test]
-    fn automatic_constraint_keys_are_canonicalized_and_restricted_to_default_toolchains() {
+    fn automatic_constraint_keys_use_target_mapping_and_reject_identifier_aliases() {
         let default = [
-            requirement("@@//rule:first"),
+            requirement("@@mapped+//rule:first"),
             requirement("@@//rule:second"),
         ];
+        let target_package = RunfilesPackageMetadata::new(
+            label("@@//consumer:request").package().clone(),
+            Arc::new(RunfilesRepositoryMapping::new(
+                Arc::from([(
+                    ApparentRepoName::new("alias").unwrap(),
+                    CanonicalRepoName::new("mapped+").unwrap(),
+                )]),
+                None,
+            )),
+        );
         let attributes = [
             attribute(
                 "_use_auto_exec_groups",
@@ -587,7 +638,7 @@ mod tests {
                 AttributeKind::LabelListDict,
                 CoercedAttributeValue::LabelListDict(Arc::from([
                     (
-                        "//rule:first".into(),
+                        "@alias//rule:first".into(),
                         Arc::from([label("@@//constraints:first")]),
                     ),
                     (
@@ -597,14 +648,8 @@ mod tests {
                 ])),
             ),
         ];
-        let normalized = normalize_execution_groups(
-            &label("@@//consumer:request"),
-            &default,
-            &[],
-            &attributes,
-            false,
-        )
-        .unwrap();
+        let normalized =
+            normalize_execution_groups(&target_package, &default, &[], &attributes, false).unwrap();
         assert_eq!(
             normalized.rows()[1].constraints().as_ref(),
             &[label("@@//constraints:first")]
@@ -627,7 +672,7 @@ mod tests {
         ];
         assert!(
             normalize_execution_groups(
-                &label("@@//consumer:request"),
+                &package("@@//consumer:request"),
                 &default,
                 &[],
                 &unknown,
@@ -635,6 +680,108 @@ mod tests {
             )
             .unwrap_err()
             .contains("unknown execution group '//rule:missing'")
+        );
+
+        let identifier_alias = [
+            attributes[0].clone(),
+            attribute(
+                "exec_group_compatible_with",
+                AttributeKind::LabelListDict,
+                CoercedAttributeValue::LabelListDict(Arc::from([(
+                    "first".into(),
+                    Arc::from([label("@@//constraints:first")]),
+                )])),
+            ),
+        ];
+        assert!(
+            normalize_execution_groups(&target_package, &default, &[], &identifier_alias, false,)
+                .unwrap_err()
+                .contains("unknown execution group 'first'")
+        );
+    }
+
+    #[test]
+    fn runtime_names_and_property_rows_follow_bazel_canonical_form() {
+        let default = [
+            requirement("@@//tc:root"),
+            requirement("@@external+//tc:external"),
+        ];
+        let attributes = [
+            attribute(
+                "_use_auto_exec_groups",
+                AttributeKind::Boolean,
+                CoercedAttributeValue::Boolean(true),
+            ),
+            attribute(
+                "exec_properties",
+                AttributeKind::StringDict,
+                CoercedAttributeValue::StringDict(Arc::from([
+                    ("//tc:root.pool".into(), "root".into()),
+                    ("//tc:root.".into(), "empty".into()),
+                    ("@@external+//tc:external.pool".into(), "external".into()),
+                ])),
+            ),
+        ];
+        let normalized = normalize_execution_groups(
+            &package("@@//consumer:request"),
+            &default,
+            &[],
+            &attributes,
+            false,
+        )
+        .unwrap();
+        assert_eq!(normalized.rows()[1].identity().runtime_name(), "//tc:root");
+        assert_eq!(
+            normalized.rows()[1].target_exec_properties(),
+            &BTreeMap::from([
+                (String::new(), "empty".to_owned()),
+                ("pool".to_owned(), "root".to_owned()),
+            ])
+        );
+        assert_eq!(
+            normalized.rows()[2].identity().runtime_name(),
+            "@@external+//tc:external"
+        );
+
+        let bad = [
+            attributes[0].clone(),
+            attribute(
+                "exec_properties",
+                AttributeKind::StringDict,
+                CoercedAttributeValue::StringDict(Arc::from([(
+                    "@@//tc:root.pool".into(),
+                    "bad".into(),
+                )])),
+            ),
+        ];
+        assert!(
+            normalize_execution_groups(
+                &package("@@//consumer:request"),
+                &default,
+                &[],
+                &bad,
+                false,
+            )
+            .unwrap_err()
+            .contains("unknown execution group '@@//tc:root'")
+        );
+    }
+
+    #[test]
+    fn property_precedence_target_default_beats_platform_group() {
+        let platform = Arc::from([
+            ("pool".into(), "platform-default".into()),
+            ("link.pool".into(), "platform-group".into()),
+        ]);
+        assert_eq!(
+            effective_exec_properties(
+                &platform,
+                &ConfiguredExecGroup::Named("link".into()),
+                &BTreeMap::from([("pool".to_owned(), "target-default".to_owned())]),
+                &BTreeMap::new(),
+            )
+            .as_ref(),
+            &[("pool".into(), "target-default".into())]
         );
     }
 }

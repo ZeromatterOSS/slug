@@ -44,6 +44,7 @@ use slug_build_api_v2::RetainedVectorArg;
 use slug_build_api_v2::RetainedVectorSource;
 use slug_build_api_v2::RunfilesConflictPolicy;
 use slug_build_api_v2::RunfilesPackageDepset;
+use slug_build_api_v2::RunfilesPackageMetadata;
 use slug_build_api_v2::RunfilesSymlink;
 use slug_build_api_v2::RunfilesSymlinkDepset;
 use slug_build_api_v2::SpawnExecutable;
@@ -124,6 +125,7 @@ use crate::build_setting;
 use crate::configured_attribute::ResolvedRuleAttribute;
 use crate::exec_group::ConfiguredExecGroup;
 use crate::execution_groups::ConfiguredExecGroupCollection;
+use crate::execution_groups::parse_target_context_label;
 use crate::files_to_run_spawn::ExecutableArtifactProvenance;
 use crate::files_to_run_spawn::executable_artifact_provenance;
 use crate::files_to_run_spawn::retained_invocation;
@@ -409,6 +411,7 @@ pub(crate) struct PreparedDependency {
 pub(crate) struct PreparedConfiguredAttribute {
     pub(crate) owner: Option<Arc<SubruleIdentity>>,
     pub(crate) user_name: Option<CompactString>,
+    pub(crate) executable: bool,
     pub(crate) value: AnalysisValue,
 }
 
@@ -922,8 +925,7 @@ fn materialize_analysis_toolchains(
 fn exec_group_name(identity: &ConfiguredExecGroup) -> Option<CompactString> {
     match identity {
         ConfiguredExecGroup::Default => None,
-        ConfiguredExecGroup::Named(name) => Some(name.clone()),
-        ConfiguredExecGroup::Automatic(label) => Some(CompactString::from(label.to_string())),
+        _ => Some(identity.runtime_name()),
     }
 }
 
@@ -1046,7 +1048,7 @@ struct SynchronousAnalysisActionSink {
     typed_configuration: Result<Option<(HostPathFlavor, RetainedActionEnvironment)>, String>,
     executable_provenance: Arc<ExecutableArtifactProvenance>,
     execution_tags: CanonicalStringMap,
-    definition_source: Arc<BzlModuleIdentity>,
+    target_package: Arc<RunfilesPackageMetadata>,
     exec_groups: ConfiguredExecGroupCollection,
 }
 
@@ -1062,7 +1064,7 @@ impl SynchronousAnalysisActionSink {
         let raw = value
             .unpack_str()
             .expect("toolchain binder admitted only labels and strings");
-        resolve_rule_definition_label(raw, &self.definition_source)
+        parse_target_context_label(raw, &self.target_package)
             .map_err(|error| anyhow::anyhow!("ctx.actions.{operation} invalid toolchain: {error}"))
     }
 
@@ -1078,6 +1080,7 @@ impl SynchronousAnalysisActionSink {
         &self,
         value: &AnalysisValue,
         scope: &AnalysisActionCallScope,
+        sequence_member: bool,
     ) -> bool {
         match value.kind() {
             AnalysisValueKind::Artifact(artifact) => {
@@ -1085,11 +1088,19 @@ impl SynchronousAnalysisActionSink {
             }
             AnalysisValueKind::List(values) | AnalysisValueKind::Tuple(values) => values
                 .iter()
-                .any(|value| self.contains_unassociated_artifact(value, scope)),
-            AnalysisValueKind::Depset(values) => values
-                .to_list()
-                .iter()
-                .any(|value| self.contains_unassociated_artifact(value, scope)),
+                .any(|value| self.contains_unassociated_artifact(value, scope, true)),
+            AnalysisValueKind::Depset(values) => {
+                sequence_member
+                    || values
+                        .to_list()
+                        .iter()
+                        .any(|value| self.contains_unassociated_artifact(value, scope, false))
+            }
+            AnalysisValueKind::Provider(provider) => {
+                slug_build_api_v2::FilesToRunProvider::from_occurrence(provider).is_some_and(
+                    |provider| !self.executable_provenance.is_associated_provider(&provider),
+                )
+            }
             _ => false,
         }
     }
@@ -1104,6 +1115,8 @@ impl SynchronousAnalysisActionSink {
                     !self
                         .executable_provenance
                         .is_associated(&request.scope, file.artifact())
+                }) || crate::analysis_value::files_to_run_provider(value).is_some_and(|provider| {
+                    !self.executable_provenance.is_associated_provider(provider)
                 })
             }
             AnalysisSpawnInvocation::Shell(_) => false,
@@ -1118,7 +1131,24 @@ impl SynchronousAnalysisActionSink {
         let tools = lowerer
             .lower(tools, "ctx.actions.run tools")
             .map_err(anyhow::Error::msg)?;
-        Ok(self.contains_unassociated_artifact(&tools, &request.scope))
+        Ok(self.contains_unassociated_artifact(&tools, &request.scope, false))
+    }
+
+    fn validate_subrule_action_overrides(
+        &self,
+        request: &AnalysisSpawnRequest<'_>,
+        operation: &str,
+    ) -> anyhow::Result<()> {
+        if !matches!(request.scope, AnalysisActionCallScope::Subrule(_)) {
+            return Ok(());
+        }
+        if request.exec_group.is_some() {
+            anyhow::bail!("ctx.actions.{operation} exec_group must be None in a subrule");
+        }
+        if !matches!(request.toolchain, AnalysisToolchainRequest::Omitted) {
+            anyhow::bail!("ctx.actions.{operation} toolchain may not be supplied in a subrule");
+        }
+        Ok(())
     }
 
     fn selected_action_group(
@@ -1126,26 +1156,34 @@ impl SynchronousAnalysisActionSink {
         request: &AnalysisSpawnRequest<'_>,
         operation: &str,
     ) -> anyhow::Result<ConfiguredExecGroup> {
+        if matches!(request.scope, AnalysisActionCallScope::Subrule(_)) {
+            return Ok(ConfiguredExecGroup::Default);
+        }
+        let toolchain = match request.toolchain {
+            AnalysisToolchainRequest::Value(value) => {
+                Some(self.action_toolchain_label(value, operation)?)
+            }
+            _ => None,
+        };
         let explicit = request
             .exec_group
             .map(|name| {
-                if !Self::is_identifier(name) {
+                let row = self.exec_groups.runtime_named(name).ok_or_else(|| {
+                    anyhow::anyhow!("ctx.actions.{operation} unknown execution group '{name}'")
+                })?;
+                if !Self::is_identifier(name)
+                    || !matches!(row.identity(), ConfiguredExecGroup::Named(_))
+                {
                     anyhow::bail!("ctx.actions.{operation} invalid exec_group '{name}'");
                 }
-                self.exec_groups
-                    .named(name)
-                    .map(|row| row.identity().clone())
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("ctx.actions.{operation} unknown execution group '{name}'")
-                    })
+                Ok(row.identity().clone())
             })
             .transpose()?;
         if !self.exec_groups.use_auto_exec_groups() {
             return Ok(explicit.unwrap_or(ConfiguredExecGroup::Default));
         }
-        match (explicit, request.toolchain) {
-            (Some(group), AnalysisToolchainRequest::Value(value)) => {
-                let label = self.action_toolchain_label(value, operation)?;
+        match (explicit, request.toolchain, toolchain) {
+            (Some(group), AnalysisToolchainRequest::Value(_), Some(label)) => {
                 let row = self
                     .exec_groups
                     .row(&group)
@@ -1162,16 +1200,15 @@ impl SynchronousAnalysisActionSink {
                 }
                 Ok(group)
             }
-            (Some(group), _) => Ok(group),
-            (None, AnalysisToolchainRequest::Value(value)) => {
-                let label = self.action_toolchain_label(value, operation)?;
+            (Some(group), _, _) => Ok(group),
+            (None, AnalysisToolchainRequest::Value(_), Some(label)) => {
                 let group = ConfiguredExecGroup::automatic(label.clone());
                 self.exec_groups.row(&group).map(|_| group).ok_or_else(|| {
                     anyhow::anyhow!("ctx.actions.{operation} unknown automatic toolchain {label}")
                 })
             }
-            (None, AnalysisToolchainRequest::None) => Ok(ConfiguredExecGroup::Default),
-            (None, AnalysisToolchainRequest::Omitted) => {
+            (None, AnalysisToolchainRequest::None, _) => Ok(ConfiguredExecGroup::Default),
+            (None, AnalysisToolchainRequest::Omitted, _) => {
                 if self.exec_groups.rows().len() > 1
                     && self.omitted_toolchain_is_ambiguous(request)?
                 {
@@ -1180,6 +1217,9 @@ impl SynchronousAnalysisActionSink {
                     );
                 }
                 Ok(ConfiguredExecGroup::Default)
+            }
+            (_, AnalysisToolchainRequest::Value(_), None) => {
+                unreachable!("value toolchain was parsed")
             }
         }
     }
@@ -1337,7 +1377,7 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             AnalysisSpawnInvocation::Executable(_) => "run",
             AnalysisSpawnInvocation::Shell(_) => "run_shell",
         };
-        let selected_group = self.selected_action_group(&request, operation)?;
+        self.validate_subrule_action_overrides(&request, operation)?;
         let mut lowerer = AnalysisValueLowerer::default();
         let (command_line, has_arguments) = retained_command_line(request.arguments, &mut lowerer)?;
         let (path_flavor, configured_environment) = self.typed_configuration()?;
@@ -1360,6 +1400,7 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             &self.executable_provenance,
             &mut lowerer,
         )?;
+        let selected_group = self.selected_action_group(&request, operation)?;
         let mnemonic = validated_mnemonic(request.mnemonic, operation)?;
         let action_environment = configured_environment.for_action(
             request.use_default_shell_env,
@@ -2033,7 +2074,7 @@ pub(crate) fn evaluate_loaded_rule(
         typed_configuration,
         executable_provenance,
         execution_tags,
-        definition_source: implementation.definition_source().clone(),
+        target_package: package.runfiles_package().clone(),
         exec_groups: exec_groups.clone(),
     });
     let (dependencies, executables, toolchain, prepared_exec_groups) = {

@@ -1420,7 +1420,7 @@ fn configured_action_specs_route_every_group_without_fallback() {
             vec![
                 action("default"),
                 action("named").with_exec_group("named"),
-                action("automatic").with_exec_group(automatic_label.to_string()),
+                action("automatic").with_exec_group("//:toolchain_type"),
             ],
             vec![default, named, automatic],
         )

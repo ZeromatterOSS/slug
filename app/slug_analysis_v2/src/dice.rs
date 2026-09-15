@@ -2251,6 +2251,7 @@ fn prepare_configured_attributes<T: ComputedAnalysis>(
             Ok(PreparedConfiguredAttribute {
                 owner: row.owner.clone(),
                 user_name: row.user_name.clone(),
+                executable: row.executable(),
                 value,
             })
         })
@@ -6119,7 +6120,7 @@ impl ConfiguredNodeAnalysisKey {
             }
         };
         let normalized_exec_groups = match normalize_execution_groups(
-            configured_target.label(),
+            package.runfiles_package(),
             implementation.required_toolchains(),
             implementation.declared_exec_groups(),
             &resolved_attributes,

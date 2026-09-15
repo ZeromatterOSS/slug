@@ -190,7 +190,9 @@ Production edits are limited to:
 
 Proof edits are limited to
 `app/slug_analysis_v2/tests/starlark_rule.rs` and unit tests beside the changed
-analysis owners. Plan receipts may update this packet, Stage 6, bootstrap
+analysis owners, plus the one existing
+`configured_action_specs_route_every_group_without_fallback` selector in
+`app/slug_analysis_v2/tests/configured_target.rs`. Plan receipts may update this packet, Stage 6, bootstrap
 readiness, the canonical plan and configured CLI ledger. No loading,
 configuration, Core, CLI, REAPI, server, query, Cargo/BUILD, fixture or Bazel
 source may change.

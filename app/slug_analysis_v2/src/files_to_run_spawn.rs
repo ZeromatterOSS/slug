@@ -68,6 +68,10 @@ impl ExecutableArtifactProvenance {
     ) -> bool {
         self.association(scope, artifact).is_some()
     }
+
+    pub(crate) fn is_associated_provider(&self, provider: &FilesToRunProvider) -> bool {
+        self.root.values().any(|candidate| candidate == provider)
+    }
 }
 
 fn retained_files_to_run_provider(value: &AnalysisValue) -> Option<FilesToRunProvider> {
@@ -91,6 +95,9 @@ pub(crate) fn executable_artifact_provenance(
         }
     }
     for attribute in configured_attributes {
+        if !attribute.executable {
+            continue;
+        }
         let (Some(owner), Some(provider)) = (
             &attribute.owner,
             retained_files_to_run_provider(&attribute.value),
