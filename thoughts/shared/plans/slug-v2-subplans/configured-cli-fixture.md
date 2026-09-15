@@ -440,3 +440,17 @@ total, 1,626 external-Bzl and 2,543 path-observation events. All observer and
 cleanup gates passed. Result review selected only a bounded post-sharding path
 identity/outcome census, with exact identity equality, first/repeat and
 Complete/Need aggregates, explicit capacity overflow and no physical paths.
+
+That census completed its sole replay at a valid selected cutoff: 2,525 path
+computations comprised 471 first-seen and 2,054 repeated exact demands. Every
+first computation returned `Need`; repeated computations returned 2,050
+`Complete` and four `Need`. Capacity, observer overflow/drop/claim, output,
+PID/reap and cleanup gates passed. The independently accepted receipt records a
+transparent proof-cap correction to the frozen 247/182/189 production/proof/
+scratch counts without changing or rerunning the hashed artifact.
+
+Result review selected only aggregate batching at the path-progress owner.
+Observer words 51--63 may count rounds committed last,
+requested/unseen/already-known totals, maximum unseen batch and six batch-size
+buckets including zero during one same-selector replay. The other nine
+configured-conflict selectors and F3 remain stopped.

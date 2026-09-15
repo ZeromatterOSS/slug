@@ -29,7 +29,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-configured-conflict-path-census-audit-r1
+Packet: WP-4-7A-configured-conflict-path-frontier-batching-audit-r1
 Status: design accepted; diagnostic execution pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
@@ -70,15 +70,21 @@ starts, with zero overflow/drops and complete PID/cleanup evidence. Result
 review selected only a bounded post-sharding `PathObservationDemand`
 identity/outcome census; the extant external-child union must not change.
 
-The active docs-first census retains at most 4,096 exact path demands privately
-at the natural post-sharding key owner and publishes aggregate first/repeat and
-Complete/Need cutoff snapshots through a second sealed diagnostic channel. It
-cannot disclose identities or select semantic work.
+The bounded post-sharding census completed its sole replay with a valid selected
+cutoff: 2,525 entries divided into 471 first-seen and 2,054 repeated exact
+demands. Every first computation returned `Need`; repeats returned 2,050
+`Complete` and four `Need`. Capacity overflow was clear, observer/census/reaped
+PIDs matched and cleanup was complete. A transparent independently accepted
+manifest correction records the frozen executed artifact at 247 production,
+182 proof and 189 scratch lines; its pre-execution diff hash is preserved and
+no proof or replay was rerun.
 
-The protocol is target-gated like the native observer and freezes two
-little-endian checksummed frames plus a selector. Workspace semantics and a
-separate Core descriptor/delegation selector must pass; a clear frame is only
-an earlier committed cutoff, and fewer than 128 entries forces replan.
+Independent result review selected only a bounded aggregate path-frontier
+batching audit at `NativeDemandSession::progress_inner`. Count rounds,
+requested/unseen/already-known totals, maximum unseen batch and six batch-size
+buckets in observer words 51--63. No identities or paths may cross the
+boundary, and the result can select only another reviewed call-site or
+shard-invalidation audit.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

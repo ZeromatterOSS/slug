@@ -9072,3 +9072,20 @@ checksum. Separate workspace and Core selectors prove census semantics and the
 sealed-descriptor boundary. A fully written newer inactive frame remains
 unselected, persistent writer failure only leaves an earlier cutoff, and fewer
 than 128 recorded entries forces replan.
+
+The workspace/Core proofs, full dual-channel supervisor self-check and sole
+configured replay passed. The selected committed frame at sequence 5,051
+recorded 2,525 entries: 471 first-seen and 2,054 repeated exact demands. All
+first-seen computations returned `Need`; repeats returned 2,050 `Complete` and
+four `Need`, with no in-flight arithmetic gap and no capacity overflow.
+Observer/census/reaped PIDs matched; observer overflow, drops and claim were
+zero; output and process-tree cleanup were clear. The frozen Rust diff is
+`1fce7c30f13d5aa0537f2df41d8eb50a9898bc21cdbe84bbe28739294c7699e0`.
+
+Independent review accepted a transparent manifest correction from the
+miscounted 180-line proof cap to the executed 182 lines; production was 247 and
+the scratch supervisor 189. No artifact changed and no proof or replay reran.
+The selected successor is only an aggregate path-frontier batching audit at
+`NativeDemandSession::progress_inner`: rounds committed last,
+requested/unseen/already-known totals, maximum unseen batch and six batch-size
+buckets including zero. It may not emit paths or select semantic work.
