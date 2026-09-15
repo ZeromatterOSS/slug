@@ -29,30 +29,28 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-configured-conflict-path-observation-activation-dependency-audit-r1
-Status: docs-first design pending independent review
+Packet: WP-4-7A-configured-conflict-path-observation-typed-invalidation-provenance-r1
+Status: corrected docs-first design accepted; implementation pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
-stack and its accepted diagnostic history. The sole exact-`PathObservationKey`
-event replay reached the 12-second deadline in `RootCompute` with 221 produced
-and committed handoffs, 220 closed windows and the final window active. It
-recorded exact event counts `[2568, 2568, 1618, 1618, 2568, 2568]`, total
-13,508. Observer, arithmetic, PID/reap, output and cleanup gates passed.
-Independent review accepts only event membership within those aggregate
-windows, with no merge attribution, invalidation, causality or cost conclusion.
+stack and its accepted diagnostic history. The accepted activation audit found
+2,488 legacy-delivered evaluated `PathObservationKey` callbacks with immediate
+exact shard dependencies at a coherent 220/220/219 cutoff. It established no
+invalidation source, necessity, cost or avoidability, so aggregate callback and
+event counting has stopped.
 
-The selected successor classifies only legacy-delivered `PathObservationKey`
-callbacks at the existing runtime activation tracker by evaluated/reused and
-presence/absence of an immediate `PathObservationShardKey` dependency. Rich-only
-reuse is explicitly excluded. Words 54--59 contain six
-aggregate cells; word 63 is a callback claim making partial or concurrent
-publication decoder-invalid. Preserve the accepted handoff lifecycle, tracker
-rich/root callbacks and demand provenance. Exact helper/delegation proof,
-supervisor self-check, artifact freeze, independent preexecution review and one
-same-selector replay remain under 180/220/140 temporary line caps and the
-existing 12/15-second limits.
-Independent design rereview returned `ACCEPT` for the narrowed legacy subset,
-fixed publication orders and claim-last cutoff.
+The accepted successor uses DICE's existing typed invalidation-path API inside
+`PathObservationKey::compute`. A doc-hidden marker arms only observer-backed
+transactions; the key retains one fixed-size normal-priority dependency-context
+source category as evaluation data after a shard or epoch dependency resolves.
+Words 54--59 publish total, clean, unknown, source-shard, source-epoch and
+source-other aggregates under the accepted handoff lifecycle and callback
+claim. Missing, wrong, malformed or duplicate-store payloads fail closed.
+Identity and version material cannot cross the boundary. Exact workspace/Core
+proofs, supervisor self-check, artifact freeze and independent preexecution
+review precede one fresh same-selector replay under 230/310/140 temporary caps
+and the existing 12/15-second limits. Independent design review returned
+`ACCEPT`; implementation may begin, but replay remains unauthorized.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
@@ -174,3 +172,6 @@ with an immediate exact shard dependency; reused and no-direct cells were zero.
 This establishes neither identity nor invalidation causality, necessity, cost or
 avoidability. Stop this aggregate diagnostic chain. Any continuation requires a
 separately reviewed typed invalidation-provenance design.
+The proposed successor uses DICE's existing typed invalidation-path API inside
+the path key and retains only a fixed-size source category. It is docs-first and
+cannot implement or replay until independent design acceptance.

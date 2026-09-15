@@ -537,3 +537,6 @@ reaped observer PID, complete cleanup, lifecycle 220/220/219 and activation
 cells `E=2488`, `R=0`, `D=2488`, `N=0`, `ED=2488`, `RD=0`. It supplies no
 identity or causal invalidation evidence. Do not rerun it or select another
 aggregate callback counter.
+One materially different same-selector replay may be reviewed only through the
+new typed invalidation-provenance packet. Its corrected six-word design is
+docs-first; no implementation or replay is yet authorized.
