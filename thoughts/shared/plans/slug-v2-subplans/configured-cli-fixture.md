@@ -394,3 +394,11 @@ selector preflighted exactly. Its sole permitted run then reached the inherited
 `running 1 test`. No typed terminal or payload demand was exposed. The other
 nine selectors and F3 remain stopped, and this resource-limit result selects no
 successor behavior.
+
+Fixture assembly was then isolated from semantic evaluation and reproduced the
+same 28 objects, 177 registry metadata files and 8,004,740 source bytes in 0.18
+seconds. The selected test calls cold in-process root evaluation before any CLI
+conflict phase, so the ceiling result belongs to that evaluation. The active
+audit permits one supervisor- and observer-instrumented replay of the same exact
+selector, with unchanged request/fixture bytes and the existing 12/15-second
+limits. F3 and the other nine selectors remain stopped.

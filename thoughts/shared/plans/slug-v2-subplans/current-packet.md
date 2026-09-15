@@ -1,144 +1,119 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-7A-repository-generated-path-r1
-Status: implementation accepted at `b75291517`; CLI attribution resource-limited
+Packet: WP-4-7A-configured-conflict-cold-progress-audit-r1
+Status: design accepted; diagnostic execution pending
 
 ## Observable result
 
-The independently accepted repository-effect diagnostic at `fde43d5cf` exposed
-the first unchanged CLI selector's typed terminal after 10.95 seconds:
-toolchain registration row 8, canonical repository
-`rules_java++toolchains+local_jdk`, repository invocation ordinal 6,
-`repository_ctx.path argument must be a Label`. Admit the exact repository-local
-string/path surface used by that authenticated local-JDK branch, then run that
-one selector once to select the next owner. The remaining nine selectors and F3
-stay stopped. The combined R2/group/computed-default/alias/initializer stack is
-still unaccepted and may not merge or push.
+Capture bounded progress evidence for the first configured-conflict selector's
+cold evaluation after it exceeded the inherited 12-second deadline/15-second
+absolute ceiling following accepted generated repository paths. Run one
+materially instrumented replay of that same exact selector. This audit changes
+no compatibility behavior and cannot accept the combined R2/execution-group
+stack or select a semantic implementation or optimization from elapsed time or
+a sampled key category.
 
-The accepted implementation is preserved at `b75291517`. Fresh gates compiled
-the loading harnesses in 14.10 seconds, preflighted and passed the two new exact
-selectors plus the inherited Label-path selector, passed 568 loading unit tests
-with one supervised ignore and 108 integration tests, and compiled
-`slug_query_v2`. Independent correction rereview returned `ACCEPT`. The final
-diff used 159/160 gross production and 156/200 gross proof lines, 315/360 total;
-physical owners remained at 2,154/2,340 and 4,280/4,350 lines.
+Immediate predecessor `b75291517` implements accepted attempt-local generated
+repository paths. Its unchanged selector was exactly preflighted, then reached
+exit 124 after 14.91 seconds and printed only `running 1 test`. The other nine
+configured-conflict selectors and F3 were not run. Preserve those stops.
 
-The unchanged CLI harness rebuilt in 34.45 seconds and its first selector
-preflighted exactly. Its sole permitted run reached the inherited 15-second
-absolute ceiling with exit 124 after 14.91 seconds and emitted only
-`running 1 test`; it exposed no typed terminal. This is a resource-limit result,
-not a semantic failure or authority to raise the ceiling. Do not repeat the
-selector, run the other nine selectors or F3, or select another behavior from
-this run.
+## Learned facts and hypothesis
 
-Authenticated rules_java 9.1.0 source
-`toolchains/local_java_repository.bzl`, SHA-256
-`9213c5cdd42bc131ec32f5732ea78e1c839a137c146b6fe1cfea61adb4d9d380`,
-uses an empty `java_home`, observes no `javac` in the selected host `PATH`, then
-calls `repository_ctx.path("./nosystemjdk")`. It derives
-`get_child("bin").get_child("java")`, reads `.exists`, and takes the absent-Java
-branch that writes the existing error BUILD plan. No repository payload or
-fixture byte is missing.
+`app/slug_cli_v2/tests/cli.rs` owns the selected selector. `one_shot_case`
+assembles the authentic 28-object fixture, calls `sentinel_outputs`, and only
+after that runs the baseline aquery, conflict command, cquery and recovery
+checks. A fresh standalone assembly of the same pinned inventory SHA-256
+`4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`
+took 0.18 seconds and produced the unchanged 8,004,740 source bytes. Every prior
+typed terminal came from the cold
+`evaluate_workspace_build_command_with_bzlmod_inputs` inside
+`sentinel_outputs`. The resource result therefore selects cold semantic
+evaluation for diagnosis, not fixture assembly or a later CLI phase.
 
-## Compatibility and ownership
+The first hypothesis is renewed DICE preparation fanout after the generated
+local-JDK branch began completing. Earlier authenticated fixture work found and
+fixed global path-epoch and external-child first-Need fanout; it also retained
+cumulative path fanout as a measured performance concern. This is only a
+hypothesis until a later causal discriminator proves it. This audit can only
+record a sampled phase and key category for that follow-up.
 
-Pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
-`StarlarkBaseExternalContext.java:1544-1578`, admits string, Label or path. A
-relative string is rooted in the repository working directory and a path input
-is returned unchanged. `StarlarkPath.java:57-77,129-160,186-198` makes paths
-immutable/hashable, joins string children lexically, exposes existence without
-implicitly watching, and shares path bytes across equality, hash, string and
-repr.
+Reuse the existing opt-in `native-probe-observer` implementation in
+`app/slug_core_v2/src/runtime/probe_observer.rs` and its lifecycle tests in
+`runtime/tests/probe_observer_tests.rs`. Its fixed 512-byte sealed mapping owns
+six independent DICE event counters, double-buffered phase/activity samples,
+overflow state and disable-on-drop. DICE's `DiceEventListener` callback supplies
+key-type tags without retaining keys or changing dependency recording. Reuse
+the supervisor invariants in `tools/v2_oracle/run_payload_demand_probe.sh`:
+bounded pipes, session isolation, subreaper cleanup, sealed inherited observer
+descriptor and exact-selector listing.
 
-`repository_rule_context.rs` remains the sole evaluator/value owner. Extend its
-existing `RepositoryStarlarkPath` with a private generated-root-relative value.
-`repository_ctx.path` keeps the existing Label demand/retry behavior, returns an
-existing path value unchanged, and converts an admitted relative string into a
-generated value. Generated values retain the canonical repository name and a
-normalized relative component sequence; `get_child` appends relative string
-components and preserves that provenance. Equality and hash include the value
-kind, canonical repository and normalized components.
+## Audit method and ownership
 
-One invocation-local `Arc<Mutex<...>>` generated-path state is shared by the
-repository context and its generated path values. It starts with the repository
-root present. A single context helper first pushes each valid `file` or
-`template` effect into the existing plan builder, then records that authored
-file and every generated-directory prefix as present. A failed push records
-nothing. `.exists` reads only this attempt state: the root, `WORKSPACE` and its
-parent are present after the authentic first write, while the disjoint
-`nosystemjdk/bin/java` path remains absent. The state dies with the evaluator
-attempt and is never copied into the returned plan.
-
-Slug has no repository working directory until the immutable effect plan is
-materialized. Generated-path `str`/`repr` therefore use the stable Slug-native
-logical spelling `@@<canonical-repo>//<normalized-path>` (and
-`@@<canonical-repo>//` for the root), never a guessed physical path. For the
-selected generated Java path, `.exists` is exactly false and adds no watch or
-observation. Existing Label and `which()` physical paths keep their byte-based
-identity and do not gain `.exists`; their statically visible `get_child` method
-returns a typed attempt error without changing Label/which provenance. Absolute
-strings, root escape, physical generated-root prediction, filesystem methods,
-`basename`, `dirname`, `is_dir`, `realpath`, `readdir`, reads of generated paths,
-and existence or child projection for Label/which paths remain unsupported.
-
-String normalization accepts `.`, repeated separators, `.` components and
-interior `..` only when they do not escape the generated root. Reject empty,
-NUL, backslash, absolute/drive-like, escaping and over-limit input before a path
-value is allocated. These string restrictions are explicitly Slug-native;
-Bazel's `workingDirectory.getRelative` accepts a broader host-path surface.
-Bound a normalized path to 256 components and 4,096 bytes.
-Generated `get_child` accepts zero or more strings, applies the same
-normalization to the combined path, returns the same value for zero arguments,
-and rejects nonstrings and limit/escape failures.
-The current `LabelPathArgument` carrier may remain private but its terminal text
-must name the admitted Label/string/path shapes.
-
-No generated path, evaluator value or physical root enters the retained effect,
-plan, key, certificate, cache or DICE graph. No source, environment, host input,
-effect ordering, print capture, retry, observation, publication or cancellation
-boundary changes.
-
-## Scope, caps and stops
-
-Production may edit only
-`app/slug_loading_v2/src/repository_rule_context.rs` and the terminal wording in
-`app/slug_loading_v2/src/module_extension_repository_file_effect.rs`. Proof may
-edit tests colocated in those two files. Scheduling/status sections in the
-canonical plan, this manifest, Stage 4, bootstrap readiness and the configured
-CLI ledger may change. No Bzlmod, materializer, source-preparation, fixture,
-registry, CLI, analysis, query or execution file may change.
-
-From `fde43d5cf`, allow 160 gross production and 200 gross proof Rust lines, 360
-total, without deletion credit. Physical caps are 2,340 lines for
-`repository_rule_context.rs` and 4,350 for the effect owner. The wider proof
-allowance covers attempt-state publication ordering, prior effects, path-value
-identity and provenance-conditional method behavior. Replan for another
-production owner, physical-path/materializer coupling, retained-state or DICE
-change, broader filesystem observation, absolute paths, cap breach or another
-authentic prerequisite.
-
-## Discriminating evidence and gates
-
-Add and preflight exact selector
-`repository_context_generated_relative_paths_are_lexical_absent_and_idempotent`.
-It proves `.`, `./nosystemjdk`, repeated separators, safe parent normalization,
-one/multiple-child joins, path idempotence, exact logical str/repr, equality,
-hash/map lookup, and Rust `Value::ptr_eq` identity for a path input. It proves
-root, authored `WORKSPACE` and authored directory-prefix presence alongside an
-absent sibling and the selected Java path's absence after `WORKSPACE`, plus
-unchanged Label-path behavior and typed physical-child rejection. It
-rejects empty, absolute, drive-like, backslash, NUL, root escape, nonstring
-children, 257 components and 4,097 bytes, while zero children are idempotent. A
-focused effect-owner selector runs
-the authenticated local-JDK path/get-child/exists fragment, proves the absent
-branch writes only its expected WORKSPACE/BUILD plan and exact terminal-attempt
-prints, and preserves invalid-type atomic failure. No fixture is added.
-
-Compile within 60 seconds. Run both exact selectors and the inherited Label-path
-selector under the 12-second/15-second limits, full loading unit and integration
-harnesses, query compile coverage, format/diff/cap checks and final independent
-review. After acceptance, commit the checkpoint, rebuild and preflight the
-unchanged CLI harness, then run only
+Make only the frozen temporary, uncommitted diagnostic edits needed to attach
+the existing observer to the integration-test thread and to drive the already
+selected selector. In `slug_cli_v2/src/lib.rs`, remove only the existing
+`native-probe-observer` integration-build `compile_error!` guard. In the exact
+integration test, read only `SLUG_SENTINEL_OBSERVER_FD`, adopt it once with
+`OwnedFd::from_raw_fd`, install one `ProbeGuard` immediately before the existing
+`one_shot_case("build")` call, and hold the guard until that unchanged call
+returns or the supervisor terminates the process. No other test body, helper or
+feature behavior may change. The exact selector remains
 `configured_action_conflicts::one_shot_build_conflict_is_atomic_and_recovers`.
-Record its newly exposed typed terminal and stop. Do not run the other nine CLI
-selectors or F3 until a reviewed successor and all joint gates pass.
+Compile a feature-enabled integration harness within 60 seconds, verify that
+the selector is present exactly once and nonignored, then supervise one run with
+a 12-second wall deadline and 15-second absolute ceiling.
+
+Place the scratch supervisor copy beside the existing script under
+`tools/v2_oracle/` so its unchanged relative-root resolution remains valid and
+exclude it from Git. Preserve the accepted observer channel, byte/output caps,
+namespace/resource isolation, 12-second timeout, kill/reap finalizer, decoder
+and cleanup logic byte-for-byte. Change only the selector name and removal of
+the ignored-selection arguments needed for the nonignored integration test;
+result wording may identify a progress audit. Run the scratch copy's existing
+`self-check` before the replay. The adapter and supervisor must not change the
+evaluated request, fixture, target, source bytes, DICE keys, equality,
+dependency graph, terminal projection or command behavior. The observer mapping
+is process-owned diagnostic memory; the supervisor closes it and kills/reaps
+the complete process group on success, failure, timeout or exception. No
+mapping, key, event, path, fixture or output is retained in Slug state.
+
+Accept the audit evidence only when selector listing is exact; the observer
+header/version, installed PID and six counters are valid; installed PID matches
+the supervised/reaped process; overflow flags and released activity claim are
+zero; output caps are clear; the activity tag is complete or its truncated
+prefix is explicitly unambiguous; dropped sample count is disclosed; and
+cleanup reports no surviving child or open observer descriptor. A timeout is an
+expected diagnostic outcome. Any sampled key category, specific or generic,
+selects only a deeper bounded causal audit. A typed terminal may be recorded and
+reviewed if it appears, but instrumentation overhead and elapsed time cannot
+establish a new semantic requirement.
+
+## Scope and stops
+
+Durable edits are limited to scheduling/status sections in the canonical plan,
+this manifest, Stage 4, bootstrap readiness and the configured CLI ledger.
+Temporary diagnostic edits are limited to
+`app/slug_cli_v2/src/lib.rs`, `app/slug_cli_v2/tests/cli.rs`, and the excluded
+scratch supervisor copy described above; none may be committed. The authentic
+fixture, oracle script, production DICE/loading/analysis behavior and Cargo
+manifests remain unchanged.
+
+Before recording the result, restore all temporary source edits, remove scratch
+script/fixture/log directories, and prove both worktrees clean except for the
+allowed documentation receipt. Record SHA-256 for the accepted supervisor, the
+scratch supervisor, and the exact temporary source diff before running. Run
+`python3 scripts/v2_plan_status.py` and `git diff --check`. Independently review
+this diagnostic design before the run; the result needs another review only if
+it claims a semantic owner or changes the allowed next action.
+
+Independent correction rereview returned `ACCEPT` for the frozen adapter,
+byte-preserved supervisor, evidence-validity checks and sampled-evidence stop.
+
+Do not run F3, any of the other nine configured-conflict selectors, the
+unmodified selected selector, or a second diagnostic replay. Do not raise a
+deadline, acquire payloads, change production code, optimize a sampled key
+category, merge the combined stack or push the review branch. Replan if the
+observer cannot attach without semantic changes, the supervisor cannot prove
+cleanup, the harness fails compilation/selection, telemetry is invalid or the
+sample is too weak to name the next bounded audit.

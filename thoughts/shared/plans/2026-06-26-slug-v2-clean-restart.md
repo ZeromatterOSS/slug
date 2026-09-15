@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-repository-generated-path-r1
-Status: implementation accepted at `b75291517`; CLI attribution resource-limited
+Packet: WP-4-7A-configured-conflict-cold-progress-audit-r1
+Status: design accepted; diagnostic execution pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -39,8 +39,10 @@ The single authorized CLI selector exposed repository invocation ordinal 6 in
 relative string `./nosystemjdk`. The accepted successor at `b75291517` adds only
 attempt-local generated path identity, lexical children and prior-effect
 existence. Its first unchanged CLI selector then reached the inherited
-15-second absolute ceiling without a typed terminal, so no successor behavior
-is selected. The combined stack remains unaccepted.
+15-second absolute ceiling without a typed terminal. The active audit permits
+one observer-instrumented replay of that exact selector to sample cold
+evaluation progress; any sampled key category can select only a deeper causal
+audit. The combined stack remains unaccepted.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

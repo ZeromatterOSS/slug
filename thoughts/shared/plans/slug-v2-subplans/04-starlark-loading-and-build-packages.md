@@ -9017,3 +9017,14 @@ one permitted run reached the inherited 15-second absolute ceiling after 14.91
 seconds with exit 124 and no typed terminal. The remaining nine selectors and
 F3 remain stopped. This resource-limit result selects no successor behavior and
 does not accept or activate the combined stack.
+
+### Cold configured-conflict progress audit selected (2026-09-14)
+
+Fixture assembly independently completes in 0.18 seconds, while the selected
+test enters its cold in-process root evaluation before any aquery, conflict,
+cquery or recovery command. This localizes the 15-second resource result to
+semantic evaluation. The active docs-first audit reuses the accepted fixed-size
+DICE observer and byte-preserved process-tree supervisor for one instrumented
+replay of the same selector. It changes no fixture or behavior and cannot run F3
+or sibling selectors. Because activity tags are sampled, every key category
+selects only a deeper causal diagnostic; it cannot select an optimization.
