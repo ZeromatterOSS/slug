@@ -30,15 +30,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-7A-repository-generated-path-r1
-Status: generated-path design accepted; implementation ready
+Status: implementation accepted at `b75291517`; CLI attribution resource-limited
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
 The single authorized CLI selector exposed repository invocation ordinal 6 in
 `rules_java++toolchains+local_jdk`: `repository_ctx.path` rejects the authentic
-relative string `./nosystemjdk`. The accepted successor adds only attempt-local
-generated path identity, lexical children and prior-effect existence. The
-combined stack remains unaccepted.
+relative string `./nosystemjdk`. The accepted successor at `b75291517` adds only
+attempt-local generated path identity, lexical children and prior-effect
+existence. Its first unchanged CLI selector then reached the inherited
+15-second absolute ceiling without a typed terminal, so no successor behavior
+is selected. The combined stack remains unaccepted.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

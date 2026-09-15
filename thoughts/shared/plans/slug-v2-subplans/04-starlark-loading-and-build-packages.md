@@ -9001,3 +9001,19 @@ disjoint Java path is absent. Stable canonical logical spelling replaces an
 unavailable physical materialization root. Absolute/escaping host paths and
 physical Label/which existence remain unsupported. Independent design review
 accepted the corrected owner, identity, limits, proofs and stop gates.
+
+### Generated repository path checkpoint; attribution resource limit (2026-09-14)
+
+The attempt-local generated-path owner is preserved unaccepted at `b75291517`.
+Its exact proofs cover live false-to-true authored-path presence, root and
+directory prefixes, generated zero-child identity, physical Label child
+rejection, lexical limits, stable identity and the authenticated local-JDK
+absence branch. Full loading passes 568 active tests with one ignored and all
+108 integration tests; direct query compile and format/diff/cap gates pass.
+Independent correction rereview returned `ACCEPT`.
+
+The unchanged first CLI selector was rebuilt and exactly preflighted, then its
+one permitted run reached the inherited 15-second absolute ceiling after 14.91
+seconds with exit 124 and no typed terminal. The remaining nine selectors and
+F3 remain stopped. This resource-limit result selects no successor behavior and
+does not accept or activate the combined stack.

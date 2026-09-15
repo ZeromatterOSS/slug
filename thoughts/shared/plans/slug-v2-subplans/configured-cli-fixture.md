@@ -385,3 +385,12 @@ repository_ctx.path argument must be a Label`. Authenticated rules_java calls
 empty repository environment. The corrected successor uses attempt-only
 generated path/presence state and changes no fixture or materializer. Its design
 review returned `ACCEPT`; the other nine selectors and F3 were not run.
+
+The generated-path implementation is preserved unaccepted at `b75291517` after
+fresh exact, full-loading, integration, query, format, cap and independent final
+review gates. The unchanged CLI harness rebuilt in 34.45 seconds and the first
+selector preflighted exactly. Its sole permitted run then reached the inherited
+15-second absolute ceiling after 14.91 seconds with exit 124 and printed only
+`running 1 test`. No typed terminal or payload demand was exposed. The other
+nine selectors and F3 remain stopped, and this resource-limit result selects no
+successor behavior.

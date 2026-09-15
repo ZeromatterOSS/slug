@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-repository-generated-path-r1
-Status: generated-path design accepted; implementation ready
+Status: implementation accepted at `b75291517`; CLI attribution resource-limited
 
 ## Observable result
 
@@ -14,6 +14,22 @@ string/path surface used by that authenticated local-JDK branch, then run that
 one selector once to select the next owner. The remaining nine selectors and F3
 stay stopped. The combined R2/group/computed-default/alias/initializer stack is
 still unaccepted and may not merge or push.
+
+The accepted implementation is preserved at `b75291517`. Fresh gates compiled
+the loading harnesses in 14.10 seconds, preflighted and passed the two new exact
+selectors plus the inherited Label-path selector, passed 568 loading unit tests
+with one supervised ignore and 108 integration tests, and compiled
+`slug_query_v2`. Independent correction rereview returned `ACCEPT`. The final
+diff used 159/160 gross production and 156/200 gross proof lines, 315/360 total;
+physical owners remained at 2,154/2,340 and 4,280/4,350 lines.
+
+The unchanged CLI harness rebuilt in 34.45 seconds and its first selector
+preflighted exactly. Its sole permitted run reached the inherited 15-second
+absolute ceiling with exit 124 after 14.91 seconds and emitted only
+`running 1 test`; it exposed no typed terminal. This is a resource-limit result,
+not a semantic failure or authority to raise the ceiling. Do not repeat the
+selector, run the other nine selectors or F3, or select another behavior from
+this run.
 
 Authenticated rules_java 9.1.0 source
 `toolchains/local_java_repository.bzl`, SHA-256
@@ -71,9 +87,9 @@ NUL, backslash, absolute/drive-like, escaping and over-limit input before a path
 value is allocated. These string restrictions are explicitly Slug-native;
 Bazel's `workingDirectory.getRelative` accepts a broader host-path surface.
 Bound a normalized path to 256 components and 4,096 bytes.
-`get_child` accepts zero or more strings, applies the same normalization to the
-combined path, returns the same value for zero arguments, and rejects nonstrings
-and limit/escape failures.
+Generated `get_child` accepts zero or more strings, applies the same
+normalization to the combined path, returns the same value for zero arguments,
+and rejects nonstrings and limit/escape failures.
 The current `LabelPathArgument` carrier may remain private but its terminal text
 must name the admitted Label/string/path shapes.
 
