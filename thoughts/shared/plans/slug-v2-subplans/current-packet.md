@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-dice-event-audit-r1
-Status: Core proof type recovery accepted; retry pending
+Status: supervisor phase-fixture recovery accepted; self-check retry pending
 
 ## Accepted predecessor receipt
 
@@ -208,3 +208,14 @@ target once under the unchanged pinned 60-second command. The production hash
 and exact 100/130 caps remain frozen.
 Independent recovery review returned `ACCEPT` for the line-neutral slice
 coercion and unchanged target, launcher, shared target directory and ceiling.
+
+The corrected Core target prepared in 4.96 seconds, its exact selector listed
+once and passed 1/1. The 81/120-line scratch supervisor passed syntax checking,
+then its escalated self-check stopped in the decoder matrix before cleanup
+cases. The synthetic valid phase frame wrote phase 6 and status 1 into separate
+words, while the protocol packs status into the high 16 bits of the phase word.
+No CLI preparation, fixture or replay ran. One reviewed line-neutral
+scratch-fixture correction may encode word 14 as `6 | (1 << 16)` and rerun the
+self-check once through `/bin/bash`; decoder, source and proof stay frozen.
+Independent recovery review returned `ACCEPT` because the correction changes
+only the synthetic packed phase/status word.

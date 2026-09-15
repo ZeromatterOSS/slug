@@ -82,6 +82,11 @@ The corrected launcher then exposed one proof-only slice/array tuple mismatch
 after 7.3 seconds without producing an executable. One reviewed line-neutral
 coercion may prepare the same frozen target; all execution remains stopped.
 Independent recovery review returned `ACCEPT` for that proof-only correction.
+The corrected Core target prepared in 4.96 seconds and its exact proof passed
+1/1. The scratch self-check then exposed only a synthetic packed-phase fixture
+error before cleanup cases. One reviewed line-neutral correction may fix that
+fixture and rerun only the self-check; the CLI and replay remain stopped.
+Independent recovery review returned `ACCEPT` for that line-neutral fixture fix.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

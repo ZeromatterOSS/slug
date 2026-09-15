@@ -9175,3 +9175,7 @@ The corrected launcher exposed one proof-only slice/array tuple mismatch after
 7.3 seconds and produced no executable. A reviewed line-neutral coercion may
 prepare only the same frozen target.
 Independent recovery review returned `ACCEPT` for that proof-only correction.
+The corrected Core target prepared in 4.96 seconds and its exact proof passed.
+The scratch self-check next exposed a synthetic packed-phase fixture error
+before cleanup cases; one reviewed line-neutral correction may rerun only it.
+Independent recovery review returned `ACCEPT` for that line-neutral fixture fix.
