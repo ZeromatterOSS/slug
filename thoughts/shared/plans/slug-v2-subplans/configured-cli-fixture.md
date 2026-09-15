@@ -510,50 +510,22 @@ and buckets `[52, 125, 24, 17, 0]`. Its corrected 133-line production cap and
 recovered 109/140 exact proof passed independent rereview without another CLI
 replay. This establishes only aggregate delivery to commit.
 
-The sole armed-window replay reached the 12-second deadline in `RootCompute`.
-Its valid cutoff recorded 221 installed merges, 221 successful commits, 220
-closed windows and the final window active, with zero events in every exact
-`PathObservationShardKey` category. Pending, flags, reserved state, observer
-overflow/drop/claim, PID/reap, output and cleanup gates passed. Independent
-review accepts this only as a negative within the measured windows.
+The sole direct-dependent event replay reached the 12-second deadline in
+`RootCompute` with a coherent 221 produced/committed, 220 closed,
+pending-zero, active-one cutoff. Exact `PathObservationKey` event counts were
+`[2568, 2568, 1618, 1618, 2568, 2568]`, total 13,508. Selector, observer,
+PID/reap, output and cleanup gates passed. Independent review accepts only
+aggregate event membership.
 
-The selected successor retains the exact configured-conflict selector,
-fixture, lifecycle, observer layout and 12/15-second limits, but filters the six
-events for `PathObservationKey`, the immediate ordinary dependent. Its exact
-Core proof, scratch self-check, `cli` integration preflight, fresh fixture and
-artifact hashes precede independent preexecution review and one replay of exact
-selector `configured_action_conflicts::one_shot_build_conflict_is_atomic_and_recovers`.
-Preflight uses `--list --exact`; execution uses `--exact ... --nocapture`, never
-`--ignored`, through `/bin/bash` and the established ptrace escalation. Accept
-only the expected wall-deadline `RootCompute` cutoff with one selected test,
-valid observer state and complete cleanup. The other nine selectors and F3
-remain stopped. A zero result ends this diagnostic chain; it does not authorize
-broadening to `ResolvedPathObservationKey`.
-Independent design rereview returned `ACCEPT` for the exact target, invocation,
-cutoff, evidence and cleanup boundaries.
-The first Core preparation stopped at the blocked bare-`cargo` Snap launcher
-before compiler entry. One reviewed pinned-absolute-Cargo recovery may prepare
-the unchanged exact-cap target; the CLI, fixture and replay remain stopped.
-Independent recovery review returned `ACCEPT` for that launcher-only retry.
-The corrected launcher exposed one proof-only slice/array tuple mismatch after
-7.3 seconds and produced no executable. A reviewed line-neutral coercion may
-prepare the same Core target; the CLI, fixture and replay remain stopped.
-Independent recovery review returned `ACCEPT` for that proof-only correction.
-The corrected Core target prepared in 4.96 seconds and its exact proof passed
-1/1. The scratch self-check next exposed only a synthetic packed-phase fixture
-error before cleanup cases; one reviewed line-neutral correction may rerun only
-the self-check. The CLI, fixture and replay remain stopped.
-Independent recovery review returned `ACCEPT` for that line-neutral fixture fix.
-The corrected self-check passed and the exact CLI target prepared/preflighted,
-but preexecution review rejected its feature workspace fallback and two Core
-proof/runtime gaps. Feature mode now requires the inherited external workspace;
-the exact-cap affected gates must rerun before the unconsumed replay.
-The changed Core proof next failed only because its snapshot preceded the guard
-drop's intentional disabled-word write. A reviewed line-neutral reorder may
-isolate the event; the CLI replay remains unconsumed.
-Independent recovery review returned `ACCEPT` for that line-neutral reorder.
-Preexecution rereview found that proof was still disarmed by the preceding
-invalid case. It now establishes a coherent armed state before guard drop; the
-CLI artifact stays frozen and the replay remains unconsumed while Core reruns.
-The armed post-disable proof passed 1/1 and final artifact rereview returned
-`EXECUTE` for exactly one escalated reviewed portable-run invocation.
+The selected successor retains the exact configured-conflict selector, fresh
+fixture, handoff lifecycle and 12/15-second limits. It classifies exact
+legacy-delivered `PathObservationKey` callbacks at the existing runtime tracker
+as evaluated/reused and with/without an immediate `PathObservationShardKey`
+dependency. Rich-only reuse is excluded. Six aggregate counters, the frozen
+two-or-three-counter order and a callback claim must fail closed on partial
+publication. Exact Core/delegation proof, scratch self-check, CLI
+preflight, fresh fixture, hashes and independent preexecution review precede
+one replay. The other nine selectors and F3 remain stopped; do not broaden to
+`ResolvedPathObservationKey` or select optimization work.
+Independent design rereview returned `ACCEPT` for the narrowed legacy subset,
+exact selector boundary and one-replay stop.

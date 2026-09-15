@@ -9146,49 +9146,25 @@ residents, maximum 85 and buckets `[52, 125, 24, 17, 0]` at a valid
 109/140 exact proof passed independent rereview without another CLI replay.
 This proves only that potential exposure reached successful commits.
 
-The sole armed-window replay reached the 12-second wall deadline in
-`RootCompute` with a coherent negative cutoff: 221 installed merges, 221
-successful commits, 220 closed windows, the final window active and zero events
-in all six exact `PathObservationShardKey` categories. Pending, flags, reserved
-state, observer overflow/drop/claim, PID/reap, output and cleanup gates passed.
-Independent review accepts only a negative observation inside those windows;
-the injected-key implementation explains the result without proving absence
-outside the measured edges.
+The shard-key audit first returned a coherent negative across 221 committed
+handoff windows. The sole direct-dependent event audit then reached the
+12-second deadline in `RootCompute` with the same coherent 221/221/220,
+pending-zero, active-one lifecycle and exact `PathObservationKey` counts
+`[2568, 2568, 1618, 1618, 2568, 2568]`, total 13,508. All observer,
+filtered/global, PID/reap, output and cleanup gates passed. Independent review
+accepts only aggregate event membership, not per-merge invalidation, causality,
+necessity, cost or avoidable work.
 
-The selected docs-first successor reuses the lifecycle and fixed words 51--63
-to count only exact `PathObservationKey` events. This immediate ordinary key
-reads the injected shard key. Its exact helper proof must cover every partial
-publication and consumer-arm state, reject an inactive completed cutoff,
-preserve inherited event accounting, and cover every event variant, tag
-discrimination and filtered/global bound before one independently reviewed
-exact configured-conflict-selector replay. A positive count
-proves only aggregate direct-dependent event membership. A zero count ends the
-window diagnostic chain and must not select `ResolvedPathObservationKey`.
-Independent design rereview returned `ACCEPT` for the corrected cutoff,
-consumer-arm and inherited-accounting proof, and exact replay gates.
-The first Core preparation stopped at the blocked bare-`cargo` Snap launcher
-before compiler entry. A reviewed recovery may prepare the unchanged exact-cap
-target once through the pinned absolute Cargo binary; all execution remains
-stopped.
-Independent recovery review returned `ACCEPT` for that launcher-only retry.
-The corrected launcher exposed one proof-only slice/array tuple mismatch after
-7.3 seconds and produced no executable. A reviewed line-neutral coercion may
-prepare only the same frozen target.
-Independent recovery review returned `ACCEPT` for that proof-only correction.
-The corrected Core target prepared in 4.96 seconds and its exact proof passed.
-The scratch self-check next exposed a synthetic packed-phase fixture error
-before cleanup cases; one reviewed line-neutral correction may rerun only it.
-Independent recovery review returned `ACCEPT` for that line-neutral fixture fix.
-The corrected self-check passed and CLI preparation/preflight completed, but
-preexecution review required disabled-state filtering, the omitted active-clear
-partial proof and a required feature workspace. The exact-cap corrections are
-applied and every affected gate must rerun before the unconsumed replay.
-The changed Core proof next failed only because its snapshot preceded the
-guard drop's intentional disabled-word write. A reviewed line-neutral reorder
-may isolate the event; no CLI replay ran.
-Independent recovery review returned `ACCEPT` for that line-neutral reorder.
-Preexecution rereview found that proof was still disarmed by the preceding
-invalid case. It now establishes a coherent armed state before guard drop; only
-the Core proof and affected hashes must rerun before the unconsumed replay.
-The armed post-disable proof passed 1/1 and final artifact rereview returned
-`EXECUTE` for exactly one escalated reviewed portable-run invocation.
+The selected docs-first successor uses the existing legacy
+`RuntimeActivationTracker::key_activated` callback to classify exact
+`PathObservationKey` callbacks as evaluated/reused and with/without an immediate
+`PathObservationShardKey` dependency. Rich-only reuse is excluded, so this is
+not a complete activation census. Publish only six aggregate cells under a
+callback claim and the frozen two-or-three-counter order so every partial or
+concurrent cutoff fails closed.
+Preserve rich/root delegation, demand provenance, handoff lifecycle and all
+semantics. One exact proof, scratch self-check and independently reviewed
+same-selector replay remain under the current packet's caps and stops. Do not
+broaden to `ResolvedPathObservationKey` or infer optimization work.
+Independent design rereview returned `ACCEPT` for the narrowed legacy subset,
+fixed publication orders and claim-last cutoff.

@@ -29,79 +29,30 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-configured-conflict-path-observation-dice-event-audit-r1
+Packet: WP-4-7A-configured-conflict-path-observation-activation-dependency-audit-r1
 Status: docs-first design pending independent review
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
-stack and its independently accepted initializer and diagnostic checkpoints.
-The accepted diagnostic chain narrowed cold evaluation through exact key counts,
-a post-sharding census, frontier batching and installed-merge shard exposure.
-The sole shard replay produced a valid `RootCompute` cutoff: 209 installed
-merges changed 438 shards while adding 462 demands, with 1,528 prior residents
-in changed shards. Maxima were 18 changed shards and 112 prior residents; the
-exposure buckets were `[49, 124, 21, 15, 0]`. All observer, arithmetic,
-PID/reap, output and cleanup gates passed.
+stack and its accepted diagnostic history. The sole exact-`PathObservationKey`
+event replay reached the 12-second deadline in `RootCompute` with 221 produced
+and committed handoffs, 220 closed windows and the final window active. It
+recorded exact event counts `[2568, 2568, 1618, 1618, 2568, 2568]`, total
+13,508. Observer, arithmetic, PID/reap, output and cleanup gates passed.
+Independent review accepts only event membership within those aggregate
+windows, with no merge attribution, invalidation, causality or cost conclusion.
 
-The accepted merge-to-commit audit then recorded 218 produced and committed
-handoffs, 1,591 total potentially exposed prior residents, maximum 85 and
-buckets `[52, 125, 24, 17, 0]` at a valid `RootCompute` cutoff. Its corrected
-133-line production cap and augmented 109/140 proof passed independent
-rereview without another CLI replay. That result proves only that aggregate
-potential exposure reached successful injection commits.
-
-The sole armed-window replay then reached the 12-second deadline after
-12.0113899707794 seconds in `RootCompute`. It recorded 221 installed merges,
-221 matching commits and 220 closed windows with the final window active, but
-all six exact `PathObservationShardKey` event counters were zero. Pending,
-flags, reserved state, overflow, dropped samples and activity claim were zero;
-PID/reap, output and cleanup gates passed. Independent result review accepts
-this as a valid negative across 221 coherent windows. It is consistent with an
-injected key producing no ordinary DICE compute event and proves no global
-absence outside these atomic window edges.
-
-The selected successor reuses that exact lifecycle, requires the final window
-active with `closed = committed - 1`, and counts the six event variants only
-for `PathObservationKey`, the immediate ordinary key whose
-compute reads the shard key. Words 51--63 and the 100/130/120 temporary
-production/proof/scratch caps remain fixed. One exact helper proof, supervisor
-self-check including every consumer-arm partial, frozen artifact set,
-independent preexecution review and one exact configured-conflict-selector
-replay remain under the existing 12/15-second bounds. A positive
-result proves only aggregate direct-dependent event membership in the armed
-windows. A zero result ends this diagnostic chain; do not broaden it to
-`ResolvedPathObservationKey`.
-Independent design rereview returned `ACCEPT` for the corrected cutoff,
-consumer-arm proof and exact replay gates.
-The first Core preparation resolved bare `cargo` through the blocked Snap
-wrapper and exited before Cargo or rustc entry. One independently reviewed
-recovery may launch the frozen exact-cap artifacts through the pinned absolute
-Cargo binary; no selector, CLI preparation, fixture or replay has run.
-Independent recovery review returned `ACCEPT`; the bare-Cargo command must not
-repeat.
-The corrected launcher then exposed one proof-only slice/array tuple mismatch
-after 7.3 seconds without producing an executable. One reviewed line-neutral
-coercion may prepare the same frozen target; all execution remains stopped.
-Independent recovery review returned `ACCEPT` for that proof-only correction.
-The corrected Core target prepared in 4.96 seconds and its exact proof passed
-1/1. The scratch self-check then exposed only a synthetic packed-phase fixture
-error before cleanup cases. One reviewed line-neutral correction may fix that
-fixture and rerun only the self-check; the CLI and replay remain stopped.
-Independent recovery review returned `ACCEPT` for that line-neutral fixture fix.
-The corrected self-check passed, the CLI target prepared and preflighted, and a
-fresh fixture verified. Preexecution review then required a disabled-state
-filter guard, the actual active-clear partial proof and a fail-closed feature
-workspace. Those exact-cap corrections are applied; all affected gates must
-rerun before review and the sole replay remains unconsumed.
-The changed Core proof then failed only because it snapshotted before the guard
-drop's intentional disabled-word write. A reviewed line-neutral reorder may
-isolate the post-disable event and rerun the affected gates; no CLI replay ran.
-Independent recovery review returned `ACCEPT` for that line-neutral reorder.
-Preexecution rereview found the post-disable proof was left disarmed by its
-preceding invalid case. A line-neutral correction now establishes a coherent
-armed state before guard drop; only the Core proof and affected hashes must
-rerun before review, and the replay remains unconsumed.
-The armed post-disable proof then passed 1/1 and final artifact rereview returned
-`EXECUTE`. Exactly one escalated reviewed portable-run invocation is authorized.
+The selected successor classifies only legacy-delivered `PathObservationKey`
+callbacks at the existing runtime activation tracker by evaluated/reused and
+presence/absence of an immediate `PathObservationShardKey` dependency. Rich-only
+reuse is explicitly excluded. Words 54--59 contain six
+aggregate cells; word 63 is a callback claim making partial or concurrent
+publication decoder-invalid. Preserve the accepted handoff lifecycle, tracker
+rich/root callbacks and demand provenance. Exact helper/delegation proof,
+supervisor self-check, artifact freeze, independent preexecution review and one
+same-selector replay remain under 180/220/140 temporary line caps and the
+existing 12/15-second limits.
+Independent design rereview returned `ACCEPT` for the narrowed legacy subset,
+fixed publication orders and claim-last cutoff.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
