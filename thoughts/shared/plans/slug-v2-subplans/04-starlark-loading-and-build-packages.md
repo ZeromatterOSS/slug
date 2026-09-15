@@ -9036,3 +9036,12 @@ was an `ExternalBzlModuleObservationKey` finish. Observer PID and reap identity
 matched; overflow, dropped samples and activity claim were zero; cleanup was
 complete. This is valid sampled progress evidence only. The permitted successor
 is an exact key-type count audit for external-Bzl and path observation events.
+
+The selected docs-first successor keeps the observer mapping at 512 bytes and
+temporarily assigns its thirteen unused words to twelve exact event counters
+for those two static tags plus filtered overflow state. It must prove the
+counter layout independently before one supervised replay, then restore every
+diagnostic source edit. Totals and filtered values are separately incremented
+atomic cutoff snapshots, so their ratio is diagnostic rather than an exact
+partition. Count volume can select only a reviewed identity or call-site audit,
+never a semantic correction.

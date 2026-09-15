@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-configured-conflict-cold-progress-audit-r1
-Status: progress audit complete; exact key-type causal audit selected
+Packet: WP-4-7A-configured-conflict-key-type-count-audit-r1
+Status: design accepted; diagnostic execution pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -50,6 +50,13 @@ deadline: 8,003 compute starts, 8,000 finishes and a complete latest
 matched installed/reaped PID and complete cleanup. It establishes progress, not
 causation. The next bounded audit must count exact external-Bzl and path key
 events before selecting any still-deeper owner investigation.
+
+The active docs-first packet assigns the observer's thirteen unused words to
+twelve exact filtered counters plus overflow state without changing its
+512-byte mapping. One temporary unit proof and one supervised replay must
+validate same-replay atomic cutoff snapshots; they are not an exact partition
+because total and filtered increments are separate. The result can select only
+another reviewed causal audit.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

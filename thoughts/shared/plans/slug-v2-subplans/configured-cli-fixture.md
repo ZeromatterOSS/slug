@@ -409,3 +409,11 @@ That single replay reached its 12-second wall deadline in `RootCompute` with
 reaped PID matched, and cleanup was complete. Sampling names no semantic owner.
 Only an exact key-type count audit for that category and the historically
 adjacent `PathObservationKey` category is selected.
+
+The selected docs-first audit reuses the 512-byte observer and assigns only its
+thirteen unused words to the two groups of six exact event counters plus
+filtered overflow. A temporary Core unit proof must validate the layout before
+one supervised replay. The separately incremented totals and filtered values
+are atomic cutoff snapshots, not an exact partition. They can select only a
+separately reviewed deeper causal audit; all sibling selectors and F3 remain
+stopped.
