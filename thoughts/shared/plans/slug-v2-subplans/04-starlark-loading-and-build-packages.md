@@ -8933,3 +8933,23 @@ configurable alias and stops at `toolchains/BUILD:365` ->
 the retained rule-initializer invocation guard. The observer is valid and the
 10.26-second run cleans every child, pipe and process group. This selects only a
 bounded rule-initializer successor. The combined stack remains unaccepted.
+
+### Selected rule-initializer execution prerequisite (2026-09-14)
+
+The authentic rules_java initializer checks seven legacy names, while BUILD 365
+supplies six as scalar Labels and omits `deps_checker`; those values pass
+through. Pinned Bazel `8220c619` normally lifts explicit non-None public
+Starlark attributes against their declared types, with mismatches admitted only
+for names in `$legacy_any_type_attrs`, then calls the initializer before final
+coercion. It distinguishes whole-call `None` from returned dictionary values of
+`None`, which unset an assignment before default installation.
+
+The successor uses the existing frozen initializer as sole retained owner.
+`FrozenRuleDefinition::invoke` copies the admitted inputs for one attempt-local
+call, validates and merges public results with definition-relative ordinary
+labels and package-relative outputs, and sends them through typed coercion. Only
+the final `AttributeValue` slice publishes; existing sources own
+invalidation and A/B/A restoration. Parent chains, private builtins, selectors
+and evaluator values outside the selected shapes remain unsupported. Scope,
+proofs, caps and atomic gates are frozen in `current-packet.md`. Independent
+design review accepted the corrected contract; implementation is active.

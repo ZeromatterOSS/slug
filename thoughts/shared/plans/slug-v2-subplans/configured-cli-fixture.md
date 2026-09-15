@@ -348,3 +348,13 @@ evidence. Native publication exited 1 at rules_java
 `java/toolchains/java_toolchain.bzl:27`: `_java_toolchain(**attrs)` reaches
 `target invocation for rule initializer is unsupported`. This establishes no
 new payload demand and selects only the bounded initializer prerequisite.
+
+The selected initializer is already in authenticated rules_java 9.1.0 bytes.
+`java/common/rules/java_toolchain.bzl:253-265` receives `**kwargs` and checks
+seven legacy names, but `toolchains/default_java_toolchain.bzl:149-178`
+authentically supplies six of them as scalar Labels and omits `deps_checker`.
+Those six pass through unchanged. Synthetic loading evidence owns singleton and
+empty-list normalization through `_legacy_any_type_attrs`. The successor changes
+no fixture object, mirror,
+metadata or assembler path. Its portable gate remains the same ten exact CLI
+selectors followed by unchanged supervised F3.
