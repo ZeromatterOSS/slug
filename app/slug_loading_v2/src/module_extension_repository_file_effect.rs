@@ -1189,7 +1189,7 @@ fn terminal_repository_rule_invocation_error(
             HostSelectedRepositoryFileEffectError::Invocation {
                 certificate: certificate.clone(),
                 ordinal,
-                message: "repository_ctx.path argument must be a Label".into(),
+                message: "repository_ctx.path argument must be an admitted Label, relative string, or path".into(),
             }
         }
         RepositoryRuleInvocationError::ReadArgument
@@ -2385,6 +2385,69 @@ ext = module_extension(implementation = impl)
             panic!("legacy Label path must complete")
         };
         assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    }
+
+    #[tokio::test]
+    async fn selected_repository_file_effect_executes_generated_local_jdk_absence_atomically() {
+        const LOCAL_JDK_EXTENSION: &str = r#"
+def write(ctx):
+    java_home = ctx.path("./nosystemjdk")
+    ctx.file("WORKSPACE", "workspace", executable = False)
+    java = java_home.get_child("bin").get_child("java")
+    print("local-java-exists=%s" % java.exists)
+    if java.exists:
+        fail("unexpected local Java")
+    ctx.file("BUILD", str(java), executable = False)
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(EffectTracker::default());
+        let mut transaction =
+            transaction_with_tracker(&dice, MODULE, LOCAL_JDK_EXTENSION, true, tracker.clone())
+                .await;
+        let owner = owner(&mut transaction).await;
+        tracker.take();
+        let key = HostSelectedRepositoryFileEffectObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            owner,
+            0,
+        );
+        let SourcePreparationOutcome::Complete(Ok(observed)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("generated local-JDK path fragment must complete")
+        };
+        let plan = observed.result().as_ref().as_ref().unwrap().plan();
+        assert_eq!(
+            plan.effects()
+                .iter()
+                .map(|effect| effect.path())
+                .collect::<Vec<_>>(),
+            ["WORKSPACE", "BUILD"]
+        );
+        assert_eq!(
+            plan.effects()[1].content(),
+            b"@@+ext+first//nosystemjdk/bin/java"
+        );
+        let events = tracker
+            .take()
+            .into_iter()
+            .find_map(|(name, _, batch)| (name == key.to_string()).then_some(batch).flatten())
+            .unwrap();
+        assert_eq!(
+            events
+                .events()
+                .iter()
+                .filter_map(|event| match event {
+                    EvaluationEvent::StarlarkPrint { text, .. } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>(),
+            ["local-java-exists=False"]
+        );
     }
 
     fn which_observation(demand: &PathObservationDemand) -> PathObservationResult {
