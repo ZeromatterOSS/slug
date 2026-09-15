@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-dice-event-audit-r1
-Status: armed post-disable proof correction applied; Core rerun pending
+Status: preexecution accepted; sole replay authorized
 
 ## Accepted predecessor receipt
 
@@ -257,3 +257,15 @@ coherent armed state `P = C = 1`, `W = 0`, pending zero, active one and clear
 flags/reserved, then drops the guard, snapshots, emits the exact event and
 compares all words. Rerun only the affected Core preparation/proof, refresh the
 Rust/Core hashes and obtain rereview. The CLI replay remains unconsumed.
+
+The corrected Core target prepared in 4.67 seconds and its exact selector
+listed once and passed 1/1. Final SHA-256 values are: Rust diff
+`ba842406b59ef65dcf911a0d7cf3bc1ea1d61f7a72f0669b721e8f38e0085122`,
+Core harness `ce1f292da4c1a18d69eabdb54d4c2357e10234cc50256744f7d2fbdaa766f5e1`,
+scratch supervisor `cde2f2b84f8ba7c995cffb09c4dac989c6522b18e107b0e671f8b7cfa4e83a76`,
+CLI harness `18e86c12665f068a3bb3e55d15915247f884ca97cbb12a194b0dfeff2bd6f1cd`
+and Slug binary
+`2fb664e3d85c6727521f4091fa24ce61670d523b7e98b1a8eb653974daeb701f`.
+The accepted supervisor remains `3b4d48a4a7c729ec0c8c17ffd2aed3ddab8677699bdce9d8bb24d97afbeab69c`.
+Independent preexecution rereview returned `EXECUTE` for exactly one specified
+escalated `/bin/bash ... --portable-run` invocation. Do not repeat it.

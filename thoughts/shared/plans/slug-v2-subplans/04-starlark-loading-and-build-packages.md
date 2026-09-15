@@ -9190,3 +9190,5 @@ Independent recovery review returned `ACCEPT` for that line-neutral reorder.
 Preexecution rereview found that proof was still disarmed by the preceding
 invalid case. It now establishes a coherent armed state before guard drop; only
 the Core proof and affected hashes must rerun before the unconsumed replay.
+The armed post-disable proof passed 1/1 and final artifact rereview returned
+`EXECUTE` for exactly one escalated reviewed portable-run invocation.

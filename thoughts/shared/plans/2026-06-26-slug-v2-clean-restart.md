@@ -100,6 +100,8 @@ Preexecution rereview found the post-disable proof was left disarmed by its
 preceding invalid case. A line-neutral correction now establishes a coherent
 armed state before guard drop; only the Core proof and affected hashes must
 rerun before review, and the replay remains unconsumed.
+The armed post-disable proof then passed 1/1 and final artifact rereview returned
+`EXECUTE`. Exactly one escalated reviewed portable-run invocation is authorized.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

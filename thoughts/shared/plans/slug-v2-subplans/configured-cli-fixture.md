@@ -555,3 +555,5 @@ Independent recovery review returned `ACCEPT` for that line-neutral reorder.
 Preexecution rereview found that proof was still disarmed by the preceding
 invalid case. It now establishes a coherent armed state before guard drop; the
 CLI artifact stays frozen and the replay remains unconsumed while Core reruns.
+The armed post-disable proof passed 1/1 and final artifact rereview returned
+`EXECUTE` for exactly one escalated reviewed portable-run invocation.
