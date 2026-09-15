@@ -94,6 +94,14 @@ proof edit and prepares a dedicated Core integration proof for the same
 aggregate method and sealed mapping. Neither completed command may be retried.
 Independent recovery rereview returned `ACCEPT` for the complete compile
 history, restore-before-hash order, one-target preparation and aligned scope.
+The first dedicated-target launcher exited 101 after 0.64 seconds before
+compilation because the command omitted the pinned toolchain `PATH` and Cargo's
+`rustc -vV` resolved through the blocked system Snap wrapper. It produced no
+executable, proof or CLI replay. A launcher-only recovery may invoke the same
+dedicated target once with the pinned toolchain `PATH` and shared target
+directory; the failed environment may not be repeated and no limit changes.
+Independent launcher-recovery review returned `ACCEPT` for that single corrected
+same-target invocation and unchanged limits.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

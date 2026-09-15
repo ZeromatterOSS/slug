@@ -116,6 +116,17 @@ unit-harness command, and do not raise a limit.
 Independent recovery rereview returned `ACCEPT` for the complete compile
 history, restore-before-hash order, one-target preparation and aligned scope.
 
+The first dedicated-target launcher exited 101 after 0.64 seconds before
+compilation because the command omitted the pinned toolchain `PATH` and Cargo's
+`rustc -vV` resolved through the blocked system Snap wrapper. It produced no
+executable, proof or CLI replay. This launcher-only recovery permits one
+corrected invocation of the same dedicated integration target with
+`PATH=/home/wgray/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin:/usr/local/bin:/usr/bin:/bin`
+and `CARGO_TARGET_DIR=/home/wgray/slug/target`, still under 60 seconds. Do not
+repeat the failed environment, change the target or raise a limit.
+Independent launcher-recovery review returned `ACCEPT` for that single corrected
+same-target invocation and unchanged limits.
+
 Copy the accepted supervisor to an excluded scratch file and extend only its
 observer decoder/result projection for words 51--63. Add bounded self-checks
 for every bucket boundary, zero-unseen rounds, maximum consistency, arithmetic

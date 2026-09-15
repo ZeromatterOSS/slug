@@ -9099,3 +9099,12 @@ command or raise a limit.
 
 Independent recovery rereview returned `ACCEPT` for the complete compile
 history, restore-before-hash order, one-target preparation and aligned scope.
+
+The first dedicated-target launcher exited 101 after 0.64 seconds before
+compilation because the pinned toolchain `PATH` was omitted and Cargo's
+`rustc -vV` resolved through the blocked system Snap wrapper. It produced no
+executable, proof or CLI replay. One corrected launcher may use the pinned
+toolchain `PATH` and shared target directory under the same 60-second limit;
+the failed environment may not be repeated.
+Independent launcher-recovery review returned `ACCEPT` for that single corrected
+same-target invocation and unchanged limits.
