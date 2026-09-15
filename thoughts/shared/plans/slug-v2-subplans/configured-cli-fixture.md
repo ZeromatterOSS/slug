@@ -541,5 +541,10 @@ One materially different same-selector replay may be reviewed only through the
 new typed invalidation-provenance packet. Its corrected six-word design is
 implemented within its temporary caps. Exact workspace/Core proofs, supervisor
 self-check, CLI target preparation, exact nonignored listing and a fresh F2
-fixture pass. Frozen hashes are recorded in the current packet; no replay is
-yet authorized pending independent preexecution review.
+fixture pass. Frozen hashes are recorded in the current packet; the replay was
+not run before independent preexecution review.
+The one independently authorized replay is accepted at the expected
+`RootCompute` deadline with exact PID/reap and cleanup, lifecycle 222/222/221,
+and typed cells `T=2541`, `S=2541`, `C=U=E=O=0`. It identifies no shard or
+path and proves no evaluation cause, necessity, cost or avoidability. Stop this
+diagnostic chain; no sibling selector, F3 or additional replay is selected.

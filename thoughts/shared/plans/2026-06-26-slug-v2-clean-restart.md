@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-typed-invalidation-provenance-r1
-Status: frozen implementation prepared; preexecution review pending
+Status: typed provenance replay accepted; diagnostic chain stopped
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its accepted diagnostic history. The accepted activation audit found
@@ -53,8 +53,14 @@ and the existing 12/15-second limits. Independent design review returned
 `ACCEPT`; implementation may begin, but replay remains unauthorized.
 The capped implementation now passes its exact workspace and Core proofs,
 supervisor self-check, exact nonignored listing and fresh-fixture verification.
-Artifacts are frozen in the current packet; no replay is authorized before
-independent preexecution review.
+Artifacts were frozen in the current packet and independently reviewed before
+the sole replay.
+The sole reviewed replay is accepted at a coherent 222/222/221 cutoff with
+`T=2541`, all categorized as exact shard-source paths, and zero global health,
+typed flags or claims. This aggregate result supplies no identity, pairing or
+evaluation causality and cannot justify optimization. No further replay or
+diagnostic audit is selected; semantic work requires a new docs-first
+architecture packet grounded in source invariants and ordinary proofs.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

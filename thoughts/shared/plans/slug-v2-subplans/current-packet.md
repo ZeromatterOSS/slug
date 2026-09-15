@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-typed-invalidation-provenance-r1
-Status: implementation and frozen preparation complete; preexecution review pending
+Status: accepted typed provenance result; diagnostic chain stopped
 
 ## Accepted predecessor and boundary
 
@@ -131,12 +131,12 @@ Restore every temporary source, supervisor, fixture and log artifact before the
 result receipt. Run exact proofs, plan-status and diff checks and independently
 review both preexecution and result.
 
-Do not implement or replay until this corrected design is independently
-accepted. Do not run another aggregate activation/event audit, F3, a sibling
-selector, or this selector outside the frozen typed instrumentation. Do not
-broaden to `ResolvedPathObservationKey`, change DICE semantics, retain identity
-or version material, infer optimization work, merge the combined stack or push
-the review branch.
+The corrected design, implementation preparation and sole replay completed
+their independent reviews. Do not replay again, run another aggregate
+activation/event audit, F3 or a sibling selector. Do not broaden to
+`ResolvedPathObservationKey`, change DICE semantics, retain identity or version
+material, infer optimization work, merge the combined stack or push the review
+branch.
 
 ## Frozen preparation checkpoint
 
@@ -165,4 +165,20 @@ CLI harness
 `63e77c3247a107a2bce13af79a05345c6e1194728e82d77daf4c53c4335b4e56`
 and required `slug` binary
 `c26d13fb1798ca22f4cd44c5d7851edbba6af7f8fccdd53703e70504a51108af`.
-No authentic replay has run; independent preexecution review remains mandatory.
+Independent preexecution rereview authorized exactly one no-retry replay. It
+reached the expected 12.013-second `RootCompute` deadline with one exact
+installed/reaped observer PID and complete cleanup. Lifecycle was coherent at
+222 produced, 222 committed and 221 closed, with pending zero, active one,
+flags zero and claim zero. The checked typed census was
+`T=2541=C0+U0+S2541+E0+O0`; global overflow, dropped samples and activity claim
+were zero. Independent result review returned `ACCEPT`.
+
+This proves only that 2,541 valid legacy-delivered evaluated exact
+`PathObservationKey` callbacks observed in aggregate armed windows had a
+normal-priority dependency-context invalidation path whose source downcast to
+`PathObservationShardKey`; the classifier also required its terminal to be the
+expected shard-key type. It identifies no shard, path or version, pairs no
+callback to a merge/window, proves no evaluation cause, and establishes no
+necessity, cost, avoidability or comparison with the predecessor count. Stop
+the diagnostic chain. Any semantic change requires a new docs-first
+architecture packet based on source invariants and ordinary correctness proofs.

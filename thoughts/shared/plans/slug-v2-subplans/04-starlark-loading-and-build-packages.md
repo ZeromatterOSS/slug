@@ -9178,4 +9178,8 @@ separately reviewed typed invalidation-provenance design.
 The proposed docs-first successor captures the selected dependency context's
 typed normal-priority source inside `PathObservationKey` and retains no identity
 or version. Its capped implementation and frozen proof/supervisor/CLI/fixture
-preparation now pass; the sole replay awaits independent preexecution review.
+preparation passed and was independently reviewed before the sole replay.
+The sole replay is accepted with lifecycle 222/222/221 and
+`T=S=2541`, `C=U=E=O=0`. This is aggregate dependency-context type evidence,
+not identity or evaluation causality. Stop the diagnostic chain; any semantic
+change requires a new docs-first architecture packet and ordinary proofs.
