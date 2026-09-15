@@ -78,6 +78,10 @@ recovery may launch the frozen exact-cap artifacts through the pinned absolute
 Cargo binary; no selector, CLI preparation, fixture or replay has run.
 Independent recovery review returned `ACCEPT`; the bare-Cargo command must not
 repeat.
+The corrected launcher then exposed one proof-only slice/array tuple mismatch
+after 7.3 seconds without producing an executable. One reviewed line-neutral
+coercion may prepare the same frozen target; all execution remains stopped.
+Independent recovery review returned `ACCEPT` for that proof-only correction.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

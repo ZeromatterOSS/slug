@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-dice-event-audit-r1
-Status: Core preparation launcher recovery accepted; retry pending
+Status: Core proof type recovery accepted; retry pending
 
 ## Accepted predecessor receipt
 
@@ -197,3 +197,14 @@ the same exact target once under the unchanged 60-second ceiling. All source,
 proof, cap, CLI, fixture and replay boundaries remain frozen.
 Independent recovery review returned `ACCEPT` because the failed launcher
 entered neither Cargo nor rustc. Do not repeat the bare-Cargo command.
+
+The corrected absolute-Cargo preparation entered the intended Core target and
+exited 101 after 7.3 seconds on one proof-only tuple assertion mismatch: actual
+values were slice references while expected values inferred array references.
+The production library compiled, but no integration executable or selector was
+produced; the CLI, fixture and replay remain stopped. One reviewed line-neutral
+correction may coerce the two expected arrays to slices and prepare the same
+target once under the unchanged pinned 60-second command. The production hash
+and exact 100/130 caps remain frozen.
+Independent recovery review returned `ACCEPT` for the line-neutral slice
+coercion and unchanged target, launcher, shared target directory and ceiling.

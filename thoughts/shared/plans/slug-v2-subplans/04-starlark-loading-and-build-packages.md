@@ -9171,3 +9171,7 @@ before compiler entry. A reviewed recovery may prepare the unchanged exact-cap
 target once through the pinned absolute Cargo binary; all execution remains
 stopped.
 Independent recovery review returned `ACCEPT` for that launcher-only retry.
+The corrected launcher exposed one proof-only slice/array tuple mismatch after
+7.3 seconds and produced no executable. A reviewed line-neutral coercion may
+prepare only the same frozen target.
+Independent recovery review returned `ACCEPT` for that proof-only correction.

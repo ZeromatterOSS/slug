@@ -535,3 +535,7 @@ The first Core preparation stopped at the blocked bare-`cargo` Snap launcher
 before compiler entry. One reviewed pinned-absolute-Cargo recovery may prepare
 the unchanged exact-cap target; the CLI, fixture and replay remain stopped.
 Independent recovery review returned `ACCEPT` for that launcher-only retry.
+The corrected launcher exposed one proof-only slice/array tuple mismatch after
+7.3 seconds and produced no executable. A reviewed line-neutral coercion may
+prepare the same Core target; the CLI, fixture and replay remain stopped.
+Independent recovery review returned `ACCEPT` for that proof-only correction.
