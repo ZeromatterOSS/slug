@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-shard-dice-event-audit-r1
-Status: supervisor self-check fixture recovery accepted; rerun pending
+Status: CLI target-selection recovery accepted; correction pending
 
 ## Accepted predecessor receipt
 
@@ -235,3 +235,39 @@ launcher with the required namespace/ptrace escalation.
 Independent recovery review returned `ACCEPT` for zeroing words 54--59 together
 without changing the decoder or runtime behavior. Keep the scratch edit
 line-neutral within its recorded 91 changed lines.
+
+The corrected final scratch artifact then passed its decoder matrix and normal,
+deadline and exception cleanup self-checks under the required escalation. Its
+portable-run result path was aligned with the reviewed event cutoff, reducing
+the final scratch delta to 66 additions and 14 deletions.
+
+The next CLI preparation exposed a target-selection error before any fixture or
+replay. The feature-enabled library-test harness compiled successfully in 7.60
+seconds and exactly listed the ignored
+`payload_demand_probe::authentic_sentinel_demand`, but the active chain requires
+the existing nonignored first configured-conflict integration selector,
+`configured_action_conflicts::one_shot_build_conflict_is_atomic_and_recovers`.
+That wrong harness is invalid evidence and may not run.
+
+One recovery may restore the intended temporary CLI adapter: remove only the
+feature's non-test compile guard in `app/slug_cli_v2/src/lib.rs`. In the allowed
+`app/slug_cli_v2/tests/cli.rs`, only the selected test adopts the inherited
+observer descriptor before calling `workspace()`/`sentinel_outputs`, retains
+the `ProbeGuard` through its whole `one_shot_case` call, and under the feature
+uses `SLUG_SENTINEL_SCRATCH/workspace`. Preserve the ordinary non-feature
+workspace assembler unchanged.
+
+Bring the combined totals back to at most 100 production and 130 proof lines
+only through token/assertion-preserving line folding or blank-line removal in
+the existing Core diagnostic and proof. If any production or Core proof token
+changes, prepare, preflight and run the dedicated Core selector again before
+CLI preparation. Then format and compile only the `cli` integration target once
+under 60 seconds. The scratch portable preflight and run commands must be
+exactly `--list --exact <selector>` and `--exact <selector> --nocapture`, with
+both old `--ignored` arguments removed. Rerun the scratch self-check because
+its bytes changed, then freeze hashes. The CLI selector itself, every sibling
+and F3 remain stopped until the sole reviewed replay.
+Independent recovery review returned `ACCEPT` for the exact nonignored
+commands, selected-test-only observer lifetime, preserved ordinary assembler,
+and token-preserving cap correction with mandatory Core reproving after any
+token change.

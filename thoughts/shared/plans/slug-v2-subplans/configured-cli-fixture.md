@@ -425,6 +425,17 @@ scratch-only correction may clear all six and rerun the self-check; no CLI or
 replay ran.
 Independent recovery review returned `ACCEPT` for that line-neutral scratch-only
 fixture correction.
+The corrected scratch artifact passed its full self-check. A subsequent CLI
+preparation selected the wrong ignored library probe instead of
+`configured_action_conflicts::one_shot_build_conflict_is_atomic_and_recovers`.
+It ran no fixture or replay. One reviewed adapter and target correction must
+restore that exact nonignored selector within the original caps before
+execution.
+The corrected scratch commands must remove `--ignored`; only the selected test
+may hold the observer across the external-fixture call. Cap recovery is limited
+to Core line folding/blank removal unless its exact proof reruns.
+Independent recovery review returned `ACCEPT` for those exact selector,
+observer-lifetime, fixture and cap constraints.
 
 The cold Core proof-harness preparation then reached its 60-second ceiling
 after entering the Core crate. It produced no executable and ran no selector or

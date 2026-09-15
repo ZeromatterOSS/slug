@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-7A-configured-conflict-path-shard-dice-event-audit-r1
-Status: supervisor self-check fixture recovery accepted; rerun pending
+Status: CLI target-selection recovery accepted; correction pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -80,6 +80,18 @@ case cleared one of six counters. A reviewed scratch-only correction may clear
 all six and rerun the self-check; no cleanup case, CLI build or replay ran.
 Independent recovery review returned `ACCEPT` for that line-neutral scratch-only
 fixture correction.
+The corrected scratch artifact passed its complete self-check. The next CLI
+preparation compiled and listed the wrong ignored library probe rather than the
+required nonignored first configured-conflict integration selector; no fixture
+or replay ran. One reviewed recovery may restore the bounded CLI adapter,
+shrink line accounting without dropping proof, compile only the `cli`
+integration target and preflight its exact selected test.
+The recovery must preserve Core tokens while folding lines, let only that test
+hold the observer across its external-fixture call, and remove `--ignored` from
+both scratch commands. Any Core token change invalidates and must rerun its
+exact proof before CLI preparation.
+Independent recovery review returned `ACCEPT` for those exact selector,
+observer-lifetime, fixture and cap constraints.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
