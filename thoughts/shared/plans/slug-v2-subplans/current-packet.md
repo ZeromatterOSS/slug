@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-key-type-count-audit-r1
-Status: design accepted; diagnostic execution pending
+Status: split preparation accepted; diagnostic execution pending
 
 ## Observable result
 
@@ -61,9 +61,27 @@ cells, proves a nonmatching tag changes only the existing total counter, and
 forces one filtered wrap to prove the corresponding word-63 overflow bit
 without changing another filtered counter or filtered-overflow bit. Assert the
 corresponding total increment and every deterministic sampling side effect.
-Preserve the existing observer size/lifecycle tests. Compile the feature-enabled
-Core unit harness within 60 seconds, exact preflight this selector, and run it
-once under the inherited 12-second deadline/15-second absolute ceiling.
+Preserve the existing observer size/lifecycle tests.
+
+The first cold feature-enabled Core unit-harness preparation reached its
+60-second ceiling after compiling dependencies and entering `slug_core_v2`.
+Exit 124 produced no test executable; no selector, self-check or CLI replay ran.
+The temporary Rust source diff SHA-256 was
+`bbb1a74bd80e8f9f3f992b8aec3c348b4daf0aefadc66c0dfd1e354f435f875e` and the
+scratch supervisor SHA-256 was
+`ddf88c7dea14f73d227d2a3fd6b52a06dedef68411477f33eede8b93ea0fb771`.
+All temporary files were restored and both worktrees proved clean.
+
+Treat that output as evidence for one split preparation, not authority to raise
+or silently retry a limit. Reapply the byte-identical temporary Rust diff and
+scratch supervisor. First compile the feature-enabled Core library alone with
+`cargo check -p slug_core_v2 --features native-probe-observer --lib` within 60
+seconds. Only after it succeeds, reissue the Core unit-harness preparation once
+within a fresh 60-second limit; the new hypothesis is that the separately
+completed library/dependency boundary leaves only test-module compilation and
+linking. Verify both temporary hashes before proceeding. Exact preflight the
+selector and run it once under the inherited 12-second deadline/15-second
+absolute ceiling. Do not retry either split step if it misses its bound.
 
 Copy `tools/v2_oracle/run_payload_demand_probe.sh` beside the original and keep
 the copy excluded from Git. Preserve its observer channel, byte/output caps,
@@ -122,10 +140,14 @@ Independent correction rereview returned `ACCEPT` for the same-replay cutoff
 semantics, fixed mapping layout, proof obligations, scratch limits and inference
 stops.
 
+Independent resource-limit rereview returned `ACCEPT` for the byte-identical,
+separately bounded feature-library and unit-harness preparation split.
+
 Do not run F3, any sibling configured-conflict selector, the uninstrumented
 selected selector or a second measured replay. Do not raise a limit, acquire a
 payload, modify the external-child loop, merge the combined stack or push the
 review branch. Replan if the fixed mapping has insufficient room, the existing
 event listener cannot count both exact tags without semantic coupling, either
-harness misses its bound, telemetry is invalid, scratch safety logic changes or
+split preparation or either harness misses its bound, telemetry is invalid,
+scratch safety logic changes or
 the exact counts cannot support a bounded next causal question.

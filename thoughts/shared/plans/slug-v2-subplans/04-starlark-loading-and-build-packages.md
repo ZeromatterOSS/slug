@@ -9045,3 +9045,10 @@ diagnostic source edit. Totals and filtered values are separately incremented
 atomic cutoff snapshots, so their ratio is diagnostic rather than an exact
 partition. Count volume can select only a reviewed identity or call-site audit,
 never a semantic correction.
+
+The first cold Core unit-harness preparation stopped at its 60-second ceiling
+after entering `slug_core_v2`; it produced no executable and ran no test or CLI
+replay. The resource recovery is one reviewed split: compile the feature Core
+library alone, then prepare the unit harness under a separate unchanged limit.
+Both temporary diagnostic hashes must remain byte-identical and neither split
+step may be retried.

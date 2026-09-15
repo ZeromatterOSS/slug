@@ -417,3 +417,9 @@ one supervised replay. The separately incremented totals and filtered values
 are atomic cutoff snapshots, not an exact partition. They can select only a
 separately reviewed deeper causal audit; all sibling selectors and F3 remain
 stopped.
+
+The cold Core proof-harness preparation then reached its 60-second ceiling
+after entering the Core crate. It produced no executable and ran no selector or
+CLI replay. A reviewed split preparation must complete the feature Core library
+before one fresh bounded unit-harness preparation; diagnostic source and
+supervisor hashes remain fixed.

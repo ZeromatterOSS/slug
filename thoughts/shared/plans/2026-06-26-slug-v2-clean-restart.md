@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-7A-configured-conflict-key-type-count-audit-r1
-Status: design accepted; diagnostic execution pending
+Status: split preparation accepted; diagnostic execution pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -57,6 +57,12 @@ twelve exact filtered counters plus overflow state without changing its
 validate same-replay atomic cutoff snapshots; they are not an exact partition
 because total and filtered increments are separate. The result can select only
 another reviewed causal audit.
+
+The cold Core unit-harness preparation reached its 60-second ceiling after
+entering the Core crate and produced no executable; no test or replay ran. The
+revised design permits one separately bounded feature-library check before one
+fresh unit-harness preparation, with byte-identical diagnostic hashes and no
+retry or raised limit.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
