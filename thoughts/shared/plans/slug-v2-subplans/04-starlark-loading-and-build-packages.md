@@ -9171,3 +9171,7 @@ fixed publication orders and claim-last cutoff.
 The final 166/217/85 preparation passed its exact Core proof and supervisor
 self-check; independent preexecution rereview returned `EXECUTE` for one frozen
 same-selector replay with no retry.
+The sole replay is accepted with `E=D=ED=2488` and `R=N=RD=0` at a coherent
+220/220/219 cutoff. It proves only legacy callback kind plus an immediate exact
+shard dependency. Aggregate counter work stops here; causality would require a
+separately reviewed typed invalidation-provenance design.

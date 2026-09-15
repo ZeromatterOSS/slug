@@ -532,3 +532,8 @@ exact selector boundary and one-replay stop.
 The final 166/217/85 preparation passed the exact Core proof, CLI target build,
 fresh fixture verification and supervisor self-check. Independent preexecution
 rereview returned `EXECUTE` for exactly one replay with no retry.
+The replay is accepted at the expected `RootCompute` deadline with one exact
+reaped observer PID, complete cleanup, lifecycle 220/220/219 and activation
+cells `E=2488`, `R=0`, `D=2488`, `N=0`, `ED=2488`, `RD=0`. It supplies no
+identity or causal invalidation evidence. Do not rerun it or select another
+aggregate callback counter.

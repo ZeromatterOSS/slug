@@ -167,3 +167,10 @@ choice outside implementation milestones.
 The legacy activation audit's corrected 166/217/85 production, proof and
 scratch preparation passed exact Core proof and independent preexecution review.
 Exactly one frozen same-selector replay is authorized; no retry is allowed.
+
+That sole replay is accepted. At a coherent 220/220/219 handoff cutoff it
+observed 2,488 legacy-delivered evaluated `PathObservationKey` callbacks, all
+with an immediate exact shard dependency; reused and no-direct cells were zero.
+This establishes neither identity nor invalidation causality, necessity, cost or
+avoidability. Stop this aggregate diagnostic chain. Any continuation requires a
+separately reviewed typed invalidation-provenance design.
