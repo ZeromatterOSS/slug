@@ -3565,6 +3565,102 @@ request(name = "request")
     assert!(context.rows()[3].selected().is_none());
 }
 
+#[tokio::test]
+async fn computed_default_label_uses_retained_exec_dependency_configuration() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"ProbeInfo = provider(fields = {"value": ""})
+def _leaf(ctx):
+    return [ProbeInfo(value = ctx.attr.marker)]
+leaf = rule(implementation = _leaf, attrs = {"marker": attr.string()})
+def _computed(name, marker):
+    if name != "probe" or marker != "callback-input":
+        fail("computed-default parameters changed")
+    return Label("//:leaf")
+def _probe(ctx):
+    return [ProbeInfo(value = ctx.attr.exec_dep[ProbeInfo].value + ":" + ctx.attr.target_dep[ProbeInfo].value)]
+probe = rule(
+    implementation = _probe,
+    attrs = {
+        "marker": attr.string(),
+        "exec_dep": attr.label(default = _computed, cfg = "exec"),
+        "target_dep": attr.label(default = "//:leaf"),
+    },
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "leaf", "probe")
+leaf(name = "leaf", marker = "leaf")
+probe(name = "probe", marker = "callback-input")
+"#,
+    )
+    .unwrap();
+
+    let request_configuration = typed_action_test_configuration();
+    let result = root_target_request_with_configuration(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//:probe",
+        request_configuration.clone(),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        provider_value(
+            &result,
+            &ProviderId::new("//:defs.bzl", "ProbeInfo").unwrap()
+        ),
+        "leaf:leaf"
+    );
+    let edge = |name: &str| {
+        result
+            .edges()
+            .iter()
+            .find(|edge| {
+                matches!(
+                    edge.kind(),
+                    ConfiguredEdgeKind::Attribute {
+                        attribute,
+                        hidden: false,
+                        ..
+                    } if attribute == name
+                )
+            })
+            .unwrap()
+    };
+    let exec = edge("exec_dep");
+    let target = edge("target_dep");
+    assert_eq!(exec.target().label(), target.target().label());
+    assert!(matches!(
+        exec.kind(),
+        ConfiguredEdgeKind::Attribute {
+            dependency: ConfiguredAttributeDependency::Exec(ConfiguredExecGroup::Default),
+            ..
+        }
+    ));
+    assert!(matches!(
+        target.kind(),
+        ConfiguredEdgeKind::Attribute {
+            dependency: ConfiguredAttributeDependency::Target,
+            ..
+        }
+    ));
+    let exec_child = exec.configured_target().unwrap();
+    let target_child = target.configured_target().unwrap();
+    assert_eq!(
+        exec_child.configuration().kind(),
+        slug_analysis_v2::ConfigurationKind::Exec
+    );
+    assert_eq!(target_child.configuration(), &request_configuration);
+    assert_ne!(exec_child.configuration(), target_child.configuration());
+}
+
 fn execution_group_configuration(auto: bool) -> ConfigurationKey {
     let configuration = typed_action_test_configuration();
     let base = configuration.slug_configuration().unwrap();

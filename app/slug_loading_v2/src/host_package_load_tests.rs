@@ -144,6 +144,7 @@ use crate::RootPackageLoadKey;
 use crate::TestRuleKind;
 use crate::attrs::AllowedAttributeValues;
 use crate::attrs::AttributeDependencyConfiguration;
+use crate::attrs::AttributeProvenance;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::cycle_detector::bzl_load_cycle_detector;
 use crate::package::AspectAttributePropagationEdge;
@@ -743,6 +744,13 @@ fn target_names(outcome: &HostPackageOutcome) -> Vec<&str> {
         .iter()
         .map(|target| target.name.as_str())
         .collect()
+}
+
+fn terminal_package(outcome: &HostPackageOutcome) -> &crate::LoadedPackage {
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
+        panic!("complete Host source epoch returned Need");
+    };
+    value.as_ref().as_ref().unwrap()
 }
 
 fn terminal_error(outcome: &HostPackageOutcome) -> String {
@@ -1801,82 +1809,276 @@ async fn rule_initializer_reexport_rejects_before_recording_and_recovers() {
 }
 
 #[tokio::test]
-async fn rule_computed_default_reexport_rejects_before_recording_and_restores() {
+async fn rule_computed_default_reexport_invokes_labels_bypasses_explicit_and_restores() {
     const A: &str = concat!(
         "def _impl(ctx): fail('implementation stayed lazy')\n",
-        "def _computed(name, tags): fail('computed default stayed lazy')\n",
-        "def _init(name, **kwargs): fail('initializer stayed lazy')\n",
-        "probe = rule(implementation = _impl, attrs = {'_def_parser': attr.label(default = _computed), 'out': attr.output()})\n",
-        "both = rule(implementation = _impl, initializer = _init, attrs = {'_def_parser': attr.label(default = _computed)})\n",
+        "def _computed(name, tags):\n",
+        "  print('COMPUTED:' + name + ':' + ','.join(tags))\n",
+        "  if name == 'explicit': fail('explicit value did not bypass callback')\n",
+        "  if 'none' in tags: return None\n",
+        "  if 'external' in tags: return Label('@@dep+//tools:parser')\n",
+        "  return Label('//tools:parser')\n",
+        "probe = rule(implementation = _impl, attrs = {'_def_parser': attr.label(default = _computed, cfg = 'exec')})\n",
     );
     const B: &str = concat!(
         "def _impl(ctx): fail('implementation stayed lazy')\n",
-        "probe = rule(implementation = _impl, attrs = {'_def_parser': attr.label()})\n",
+        "def _computed(name, tags): return Label('//edited:parser')\n",
+        "probe = rule(implementation = _impl, attrs = {'_def_parser': attr.label(default = _computed, cfg = 'exec')})\n",
     );
-    const C: &str = concat!(
+    const FAIL: &str = concat!(
         "def _impl(ctx): fail('implementation stayed lazy')\n",
-        "probe = rule(implementation = _impl, attrs = {'_def_parser': attr.label(default = lambda name, tags: fail('lambda stayed lazy'))})\n",
+        "def _computed(name, tags): fail('computed callback failure')\n",
+        "probe = rule(implementation = _impl, attrs = {'_def_parser': attr.label(default = _computed)})\n",
     );
     const REEXPORT: &str = "load(':defs.bzl', _probe = 'probe')\nprobe = _probe\n";
-    const BAD_BUILD: &str = concat!(
+    const BUILD: &str = concat!(
         "load(':reexport.bzl', 'probe')\n",
-        "probe(name = 'bad', _def_parser = 1, unknown = 1)\n",
-        "filegroup(name = 'must_not_publish')\n",
+        "probe(name = 'root', tags = ['root'])\n",
+        "probe(name = 'external', tags = ['external'])\n",
+        "probe(name = 'none', tags = ['none'])\n",
+        "probe(name = 'explicit', _def_parser = '//override:parser')\n",
     );
-    const CLEAN_BUILD: &str = "load(':defs.bzl', 'probe')\nprobe(name = 'clean')\n";
-    const ERROR: &str =
-        "target invocation for computed-default attribute '_def_parser' is unsupported";
+    const MODULE: &str = "print('ROOT')\n";
     let dice = Dice::builder().build(DetectCycles::Enabled);
-    for (source, build, variant, error) in [
-        (A, BAD_BUILD, 201, Some(ERROR)),
-        (B, CLEAN_BUILD, 202, None),
-        (C, BAD_BUILD, 203, Some(ERROR)),
-        (A, BAD_BUILD, 204, Some(ERROR)),
-    ] {
-        let outcome = compute_package(
-            &dice,
-            EpochBuilder::workspace_sources(
-                "print('ROOT')\n",
-                build,
-                &[("defs.bzl", source), ("reexport.bzl", REEXPORT)],
-                variant,
-            )
-            .build(),
-            package_policy(),
-        )
-        .await;
-        if let Some(error) = error {
-            assert!(terminal_error(&outcome).contains(error));
-        } else {
-            assert_eq!(target_names(&outcome), ["clean"]);
-        }
-    }
-    let initializer = compute_package(
+    let tracker = Arc::new(EventTracker::default());
+    let mut transaction = transaction(
         &dice,
         EpochBuilder::workspace_sources(
-            "print('ROOT')\n",
-            "load(':defs.bzl', 'both')\nboth(name = 'bad')\n",
+            MODULE,
+            BUILD,
             &[("defs.bzl", A), ("reexport.bzl", REEXPORT)],
+            201,
+        )
+        .build(),
+        true,
+        Some(tracker.clone()),
+    )
+    .await;
+    let first = transaction.compute(&package_key()).await.unwrap();
+    assert_eq!(
+        target_names(&first),
+        ["root", "external", "none", "explicit"]
+    );
+    let value = |target_name: &str| {
+        let target = terminal_package(&first)
+            .targets
+            .iter()
+            .find(|target| target.name == target_name)
+            .unwrap();
+        let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
+            panic!("expected Starlark rule")
+        };
+        let (schema, value) = rule
+            .schema()
+            .iter()
+            .zip(rule.values())
+            .find(|(schema, _)| schema.declaration_name() == "_def_parser")
+            .unwrap();
+        value.query_value(schema)
+    };
+    for (target, expected, provenance) in [
+        (
+            "root",
+            Some("@@//tools:parser"),
+            AttributeProvenance::Default,
+        ),
+        (
+            "external",
+            Some("@@dep+//tools:parser"),
+            AttributeProvenance::Default,
+        ),
+        ("none", None, AttributeProvenance::Default),
+        (
+            "explicit",
+            Some("@@//override:parser"),
+            AttributeProvenance::Explicit,
+        ),
+    ] {
+        let value = value(target);
+        assert_eq!(value.provenance, provenance);
+        match (value.value, expected) {
+            (CoercedAttributeValue::Label(label), Some(expected)) => {
+                assert_eq!(label.to_string(), expected)
+            }
+            (CoercedAttributeValue::None, None) => {}
+            pair => panic!("unexpected computed value for {target}: {pair:?}"),
+        }
+    }
+    let batches = tracker.take();
+    let package_events = batches
+        .iter()
+        .find(|batch| batch.key.starts_with("host-package-load:"))
+        .and_then(|batch| batch.batch.as_ref())
+        .unwrap();
+    assert_eq!(
+        event_texts(package_events),
+        [
+            "COMPUTED:root:root",
+            "COMPUTED:external:external",
+            "COMPUTED:none:none"
+        ]
+    );
+    let edited = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources(
+            MODULE,
+            BUILD,
+            &[("defs.bzl", B), ("reexport.bzl", REEXPORT)],
+            202,
+        )
+        .build(),
+        package_policy(),
+    )
+    .await;
+    assert_ne!(terminal_package(&edited), terminal_package(&first));
+    let restored = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources(
+            MODULE,
+            BUILD,
+            &[("defs.bzl", A), ("reexport.bzl", REEXPORT)],
+            203,
+        )
+        .build(),
+        package_policy(),
+    )
+    .await;
+    assert_eq!(terminal_package(&restored), terminal_package(&first));
+
+    let failed = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources(
+            MODULE,
+            "load(':reexport.bzl', 'probe')\nfilegroup(name = 'earlier')\nprobe(name = 'bad')\n",
+            &[("defs.bzl", FAIL), ("reexport.bzl", REEXPORT)],
+            204,
+        )
+        .build(),
+        package_policy(),
+    )
+    .await;
+    assert!(terminal_error(&failed).contains("computed callback failure"));
+    let recovered = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources(
+            MODULE,
+            "filegroup(name = 'after')\n",
+            &[("defs.bzl", FAIL), ("reexport.bzl", REEXPORT)],
             205,
         )
         .build(),
         package_policy(),
     )
     .await;
-    assert!(
-        terminal_error(&initializer)
-            .contains("target invocation for rule initializer is unsupported")
-    );
-    let external = load_repository_package_fixture(
-        &[
-            ("BUILD.bazel", BAD_BUILD.as_bytes()),
-            ("defs.bzl", C.as_bytes()),
-            ("reexport.bzl", REEXPORT.as_bytes()),
-        ],
-        206,
-    )
-    .await;
-    assert!(repository_package_error(&external).contains(ERROR));
+    assert_eq!(target_names(&recovered), ["after"]);
+}
+
+#[tokio::test]
+async fn rule_computed_default_rejects_unavailable_configurable_and_invalid_results() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let cases = [
+        (
+            "def _computed(missing): return None\n",
+            "",
+            "parameter 'missing' is unavailable",
+        ),
+        (
+            "def _other(name): return None\ndef _computed(_other): return None\n",
+            "'_other': attr.label(default = _other), ",
+            "parameter '_other' is unavailable",
+        ),
+        (
+            "def _computed(optional): return None\n",
+            "'optional': attr.label(), ",
+            "parameter 'optional' is unavailable",
+        ),
+        (
+            "def _computed(items): return None\n",
+            "'items': attr.string_list(), ",
+            "parameter 'items' is unavailable",
+        ),
+        (
+            "def _computed(items): return None\n",
+            "'items': attr.string_list(), ",
+            "parameter 'items' is unavailable",
+        ),
+        (
+            "def _computed(name = 'x'): return None\n",
+            "",
+            "must use required positional parameters",
+        ),
+        (
+            "def _computed(*args): return None\n",
+            "",
+            "must use required positional parameters",
+        ),
+        (
+            "def _computed(*, name): return None\n",
+            "",
+            "must use required positional parameters",
+        ),
+        (
+            "def _computed(**kwargs): return None\n",
+            "",
+            "must use required positional parameters",
+        ),
+        (
+            "def _computed(): return None\n",
+            "",
+            "must use required positional parameters",
+        ),
+        (
+            "def _computed(name): return '//bad:string'\n",
+            "",
+            "expected a Label or None, got string",
+        ),
+        (
+            "def _computed(name): return 1\n",
+            "",
+            "expected a Label or None, got int",
+        ),
+        (
+            "def _computed(name): return []\n",
+            "",
+            "expected a Label or None, got list",
+        ),
+        (
+            "def _computed(name): fail('callback failed')\n",
+            "",
+            "callback failed",
+        ),
+    ];
+    for (index, (callback, extra_attrs, expected)) in cases.into_iter().enumerate() {
+        let source = format!(
+            "def _impl(ctx): pass\n{callback}probe = rule(implementation = _impl, attrs = {{{extra_attrs}'_def_parser': attr.label(default = _computed)}})\n"
+        );
+        let build = match index {
+            3 => {
+                "load(':defs.bzl', 'probe')\nprobe(name = 'bad', items = select({'//conditions:default': []}))\n"
+            }
+            4 => {
+                "load(':defs.bzl', 'probe')\nprobe(name = 'bad', items = ['x'] + select({'//conditions:default': []}))\n"
+            }
+            _ => "load(':defs.bzl', 'probe')\nprobe(name = 'bad')\n",
+        };
+        let outcome = compute_package(
+            &dice,
+            EpochBuilder::workspace_sources(
+                "print('ROOT')\n",
+                build,
+                &[("defs.bzl", &source)],
+                300 + index as i64,
+            )
+            .build(),
+            package_policy(),
+        )
+        .await;
+        let error = terminal_error(&outcome);
+        assert!(
+            error.contains(expected),
+            "case {index} expected {expected:?}, got {error:?}"
+        );
+    }
 }
 
 #[tokio::test]

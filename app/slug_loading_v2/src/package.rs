@@ -7667,12 +7667,6 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 "target invocation for rule initializer is unsupported"
             )));
         }
-        if let Some(attribute) = self.computed_default_attributes.first() {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
-                "target invocation for computed-default attribute '{}' is unsupported",
-                self.schema[attribute.schema_index as usize].name
-            )));
-        }
         self.reject_deferred_attribute_invocation()
             .map_err(starlark::Error::new_other)?;
         for attribute in names.keys() {
@@ -7899,6 +7893,26 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         value: Arc::new(value),
                     });
                 }
+                for computed in self.computed_default_attributes.iter() {
+                    let schema_index = computed.schema_index as usize;
+                    let declaration = &self.schema[schema_index];
+                    if explicit_rule_attribute_value(&names, declaration.name.as_str()).is_some() {
+                        continue;
+                    }
+                    let value = invoke_rule_label_computed_default(
+                        computed.callback,
+                        schema_index,
+                        &values,
+                        &self.computed_default_attributes,
+                        recorder,
+                        self,
+                    )?;
+                    values[schema_index] = AttributeValue {
+                        declaration_name: declaration.name.clone(),
+                        provenance: AttributeProvenance::Default,
+                        value: Arc::new(value),
+                    };
+                }
                 let config_dependencies = values
                     .iter()
                     .flat_map(|value| selector_key_labels(&value.value))
@@ -8105,6 +8119,94 @@ fn allocate_macro_attribute<'v>(
             }
         }
     })
+}
+
+fn invoke_rule_label_computed_default(
+    callback: FrozenValue,
+    schema_index: usize,
+    attributes: &[AttributeValue],
+    computed_attributes: &[ComputedDefaultRuleAttributeGen<FrozenValue>],
+    recorder: &PackageRecorder,
+    definition: &FrozenRuleDefinition,
+) -> anyhow::Result<CoercedAttributeValue> {
+    let attribute_name = definition.schema[schema_index].name.as_str();
+    let DocItem::Member(DocMember::Function(documentation)) = callback.to_value().documentation()
+    else {
+        anyhow::bail!(
+            "computed default for attribute '{attribute_name}' must be a Starlark function"
+        );
+    };
+    let params = &documentation.params;
+    if params.pos_or_named.is_empty()
+        || !params.pos_only.is_empty()
+        || params.args.is_some()
+        || !params.named_only.is_empty()
+        || params.kwargs.is_some()
+        || params
+            .pos_or_named
+            .iter()
+            .any(|parameter| parameter.default_value.is_some())
+    {
+        anyhow::bail!(
+            "computed-default callback for attribute '{attribute_name}' must use required positional parameters"
+        );
+    }
+    let unavailable = |name: &str| {
+        anyhow::anyhow!(
+            "Cannot compute default value of attribute '{attribute_name}': parameter '{name}' is unavailable"
+        )
+    };
+    let module = starlark::environment::Module::new();
+    let arguments = params
+        .pos_or_named
+        .iter()
+        .map(|parameter| {
+            let (index, attribute) = attributes
+                .iter()
+                .enumerate()
+                .find(|(_, attribute)| attribute.declaration_name == parameter.name)
+                .ok_or_else(|| unavailable(&parameter.name))?;
+            if computed_attributes
+                .iter()
+                .any(|computed| computed.schema_index as usize == index)
+                || matches!(
+                    attribute.value.as_ref(),
+                    CoercedAttributeValue::None
+                        | CoercedAttributeValue::Selector { .. }
+                        | CoercedAttributeValue::Concatenation(_, _)
+                )
+            {
+                return Err(unavailable(&parameter.name));
+            }
+            allocate_macro_attribute(attribute.value.as_ref(), module.heap())
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    let bzl = BzlEvaluationContext::macro_runtime_context(
+        (*definition.definition_source).clone(),
+        definition.source_identities_by_filename.clone(),
+    );
+    let context = MacroEvaluationContext { recorder, bzl };
+    let result = {
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&context);
+        if let Some(capture) = recorder.print_capture() {
+            evaluator.set_print_handler(capture);
+        }
+        evaluator.eval_function(callback.to_value(), &arguments, &[])
+    }
+    .map_err(|error| {
+        anyhow::anyhow!("Cannot compute default value of attribute '{attribute_name}': {error}")
+    })?;
+    if result.is_none() {
+        return Ok(CoercedAttributeValue::None);
+    }
+    let label = StarlarkLabel::from_value(result).ok_or_else(|| {
+        anyhow::anyhow!(
+            "computed default for attribute '{attribute_name}' expected a Label or None, got {}",
+            result.get_type()
+        )
+    })?;
+    Ok(CoercedAttributeValue::Label(label.canonical().clone()))
 }
 
 fn invoke_rule_outputs_callback(
