@@ -368,3 +368,11 @@ toolchain registration row 8 for `rules_java++toolchains+local_jdk` with
 underlying `HostSelectedRepositoryFileEffectError` variant, so this is only
 attribution demand. F3 was not rerun, the remaining nine CLI selectors were not
 blindly repeated, and no new payload, effect behavior or acceptance is claimed.
+
+The bounded repository-effect projection now passes its exact exhaustive proof,
+full loading harness and query compile gate. It keeps typed effect identity and
+fixture bytes unchanged while rendering only finite decisive fields through the
+existing registration sink. Independent review accepted its exhaustive bounded
+projection, lifecycle, scope and caps. Commit this checkpoint, then rebuild,
+preflight and run the first CLI selector once. The other nine selectors and F3
+remain stopped.

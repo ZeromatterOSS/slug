@@ -2,6 +2,9 @@
 use std::fmt;
 use std::fmt::Write;
 
+use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanError as Plan;
+use slug_bzlmod_v2::HostRepositoryLabelPathError as LabelPath;
+use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_identity_v2::CanonicalLabel;
 
 use crate::ModuleRegistrationExpansionError;
@@ -18,6 +21,7 @@ use crate::generated_repository_definition::HostGeneratedRepositoryDefinitionErr
 use crate::generated_repository_definition::HostGeneratedRepositoryDefinitionErrorKind as Generated;
 use crate::module_extension::HostSelectedExtensionOwnerPureError as Pure;
 use crate::module_extension_innate_repository::HostPureInnateRepositoryOwnerError as Innate;
+use crate::module_extension_repository_file_effect::HostSelectedRepositoryFileEffectError as Effect;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoryError as Instantiate;
 use crate::module_extension_repository_validation::HostModuleExtensionValidationError as ValidationReason;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateError;
@@ -58,6 +62,16 @@ impl Buffer {
             label.package().repo().as_str(),
             label.package().package().as_str(),
             label.target().as_str()
+        )
+    }
+
+    fn address(&mut self, address: &RepositoryLabelPathAddress) -> fmt::Result {
+        write!(
+            self,
+            "@@{}//{}:{}",
+            address.repo().as_str(),
+            address.package().as_str(),
+            address.target().as_str()
         )
     }
 
@@ -118,6 +132,7 @@ impl fmt::Display for Diagnostic<'_> {
 
 enum Node<'a> {
     Load(&'a HostCanonicalRepositoryLoadRouteError),
+    Effect(&'a Effect),
     Route(&'a HostCanonicalRepositoryRouteError),
     Generated(&'a HostGeneratedRepositoryDefinitionError),
     Certificate(&'a HostSelectedExtensionOwnerCertificateError),
@@ -125,6 +140,25 @@ enum Node<'a> {
     Innate(&'a Innate),
     RootBzl(&'a HostBzlModuleError),
     ExternalBzl(&'a ExternalBzlModuleError),
+}
+
+#[rustfmt::skip]
+fn label_path(out: &mut Buffer, error: &LabelPath) -> fmt::Result {
+    match error {
+        LabelPath::RootRepositoryMismatch(repo) => write!(out, "RootRepositoryMismatch: {}", repo.as_str()),
+        LabelPath::ExternalRepositoryMismatch(route, requested) => write!(out, "ExternalRepositoryMismatch: {} / {}", route.as_str(), requested.as_str()),
+        LabelPath::PackageAbsent => out.write_str("PackageAbsent"),
+        LabelPath::PackageDeleted => out.write_str("PackageDeleted"),
+        LabelPath::PackageIgnored => out.write_str("PackageIgnored"),
+        LabelPath::InvalidPackageName(message) => write!(out, "InvalidPackageName: {message}"),
+        LabelPath::RootPackageLookup(message) => write!(out, "RootPackageLookup: {message}"),
+        LabelPath::ExternalPackageLookup(message) => write!(out, "ExternalPackageLookup: {message}"),
+        LabelPath::BuiltinCatalog => out.write_str("BuiltinCatalog"),
+        LabelPath::Materialization(message) => write!(out, "Materialization: {message}"),
+        LabelPath::MaterializationCompute(message) => write!(out, "MaterializationCompute: {message}"),
+        LabelPath::InvalidMaterializedPath => out.write_str("InvalidMaterializedPath"),
+        LabelPath::NonUnicodePhysicalPath => out.write_str("NonUnicodePhysicalPath"),
+    }
 }
 
 fn instantiation(out: &mut Buffer, error: &Instantiate) -> fmt::Result {
@@ -194,8 +228,25 @@ fn walk(out: &mut Buffer, mut node: Node<'_>) -> fmt::Result {
                     Load::Route(error) => Node::Route(error),
                     Load::RouteCompute(message) => return write!(out, "RouteCompute: {message}"),
                     Load::EffectCompute(message) => return write!(out, "EffectCompute: {message}"),
-                    Load::Effect(_) => return out.incomplete("Effect"),
+                    Load::Effect(error) => Node::Effect(error),
                     Load::Projection(_) => return out.incomplete("Projection"),
+                }
+            }
+            Node::Effect(error) => {
+                out.write_str("Effect: ")?;
+                match error {
+                    Effect::Certificate(error) => Node::Certificate(error),
+                    Effect::Compute(message) => return write!(out, "Compute: {message}"),
+                    Effect::MissingOrdinal { ordinal, .. } => return write!(out, "MissingOrdinal: {ordinal}"),
+                    Effect::UnsupportedDefiningLabel { ordinal, label, .. } => { write!(out, "UnsupportedDefiningLabel {ordinal}: ")?; return out.label(label); }
+                    Effect::HostBzl { ordinal, error, .. } => return write!(out, "HostBzl {ordinal}: {}", error.message()),
+                    Effect::Projection { ordinal, message, .. } => return write!(out, "Projection {ordinal}: {message}"),
+                    Effect::HostInput { ordinal, message, .. } => return write!(out, "HostInput {ordinal}: {message}"),
+                    Effect::Path { ordinal, error, .. } => return match error { Plan::InvalidPath(path) => write!(out, "Path {ordinal}: InvalidPath: {path}"), Plan::RepeatedPath(path) => write!(out, "Path {ordinal}: RepeatedPath: {path}") },
+                    Effect::LabelPathRoute { address, error, .. } => { out.write_str("LabelPathRoute ")?; out.address(address)?; out.write_str(": ")?; Node::Load(error) }
+                    Effect::LabelPath { address, error, .. } => { out.write_str("LabelPath ")?; out.address(address)?; out.write_str(": ")?; return label_path(out, error); }
+                    Effect::Invocation { ordinal, message, .. } => return write!(out, "Invocation {ordinal}: {message}"),
+                    Effect::Result { ordinal, type_name, .. } => return write!(out, "Result {ordinal}: {type_name}"),
                 }
             }
             Node::Route(error) => {

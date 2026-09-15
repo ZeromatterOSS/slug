@@ -100,6 +100,15 @@ impl HostSelectedRepositoryFileEffectHostBzlError {
     fn new(error: impl fmt::Display) -> Self {
         Self(error.to_string().into())
     }
+
+    pub(crate) fn message(&self) -> &str {
+        &self.0
+    }
+
+    #[cfg(test)]
+    pub(crate) fn diagnostic_test(message: impl Into<CompactString>) -> Self {
+        Self(message.into())
+    }
 }
 
 #[doc(hidden)]

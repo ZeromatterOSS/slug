@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-registration-effect-diagnostic-r1
-Status: diagnostic design review
+Status: diagnostic checkpoint accepted; one CLI attribution run pending
 
 ## Observable result
 
@@ -89,3 +89,11 @@ unchanged CLI harness. Run only
 Record its newly exposed typed terminal and stop. Do not run the remaining nine
 CLI selectors or F3 until the selected semantic owner has a reviewed successor
 and all joint gates pass.
+
+The formatted implementation adds 61 production and 73 proof lines (134 total).
+Physical sizes are 358 lines for the diagnostic, 4,217 for the effect owner and
+728 for the proof. The exact all-variant selector passes, full loading passes
+566 active tests with one ignored, and query compile coverage passes. Final
+independent review accepted exhaustive bounded traversal, information
+minimization, unchanged identity/lifecycle, scope and caps. Commit this
+checkpoint before the single CLI selector.

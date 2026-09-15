@@ -8972,3 +8972,16 @@ identify the underlying typed repository-effect variant, so no effect behavior
 is selected yet. Replan the existing registration diagnostic projection first;
 do not rerun F3, acquire payloads, change the effect driver or accept the stack
 from this opaque terminal.
+
+### Repository-effect diagnostic checkpoint review (2026-09-14)
+
+The existing bounded registration projection now traverses every retained
+repository-effect variant without changing effect evaluation or typed identity.
+It renders only decisive ordinals, labels, requested addresses, variant names
+and messages; certificate and canonical-route failures reuse their existing
+borrowed nodes. The exact exhaustive selector covers all label-path variants,
+escaping, output and depth bounds, recursive handoffs and poison exclusion.
+Full loading passes 566 active tests with one ignored, and query compile
+coverage passes. Independent review accepted exhaustiveness, bounded traversal,
+information minimization, unchanged identity/lifecycle, scope and caps. The
+checkpoint precedes the single unchanged CLI selector.

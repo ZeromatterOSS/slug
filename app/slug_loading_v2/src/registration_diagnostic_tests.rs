@@ -64,6 +64,21 @@ async fn owner_fixture(
     (tx, Arc::clone(demand.as_ref().as_ref().unwrap().owner()))
 }
 
+async fn effect_certificate() -> Arc<crate::HostSelectedExtensionOwnerCertificate> {
+    use crate::HostSelectedExtensionOwnerCertificateKey;
+    use crate::module_extension_repository_instantiation::tests::WORKSPACE;
+    let (mut tx, owner) = owner_fixture(false).await;
+    let workspace = slug_workspace_v2::NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+    let result = complete(
+        tx.compute(&HostSelectedExtensionOwnerCertificateKey::new(
+            workspace, owner,
+        ))
+        .await
+        .unwrap(),
+    );
+    Arc::new(result.as_ref().as_ref().unwrap().clone())
+}
+
 #[tokio::test]
 async fn registration_diagnostic_owner_plans_are_not_causal_text() {
     use crate::module_extension::HostSelectedExtensionOwnerPureKey;
@@ -246,7 +261,7 @@ async fn registration_diagnostic_route_leaves_and_incomplete_boundaries() {
     for (kind, tail) in [
         (Load::RouteCompute("CAUSE".into()), "RouteCompute: CAUSE"),
         (Load::EffectCompute("CAUSE".into()), "EffectCompute: CAUSE"),
-        (Load::Effect(HostSelectedRepositoryFileEffectError::Compute("POISON".into())), "[diagnostic incomplete: Effect]"),
+        (Load::Effect(HostSelectedRepositoryFileEffectError::Compute("CAUSE".into())), "Effect: Compute: CAUSE"),
         (Load::Projection(HostCanonicalRepositorySourceInputError::Root), "[diagnostic incomplete: Projection]"),
     ] {
         let error = Arc::new(HostCanonicalRepositoryLoadRouteError { canonical_repo: load.canonical_repo.clone(), kind });
@@ -257,6 +272,63 @@ async fn registration_diagnostic_route_leaves_and_incomplete_boundaries() {
     let error = ModuleRegistrationExpansionError::diagnostic_test(Registration::Configuration(
         slug_configuration_v2::SlugConfigurationError::MissingAutoCpu));
     assert!(error.diagnostic().to_string().ends_with("[diagnostic incomplete: Configuration]"));
+}
+
+#[tokio::test]
+#[rustfmt::skip]
+async fn registration_diagnostic_repository_effect_variants_are_bounded_and_structural() {
+    use slug_bzlmod_v2::{GeneratedRepositoryFileEffectPlanError as Plan, HostRepositoryLabelPathError as PathError, RepositoryLabelPathAddress};
+    use crate::module_extension_repository_file_effect::{HostSelectedRepositoryFileEffectError as Effect, HostSelectedRepositoryFileEffectHostBzlError as HostBzl};
+    let certificate = effect_certificate().await;
+    let address = RepositoryLabelPathAddress::from_label(&CanonicalLabel::parse("@@requested+//pkg:leaf").unwrap());
+    let label = CanonicalLabel::parse("@@definition+//defs:repo.bzl").unwrap();
+    let effect = |error| render_node(Node::Effect(&error));
+    let ordinary = vec![
+        (Effect::Certificate(HostSelectedExtensionOwnerCertificateError(Certificate::Compute("certificate".into()))), "Effect: Loading: Compute: certificate".to_owned()),
+        (Effect::Compute("compute".into()), "Effect: Compute: compute".to_owned()),
+        (Effect::MissingOrdinal { certificate: certificate.clone(), ordinal: 2 }, "Effect: MissingOrdinal: 2".to_owned()),
+        (Effect::UnsupportedDefiningLabel { certificate: certificate.clone(), ordinal: 3, label: label.clone() }, "Effect: UnsupportedDefiningLabel 3: @@definition+//defs:repo.bzl".to_owned()),
+        (Effect::HostBzl { certificate: certificate.clone(), ordinal: 4, error: HostBzl::diagnostic_test("host\nBzl") }, "Effect: HostBzl 4: host\\nBzl".to_owned()),
+        (Effect::Projection { certificate: certificate.clone(), ordinal: 5, message: "projection".into() }, "Effect: Projection 5: projection".to_owned()),
+        (Effect::HostInput { certificate: certificate.clone(), ordinal: 6, message: "host input".into() }, "Effect: HostInput 6: host input".to_owned()),
+        (Effect::Path { certificate: certificate.clone(), ordinal: 7, error: Plan::InvalidPath("bad/path".into()) }, "Effect: Path 7: InvalidPath: bad/path".to_owned()),
+        (Effect::Path { certificate: certificate.clone(), ordinal: 8, error: Plan::RepeatedPath("same/path".into()) }, "Effect: Path 8: RepeatedPath: same/path".to_owned()),
+        (Effect::Invocation { certificate: certificate.clone(), ordinal: 9, message: "invocation".into() }, "Effect: Invocation 9: invocation".to_owned()),
+        (Effect::Result { certificate: certificate.clone(), ordinal: 10, type_name: "int".into() }, "Effect: Result 10: int".to_owned()),
+    ];
+    for (error, expected) in ordinary { assert_eq!(effect(error), expected); }
+
+    let repo = |text| CanonicalLabel::parse(text).unwrap().package().repo().clone();
+    let paths = vec![
+        (PathError::RootRepositoryMismatch(repo("@@root-mismatch+//:x")), "RootRepositoryMismatch: root-mismatch+"),
+        (PathError::ExternalRepositoryMismatch(repo("@@route+//:x"), repo("@@requested+//:x")), "ExternalRepositoryMismatch: route+ / requested+"),
+        (PathError::PackageAbsent, "PackageAbsent"), (PathError::PackageDeleted, "PackageDeleted"),
+        (PathError::PackageIgnored, "PackageIgnored"), (PathError::InvalidPackageName("invalid".into()), "InvalidPackageName: invalid"),
+        (PathError::RootPackageLookup("root lookup".into()), "RootPackageLookup: root lookup"),
+        (PathError::ExternalPackageLookup("external lookup".into()), "ExternalPackageLookup: external lookup"),
+        (PathError::BuiltinCatalog, "BuiltinCatalog"), (PathError::Materialization("materialization".into()), "Materialization: materialization"),
+        (PathError::MaterializationCompute("materialization compute".into()), "MaterializationCompute: materialization compute"),
+        (PathError::InvalidMaterializedPath, "InvalidMaterializedPath"), (PathError::NonUnicodePhysicalPath, "NonUnicodePhysicalPath"),
+    ];
+    for (error, tail) in paths {
+        let text = effect(Effect::LabelPath { certificate: certificate.clone(), ordinal: 11, address: address.clone(), error });
+        assert_eq!(text, format!("Effect: LabelPath @@requested+//pkg:leaf: {tail}"));
+        assert!(!text.contains("bazel_tools") && !text.contains("WORKSPACE"));
+    }
+
+    let missing = crate::registration_expansion_tests::registration_diagnostic_missing_route("ROUTE_POISON").await;
+    let Registration::CanonicalRoute(route) = missing.kind() else { panic!("expected route") };
+    let nested = Effect::LabelPathRoute { certificate: certificate.clone(), ordinal: 12, address: address.clone(), error: Arc::new(route.clone()) };
+    let text = effect(nested);
+    assert!(text.starts_with("Effect: LabelPathRoute @@requested+//pkg:leaf: CanonicalRoute ") && text.ends_with("Missing: selected and generated lookups missed") && !text.contains("ROUTE_POISON"));
+
+    assert_eq!(effect(Effect::Compute("line\n\u{00e9}".into())), "Effect: Compute: line\\n\\u{e9}");
+    let text = effect(Effect::Compute("\u{00e9}".repeat(LIMIT).into()));
+    assert!(text.is_ascii() && text.len() <= LIMIT && text.ends_with(OUTPUT_STOP));
+    let mut recursive = Arc::new(route.clone());
+    for _ in 0..40 { recursive = Arc::new(HostCanonicalRepositoryLoadRouteError { canonical_repo: route.canonical_repo.clone(), kind: Load::Effect(Effect::LabelPathRoute { certificate: certificate.clone(), ordinal: 13, address: address.clone(), error: recursive }) }); }
+    let text = render_node(Node::Load(&recursive));
+    assert!(text.len() <= LIMIT && text.ends_with(DEPTH_STOP) && !text.contains("ROUTE_POISON"));
 }
 
 #[test]
