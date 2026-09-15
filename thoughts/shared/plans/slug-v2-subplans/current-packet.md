@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-activation-dependency-audit-r1
-Status: Core proof reactor recovery accepted; corrected proof rerun pending
+Status: frozen preexecution review returned EXECUTE; sole replay authorized
 
 ## Accepted predecessor receipt
 
@@ -186,3 +186,26 @@ assertions because tracker acquisition constructed the cycle detector outside a
 Tokio reactor. Independent recovery review accepted acquiring that tracker
 inside the runtime's existing `block_on` and authorized one corrected exact
 proof rerun. No CLI build, fixture validation or selected replay was consumed.
+
+The corrected exact Core selector passed 1/1. Preexecution review first required
+actual rich/root tracker exercise, every frozen publication partial, independent
+`ED <= E`, `RD <= R` and checked `W + 1` discriminators, and one exact reaped
+PID. Those corrections passed the exact proof and supervisor self-check;
+independent rereview returned `EXECUTE`. Final totals are 166/217/85 against
+180/220/140 production, proof and scratch caps. The fresh fixture again verified
+28 objects, 177 metadata entries, 8,004,740 bytes and inventory
+`4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`.
+Frozen SHA-256 values are:
+
+| Artifact | SHA-256 |
+|---|---|
+| base supervisor | `d9a012989d595e6da275094d4ce020a8e8a8214e1714df79e8a3285282191179` |
+| activation supervisor | `b33d749f9c53897f82ba141519bbdca5c0b05bf049108e71a07bfe2876da1ceb` |
+| exact Rust diff | `77817b67e6e0029f44e5e9d28e156f86be7f4877e08f33c6d9d54fb3e0155f11` |
+| Core proof harness | `27f71dd21e80c727b7c8775a1001f9750b4c99360bea37ca3b2304c33c9eaeb8` |
+| CLI integration harness | `613e25da51dbeaae395bf846062494126c769f05717fcc3f0e3ca83512e830f0` |
+| Slug binary | `2fe5c70984f30096fe27dd14527a41b928b0d2a21b85a12b068caeb13ad26268` |
+| CLI harness binary | `b80d3939a1ac8a6980deaa9f016c17bf08edc4262f1607c576ef05f274eaad45` |
+
+Exactly one portable replay of the frozen nonignored selector is authorized.
+There is no replay retry.

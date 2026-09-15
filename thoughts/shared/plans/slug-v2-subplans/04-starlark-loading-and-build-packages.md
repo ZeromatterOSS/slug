@@ -9168,3 +9168,6 @@ same-selector replay remain under the current packet's caps and stops. Do not
 broaden to `ResolvedPathObservationKey` or infer optimization work.
 Independent design rereview returned `ACCEPT` for the narrowed legacy subset,
 fixed publication orders and claim-last cutoff.
+The final 166/217/85 preparation passed its exact Core proof and supervisor
+self-check; independent preexecution rereview returned `EXECUTE` for one frozen
+same-selector replay with no retry.

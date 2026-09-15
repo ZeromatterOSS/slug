@@ -529,3 +529,6 @@ one replay. The other nine selectors and F3 remain stopped; do not broaden to
 `ResolvedPathObservationKey` or select optimization work.
 Independent design rereview returned `ACCEPT` for the narrowed legacy subset,
 exact selector boundary and one-replay stop.
+The final 166/217/85 preparation passed the exact Core proof, CLI target build,
+fresh fixture verification and supervisor self-check. Independent preexecution
+rereview returned `EXECUTE` for exactly one replay with no retry.

@@ -163,3 +163,7 @@ executor is admitted.
 
 Future branding consideration: Rubin (Red Rubin basil) remains a product
 choice outside implementation milestones.
+
+The legacy activation audit's corrected 166/217/85 production, proof and
+scratch preparation passed exact Core proof and independent preexecution review.
+Exactly one frozen same-selector replay is authorized; no retry is allowed.
