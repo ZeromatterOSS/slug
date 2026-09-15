@@ -18,10 +18,14 @@ Those changes are not pending implementation.
 Combined selected-toolchain request/output-conflict R2 is preserved and
 unaccepted. [The fixture/gate ledger](./configured-cli-fixture.md) owns the
 remaining validation state. The detailed contracts below own semantics; the
-current manifest owns scheduling. Authentic F3 now confirms that named
-execution-group target invocation is in the selected production closure. The
-combined R2 candidate must complete its non-F3 owner and consumer gates before
-the shared named/automatic runtime can activate; F3 follows that runtime.
+current manifest owns scheduling. The named/automatic runtime and its automatic
+qualifier/property correction are preserved unaccepted through `498ea2f49`;
+full corrected analysis passes 164/164. Authentic F3 and all three real CLI
+gates now clear that invocation and select rules_cc `_def_parser`, an omitted
+`attr.label` computed default whose retained schema already carries
+`cfg = "exec"`. Stage 4 owns its narrow loading-time callback prerequisite;
+existing configured dependency resolution consumes the resulting label. R2,
+groups, and that prerequisite remain one atomic acceptance stack.
 
 ### Analysis surface
 

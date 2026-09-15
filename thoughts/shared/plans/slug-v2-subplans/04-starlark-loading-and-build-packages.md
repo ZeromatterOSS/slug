@@ -8875,3 +8875,32 @@ do not bypass this package's guard or computed-default boundary in the meantime.
 That selected-request candidate is now parked after its cross-owner output
 conflict discriminator failed. Stage 6 owns the output-conflict prerequisite
 design and saved candidate evidence; no loading or configured behavior shipped.
+
+### Selected computed-default target invocation prerequisite (2026-09-14)
+
+The unaccepted R2 plus corrected named/automatic execution-group stack clears
+the former target-invocation guard. All three real CLI consumers and supervised
+F3 now reach rules_java `toolchains/BUILD:138` -> rules_cc
+`cc_library.bzl:19` and stop at `_def_parser`: an omitted private
+`attr.label(default = _def_parser_computed_default, cfg = "exec")`.
+`cc/common/semantics.bzl:54-66` shows the callback reads only the already
+coerced `name` and `tags` values and returns either `None` or a typed
+`@bazel_tools//tools/def_parser:def_parser` Label.
+
+The selected successor activates only this retained generic label callback
+shape during package target declaration. The frozen rule remains the callback
+owner; an attempt-local evaluator supplies noncomputed parameters by name,
+preserves lexical Bzl label context and print capture, maps `None` to the
+label default, rejects other return types and replaces only an omitted value.
+Explicit target values bypass invocation. The existing schema and Stage 6
+dependency-row resolver consume any returned label under its retained Target,
+Exec or ExecGroup configuration; no configured repair is added.
+
+Configurable-combination precomputation, computed-to-computed parameters, other
+attribute kinds, initializers and other deferred callable surfaces remain
+unsupported. Callback scratch borrows no retained evaluator heap; package
+source/recursive-manifest DICE facts continue to own invalidation and atomic
+A/B/A publication. The exact allowlist, caps, negative proofs and atomic
+R2/group acceptance gates are frozen in `current-packet.md`. The corrected
+design review returned `ACCEPT`; implementation is active only within that
+allowlist.

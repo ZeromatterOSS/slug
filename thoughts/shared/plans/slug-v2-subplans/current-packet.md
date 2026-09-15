@@ -1,385 +1,208 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-6-7A-r2-execution-group-combined-r1
-Status: Phase A design freeze accepted; Phase B ready
+Packet: WP-4-6-7A-r2-execution-group-computed-default-combined-r1
+Status: Phase A design freeze accepted; Phase B active
 
-## Result and owner
+## Observable result
 
-Preserve the reconciled selected-toolchain request/configured-action conflict R2
-candidate as an explicitly unaccepted base, freeze the complete named and
-automatic rule execution-group contract against that base, implement the group
-runtime on top of it, and accept the two owners only as one combined checkpoint.
-Then replay the unchanged authentic F3 configured-source proof.
+Complete and accept one atomic stack containing the unaccepted selected-request /
+output-conflict R2 candidate, named and automatic execution groups, and the
+narrow `attr.label` computed-default prerequisite demanded by the authentic
+configured CLI fixture. Then pass the three real CLI consumer gates and replay
+unchanged F3. Nothing in this packet may reach `main` separately.
 
-R2 commit `f3c90ea46` is local on
-`integration/selected-request-output-conflict-r2`, based on current main
-`2b3fedf76`. It contains only the reconciled 19-file app candidate plus the
-12-second CLI deadline correction and positive producer-to-REAPI proof. It is a
-preservation commit, not accepted behavior, and must not reach `main` alone.
-The older preserved source is `27e9e9c0c` based on `97dffd5d4`; exclude all
-`review-evidence/` content.
+The stack is preserved on
+`integration/selected-request-output-conflict-r2`. Its checkpoints are R2
+`f3c90ea46`, group implementation `7a2a149af`, compact automatic identity
+`7b2fccb76`, and automatic qualifier/property correction `498ea2f49`. They are
+reviewable preservation commits, not accepted behavior. The complete reviewed
+R2/group contract is retained at
+`7d48e6671:thoughts/shared/plans/slug-v2-subplans/current-packet.md`; this packet
+inherits every invariant, proof, cap, and atomic-integration condition from that
+record unless it explicitly tightens one below.
 
-The configured-target-owned group collection is the semantic owner. Loaded rule
-declarations produce detached requirements, execution constraints and automatic
-policy. Configured analysis resolves every group under the owner's target
-configuration and retains group identity, selected execution platform,
-configured toolchain providers and merged properties. That one immutable
-collection supplies named dependency transitions, `ctx.exec_groups`, action
-routing and automatic group inference. R2 supplies selected-platform request
-identity and root-set action-closure validation before success, RPC or
-materialization.
+The first final review found that automatic groups had dropped label-qualified
+target constraints and group properties. Commit `498ea2f49` corrects that
+within the frozen owner: `//rule:type` and `@//rule:type` normalize against the
+configured target, automatic constraints select platforms, and Default, Named,
+and Automatic rows receive the full platform-default < platform-group <
+target-default < target-group property order. Full analysis now passes 164/164.
+That correction remains subject to final review.
 
-Exact: the pinned Bazel named/automatic declaration, resolution, transition,
-provider, property and action-routing behavior enumerated in Stage 6, plus R2's
-selected request and FileWrite equality/conflict contract. Slug-native: DICE
-keys, structural configured owners, closure ordering and error storage.
-Deferred: configured aspects, built-in test-runner groups unless current demand
-proves them, unrelated action-family equivalence, computed defaults, complete
-C++/Java behavior, exact configuration/output/ActionKey bytes and execution.
+The same review exposed the next authentic boundary. All three real CLI gates
+and supervised F3 reach rules_java `toolchains/BUILD:138`, enter rules_cc
+`cc_library.bzl:19`, and stop at its private `_def_parser` attribute because
+computed-default target invocation is guarded. F3 selected exactly one test,
+published a valid native observer result and cleaned up, then failed at that
+guard. This is a semantic prerequisite rather than a timeout waiver.
 
-## Why the order changed
+## Compatibility and source authority
 
-The first reconciliation pass completed Analysis, Build API, REAPI and compile
-consumers, and accounted for every Core library test. Its required real CLI
-one-shot, stable-daemon and positive handoff tests enter builtin `bazel_tools`
-transitive registration before their command assertions. They cannot complete
-before the retained rules_java/rules_cc named/automatic group declarations are
-supported. Minimal local-module stubs merely advanced to the first required
-autoload and were reverted; they are no acceptance evidence.
+Exact within the admitted signature: an omitted Starlark
+`attr.label(default = callback)` invokes its retained ordinary Starlark
+callback during target declaration. The callback must have one or more required
+positional-or-named parameters and no positional-only, defaulted, variadic,
+keyword-only or residual parameters; each admitted parameter is supplied
+positionally from the same-named, already-coerced, noncomputed rule attribute.
+The result is a typed Label or `None`;
+`None` becomes the label type default; an explicit target value bypasses the
+callback; and the resulting label enters the attribute's already-retained
+dependency configuration, including `cfg = "exec"`. Callback evaluation uses
+the lexical `.bzl` source identities retained with the frozen rule and preserves
+print capture and package failure atomicity.
 
-Independent correction review returned `REVISE`: landing groups alone on current
-main would consume the still-unaccepted R2 selected-platform identity and
-validated closure. The safe boundary is therefore R2 plus complete groups on one
-branch, with joint gates and atomic integration. Matching resource timeouts are
-open gates, not semantic passes.
+Slug-native restrictions: callback signatures outside that fixed required
+positional shape are rejected. A parameter that is absent, names another
+computed attribute, has a present `None` value, or currently holds a
+selector/concatenation fails before target publication; Bazel likewise omits
+noncomputed null/None values from the parameter structure. Return values other
+than Label or `None` fail with the attribute name. These restrictions cover
+the selected rules_cc `def _def_parser_computed_default(name, tags)` shape
+without inventing configured values.
 
-## Phase A: freeze the implementation contract
+Deferred: configurable-assignment precomputation and its combination limit,
+computed-to-computed dependencies, function defaults on attribute kinds other
+than label, rule initializers, aspects, subrules, symbolic macros, repository
+rules, tag classes, and broader C++/Java provider/action behavior. The existing
+initializer guard keeps precedence. This packet adds no fallback.
 
-Do not edit runtime code until Phase A is complete and independently reviewed.
-Against `f3c90ea46`:
+Primary authority is pinned Bazel commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`: `StarlarkAttrModule.java:356-368`
+retains callback parameter names; `Attribute.java:1370-1492` computes defaults
+from noncomputed attributes, invokes the callback, maps `None` to the type
+default and type-checks its result; `StarlarkCallbackHelper.java:37-101` supplies
+callback arguments by parameter name. `AttributeProvider.java:415-431` and
+`RuleClass.java` establish loading-time specialization before configured
+dependency consumption. The selected rules_cc 0.2.17
+`cc/common/semantics.bzl:54-66` callback reads only `name` and `tags`, returning
+`None` or `Label("@bazel_tools//tools/def_parser:def_parser")`; its descriptor
+uses `cfg = "exec"`. The existing Stage 6 dependency-row resolver is the direct
+configured consumer. Bazel configurable-combination tests are skipped because
+that broader category remains explicitly unsupported.
 
-1. Reconcile production-closure demand for named and automatic groups under
-   `//app/slug_cli_v2:slug`. Preserve the authenticated F3 chain
-   rules_java `toolchains/BUILD:138` -> rules_cc `cc_library.bzl:19`, but do not
-   claim broader bootstrap membership without the current Bazel/Cargo closure.
-2. Trace the live declaration, configured-target, dependency-transition,
-   provider, property and action-factory call paths. Decide the cohesive owner
-   and any necessary extension of the existing structural toolchain-resolution
-   key. Do not activate `toolchains/exec_groups.rs` as a detached registry.
-3. Freeze exact Rust/test files, direct consumers, executable proof selectors,
-   upstream adaptations, production/proof growth estimates and review caps.
-   Give concrete split/cohesion decisions for large `package.rs` and `dice.rs`.
-4. Freeze guard replacement: the loading guard remains until the complete
-   collection supplies resolution, transitions, providers, properties and
-   action routing. Unknown names fail; no default fallback is allowed.
-5. Obtain independent terminal design review. Update this manifest with the
-   reviewed Phase B allowlist and caps before the first runtime edit.
+## Owner and lifecycle
 
-## Phase A audit and proposed Phase B freeze
+`FrozenRuleDefinition` remains the sole retained owner of sparse callback and
+schema-index identity. `FrozenRuleDefinition::invoke` is the sole producer: it
+coerces ordinary attributes, evaluates omitted computed labels in a fresh
+attempt-local Starlark module using `MacroEvaluationContext`, replaces only
+their default values, and publishes the final `StarlarkRuleImplementation`
+through the existing `PackageRecorder`. Existing source/recursive-manifest DICE
+dependencies own invalidation and A/B/A restoration. The result is part of the
+ordinary package target's structural equality; no new DICE key, map, cache,
+interner, registry, lock, service memory, request input, or retained evaluator
+heap is admitted. Callback modules, lifted arguments and return values are
+attempt scratch and drop on success, error, cancellation, or retry.
 
-The 2026-09-14 closure audit used a detached worktree at current `main`, set
-`CARGO_BAZEL_REPIN=1` only there to repair the stale Cargo.Bazel digest, and ran
-the bounded Bazel query `deps(//app/slug_cli_v2:slug)`. The query completed in
-14.82 seconds after loading 511 packages. Its C++ rule-class slice contains only
-`@rules_rust//rust/private/cc:empty`, a `cc_empty_library` whose definition has
-no toolchains, execution groups or automatic-policy attribute. The closure has
-no `cc_library` instance. The rules_rust rule definitions in the closure retain
-default toolchains but contain neither `exec_groups` nor
-`_use_auto_exec_groups`, and neither repository configuration nor the native
-registry changes the false `incompatible_auto_exec_groups` default. Therefore
-compiling the production `//app/slug_cli_v2:slug` binary does not itself demand
-named or automatic execution groups.
+The callback is evaluated only after every noncomputed attribute has its final
+loading value and before selector-key collection, implicit-output callbacks,
+generated-file publication, or target publication. Explicit values remain
+`AttributeProvenance::Explicit`; computed values use
+`AttributeProvenance::Default`. A callback error publishes neither its target nor
+earlier declarations from the failing package attempt. Existing analysis reads
+the resulting `CoercedAttributeValue::Label` and the unchanged schema
+`AttributeDependencyConfiguration`, so `cfg = "exec"` produces the configured
+execution dependency without a command-side repair.
 
-That result does not remove the runtime requirement. The production CLI's
-configured-source consumer enters the authenticated F3/R2 builtin registration
-chain rules_java `toolchains/BUILD:138` -> rules_cc 0.2.17
-`cc_library.bzl:19`. That target's retained rule definition has public named
-`cpp_link`, `_use_auto_exec_groups=True`, a default C++ toolchain and actions
-that select group/toolchain contexts. The exact demand claim is consequently
-limited to the production CLI runtime and its authentic configured fixture; it
-is not a claim about the Bazel graph that compiles the Slug executable. The
-temporary repinned worktree and its two changed lockfiles were removed after the
-query.
+## Scope, caps, and stops
 
-The live path is now traced end to end. `package.rs` owns live/frozen rule
-declarations and target publication; `attrs.rs` owns the dependency-transition
-tag. `dice.rs` resolves attributes, default toolchains and one selected platform,
-then prepares children and calls `evaluate_loaded_rule`. `starlark_rule.rs`
-materializes one toolchain view and registers actions; `result.rs` already owns
-structural action group/platform/toolchain identity and routes retained action
-specs by group. `ConfiguredToolchainResolutionKey` is the correct shared
-resolution key, but it must add a sorted, duplicate-free
-`Arc<[CanonicalLabel]>` execution-constraint field. Requirements preserve their
-declared order; semantically equal constraint sets share one key regardless of
-source order. Equal requirement/constraint/configuration inputs may then cut off
-at that key while the parent collection retains distinct group identities.
-Empty-requirement resolution must filter candidates by those constraints before
-selecting a platform.
+The computed-default delta may edit only:
 
-The sole new configured semantic owner is an immutable
-`ConfiguredExecGroupCollection` in a new top-level analysis module
-`execution_groups.rs`. Its ordered rows retain `Default`, public `Named`, or
-internal `Automatic(CanonicalLabel)` identity, the complete normalized
-requirements/constraints, the selected action owner context and selected-
-toolchain runfiles closure. It also owns the existing default candidate and
-preferred-platform `ToolchainTopology` data. The final `ConfiguredNodeResult`
-replaces its separate topology field with this one collection, and
-`toolchain_topology()` becomes a borrowed projection of the collection's default
-row for unchanged consumers. Normalization and joins are phase scratch. The existing mutable
-`toolchains/exec_groups.rs` prototype and its public test/export are deleted;
-they are not adapted or activated as a second registry.
+- `app/slug_loading_v2/src/package.rs`;
+- `app/slug_loading_v2/src/host_package_load_tests.rs`;
+- `app/slug_analysis_v2/tests/starlark_rule.rs` for the end-to-end configured
+  dependency discriminator;
+- this manifest, canonical Live Status, Stage 4, Stage 6, bootstrap readiness,
+  and the configured CLI fixture ledger.
 
-Loading retains canonical group constraints and writes public named-transition
-identity directly into `AttributeDependencyConfiguration::ExecGroup`. Target
-publication retains the transition name without membership validation and moves
-the immutable declarations into `StarlarkRuleImplementation` and its structural
-equality. Membership is checked later by configured dependency resolution,
-matching Bazel loading/query timing; an unknown name fails configured analysis
-without Default fallback. The existing invocation guard is removed only in that
-same carrier-complete change. Initializer, computed-default, aspect, subrule,
-macro, repository-rule and tag-class guards keep their current precedence and
-remain closed.
+No Cargo manifest, BUILD file, fixture payload, server/query/CLI source,
+configuration source, or DICE production source may change for this
+prerequisite. `package.rs` stays cohesive because the frozen callback,
+evaluator-private values, package recorder, coercion and publication all meet in
+the target invocation loop; extraction would expose evaluator lifetimes without
+creating a second semantic owner.
 
-Configured normalization reads `exec_compatible_with`,
-`exec_group_compatible_with`, raw `exec_properties`, retained rule declarations,
-default toolchain requirements, `_use_auto_exec_groups` when declared, and the
-structural native option through one typed configuration getter. An explicit
-private rule attribute, true or false, overrides the native option; absence uses
-the option. Automatic mode empties default requirements and creates one
-internal group for each default toolchain type. Public named groups never share
-that identity even when their inputs are equal. Unknown target constraint or
-property prefixes fail during configured collection construction, and unknown
-named transitions fail during configured dependency resolution.
-Platform property prefixes follow Bazel: unknown prefixes are parsed but unused.
-Public action group names cannot address automatic groups.
+From `f3c90ea46`, the inherited combined caps remain 2,300 production, 3,600
+proof, and 5,900 gross added Rust lines, with no deletion credit. The new delta
+is estimated at 170 production and 280 proof lines. Tightened physical caps are
+12,300 lines for `package.rs`, 39,000 for
+`host_package_load_tests.rs`, 7,150 for `dice.rs`, 2,550 for production
+`starlark_rule.rs`, 13,250 for its integration test, and 650 for
+`execution_groups.rs`. Stop and replan for a second retained owner, a new DICE
+key/cache, configurable callback precomputation, initializer execution, a
+manifest/build/fixture change, a required production file outside the inherited
+allowlist, or any cap breach.
 
-`root_declared_dependency_keys` and `subrule.rs::configured_dependency_rows`
-receive the completed collection and preserve `Named(name)` while selecting the
-named row's execution configuration for `config.exec(exec_group=...)`. Unknown
-names error without default fallback. The evaluator receives the same
-collection. With automatic policy off, `ctx.toolchains` reads only the Default
-row. With automatic policy on, Default retains zero resolution requirements but
-`ctx.toolchains` still exposes exactly the rule's default-declared toolchain
-labels, resolving each provider from its corresponding Automatic row and using
-the pinned requested-label alias fallback: both the declared alias and resolved
-real toolchain type address the provider. Action `toolchain=` deliberately does
-not use that alias search and routes only by the Automatic identity created from
-the declared requirement. Named rows never enter the `ctx.toolchains` view.
-Every nondefault row forms a thin `ctx.exec_groups[name].toolchains` view, so
-Automatic label-named rows are indexable there even though an explicit action
-`exec_group=` must pass public-identifier validation and cannot name them.
-Constraint-only Named groups expose a present empty toolchain map. The views
-retain the existing analysis token and do not own a second map.
+## Discriminating evidence
 
-The action binder replaces erased `Option<Value>` toolchain state with an
-explicit omitted/None/label-or-string enum. The synchronous sink validates a
-public explicit group first; automatic policy plus an explicit toolchain selects
-that toolchain's internal group; supplying both requires membership agreement
-only when automatic policy is enabled. With automatic policy off, `toolchain=`
-does not reroute an explicitly named action.
-The existing executable/tool provenance path supplies the Bazel discriminator:
-under automatic mode, with no explicit group and multiple contexts, an
-unassociated File/tool requires an explicit toolchain or explicit None, while
-recognized dependency runfiles and string executables remain valid. Nested tool
-depsets perform this check before element conversion. Only after validation does
-the sink attach the selected internal group spelling to `ActionSpec`;
-`with_action_specs` resolves that spelling against the one collection and binds
-the corresponding structural context.
+Add and preflight exact selectors for:
 
-The action proof table runs both `run` and `run_shell` across automatic policy
-off/on, omitted toolchain versus explicit None, unassociated File and
-FilesToRunProvider executables, direct and nested-depset tools, recognized
-dependency runfiles and string executables, valid and unknown toolchain labels,
-declared toolchain aliases versus their resolved real types (provider-view
-fallback succeeds; action routing by the resolved real type fails),
-valid, invalid and unknown explicit group names, and compatible versus
-mismatched group/toolchain pairs. It checks both the selected context and error
-precedence; no row may fall back to Default after a failed lookup.
+- `host_package_load_tests::rule_computed_default_reexport_invokes_labels_bypasses_explicit_and_restores`:
+  imported/re-exported callbacks observe exact `name`/`tags`, return typed root
+  and external labels or `None`, explicit `_def_parser` bypasses a failing
+  callback, label provenance is Default versus Explicit, and callback `print()`
+  reaches the existing capture. A callback-source A/B/A edit runs on one DICE
+  graph and restores the exact package result. The failure leg declares an
+  earlier target before the failing callback target and proves the failed
+  package publishes neither;
+- `host_package_load_tests::rule_computed_default_rejects_unavailable_configurable_and_invalid_results`:
+  missing/computed/None parameters, selectors/concatenations, every excluded
+  callback signature class, string/integer/list returns and callback failure
+  produce bounded attribute-named errors;
+- `computed_default_label_uses_retained_exec_dependency_configuration` in
+  `app/slug_analysis_v2/tests/starlark_rule.rs`: a real loaded callback result
+  produces a `ConfiguredAttributeDependency::Exec(Default)` edge whose child
+  uses the selected Exec configuration, while a same-label Target attribute is
+  the structural control.
 
-Group properties are parsed once during collection construction. Both target
-and each selected platform accept unqualified default keys and qualified group
-keys. Every effective row is merged in the pinned order platform-default,
-platform-group, target-default, target-group; the target-default-over-platform-
-group discriminator is mandatory. The proof also supplies an unknown platform
-property prefix and proves it is parsed but unused. `ConfiguredActionOwnerContext` preserves the
-selected platform's unchanged `raw_platform_fact` separately from the completed
-effective fact. R2 FileWrite sharing remains field-for-field unchanged: it
-compares output shape, mnemonic/content/executable, selected platform label,
-`raw_platform_fact` and constraint labels, and does not add group identity or
-effective properties. Effective merged group properties feed action ownership,
-aquery and REAPI. The cross-group conflict proof uses nonshareable Spawn actions.
-No output suffix,
-configuration-byte change or action-family expansion is admitted.
+The positive loading proof must use `Label()` inside the retained callback so
+lexical source mapping is exercised. The configured end-to-end selector is
+mandatory.
 
-Before node publication, the parent runfiles collector unions the selected
-toolchain runfiles closure from every Default, Named and Automatic row into the
-existing `runfiles_packages`. A group child Need/error/cancellation publishes no
-partial parent collection or closure. Named or automatic toolchain runfiles
-edits must invalidate the parent even when its providers and actions are
-otherwise equal.
+Rerun every affected corrected group selector and the full loading,
+configuration, analysis, Build API and direct REAPI suites. Run the direct
+server REAPI consumer and query/server/CLI compile dependents. Account for the
+exact Core binary: candidate and current main both produced 313 passes, eight
+matching assertion failures and nine matching 12-second timeouts across 330
+active tests with one ignored; this supersedes the older 309/13/7 receipt.
+Rerun Core only if this package-only delta changes its binary or dependencies.
 
-The Phase B Rust allowlist, measured from preservation commit `f3c90ea46`, is
-exactly:
+Then run the CLI drain control and each real one-shot, stable-daemon and positive
+shared-closure/REAPI gate separately under the standing deadline, followed by
+unchanged supervised F3 with observer and cleanup. A new later authentic
+semantic stop triggers a bounded replan; a passed package callback that merely
+advances the closure does not accept the stack. Matching timeouts are open
+resource gates.
 
-- loading: `app/slug_loading_v2/src/package.rs`, `attrs.rs`, `subrule.rs`,
-  `subrule_invocation.rs`, `host_package_load_tests.rs`, and
-  `app/slug_loading_v2/tests/build_file_loading.rs`;
-- configuration: `app/slug_configuration_v2/src/native/configuration.rs` and
-  `native/tests.rs`;
-- analysis production: new `app/slug_analysis_v2/src/execution_groups.rs`,
-  `exec_group.rs`, `dice.rs`, `starlark_rule.rs`, `files_to_run_spawn.rs`,
-  `subrule.rs`, `result.rs`, `lib.rs`, `toolchains/mod.rs`, and deletion of
-  `toolchains/exec_groups.rs`;
-- analysis proof: `app/slug_analysis_v2/tests/starlark_rule.rs`,
-  `configured_target.rs`, and `toolchain.rs`;
-- combined R2 consumers: `app/slug_core_v2/src/runtime/file_write_identity.rs`,
-  `tests/configured_action_conflicts_tests.rs`,
-  `app/slug_reapi_v2/tests/reapi.rs`, and `app/slug_cli_v2/tests/cli.rs`.
+Use pinned `nightly-2025-09-14-x86_64-unknown-linux-gnu`. Preparation and
+compilation have a 60-second ceiling; each test command has a 12-second deadline
+and 15-second absolute outer ceiling. Use direct pinned binaries, explicit
+`--target-dir /home/wgray/slug/target`, serial Cargo commands, and
+`scripts/v2_test_preflight.py` for every exact nonignored selector after its
+final rebuild. Finish with pinned formatting, `git diff --check`, scope/growth
+checks, `scripts/v2_plan_status.py`, and independent final invariant review.
 
-No Cargo manifest, BUILD file, fixture payload, server/query source or other R2
-file may change. If a compiler error proves one omitted direct consumer needs a
-mechanical exhaustive-match adaptation, stop for focused scope review before
-editing it.
+## Review and acceptance
 
-Estimated group-only growth is 1,750 production and 2,700 proof Rust lines.
-Review caps are 2,300 production, 3,600 proof and 5,900 gross added Rust lines;
-deletions do not create cap credit. Physical caps are 12,300 lines for
-`package.rs`, 7,150 for `dice.rs`, 2,550 for `starlark_rule.rs`, 13,250 for its
-integration test, and 650 for the new `execution_groups.rs`. `package.rs` keeps
-only the binding/live/frozen/final carrier changes because extracting them would
-expose evaluator-private types. `dice.rs` keeps DICE awaits and root orchestration
-but moves normalized rows, property parsing and immutable collection validation
-to the new module. Stop and replan on any cap breach or a second retained owner.
+Independent design review must confirm the narrow execution point, label
+context, parameter availability, provenance, `cfg = "exec"` handoff, failure
+atomicity and unchanged R2/group ownership before runtime edits. Final review
+must inspect `498ea2f49`, the computed-default delta, every affected proof and
+the CLI/F3 receipts. Only an `ACCEPT` after all joint gates permits one atomic
+integration commit on `main`; push only that accepted main commit.
 
-The exact new proof selectors are:
-
-- `package::tests::exec_group_declarations_retain_constraints_and_named_transitions`;
-- `host_package_load_tests::exec_group_reexports_publish_complete_target_semantics_and_restore`;
-- `host_package_load_tests::rules_cc_exec_groups_retain_named_and_automatic_policy`;
-- `execution_groups::tests::normalization_preserves_named_constraint_only_and_automatic_groups`;
-- `execution_groups::tests::property_precedence_target_default_beats_platform_group`;
-- `execution_groups::tests::unknown_target_group_prefixes_fail_and_unknown_platform_prefixes_are_unused`;
-- `named_exec_group_resolves_independent_toolchains_constraints_and_provider_view`;
-- `named_exec_transition_preserves_ordinary_and_configured_rows_uses_selected_platform_and_rejects_unknown`;
-- `automatic_exec_group_policy_obeys_attribute_over_flag_aba`;
-- `automatic_exec_group_projects_default_labels_from_automatic_rows_and_indexes_all_nondefault_rows`;
-- `automatic_exec_group_routes_run_and_run_shell_across_the_complete_parameter_matrix`;
-- `exec_group_collection_publishes_only_after_complete_resolution`;
-- `exec_group_collection_invalidates_sources_requirements_constraints_payload_and_properties`;
-- `exec_group_collection_unions_and_invalidates_named_and_automatic_toolchain_runfiles`;
-- `default_exec_group_behavior_is_unchanged`;
-- `configured_action_context_distinguishes_default_named_and_automatic_groups`;
-- `configured_action_specs_route_every_group_without_fallback`;
-- `configured_action_conflicts_cross_group_spawns_reject_before_publication`.
-
-Each selector is preflighted and run exactly under the packet deadline. The
-joint R2 selectors include
-`configured_action_conflicts::validated_shared_closure_lowers_one_reapi_plan_and_keeps_aquery_owners`,
-`configured_action_conflicts::one_shot_rejects_unused_conflicts_before_transport_and_output_changes`,
-`configured_action_conflicts::stable_daemon_restores_sharing_after_repeated_conflicts`,
-`configured_file_write_reapi_plan_reads_retained_platform_properties`, and
-`selected_toolchain_request_reapi_payload_is_not_owner_identity`, plus every
-selected-request/raw-platform/cutoff/cancellation A/B/A test touched by R2.
-Complete loading, configuration, analysis, Build API and direct REAPI suites;
-the direct server REAPI test; query/server/CLI compile checks; partitioned Core;
-the three separately bounded CLI gates; and unchanged F3 remain mandatory.
-
-Independent terminal design review returned `ACCEPT` on 2026-09-14 after the
-freeze corrected automatic-row `ctx.exec_groups` exposure, composite
-`ctx.toolchains` alias behavior, action parameter precedence, property validation,
-the R2 raw/effective split, topology/runfiles ownership, configured transition
-timing and both dependency-row producers. Phase B may begin exactly within this
-allowlist and these caps. The seven prior Core timeouts remain joint acceptance
-gates requiring diagnosis or bounded discriminating replacements.
-
-Primary source authority is Bazel commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` in `/home/wgray/bazel`, using the
-Stage 6 source/test matrix. Read only that pinned object when working-tree HEAD
-differs. Buck2/DICE sources are ownership and memory guidance only.
-
-## Required Phase B semantics
-
-The reviewed freeze must preserve all of these obligations:
-
-- named requirements and execution constraints resolve independently, including
-  constraint-only groups, under the owner's target configuration;
-- named dependency edges use the named group's selected execution platform and
-  reject unknown names;
-- public `ctx.exec_groups` exposes every resolved nondefault row, including
-  Automatic rows, excludes Default and distinguishes an absent collection from
-  an empty toolchain map;
-- effective property precedence is platform-default < platform-group <
-  target-default < target-group, including the target-default-over-platform-group
-  discriminator;
-- actions validate the public group then bind that group's owner/platform;
-  automatic actions also validate explicit toolchain/group agreement;
-- automatic policy comes from the retained native option plus rule attribute
-  precedence, derives a distinct structural group per toolchain type and does
-  not collapse public named identity;
-- equal resolution inputs may share computation but never collapse group/action
-  identity;
-- the complete immutable collection publishes only after every group resolution,
-  child and final source-certificate validation; Need/error/cancellation exposes
-  no partial provider or action state;
-- no second registry/cache, CLI reconstruction, evaluator-owned retained map,
-  lock across DICE awaits, output suffix, fallback or broader action equivalence;
-- R2 output-conflict validation remains before command success, RPC and
-  materialization, while cquery remains independent.
-
-Required invalidation proof covers same-DICE source/configuration/platform and
-policy A/B/A; requirements, constraints, toolchain payload and properties;
-absent/edit/delete/recreate; unavailable history; overlapping policies;
-unchanged-input Arc cutoff; Need/error/cancellation; and default-only
-nonregression. Views and joins are phase scratch; declarations and configured
-collections are DICE-retained structural memory with Allocative coverage.
-
-## Joint validation and acceptance
-
-Use the pinned nightly `nightly-2025-09-14-x86_64-unknown-linux-gnu`. Every
-compile/preparation command has a 60-second ceiling. Every test command has a
-12-second deadline and 15-second absolute outer ceiling. Run Cargo serially per
-target directory and preflight every exact nonignored selector with
-`scripts/v2_test_preflight.py` after its final rebuild.
-
-Joint acceptance requires:
-
-- all reviewed declaration and configured group tests, including named,
-  constraint-only, automatic-policy, transition, provider, property-precedence,
-  action-routing and negative controls;
-- all R2 selected-request/raw-platform/cutoff/cancellation/A-B-A tests and all
-  configured-action conflict/sharing tests;
-- complete `slug_analysis_v2` and `slug_build_api_v2` suites;
-- every `slug_core_v2` library test in bounded exact partitions, with each
-  candidate failure compared by exact selector to unchanged current main;
-- the CLI drain control and separately bounded real one-shot, stable-daemon and
-  positive completed-closure -> one `FileWriteReapiPlan` tests;
-- complete direct `slug_reapi_v2` tests, the direct server REAPI consumer, and
-  query/server/CLI compile dependents;
-- unchanged F3 with its observer and cleanup receipt after complete group
-  activation;
-- pinned formatting, `git diff --check`, scope/growth checks,
-  `python3 scripts/v2_plan_status.py` and independent final invariant review.
-
-The reconciliation receipt is reusable only for untouched code: Analysis
-150/150, Build API 79/79, direct REAPI 23 active with one ignored, direct server
-REAPI consumer pass, and query/server/CLI checks pass. Core preflighted 329
-nonignored tests with one ignored; 309 passed, 13 assertions failed identically
-on current main, and seven exact commands timed out at 12 seconds on both lines.
-Those seven remain resource gates and must be diagnosed or replaced by bounded
-discriminating proof. Group edits invalidate every affected receipt.
-
-Commit intermediate preservation/design checkpoints on the isolated branch.
-Do not push R2 or group behavior to `main` until every joint gate passes.
-Integration must be atomic, followed immediately by the unchanged F3 receipt.
-Return `REPLAN` if Phase A cannot freeze one configured-target owner, demand is
-unresolved, required semantics exceed a bounded reviewed packet, or the combined
-runtime cannot preserve landed behavior.
+Independent design review returned `ACCEPT` on 2026-09-14 after the freeze
+made the configured handoff selector end to end, excluded present `None`
+parameters and unsupported callback signatures, and required observed print
+capture, one-DICE A/B/A restoration and whole-package failure atomicity. Phase B
+may edit only the frozen allowlist.
 
 ## Immediate predecessor
 
-Commit `2b3fedf76` recorded the now-superseded R2-before-groups order after F3
-reached `target invocation for named execution-group semantics is unsupported`
-in 9.98 seconds with valid observer and cleanup evidence. The reconciled trial
-proved that R2's real command consumers traverse that same builtin registration
-boundary. Independent review therefore requires a combined R2-based group stack
-and joint acceptance.
+`WP-4-6-7A-r2-execution-group-combined-r1` implemented the shared group
+collection on unaccepted R2 and passed loading 562 active tests, configuration
+67/67, corrected analysis 164/164, Build API 76/76, direct REAPI 23 active plus
+one ignored, and compile consumers. Its final review returned `REPLAN` for the
+automatic qualifier defect now corrected at `498ea2f49` and for this authentic
+computed-default prerequisite. The three CLI gates and F3 all identify the same
+`_def_parser` boundary.

@@ -29,14 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-6-7A-r2-execution-group-combined-r1
-Status: ready; Phase A contract freeze
+Packet: WP-4-6-7A-r2-execution-group-computed-default-combined-r1
+Status: ready; computed-default Phase B active
 
-Freeze the complete named/automatic execution-group contract against the
-reconciled but unaccepted R2 selected-request/output-conflict base, implement the
-combined stack, and accept it atomically as specified by
-[current-packet.md](./slug-v2-subplans/current-packet.md). The unchanged F3 proof
-follows complete group activation.
+Preserve the corrected but unaccepted R2/execution-group stack, implement the
+narrow package-owned `attr.label` computed-default prerequisite selected by all
+three real CLI gates and F3, and accept the whole stack atomically as specified
+by [current-packet.md](./slug-v2-subplans/current-packet.md). The unchanged CLI
+and F3 proofs follow the computed-default correction.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
