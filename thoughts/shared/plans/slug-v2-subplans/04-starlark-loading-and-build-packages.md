@@ -9156,3 +9156,8 @@ replay require independent design review. Even positive counts prove no
 per-merge event attribution, invalidation, causal recomputation or cost.
 Independent design review returned `ACCEPT` for the corrected lifecycle
 publication order and per-category filtered-to-global bounds.
+The first dedicated Core preparation then exited 101 after 4.73 seconds on one
+proof-only `usize`/`off_t` mismatch before creating an executable or running a
+selector. A reviewed correction may change only that conversion and prepare the
+same target once under the unchanged limit.
+Independent recovery review returned `ACCEPT` for that proof-only conversion.

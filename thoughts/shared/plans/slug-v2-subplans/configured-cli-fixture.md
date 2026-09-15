@@ -502,3 +502,8 @@ Even positive counts prove no per-merge attribution, invalidation, causality or
 cost.
 Independent design review returned `ACCEPT` for the corrected lifecycle
 publication order and per-category filtered-to-global bounds.
+The first dedicated Core preparation exited 101 after 4.73 seconds on one
+proof-only `usize`/`off_t` mismatch. It created no executable and ran no
+selector. A reviewed correction may change only that conversion and prepare
+the same target once; the CLI and replay remain stopped.
+Independent recovery review returned `ACCEPT` for that proof-only conversion.

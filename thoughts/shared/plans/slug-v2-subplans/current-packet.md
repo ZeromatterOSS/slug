@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-shard-dice-event-audit-r1
-Status: design accepted; diagnostic execution pending
+Status: Core preparation recovery accepted; corrected preparation pending
 
 ## Accepted predecessor receipt
 
@@ -176,3 +176,26 @@ Independent design review returned `ACCEPT` after requiring the producer to
 increment produced before closed, eliminating a decoder-valid partial cutoff,
 and replacing unsound event-pair inequalities with exact filtered-to-global
 counter bounds across concurrent window edges.
+
+## Core preparation recovery
+
+The first pinned dedicated-target preparation exited 101 after 4.73 seconds on
+one proof-only type mismatch: `libc::pwrite` requires its offset as `off_t`, but
+`write_word` supplied `index * 8` as `usize`. The production library compiled;
+no test executable, preflight, proof, supervisor, CLI build or replay occurred.
+The frozen production diff SHA-256 is
+`4183595095e1e951575fd88e21bcd438c50f45fb27accac54f1cc1b90c429b5f`.
+The uncorrected exact 130-line proof SHA-256 is
+`c6b12f38bf7231babb0e277a207f6b279d827a7d0f4d222b2af82e71cc96f0bc`.
+
+One recovery may change only that proof expression to an explicit checked or
+lossless `libc::off_t` conversion and prepare the same dedicated target once
+under the unchanged 60-second ceiling. It may then preflight and run only the
+same exact selector under 12/15 seconds. Preserve the 99-line production diff,
+130-line proof cap, scratch supervisor, CLI and replay stops. The earlier
+unpinned `rustfmt` launcher also failed before formatting through the blocked
+system Snap wrapper; the corrected absolute pinned `rustfmt` invocation passed
+and may not be repeated without a later source change.
+Independent recovery review returned `ACCEPT` for a checked multiplication and
+`libc::off_t::try_from` conversion or an equivalently proven lossless
+conversion, with the same target and limits.

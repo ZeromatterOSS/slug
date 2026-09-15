@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-7A-configured-conflict-path-shard-dice-event-audit-r1
-Status: design accepted; diagnostic execution pending
+Status: Core preparation recovery accepted; corrected preparation pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -60,6 +60,13 @@ result cannot establish per-merge attribution, invalidation, causal
 recomputation, cost or avoidable work.
 Independent design review returned `ACCEPT` for the corrected partial-cutoff
 ordering and concurrent filtered-to-global counter bounds.
+The first pinned dedicated Core preparation exited 101 after 4.73 seconds on a
+proof-only `usize` versus `off_t` argument mismatch before producing an
+executable or running a selector. One reviewed recovery may correct only that
+conversion and prepare the same target once under the unchanged limit; all
+production, CLI and replay boundaries remain frozen.
+Independent recovery review returned `ACCEPT` for the proof-only conversion and
+unchanged target, cap and execution stops.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
