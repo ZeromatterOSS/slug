@@ -29,14 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-6-7A-r2-execution-group-computed-default-combined-r1
-Status: ready; computed-default Phase B active
+Packet: WP-4-6-7A-r2-execution-group-configurable-alias-combined-r2
+Status: configurable-alias Phase B active after independent design acceptance
 
 Preserve the corrected but unaccepted R2/execution-group stack, implement the
-narrow package-owned `attr.label` computed-default prerequisite selected by all
-three real CLI gates and F3, and accept the whole stack atomically as specified
-by [current-packet.md](./slug-v2-subplans/current-packet.md). The unchanged CLI
-and F3 proofs follow the computed-default correction.
+narrow package-owned `attr.label` computed-default prerequisite and the native
+configurable-alias prerequisite selected next by F3, and accept the whole stack
+atomically as specified by [current-packet.md](./slug-v2-subplans/current-packet.md).
+The real CLI matrices are partitioned under the unchanged deadline, then F3 is
+replayed after the alias correction.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

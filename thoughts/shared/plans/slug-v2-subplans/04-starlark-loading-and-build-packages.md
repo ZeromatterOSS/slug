@@ -8904,3 +8904,20 @@ A/B/A publication. The exact allowlist, caps, negative proofs and atomic
 R2/group acceptance gates are frozen in `current-packet.md`. The corrected
 design review returned `ACCEPT`; implementation is active only within that
 allowlist.
+
+### Native configurable alias prerequisite (2026-09-14)
+
+Computed-default commit `dab5cb5ea` passes its focused and broad loading gates.
+The next supervised F3 advances to rules_java `toolchains/BUILD:205`, where
+`alias.actual = select(...)` is rejected as nonconfigurable. The selected
+successor changes the existing alias target's `actual` from a literal label to
+the ordinary loading-owned configurable label expression. Branch labels remain
+ordinary unconfigured-query candidates; selector keys remain configuration
+dependencies. Literal aliases keep their current behavior.
+
+Pinned Bazel `8220c619` `rules/Alias.java:54-89,102-116` defines a mandatory
+LABEL without a nonconfigurable flag and names alias as a carrier for reusable
+`select()` logic. Loading remains the sole retained producer. No evaluator heap,
+cache, key or fallback is added; package equality and existing observed source
+dependencies own invalidation and A/B/A restoration. The exact proof, scope and
+atomic acceptance contract is in `current-packet.md`.

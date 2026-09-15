@@ -1314,6 +1314,22 @@ bounded discriminating proof. The attempted minimal local-module overrides
 were reverted: they only bypassed authentic module sources and advanced to the
 first missing autoload, so they provide no acceptance evidence.
 
+## Configurable native alias prerequisite (2026-09-14)
+
+After the computed-default correction, authentic F3 reaches rules_java's
+configured `alias.actual = select(...)`. The selected correction reuses
+`prepare_configured_attribute_conditions` and `resolve_configured_attribute` in
+the existing native alias arm. The alias's own target or exec configuration
+selects one label, and the child keeps that same configuration. Condition nodes
+remain configured dependencies; only the selected label becomes the
+`AliasActual` edge. Missing, ambiguous or wrong-shaped selections fail before a
+configured alias result is published.
+
+This adds no transition, key, cache, resolver or command repair. Loading's
+retained expression is the semantic input, existing condition DICE keys own
+Need/error/invalidation behavior, and the configured alias result owns the
+selected edge. Target/exec A/B/A, condition dependencies and stale-publication
+negatives are mandatory before the combined R2/group stack can be accepted.
 
 ## Historical evidence
 

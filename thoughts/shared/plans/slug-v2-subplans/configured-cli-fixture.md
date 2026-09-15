@@ -326,3 +326,15 @@ and F3. Neither owner may land alone.
 Reconcile landed nodep/archive/file-capture/diagnostic/registry prerequisites
 before validating; preservation metadata never ships. R1–R4 completion now
 requires the combined R2/group stack and its joint gates.
+
+The computed-default checkpoint `dab5cb5ea` then passed its focused and broad
+library gates. A fresh portable fixture assembled the same 28 objects, 177
+registry metadata files and 8,004,740 source bytes at inventory SHA-256
+`4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`.
+The supervised F3 selected and executed exactly one test in 9.82 seconds;
+observer telemetry was valid and cleanup reported no children, open pipes or
+live process group. Native publication exited 1 at rules_java
+`@@rules_java+//toolchains:BUILD:205`: `alias.actual` contains `select()` but
+Slug marks it nonconfigurable. This proves the callback boundary cleared and
+selects only the native configurable-alias prerequisite. It establishes no new
+payload demand and does not accept F3.
