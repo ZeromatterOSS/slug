@@ -1,297 +1,207 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-6-7A-r2-execution-group-source-invariant-reconcile-r2
-Status: Phase B ready; independent architecture review ACCEPT
+Packet: WP-4-6-7A-r2-core-source-test-boundary-reconcile-r1
+Status: Phase B ready; independent design review ACCEPT
 
 ## Result and acceptance boundary
 
-Reconcile the preserved selected-toolchain request/configured-action-conflict R2
-candidate and named/automatic execution-group implementation against pinned
-Bazel 9.2 source invariants, correct the bounded mismatches below, and accept
-the two owners as one atomic checkpoint through ordinary correctness proofs.
-Do not resume the completed invalidation diagnostic chain and do not repeat its
-authentic CLI selector.
+Replace nine over-broad Core tests that exceeded the standing 12-second exact
+deadline with a proof-only set of smaller exact selectors. Preserve every
+assertion and semantic return path, including real public build/cquery command
+ownership, while making each selector independently bounded. This packet
+changes no production behavior, compatibility class, DICE key, retained value,
+command surface or execution-group/R2 implementation.
 
-The preserved stack remains unaccepted on
-`integration/selected-request-output-conflict-r2`. Its R2 base is
-`f3c90ea46`; execution-group implementation commits are `868d30a0f`,
-`7a2a149af`, `7b2fccb76` and `498ea2f49`. Loading prerequisites after that
-stack are independently accepted, but none accepts R2 or execution groups.
-Current `main` is `4824a0861`. No feature-branch commit may be pushed.
+The predecessor implementation remains unaccepted at local commit
+`1b09dbfa1` on `integration/selected-request-output-conflict-r2`. Freeze its
+production source. No feature-branch commit may be pushed, and no merge or
+`main` push is authorized until the replacement proof set passes, the remaining
+predecessor gates resume and independent final review accepts the complete
+atomic stack.
 
-If the corrected stack passes this packet and independent final review, merge it
-to `main` atomically, run main checks, commit the acceptance receipt, and push
-`main` to the authorized ZeromatterOSS Slug remote. Authentic configured CLI F3
-is the next separate packet after activation; it is not an input to this
-checkpoint.
+Exact compatibility remains limited to the predecessor packet's pinned Bazel
+9.2 named/automatic execution-group and selected-request/configured-conflict
+surface. DICE key shape, immutable configured owners, closure ordering and
+typed error storage remain Slug-native. This packet changes only the size and
+composition of tests for already-declared behavior.
 
-Exact behavior is limited to the pinned named/automatic declaration,
-resolution, dependency-transition, provider-view, property and action-routing
-category plus R2's selected-platform request and configured-action closure
-contract. Slug-native behavior remains DICE key shape, immutable configured
-owners, closure ordering and typed error storage. Configured aspects, inherited
-or built-in test-runner groups, unrelated action families, complete C++/Java
-semantics and exact Bazel configuration/output/ActionKey bytes remain deferred.
+## Predecessor stop and frozen evidence
 
-## Source authority and completed audit
+The corrected final Core candidate binary was compiled in 59.20 seconds and is
+frozen at SHA-256
+`6001c0a41074422961a36c08f6e4618df37db8182504ccc059aa46b4632b83d6`.
+Its complete supervised receipt is SHA-256
+`0df68baf746ca3916614ee2f103a7a64ab2116d9cd60bf37248ce40927699d8d`.
+The receipt preflighted 331 listed tests, exactly one ignored test and 330
+active selectors. In the approved host environment it recorded 313 passes,
+eight non-timeout exit-101 results and nine exact timeouts, with a durable row
+for every active selector. All seven selectors in
+`runtime::dice::tests::configured_action_conflicts_tests` passed, including the
+new cross-group conflict proof.
 
-Primary authority is Bazel commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` in `/home/wgray/bazel`. Its working
-HEAD is different and is not authority. The audit used these pinned objects:
+The eight non-timeout results are:
 
-- `packages/DeclaredExecGroup.java:43-149`;
-- `skyframe/toolchains/ToolchainContextUtil.java:169-244`;
-- `analysis/ExecGroupCollection.java:52-215`;
-- `analysis/RuleContext.java:457-476,1069-1142,1216-1229`;
-- `analysis/TargetContext.java:92-99`;
-- `analysis/starlark/StarlarkActionFactory.java:405-472,740-895`;
-- `analysis/starlark/StarlarkRuleContext.java:860-910,979-992`;
-- `analysis/starlark/StarlarkExecGroupCollection.java:45-159`;
-- `analysis/starlark/StarlarkToolchainContext.java:99-147`;
-- `analysis/starlark/StarlarkSubrule.java:434-475`;
-- `analysis/AutoExecGroupsTest.java:303-431,488-705,1243-1304` and
-  `analysis/StarlarkExecGroupTest.java` named transition, property and action
-  tests.
+- `runtime::dice::tests::build_command_tests::build_command_root_selects_each_terminal_producer_once_for_duplicate_targets`;
+- `runtime::dice::tests::build_command_tests::build_command_root_terminal_closure_retains_reused_and_clears_retry_only_batches`;
+- `runtime::dice::tests::build_command_tests::multi_target_exported_sources_do_not_enter_revision_bridge`;
+- `runtime::dice::tests::build_command_tests::public_external_single_uses_observed_family_and_full_source_certificate`;
+- `runtime::dice::tests::build_command_tests::resolved_run_view_reuses_exact_executable_filewrite_relation`;
+- `runtime::dice::tests::build_command_tests::root_exported_source_revision_bridge_retries_changed_terminal_and_preserves_epoch`;
+- `runtime::dice::tests::cquery_drives_only_the_requested_root_across_platform_retries`; and
+- `runtime::dice::tests::query_command_tests::direct_external_query_uses_host_route_native_materialization_and_apparent_output`.
 
-The preserved configured-target owner, independent group resolution,
-constraint-carrying resolution key, selected execution configurations,
-provider materialization, group property merge, raw/effective platform split,
-runfiles union and all-or-nothing publication agree with that source model.
-They remain unchanged. The audit found the following bounded mismatches in
-normalization and the synchronous action adapter.
+An unchanged-main comparison remains missing. Preparing a Core test binary at
+unchanged `main` `4824a0861` advanced through worktree-specific dependency
+layers but reached the 60-second preparation ceiling three times without
+selecting or running a test. This comparison is useful baseline attribution but
+cannot cure the timeout stop. Resume it only after this proof design is
+accepted; never run the nine prohibited timeout selectors on `main`.
 
-### Automatic identity has two source spellings
+The nine selectors that reached 12.004--12.008 seconds are:
 
-Bazel stores an automatic runtime group under
-`toolchainType.toolchainType().toString()`: a main-repository label is
-`//pkg:type`. `exec_group_compatible_with` instead canonicalizes a parsed key
-to `getUnambiguousCanonicalForm()`: the same label is `@@//pkg:type`.
-The preserved stack uses `CanonicalLabel::to_string()` (`@@//pkg:type`) for
-both roles and its public proof expects that spelling.
+- `runtime::dice::tests::build_command_tests::public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superset`;
+- `runtime::dice::tests::build_command_tests::public_singleton_observation_replays_lifecycle_and_isolates_legacy`;
+- `runtime::dice::tests::cquery_command_tests::cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots`;
+- `runtime::dice::tests::cquery_command_tests::cquery_executables_deps_filters_complete_closure_and_induces_edges`;
+- `runtime::dice::tests::cquery_command_tests::cquery_restores_structural_configuration_and_display_projection`;
+- `runtime::dice::tests::cquery_command_tests::cquery_uses_only_observed_families_and_replays_child_events_once`;
+- `runtime::dice::tests::cquery_deps_uses_the_retained_noimplicit_graph_with_null_sources`;
+- `runtime::dice::tests::real_build_command_drives_typed_analysis_and_cold_events_without_warm_replay`; and
+- `runtime::dice::tests::retained_runtime_restores_default_transition_configuration_after_explicit_override`.
 
-Keep `ConfiguredExecGroup::Automatic(Arc<CanonicalLabel>)` as the sole
-structural identity. Add one projection owned beside that enum for Bazel's
-runtime name: strip only the leading `@@` of the main repository and preserve
-external canonical names. Use it for `ctx.exec_groups`, retained `ActionSpec`
-group names, action-context lookup and target/platform `exec_properties` row
-matching. Use label equality, not a stored second string, for constraint
-normalization and action routing.
+Do not run these nine selectors again on either line. The earlier restricted
+sandbox attempt recorded only 291 passes, 39 exit-101 results and zero timeouts,
+lost exact failure membership to truncated console output and is inadmissible.
+The approved-host receipt supersedes it.
 
-### Constraint keys use the target package context
+The direct REAPI compile preparation also reached 60 seconds before producing
+a test executable. All remaining REAPI/server/compile/final-review gates were
+stopped after the mandatory Core timeout boundary; their earlier focused passes
+remain valid only where their binaries and relevant source stay unchanged.
 
-Pinned `ToolchainContextUtil` treats a valid identifier exclusively as a public
-named group. An absent named group fails even if the same text could parse as a
-relative toolchain label. A nonidentifier may denote an automatic group only
-when automatic policy is active; Bazel parses it with the target package and
-the target package's repository mapping, verifies membership in the rule's
-default toolchain requirements, then stores its unambiguous canonical form.
+## Semantic owners and proof rule
 
-Split the preserved shared qualifier helper. `exec_group_compatible_with`
-gets the source algorithm above and may not address Default. `exec_properties`
-uses exact runtime row names: `default-exec-group`, declared public names and
-the runtime automatic projection. Unknown target rows fail. Platform rows are
-parsed identically but unknown rows remain unused. An empty property suffix is
-retained because pinned `parseExecProperties` accepts it. Property precedence
-stays platform-default < platform-group < target-default < target-group.
+The proof remains attached to the real owners named in the timed bodies:
 
-Pass the already retained `LoadedPackage::runfiles_package()` package identity
-and mapping into normalization. This is a borrowed/Arc-backed input to phase
-scratch, not a new retained semantic owner. Source/package/mapping changes are
-already DICE inputs to the loaded package and configured parent.
+- `WorkspaceRuntime::{build_command_with_bzlmod_inputs,cquery_command_with_bzlmod_inputs}`
+  owns public command driving, accepted terminal publication and event replay;
+- `BuildCommandRootKey`, `BuildCommandRootObservationKey` and their observed
+  terminal/source certificates own build root results, dependencies and
+  lifecycle;
+- configured target keys and structural configurations own target/transition
+  identity, output roots and C0/C1/C0 restoration;
+- `CqueryCommandEvaluation` owns ordered result sets, configured analyses and
+  induced graph projections; and
+- accepted native demand snapshots and activation audits observe retained
+  path epochs and route-family use without becoming semantic state.
 
-### Action toolchain strings use the target package context
+The repository DICE guidance in `docs/developers/dice.md` remains binding:
+warm reuse must be explained by tracked dependencies, and a silent timeout may
+signal lock/re-entry trouble. Therefore a replacement for a public root or DICE
+lifecycle assertion must execute that same real owner. Every table row preserves
+the original public command expression or expressions, the outer `Ok`/`Err`
+classification and the terminal `Ok`/`Err` classification. Test-only helpers
+may factor fixture construction or assertions over the returned evaluation;
+they may not synthesize an evaluation, substitute a direct set/graph call or
+eliminate a command. No mock, fresh-graph bypass, observer, diagnostic
+supervisor, deleted assertion, changed expectation, semantic repair or longer
+deadline is allowed.
 
-Pinned `determineExecGroup` parses every string `toolchain=` value with
-`RuleContext.getPackageContext()`, which is the analyzed target's package and
-repository mapping. This differs intentionally from string indexing of
-`ctx.toolchains`, whose `LabelConverter.forBzlEvaluatingThread` uses the
-executing Bzl definition context. The preserved action adapter incorrectly
-uses the definition context for both.
+## Assertion-to-owner table
 
-Give the action sink the same already retained target package/mapping view.
-Parse a `toolchain=` string before automatic-policy routing, so malformed
-strings fail even when automatic groups are disabled. Typed Label values remain
-unchanged. Do not alter `ctx.toolchains` string lookup.
+Line references identify every semantic assertion and command return path in
+the frozen nine bodies. Fixture-construction `unwrap` calls before a command
+are setup preconditions; each command success/error `unwrap`, terminal branch
+and assertion is included in the ranges below.
 
-Pinned root action handling performs subrule overrides first, then lowers the
-supported `executable` and `tools` fields, and only then calls
-`determineExecGroup`. Preserve that outer order. Parsing `toolchain=` precedes
-group existence, public-name and membership checks only inside
-`determineExecGroup`; it does not precede executable/tools conversion. A
-combined malformed-toolchain/invalid-tools proof must therefore report the
-invalid-tools error.
+| Frozen selector and source range | Owned claim/return path | Required replacement selector |
+|---|---|---|
+| `public_singleton...`, `build_command_tests.rs:2169-2184` | Real build cold terminal, exact module/package events, no repository requests and observed-only root activation | `public_singleton_cold_terminal_events_and_observed_route` |
+| same, `2186-2195` | Warm command emits no events and reuses every retained path-observation Arc | `public_singleton_warm_reuses_epoch_without_event_replay` |
+| same, `2196-2209` | Real edit changes the terminal, delete errors and recreate restores the original A terminal | `public_singleton_edit_delete_restore_lifecycle` |
+| same, `2211-2216` | Legacy exact-target request does not activate the observed family and does activate legacy | `public_singleton_legacy_route_isolation` |
+| `public_multi...`, `build_command_tests.rs:2602-2630` | Real three-root cold order, target/source/analysis shapes and selected repository request/validation inventory | `public_multi_cold_aggregates_targets_and_repository_inputs` |
+| same, `2632-2701` | Observed root equals public result, is a dependency subset, validates superset association, certificates both sources by shared Arc, orders revision before source dependencies and excludes neutral/legacy roots | `public_multi_observed_superset_certificate_and_dependency_order` |
+| same, `2702-2735` | Warm silence, source edit to `ONE` with certificate bytes/Arc verification, then a silent restore command | `public_multi_source_edit_restore_without_event_replay` |
+| same, `2737-2783` | Analysis error publishes no events/selected repository state, stays observed-only and a corrected fresh runtime recovers | `public_multi_analysis_failure_is_atomic_and_recovers` |
+| `cquery_executables...`, `cquery_command_tests.rs:61-102` | Public cquery depth 0/1/full executable filtering, repeated configured analysis/label occurrences, kinds and induced root/direct edges | `cquery_executables_depth_and_complete_closure` |
+| same, `104-159` | Reverse self/0/full selection, distinct configurations, depth bounds, induced edges and empty bridge case | `cquery_executables_reverse_depth_and_edges` |
+| same, `161-234` | `filter`, `kind` and chained executable projections preserve every admitted text/graph view | `cquery_executables_filter_kind_composition` |
+| same, `236-324` | Depth 0/1/2/max composition matrices and empty filter/kind outputs | `cquery_executables_depth_boundaries_and_empty_results` |
+| `cquery_evaluates...`, `cquery_command_tests.rs:486-526` | Empty set/let returns no results or roots; oversized count fails request parsing before activation | `cquery_set_empty_and_count_preflight` |
+| same, `527-587` | Ordered union/set/let/intersect/except/filter/some semantics and deduplication | `cquery_set_ordered_operators_filter_and_some` |
+| same, `588-606` | Empty/zero/negative `some` returns the declared terminal error | `cquery_some_empty_zero_and_negative_errors` |
+| same, `607-676` | Starlark labels, missing-target precedence over malformed nested regex and malformed-regex terminal | `cquery_set_starlark_and_error_precedence` |
+| `cquery_restores...`, `cquery_command_tests.rs:716-799` | Public C0/C1/C0 structural option, display projection, topology and event behavior | `cquery_configuration_c0_c1_c0_projection_and_topology` |
+| same, `801-827` | Missing-target envelope, fresh-runtime equality and default build-setting configuration | `cquery_configuration_missing_fresh_and_setting_default` |
+| same, `829-845` | Parent dependency uses the transitioned child configuration | `cquery_configuration_transitioned_child` |
+| `cquery_uses_only...`, `cquery_command_tests.rs:941-985` | Real cold event order, a nonempty cold path-observation epoch, warm silence and equal/pointer-identical retained path results | `cquery_observed_cold_warm_events_and_epoch_reuse` |
+| same, `988-1011` | Target/union/rdeps requests avoid legacy package/analysis families and activate only the required observed families | `cquery_observed_family_route_isolation` |
+| `real_build_command...`, `dice.rs:8996-9026` | Real cold build counts and exact module/Bzl/BUILD/analysis event order | `real_build_cold_counts_and_event_order` |
+| same, `9028-9076` | Warm silence, explicit configuration change, output-root distinction and C0 restoration | `real_build_warm_transition_restore_and_output_root` |
+| same, `9078-9101` | Empty roots return empty counts; missing target returns typed exact diagnostic after loading events | `real_build_empty_and_missing_target_terminal` |
+| `retained_runtime...`, `dice.rs:9207-9288` | Parent C0/C1/C0 identity, analysis-event cutoff, topology equality and distinct output roots | `retained_configuration_c0_c1_c0_topology_and_events` |
+| same, `9290-9317` | Fresh default equality/projection and transitive left-transition child | `retained_configuration_fresh_and_transitive_transition` |
+| same, `9319-9350` | Top/parent reanalysis excludes unchanged consumer; direct setting stays default | `retained_configuration_top_change_and_setting_default` |
+| `cquery_deps_uses...`, `dice.rs:9531-9619` | Request rejection without `--noimplicit_deps`, depth-zero/full ordered results, null nodes/kinds and distinct ordinary configurations | `cquery_deps_preflight_depth_null_and_identity` |
+| same, `9621-9696` | Structural kind/filter projections, zero induced edges and duplicate configured identity | `cquery_deps_structural_filter_and_duplicate_identity` |
+| same, `9698-9839` | Normalized topology plus reverse depth negative/0/1/full nodes, edges and formats | `cquery_deps_reverse_depth_and_topology` |
+| same, `9840-9932` | Direct/normalized and filtered rdeps preserve labels, kinds, Starlark, graph and configured keys; selected subgraph keeps induced edges | `cquery_deps_rdeps_composition_and_selected_subgraph` |
+| same, `9933-10083` | Empty filter, kind depth boundaries, aliases, inner-depth normalization and negative composition | `cquery_deps_filter_kind_and_inner_depth_boundaries` |
+| same, `10084-10169` | Broken/unreachable/missing/regex/universe/default-seed precedence, transitioned seed and BUILD edit/restore | `cquery_deps_errors_transition_and_edit_restore` |
+| same, `10171-10237` | Deps depth 1/2/max topology closure and include-tool equivalence | `cquery_deps_depth_closure_and_tool_flag_equivalence` |
 
-### Root omitted-toolchain provenance preserves Starlark shape
+The frozen 313-pass receipt additionally retains direct discriminators such as
+`observed_multi_reducer_and_selected_superset_preserve_total_order_and_arcs`,
+`observed_build_replays_lifecycle_and_cancellation_without_parent_publication`,
+`prepared_command_configuration_keeps_distinct_transitioned_children`,
+`cquery_executables_uses_rule_capability_order_and_full_key_dedupe`,
+`cquery_evaluator_terminal_classification_is_narrow`, and the focused cquery
+Need/error/cancellation selectors. They support the owner mapping but do not
+replace the real public-command selectors named above.
 
-Pinned action code allows an omitted `toolchain` with an executable File when
-that File maps to an executable dependency's `FilesToRunProvider`, and with a
-`FilesToRunProvider` only when the complete provider equals one from an
-executable dependency in the current root scope. A provider or File from
-`ctx.toolchains` is unassociated. A top-level `tools=depset(...)` is flattened
-and each element is checked for executable-dependency association, so an
-associated root executable File may omit `toolchain`. A depset nested in a
-tools sequence is opaque and unconditionally invokes the omitted-toolchain
-check; with multiple automatic contexts it requires an explicit toolchain or
-explicit `None` even when its artifacts came from executable dependencies.
+## Scope, caps and validation
 
-Extend the existing attempt-local `ExecutableArtifactProvenance` with provider
-equality lookup; add no retained registry. The root ambiguity classifier must
-keep the original Starlark shape long enough to flatten a top-level depset but
-classify a sequence-nested depset as opaque, compare direct Files and providers
-against root executable dependencies, and remain inactive when automatic mode
-has only Default or when `toolchain` is present.
+Production additions are exactly zero. Test edits are limited to:
 
-### Explicit group validation preserves source precedence
+- `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`;
+- `app/slug_core_v2/src/runtime/tests/cquery_command_tests.rs`; and
+- the `#[cfg(test)]` module in `app/slug_core_v2/src/runtime/dice.rs`.
 
-Pinned `determineExecGroup` parses `toolchain=` first, then verifies that an
-explicit group row exists, then applies public identifier validation, then—only
-under automatic policy—checks toolchain membership. Thus an existing automatic
-runtime name or `default-exec-group` supplied as `exec_group=` fails public-name
-validation, while an absent invalid spelling fails as unknown before name
-validation. The preserved adapter validates identifier syntax before row
-existence.
+Plan receipts may update this packet, Stage 6 and the canonical plan. No
+analysis, loading, configuration, CLI, REAPI, server, query, Cargo/BUILD,
+fixture or production Core code may change.
 
-Lookup explicit strings across the complete collection by runtime name, then
-validate public syntax, and finally require `Named` identity. Preserve unknown
-group failure without Default fallback and the existing automatic-mode
-membership rule. Do not expose automatic groups through explicit
-`exec_group=`.
+The table requires 34 replacement selectors. Shared test-only fixture builders
+may reduce repeated setup but may not cache semantic state across selectors.
+Cap gross proof additions at 1,100 Rust lines. Physical caps are 4,350 lines
+for `build_command_tests.rs`, 1,500 for `cquery_command_tests.rs` and 13,250 for
+`dice.rs`. These large files remain cohesive for this packet because the first
+two are owner-specific included test modules and the third may change only its
+existing test module. A new production owner, new semantic helper, fixture
+file, or cap excess requires replan.
 
-### Subrule action overrides remain closed
+After independent design acceptance, split the tests without changing any
+assertion value. Compile one final Core test binary under the 60-second
+preparation ceiling. Preflight all 34 exact new names against that binary, then
+run each once with the standing 12-second command deadline and 15-second
+absolute ceiling. A single timeout replans. Preserve the frozen 313 passes; do
+not rerun the nine removed names or broaden into another full-Core sweep.
 
-Pinned `StarlarkSubrule` permits omitted or explicitly `None` `exec_group` and
-rejects only a non-`None` value. It rejects every supplied `toolchain`, including
-explicit `None`, and checks `exec_group` before `toolchain`, so a call with both
-invalid reports the execution-group error. With configured subrule toolchains
-absent, an omitted toolchain is overridden to explicit `None`, selects Default
-and never consults provider association for ambiguity. Slug already defers
-configured subrule toolchains but currently sends the unmodified request
-through the root action adapter.
-
-Carry the existing schema executable bit into subrule configured-attribute
-scratch so executable lookup has the correct scope. A matching executable File
-must fail before routing with `expected FilesToRunProvider, got File`; the
-matching `FilesToRunProvider` form is admitted, but its association does not
-control ambiguity. Use `AnalysisActionCallScope::Subrule` in the existing sink
-to enforce these conversion and override distinctions and Default selection.
-Add no subrule group or toolchain semantics.
-
-## Implementation scope and limits
-
-Production edits are limited to:
-
-- `app/slug_analysis_v2/src/exec_group.rs`;
-- `app/slug_analysis_v2/src/execution_groups.rs`;
-- `app/slug_analysis_v2/src/dice.rs`;
-- `app/slug_analysis_v2/src/starlark_rule.rs`;
-- `app/slug_analysis_v2/src/files_to_run_spawn.rs`;
-- `app/slug_analysis_v2/src/result.rs` only for the shared runtime-name
-  projection.
-
-Proof edits are limited to
-`app/slug_analysis_v2/tests/starlark_rule.rs` and unit tests beside the changed
-analysis owners, plus the one existing
-`configured_action_specs_route_every_group_without_fallback` selector in
-`app/slug_analysis_v2/tests/configured_target.rs`. Plan receipts may update this packet, Stage 6, bootstrap
-readiness, the canonical plan and configured CLI ledger. No loading,
-configuration, Core, CLI, REAPI, server, query, Cargo/BUILD, fixture or Bazel
-source may change.
-
-The correction cap is 210 gross production and 520 gross proof Rust additions.
-Existing Phase B physical caps become 820 lines for `execution_groups.rs`,
-7,150 for `dice.rs`, 2,550 for `starlark_rule.rs` and 13,500 for its integration
-test. If the first three files need a new retained owner, if a mapping must be
-copied into a new semantic carrier, or if any cap is exceeded, stop and replan.
-
-## Ordinary correctness proofs
-
-Before execution, preflight every exact selector against its produced binary.
-Prepare one target at a time with the pinned nightly and shared target directory;
-each compile has a 60-second ceiling. Each exact test has a 12-second deadline
-and 15-second absolute ceiling. No diagnostic observer, supervisor,
-instrumentation, authentic configured CLI conflict replay or F3 is admitted.
-
-Correct and run these execution-group selectors exactly:
-
-- `execution_groups::tests::normalization_preserves_named_constraint_only_and_automatic_groups`;
-- `execution_groups::tests::automatic_constraint_keys_use_target_mapping_and_reject_identifier_aliases`;
-- `execution_groups::tests::runtime_names_and_property_rows_follow_bazel_canonical_form`;
-- `execution_groups::tests::property_precedence_target_default_beats_platform_group`;
-- `execution_groups::tests::unknown_target_group_prefixes_fail_and_unknown_platform_prefixes_are_unused`;
-- `automatic_exec_group_policy_obeys_attribute_over_flag_aba`;
-- `automatic_exec_group_projects_default_labels_from_automatic_rows_and_indexes_all_nondefault_rows`;
-- `automatic_exec_group_routes_run_and_run_shell_across_the_complete_parameter_matrix`;
-- `automatic_action_toolchain_strings_use_target_package_and_repository_mapping`;
-- `automatic_action_group_validation_preserves_existence_and_name_precedence`;
-- `subrule_action_group_and_toolchain_parameters_preserve_bazel_override_boundary`;
-- `named_exec_group_resolves_independent_toolchains_constraints_and_provider_view`;
-- `named_exec_transition_preserves_ordinary_and_configured_rows_uses_selected_platform_and_rejects_unknown`;
-- `configured_action_context_distinguishes_default_named_and_automatic_groups`;
-- `configured_action_specs_route_every_group_without_fallback`.
-
-The action matrix must discriminate run and run_shell, automatic off/on,
-omitted/None/Label/string toolchain, target versus definition package context,
-apparent target mapping, valid/unknown/malformed toolchain labels, associated
-and unassociated executable Files and FilesToRunProviders, direct tools,
-associated and unassociated top-level depsets, opaque sequence-nested depsets,
-string executables, valid/unknown/invalid/default/automatic explicit groups,
-and compatible/mismatched group-toolchain pairs. A combined malformed
-toolchain/invalid-tools call must prove that supported-field lowering precedes
-group selection. The subrule matrix must separately prove omitted and explicit
-`None` `exec_group`, non-`None` `exec_group`, omitted and explicit `None`
-`toolchain`, both-invalid error precedence, rejection of a matching executable
-File, admission of its FilesToRunProvider, Default selection without provenance
-ambiguity, and continued deferral of configured subrule toolchains.
-
-Re-run these selected-request selectors exactly:
-
-- `selected_toolchain_request_keys_keep_configuration_and_distinct_structural_identity`;
-- `selected_toolchain_request_keeps_parent_options_and_nonfirst_platform`;
-- `selected_toolchain_request_interleaves_full_keys_and_restores_source_properties`;
-- `selected_toolchain_request_clears_ordinary_edges_and_alias_actual`;
-- `selected_toolchain_request_preserves_preference_through_incoming_transition`;
-- `selected_toolchain_request_selection_priority_fallback_and_alias_lookup`;
-- `selected_toolchain_request_known_target_outside_registration_empty_and_optional`;
-- `selected_toolchain_request_observed_need_cancellation_and_error_recover`.
-
-Run all exact tests in Core's
-`runtime::tests::configured_action_conflicts_tests`. Run the two direct REAPI
-selectors
-`configured_file_write_reapi_plan_reads_retained_platform_properties` and
-`selected_toolchain_request_reapi_payload_is_not_owner_identity`, the direct
-server selector
-`reapi_materialization_uses_distinct_and_restored_structural_configuration_roots`,
-and query/server/CLI compile checks.
-
-The earlier Core reconciliation compiled one library binary, preflighted 329
-active selectors, passed 309, and attributed 13 identical assertion failures to
-current main. Seven bounded commands hit the common 12-second resource ceiling
-on both lines, but their exact membership was not retained as an acceptance
-receipt. Replace the complete Core batching receipt: using the compiled final
-binary, run all 329 active selectors as separate preflighted exact commands
-once. Compare any semantic failure exactly to unchanged current main. A single
-exact timeout blocks acceptance and causes a source/test-boundary replan; it
-does not authorize more instrumentation or a longer deadline.
-
-The completed diagnostic chain showed that authentic CLI conflict selectors
-enter `RootCompute` and exhaust the deadline before their command assertions.
-Repeating them cannot establish R2 correctness. Their bounded replacements are
-the complete direct configured-action-conflict module, the selected-request
-analysis proofs, the direct REAPI/server consumers, CLI compile linkage and a
-source review of the two-line CLI closure-consumer call site. This replacement
-set and the final evidence require independent acceptance review.
-
-Run pinned `cargo fmt --all -- --check`, `git diff --check`, scope/growth checks,
-`python3 scripts/v2_plan_status.py`, clean-worktree checks and independent final
-invariant review. Commit the reviewed design before runtime edits, commit the
-correction after focused proofs, and commit the acceptance receipt separately.
+Run `cargo fmt --all -- --check`, `git diff --check`, scope/growth checks and
+`python3 scripts/v2_plan_status.py`. Independent final review must compare the
+new selectors against every table row and confirm that public root/DICE claims
+still execute the real owner. After that proof passes, resume the eight-selector
+unchanged-main attribution and the predecessor's remaining direct
+REAPI/server/compile/final-review gates. Only complete predecessor acceptance
+may merge the atomic stack, create an acceptance receipt on `main` and push
+`main` to the already authorized ZeromatterOSS remote.
 
 ## Stops
 
-Return `REPLAN` if source comparison reveals another semantic owner or key
-family, a correction changes selected-request or FileWrite equivalence, an exact
-ordinary proof times out, the target package mapping is unavailable without a
-new carrier, or independent review rejects the replacement acceptance boundary.
-Do not infer performance work from the completed diagnostics, repeat an
-activation/path/invalidation measurement, run an authentic conflict selector,
-run F3, merge a partial stack or push the feature branch.
+Return `REPLAN` for any production change, weakened/removed assertion, mock or
+fresh-graph substitute for a public lifecycle claim, new semantic owner,
+timeout, cap excess or rejected independent coverage review. Do not run the
+nine frozen selectors, the completed diagnostic chain, an authentic configured
+CLI conflict selector or F3. Do not merge a partial stack or push the feature
+branch.

@@ -1335,12 +1335,34 @@ reject a matching executable File in favor of its `FilesToRunProvider`. An
 omitted subrule toolchain becomes explicit `None` and selects Default.
 
 Acceptance uses ordinary correctness proofs. Compile the corrected final Core
-candidate first, then preflight and run all 329 active selectors separately;
+candidate first, then preflight and run all 330 active selectors separately;
 earlier binaries do not qualify. Focused analysis, selected-request,
 configured-conflict, direct REAPI/server and compile gates complete the
 replacement boundary. Do not repeat the finished diagnostic chain, run an
 authentic configured conflict selector or run F3 before atomic R2/group
 acceptance.
+
+## Core source/test-boundary reconciliation (2026-09-15)
+
+The final corrected Core binary
+`6001c0a41074422961a36c08f6e4618df37db8182504ccc059aa46b4632b83d6`
+completed an atomic 330-selector approved-host receipt: 313 pass, eight
+non-timeout assertion results and nine exact 12-second timeouts. The complete
+receipt hash is
+`0df68baf746ca3916614ee2f103a7a64ab2116d9cd60bf37248ce40927699d8d`.
+All configured-action-conflict selectors pass, including the cross-group
+addition, but one timeout is sufficient to reject acceptance. Preserve
+implementation commit `1b09dbfa1` unaccepted; no merge or push occurred.
+
+The next packet is proof-only. It freezes production and replaces the nine
+over-broad public build/cquery tests with 34 smaller exact selectors mapped to
+every assertion and semantic return path. Real public root and DICE lifecycle
+claims keep their original owners and public command calls; test-only helpers
+may factor fixture setup or returned-evaluation assertions but cannot synthesize
+an evaluation or eliminate a command. Do not rerun the nine original names,
+weaken assertions, lengthen deadlines, resume diagnostics, or run F3. After
+independent design review, the replacement selectors must each pass within the
+same 12/15-second limits before remaining R2/group acceptance gates resume.
 
 ## Configurable native alias prerequisite (2026-09-14)
 

@@ -29,28 +29,25 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-6-7A-r2-execution-group-source-invariant-reconcile-r2
-Status: Phase B ready; independent architecture review ACCEPT
+Packet: WP-4-6-7A-r2-core-source-test-boundary-reconcile-r1
+Status: Phase B ready; independent design review ACCEPT
 
-Reconcile the preserved selected-request/output-conflict R2 and
-named/automatic execution-group stack as one atomic checkpoint. The completed
-audit against pinned Bazel commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` freezes the two automatic-label
-spellings, target-package parsing and mapping, exact property rows, supported
-action-field order, root executable provenance, top-level versus nested depset
-handling, explicit-group precedence and the closed subrule override boundary.
-The existing configured owner, resolution, transition, provider, property,
-runfiles and atomic-publication architecture stays unchanged.
+The reconciled selected-request/configured-conflict and execution-group stack
+remains unaccepted at local commit `1b09dbfa1`. Its frozen Core binary passed
+313 of 330 active selectors in the approved host environment, produced eight
+non-timeout assertion results and hit the exact 12-second deadline in nine
+over-broad public build/cquery selectors. The complete receipt and binary are
+hashed in the current packet. A timeout cannot be waived or retried.
 
-Independent review accepts the bounded correction scope and ordinary proof
-replacement. Build the corrected final Core candidate binary before
-preflighting and running all 329 active selectors as separate exact commands;
-earlier binaries are inadmissible. Run the focused analysis, selected-request,
-configured-conflict, direct REAPI/server and compile gates under the standing
-limits. No diagnostic observer, authentic configured CLI conflict replay or F3
-belongs to this packet. After final review, integrate the stack atomically,
-record acceptance on `main`, and push only `main` to the authorized
-ZeromatterOSS remote.
+Run the proof-only source/test-boundary packet next. Its assertion-to-owner
+table partitions every claim and semantic return path from the nine timed
+bodies into 34 smaller exact selectors while preserving real public-command
+and DICE lifecycle ownership. Production is frozen, the nine original names
+may not run again, and independent design review precedes test edits. After the
+replacement set passes and final coverage review accepts it, resume the eight
+unchanged-main assertion comparisons and the remaining direct consumer gates.
+Only complete atomic acceptance may merge to `main` and push `main` to the
+authorized ZeromatterOSS remote.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
