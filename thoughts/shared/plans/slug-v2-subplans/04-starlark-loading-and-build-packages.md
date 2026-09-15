@@ -9060,3 +9060,15 @@ a post-sharding `PathObservationDemand` identity/outcome census. It must
 distinguish first-seen from repeated exact identities and `Complete` from
 retry-producing `Need`, publish aggregates without physical paths, and select
 only another reviewed causal audit.
+
+The selected docs-first census runs at `PathObservationKey::compute`, after the
+64-way shard choice. It privately caps exact demand identity at 4,096 and emits
+only double-buffered aggregate first/repeat and Complete/Need cutoff snapshots
+through a separate sealed descriptor. The existing observer and path semantics
+remain unchanged; identity bytes never leave the process.
+
+The target-gated protocol fixes little-endian selector/frame offsets and an XOR
+checksum. Separate workspace and Core selectors prove census semantics and the
+sealed-descriptor boundary. A fully written newer inactive frame remains
+unselected, persistent writer failure only leaves an earlier cutoff, and fewer
+than 128 recorded entries forces replan.

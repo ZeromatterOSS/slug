@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-configured-conflict-key-type-count-audit-r1
-Status: key-count audit complete; path identity/outcome census selected
+Packet: WP-4-7A-configured-conflict-path-census-audit-r1
+Status: design accepted; diagnostic execution pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -69,6 +69,16 @@ total compute starts, 1,626 external-Bzl and 2,543 path-observation compute
 starts, with zero overflow/drops and complete PID/cleanup evidence. Result
 review selected only a bounded post-sharding `PathObservationDemand`
 identity/outcome census; the extant external-child union must not change.
+
+The active docs-first census retains at most 4,096 exact path demands privately
+at the natural post-sharding key owner and publishes aggregate first/repeat and
+Complete/Need cutoff snapshots through a second sealed diagnostic channel. It
+cannot disclose identities or select semantic work.
+
+The protocol is target-gated like the native observer and freezes two
+little-endian checksummed frames plus a selector. Workspace semantics and a
+separate Core descriptor/delegation selector must pass; a clear frame is only
+an earlier committed cutoff, and fewer than 128 entries forces replan.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

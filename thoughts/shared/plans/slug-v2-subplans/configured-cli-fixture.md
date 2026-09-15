@@ -424,6 +424,17 @@ CLI replay. A reviewed split preparation must complete the feature Core library
 before one fresh bounded unit-harness preparation; diagnostic source and
 supervisor hashes remain fixed.
 
+The active docs-first census retains exact path-demand identities only in a
+4,096-entry process-local set at the post-sharding key owner. A second sealed
+512-byte channel publishes only committed aggregate first/repeat and
+Complete/Need cutoff snapshots. One reviewed replay remains the sole CLI
+authority; F3 and sibling selectors stay stopped.
+
+The fixed little-endian dual-frame protocol needs separate workspace semantic
+and Core descriptor proofs. Its decoder retains an older selected frame even
+when a complete valid newer frame was not committed. A clear frame proves only
+that earlier cutoff; a snapshot below 128 entries is too weak and forces replan.
+
 The split passed; the one replay recorded same-cutoff compute starts of 8,094
 total, 1,626 external-Bzl and 2,543 path-observation events. All observer and
 cleanup gates passed. Result review selected only a bounded post-sharding path

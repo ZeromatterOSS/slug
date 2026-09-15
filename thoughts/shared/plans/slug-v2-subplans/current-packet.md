@@ -1,203 +1,177 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-7A-configured-conflict-key-type-count-audit-r1
-Status: audit complete; path identity/outcome census selected
+Packet: WP-4-7A-configured-conflict-path-census-audit-r1
+Status: design accepted; diagnostic execution pending
 
 ## Observable result
 
-Measure exact current DICE event counts for
-`ExternalBzlModuleObservationKey` and `PathObservationKey` during one bounded
-replay of the already selected configured-conflict test. The predecessor's
-latest activity tag was only a sample and its 8,003 compute starts are
-motivation, not the denominator for this replay. This audit compares each named
-category only with the six total counters captured at the same cutoff. It does
-not attribute CPU time, prove retry causation, select a semantic change or
-accept the combined R2/execution-group stack.
+Run one bounded, same-selector post-sharding `PathObservationKey` census. At
+the natural key owner, count exact `PathObservationDemand` identities as first
+seen or repeated and classify completed key computations as `Complete` or
+`Need`. Publish only fixed aggregate cutoff snapshots. This audit distinguishes
+distinct cold path breadth from repeated completed observations and
+retry-producing needs; it does not disclose paths, attribute CPU cost, prove an
+invalidation or call-site cause, select an optimization or accept the combined
+R2/execution-group stack.
 
-The accepted generated-path implementation remains at `b75291517`. The
-reviewed predecessor audit is recorded at `89e3ad084`: exact selector listing,
-valid observer PID/reap identity, zero overflow and dropped samples, released
-activity claim, complete cleanup, `RootCompute`, and total counters
-52,360/52,350 starts/finishes, 46,028/46,021 dependency-check
-starts/finishes, and 8,003/8,000 compute starts/finishes. Its complete latest
-tag was an external-Bzl observation finish. The other nine configured-conflict
-selectors and F3 remain stopped.
+The reviewed key-type audit at `9d2d470b6` recorded same-cutoff compute starts
+of 8,094 total, 1,626 external-Bzl and 2,543 path-observation events, with valid
+PID, overflow, sampling, output and cleanup evidence. Those separate atomic
+counters are diagnostic, not an exact partition. Independent result review
+selected only this path census. The historical external identity census already
+selected the sibling-need union still present in `bzl_module.rs`; do not repeat
+that audit or modify the union. The other nine configured-conflict selectors
+and F3 remain stopped.
 
-## Compatibility and bounded diagnostic owner
+## Census owner, identity and bounds
 
-Reuse the opt-in `native-probe-observer` and its existing fixed 512-byte sealed
-mapping. Words 0 through 50 own the accepted header, lifecycle state, six total
-counters and double-buffered phase/activity frames. Words 51 through 63 are
-currently unused and zero. In temporary feature-only code, assign words 51--56
-to the six DICE event kinds for the exact static tag
-`ExternalBzlModuleObservationKey`, words 57--62 to the same event kinds for
-`PathObservationKey`, and word 63 to twelve independent filtered-counter
-overflow bits. Keep the existing header, version, size, seals, total counters,
-sampling, claim/drop behavior and frames unchanged.
+Temporarily extend `app/slug_workspace_v2/src/path_observation.rs`, beside
+`PathObservationKey::compute`. Install one process-local census before the
+selected call begins. Its private state owns a `HashSet<PathObservationDemand>`
+under one mutex and uses the type's existing exact `Eq`/`Hash`: namespace,
+normalized absolute path, operation and any raw Windows input all participate.
+Cap the set at 4,096 identities. Refuse a new identity at capacity, set a sticky
+capacity-overflow flag and leave it unclassified; any overflow invalidates the
+audit. Retained identities and the census disappear with the test process.
+Target-gate the temporary census owner, install API and proof to Linux x86-64,
+little endian and 64-bit atomics, exactly matching Core's observer envelope.
 
-In `Observer::record_event`, increment the existing independent total counter
-first. Before the existing sampling return, compare the supplied static tag to
-the two exact names and increment at most one corresponding filtered counter.
-Set overflow bit `group * 6 + event_kind` only if that filtered counter wraps.
-No tag prefix, hash, dynamic identity, key value, path or retained allocation is
-admitted. The filtered counters observe callbacks already emitted by DICE and
-cannot affect dependency recording, key equality, computation order, source
-preparation, terminal selection or publication. Their extra comparisons and
-atomics make timing noncomparable and cannot support a performance claim.
+On every `PathObservationKey::compute` entry, classify the demand as first-seen
+or repeated under the mutex and increment `entered`, `first_seen` or `repeated`.
+After the existing shard/fallback logic produces its unchanged `PathOutcome`,
+increment exactly one of `first_complete`, `first_need`, `repeat_complete` or
+`repeat_need` for the entry classification. Cancellation or termination between
+entry and return may leave `entered` greater than the four outcome counters;
+publish that difference as in-flight cutoff work. Do not hold the census mutex
+across an await. Do not change the shard, epoch fallback, key equality,
+validity, demand projection or returned value.
 
-Use the same frozen temporary CLI adapter accepted by the predecessor: remove
-only the `slug_cli_v2` integration-build feature guard, adopt only
-`SLUG_SENTINEL_OBSERVER_FD` once in the exact test, install one `ProbeGuard`
-immediately before the unchanged `one_shot_case("build")`, and hold it until
-return or supervisor termination. No helper, request, fixture or test behavior
-may change.
+The census retains no result, source, DICE key, epoch or call-site state. It
+publishes no identity, hash, namespace, operation or physical/logical path.
+Only the capacity, sequence, entered, first/repeated, four outcome counts,
+overflow/error flags and installed PID cross the diagnostic boundary.
 
-## Diagnostic proof and replay
+## Fixed aggregate channel
 
-Add one temporary exact Core observer unit selector,
-`filtered_key_type_counters_are_exact_independent_and_bounded`. It emits each
-of the six DICE event kinds for both admitted tags, proves the twelve exact
-cells, proves a nonmatching tag changes only the existing total counter, and
-forces one filtered wrap to prove the corresponding word-63 overflow bit
-without changing another filtered counter or filtered-overflow bit. Assert the
-corresponding total increment and every deterministic sampling side effect.
-Preserve the existing observer size/lifecycle tests.
+Keep the accepted 512-byte DICE observer mapping unchanged. The excluded
+scratch supervisor creates a second independent 512-byte zeroed memfd, seals it
+against grow/shrink/further seals, and passes it only as
+`SLUG_PATH_CENSUS_FD`. The temporary CLI adapter adopts that descriptor once
+and transfers it through a feature-only Core wrapper to the workspace census;
+the existing `SLUG_SENTINEL_OBSERVER_FD` adoption and one `ProbeGuard` remain
+otherwise byte-identical. Core validates that the census descriptor is an exact
+read-write regular file with the required seals and without `F_SEAL_WRITE`
+before delegation. No Cargo manifest or feature graph changes.
 
-The first cold feature-enabled Core unit-harness preparation reached its
-60-second ceiling after compiling dependencies and entering `slug_core_v2`.
-Exit 124 produced no test executable; no selector, self-check or CLI replay ran.
-The temporary Rust source diff SHA-256 was
-`bbb1a74bd80e8f9f3f992b8aec3c348b4daf0aefadc66c0dfd1e354f435f875e` and the
-scratch supervisor SHA-256 was
-`ddf88c7dea14f73d227d2a3fd6b52a06dedef68411477f33eede8b93ea0fb771`.
-All temporary files were restored and both worktrees proved clean.
+The workspace census converts the owned descriptor to `std::fs::File` and uses
+target-gated positional standard-library file writes, not mmap or a new
+dependency. Every word is encoded little endian. Word 0 is the selector and
+must equal 1 or 2. Frame 1 occupies words 1--15 and frame 2 words 16--30; words
+31--63 remain zero. Each 15-word frame is, in order: magic
+`u64::from_le_bytes(*b"SLGPTH01")`, version 1, installed PID, monotonically
+increasing sequence, capacity 4,096, `entered`, `first_seen`, `repeated`,
+`first_complete`, `first_need`, `repeat_complete`, `repeat_need`, capacity-
+overflow flag, reserved-zero, and checksum. The checksum is the fixed seed
+`0x534c554750415448` XOR every preceding word in that frame.
 
-Treat that output as evidence for one split preparation, not authority to raise
-or silently retry a limit. Reapply the byte-identical temporary Rust diff and
-scratch supervisor. First compile the feature-enabled Core library alone with
-`cargo check -p slug_core_v2 --features native-probe-observer --lib` within 60
-seconds. Only after it succeeds, reissue the Core unit-harness preparation once
-within a fresh 60-second limit; the new hypothesis is that the separately
-completed library/dependency boundary leaves only test-module compilation and
-linking. Verify both temporary hashes before proceeding. Exact preflight the
-selector and run it once under the inherited 12-second deadline/15-second
-absolute ceiling. Do not retry either split step if it misses its bound.
+Under the mutex, write the complete inactive 120-byte frame first and commit it
+with a separate little-endian selector write at offset zero. Alternate frames
+on every entry and outcome update. A failed or killed write leaves the prior
+selected frame authoritative; no writer-error absence is claimed. Invalid
+selector, selected-frame checksum/header/version/PID, reserved word,
+nonmonotonic counts, impossible outcome totals, nonzero capacity overflow or a
+nonzero byte outside the defined layout invalidates the audit. A selected
+snapshot with sequence below 2 or fewer than 128 entries is too early/weak and
+forces replan. Treat every selected frame as an earlier committed cutoff, not
+the final state of the terminated computation.
+
+## Diagnostic proofs and replay
+
+Add one temporary exact workspace unit selector,
+`path_observation_census_counts_exact_identities_outcomes_and_capacity`. With a
+private 512-byte file it proves install validation, exact first/repeat identity
+classification across namespace/path/operation differences, all four
+Complete/Need outcome cells, entered/outcome/in-flight arithmetic, alternating
+frame/sequence/XOR-checksum commits, no identity bytes in the file, and sticky
+capacity overflow at the 4,097th distinct demand. It proves both an intentionally
+partial inactive frame and a fully valid higher-sequence inactive frame cannot
+replace the older selected snapshot until selector commit.
+
+Add one temporary feature-enabled Core selector,
+`path_census_descriptor_validation_delegation_is_owned_and_closed`. It covers
+wrong size, nonregular file, non-read-write mode, missing required seals,
+forbidden `F_SEAL_WRITE`, consumed/closed ownership on every rejection, and one
+successful delegated descriptor. The workspace proof cannot substitute for
+this Core boundary proof.
+
+Use split preparation: compile `slug_workspace_v2` and feature-enabled
+`slug_core_v2` library paths within separate 60-second limits, then compile each
+unit harness once within its own 60-second limit. Exact preflight and run only
+the two named selectors, each under the inherited 12-second deadline/15-second
+absolute ceiling. Do not retry a failed preparation or proof.
 
 Copy `tools/v2_oracle/run_payload_demand_probe.sh` beside the original and keep
-the copy excluded from Git. Preserve its observer channel, byte/output caps,
-namespace/resource isolation, 12-second timeout, kill/reap finalizer and
-cleanup logic byte-for-byte. The permitted scratch changes are the exact
-nonignored integration selector launch, decoding/validating words 51--63 under
-the two fixed names, decoder self-check cases for the twelve counters and
-overflow word, and result wording. Run the scratch self-check before the CLI
-replay. Record SHA-256 for the accepted supervisor, scratch supervisor, exact
-temporary Rust source diff and both compiled harnesses.
+the copy excluded from Git. Preserve its observer channel, output caps,
+namespace/resource isolation, 12-second timeout, kill/reap finalizer and cleanup
+logic. Extend the same ownership/finalizer path to the census memfd: one parent
+owner, one inherited child descriptor, exact 512-byte post-reap read, close on
+success/failure/timeout/exception and proof that both descriptors are closed.
+Add a bounded census decoder and self-check cases for exact little-endian
+offsets, selector values, XOR checksum, valid alternating frames, bad
+selector/header/version/PID/checksum/counts/flags, partial inactive frames, a
+fully valid higher-sequence uncommitted frame, normal/deadline/exception
+retention, weak snapshots, output cap and descriptor cleanup. Run the entire
+scratch self-check before the replay.
 
 Compile the feature-enabled CLI integration harness within 60 seconds and
 exactly preflight
 `configured_action_conflicts::one_shot_build_conflict_is_atomic_and_recovers`
 once as nonignored. Reassemble the authentic fixture at inventory SHA-256
 `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`.
-Then run that selector once through the scratch supervisor with the unchanged
-12-second wall deadline and 15-second absolute ceiling. Do not run it directly.
+Then run that selector once through the scratch supervisor under the unchanged
+12-second wall deadline and 15-second absolute ceiling. Record SHA-256 for the
+accepted supervisor, scratch supervisor, exact temporary Rust diff and both
+harnesses before execution.
 
-Evidence is valid only if exact listing succeeds; the observer header/version,
-installed PID and original six counters validate; installed PID matches the
-supervised/reaped test; original and filtered overflow are zero; activity claim
-is released; dropped samples are disclosed; output caps remain clear; and
-cleanup reports no group, child, pipe, descriptor or telemetry error. Record
-all twelve filtered counters beside the six totals. Because each callback
-increments its total and filtered cells separately, termination may occur
-between those atomic operations. Treat both arrays as same-replay atomic cutoff
-snapshots and every ratio as diagnostic, never as an exact partition. The result
-may select only a separately reviewed identity/call-site causal audit for the
-measured categories, or a broader exact category audit if neither explains
-enough event volume. It cannot select an optimization or semantic edit from
-count, ratio, sample, timeout or elapsed time.
+Evidence is valid only if exact selector listing succeeds; the accepted DICE
+observer header/version/counters, PID, overflow, sampling and released claim
+validate; the census selected frame and arithmetic validate; both installed
+PIDs match the reaped test; capacity overflow and output caps are clear; the
+census has at least 128 entries; dropped samples are disclosed; and cleanup
+reports no group, child, pipe, descriptor or telemetry error. Record the
+aggregate census snapshot only. A clear census frame means only that the
+selected earlier cutoff committed successfully; it does not prove later writes
+succeeded. Independent result
+review may select only another bounded call-site/invalidation audit or a
+broader exact category audit. Census ratios, elapsed time and a deadline cannot
+select production or semantic work.
 
 ## Scope, caps and stops
 
 Durable edits are limited to scheduling/status sections in the canonical plan,
 this manifest, Stage 4, bootstrap readiness and the configured CLI ledger.
-Temporary diagnostic Rust edits are limited to
+Temporary Rust edits are limited to
+`app/slug_workspace_v2/src/path_observation.rs`,
 `app/slug_core_v2/src/runtime/probe_observer.rs`,
-`app/slug_core_v2/src/runtime/probe_observer/mapping.rs`,
 `app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs`,
-`app/slug_cli_v2/src/lib.rs`, and `app/slug_cli_v2/tests/cli.rs`. The mapping
-file may add only constants naming the thirteen existing unused words. Allow at
-most 70 gross temporary diagnostic production lines, 60 gross temporary proof
-lines and 50 changed scratch-supervisor lines; restore all before the receipt.
-No Cargo manifest, DICE/loading implementation, fixture, oracle input or
-production semantic file may change.
+`app/slug_cli_v2/src/lib.rs`, and `app/slug_cli_v2/tests/cli.rs`. Allow at most
+250 gross temporary diagnostic production lines, 180 gross temporary proof
+lines and 210 changed scratch-supervisor lines. No Cargo manifest, DICE crate,
+loading owner, path shard/epoch semantics, fixture or oracle input may change.
 
 Before recording the result, restore every temporary source edit, remove the
-scratch supervisor, fixture and logs, and prove both worktrees clean except for
-the allowed documentation receipt. Run `python3 scripts/v2_plan_status.py` and
-`git diff --check`. Independently review this design before execution and the
-result before it selects any further owner audit.
+scratch supervisor, census/fixture files and logs, and prove both worktrees
+clean except for the allowed documentation receipt. Run
+`python3 scripts/v2_plan_status.py` and `git diff --check`. Independently review
+this design before execution and the result before selecting a successor.
 
-Independent correction rereview returned `ACCEPT` for the same-replay cutoff
-semantics, fixed mapping layout, proof obligations, scratch limits and inference
-stops.
-
-Independent resource-limit rereview returned `ACCEPT` for the byte-identical,
-separately bounded feature-library and unit-harness preparation split.
-
-## Audit receipt (2026-09-14)
-
-The byte-identical temporary Rust diff retained SHA-256
-`bbb1a74bd80e8f9f3f992b8aec3c348b4daf0aefadc66c0dfd1e354f435f875e`.
-The accepted and scratch supervisors retained SHA-256
-`3b4d48a4a7c729ec0c8c17ffd2aed3ddab8677699bdce9d8bb24d97afbeab69c`
-and `ddf88c7dea14f73d227d2a3fd6b52a06dedef68411477f33eede8b93ea0fb771`.
-The split feature Core check passed in 31.24 seconds. The Core unit harness
-compiled in 23.76 seconds at SHA-256
-`d3e4c89acc8bb585cd0126a7ba8764b4e15a4b33489f2fdac50f25ed08d44558`.
-After a nonexecuting wrong-module-name preflight found zero tests, listing
-supplied the exact module path; exact preflight then found one nonignored test
-and the filtered-counter proof passed once. The extended supervisor self-check
-passed normal, deadline, exception, decoder and cap paths.
-
-The CLI integration harness compiled in 8.22 seconds at SHA-256
-`8158218269f31515fe5627f082a71d991d8b60b1805b4038b1f3a17eab809046`.
-Exact preflight found the selected nonignored test once. The authentic fixture
-retained 28 objects, 177 registry metadata files, 8,004,740 source bytes and
-inventory SHA-256
-`4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`.
-
-The sole replay reached the 12.009-second wall deadline in `RootCompute`. Its
-same-cutoff total arrays were 48,760/48,745 starts/finishes,
-42,341/42,330 dependency-check starts/finishes and 8,094/8,090 compute
-starts/finishes. The external-Bzl filtered array was
-9,311/9,305, 7,685/7,679 and 1,626/1,626. The path-observation filtered array
-was 2,543/2,543, 1,592/1,592 and 2,543/2,543. Thus the two filtered compute-start
-snapshots total 4,169 against the same-cutoff total 8,094, about 51.5%; separate
-atomic increments make this diagnostic rather than an exact partition. The
-latest complete tag was an external-Bzl dependency-check finish.
-
-Observer PID 632485 exactly matched the reaped test PID. Original and filtered
-overflow, dropped samples and the released activity claim were zero. Exact
-selector listing and output caps passed; cleanup reported no group, child, pipe
-or telemetry error. No typed terminal appeared. Every temporary source edit,
-scratch supervisor, fixture, log and self-check artifact was removed, and both
-worktrees were clean.
-
-Independent result review returned `ACCEPT` only for a post-sharding
-`PathObservationKey` identity/outcome census at the natural key owner. It must
-count exact `PathObservationDemand` identities as first-seen versus repeated
-and classify returns as `Complete` versus `Need`, with bounded capacity,
-explicit overflow, aggregate-only output and no physical-path disclosure. This
-distinguishes distinct cold breadth from completed repetition or retry-producing
-needs. The historical external identity census already selected the sibling-
-need union still present in source; neither these counts nor the latest sample
-justify repeating it or changing that loop. A census can select only another
-reviewed causal audit.
+Independent correction rereview returned `ACCEPT` for the natural owner,
+bounded exact identity state, frozen dual-frame wire, separate Core/workspace
+proofs, earlier-cutoff semantics, target gate, cleanup and inference stops.
 
 Do not run F3, any sibling configured-conflict selector, the uninstrumented
-selected selector or a second measured replay. Do not raise a limit, acquire a
-payload, modify the external-child loop, merge the combined stack or push the
-review branch. Replan if the fixed mapping has insufficient room, the existing
-event listener cannot count both exact tags without semantic coupling, either
-split preparation or either harness misses its bound, telemetry is invalid,
-scratch safety logic changes or
-the exact counts cannot support a bounded next causal question.
+selected selector or a second census replay. Do not raise a limit, acquire a
+payload, emit identity material, change the external-child union, merge the
+combined stack or push the review branch. Replan for capacity/flag/checksum
+failure, unbounded identity memory, physical-path output, semantic coupling,
+compile/proof failure, invalid dual-channel cleanup or weak census evidence.
