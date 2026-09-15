@@ -9028,3 +9028,11 @@ DICE observer and byte-preserved process-tree supervisor for one instrumented
 replay of the same selector. It changes no fixture or behavior and cannot run F3
 or sibling selectors. Because activity tags are sampled, every key category
 selects only a deeper causal diagnostic; it cannot select an optimization.
+
+The one reviewed replay reached the 12-second wall deadline in `RootCompute`
+with 52,360/52,350 starts/finishes, 46,028/46,021 dependency-check
+starts/finishes and 8,003/8,000 compute starts/finishes. Its complete latest tag
+was an `ExternalBzlModuleObservationKey` finish. Observer PID and reap identity
+matched; overflow, dropped samples and activity claim were zero; cleanup was
+complete. This is valid sampled progress evidence only. The permitted successor
+is an exact key-type count audit for external-Bzl and path observation events.

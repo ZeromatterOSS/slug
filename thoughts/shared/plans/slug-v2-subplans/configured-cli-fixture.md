@@ -402,3 +402,10 @@ conflict phase, so the ceiling result belongs to that evaluation. The active
 audit permits one supervisor- and observer-instrumented replay of the same exact
 selector, with unchanged request/fixture bytes and the existing 12/15-second
 limits. F3 and the other nine selectors remain stopped.
+
+That single replay reached its 12-second wall deadline in `RootCompute` with
+8,003 compute starts and 8,000 finishes. The latest complete tag was
+`ExternalBzlModuleObservationKey`; zero samples were dropped, observer and
+reaped PID matched, and cleanup was complete. Sampling names no semantic owner.
+Only an exact key-type count audit for that category and the historically
+adjacent `PathObservationKey` category is selected.

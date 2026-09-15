@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-7A-configured-conflict-cold-progress-audit-r1
-Status: design accepted; diagnostic execution pending
+Status: progress audit complete; exact key-type causal audit selected
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -43,6 +43,13 @@ existence. Its first unchanged CLI selector then reached the inherited
 one observer-instrumented replay of that exact selector to sample cold
 evaluation progress; any sampled key category can select only a deeper causal
 audit. The combined stack remains unaccepted.
+
+That one replay produced valid `RootCompute` evidence at the 12-second wall
+deadline: 8,003 compute starts, 8,000 finishes and a complete latest
+`ExternalBzlModuleObservationKey` finish sample, with zero overflow/drops,
+matched installed/reaped PID and complete cleanup. It establishes progress, not
+causation. The next bounded audit must count exact external-Bzl and path key
+events before selecting any still-deeper owner investigation.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

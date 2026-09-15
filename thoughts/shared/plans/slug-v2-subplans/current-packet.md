@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-cold-progress-audit-r1
-Status: design accepted; diagnostic execution pending
+Status: audit complete; exact key-type causal audit selected
 
 ## Observable result
 
@@ -109,6 +109,43 @@ it claims a semantic owner or changes the allowed next action.
 
 Independent correction rereview returned `ACCEPT` for the frozen adapter,
 byte-preserved supervisor, evidence-validity checks and sampled-evidence stop.
+
+## Audit receipt (2026-09-14)
+
+The accepted supervisor SHA-256 was
+`3b4d48a4a7c729ec0c8c17ffd2aed3ddab8677699bdce9d8bb24d97afbeab69c`.
+The excluded scratch copy changed only the exact selector and the two
+nonignored launch arguments; its SHA-256 was
+`650785f4a47fedbf79622496f48ee20fa27ec3a2eb3036ee43320c6704f4c10d`.
+The exact temporary adapter diff SHA-256 was
+`c91f97ab881133fc2edc4926400a15941bf785c5a1688b5630a6626f0a48ef19`.
+The scratch supervisor self-check passed normal, deadline and exception cleanup.
+Its first sandboxed preflight could not enter `strace` because ptrace was
+denied; the approved outside-sandbox invocation then passed without changing
+the script bytes.
+
+The feature-enabled integration harness compiled in 22.64 seconds at SHA-256
+`45b83d6d7a08e1dabfcf38ad0b0e31edfde42cbbf865c1ec74096f90192deab2`.
+Exact preflight found the selected nonignored test once without execution. The
+authentic fixture retained 28 objects, 177 registry metadata files, 8,004,740
+source bytes and inventory SHA-256
+`4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`.
+
+The one permitted replay reached the 12-second wall deadline in `RootCompute`.
+The six independent started/finished, check-started/check-finished and
+compute-started/compute-finished counters were respectively
+52,360/52,350, 46,028/46,021 and 8,003/8,000. The latest complete 31-byte tag
+was `ExternalBzlModuleObservationKey`, event kind `Finished`; sampling dropped
+zero activities. Observer PID 622972 exactly matched the reaped test PID.
+Overflow flags and the released activity claim were zero. Cleanup reported no
+live group, child, pipe or telemetry error. The selector listing was exact and
+the capped outputs contained only `running 1 test`; no typed terminal appeared.
+
+This valid sample establishes progress and no semantic owner. It selects only a
+bounded exact key-type count audit that can distinguish the sampled external-Bzl
+category and the historically adjacent `PathObservationKey` category. Every
+temporary source edit, scratch script, fixture and log was removed. Both
+worktrees were clean before this durable receipt.
 
 Do not run F3, any of the other nine configured-conflict selectors, the
 unmodified selected selector, or a second diagnostic replay. Do not raise a
