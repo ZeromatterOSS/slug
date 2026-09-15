@@ -8921,3 +8921,15 @@ LABEL without a nonconfigurable flag and names alias as a carrier for reusable
 cache, key or fallback is added; package equality and existing observed source
 dependencies own invalidation and A/B/A restoration. The exact proof, scope and
 atomic acceptance contract is in `current-packet.md`.
+
+### Configurable alias checkpoint; rule initializer selected (2026-09-14)
+
+The retained alias expression, derived configuration dependencies, configured
+selection and query projection now pass their exact loading, analysis and query
+proofs. Full loading passes 563 active tests with one ignored; full analysis
+passes 168/168. The supervised authentic fixture advances through rules_java's
+configurable alias and stops at `toolchains/BUILD:365` ->
+`java/toolchains/java_toolchain.bzl:27`, where `_java_toolchain(**attrs)` reaches
+the retained rule-initializer invocation guard. The observer is valid and the
+10.26-second run cleans every child, pipe and process group. This selects only a
+bounded rule-initializer successor. The combined stack remains unaccepted.

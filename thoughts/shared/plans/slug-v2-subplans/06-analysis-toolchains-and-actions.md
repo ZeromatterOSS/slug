@@ -1331,6 +1331,17 @@ Need/error/invalidation behavior, and the configured alias result owns the
 selected edge. Target/exec A/B/A, condition dependencies and stale-publication
 negatives are mandatory before the combined R2/group stack can be accepted.
 
+## Configurable alias checkpoint and later loading stop (2026-09-14)
+
+Configured alias selection now reuses the existing condition preparation and
+attribute resolver, publishes one selected `AliasActual` edge in the alias's
+exact Target or Exec configuration, and carries condition packages only in the
+runfiles closure. Exact A/B/A, Need, invalid-selection and query proofs pass;
+full analysis is 168/168. Authentic F3 proceeds beyond this configured owner and
+stops during later rules_java loading at rule-initializer invocation. Stage 6
+adds no initializer owner; the R2/group/alias stack remains atomic and
+unaccepted while Stage 4 freezes the successor.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

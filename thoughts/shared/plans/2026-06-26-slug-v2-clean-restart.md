@@ -30,14 +30,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-6-7A-r2-execution-group-configurable-alias-combined-r2
-Status: configurable-alias Phase B active after independent design acceptance
+Status: configurable-alias checkpoint complete; stopped for initializer replan
 
 Preserve the corrected but unaccepted R2/execution-group stack, implement the
 narrow package-owned `attr.label` computed-default prerequisite and the native
 configurable-alias prerequisite selected next by F3, and accept the whole stack
 atomically as specified by [current-packet.md](./slug-v2-subplans/current-packet.md).
-The real CLI matrices are partitioned under the unchanged deadline, then F3 is
-replayed after the alias correction.
+The real CLI matrices are partitioned under the unchanged deadline. The alias
+correction passes its focused and broad owner suites; supervised F3 now reaches
+the retained rules_java rule-initializer guard. A bounded initializer successor
+must be designed and reviewed before implementation resumes.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

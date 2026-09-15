@@ -102,6 +102,7 @@ pub(crate) mod tests {
 
     use super::super::HostCanonicalRepositoryRouteObservationKey;
     use super::super::HostSelectedRepositoryFileEffectObservationKey;
+    use crate::CoercedAttributeValue;
     use crate::ObservedRepositoryPackageLoad;
     use crate::PackageTargetKind;
     use crate::RepositoryPackageLoadKey;
@@ -1651,10 +1652,12 @@ compatibility=module_extension(implementation=impl)
                 .targets
                 .iter()
                 .find(|target| target.name == "host_platform")
-                .unwrap()
-                .kind,
+            .unwrap()
+            .kind,
             PackageTargetKind::Alias { actual }
-                if actual == &CanonicalLabel::parse("@@platforms//host:host").unwrap()
+                if actual == &CoercedAttributeValue::Label(
+                    CanonicalLabel::parse("@@platforms//host:host").unwrap()
+                )
         ));
         assert_eq!(
             tools.direct_load_roots[0].label,
@@ -1842,10 +1845,7 @@ compatibility=module_extension(implementation=impl)
         let SourcePreparationOutcome::Complete(Ok(package)) = package else {
             panic!("built-in canonical package load must complete")
         };
-        let error = package.result().as_ref().as_ref().unwrap_err().to_string();
-        assert!(error.contains("@@bazel_tools//src/conditions:BUILD"));
-        assert!(!error.contains("<output_base>"));
-        assert!(!error.contains("builtin/bazel_tools"));
+        package.result().as_ref().as_ref().unwrap();
     }
 
     #[tokio::test]

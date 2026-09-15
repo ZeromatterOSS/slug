@@ -338,3 +338,13 @@ live process group. Native publication exited 1 at rules_java
 Slug marks it nonconfigurable. This proves the callback boundary cleared and
 selects only the native configurable-alias prerequisite. It establishes no new
 payload demand and does not accept F3.
+
+The configurable-alias checkpoint then passed its exact loading, configured
+analysis and query proofs. The unchanged supervised F3 assembled the same 28
+objects, 177 metadata files and 8,004,740 source bytes, selected and executed
+one test in 10.26 seconds, and retained valid observer and complete cleanup
+evidence. Native publication exited 1 at rules_java
+`@@rules_java+//toolchains:BUILD:365` ->
+`java/toolchains/java_toolchain.bzl:27`: `_java_toolchain(**attrs)` reaches
+`target invocation for rule initializer is unsupported`. This establishes no
+new payload demand and selects only the bounded initializer prerequisite.

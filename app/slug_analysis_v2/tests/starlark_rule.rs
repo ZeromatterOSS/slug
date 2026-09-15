@@ -152,6 +152,7 @@ use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
+use slug_workspace_v2::path_observation_shards;
 use starlark_map::small_map::SmallMap;
 
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
@@ -12889,4 +12890,273 @@ async fn native_genrule_and_generated_output_fail_before_configured_work() {
         );
         assert!(!error.contains("missing-src") && !error.contains("missing-toolchain"));
     }
+}
+
+#[tokio::test]
+async fn configurable_alias_selects_actual_and_restores_same_key() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "def _leaf(ctx): return [DefaultInfo()]\nleaf = rule(implementation = _leaf)\n",
+    )
+    .unwrap();
+    for package in ["cond", "left", "right"] {
+        fs::create_dir(workspace.join(package)).unwrap();
+    }
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "platform(name='platform')\nalias(name='selected', actual=select({'//cond:on':'//left:leaf', '//conditions:default':'//right:leaf'}))\n",
+    )
+    .unwrap();
+    let condition = workspace.join("cond/BUILD.bazel");
+    fs::write(
+        &condition,
+        "config_setting(name='on', values={'compilation_mode':'fastbuild'})\n",
+    )
+    .unwrap();
+    for package in ["left", "right"] {
+        fs::write(
+            workspace.join(format!("{package}/BUILD.bazel")),
+            "load('//:defs.bzl', 'leaf')\nleaf(name='leaf')\n",
+        )
+        .unwrap();
+    }
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let configuration = test_configuration();
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:selected").unwrap(),
+        configuration.clone(),
+    );
+    let first = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(first.kind(), &ConfiguredNodeKind::Alias);
+    assert_eq!(first.edges().len(), 1);
+    assert_eq!(
+        first.edges()[0].target().label().to_string(),
+        "@@//left:leaf"
+    );
+    assert_eq!(
+        first.edges()[0]
+            .target()
+            .configured_target()
+            .unwrap()
+            .configuration(),
+        &configuration
+    );
+    let packages = runfiles_package_names(&first);
+    assert!(packages.contains("@@//cond") && packages.contains("@@//left"));
+
+    fs::write(
+        &condition,
+        "config_setting(name='on', values={'compilation_mode':'opt'})\n",
+    )
+    .unwrap();
+    let changed = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        changed.edges()[0].target().label().to_string(),
+        "@@//right:leaf"
+    );
+    assert!(runfiles_package_names(&changed).contains("@@//cond"));
+    fs::write(
+        &condition,
+        "config_setting(name='on', values={'compilation_mode':'fastbuild'})\n",
+    )
+    .unwrap();
+    assert_eq!(
+        analyze_request(&dice, &workspace, &key, None, false)
+            .await
+            .unwrap(),
+        first
+    );
+
+    let exec = ConfigurationKey::from_slug(
+        configuration
+            .slug_configuration()
+            .unwrap()
+            .to_exec_for_platform(&CanonicalLabel::parse("@@//:platform").unwrap())
+            .unwrap(),
+    );
+    let exec_key = ConfiguredTargetKey::new(key.label().clone(), exec.clone());
+    let exec_result = analyze_request(&dice, &workspace, &exec_key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        exec_result.edges()[0]
+            .target()
+            .configured_target()
+            .unwrap()
+            .configuration(),
+        &exec
+    );
+}
+
+#[tokio::test]
+async fn configurable_alias_propagates_condition_and_child_needs_without_publication() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "def _empty(ctx): return []\nsetting = rule(implementation=_empty, attrs={'dep':attr.label(default='//condition_dep:leaf')}, build_setting=config.string(flag=True))\nleaf = rule(implementation=_empty)\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "config_setting(name='on', flag_values={'//flags:mode':'ready'})\nalias(name='selected', actual=select({':on':'//late:leaf'}))\n",
+    )
+    .unwrap();
+    fs::create_dir(workspace.join("flags")).unwrap();
+    fs::write(
+        workspace.join("flags/BUILD.bazel"),
+        "load('//:defs.bzl','setting')\nsetting(name='mode', build_setting_default='ready')\n",
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:selected").unwrap(),
+        test_configuration().with_starlark_option(StarlarkOption::string(
+            CanonicalLabel::parse("@@//flags:mode").unwrap(),
+            "ready",
+            StarlarkOptionScope::Default,
+        )),
+    );
+    let observation = ConfiguredNodeAnalysisObservationKey::new(
+        NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+        key.clone(),
+    )
+    .unwrap();
+    async fn observed_need(
+        dice: &Arc<Dice>,
+        workspace: &std::path::Path,
+        key: &ConfiguredNodeAnalysisObservationKey,
+    ) -> Vec<PathBuf> {
+        let mut updater = dice.updater_with_data(UserComputationData {
+            cycle_detector: Some(analysis_cycle_detector()),
+            ..Default::default()
+        });
+        let epoch = root_epoch(workspace);
+        updater.changed_to(path_observation_shards(&epoch)).unwrap();
+        inject_root_target_inputs(&mut updater, workspace, epoch, &[]);
+        let outcome = updater.commit().await.compute(key).await.unwrap();
+        let AnalysisPreparationOutcome::Need(needs) = outcome else {
+            panic!("missing alias dependencies did not produce Need: {outcome:?}")
+        };
+        needs
+            .path_observations()
+            .unwrap()
+            .demands()
+            .iter()
+            .map(|demand| demand.path().as_path().to_path_buf())
+            .collect()
+    }
+    let paths = observed_need(&dice, &workspace, &observation).await;
+    assert!(paths.contains(&workspace.join("late")), "{paths:?}");
+    assert!(
+        paths.contains(&workspace.join("condition_dep")),
+        "{paths:?}"
+    );
+    for package in ["late", "condition_dep"] {
+        fs::create_dir(workspace.join(package)).unwrap();
+        fs::write(
+            workspace.join(format!("{package}/BUILD.bazel")),
+            "load('//:defs.bzl', 'leaf')\nleaf(name='leaf')\n",
+        )
+        .unwrap();
+    }
+    let mut updater = dice.updater();
+    updater
+        .changed_to(path_observation_shards(&root_epoch(&workspace)))
+        .unwrap();
+    updater.commit().await;
+    let result = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        result.edges()[0].target().label().to_string(),
+        "@@//late:leaf"
+    );
+}
+
+#[tokio::test]
+async fn configurable_alias_rejects_invalid_configured_selections() {
+    for (name, conditions, actual, expected) in [
+        (
+            "none",
+            "",
+            "select({'//conditions:default':None})",
+            "must resolve to a label",
+        ),
+        (
+            "no_match",
+            "config_setting(name='opt', values={'compilation_mode':'opt'})",
+            "select({':opt':':leaf'})",
+            "no matching condition and no default",
+        ),
+        (
+            "ambiguous",
+            "config_setting(name='a', values={'compilation_mode':'fastbuild'})\nconfig_setting(name='b', values={'stamp':'false'})",
+            "select({':a':':leaf', ':b':':other'})",
+            "ambiguous matching conditions",
+        ),
+    ] {
+        let workspace = scratch();
+        fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+        fs::write(
+            workspace.join("BUILD.bazel"),
+            format!("{conditions}\nalias(name='selected', actual={actual})\n"),
+        )
+        .unwrap();
+        let key = ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:selected").unwrap(),
+            test_configuration(),
+        );
+        let error = analyze_request(
+            &Dice::builder().build(DetectCycles::Enabled),
+            &workspace,
+            &key,
+            None,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains(expected), "{name}: {error}");
+    }
+
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name='root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "def _leaf(ctx): return []\nleaf=rule(implementation=_leaf)\n",
+    )
+    .unwrap();
+    let build = workspace.join("BUILD.bazel");
+    let valid =
+        "load(':defs.bzl','leaf')\nleaf(name='leaf')\nalias(name='selected', actual=':leaf')\n";
+    let invalid = "load(':defs.bzl','leaf')\nleaf(name='leaf')\nalias(name='selected', actual=select({'//conditions:default':None}))\n";
+    fs::write(&build, valid).unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:selected").unwrap(),
+        test_configuration(),
+    );
+    let first = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    fs::write(&build, invalid).unwrap();
+    assert!(
+        analyze_request(&dice, &workspace, &key, None, false)
+            .await
+            .unwrap_err()
+            .contains("must resolve to a label")
+    );
+    fs::write(&build, valid).unwrap();
+    assert_eq!(
+        analyze_request(&dice, &workspace, &key, None, false)
+            .await
+            .unwrap(),
+        first
+    );
 }

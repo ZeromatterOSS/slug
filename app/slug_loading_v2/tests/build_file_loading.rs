@@ -1308,7 +1308,10 @@ native_emit()
     };
     assert!(matches!(
         &target("alias").kind,
-        PackageTargetKind::Alias { actual } if actual == &CanonicalLabel::parse("@@//pkg:typed").unwrap()
+        PackageTargetKind::Alias { actual }
+            if actual == &CoercedAttributeValue::Label(
+                CanonicalLabel::parse("@@//pkg:typed").unwrap()
+            )
     ));
     let PackageTargetKind::PackageGroup { includes, .. } = &target("group").kind else {
         panic!("expected package group")
@@ -1408,7 +1411,9 @@ def emit():
     assert!(matches!(
         &loaded.targets[0].kind,
         PackageTargetKind::Alias { actual }
-            if actual == &CanonicalLabel::parse("@@//owner:typed").unwrap()
+            if actual == &CoercedAttributeValue::Label(
+                CanonicalLabel::parse("@@//owner:typed").unwrap()
+            )
     ));
     assert!(matches!(
         &loaded.targets[1].kind,
@@ -1764,7 +1769,9 @@ filegroup(name = "metadata")
     };
     assert!(
         matches!(&target("alias").kind, PackageTargetKind::Alias { actual }
-        if actual == &CanonicalLabel::parse("@@//pkg:typed").unwrap())
+        if actual == &CoercedAttributeValue::Label(
+            CanonicalLabel::parse("@@//pkg:typed").unwrap()
+        ))
     );
     assert!(
         matches!(&target("suite").kind, PackageTargetKind::TestSuite { membership: TestSuiteMembership::Explicit { tests }, .. }
@@ -2421,7 +2428,9 @@ fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
             PackageTarget {
                 name: "alias_fg".to_owned(),
                 kind: PackageTargetKind::Alias {
-                    actual: CanonicalLabel::parse("@@//pkg:fg").unwrap(),
+                    actual: CoercedAttributeValue::Label(
+                        CanonicalLabel::parse("@@//pkg:fg").unwrap(),
+                    ),
                 },
                 visibility: VisibilitySource::PackageDefault,
             },
@@ -2485,7 +2494,9 @@ fn native_labels_canonicalize_spelling_preserve_order_and_reject_duplicates() {
     assert!(matches!(
         &equivalent.targets[1].kind,
         PackageTargetKind::Alias { actual }
-            if actual == &CanonicalLabel::parse("@@//pkg:group").unwrap()
+            if actual == &CoercedAttributeValue::Label(
+                CanonicalLabel::parse("@@//pkg:group").unwrap()
+            )
     ));
 
     let reordered = write_build(
@@ -5096,5 +5107,100 @@ fn imported_native_genrule_rejects_unadmitted_and_conflicting_shapes_atomically(
             try_load_package(&workspace, &package).is_err(),
             "accepted: {body}"
         );
+    }
+}
+
+#[test]
+fn native_alias_retains_configurable_actual_and_config_dependencies() {
+    let workspace = scratch("native-alias-configurable");
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"config_setting(name = "a", values = {"compilation_mode": "dbg"})
+config_setting(name = "b", values = {"compilation_mode": "opt"})
+alias(name = "literal", actual = ":left")
+alias(name = "selected", actual = select({":a": ":left", ":b": ":right", "//conditions:default": ":fallback"}))
+"#,
+    )
+    .unwrap();
+    let loaded = load_package(&workspace, &package);
+    let target = |name: &str| {
+        loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap()
+    };
+    assert!(matches!(
+        &target("literal").kind,
+        PackageTargetKind::Alias { actual }
+            if actual == &CoercedAttributeValue::Label(
+                CanonicalLabel::parse("@@//pkg:left").unwrap()
+            )
+    ));
+    let PackageTargetKind::Alias { actual } = &target("selected").kind else {
+        panic!("selected target must remain an alias")
+    };
+    let CoercedAttributeValue::Selector { branches, default } = actual else {
+        panic!("selected actual must retain its selector")
+    };
+    assert_eq!(
+        branches
+            .iter()
+            .map(|(condition, value)| (condition.to_string(), value.as_ref().clone()))
+            .collect::<Vec<_>>(),
+        [
+            (
+                "@@//pkg:a".to_owned(),
+                CoercedAttributeValue::Label(CanonicalLabel::parse("@@//pkg:left").unwrap())
+            ),
+            (
+                "@@//pkg:b".to_owned(),
+                CoercedAttributeValue::Label(CanonicalLabel::parse("@@//pkg:right").unwrap())
+            ),
+        ]
+    );
+    assert_eq!(
+        default.as_deref(),
+        Some(&CoercedAttributeValue::Label(
+            CanonicalLabel::parse("@@//pkg:fallback").unwrap()
+        ))
+    );
+    let attributes = loaded.native_attributes("selected").unwrap();
+    assert!(matches!(
+        &attributes.get("actual").unwrap().1.value,
+        CoercedAttributeValue::Selector { .. }
+    ));
+    assert!(matches!(
+        &attributes.get("$config_dependencies").unwrap().1.value,
+        CoercedAttributeValue::LabelList(labels)
+            if labels.as_ref() == [
+                CanonicalLabel::parse("@@//pkg:a").unwrap(),
+                CanonicalLabel::parse("@@//pkg:b").unwrap(),
+            ]
+    ));
+}
+
+#[test]
+fn native_alias_rejects_invalid_loading_shapes_atomically() {
+    let workspace = scratch("native-alias-invalid");
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    for invalid in [
+        "alias(name = 'bad')",
+        "alias(name = 'bad', actual = None)",
+        "alias(name = 'bad', actual = [':x'])",
+        "alias(name = 'bad', actual = select({'//conditions:default': 1}))",
+        "alias(name = 'bad', actual = select({':a': ':x'}) + select({'//conditions:default': ':y'}))",
+    ] {
+        fs::write(
+            package.join(BUILD_FILE_PRIMARY),
+            format!("alias(name = 'prior', actual = ':x')\n{invalid}\n"),
+        )
+        .unwrap();
+        assert!(try_load_package(&workspace, &package).is_err(), "{invalid}");
     }
 }

@@ -1856,6 +1856,84 @@ async fn labels_projects_supported_native_filegroup_and_alias_attributes() {
 }
 
 #[tokio::test]
+async fn configurable_alias_projects_branch_and_condition_edges() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = 'root')\n");
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        r#"config_setting(name = "dbg", values = {"compilation_mode": "dbg"})
+config_setting(name = "opt", values = {"compilation_mode": "opt"})
+exports_files(["left.txt", "right.txt", "fallback.txt"])
+alias(name = "selected", actual = select({":dbg": ":left.txt", ":opt": ":right.txt", "//conditions:default": ":fallback.txt"}))
+"#,
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let graph = transaction
+        .compute(&UnconfiguredPackageGraphKey {
+            workspace: workspace.clone(),
+            package: PathBuf::from("pkg"),
+        })
+        .await
+        .unwrap();
+    let graph = graph.as_ref().as_ref().unwrap();
+    let alias = graph
+        .nodes
+        .values()
+        .find(|node| node.label.to_string() == "//pkg:selected")
+        .unwrap();
+    assert_eq!(
+        alias
+            .edges
+            .iter()
+            .map(|edge| (edge.kind, edge.target.to_string()))
+            .collect::<Vec<_>>(),
+        [
+            (QueryEdgeKind::Ordinary, "//pkg:left.txt".to_owned()),
+            (QueryEdgeKind::Ordinary, "//pkg:right.txt".to_owned()),
+            (QueryEdgeKind::Ordinary, "//pkg:fallback.txt".to_owned()),
+            (QueryEdgeKind::Implicit, "//pkg:dbg".to_owned()),
+            (QueryEdgeKind::Implicit, "//pkg:opt".to_owned()),
+        ]
+    );
+    let actual = alias
+        .attributes
+        .iter()
+        .find(|attribute| attribute.name == "actual")
+        .unwrap();
+    assert!(matches!(
+        actual.value.as_ref().map(|value| &value.value),
+        Some(CoercedAttributeValue::Selector { .. })
+    ));
+    assert_eq!(
+        actual
+            .labels
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["//pkg:left.txt", "//pkg:right.txt", "//pkg:fallback.txt"]
+    );
+    let conditions = alias
+        .attributes
+        .iter()
+        .find(|attribute| attribute.name == "$config_dependencies")
+        .unwrap();
+    assert!(!conditions.explicit);
+    assert!(matches!(
+        conditions.value.as_ref().map(|value| &value.value),
+        Some(CoercedAttributeValue::LabelList(_))
+    ));
+    assert_eq!(
+        conditions
+            .labels
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["//pkg:dbg", "//pkg:opt"]
+    );
+}
+
+#[tokio::test]
 async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitness() {
     let workspace = scratch();
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");

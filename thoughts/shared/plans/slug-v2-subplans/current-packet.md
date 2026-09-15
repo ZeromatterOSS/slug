@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-6-7A-r2-execution-group-configurable-alias-combined-r2
-Status: Phase A design freeze accepted; Phase B active
+Status: configurable-alias checkpoint complete; stopped for initializer replan
 
 ## Observable result
 
@@ -47,6 +47,19 @@ to rules_java `toolchains/BUILD:205`. It now stops because native
 as an ordinary mandatory LABEL and explicitly documents alias as the reusable
 configured-selection carrier. This later semantic stop triggers the bounded
 replan below; it is not a timeout waiver.
+
+The configurable-alias implementation now passes its loading, configured
+analysis and query discriminators. Full loading passes 563 active tests with
+one ignored, and full analysis passes 168/168. The final supervised F3 selected
+and executed exactly one test in 10.26 seconds with valid observer telemetry,
+complete cleanup, no children, no open pipes and no live process group. Native
+publication exited 1 after advancing through the alias at line 205 to rules_java
+`@@rules_java+//toolchains:BUILD:365`, where
+`java/toolchains/java_toolchain.bzl:27` invokes `_java_toolchain(**attrs)` and
+the retained declaration guard reports `target invocation for rule initializer
+is unsupported`. This is the next authentic semantic prerequisite. Initializer
+execution remains outside this packet, so implementation stops for a bounded
+successor design. The complete R2/group/callback/alias stack remains unaccepted.
 
 ## Compatibility and source authority
 
@@ -165,6 +178,8 @@ The configurable-alias correction may additionally edit only:
 
 - `app/slug_loading_v2/src/package.rs`;
 - `app/slug_loading_v2/src/host_package_load_tests.rs`;
+- `app/slug_loading_v2/src/canonical_repository_load_route_tests.rs` only for
+  the public representation's existing canonical-route assertion;
 - `app/slug_loading_v2/tests/build_file_loading.rs`;
 - `app/slug_analysis_v2/src/dice.rs`;
 - `app/slug_analysis_v2/tests/starlark_rule.rs` for the end-to-end configured
@@ -195,7 +210,8 @@ Tightened physical caps are
 `starlark_rule.rs`, 13,250 for its integration test, and 650 for
 `execution_groups.rs`; the newly admitted caps are 5,300 for
 `build_file_loading.rs`, 3,500 for query `graph.rs`, 6,000 for
-`loading_query.rs`, and 6,050 for CLI `cli.rs`. Stop and replan for a second retained owner, a new DICE
+`loading_query.rs`, 3,710 for `canonical_repository_load_route_tests.rs`, and
+6,050 for CLI `cli.rs`. Stop and replan for a second retained owner, a new DICE
 key/cache, configurable callback precomputation, an alias transition,
 initializer execution, a
 manifest/build/fixture change, a required production file outside the inherited

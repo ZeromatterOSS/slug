@@ -32,6 +32,7 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
+use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::AttributeQueryValue;
 use slug_loading_v2::ConfiguredDependencyDefault;
@@ -952,21 +953,47 @@ fn package_graph_from_loaded(
                 )
             }
             PackageTargetKind::Alias { actual } => {
-                let actual = QueryLabel::from_canonical(actual.clone());
+                let mut actual_labels = Vec::new();
+                actual.labels(&mut actual_labels);
+                let actual_labels = actual_labels
+                    .into_iter()
+                    .map(QueryLabel::from_canonical)
+                    .collect::<Vec<_>>();
+                let condition_labels = actual
+                    .selector_key_labels()
+                    .into_iter()
+                    .map(QueryLabel::from_canonical)
+                    .collect::<Vec<_>>();
                 let mut edges = visibility_edges;
-                edges.push(QueryEdge {
+                edges.extend(actual_labels.iter().cloned().map(|target| QueryEdge {
                     kind: QueryEdgeKind::Ordinary,
-                    target: actual.dupe(),
-                });
+                    target,
+                }));
+                edges.extend(condition_labels.iter().cloned().map(|target| QueryEdge {
+                    kind: QueryEdgeKind::Implicit,
+                    target,
+                }));
                 (
                     QueryNodeKind::Rule(CompactString::new("alias rule")),
                     edges,
-                    vec![QueryAttribute {
-                        name: CompactString::new("actual"),
-                        labels: Arc::from([actual]),
-                        explicit: true,
-                        value: None,
-                    }],
+                    vec![
+                        QueryAttribute {
+                            name: CompactString::new("actual"),
+                            labels: actual_labels.into(),
+                            explicit: true,
+                            value: Some(AttributeQueryValue {
+                                kind: AttributeKind::Label,
+                                provenance: AttributeProvenance::Explicit,
+                                value: actual.clone(),
+                            }),
+                        },
+                        QueryAttribute {
+                            name: CompactString::new("$config_dependencies"),
+                            labels: condition_labels.into(),
+                            explicit: false,
+                            value: None,
+                        },
+                    ],
                 )
             }
             PackageTargetKind::ConfigSetting { declaration } => {
@@ -1346,20 +1373,63 @@ fn external_package_graph_from_targets(
                 )
             }
             PackageTargetKind::Alias { actual } => {
-                let actual =
-                    external_alias_actual_label(canonical_repo, apparent_repo, package, actual)?;
+                let actual_value = actual
+                    .rebind_provisional_root_labels(canonical_repo)
+                    .map_err(QueryError::evaluation)?;
+                let mut actual_labels = Vec::new();
+                actual_value.labels(&mut actual_labels);
+                let actual_labels = actual_labels
+                    .iter()
+                    .map(|actual| {
+                        external_alias_actual_label(canonical_repo, apparent_repo, package, actual)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let condition_labels = actual_value
+                    .selector_key_labels()
+                    .iter()
+                    .map(|condition| {
+                        external_alias_actual_label(
+                            canonical_repo,
+                            apparent_repo,
+                            package,
+                            condition,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
                 (
                     QueryNodeKind::Rule(CompactString::new("alias rule")),
-                    Arc::from([QueryEdge {
-                        kind: QueryEdgeKind::Ordinary,
-                        target: actual.dupe(),
-                    }]),
-                    Arc::from([QueryAttribute {
-                        name: CompactString::new("actual"),
-                        labels: Arc::from([actual]),
-                        explicit: true,
-                        value: None,
-                    }]),
+                    actual_labels
+                        .iter()
+                        .cloned()
+                        .map(|target| QueryEdge {
+                            kind: QueryEdgeKind::Ordinary,
+                            target,
+                        })
+                        .chain(condition_labels.iter().cloned().map(|target| QueryEdge {
+                            kind: QueryEdgeKind::Implicit,
+                            target,
+                        }))
+                        .collect::<Vec<_>>()
+                        .into(),
+                    vec![
+                        QueryAttribute {
+                            name: CompactString::new("actual"),
+                            labels: actual_labels.into(),
+                            explicit: true,
+                            value: Some(AttributeQueryValue {
+                                kind: AttributeKind::Label,
+                                provenance: AttributeProvenance::Explicit,
+                                value: actual_value,
+                            }),
+                        },
+                        QueryAttribute {
+                            name: CompactString::new("$config_dependencies"),
+                            labels: condition_labels.into(),
+                            explicit: false,
+                            value: None,
+                        },
+                    ]
+                    .into(),
                 )
             }
             PackageTargetKind::ConfigSetting { declaration } => {
@@ -2590,7 +2660,7 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
             PackageTarget {
                 name: "files_alias".to_owned(),
                 kind: PackageTargetKind::Alias {
-                    actual: source("files"),
+                    actual: CoercedAttributeValue::Label(source("files")),
                 },
                 visibility: VisibilitySource::PackageDefault,
             },
@@ -2656,7 +2726,7 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
                 .map(|capability| capability.rule_class.as_str()),
             Some("alias")
         );
-        assert_eq!(alias.attributes.len(), 1);
+        assert_eq!(alias.attributes.len(), 2);
         assert_eq!(alias.attributes[0].name, "actual");
         assert!(alias.attributes[0].explicit);
         assert_eq!(
@@ -2667,6 +2737,8 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
                 .collect::<Vec<_>>(),
             ["@dep//:files"]
         );
+        assert_eq!(alias.attributes[1].name, "$config_dependencies");
+        assert!(alias.attributes[1].labels.is_empty());
         assert_eq!(
             alias
                 .edges
@@ -3072,7 +3144,7 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
         let alias = project(
             source("@@dep+//:member"),
             PackageTargetKind::Alias {
-                actual: source("@@dep+//:source.txt"),
+                actual: CoercedAttributeValue::Label(source("@@dep+//:source.txt")),
             },
         )
         .unwrap_err();
@@ -3318,14 +3390,14 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
             PackageTarget {
                 name: "first".to_owned(),
                 kind: PackageTargetKind::Alias {
-                    actual: source("second"),
+                    actual: CoercedAttributeValue::Label(source("second")),
                 },
                 visibility: VisibilitySource::PackageDefault,
             },
             PackageTarget {
                 name: "second".to_owned(),
                 kind: PackageTargetKind::Alias {
-                    actual: source("source.txt"),
+                    actual: CoercedAttributeValue::Label(source("source.txt")),
                 },
                 visibility: VisibilitySource::PackageDefault,
             },
@@ -3341,7 +3413,7 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
         let build_destination = project(vec![PackageTarget {
             name: "to_build".to_owned(),
             kind: PackageTargetKind::Alias {
-                actual: source("BUILD.bazel"),
+                actual: CoercedAttributeValue::Label(source("BUILD.bazel")),
             },
             visibility: VisibilitySource::PackageDefault,
         }])
@@ -3352,5 +3424,65 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
                 .contains("external repository alias actual destination is deferred"),
             "{build_destination}"
         );
+    }
+
+    #[test]
+    fn external_configurable_alias_restores_same_owner_route() {
+        let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
+        let apparent_repo = ApparentRepoName::new("dep").unwrap();
+        let package = PackagePath::parse("").unwrap();
+        let provisional = |target| CanonicalLabel::parse(&format!("@@//:{target}")).unwrap();
+        let mut targets = ["condition", "left", "right"]
+            .into_iter()
+            .map(|name| PackageTarget {
+                name: name.to_owned(),
+                kind: PackageTargetKind::ExportedFile,
+                visibility: VisibilitySource::AlwaysPublic,
+            })
+            .collect::<Vec<_>>();
+        targets.push(PackageTarget {
+            name: "selected".to_owned(),
+            kind: PackageTargetKind::Alias {
+                actual: CoercedAttributeValue::Selector {
+                    branches: Arc::from([(
+                        provisional("condition"),
+                        Arc::new(CoercedAttributeValue::Label(provisional("left"))),
+                    )]),
+                    default: Some(Arc::new(CoercedAttributeValue::Label(provisional("right")))),
+                },
+            },
+            visibility: VisibilitySource::AlwaysPublic,
+        });
+        let graph = external_package_graph_from_targets(
+            &canonical_repo,
+            &apparent_repo,
+            &package,
+            Path::new("/external/dep+/BUILD.bazel"),
+            &RuleVisibility::Private,
+            &targets,
+            None,
+        )
+        .unwrap();
+        let alias = graph
+            .nodes
+            .values()
+            .find(|node| node.label.output_label().to_string() == "@dep//:selected")
+            .unwrap();
+        assert_eq!(
+            alias
+                .edges
+                .iter()
+                .map(|edge| (edge.kind, edge.target.output_label().to_string()))
+                .collect::<Vec<_>>(),
+            [
+                (QueryEdgeKind::Ordinary, "@dep//:left".to_owned()),
+                (QueryEdgeKind::Ordinary, "@dep//:right".to_owned()),
+                (QueryEdgeKind::Implicit, "@dep//:condition".to_owned()),
+            ]
+        );
+        assert!(matches!(
+            alias.attributes[0].value.as_ref().map(|value| &value.value),
+            Some(CoercedAttributeValue::Selector { .. })
+        ));
     }
 }

@@ -542,7 +542,7 @@ pub enum PackageTargetKind {
         srcs_explicit: bool,
     },
     Alias {
-        actual: CanonicalLabel,
+        actual: CoercedAttributeValue,
     },
     /// Loading-owned declaration of Bazel's `config_setting`. Configuration
     /// matching is intentionally owned by a later configured-analysis stage.
@@ -1587,7 +1587,7 @@ impl PackageRecorder {
     fn alias(
         &self,
         name: String,
-        actual: CanonicalLabel,
+        actual: CoercedAttributeValue,
         visibility: Option<Vec<VisibilityArgument>>,
     ) -> anyhow::Result<()> {
         self.record_target(
@@ -2590,7 +2590,7 @@ fn native_rule_attributes(
             &mut values,
             "actual",
             AttributeProvenance::Explicit,
-            CoercedAttributeValue::Label(actual.clone()),
+            actual.clone(),
         ),
         PackageTargetKind::ConfigSetting {
             declaration: setting,
@@ -2794,6 +2794,19 @@ fn native_rule_attributes(
             }
         }
         _ => unreachable!("native class was selected above"),
+    }
+
+    if let PackageTargetKind::Alias { actual } = kind {
+        let config_dependencies = actual.selector_key_labels();
+        if !config_dependencies.is_empty() {
+            set_native_value(
+                class,
+                &mut values,
+                "$config_dependencies",
+                AttributeProvenance::Implicit,
+                CoercedAttributeValue::LabelList(config_dependencies.into()),
+            );
+        }
     }
 
     Some(NativeRuleAttributes::new(class, values))
@@ -3260,11 +3273,18 @@ fn alias_global<'v>(
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<NoneType> {
     let recorder = PackageRecorder::from_evaluator(eval)?;
-    recorder.alias(
-        name.to_owned(),
-        coerce_native_direct_label(recorder, "actual", actual)?,
-        visibility.map(|value| value.items),
-    )?;
+    let actual = coerce_starlark_value(recorder, AttributeKind::Label, "actual", true, actual)?;
+    match &actual {
+        CoercedAttributeValue::Label(_) | CoercedAttributeValue::Selector { .. } => {}
+        CoercedAttributeValue::Concatenation(_, _) => {
+            anyhow::bail!(
+                "attribute `actual` of type 'label' does not support select concatenation"
+            )
+        }
+        CoercedAttributeValue::None => anyhow::bail!("attribute `actual` is mandatory"),
+        _ => anyhow::bail!("attribute `actual` must be a label"),
+    }
+    recorder.alias(name.to_owned(), actual, visibility.map(|value| value.items))?;
     recorder.set_native_generator_from_evaluator(name, eval)?;
     Ok(NoneType)
 }

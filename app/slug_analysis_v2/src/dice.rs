@@ -5859,30 +5859,129 @@ impl ConfiguredNodeAnalysisKey {
                 ConfiguredNodeKey::Configured(configured_target),
                 Some(PackageTargetKind::Alias { actual }),
             ) => {
-                let cycle_guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
-                let child_future = compute_configured_child(
+                let selector_labels = actual
+                    .selector_key_labels()
+                    .into_iter()
+                    .collect::<SmallSet<_>>()
+                    .into_iter()
+                    .collect();
+                let conditions = match prepare_configured_attribute_conditions(
                     ctx,
                     mode,
-                    self.workspace.dupe(),
-                    actual.clone(),
-                    configured_target.configuration().clone(),
-                );
-                let child = match cycle_guard {
+                    &self.workspace,
+                    configured_target.configuration(),
+                    selector_labels,
+                )
+                .await
+                {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return LoadingPreparationOutcome::Need(need);
+                    }
+                    LoadingPreparationOutcome::Complete(Err(error)) => {
+                        return LoadingPreparationOutcome::Complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                        return root_analysis_driver_complete(Err(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(Ok(conditions))) => conditions,
+                };
+                let actual = match resolve_configured_attribute(actual, &conditions.values) {
+                    Ok(CoercedAttributeValue::Label(actual)) => actual,
+                    Ok(_) => {
+                        return root_analysis_driver_complete(Err(AnalysisError::message(
+                            "native alias actual must resolve to a label",
+                        )));
+                    }
+                    Err(error) => {
+                        return root_analysis_driver_complete(Err(AnalysisError::message(
+                            format!("resolving native alias actual: {error}"),
+                        )));
+                    }
+                };
+                let inputs = std::iter::once((true, actual.clone()))
+                    .chain(
+                        conditions
+                            .packages
+                            .iter()
+                            .map(|condition| (false, condition.label().clone())),
+                    )
+                    .collect::<Vec<_>>();
+                let cycle_guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
+                let child_future = ctx.compute_join(inputs, |ctx, (selected, label)| {
+                    let configuration = configured_target.configuration().clone();
+                    Box::pin(async move {
+                        (
+                            selected,
+                            compute_configured_child(
+                                ctx,
+                                mode,
+                                self.workspace.dupe(),
+                                label,
+                                configuration,
+                            )
+                            .await,
+                        )
+                    })
+                });
+                let outcomes = match cycle_guard {
                     Ok(Some(guard)) => match guard.guard_this(child_future).await {
-                        Ok(child) => root_value!(child),
+                        Ok(outcomes) => outcomes,
                         Err(cycle) => {
                             return root_analysis_driver_complete(Err(AnalysisError::message(
                                 cycle.to_string(),
                             )));
                         }
                     },
-                    Ok(None) => root_value!(child_future.await),
+                    Ok(None) => child_future.await,
                     Err(error) => {
                         return root_analysis_driver_complete(Err(AnalysisError::message(
                             format!("reading configured-analysis cycle guard: {error}"),
                         )));
                     }
                 };
+                let mut all_need: Option<LoadingPreparationNeeds> = None;
+                let mut first_outer = None;
+                let mut first_error = None;
+                let mut child = None;
+                let mut selector_rows = Vec::with_capacity(conditions.packages.len());
+                for (selected, outcome) in outcomes {
+                    match outcome {
+                        LoadingPreparationOutcome::Need(need) => {
+                            all_need = Some(match all_need {
+                                Some(current) => current
+                                    .try_union(&need)
+                                    .expect("native alias dependency Needs agree"),
+                                None => need,
+                            });
+                        }
+                        LoadingPreparationOutcome::Complete(Err(error))
+                            if first_outer.is_none() =>
+                        {
+                            first_outer = Some(error);
+                        }
+                        LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
+                            Ok(result) if selected => child = Some(result.dupe()),
+                            Ok(result) => {
+                                selector_rows.push(RunfilesPackageClosureRow::from_result(result));
+                            }
+                            Err(error) if first_error.is_none() => {
+                                first_error = Some(error.clone());
+                            }
+                            Err(_) => {}
+                        },
+                        _ => {}
+                    }
+                }
+                if let Some(error) = first_outer {
+                    return LoadingPreparationOutcome::Complete(Err(error));
+                }
+                if let Some(need) = all_need {
+                    return LoadingPreparationOutcome::Need(need);
+                }
+                if let Some(error) = first_error {
+                    return root_analysis_driver_complete(Err(error));
+                }
+                let child = child.expect("selected native alias dependency completed");
                 let edges = vec![crate::configured_target::ConfiguredEdge::new(
                     child.key().clone(),
                     crate::configured_target::ConfiguredEdgeKind::AliasActual {
@@ -5898,7 +5997,7 @@ impl ConfiguredNodeAnalysisKey {
                         target.and_then(|target| target.rule_capability()).cloned(),
                         edges,
                         std::slice::from_ref(&child),
-                        &[],
+                        &selector_rows,
                     )
                     .map(|result| {
                         result.with_actual_configured_target(

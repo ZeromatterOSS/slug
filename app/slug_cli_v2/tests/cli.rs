@@ -5254,42 +5254,25 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
 "#;
 
     fn workspace() -> std::path::PathBuf {
-        let workspace = scratch("configured-action-conflicts");
-        write(
-            workspace.join("MODULE.bazel"),
-            "module(name = 'conflicts')\nregister_execution_platforms('//:platform')\nregister_toolchains('//:registration')\nbazel_dep(name = 'platforms', version = '1.0.0')\nlocal_path_override(module_name = 'platforms', path = '.slug_test_builtin/platforms')\n",
-        );
-        let platforms = workspace.join(".slug_test_builtin/platforms");
-        write(
-            platforms.join("MODULE.bazel"),
-            "module(name = 'platforms', version = '1.0.0')\n",
-        );
-        write(
-            platforms.join("host/BUILD.bazel"),
-            "exports_files(['constraints.bzl'])\nplatform(name = 'host')\n",
-        );
-        write(
-            platforms.join("host/constraints.bzl"),
-            "HOST_CONSTRAINTS = []\n",
-        );
-        write(workspace.join("BUILD.bazel"), BUILD);
-        write(
-            workspace.join("defs.bzl"),
-            r##"def _toolchain(ctx): return [platform_common.ToolchainInfo()]
-toolchain_impl = rule(implementation = _toolchain)
-def _writer(ctx):
-    out = ctx.actions.declare_file("shared.txt")
-    ctx.actions.write(out, ctx.attr.content)
-    return [DefaultInfo()]
-writer = rule(implementation = _writer, attrs = {"content": attr.string()}, toolchains = ["//:kind"])
-def _root(ctx):
-    out = ctx.actions.declare_file("runner.sh")
-    ctx.actions.write(out, "#!/bin/sh\nexit 0\n", is_executable = True)
-    return [DefaultInfo(executable = out)]
-root_rule = rule(implementation = _root, executable = True, attrs = {"deps": attr.label_list()}, toolchains = ["//:kind"])
-"##,
-        );
-        workspace
+        let destination = scratch("configured-action-conflicts").join("fixture");
+        let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tools/v2_oracle/configured_cli_fixture.py");
+        let output = Command::new("python3")
+            .arg(script)
+            .arg("assemble")
+            .arg("--output")
+            .arg(&destination)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        destination.join("workspace")
+    }
+
+    fn registry_flag(workspace: &std::path::Path) -> String {
+        format!(
+            "--registry=file://{}",
+            workspace.parent().unwrap().join("registry").display()
+        )
     }
 
     fn run(
@@ -5302,8 +5285,11 @@ root_rule = rule(implementation = _root, executable = True, attrs = {"deps": att
         if let Some(output_base) = output_base {
             command.arg(output_base);
         }
+        let registry = registry_flag(workspace);
         let child = command
-            .args(args)
+            .arg(args[0])
+            .arg(registry)
+            .args(&args[1..])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()
@@ -5449,7 +5435,8 @@ root_rule = rule(implementation = _root, executable = True, attrs = {"deps": att
     }
 
     fn sentinel_outputs(workspace: &std::path::Path) -> std::path::PathBuf {
-        let request = BuildRequest::parse(&["//:root"]).unwrap();
+        let registry = registry_flag(workspace);
+        let request = BuildRequest::parse(&[registry.as_str(), "//:root"]).unwrap();
         let accepted = evaluate_workspace_build_command_with_bzlmod_inputs(
             workspace,
             &request.targets,
@@ -5513,34 +5500,46 @@ root_rule = rule(implementation = _root, executable = True, attrs = {"deps": att
         output.stdout
     }
 
-    fn reject_commands(workspace: &std::path::Path, base: Option<&str>, probe: &TransportProbe) {
-        for args in [
-            vec!["build", "//:root", probe.flag.as_str()],
-            vec!["run", "//:root", probe.flag.as_str()],
-            vec!["aquery", "//:root"],
-            vec!["aquery", "deps(//:root)"],
-        ] {
-            let output = run(workspace, base, &args);
-            assert_eq!(output.status.code(), Some(2), "{args:?}: {output:?}");
-            assert!(output.stdout.is_empty(), "{args:?}: {output:?}");
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let category = if args[0] == "aquery" {
-                "aquery_runtime_error"
-            } else {
-                "configured_action_conflict"
-            };
-            for fragment in [
-                category,
-                "configured action output conflict",
-                "shared.txt",
-                "writer_a",
-                "writer_b",
-            ] {
-                assert!(stderr.contains(fragment), "{args:?}: {stderr}");
-            }
-            assert!(!stderr.contains("transport"), "{stderr}");
+    fn rejected_args<'a>(command: &'a str, flag: &'a str) -> Vec<&'a str> {
+        match command {
+            "build" => vec!["build", "//:root", flag],
+            "run" => vec!["run", "//:root", flag],
+            "aquery_literal" => vec!["aquery", "//:root"],
+            "aquery_deps" => vec!["aquery", "deps(//:root)"],
+            _ => panic!("unknown conflict command {command}"),
         }
+    }
+
+    fn reject_command(
+        workspace: &std::path::Path,
+        base: Option<&str>,
+        probe: &TransportProbe,
+        command: &str,
+    ) {
+        let args = rejected_args(command, probe.flag.as_str());
+        let output = run(workspace, base, &args);
+        assert_eq!(output.status.code(), Some(2), "{args:?}: {output:?}");
+        assert!(output.stdout.is_empty(), "{args:?}: {output:?}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let category = if args[0] == "aquery" {
+            "aquery_runtime_error"
+        } else {
+            "configured_action_conflict"
+        };
+        for fragment in [
+            category,
+            "configured action output conflict",
+            "shared.txt",
+            "writer_a",
+            "writer_b",
+        ] {
+            assert!(stderr.contains(fragment), "{args:?}: {stderr}");
+        }
+        assert!(!stderr.contains("transport"), "{stderr}");
         assert_eq!(probe.calls.load(Ordering::Relaxed), 0);
+    }
+
+    fn cquery_control(workspace: &std::path::Path, base: Option<&str>) {
         let cquery = run(workspace, base, &["cquery", "deps(//:root)"]);
         assert!(cquery.status.success(), "{cquery:?}");
         let labels = String::from_utf8_lossy(&cquery.stdout);
@@ -5550,12 +5549,7 @@ root_rule = rule(implementation = _root, executable = True, attrs = {"deps": att
         );
     }
 
-    #[test]
-    fn one_shot_rejects_unused_conflicts_before_transport_and_output_changes() {
-        let workspace = workspace();
-        let outputs = sentinel_outputs(&workspace);
-        let baseline = aquery(&workspace, None);
-        let probe = TransportProbe::new();
+    fn mutate(workspace: &std::path::Path) {
         write(
             workspace.join("BUILD.bazel"),
             &BUILD.replace(
@@ -5563,8 +5557,17 @@ root_rule = rule(implementation = _root, executable = True, attrs = {"deps": att
                 "writer_b\", content = \"different",
             ),
         );
-        reject_commands(&workspace, None, &probe);
+    }
+
+    fn one_shot_case(command: &str) {
+        let workspace = workspace();
+        let outputs = sentinel_outputs(&workspace);
+        let baseline = aquery(&workspace, None);
+        let probe = TransportProbe::new();
+        mutate(&workspace);
+        reject_command(&workspace, None, &probe, command);
         assert_outputs_unchanged(&outputs);
+        cquery_control(&workspace, None);
         write(workspace.join("BUILD.bazel"), BUILD);
         assert_eq!(aquery(&workspace, None), baseline);
         assert_outputs_unchanged(&outputs);
@@ -5572,9 +5575,30 @@ root_rule = rule(implementation = _root, executable = True, attrs = {"deps": att
     }
 
     #[test]
-    fn validated_shared_closure_lowers_one_reapi_plan_and_keeps_aquery_owners() {
+    fn one_shot_build_conflict_is_atomic_and_recovers() {
+        one_shot_case("build");
+    }
+
+    #[test]
+    fn one_shot_run_conflict_is_atomic_and_recovers() {
+        one_shot_case("run");
+    }
+
+    #[test]
+    fn one_shot_aquery_literal_conflict_is_atomic_and_recovers() {
+        one_shot_case("aquery_literal");
+    }
+
+    #[test]
+    fn one_shot_aquery_deps_conflict_is_atomic_and_recovers() {
+        one_shot_case("aquery_deps");
+    }
+
+    #[test]
+    fn validated_shared_closure_keeps_semantic_owners_and_lowers_one_reapi_plan() {
         let workspace = workspace();
-        let request = BuildRequest::parse(&["//:root"]).unwrap();
+        let registry = registry_flag(&workspace);
+        let request = BuildRequest::parse(&[registry.as_str(), "//:root"]).unwrap();
         let accepted = evaluate_workspace_build_command_with_bzlmod_inputs(
             &workspace,
             &request.targets,
@@ -5617,13 +5641,16 @@ root_rule = rule(implementation = _root, executable = True, attrs = {"deps": att
             TerminalOutput::new(0, String::new(), String::new())
         });
         assert_eq!(projected.publish().into_parts().1, 0);
+    }
 
+    #[test]
+    fn validated_shared_closure_aquery_keeps_both_owners() {
+        let workspace = workspace();
         let output = aquery(&workspace, None);
         assert!(String::from_utf8_lossy(&output).contains("shared.txt"));
     }
 
-    #[test]
-    fn stable_daemon_restores_sharing_after_repeated_conflicts() {
+    fn stable_daemon_case(command: &str) {
         let workspace = workspace();
         let outputs = sentinel_outputs(&workspace);
         let output_base = scratch("configured-action-conflicts-daemon");
@@ -5632,15 +5659,10 @@ root_rule = rule(implementation = _root, executable = True, attrs = {"deps": att
         let baseline = aquery(&workspace, Some(&base));
         let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
         let probe = TransportProbe::new();
-        write(
-            workspace.join("BUILD.bazel"),
-            &BUILD.replace(
-                "writer_b\", content = \"same",
-                "writer_b\", content = \"different",
-            ),
-        );
+        mutate(&workspace);
+        cquery_control(&workspace, Some(&base));
         for _ in 0..2 {
-            reject_commands(&workspace, Some(&base), &probe);
+            reject_command(&workspace, Some(&base), &probe, command);
             assert_outputs_unchanged(&outputs);
             assert_eq!(
                 std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
@@ -5655,6 +5677,26 @@ root_rule = rule(implementation = _root, executable = True, attrs = {"deps": att
         );
         assert_outputs_unchanged(&outputs);
         probe.assert_unused();
+    }
+
+    #[test]
+    fn stable_daemon_build_conflict_retries_and_restores() {
+        stable_daemon_case("build");
+    }
+
+    #[test]
+    fn stable_daemon_run_conflict_retries_and_restores() {
+        stable_daemon_case("run");
+    }
+
+    #[test]
+    fn stable_daemon_aquery_literal_conflict_retries_and_restores() {
+        stable_daemon_case("aquery_literal");
+    }
+
+    #[test]
+    fn stable_daemon_aquery_deps_conflict_retries_and_restores() {
+        stable_daemon_case("aquery_deps");
     }
 }
 
