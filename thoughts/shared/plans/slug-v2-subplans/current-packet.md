@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-dice-event-audit-r1
-Status: post-disable proof-order recovery accepted; gates pending rerun
+Status: armed post-disable proof correction applied; Core rerun pending
 
 ## Accepted predecessor receipt
 
@@ -248,3 +248,12 @@ event and compare the full array, then rerun the affected gates. Production and
 the exact 100/130 caps stay frozen.
 Independent recovery review returned `ACCEPT` because snapshotting after guard
 drop includes the intentional disabled transition and isolates the event.
+
+The affected gates passed and the final artifacts were frozen, but independent
+preexecution rereview returned `REVISE`: the preceding invalid consumer case
+left the final post-disable proof disarmed, so it would pass even without the
+disabled guard. The line-neutral correction first resets words 51--63 to a
+coherent armed state `P = C = 1`, `W = 0`, pending zero, active one and clear
+flags/reserved, then drops the guard, snapshots, emits the exact event and
+compares all words. Rerun only the affected Core preparation/proof, refresh the
+Rust/Core hashes and obtain rereview. The CLI replay remains unconsumed.

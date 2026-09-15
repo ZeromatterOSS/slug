@@ -96,6 +96,10 @@ The changed Core proof then failed only because it snapshotted before the guard
 drop's intentional disabled-word write. A reviewed line-neutral reorder may
 isolate the post-disable event and rerun the affected gates; no CLI replay ran.
 Independent recovery review returned `ACCEPT` for that line-neutral reorder.
+Preexecution rereview found the post-disable proof was left disarmed by its
+preceding invalid case. A line-neutral correction now establishes a coherent
+armed state before guard drop; only the Core proof and affected hashes must
+rerun before review, and the replay remains unconsumed.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

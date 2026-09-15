@@ -9187,3 +9187,6 @@ The changed Core proof next failed only because its snapshot preceded the
 guard drop's intentional disabled-word write. A reviewed line-neutral reorder
 may isolate the event; no CLI replay ran.
 Independent recovery review returned `ACCEPT` for that line-neutral reorder.
+Preexecution rereview found that proof was still disarmed by the preceding
+invalid case. It now establishes a coherent armed state before guard drop; only
+the Core proof and affected hashes must rerun before the unconsumed replay.
