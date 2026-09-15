@@ -9167,3 +9167,9 @@ because the copied file was mode 0644. One reviewed `/bin/bash` launcher
 correction may run only its self-check; the CLI and replay remain stopped.
 Independent recovery review returned `ACCEPT` and preserves the unchanged
 scratch bytes through an explicit `/bin/bash` launcher.
+After the required ptrace escalation, the decoder self-check exposed a fixture
+bug: its zero-event case cleared only one of six filtered counters. One reviewed
+scratch-only correction may clear all six and rerun the self-check; no CLI or
+replay ran.
+Independent recovery review returned `ACCEPT` for that line-neutral scratch-only
+fixture correction.

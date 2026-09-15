@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-shard-dice-event-audit-r1
-Status: supervisor launcher recovery accepted; self-check pending
+Status: supervisor self-check fixture recovery accepted; rerun pending
 
 ## Accepted predecessor receipt
 
@@ -218,3 +218,20 @@ self-check succeeds.
 Independent recovery review returned `ACCEPT` because the failed command entered
 no script code. Use `/bin/bash` for the self-check and every later invocation of
 the unchanged 0644 scratch artifact.
+
+The corrected launcher first stopped in the sandbox's namespace/ptrace
+preflight with `PTRACE_TRACEME: Operation not permitted`; per the environment
+contract it was rerun with escalation. That preflight passed and the Perl
+self-check reached its decoder matrix, then exited 255 because the synthetic
+`zero-filtered-events` case cleared only word 54 while words 55--59 remained
+one. The decoder correctly found a nonzero filtered sum, so the expected reason
+was absent. No cleanup self-check case, compiler, fixture assembly or replay ran.
+
+One recovery may change only that scratch self-check fixture to zero all six
+filtered words 54--59 before expecting `zero-filtered-events`. Preserve the
+decoder, production/proof artifacts, 91-line scratch cap accounting and all CLI
+and replay stops. Re-run the self-check once through the reviewed `/bin/bash`
+launcher with the required namespace/ptrace escalation.
+Independent recovery review returned `ACCEPT` for zeroing words 54--59 together
+without changing the decoder or runtime behavior. Keep the scratch edit
+line-neutral within its recorded 91 changed lines.

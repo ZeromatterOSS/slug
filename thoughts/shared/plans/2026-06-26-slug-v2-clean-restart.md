@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-7A-configured-conflict-path-shard-dice-event-audit-r1
-Status: supervisor launcher recovery accepted; self-check pending
+Status: supervisor self-check fixture recovery accepted; rerun pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -74,6 +74,12 @@ may invoke the unchanged scratch script through `/bin/bash`; no CLI or replay
 has run.
 Independent recovery review returned `ACCEPT` and requires `/bin/bash` for every
 later invocation of the unchanged 0644 scratch artifact.
+The sandbox namespace/ptrace preflight required the prescribed escalation. The
+escalated self-check then exposed only a synthetic fixture error: its zero-event
+case cleared one of six counters. A reviewed scratch-only correction may clear
+all six and rerun the self-check; no cleanup case, CLI build or replay ran.
+Independent recovery review returned `ACCEPT` for that line-neutral scratch-only
+fixture correction.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
