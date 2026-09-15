@@ -117,7 +117,7 @@ fixture hashes, command, counts, status and supervisor receipt.
 |---|---|---|
 | F1 authentic input inventory | partial with every payload demanded so far repository-owned, including rules_java 9.1.0 and all 183 demanded metadata objects | attribute the current bounded deadline before acquiring any further payload; catalog membership does not establish demand |
 | F2 portable offline assembly | accepted through the rules_java checkpoint | 28 objects / 8,004,740 source bytes, inventory `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
-| F3 configured source closure | corrected group runtime clears named/automatic invocation; supervised F3 selects one test and stops at rules_cc `_def_parser` computed-default target invocation with valid observer and cleanup | implement the reviewed narrow `attr.label` callback prerequisite on the same unaccepted R2/group stack, pass joint gates, then replay unchanged F3 |
+| F3 configured source closure | groups, computed defaults, configurable aliases and the independently accepted initializer checkpoint are preserved with R2; the first unchanged CLI gate clears them and reaches an opaque local_jdk repository-effect diagnostic | attribute `[diagnostic incomplete: Effect]`, implement only a reviewed selected owner if needed, pass joint gates, then replay unchanged F3 |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 plus corrected group runtime is preserved through `498ea2f49`, not accepted; focused owner suites pass, real CLI consumers select the same computed-default prerequisite | retain the stack, add only the reviewed package-owned callback prerequisite, then rerun affected selected-request, group, root-set conflict/sharing, CLI and direct-consumer gates for joint atomic acceptance |
 | R2 production consumer gates | pending R1 and complete baseline attribution | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization, positive shared execution-view/REAPI proof and partitioned affected suites; cquery remains independent |
@@ -358,3 +358,13 @@ empty-list normalization through `_legacy_any_type_attrs`. The successor changes
 no fixture object, mirror,
 metadata or assembler path. Its portable gate remains the same ten exact CLI
 selectors followed by unchanged supervised F3.
+
+The corrected initializer checkpoint passes its exact four selectors, full
+loading and query compile coverage; independent rereview returned `ACCEPT`.
+The first of the unchanged ten CLI selectors then ran for 10.59 seconds and
+advanced through rules_java's initializer before fixture setup stopped at
+toolchain registration row 8 for `rules_java++toolchains+local_jdk` with
+`[diagnostic incomplete: Effect]`. The diagnostic deliberately hides the
+underlying `HostSelectedRepositoryFileEffectError` variant, so this is only
+attribution demand. F3 was not rerun, the remaining nine CLI selectors were not
+blindly repeated, and no new payload, effect behavior or acceptance is claimed.

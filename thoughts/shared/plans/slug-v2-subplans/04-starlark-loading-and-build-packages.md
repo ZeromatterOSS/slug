@@ -8953,3 +8953,22 @@ invalidation and A/B/A restoration. Parent chains, private builtins, selectors
 and evaluator values outside the selected shapes remain unsupported. Scope,
 proofs, caps and atomic gates are frozen in `current-packet.md`. Independent
 design review accepted the corrected contract; implementation is active.
+
+### Rule initializer checkpoint; repository effect attribution selected (2026-09-14)
+
+The package-owned initializer now passes its exact invocation, failure, Java
+and cancellation selectors, full loading (565 active plus one ignored and all
+eight integration harnesses), and query compile coverage. Independent rereview
+accepted the Bzl-only evaluator boundary, exact schema-order filtering and
+copying, legacy marker, typed merge, lexical/package label split, computed-
+default reset, one-call events, terminal Bzlmod re-export and A/B/A restoration.
+The checkpoint is preserved unaccepted with the combined stack.
+
+The first unchanged CLI consumer advances beyond rules_java's initializer and
+stops during fixture setup at toolchain registration row 8 for
+`rules_java++toolchains+local_jdk`: its canonical load route reports the bounded
+placeholder `[diagnostic incomplete: Effect]` after 10.59 seconds. This does not
+identify the underlying typed repository-effect variant, so no effect behavior
+is selected yet. Replan the existing registration diagnostic projection first;
+do not rerun F3, acquire payloads, change the effect driver or accept the stack
+from this opaque terminal.

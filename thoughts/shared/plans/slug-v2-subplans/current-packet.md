@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-6-7A-r2-execution-group-rule-initializer-combined-r3
-Status: rule-initializer implementation active
+Status: rule-initializer checkpoint accepted; effect attribution selected
 
 ## Observable result
 
@@ -110,8 +110,15 @@ query, server, CLI production or CLI test may change. `package.rs` remains
 cohesive because frozen callback, schema, BUILD values, coercion, Bzl identity
 and recorder meet in this invocation.
 
-From `fe57809f6`, allow 170 gross production and 230 gross proof Rust lines,
-400 total, without deletion credit. Preserve inherited caps from `f3c90ea46`:
+From `fe57809f6`, allow 250 gross production and 300 gross proof Rust lines,
+550 total, without deletion credit. The formatted owner-local draft needs
+229 production and 300 proof lines. Production is 59 beyond the design estimate
+for finite deep copying, legacy-marker admission, two label contexts and reset-
+aware merge. The additional 50 proof lines isolate the callback from package
+state, execute the exact Java marker through a typed-Label Bzl wrapper, make the
+external re-export terminal, count callback events and discriminate computed-
+default reset. No new owner or behavior category is added. Preserve inherited
+caps from `f3c90ea46`:
 2,300 production, 3,600 proof and 5,900 gross Rust additions. Physical caps are
 12,250 for `package.rs` and 39,000 for `host_package_load_tests.rs`. Replan for
 another owner or production file, retained state, DICE/cache/lock/request
@@ -157,6 +164,17 @@ merge/coercion, atomicity, A/B/A, scope and caps. If F3 finds another semantic
 guard, preserve this checkpoint and replan it. Only after every inherited joint
 gate and final review may the complete stack merge to `main` and push to
 `git@github.com:ZeromatterOSS/slug.git`.
+
+The corrected checkpoint passes all four exact selectors, full loading (565
+active plus one ignored and all eight integration harnesses), and query compile
+coverage. Independent rereview returned `ACCEPT` for the Bzl-only evaluator,
+copy/filter/merge semantics, authentic Java path, exact events, computed reset,
+atomic failure and A/B/A. Live additions are 229 production, 300 proof and 529
+total; physical sizes are 12,221 and 38,896 lines. The first unchanged CLI
+selector advances beyond the initializer and stops during fixture setup at
+registration row 8 for `rules_java++toolchains+local_jdk` with
+`[diagnostic incomplete: Effect]` after 10.59 seconds. This selects a diagnostic
+attribution replan; it does not accept the combined stack or authorize F3.
 
 ## Immediate predecessor
 

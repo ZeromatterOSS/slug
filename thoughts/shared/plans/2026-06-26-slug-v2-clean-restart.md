@@ -30,14 +30,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-6-7A-r2-execution-group-rule-initializer-combined-r3
-Status: rule-initializer implementation active
+Status: rule-initializer checkpoint accepted; effect attribution selected
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack, execute the retained rules_java initializer under the bounded package-
-owned contract, and accept the whole stack atomically as specified by
+owned contract, then attribute the newly exposed repository-effect terminal
+before accepting the whole stack atomically as specified by
 [current-packet.md](./slug-v2-subplans/current-packet.md). Independent review
-accepted argument copying, legacy-any-type admission, `None` reset semantics,
-label contexts and package-attempt lifecycle; implementation is active.
+accepted the completed initializer and its owner gates. The first unchanged CLI
+consumer clears it and reaches `[diagnostic incomplete: Effect]`; the stack
+remains unaccepted while that typed effect error is attributed.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

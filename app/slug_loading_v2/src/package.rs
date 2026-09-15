@@ -70,6 +70,7 @@ use starlark::values::none::NoneType;
 use starlark::values::set::SetRef;
 use starlark::values::starlark_value;
 use starlark::values::structs::AllocStruct;
+use starlark::values::tuple::AllocTuple;
 use starlark::values::tuple::TupleRef;
 use starlark::values::typing::StarlarkCallable;
 use starlark_map::small_map::SmallMap;
@@ -7660,6 +7661,194 @@ impl<'v> StarlarkValue<'v> for JavaCommonInternalModule {
     }
 }
 
+enum RuleInitializerOverride {
+    Unset,
+    Value(CoercedAttributeValue),
+}
+
+fn copy_rule_initializer_value<'v>(value: Value<'_>, heap: Heap<'v>) -> anyhow::Result<Value<'v>> {
+    if value.is_none() {
+        return Ok(Value::new_none());
+    }
+    if let Some(label) = StarlarkLabel::from_value(value) {
+        return Ok(heap.alloc_simple(StarlarkLabel::new(label.canonical().clone())));
+    }
+    if let Some(value) = value.unpack_str() {
+        return Ok(heap.alloc_str(value).to_value());
+    }
+    if let Some(value) = value.unpack_bool() {
+        return Ok(Value::new_bool(value));
+    }
+    if let Some(value) = value.unpack_i32() {
+        return Ok(heap.alloc(value));
+    }
+    if let Some(values) = ListRef::from_value(value) {
+        let copied = values
+            .iter()
+            .map(|value| copy_rule_initializer_value(value, heap))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        return Ok(heap.alloc(AllocList(copied)));
+    }
+    if let Some(values) = TupleRef::from_value(value) {
+        let copied = values
+            .iter()
+            .map(|value| copy_rule_initializer_value(value, heap))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        return Ok(heap.alloc(AllocTuple(copied)));
+    }
+    if let Some(values) = DictRef::from_value(value) {
+        let copied = values
+            .iter()
+            .map(|(key, value)| {
+                Ok((
+                    copy_rule_initializer_value(key, heap)?,
+                    copy_rule_initializer_value(value, heap)?,
+                ))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        return Ok(heap.alloc(AllocDict(copied)));
+    }
+    anyhow::bail!(
+        "rule initializer input contains unsupported {} value",
+        value.get_type()
+    )
+}
+
+fn invoke_rule_initializer<'v>(
+    initializer: FrozenValue,
+    names: &SmallMap<StringValue<'v>, Value<'v>>,
+    recorder: &PackageRecorder,
+    definition: &FrozenRuleDefinition,
+) -> anyhow::Result<SmallMap<CompactString, RuleInitializerOverride>> {
+    let legacy = definition
+        .schema
+        .iter()
+        .find(|schema| schema.name == "_legacy_any_type_attrs")
+        .and_then(|schema| schema.default.as_ref())
+        .and_then(|value| match value {
+            CoercedAttributeValue::StringList(values) => Some(values.as_ref()),
+            _ => None,
+        })
+        .unwrap_or_default();
+    let module = starlark::environment::Module::new();
+    let mut argument_names = vec![CompactString::const_new("name")];
+    let mut argument_values = vec![
+        module
+            .heap()
+            .alloc_str(
+                names
+                    .get("name")
+                    .and_then(|value| value.unpack_str())
+                    .expect("rule invocation validated name"),
+            )
+            .to_value(),
+    ];
+    for declaration in definition
+        .schema
+        .iter()
+        .filter(|schema| !schema.builtin && !schema.name.starts_with('_'))
+    {
+        let Some(value) = explicit_rule_attribute_value(names, &declaration.name)
+            .filter(|value| !value.is_none())
+        else {
+            continue;
+        };
+        let value = if legacy.iter().any(|name| name == &declaration.name) {
+            copy_rule_initializer_value(value, module.heap())?
+        } else {
+            let value = coerce_starlark_value(
+                recorder,
+                declaration.kind,
+                &declaration.name,
+                declaration.configurable,
+                value,
+            )?;
+            if matches!(
+                value,
+                CoercedAttributeValue::Selector { .. } | CoercedAttributeValue::Concatenation(_, _)
+            ) {
+                anyhow::bail!(
+                    "rule initializer input '{}' cannot use select()",
+                    declaration.name
+                );
+            }
+            allocate_macro_attribute(&value, module.heap())?
+        };
+        argument_names.push(declaration.name.clone());
+        argument_values.push(value);
+    }
+    let named = argument_names
+        .iter()
+        .zip(argument_values.iter().copied())
+        .map(|(name, value)| (name.as_str(), value))
+        .collect::<Vec<_>>();
+    let bzl = BzlEvaluationContext::macro_runtime_context(
+        (*definition.definition_source).clone(),
+        definition.source_identities_by_filename.clone(),
+    );
+    let result = {
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&bzl);
+        if let Some(capture) = recorder.print_capture() {
+            evaluator.set_print_handler(capture);
+        }
+        evaluator.eval_function(initializer.to_value(), &[], &named)
+    }
+    .map_err(|error| anyhow::anyhow!("rule initializer failed: {error}"))?;
+    if result.is_none() {
+        return Ok(SmallMap::new());
+    }
+    let result = DictRef::from_value(result)
+        .ok_or_else(|| anyhow::anyhow!("rule initializer must return None or a dictionary"))?;
+    let mut overrides = SmallMap::with_capacity(result.len());
+    for (key, value) in result.iter() {
+        let key = key
+            .unpack_str()
+            .ok_or_else(|| anyhow::anyhow!("rule initializer keys must be strings"))?;
+        if key == "name" {
+            if value.unpack_str() != names.get("name").and_then(|value| value.unpack_str()) {
+                anyhow::bail!("rule initializer cannot change target name");
+            }
+            continue;
+        }
+        let declaration = definition
+            .schema
+            .iter()
+            .find(|schema| schema.name == key)
+            .ok_or_else(|| {
+                anyhow::anyhow!("rule initializer returned unknown attribute '{key}'")
+            })?;
+        if declaration.builtin || declaration.name.starts_with('_') {
+            anyhow::bail!("rule initializer cannot set attribute '{key}'");
+        }
+        if value.is_none() {
+            overrides.insert(declaration.name.clone(), RuleInitializerOverride::Unset);
+            continue;
+        }
+        if SelectorValue::from_value(value).is_some() {
+            anyhow::bail!("rule initializer result '{key}' cannot use select()");
+        }
+        let raw = raw_attribute_value(value)?;
+        let label_context = if matches!(
+            declaration.kind,
+            AttributeKind::Output | AttributeKind::OutputList
+        ) {
+            RawLabelContext::Package(recorder)
+        } else {
+            RawLabelContext::Definition(&definition.definition_source)
+        };
+        overrides.insert(
+            declaration.name.clone(),
+            RuleInitializerOverride::Value(coerce_raw_value(
+                label_context,
+                declaration.kind,
+                &raw,
+            )?),
+        );
+    }
+    Ok(overrides)
+}
+
 #[starlark_value(type = "rule")]
 impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
     type Canonical = Self;
@@ -7682,25 +7871,6 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 "a target declared by rule() requires a string `name`"
             ))
         })?;
-        if self.initializer.is_some() {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
-                "target invocation for rule initializer is unsupported"
-            )));
-        }
-        self.reject_deferred_attribute_invocation()
-            .map_err(starlark::Error::new_other)?;
-        for attribute in names.keys() {
-            let attribute = canonical_rule_attribute_name(attribute);
-            if attribute != "name"
-                && attribute != "visibility"
-                && !self.schema.iter().any(|schema| schema.name == attribute)
-            {
-                return Err(starlark::Error::new_other(anyhow::anyhow!(
-                    "target `{name}` received unknown attribute `{}`",
-                    attribute
-                )));
-            }
-        }
         let visibility = names.get("visibility").copied();
         let implementation = self.implementation;
         let definition_source = self.definition_source.clone();
@@ -7728,6 +7898,21 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         let heap = eval.heap();
         PackageRecorder::from_evaluator(eval)
             .and_then(|recorder| {
+                let initialized = self
+                    .initializer
+                    .map(|initializer| invoke_rule_initializer(initializer, &names, recorder, self))
+                    .transpose()?
+                    .unwrap_or_default();
+                self.reject_deferred_attribute_invocation()?;
+                for attribute in names.keys() {
+                    let attribute = canonical_rule_attribute_name(attribute);
+                    if attribute != "name"
+                        && attribute != "visibility"
+                        && !self.schema.iter().any(|schema| schema.name == attribute)
+                    {
+                        anyhow::bail!("target `{name}` received unknown attribute `{attribute}`");
+                    }
+                }
                 let visibility = visibility
                     .map(|value| parse_rule_visibility_argument(recorder, value))
                     .transpose()?;
@@ -7826,8 +8011,11 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     // optional value. Stage 8 must distinguish absent-looking
                     // values from a missing declaration.
                     schema.push(attribute_schema.clone());
-                    let explicit =
-                        explicit_rule_attribute_value(&names, declaration.name.as_str());
+                    let initialized = initialized.get(declaration.name.as_str());
+                    let explicit = initialized
+                        .is_none()
+                        .then(|| explicit_rule_attribute_value(&names, declaration.name.as_str()))
+                        .flatten();
                     if builtin
                         && explicit.is_some()
                         && !starlark_builtin_callable(declaration.name.as_str())
@@ -7837,7 +8025,24 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                             declaration.name
                         );
                     }
-                    let (provenance, value) = match explicit {
+                    let (provenance, value) = match initialized {
+                        Some(RuleInitializerOverride::Value(value)) => {
+                            (AttributeProvenance::Explicit, value.clone())
+                        }
+                        Some(RuleInitializerOverride::Unset) if declaration.mandatory => {
+                            anyhow::bail!(
+                                "missing value for mandatory attribute '{}'",
+                                declaration.name
+                            )
+                        }
+                        Some(RuleInitializerOverride::Unset) => (
+                            AttributeProvenance::Default,
+                            attribute_schema
+                                .default()
+                                .expect("intrinsic default")
+                                .clone(),
+                        ),
+                        None => match explicit {
                         Some(_) if builtin && declaration.name == "visibility" => {
                             (AttributeProvenance::Explicit, visibility_value.clone())
                         }
@@ -7892,6 +8097,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                                 .expect("intrinsic default")
                                 .clone(),
                         ),
+                        },
                     };
                     let value = normalize_starlark_value(value, attribute_schema.order_independent());
                     if provenance == AttributeProvenance::Explicit {
@@ -7916,7 +8122,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 for computed in self.computed_default_attributes.iter() {
                     let schema_index = computed.schema_index as usize;
                     let declaration = &self.schema[schema_index];
-                    if explicit_rule_attribute_value(&names, declaration.name.as_str()).is_some() {
+                    if values[schema_index].provenance == AttributeProvenance::Explicit {
                         continue;
                     }
                     let value = invoke_rule_label_computed_default(

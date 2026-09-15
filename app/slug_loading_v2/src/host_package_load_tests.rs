@@ -760,6 +760,28 @@ fn terminal_error(outcome: &HostPackageOutcome) -> String {
     value.as_ref().as_ref().unwrap_err().to_string()
 }
 
+fn starlark_attr(
+    package: &crate::LoadedPackage,
+    target_name: &str,
+    attribute: &str,
+) -> crate::attrs::AttributeQueryValue {
+    let target = package
+        .targets
+        .iter()
+        .find(|target| target.name == target_name)
+        .unwrap();
+    let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
+        panic!("expected Starlark rule")
+    };
+    let (schema, value) = rule
+        .schema()
+        .iter()
+        .zip(rule.values())
+        .find(|(schema, _)| schema.declaration_name() == attribute)
+        .unwrap();
+    value.query_value(schema)
+}
+
 async fn compute_package(
     dice: &Arc<Dice>,
     epoch: PathObservationEpoch,
@@ -1742,70 +1764,299 @@ async fn host_package_loads_bzl_and_owns_only_local_complete_events() {
 }
 
 #[tokio::test]
-async fn rule_initializer_reexport_rejects_before_recording_and_recovers() {
-    const DEFS: &str = concat!(
+async fn rule_initializer_reexport_invokes_copies_merges_and_restores() {
+    const A: &str = concat!(
         "def _impl(ctx): fail('implementation stayed lazy')\n",
-        "def _init(name, **kwargs): fail('initializer stayed lazy')\n",
-        "probe = rule(implementation = _impl, initializer = _init, ",
-        "attrs = {'out': attr.output()})\n",
-        "plain = rule(implementation = _impl)\n",
+        "def _computed(name, keep): print('RESET:' + name); return Label(':computed')\n",
+        "def _init(name, **kwargs):\n",
+        "  print('INIT:%s:%s:%s:%s' % (name, ','.join(kwargs.keys()), type(kwargs['dep']), kwargs['dep']))\n",
+        "  kwargs['items'].append('scratch')\n",
+        "  if name == 'whole': return None\n",
+        "  return {'name': name, 'dep': ':returned', 'label_obj': Label(':object'), 'out': name + '.txt', 'reset': None, 'computed': None}\n",
+        "probe = rule(implementation = _impl, initializer = _init, attrs = {",
+        "'dep': attr.label(), 'label_obj': attr.label(), 'items': attr.string_list(), ",
+        "'keep': attr.string(), 'reset': attr.label(default = '//defaults:reset'), 'computed': attr.label(default = _computed), ",
+        "'defaulted': attr.string(default = 'default'), 'none_arg': attr.label(), ",
+        "'out': attr.output(), '_private': attr.string(default = 'private')})\n",
     );
-    const REEXPORT: &str =
-        "load(':defs.bzl', _plain = 'plain', _probe = 'probe')\nplain = _plain\nprobe = _probe\n";
-    let sources = [("defs.bzl", DEFS), ("reexport.bzl", REEXPORT)];
+    const B: &str = concat!(
+        "def _impl(ctx): fail('implementation stayed lazy')\n",
+        "def _computed(name, keep): return Label(':computed')\n",
+        "def _init(name, **kwargs): return {'dep': '//edited:value'}\n",
+        "probe = rule(implementation = _impl, initializer = _init, attrs = {'dep': attr.label(), 'label_obj': attr.label(), 'items': attr.string_list(), 'keep': attr.string(), 'reset': attr.label(default = '//defaults:reset'), 'computed': attr.label(default = _computed), 'defaulted': attr.string(default = 'default'), 'none_arg': attr.label(), 'out': attr.output(), '_private': attr.string(default = 'private')})\n",
+    );
+    const REEXPORT: &str = "load('//rules:defs.bzl', _probe = 'probe')\nprobe = _probe\n";
+    const BUILD: &str = concat!(
+        "load(':reexport.bzl', 'probe')\n",
+        "probe(name = 'subject', dep = ':input', items = ['one'], keep = 'kept', reset = ':explicit', computed = ':explicit-computed', none_arg = None, visibility = ['//visibility:public'])\n",
+        "probe(name = 'whole', dep = ':whole', items = ['two'], keep = 'whole-kept', reset = ':whole-reset', out = 'whole.raw')\n",
+    );
+    let epoch = |defs: &str, variant| {
+        let mut epoch = EpochBuilder::workspace_sources(
+            "print('ROOT')\n",
+            BUILD,
+            &[("reexport.bzl", REEXPORT)],
+            variant,
+        );
+        epoch.directory("/workspace/rules", variant);
+        epoch.file("/workspace/rules/BUILD.bazel", "", variant);
+        epoch.file("/workspace/rules/defs.bzl", defs, variant);
+        epoch.build()
+    };
     let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(EventTracker::default());
+    let mut root_tx = transaction(&dice, epoch(A, 101), true, Some(tracker.clone())).await;
+    let first = root_tx.compute(&package_key()).await.unwrap();
+    let package = terminal_package(&first);
+    for (attribute, expected, provenance) in [
+        ("dep", "@@//rules:returned", AttributeProvenance::Explicit),
+        (
+            "label_obj",
+            "@@//rules:object",
+            AttributeProvenance::Explicit,
+        ),
+        ("reset", "@@//defaults:reset", AttributeProvenance::Default),
+        (
+            "computed",
+            "@@//rules:computed",
+            AttributeProvenance::Default,
+        ),
+        ("keep", "kept", AttributeProvenance::Explicit),
+    ] {
+        let value = starlark_attr(package, "subject", attribute);
+        assert_eq!(value.provenance, provenance);
+        match value.value {
+            CoercedAttributeValue::Label(label) => assert_eq!(label.to_string(), expected),
+            CoercedAttributeValue::String(value) => assert_eq!(value, expected),
+            value => panic!("unexpected {attribute}: {value:?}"),
+        }
+    }
+    assert_eq!(
+        starlark_attr(package, "subject", "items").value,
+        CoercedAttributeValue::StringList(Arc::from(["one".into()]))
+    );
+    assert_eq!(
+        starlark_attr(package, "subject", "out").value,
+        CoercedAttributeValue::Output(CanonicalLabel::parse("@@//pkg:subject.txt").unwrap())
+    );
+    assert_eq!(
+        starlark_attr(package, "whole", "dep").value,
+        CoercedAttributeValue::Label(CanonicalLabel::parse("@@//pkg:whole").unwrap())
+    );
+    let events = tracker.take();
+    let package_events = batch_with_prefix(&events, "host-package-load:")
+        .batch
+        .as_ref()
+        .unwrap();
+    assert_eq!(
+        event_texts(package_events),
+        [
+            "INIT:subject:dep,items,keep,reset,computed:Label:@@//pkg:input",
+            "RESET:subject",
+            "INIT:whole:dep,items,keep,reset,out:Label:@@//pkg:whole",
+            "RESET:whole",
+        ]
+    );
+    let edited = compute_package(&dice, epoch(B, 102), package_policy()).await;
+    assert_ne!(terminal_package(&edited), package);
+    let restored = compute_package(&dice, epoch(A, 101), package_policy()).await;
+    assert_eq!(terminal_package(&restored), package);
+
+    let mut external_epoch = EpochBuilder::workspace_sources(
+        "module(name='bazel_tools')\nbazel_dep(name='dep', version='1.0.0')\nlocal_path_override(module_name='dep', path='dep')\n",
+        "load('@dep//rules:reexport.bzl', 'probe')\nprobe(name='external', dep=':input', items=[], keep='x', reset=':x', computed=':explicit')\n",
+        &[],
+        103,
+    );
+    external_epoch.directory("/workspace/dep", 103);
+    external_epoch.file(
+        "/workspace/dep/MODULE.bazel",
+        "module(name='dep', version='1.0.0')\n",
+        103,
+    );
+    external_epoch.missing("/workspace/dep/REPO.bazel");
+    external_epoch.missing("/workspace/dep/.bazelignore");
+    external_epoch.directory("/workspace/dep/rules", 103);
+    external_epoch.file("/workspace/dep/rules/BUILD.bazel", "", 103);
+    external_epoch.file("/workspace/dep/rules/defs.bzl", A, 103);
+    external_epoch.file(
+        "/workspace/dep/rules/reexport.bzl",
+        "load(':defs.bzl', _probe='probe')\nprobe=_probe\n",
+        103,
+    );
+    let external_tracker = Arc::new(EventTracker::default());
+    let mut external_tx = transaction(
+        &dice,
+        external_epoch.build(),
+        true,
+        Some(external_tracker.clone()),
+    )
+    .await;
+    let external = external_tx.compute(&package_key()).await.unwrap();
+    let external_package = terminal_package(&external);
+    assert_eq!(
+        event_texts(
+            batch_with_prefix(&external_tracker.take(), "host-package-load:")
+                .batch
+                .as_ref()
+                .unwrap()
+        ),
+        [
+            "INIT:external:dep,items,keep,reset,computed:Label:@@//pkg:input",
+            "RESET:external"
+        ]
+    );
+    for (attribute, expected) in [
+        ("dep", "@@dep+//rules:returned"),
+        ("computed", "@@dep+//rules:computed"),
+        ("label_obj", "@@dep+//rules:object"),
+    ] {
+        let CoercedAttributeValue::Label(label) =
+            starlark_attr(external_package, "external", attribute).value
+        else {
+            panic!("expected label")
+        };
+        assert_eq!(label.to_string(), expected);
+    }
+    assert_eq!(
+        starlark_attr(external_package, "external", "out").value,
+        CoercedAttributeValue::Output(CanonicalLabel::parse("@@//pkg:external.txt").unwrap())
+    );
+}
+
+#[tokio::test]
+async fn rule_initializer_failures_publish_no_target_or_output() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let cases = [
+        ("fail('failure')", "out = 'x'", "failure"),
+        ("return []", "", "None or a dictionary"),
+        ("return {1: 'x'}", "", "keys must be strings"),
+        (
+            "return {'name': 'changed'}",
+            "",
+            "cannot change target name",
+        ),
+        ("return {'unknown': 1}", "", "unknown attribute 'unknown'"),
+        (
+            "return {'_private': 'x'}",
+            "",
+            "cannot set attribute '_private'",
+        ),
+        ("return {'tags': []}", "", "cannot set attribute 'tags'"),
+        ("native.filegroup(name='side')", "", "without package state"),
+        (
+            "fail('selector reached callback')",
+            "dep = select({'//conditions:default': ':x'})",
+            "cannot use select()",
+        ),
+        (
+            "fail('callable reached callback')",
+            "legacy = glob",
+            "unsupported function value",
+        ),
+        ("return {'dep': 1}", "", "must be a string"),
+        (
+            "fail('list reached callback')",
+            "dep = [':x']",
+            "must be a string",
+        ),
+    ];
+    for (index, (body, argument, expected)) in cases.into_iter().enumerate() {
+        let defs = format!(
+            "def _impl(ctx): fail('implementation stayed lazy')\ndef _init(name, **kwargs): {body}\nprobe = rule(implementation = _impl, initializer = _init, attrs = {{'dep': attr.label(), 'legacy': attr.string(), 'out': attr.output(), '_private': attr.string(), '_legacy_any_type_attrs': attr.string_list(default = ['legacy'])}})\n"
+        );
+        let build = format!(
+            "load(':defs.bzl', 'probe')\nfilegroup(name='earlier')\nprobe(name='bad'{})\n",
+            if argument.is_empty() {
+                "".into()
+            } else {
+                format!(", {argument}")
+            }
+        );
+        let outcome = compute_package(
+            &dice,
+            EpochBuilder::workspace_sources("", &build, &[("defs.bzl", &defs)], 200 + index as i64)
+                .build(),
+            package_policy(),
+        )
+        .await;
+        let error = terminal_error(&outcome);
+        assert!(error.contains(expected), "case {index}: {error}");
+    }
+    let control = compute_package(&dice, EpochBuilder::workspace_sources("", "load(':defs.bzl', 'plain')\nplain(name='clean', out='clean.out')\n", &[("defs.bzl", "def _impl(ctx): fail('lazy')\nplain=rule(implementation=_impl, attrs={'out': attr.output()})\n")], 220).build(), package_policy()).await;
+    assert!(target_names(&control).contains(&"clean"));
+}
+
+#[tokio::test]
+async fn java_toolchain_initializer_passes_authentic_labels_and_legacy_lists() {
+    const DEFS: &str = concat!(
+        "LEGACY = ['genclass', 'deps_checker', 'header_compiler', 'header_compiler_direct', 'ijar', 'javabuilder', 'singlejar']\n",
+        "def _impl(ctx): fail('analysis stayed lazy')\n",
+        "def _init(name, **kwargs):\n",
+        "  for key in LEGACY:\n",
+        "    if key in kwargs and type(kwargs[key]) == 'list':\n",
+        "      if len(kwargs[key]) == 1: kwargs[key] = kwargs[key][0]\n",
+        "      elif len(kwargs[key]) == 0: kwargs[key] = None\n",
+        "      else: fail('legacy list too long')\n",
+        "  return kwargs\n",
+        "LABELS = {k: attr.label() for k in ['genclass', 'header_compiler', 'header_compiler_direct', 'ijar', 'javabuilder', 'singlejar', 'deps_checker']}\n",
+        "LABELS['_legacy_any_type_attrs'] = attr.string_list(default=LEGACY)\n",
+        "java_toolchain = rule(implementation = _impl, initializer = _init, attrs = LABELS)\n",
+        "def authentic(name): java_toolchain(name=name, genclass=Label(':genclass'), header_compiler=Label(':header_compiler'), header_compiler_direct=Label(':header_compiler_direct'), ijar=Label(':ijar'), javabuilder=Label(':javabuilder'), singlejar=Label(':singlejar'))\n",
+        "legacy = rule(implementation = _impl, initializer = _init, attrs = {'genclass': attr.label(default='//defaults:genclass'), 'deps_checker': attr.label(default='//defaults:deps_checker'), 'strict': attr.label(), '_legacy_any_type_attrs': attr.string_list(default=LEGACY)})\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let names = [
+        "genclass",
+        "header_compiler",
+        "header_compiler_direct",
+        "ijar",
+        "javabuilder",
+        "singlejar",
+    ];
+    let build = "load(':defs.bzl', 'authentic', 'legacy')\nauthentic(name='jdk')\nlegacy(name='normalized', genclass=[':genclass'], deps_checker=[], strict=':strict')\n";
+    let outcome = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources("", build, &[("defs.bzl", DEFS)], 301).build(),
+        package_policy(),
+    )
+    .await;
+    let package = terminal_package(&outcome);
+    for name in names {
+        assert_eq!(
+            starlark_attr(package, "jdk", name).value,
+            CoercedAttributeValue::Label(
+                CanonicalLabel::parse(&format!("@@//pkg:{name}")).unwrap()
+            )
+        );
+    }
+    assert_eq!(
+        starlark_attr(package, "jdk", "deps_checker").value,
+        CoercedAttributeValue::None
+    );
+    assert_eq!(
+        starlark_attr(package, "normalized", "genclass").value,
+        CoercedAttributeValue::Label(CanonicalLabel::parse("@@//pkg:genclass").unwrap())
+    );
+    let reset = starlark_attr(package, "normalized", "deps_checker");
+    assert_eq!(reset.provenance, AttributeProvenance::Default);
+    assert_eq!(
+        reset.value,
+        CoercedAttributeValue::Label(CanonicalLabel::parse("@@//defaults:deps_checker").unwrap())
+    );
     let rejected = compute_package(
         &dice,
         EpochBuilder::workspace_sources(
-            "print('ROOT')\n",
-            concat!(
-                "load(':reexport.bzl', 'probe')\n",
-                "probe(name = 'bad', out = ['not an output'], unknown = 1)\n",
-                "filegroup(name = 'must_not_publish')\n",
-            ),
-            &sources,
-            101,
+            "",
+            "load(':defs.bzl', 'legacy')\nlegacy(name='bad', strict=[':x'])\n",
+            &[("defs.bzl", DEFS)],
+            302,
         )
         .build(),
         package_policy(),
     )
     .await;
-    let error = terminal_error(&rejected);
-    assert!(
-        error.contains("target invocation for rule initializer is unsupported"),
-        "{error}"
-    );
-
-    let recovered = compute_package(
-        &dice,
-        EpochBuilder::workspace_sources(
-            "print('ROOT')\n",
-            "load(':reexport.bzl', 'plain')\nplain(name = 'clean')\n",
-            &sources,
-            102,
-        )
-        .build(),
-        package_policy(),
-    )
-    .await;
-    assert_eq!(target_names(&recovered), ["clean"]);
-
-    let external = load_repository_package_fixture(
-        &[
-            (
-                "BUILD.bazel",
-                b"load(':reexport.bzl', 'probe')\nprobe(name = 'bad', unknown = 1)\n",
-            ),
-            ("defs.bzl", DEFS.as_bytes()),
-            ("reexport.bzl", REEXPORT.as_bytes()),
-        ],
-        103,
-    )
-    .await;
-    assert!(
-        repository_package_error(&external)
-            .contains("target invocation for rule initializer is unsupported")
-    );
+    assert!(terminal_error(&rejected).contains("must be a string"));
 }
 
 #[tokio::test]
