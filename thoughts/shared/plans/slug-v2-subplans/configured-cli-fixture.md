@@ -117,7 +117,7 @@ fixture hashes, command, counts, status and supervisor receipt.
 |---|---|---|
 | F1 authentic input inventory | partial with every payload demanded so far repository-owned, including rules_java 9.1.0 and all 183 demanded metadata objects | attribute the current bounded deadline before acquiring any further payload; catalog membership does not establish demand |
 | F2 portable offline assembly | accepted through the rules_java checkpoint | 28 objects / 8,004,740 source bytes, inventory `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`, and 177 bundled metadata entries verify and assemble in a fresh root; negative patch/input checks remain green |
-| F3 configured source closure | groups, computed defaults, configurable aliases and the independently accepted initializer checkpoint are preserved with R2; the first unchanged CLI gate clears them and reaches an opaque local_jdk repository-effect diagnostic | attribute `[diagnostic incomplete: Effect]`, implement only a reviewed selected owner if needed, pass joint gates, then replay unchanged F3 |
+| F3 configured source closure | groups, computed defaults, configurable aliases and accepted initializer/effect-diagnostic checkpoints are preserved with R2; the first unchanged CLI gate selects local-JDK generated string path/get_child/exists semantics | implement the reviewed attempt-local generated-path owner, pass joint gates, continue one-selector attribution, then replay unchanged F3 |
 | B1 baseline attribution | two failures reproduced on `97dffd5d4` | retain source/environment-specific evidence; characterize remaining reported failures without weakening assertions |
 | R1 combined semantic gates | R2 plus corrected group runtime is preserved through `498ea2f49`, not accepted; focused owner suites pass, real CLI consumers select the same computed-default prerequisite | retain the stack, add only the reviewed package-owned callback prerequisite, then rerun affected selected-request, group, root-set conflict/sharing, CLI and direct-consumer gates for joint atomic acceptance |
 | R2 production consumer gates | pending R1 and complete baseline attribution | one-shot/stable-daemon build/run/aquery conflict rejection before RPC/materialization, positive shared execution-view/REAPI proof and partitioned affected suites; cquery remains independent |
@@ -376,3 +376,12 @@ existing registration sink. Independent review accepted its exhaustive bounded
 projection, lifecycle, scope and caps. Commit this checkpoint, then rebuild,
 preflight and run the first CLI selector once. The other nine selectors and F3
 remain stopped.
+
+The rebuilt first selector then ran once for 10.95 seconds and exposed the exact
+typed leaf: toolchain registration row 8,
+`rules_java++toolchains+local_jdk`, `Effect: Invocation 6:
+repository_ctx.path argument must be a Label`. Authenticated rules_java calls
+`path("./nosystemjdk")`, derives `bin/java` and tests absence under the selected
+empty repository environment. The corrected successor uses attempt-only
+generated path/presence state and changes no fixture or materializer. Its design
+review returned `ACCEPT`; the other nine selectors and F3 were not run.

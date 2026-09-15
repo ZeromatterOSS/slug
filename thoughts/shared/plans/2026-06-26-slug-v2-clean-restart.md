@@ -29,16 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-registration-effect-diagnostic-r1
-Status: repository-effect diagnostic accepted; one CLI attribution run pending
+Packet: WP-4-7A-repository-generated-path-r1
+Status: generated-path design accepted; implementation ready
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
-stack and its independently accepted initializer checkpoint. The current packet
-replaces the opaque repository-effect placeholder with a bounded borrowed
-projection. Its exact exhaustive proof, full loading harness and query compile
-gate pass, and independent review accepted its bounded scope and lifecycle.
-One authorized CLI selector will expose the next typed leaf. The combined stack
-remains unaccepted.
+stack and its independently accepted initializer and diagnostic checkpoints.
+The single authorized CLI selector exposed repository invocation ordinal 6 in
+`rules_java++toolchains+local_jdk`: `repository_ctx.path` rejects the authentic
+relative string `./nosystemjdk`. The accepted successor adds only attempt-local
+generated path identity, lexical children and prior-effect existence. The
+combined stack remains unaccepted.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

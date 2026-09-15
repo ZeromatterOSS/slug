@@ -8985,3 +8985,19 @@ Full loading passes 566 active tests with one ignored, and query compile
 coverage passes. Independent review accepted exhaustiveness, bounded traversal,
 information minimization, unchanged identity/lifecycle, scope and caps. The
 checkpoint precedes the single unchanged CLI selector.
+
+### Generated repository path successor selected (2026-09-14)
+
+The accepted diagnostic checkpoint `fde43d5cf` exposed repository invocation
+ordinal 6 in `rules_java++toolchains+local_jdk`: the authenticated rule calls
+`repository_ctx.path("./nosystemjdk")`, derives `bin/java`, and tests `.exists`.
+The selected host repository environment is empty, so this is the absent-Java
+branch and no payload demand.
+
+The reviewed successor keeps generated paths and their presence set in one
+evaluator attempt. Successful file/template pushes add authored files and
+directory prefixes; root and the prior `WORKSPACE` are present while the
+disjoint Java path is absent. Stable canonical logical spelling replaces an
+unavailable physical materialization root. Absolute/escaping host paths and
+physical Label/which existence remain unsupported. Independent design review
+accepted the corrected owner, identity, limits, proofs and stop gates.
