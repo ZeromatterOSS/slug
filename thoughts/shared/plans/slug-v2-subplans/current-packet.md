@@ -141,7 +141,7 @@ the review branch.
 ## Frozen preparation checkpoint
 
 The final temporary change fits the 230/310/140 caps at 221 production
-additions, 310 proof additions and 63 changed supervisor lines. The exact
+additions, 310 proof additions and 76 changed supervisor lines. The exact
 workspace and feature-enabled Core proofs each pass 1/1. The corrected 0644
 supervisor passes syntax plus normal/deadline/exception cleanup and decoder
 self-checks. Its compiler completed the sole `cli` integration target with zero
@@ -154,7 +154,7 @@ source bytes and inventory
 Frozen SHA-256 values are: base supervisor
 `d9a012989d595e6da275094d4ce020a8e8a8214e1714df79e8a3285282191179`,
 typed supervisor
-`f58171f86d0e5ace28004d9dfdddb0b4ff02d5752ac533e23a59b2ee1b9d0ea9`,
+`b81d12e42bc3801126e9ac837ec9ffd8727adf01421831826628d637930c5b2e`,
 exact Rust diff
 `4bf84230b7e5a299d35a102eeb3c7605551922c1e05cf1311648ce40e3116606`,
 workspace proof binary
