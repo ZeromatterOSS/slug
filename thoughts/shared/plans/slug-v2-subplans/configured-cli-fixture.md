@@ -531,3 +531,7 @@ remain stopped. A zero result ends this diagnostic chain; it does not authorize
 broadening to `ResolvedPathObservationKey`.
 Independent design rereview returned `ACCEPT` for the exact target, invocation,
 cutoff, evidence and cleanup boundaries.
+The first Core preparation stopped at the blocked bare-`cargo` Snap launcher
+before compiler entry. One reviewed pinned-absolute-Cargo recovery may prepare
+the unchanged exact-cap target; the CLI, fixture and replay remain stopped.
+Independent recovery review returned `ACCEPT` for that launcher-only retry.

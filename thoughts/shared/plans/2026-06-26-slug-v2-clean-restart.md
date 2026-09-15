@@ -72,6 +72,12 @@ windows. A zero result ends this diagnostic chain; do not broaden it to
 `ResolvedPathObservationKey`.
 Independent design rereview returned `ACCEPT` for the corrected cutoff,
 consumer-arm proof and exact replay gates.
+The first Core preparation resolved bare `cargo` through the blocked Snap
+wrapper and exited before Cargo or rustc entry. One independently reviewed
+recovery may launch the frozen exact-cap artifacts through the pinned absolute
+Cargo binary; no selector, CLI preparation, fixture or replay has run.
+Independent recovery review returned `ACCEPT`; the bare-Cargo command must not
+repeat.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

@@ -9166,3 +9166,8 @@ proves only aggregate direct-dependent event membership. A zero count ends the
 window diagnostic chain and must not select `ResolvedPathObservationKey`.
 Independent design rereview returned `ACCEPT` for the corrected cutoff,
 consumer-arm and inherited-accounting proof, and exact replay gates.
+The first Core preparation stopped at the blocked bare-`cargo` Snap launcher
+before compiler entry. A reviewed recovery may prepare the unchanged exact-cap
+target once through the pinned absolute Cargo binary; all execution remains
+stopped.
+Independent recovery review returned `ACCEPT` for that launcher-only retry.

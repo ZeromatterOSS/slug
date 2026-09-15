@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-dice-event-audit-r1
-Status: corrected docs-first design accepted; implementation pending
+Status: Core preparation launcher recovery accepted; retry pending
 
 ## Accepted predecessor receipt
 
@@ -179,3 +179,21 @@ Independent design rereview returned `ACCEPT` after requiring the final active
 window and `W = C - 1`, rejecting inactive completed cutoffs, covering every
 consumer-arm partial, preserving inherited event accounting in the filter
 proof, and restoring the exact selector, launcher and evidence gates.
+
+## Core preparation launcher recovery
+
+The first bounded Core preparation resolved bare `cargo` through the blocked
+system Snap wrapper and exited before Cargo, rustc or any test process started.
+It produced no executable and ran no selector, CLI preparation, fixture or
+replay. The frozen 100-line production diff has SHA-256
+`980b13e379b4219db72a22e637b5456b5d59ec6dce13710dfe777eeef9b76e48`;
+the 116-line Core proof has SHA-256
+`e2fab12052baf3171e4b0c7a0d76b4fc805b85097f7ade49dacf5b855cd18f50`
+and remains 130 lines with the 14-line CLI adapter.
+
+One reviewed recovery may invoke the pinned absolute Cargo binary directly,
+with the pinned PATH and `CARGO_TARGET_DIR=/home/wgray/slug/target`, to prepare
+the same exact target once under the unchanged 60-second ceiling. All source,
+proof, cap, CLI, fixture and replay boundaries remain frozen.
+Independent recovery review returned `ACCEPT` because the failed launcher
+entered neither Cargo nor rustc. Do not repeat the bare-Cargo command.
