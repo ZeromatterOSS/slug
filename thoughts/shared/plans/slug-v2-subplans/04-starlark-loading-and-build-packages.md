@@ -9177,4 +9177,5 @@ shard dependency. Aggregate counter work stops here; causality would require a
 separately reviewed typed invalidation-provenance design.
 The proposed docs-first successor captures the selected dependency context's
 typed normal-priority source inside `PathObservationKey` and retains no identity
-or version. Implementation and replay await independent design acceptance.
+or version. Its capped implementation and frozen proof/supervisor/CLI/fixture
+preparation now pass; the sole replay awaits independent preexecution review.

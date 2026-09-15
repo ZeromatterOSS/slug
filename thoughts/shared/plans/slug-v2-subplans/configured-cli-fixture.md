@@ -539,4 +539,7 @@ identity or causal invalidation evidence. Do not rerun it or select another
 aggregate callback counter.
 One materially different same-selector replay may be reviewed only through the
 new typed invalidation-provenance packet. Its corrected six-word design is
-docs-first; no implementation or replay is yet authorized.
+implemented within its temporary caps. Exact workspace/Core proofs, supervisor
+self-check, CLI target preparation, exact nonignored listing and a fresh F2
+fixture pass. Frozen hashes are recorded in the current packet; no replay is
+yet authorized pending independent preexecution review.

@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-typed-invalidation-provenance-r1
-Status: corrected docs-first design pending independent acceptance
+Status: implementation and frozen preparation complete; preexecution review pending
 
 ## Accepted predecessor and boundary
 
@@ -137,3 +137,32 @@ selector, or this selector outside the frozen typed instrumentation. Do not
 broaden to `ResolvedPathObservationKey`, change DICE semantics, retain identity
 or version material, infer optimization work, merge the combined stack or push
 the review branch.
+
+## Frozen preparation checkpoint
+
+The final temporary change fits the 230/310/140 caps at 221 production
+additions, 310 proof additions and 63 changed supervisor lines. The exact
+workspace and feature-enabled Core proofs each pass 1/1. The corrected 0644
+supervisor passes syntax plus normal/deadline/exception cleanup and decoder
+self-checks. Its compiler completed the sole `cli` integration target with zero
+errors in 56.53 seconds; Cargo's required non-test `slug` binary is retained as
+the integration harness dependency. The exact nonignored selector lists once.
+
+The fresh fixture retains 28 objects, 177 registry metadata files, 8,004,740
+source bytes and inventory
+`4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`.
+Frozen SHA-256 values are: base supervisor
+`d9a012989d595e6da275094d4ce020a8e8a8214e1714df79e8a3285282191179`,
+typed supervisor
+`f58171f86d0e5ace28004d9dfdddb0b4ff02d5752ac533e23a59b2ee1b9d0ea9`,
+exact Rust diff
+`4bf84230b7e5a299d35a102eeb3c7605551922c1e05cf1311648ce40e3116606`,
+workspace proof binary
+`7a87acf55b2de44903975b698928029064be1b0a07bb76b965177f7f78cd1a7a`,
+Core proof binary
+`d31095972f62ea0976e172bf4d60d597d360b45d058ba2ff57aa39935aa55c13`,
+CLI harness
+`63e77c3247a107a2bce13af79a05345c6e1194728e82d77daf4c53c4335b4e56`
+and required `slug` binary
+`c26d13fb1798ca22f4cd44c5d7851edbba6af7f8fccdd53703e70504a51108af`.
+No authentic replay has run; independent preexecution review remains mandatory.

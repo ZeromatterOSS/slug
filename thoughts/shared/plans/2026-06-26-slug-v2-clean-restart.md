@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-typed-invalidation-provenance-r1
-Status: corrected docs-first design accepted; implementation pending
+Status: frozen implementation prepared; preexecution review pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its accepted diagnostic history. The accepted activation audit found
@@ -51,6 +51,10 @@ proofs, supervisor self-check, artifact freeze and independent preexecution
 review precede one fresh same-selector replay under 230/310/140 temporary caps
 and the existing 12/15-second limits. Independent design review returned
 `ACCEPT`; implementation may begin, but replay remains unauthorized.
+The capped implementation now passes its exact workspace and Core proofs,
+supervisor self-check, exact nonignored listing and fresh-fixture verification.
+Artifacts are frozen in the current packet; no replay is authorized before
+independent preexecution review.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
