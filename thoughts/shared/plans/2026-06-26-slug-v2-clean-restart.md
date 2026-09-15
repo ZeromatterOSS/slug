@@ -29,79 +29,36 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-configured-conflict-path-frontier-batching-audit-r1
+Packet: WP-4-7A-configured-conflict-path-shard-exposure-audit-r1
 Status: design accepted; diagnostic execution pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
-The single authorized CLI selector exposed repository invocation ordinal 6 in
-`rules_java++toolchains+local_jdk`: `repository_ctx.path` rejects the authentic
-relative string `./nosystemjdk`. The accepted successor at `b75291517` adds only
-attempt-local generated path identity, lexical children and prior-effect
-existence. Its first unchanged CLI selector then reached the inherited
-15-second absolute ceiling without a typed terminal. The active audit permits
-one observer-instrumented replay of that exact selector to sample cold
-evaluation progress; any sampled key category can select only a deeper causal
-audit. The combined stack remains unaccepted.
+The accepted diagnostic chain narrowed cold evaluation from sampled progress to
+exact key counts, a post-sharding path-demand census and aggregate frontier
+batching. The batching proof and sole replay passed after reviewed resource and
+launcher recoveries. At a valid `RootCompute` cutoff, 215 successful path
+progress rounds requested 468 demands, all unseen at their round boundary.
+The six batch buckets were `[0, 164, 29, 8, 9, 5]`, maximum 21. Observer
+overflow/drop/claim, arithmetic, PID/reap, output and cleanup gates passed.
 
-That one replay produced valid `RootCompute` evidence at the 12-second wall
-deadline: 8,003 compute starts, 8,000 finishes and a complete latest
-`ExternalBzlModuleObservationKey` finish sample, with zero overflow/drops,
-matched installed/reaped PID and complete cleanup. It establishes progress, not
-causation. The next bounded audit must count exact external-Bzl and path key
-events before selecting any still-deeper owner investigation.
-
-The active docs-first packet assigns the observer's thirteen unused words to
-twelve exact filtered counters plus overflow state without changing its
-512-byte mapping. One temporary unit proof and one supervised replay must
-validate same-replay atomic cutoff snapshots; they are not an exact partition
-because total and filtered increments are separate. The result can select only
-another reviewed causal audit.
-
-The cold Core unit-harness preparation reached its 60-second ceiling after
-entering the Core crate and produced no executable; no test or replay ran. The
-revised design permits one separately bounded feature-library check before one
-fresh unit-harness preparation, with byte-identical diagnostic hashes and no
-retry or raised limit.
-
-The split passed and the sole replay produced valid same-cutoff counts: 8,094
-total compute starts, 1,626 external-Bzl and 2,543 path-observation compute
-starts, with zero overflow/drops and complete PID/cleanup evidence. Result
-review selected only a bounded post-sharding `PathObservationDemand`
-identity/outcome census; the extant external-child union must not change.
-
-The bounded post-sharding census completed its sole replay with a valid selected
-cutoff: 2,525 entries divided into 471 first-seen and 2,054 repeated exact
-demands. Every first computation returned `Need`; repeats returned 2,050
-`Complete` and four `Need`. Capacity overflow was clear, observer/census/reaped
-PIDs matched and cleanup was complete. A transparent independently accepted
-manifest correction records the frozen executed artifact at 247 production,
-182 proof and 189 scratch lines; its pre-execution diff hash is preserved and
-no proof or replay was rerun.
-
-Independent result review selected only a bounded aggregate path-frontier
-batching audit at `NativeDemandSession::progress_inner`. Count rounds,
-requested/unseen/already-known totals, maximum unseen batch and six batch-size
-buckets in observer words 51--63. No identities or paths may cross the
-boundary, and the result can select only another reviewed call-site or
-shard-invalidation audit.
-
-An initial feature Core compile exposed an ambiguous integer conversion; the
-corrected feature library check then passed in 3.45 seconds. The first large
-unit-harness preparation subsequently exited 124 at 60 seconds without an
-executable, proof or CLI replay. The selected recovery restores that attempted
-proof edit and prepares a dedicated Core integration proof for the same
-aggregate method and sealed mapping. Neither completed command may be retried.
-Independent recovery rereview returned `ACCEPT` for the complete compile
-history, restore-before-hash order, one-target preparation and aligned scope.
-The first dedicated-target launcher exited 101 after 0.64 seconds before
-compilation because the command omitted the pinned toolchain `PATH` and Cargo's
-`rustc -vV` resolved through the blocked system Snap wrapper. It produced no
-executable, proof or CLI replay. A launcher-only recovery may invoke the same
-dedicated target once with the pinned toolchain `PATH` and shared target
-directory; the failed environment may not be repeated and no limit changes.
-Independent launcher-recovery review returned `ACCEPT` for that single corrected
-same-target invocation and unchanged limits.
+Independent result review accepts only that many frontiers are small. It does
+not identify a producer, establish avoidable work or attribute the deadline.
+The active docs-first successor may compare current and successfully merged
+epochs through the accepted 64-way `path_observation_shards` projection at
+`NativeDemandSession::progress_inner`, after the merged epoch is assigned and
+only while both epochs fit the inherited 4,096-demand cap. It publishes only successful merge
+count, total/maximum changed shards, total/maximum prior demands resident in
+changed shards, newly added total, a fixed prior-exposure histogram and
+overflow/reserved state. Call these potential next-injection exposures, not
+completed DICE invalidations. One exact aggregation proof and one same-selector
+replay remain subject to independent design review and the existing 12/15-second
+bounds. The proof drives the production shard-comparison helper, and decoder
+arithmetic bounds every histogram bucket. No path, identity or semantic
+behavior may cross the boundary.
+Independent design review returned `ACCEPT` after requiring post-assignment
+publication, the 4,096-demand admission cap, production-helper proof coverage
+and maximum-attainment decoder bounds.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

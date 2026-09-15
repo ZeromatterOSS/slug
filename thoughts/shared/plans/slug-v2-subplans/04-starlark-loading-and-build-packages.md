@@ -9108,3 +9108,26 @@ toolchain `PATH` and shared target directory under the same 60-second limit;
 the failed environment may not be repeated.
 Independent launcher-recovery review returned `ACCEPT` for that single corrected
 same-target invocation and unchanged limits.
+
+The dedicated Core proof, supervisor self-check and sole configured replay then
+passed. The valid `RootCompute` cutoff recorded 215 committed path-progress
+rounds and 468 requested demands, all unseen, with batch buckets
+`[0, 164, 29, 8, 9, 5]` and maximum 21. Observer arithmetic, overflow,
+PID/reap, output and cleanup gates were clear. Independent result review accepts
+only that many frontiers are small; it does not identify their producer or
+attribute the deadline.
+
+The selected docs-first successor is a bounded path-shard exposure audit at the
+successful installed-merge boundary in `NativeDemandSession::progress_inner`.
+After enforcing the inherited 4,096-demand cap, compare the current and merged
+epochs through the accepted `path_observation_shards`
+projection and publish only merge count, total/maximum changed shards,
+total/maximum prior demands resident in changed shards, newly added total, a
+fixed prior-exposure histogram and overflow/reserved state. These are potential
+next-injection exposures, not completed DICE invalidations. One exact proof must
+drive that production shard-comparison helper and the decoder must enforce
+weighted bucket arithmetic before one same-selector replay. Independent design
+review remains required; no path, identity or semantic change is authorized.
+Independent design review returned `ACCEPT` after adding post-assignment
+publication, the 4,096-demand admission cap, exact production-helper coverage
+and maximum-attainment decoder bounds.

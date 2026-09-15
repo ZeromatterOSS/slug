@@ -1,158 +1,181 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-7A-configured-conflict-path-frontier-batching-audit-r1
+Packet: WP-4-7A-configured-conflict-path-shard-exposure-audit-r1
 Status: design accepted; diagnostic execution pending
+
+## Accepted predecessor receipt
+
+The sole path-frontier batching replay completed with valid aggregate evidence.
+The dedicated Core integration harness prepared in 8.89 seconds after a
+reviewed launcher correction and its exact selector passed 1/1. The bounded
+supervisor passed normal, deadline and exception cleanup self-checks. The CLI
+integration harness prepared in 57.28 seconds, its exact nonignored selector
+preflighted once, and the authentic fixture reproduced 28 objects, 177 metadata
+entries and 8,004,740 bytes at inventory SHA-256
+`4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`.
+
+Pre-execution SHA-256 values were:
+
+| Artifact | SHA-256 |
+|---|---|
+| accepted supervisor | `3b4d48a4a7c729ec0c8c17ffd2aed3ddab8677699bdce9d8bb24d97afbeab69c` |
+| scratch supervisor | `780a82954c745f327778e1972d1df876512cf1d308fbd0cf66514b35c56fb454` |
+| exact temporary Rust diff | `d5bd1453f1bafb6ae1f0c594b18ef70cf2f36677c72064dc15dc543feaa33b24` |
+| Core proof harness | `ac4512d44b9c7406908da7ae7113f0a2ec9d18eceaa096c60585d4cd202be955` |
+| CLI integration harness | `3863fb585423ba878c6e17ab8c42ced4be89ef885485c873be8b2214d22fb283` |
+| spawned Slug binary | `adb6d1e917105bef63fca827442d0d1f5c896882b354b086fcb135caf461e7e3` |
+
+The one selected replay reached its 12-second wall deadline after 12.012391
+seconds in `RootCompute`. The observer and sole reaped run PID were both
+669693. Counters were 51,968 starts, 51,954 finishes, 45,647 dependency-check
+starts, 45,637 dependency-check finishes, 7,976 compute starts and 7,972
+compute finishes. Overflow, dropped samples and activity claim were zero.
+
+The committed batching cutoff contained 215 path-progress rounds and 468
+requested demands, all 468 unseen and zero already known. The six unseen-batch
+buckets were `[0, 164, 29, 8, 9, 5]`, with maximum 21. The buckets sum to the
+rounds and `468 = 468 + 0`; overflow and reserved state were clear. Selector and
+run supervision reported no live group, children, pipes or telemetry error.
+Independent result review returned `ACCEPT` and limited the conclusion to many
+small unseen frontiers. It does not identify their producer, prove avoidable
+work, attribute the deadline or authorize a semantic change.
+
+Temporary production/proof/scratch work was 60/88/76 lines against 100/90/120
+caps. Every temporary source edit and scratch artifact was removed, both
+worktrees were clean, and no selector was rerun.
 
 ## Observable result
 
-Run one bounded aggregate audit at the path branch of
-`NativeDemandSession::progress_inner`. Count how path demands presented by one
-progress round divide into unseen and already-known demands, and record the
-size distribution of unseen-demand batches. This tests whether the
-accepted census's 471 first-Need identities are supplied in broad batches or
-through small repeated frontier advances. It does not identify a path or caller,
-attribute CPU cost, prove invalidation, select an optimization, or accept the
-combined R2/execution-group stack.
+Run one bounded aggregate path-shard exposure audit at the successful path
+merge boundary in `NativeDemandSession::progress_inner`. Compare the existing
+and successfully merged path epochs through the accepted
+`path_observation_shards` projection. Count how many shards change and how many
+previously observed demands reside in those changed shards before the next
+injection. This measures potential next-injection exposure only. It does not
+prove that DICE invalidated or recomputed a key, attribute elapsed time, select
+an optimization, or accept the combined R2/execution-group stack.
 
-The completed census packet used the sole authorized replay and produced a
-valid selected cutoff at sequence 5,051: 2,525 entries, 471 exact first-seen
-demands and 2,054 repeats. All 471 first computations returned `Need`; repeats
-returned 2,050 `Complete` and four `Need`. Capacity overflow was zero and the
-outcome arithmetic had no in-flight gap. Observer and census PIDs matched the
-sole reaped test PID; observer overflow, drops and claim were zero; the process
-tree and descriptors were clean. Independent review accepted this result only
-after a transparent manifest correction recorded the frozen executed artifact
-at 247 production, 182 proof and 189 scratch lines. The exact Rust diff retained
-SHA-256 `1fce7c30f13d5aa0537f2df41d8eb50a9898bc21cdbe84bbe28739294c7699e0`;
-no proof or replay was rerun.
+Record only successful path merges, total and maximum changed shards per merge,
+total and maximum prior demands resident in changed shards, total newly added
+demands, and one fixed prior-exposure bucket per merge: 0, 1--7, 8--31, 32--127
+or 128+. Do not retain or publish a demand, path, hash, shard identity, result,
+epoch, call site or timestamp.
 
-## Owner and aggregate counters
+## Owner and counting boundary
 
 Temporarily instrument only the path branch in
-`app/slug_core_v2/src/runtime/dice.rs`, immediately after obtaining the
-nonempty `NeedPathObservations` and computing which exact demands are absent
-from `self.path_observations`. The existing branch remains the sole owner of
-deduplication, observation, merge and nonprogress errors. Record one round with:
+`app/slug_core_v2/src/runtime/dice.rs`. Preserve construction of `new_demands`,
+`observe_native` and the existing merged iterator. First construct the merged
+`PathObservationEpoch` through the existing fallible owner. Only after that
+succeeds, project both the current and merged epochs with
+`path_observation_shards`, compare corresponding shard values and compute:
 
-- total requested demands in `path_needs`;
-- unseen demands in `new_demands` before `observe_native` runs;
-- already-known demands, exactly requested minus new;
-- the maximum unseen-demand batch size; and
-- one unseen-batch bucket: 0, 1, 2--3, 4--7, 8--15 or 16+.
+- changed shards, whose prior and merged shard epochs differ;
+- prior exposure, the sum of current-epoch demand counts in changed shards; and
+- newly added demands, merged epoch length minus current epoch length.
 
-Count a zero-unseen round before returning the existing
-`PathInternalNonProgress`. Use checked conversion from `usize` and
-sticky counter-overflow state. Any conversion failure, counter wrap or maximum
-overflow invalidates the audit. Do not retain a demand, path, hash, result,
-round identity, call site, epoch or timestamp. Do not change sorting,
-deduplication, filtering, `observe_native`, merge order, error selection or the
-returned progress value.
+Before projecting, admit both epochs only when each contains at most 4,096
+demands, matching the completed census's exact-identity capacity. On excess,
+set diagnostic overflow and skip both shard projections. Otherwise clone the
+current Arc-backed epoch for the feature-only comparison, assign the successfully
+constructed merged epoch to `self.path_observations`, and only then compare and
+record the installed state. Each successful merge must add at least one demand;
+changed shards must be in 1--64 and cannot exceed newly added demands. Preserve
+all sorting, deduplication, observation, merge, assignment, error and returned
+progress behavior. An absent observer must leave behavior byte-for-byte
+equivalent.
+
+Call the prior-demand count a potential next-injection exposure. A changed
+shard value is not evidence that its DICE key was invalidated, requested,
+checked or recomputed. Do not instrument the later injection updater or add a
+DICE listener, key, retained collection or cache.
 
 ## Fixed observer layout
 
-Reuse only the accepted observer's currently unused words 51--63. Keep its
-512-byte size, existing words 0--50, descriptor contract, event sampling and
-phase publication unchanged. Assign these little-endian atomic words:
+Reuse only the observer's unused words 51--63. Keep its 512-byte size, words
+0--50, descriptor contract, event sampling and phase publication unchanged.
 
 | Word | Aggregate |
 |---:|---|
-| 51 | path progress rounds |
-| 52 | total requested demands |
-| 53 | unseen demands |
-| 54 | already-known demands |
-| 55 | maximum unseen-demand batch size |
-| 56 | unseen batches of size 0 |
-| 57 | unseen batches of size 1 |
-| 58 | unseen batches of size 2--3 |
-| 59 | unseen batches of size 4--7 |
-| 60 | unseen batches of size 8--15 |
-| 61 | unseen batches of size 16+ |
-| 62 | sticky counter-overflow flag |
+| 51 | successful path merges |
+| 52 | total changed shards |
+| 53 | maximum changed shards in one merge |
+| 54 | total prior demands resident in changed shards |
+| 55 | maximum prior demands resident in changed shards in one merge |
+| 56 | total newly added demands |
+| 57 | merges exposing 0 prior demands |
+| 58 | merges exposing 1--7 prior demands |
+| 59 | merges exposing 8--31 prior demands |
+| 60 | merges exposing 32--127 prior demands |
+| 61 | merges exposing 128+ prior demands |
+| 62 | sticky invalid-conversion/counter-overflow flag |
 | 63 | reserved zero |
 
-Add a feature-only observer method that receives only requested and unseen
-counts. Update exactly one bucket first, then requested/unseen/known totals and
-maximum, and commit the round counter last. Before refusing any addition that
-would wrap, set word 62. The call site passes counts only after it has
-constructed `new_demands` and before the existing empty check. The observer is
-optional; an absent observer must leave behavior byte-for-byte equivalent.
+Add a feature-only doc-hidden observer helper receiving borrowed prior and
+installed epochs. It first enforces the 4,096-demand cap, then performs the
+production `path_observation_shards` comparison and derives changed-shard,
+prior-exposure and newly-added counts. It retains none of the borrowed values.
+Validate the per-merge bounds, update the histogram bucket first, then checked
+totals and maxima, and commit the successful-merge counter last with release
+ordering. Set word 62 before refusing an oversized epoch, conversion, invalid
+tuple or addition that would wrap.
 
-The supervisor decoder accepts the aggregate only when requested equals unseen
-plus known, all six histogram buckets sum exactly to the committed round count,
-the maximum is consistent with the highest populated bucket, overflow is zero
-and word 63 is zero. Because the round commits last, a killed partial update
-fails this post-reap arithmetic instead of being mistaken for a zero-unseen
-round. A clear aggregate with no path progress rounds or inconsistent arithmetic
-is weak and forces replan. The values remain a committed aggregate cutoff, not
-an exact transaction snapshot across the rest of the observer.
+Let `M` be merges, `C` total changed shards, `Cmax` maximum changed shards, `E`
+total prior exposure, `Emax` maximum prior exposure, `N` newly added and
+`b0..b4` the five buckets. The decoder accepts only:
+
+- `M > 0`, `sum(b0..b4) = M`, `M <= C <= 64*M` and `C <= N`;
+- `1 <= Cmax <= 64`, `Cmax + (M - 1) <= C <= Cmax*M`;
+- `Emax <= 4,096`, `E <= 4,096*M` and `N <= 4,096*M`;
+- `b1 + 8*b2 + 32*b3 + 128*b4 <= E`;
+- `E <= min(7,Emax)*b1 + min(31,Emax)*b2 + min(127,Emax)*b3 + Emax*b4`;
+- if `h` is the bucket containing `Emax`, with lower bound `Lh`, then `bh > 0`,
+  no bucket above `h` is populated, and
+  `E >= (b1 + 8*b2 + 32*b3 + 128*b4) + Emax - Lh`;
+- `E = Emax = 0` exactly when `b0 = M` and `b1..b4` are zero; and
+- clear word 62 and zero word 63.
+
+All products and sums are checked. Merge-last publication makes a killed
+partial update fail arithmetic rather than appear complete. These are
+same-channel aggregate cutoffs, not one atomic snapshot with words 0--50.
 
 ## Proof and one replay
 
 Add one exact feature-enabled dedicated Core integration selector,
-`path_frontier_batching_counts_round_totals_histogram_max_and_overflow`. It
-installs the existing observer channel and directly records bounded synthetic
-rounds covering zero unseen, every histogram bucket, mixed known/unseen
-arithmetic, maximum retention, commit order and sticky overflow. It proves
-words 0--50 remain owned by the accepted observer contract and word 63 remains zero. No production
-session, fixture or filesystem path is needed for this aggregation proof.
+`path_shard_exposure_counts_totals_histogram_max_and_overflow`. It installs the
+sealed observer mapping and drives the same epoch-comparison helper with
+multiple additions in one shard, additions across shards, prior residents in
+changed and unchanged shards, and a zero-add/no-change rejection. It verifies
+exact changed-shard, prior-exposure and newly-added results, every histogram
+bucket, maxima, the 4,096 cap, checked overflow, commit order, unchanged words
+0--50 and reserved word 63. Prepare
+only that integration target once under 60 seconds with the pinned toolchain
+`PATH` and shared `CARGO_TARGET_DIR`; preflight and run only its exact selector
+under the inherited 12-second deadline and 15-second absolute ceiling.
 
-The first feature Core library compile exposed one ambiguous integer conversion
-and exited 101 after 22.69 seconds. After that exact inference error was fixed,
-the corrected feature library check passed in 3.45 seconds. Do not repeat it.
-The subsequent Core unit-harness preparation reached its 60-second ceiling with
-exit 124, produced no test executable and ran no proof or CLI replay.
+Copy `tools/v2_oracle/run_payload_demand_probe.sh` to an excluded scratch file
+and extend only words 51--63 decoding/result projection. Add bounded self-checks
+for every bucket boundary, per-merge bounds, maxima, arithmetic, overflow,
+reserved state, output cap, and normal/deadline/exception cleanup. Preserve its
+namespace/resource isolation, exact 512-byte observer read, wall timeout,
+kill/reap finalizer and cleanup ownership.
 
-The resource recovery moves only this proof from the crate's large included unit suite to
-`app/slug_core_v2/tests/path_frontier_batching.rs`. The feature-only observer
-method becomes doc-hidden public so that this dedicated integration harness can
-drive it through the same sealed channel and verify the raw 512-byte mapping.
-First restore the attempted edit to
-`app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs`. Then prepare only
-the named integration target once under the unchanged 60-second limit, and
-preflight/run only its named selector under the inherited 12-second deadline
-and 15-second absolute ceiling. Do not retry the passed library check or stopped
-unit-harness command, and do not raise a limit.
-
-Independent recovery rereview returned `ACCEPT` for the complete compile
-history, restore-before-hash order, one-target preparation and aligned scope.
-
-The first dedicated-target launcher exited 101 after 0.64 seconds before
-compilation because the command omitted the pinned toolchain `PATH` and Cargo's
-`rustc -vV` resolved through the blocked system Snap wrapper. It produced no
-executable, proof or CLI replay. This launcher-only recovery permits one
-corrected invocation of the same dedicated integration target with
-`PATH=/home/wgray/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin:/usr/local/bin:/usr/bin:/bin`
-and `CARGO_TARGET_DIR=/home/wgray/slug/target`, still under 60 seconds. Do not
-repeat the failed environment, change the target or raise a limit.
-Independent launcher-recovery review returned `ACCEPT` for that single corrected
-same-target invocation and unchanged limits.
-
-Copy the accepted supervisor to an excluded scratch file and extend only its
-observer decoder/result projection for words 51--63. Add bounded self-checks
-for every bucket boundary, zero-unseen rounds, maximum consistency, arithmetic
-failure, overflow, reserved words and output cap. Preserve the accepted
-namespace/resource isolation, exact 512-byte observer read, 12-second timeout,
-kill/reap finalizer and normal/deadline/exception cleanup self-checks.
-
-Compile the feature-enabled CLI integration harness within 60 seconds and
-exactly preflight the nonignored selector
+Compile the feature-enabled CLI integration harness once under 60 seconds and
+exactly preflight the same nonignored selector,
 `configured_action_conflicts::one_shot_build_conflict_is_atomic_and_recovers`.
-Reassemble the authentic 28-object fixture at inventory SHA-256
-`4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`.
-Record hashes for the accepted supervisor, scratch supervisor, exact temporary
-Rust diff, Core harness, CLI harness and spawned Slug binary before executing.
-Run the selector once through the scratch supervisor under the unchanged
-12-second wall deadline and 15-second absolute ceiling. F3 and every sibling
-selector remain stopped.
+Reassemble the unchanged authentic fixture and verify its accepted inventory.
+Hash the accepted supervisor, scratch supervisor, exact temporary Rust diff,
+Core harness, CLI harness and spawned Slug binary before the sole replay. Run
+that selector once through the scratch supervisor under the unchanged 12/15
+second bounds. F3 and every sibling selector remain stopped.
 
-Evidence is valid only if exact selector listing succeeds; observer
-header/version/PID, existing counters, overflow, sampling and released claim
-validate; path rounds are nonzero; batching arithmetic and the reserved word
-validate; the installed PID equals the reaped test; output caps are clear; and
-cleanup reports no group, child, pipe, descriptor or telemetry error. Record
-only the aggregate batching snapshot. Ratios, elapsed time and a deadline cannot
-select production work. Independent result review may select only another
-bounded call-site or shard-invalidation audit.
+Evidence is valid only if selector count, observer header/version/PID, existing
+counters, overflow, sampling and released claim validate; shard arithmetic and
+reserved state validate; installed PID equals the reaped test; output caps are
+clear; and cleanup reports no group, child, pipe, descriptor or telemetry
+error. Independent result review may select only a narrower injection-boundary
+audit. Replan on overflow, zero successful merges, inconsistent arithmetic,
+path/identity output, proof/preparation failure or invalid cleanup.
 
 ## Scope, caps and stops
 
@@ -162,25 +185,24 @@ Temporary Rust edits are limited to
 `app/slug_core_v2/src/runtime/probe_observer.rs`,
 `app/slug_core_v2/src/runtime/probe_observer/mapping.rs`,
 `app/slug_core_v2/src/runtime/dice.rs`,
-`app/slug_core_v2/tests/path_frontier_batching.rs`,
+`app/slug_core_v2/tests/path_shard_exposure.rs`,
 `app/slug_cli_v2/src/lib.rs` and `app/slug_cli_v2/tests/cli.rs`. Allow at most
-100 gross temporary diagnostic production lines, 90 gross temporary proof
+120 gross temporary diagnostic production lines, 130 gross temporary proof
 lines and 120 changed scratch-supervisor lines. No Cargo manifest, DICE crate,
 workspace/path owner, loading owner, fixture or oracle input may change.
 
-Before recording the result, restore every temporary source edit, remove the
-scratch supervisor, fixture and logs, and prove both worktrees clean except for
-the allowed documentation receipt. Run `python3 scripts/v2_plan_status.py` and
+Before recording the result, restore every temporary source edit, remove all
+scratch artifacts and prove both worktrees clean except for the allowed
+documentation receipt. Run `python3 scripts/v2_plan_status.py` and
 `git diff --check`. Independently review this design before execution and the
 result before selecting a successor.
 
-Do not rerun the completed census, F3, a sibling configured-conflict selector
-or the selected selector without this instrumentation. Do not raise a limit,
-acquire a payload, emit identity material, change path or external-child
-semantics, merge the combined stack or push the review branch. Replan on
-counter overflow, no path rounds, weak/inconsistent arithmetic, compile/proof
-failure or invalid cleanup.
+Do not rerun the completed batching audit, census, F3, a sibling
+configured-conflict selector or the selected selector without this new
+instrumentation. Do not raise a limit, acquire a payload, emit identity
+material, change path/shard/injection semantics, merge the combined stack or
+push the review branch.
 
-Independent correction rereview returned `ACCEPT` for the natural owner,
-pre-observation unseen terminology, explicit zero bucket, bucket-first and
-round-last aggregate commit, arithmetic decoder, exact scope, caps and stops.
+Independent design review returned `ACCEPT` after requiring post-assignment
+publication, the 4,096-demand admission cap, exact production-helper proof,
+weighted histogram bounds and explicit maximum-attainment arithmetic.

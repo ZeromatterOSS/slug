@@ -454,3 +454,25 @@ Observer words 51--63 may count rounds committed last,
 requested/unseen/already-known totals, maximum unseen batch and six batch-size
 buckets including zero during one same-selector replay. The other nine
 configured-conflict selectors and F3 remain stopped.
+
+The dedicated aggregation proof and supervisor self-check passed. The sole
+configured replay reached its 12-second wall deadline in `RootCompute` with a
+valid batching cutoff: 215 committed rounds, 468 requested and unseen demands,
+zero already known, batch buckets `[0, 164, 29, 8, 9, 5]` and maximum 21.
+Observer overflow/drop/claim, PID/reap, output and cleanup gates passed.
+Independent review accepts only that many unseen frontiers are small.
+
+The selected successor is one docs-first path-shard exposure audit after the
+successful path merge is installed. It may compare current and merged epochs
+under the inherited 4,096-demand cap using the accepted 64-way shard projection
+and publish only successful merges,
+total/maximum changed shards, total/maximum prior residents of changed shards,
+newly added total, fixed prior-exposure buckets and overflow/reserved state.
+Those counts are potential next-injection exposures, not completed DICE
+invalidations. The exact proof drives the same shard-comparison helper and the
+decoder enforces weighted bucket bounds. The same exact selector may run once
+only after that proof, supervisor self-check, artifact hashes and independent design review;
+the other nine selectors and F3 remain stopped.
+Independent design review returned `ACCEPT` after adding post-assignment
+publication, the 4,096-demand cap, production-helper proof coverage and
+maximum-attainment decoder bounds.
