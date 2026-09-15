@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-dice-event-audit-r1
-Status: preexecution corrections applied; affected gates pending rerun
+Status: post-disable proof-order recovery accepted; gates pending rerun
 
 ## Accepted predecessor receipt
 
@@ -237,3 +237,14 @@ production/proof caps; the scratch stays 81/120. Rerun the changed Core proof,
 unchanged supervisor self-check, CLI preparation/preflight, fresh fixture and
 artifact freeze before another independent preexecution review. The replay
 remains unconsumed.
+
+The corrected Core target prepared in 8.24 seconds and its exact selector
+listed once, but the proof failed only at the new post-disable full-array
+assertion. It snapshotted before dropping `ProbeGuard`, whose drop intentionally
+sets observer word 3 to disabled; that was the sole changed word. No CLI rebuild,
+fixture/hash refresh or replay followed. One reviewed line-neutral proof-only
+reorder may drop the guard, snapshot the disabled observer, emit the exact-tag
+event and compare the full array, then rerun the affected gates. Production and
+the exact 100/130 caps stay frozen.
+Independent recovery review returned `ACCEPT` because snapshotting after guard
+drop includes the intentional disabled transition and isolates the event.

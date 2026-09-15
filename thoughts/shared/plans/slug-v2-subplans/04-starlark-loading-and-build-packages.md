@@ -9183,3 +9183,7 @@ The corrected self-check passed and CLI preparation/preflight completed, but
 preexecution review required disabled-state filtering, the omitted active-clear
 partial proof and a required feature workspace. The exact-cap corrections are
 applied and every affected gate must rerun before the unconsumed replay.
+The changed Core proof next failed only because its snapshot preceded the
+guard drop's intentional disabled-word write. A reviewed line-neutral reorder
+may isolate the event; no CLI replay ran.
+Independent recovery review returned `ACCEPT` for that line-neutral reorder.

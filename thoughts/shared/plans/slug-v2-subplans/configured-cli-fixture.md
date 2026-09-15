@@ -548,3 +548,7 @@ The corrected self-check passed and the exact CLI target prepared/preflighted,
 but preexecution review rejected its feature workspace fallback and two Core
 proof/runtime gaps. Feature mode now requires the inherited external workspace;
 the exact-cap affected gates must rerun before the unconsumed replay.
+The changed Core proof next failed only because its snapshot preceded the guard
+drop's intentional disabled-word write. A reviewed line-neutral reorder may
+isolate the event; the CLI replay remains unconsumed.
+Independent recovery review returned `ACCEPT` for that line-neutral reorder.

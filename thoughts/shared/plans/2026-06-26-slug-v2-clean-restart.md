@@ -92,6 +92,10 @@ fresh fixture verified. Preexecution review then required a disabled-state
 filter guard, the actual active-clear partial proof and a fail-closed feature
 workspace. Those exact-cap corrections are applied; all affected gates must
 rerun before review and the sole replay remains unconsumed.
+The changed Core proof then failed only because it snapshotted before the guard
+drop's intentional disabled-word write. A reviewed line-neutral reorder may
+isolate the post-disable event and rerun the affected gates; no CLI replay ran.
+Independent recovery review returned `ACCEPT` for that line-neutral reorder.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
