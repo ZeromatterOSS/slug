@@ -9089,3 +9089,13 @@ The selected successor is only an aggregate path-frontier batching audit at
 `NativeDemandSession::progress_inner`: rounds committed last,
 requested/unseen/already-known totals, maximum unseen batch and six batch-size
 buckets including zero. It may not emit paths or select semantic work.
+
+After correcting one compiler-reported integer inference error, the feature
+Core library check passed in 3.45 seconds. The first full Core unit-harness
+preparation then exited 124 at 60 seconds without an executable, proof or CLI
+replay. The recovery restores that attempted proof edit and prepares the same
+proof as a dedicated Core integration target. It may not retry either completed
+command or raise a limit.
+
+Independent recovery rereview returned `ACCEPT` for the complete compile
+history, restore-before-hash order, one-target preparation and aligned scope.

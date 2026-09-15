@@ -88,7 +88,7 @@ an exact transaction snapshot across the rest of the observer.
 
 ## Proof and one replay
 
-Add one exact feature-enabled Core selector,
+Add one exact feature-enabled dedicated Core integration selector,
 `path_frontier_batching_counts_round_totals_histogram_max_and_overflow`. It
 installs the existing observer channel and directly records bounded synthetic
 rounds covering zero unseen, every histogram bucket, mixed known/unseen
@@ -96,10 +96,25 @@ arithmetic, maximum retention, commit order and sticky overflow. It proves
 words 0--50 remain owned by the accepted observer contract and word 63 remains zero. No production
 session, fixture or filesystem path is needed for this aggregation proof.
 
-Compile the feature-enabled Core library path and then the exact Core unit
-harness within separate 60-second limits. Preflight and run only the named
-selector under the inherited 12-second deadline and 15-second absolute ceiling.
-Do not retry a failed preparation or proof.
+The first feature Core library compile exposed one ambiguous integer conversion
+and exited 101 after 22.69 seconds. After that exact inference error was fixed,
+the corrected feature library check passed in 3.45 seconds. Do not repeat it.
+The subsequent Core unit-harness preparation reached its 60-second ceiling with
+exit 124, produced no test executable and ran no proof or CLI replay.
+
+The resource recovery moves only this proof from the crate's large included unit suite to
+`app/slug_core_v2/tests/path_frontier_batching.rs`. The feature-only observer
+method becomes doc-hidden public so that this dedicated integration harness can
+drive it through the same sealed channel and verify the raw 512-byte mapping.
+First restore the attempted edit to
+`app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs`. Then prepare only
+the named integration target once under the unchanged 60-second limit, and
+preflight/run only its named selector under the inherited 12-second deadline
+and 15-second absolute ceiling. Do not retry the passed library check or stopped
+unit-harness command, and do not raise a limit.
+
+Independent recovery rereview returned `ACCEPT` for the complete compile
+history, restore-before-hash order, one-target preparation and aligned scope.
 
 Copy the accepted supervisor to an excluded scratch file and extend only its
 observer decoder/result projection for words 51--63. Add bounded self-checks
@@ -135,8 +150,8 @@ this manifest, Stage 4, bootstrap readiness and the configured CLI ledger.
 Temporary Rust edits are limited to
 `app/slug_core_v2/src/runtime/probe_observer.rs`,
 `app/slug_core_v2/src/runtime/probe_observer/mapping.rs`,
-`app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs`,
 `app/slug_core_v2/src/runtime/dice.rs`,
+`app/slug_core_v2/tests/path_frontier_batching.rs`,
 `app/slug_cli_v2/src/lib.rs` and `app/slug_cli_v2/tests/cli.rs`. Allow at most
 100 gross temporary diagnostic production lines, 90 gross temporary proof
 lines and 120 changed scratch-supervisor lines. No Cargo manifest, DICE crate,

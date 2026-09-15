@@ -86,6 +86,15 @@ buckets in observer words 51--63. No identities or paths may cross the
 boundary, and the result can select only another reviewed call-site or
 shard-invalidation audit.
 
+An initial feature Core compile exposed an ambiguous integer conversion; the
+corrected feature library check then passed in 3.45 seconds. The first large
+unit-harness preparation subsequently exited 124 at 60 seconds without an
+executable, proof or CLI replay. The selected recovery restores that attempted
+proof edit and prepares a dedicated Core integration proof for the same
+aggregate method and sealed mapping. Neither completed command may be retried.
+Independent recovery rereview returned `ACCEPT` for the complete compile
+history, restore-before-hash order, one-target preparation and aligned scope.
+
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
 observation diagnostics at `ac6140f41`. Their old implementation checkpoints
