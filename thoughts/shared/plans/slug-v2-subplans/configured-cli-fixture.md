@@ -544,3 +544,7 @@ The corrected Core target prepared in 4.96 seconds and its exact proof passed
 error before cleanup cases; one reviewed line-neutral correction may rerun only
 the self-check. The CLI, fixture and replay remain stopped.
 Independent recovery review returned `ACCEPT` for that line-neutral fixture fix.
+The corrected self-check passed and the exact CLI target prepared/preflighted,
+but preexecution review rejected its feature workspace fallback and two Core
+proof/runtime gaps. Feature mode now requires the inherited external workspace;
+the exact-cap affected gates must rerun before the unconsumed replay.

@@ -87,6 +87,11 @@ The corrected Core target prepared in 4.96 seconds and its exact proof passed
 error before cleanup cases. One reviewed line-neutral correction may fix that
 fixture and rerun only the self-check; the CLI and replay remain stopped.
 Independent recovery review returned `ACCEPT` for that line-neutral fixture fix.
+The corrected self-check passed, the CLI target prepared and preflighted, and a
+fresh fixture verified. Preexecution review then required a disabled-state
+filter guard, the actual active-clear partial proof and a fail-closed feature
+workspace. Those exact-cap corrections are applied; all affected gates must
+rerun before review and the sole replay remains unconsumed.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

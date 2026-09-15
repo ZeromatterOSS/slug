@@ -9179,3 +9179,7 @@ The corrected Core target prepared in 4.96 seconds and its exact proof passed.
 The scratch self-check next exposed a synthetic packed-phase fixture error
 before cleanup cases; one reviewed line-neutral correction may rerun only it.
 Independent recovery review returned `ACCEPT` for that line-neutral fixture fix.
+The corrected self-check passed and CLI preparation/preflight completed, but
+preexecution review required disabled-state filtering, the omitted active-clear
+partial proof and a required feature workspace. The exact-cap corrections are
+applied and every affected gate must rerun before the unconsumed replay.

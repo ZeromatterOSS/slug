@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-dice-event-audit-r1
-Status: supervisor phase-fixture recovery accepted; self-check retry pending
+Status: preexecution corrections applied; affected gates pending rerun
 
 ## Accepted predecessor receipt
 
@@ -219,3 +219,21 @@ scratch-fixture correction may encode word 14 as `6 | (1 << 16)` and rerun the
 self-check once through `/bin/bash`; decoder, source and proof stay frozen.
 Independent recovery review returned `ACCEPT` because the correction changes
 only the synthetic packed phase/status word.
+
+The corrected supervisor self-check then passed its complete matrix. The
+feature-enabled `cli` integration target prepared in 10.10 seconds, its exact
+nonignored selector listed once, and a fresh fixture verified at the accepted
+28-object inventory hash. Independent preexecution review returned `REVISE`
+before any CLI replay: the filtered helper could still write after observer
+disable, the Core proof omitted the actual active-clear producer partial, and
+feature mode could fall back to ordinary fixture assembly when its inherited
+scratch variable was absent.
+
+The bounded correction checks disabled state before filtered activity, adds the
+missing partial and an exact post-disable no-write proof, and gives feature mode
+a required external workspace while retaining the assembler only outside that
+feature. Offset derivation and proof-only line folding preserve exact 100/130
+production/proof caps; the scratch stays 81/120. Rerun the changed Core proof,
+unchanged supervisor self-check, CLI preparation/preflight, fresh fixture and
+artifact freeze before another independent preexecution review. The replay
+remains unconsumed.
