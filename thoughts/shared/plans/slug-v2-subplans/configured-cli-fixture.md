@@ -423,3 +423,9 @@ after entering the Core crate. It produced no executable and ran no selector or
 CLI replay. A reviewed split preparation must complete the feature Core library
 before one fresh bounded unit-harness preparation; diagnostic source and
 supervisor hashes remain fixed.
+
+The split passed; the one replay recorded same-cutoff compute starts of 8,094
+total, 1,626 external-Bzl and 2,543 path-observation events. All observer and
+cleanup gates passed. Result review selected only a bounded post-sharding path
+identity/outcome census, with exact identity equality, first/repeat and
+Complete/Need aggregates, explicit capacity overflow and no physical paths.

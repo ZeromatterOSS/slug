@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-key-type-count-audit-r1
-Status: split preparation accepted; diagnostic execution pending
+Status: audit complete; path identity/outcome census selected
 
 ## Observable result
 
@@ -142,6 +142,56 @@ stops.
 
 Independent resource-limit rereview returned `ACCEPT` for the byte-identical,
 separately bounded feature-library and unit-harness preparation split.
+
+## Audit receipt (2026-09-14)
+
+The byte-identical temporary Rust diff retained SHA-256
+`bbb1a74bd80e8f9f3f992b8aec3c348b4daf0aefadc66c0dfd1e354f435f875e`.
+The accepted and scratch supervisors retained SHA-256
+`3b4d48a4a7c729ec0c8c17ffd2aed3ddab8677699bdce9d8bb24d97afbeab69c`
+and `ddf88c7dea14f73d227d2a3fd6b52a06dedef68411477f33eede8b93ea0fb771`.
+The split feature Core check passed in 31.24 seconds. The Core unit harness
+compiled in 23.76 seconds at SHA-256
+`d3e4c89acc8bb585cd0126a7ba8764b4e15a4b33489f2fdac50f25ed08d44558`.
+After a nonexecuting wrong-module-name preflight found zero tests, listing
+supplied the exact module path; exact preflight then found one nonignored test
+and the filtered-counter proof passed once. The extended supervisor self-check
+passed normal, deadline, exception, decoder and cap paths.
+
+The CLI integration harness compiled in 8.22 seconds at SHA-256
+`8158218269f31515fe5627f082a71d991d8b60b1805b4038b1f3a17eab809046`.
+Exact preflight found the selected nonignored test once. The authentic fixture
+retained 28 objects, 177 registry metadata files, 8,004,740 source bytes and
+inventory SHA-256
+`4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`.
+
+The sole replay reached the 12.009-second wall deadline in `RootCompute`. Its
+same-cutoff total arrays were 48,760/48,745 starts/finishes,
+42,341/42,330 dependency-check starts/finishes and 8,094/8,090 compute
+starts/finishes. The external-Bzl filtered array was
+9,311/9,305, 7,685/7,679 and 1,626/1,626. The path-observation filtered array
+was 2,543/2,543, 1,592/1,592 and 2,543/2,543. Thus the two filtered compute-start
+snapshots total 4,169 against the same-cutoff total 8,094, about 51.5%; separate
+atomic increments make this diagnostic rather than an exact partition. The
+latest complete tag was an external-Bzl dependency-check finish.
+
+Observer PID 632485 exactly matched the reaped test PID. Original and filtered
+overflow, dropped samples and the released activity claim were zero. Exact
+selector listing and output caps passed; cleanup reported no group, child, pipe
+or telemetry error. No typed terminal appeared. Every temporary source edit,
+scratch supervisor, fixture, log and self-check artifact was removed, and both
+worktrees were clean.
+
+Independent result review returned `ACCEPT` only for a post-sharding
+`PathObservationKey` identity/outcome census at the natural key owner. It must
+count exact `PathObservationDemand` identities as first-seen versus repeated
+and classify returns as `Complete` versus `Need`, with bounded capacity,
+explicit overflow, aggregate-only output and no physical-path disclosure. This
+distinguishes distinct cold breadth from completed repetition or retry-producing
+needs. The historical external identity census already selected the sibling-
+need union still present in source; neither these counts nor the latest sample
+justify repeating it or changing that loop. A census can select only another
+reviewed causal audit.
 
 Do not run F3, any sibling configured-conflict selector, the uninstrumented
 selected selector or a second measured replay. Do not raise a limit, acquire a

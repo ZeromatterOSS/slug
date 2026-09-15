@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-7A-configured-conflict-key-type-count-audit-r1
-Status: split preparation accepted; diagnostic execution pending
+Status: key-count audit complete; path identity/outcome census selected
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -63,6 +63,12 @@ entering the Core crate and produced no executable; no test or replay ran. The
 revised design permits one separately bounded feature-library check before one
 fresh unit-harness preparation, with byte-identical diagnostic hashes and no
 retry or raised limit.
+
+The split passed and the sole replay produced valid same-cutoff counts: 8,094
+total compute starts, 1,626 external-Bzl and 2,543 path-observation compute
+starts, with zero overflow/drops and complete PID/cleanup evidence. Result
+review selected only a bounded post-sharding `PathObservationDemand`
+identity/outcome census; the extant external-child union must not change.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

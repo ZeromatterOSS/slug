@@ -9052,3 +9052,11 @@ replay. The resource recovery is one reviewed split: compile the feature Core
 library alone, then prepare the unit harness under a separate unchanged limit.
 Both temporary diagnostic hashes must remain byte-identical and neither split
 step may be retried.
+
+The split passed and the sole replay recorded 8,094 total, 1,626 external-Bzl
+and 2,543 path-observation compute-start cutoff snapshots. Observer validity,
+overflow, PID and cleanup gates passed. Independent result review selected only
+a post-sharding `PathObservationDemand` identity/outcome census. It must
+distinguish first-seen from repeated exact identities and `Complete` from
+retry-producing `Need`, publish aggregates without physical paths, and select
+only another reviewed causal audit.
