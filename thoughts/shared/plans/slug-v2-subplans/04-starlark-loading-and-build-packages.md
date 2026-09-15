@@ -9161,3 +9161,9 @@ proof-only `usize`/`off_t` mismatch before creating an executable or running a
 selector. A reviewed correction may change only that conversion and prepare the
 same target once under the unchanged limit.
 Independent recovery review returned `ACCEPT` for that proof-only conversion.
+The corrected target prepared in 4.83 seconds and its exact selector passed
+1/1. A direct scratch-supervisor launcher then exited 126 before script entry
+because the copied file was mode 0644. One reviewed `/bin/bash` launcher
+correction may run only its self-check; the CLI and replay remain stopped.
+Independent recovery review returned `ACCEPT` and preserves the unchanged
+scratch bytes through an explicit `/bin/bash` launcher.

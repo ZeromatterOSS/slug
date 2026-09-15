@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-7A-configured-conflict-path-shard-dice-event-audit-r1
-Status: Core preparation recovery accepted; corrected preparation pending
+Status: supervisor launcher recovery accepted; self-check pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -67,6 +67,13 @@ conversion and prepare the same target once under the unchanged limit; all
 production, CLI and replay boundaries remain frozen.
 Independent recovery review returned `ACCEPT` for the proof-only conversion and
 unchanged target, cap and execution stops.
+The corrected target then prepared in 4.83 seconds and its exact selector
+passed 1/1. The first scratch-supervisor self-check launcher exited 126 before
+entering the script because the copied file was mode 0644. One reviewed recovery
+may invoke the unchanged scratch script through `/bin/bash`; no CLI or replay
+has run.
+Independent recovery review returned `ACCEPT` and requires `/bin/bash` for every
+later invocation of the unchanged 0644 scratch artifact.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-shard-dice-event-audit-r1
-Status: Core preparation recovery accepted; corrected preparation pending
+Status: supervisor launcher recovery accepted; self-check pending
 
 ## Accepted predecessor receipt
 
@@ -199,3 +199,22 @@ and may not be repeated without a later source change.
 Independent recovery review returned `ACCEPT` for a checked multiplication and
 `libc::off_t::try_from` conversion or an equivalently proven lossless
 conversion, with the same target and limits.
+
+The checked proof correction preserved the 130-line cap. The same dedicated
+target then prepared successfully in 4.83 seconds, produced exactly one
+executable, and its exact nonignored selector preflighted and passed 1/1. The
+production diff remains 99/100 lines.
+
+The first scratch-supervisor self-check launcher exited 126 immediately because
+the accepted script and its copied scratch file both have mode 0644, so
+`timeout` could not execute the path directly. It entered no script code and
+ran no self-check case, compiler, fixture or replay. The scratch diff is 80
+additions and 11 deletions against the 120-line cap, at SHA-256
+`53b5ed8b94bcaebca30b54a48815f2eda55ec0079365d546f2cb13e981e93409`.
+One recovery may invoke this unchanged file through `/bin/bash` under the same
+15-second outer bound and run its self-check once. It may not repeat the direct
+nonexecutable-path launcher or proceed to CLI preparation/replay until the
+self-check succeeds.
+Independent recovery review returned `ACCEPT` because the failed command entered
+no script code. Use `/bin/bash` for the self-check and every later invocation of
+the unchanged 0644 scratch artifact.

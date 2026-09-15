@@ -417,6 +417,8 @@ one supervised replay. The separately incremented totals and filtered values
 are atomic cutoff snapshots, not an exact partition. They can select only a
 separately reviewed deeper causal audit; all sibling selectors and F3 remain
 stopped.
+Independent recovery review returned `ACCEPT` and preserves the unchanged
+scratch bytes through an explicit `/bin/bash` launcher.
 
 The cold Core proof-harness preparation then reached its 60-second ceiling
 after entering the Core crate. It produced no executable and ran no selector or
@@ -507,3 +509,8 @@ proof-only `usize`/`off_t` mismatch. It created no executable and ran no
 selector. A reviewed correction may change only that conversion and prepare
 the same target once; the CLI and replay remain stopped.
 Independent recovery review returned `ACCEPT` for that proof-only conversion.
+The corrected Core target prepared in 4.83 seconds and its exact selector
+passed 1/1. The first scratch-supervisor self-check launcher exited 126 before
+script entry because the copied file was mode 0644. One reviewed `/bin/bash`
+launcher correction may run only the self-check; the CLI and replay remain
+stopped.
