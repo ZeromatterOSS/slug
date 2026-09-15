@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-6-7A-r2-core-source-test-boundary-reconcile-r1
-Status: Phase B ready; independent design review ACCEPT
+Status: Phase B second partition ready; independent replan review ACCEPT
 
 ## Result and acceptance boundary
 
@@ -160,6 +160,84 @@ The frozen 313-pass receipt additionally retains direct discriminators such as
 Need/error/cancellation selectors. They support the owner mapping but do not
 replace the real public-command selectors named above.
 
+## First replacement checkpoint and second partition
+
+Unaccepted implementation checkpoint `678ff2e7c` materialized the 34-row
+table within the first caps. Its final Core binary
+`66ce3e7472d9c9982139e6ad6c5c38cf4a46ee8c8abcaae9f24e25d899de9b16`
+compiled in 58.81 seconds. Atomic approved-host receipt
+`3d2c7f0706c0760da702117ed47f9d9cb5a4f8e79be5e43be2630e28b5c59656`
+records 25 exact passes, nine exact 12.004-second timeouts and zero assertion
+failures. Freeze the 25 passing bodies and all shared fixture behavior; do not
+rerun them.
+
+The nine timed first replacements are
+`cquery_executables_reverse_depth_and_edges`,
+`cquery_executables_filter_kind_composition`,
+`cquery_executables_depth_boundaries_and_empty_results`,
+`cquery_set_ordered_operators_filter_and_some`,
+`cquery_deps_reverse_depth_and_topology`,
+`cquery_deps_rdeps_composition_and_selected_subgraph`,
+`cquery_deps_filter_kind_and_inner_depth_boundaries`,
+`cquery_deps_errors_transition_and_edit_restore`, and
+`cquery_deps_depth_closure_and_tool_flag_equivalence`. Remove and replace only
+these bodies. Do not rerun their names.
+
+Every second-partition selector gets a fresh fixture and executes no more than
+three real public command evaluations. Preserve the original expression
+strings, outer and terminal result classes, assertion values, edit order and
+returned-evaluation comparisons. The 53 exact second-partition names are:
+
+- executable reverse: `cquery_executables_reverse_self_zero_and_empty`,
+  `cquery_executables_reverse_full_identity_and_upper_bounds`,
+  `cquery_executables_reverse_negative_and_zero_bounds`;
+- executable composition: `cquery_executables_chained_and_named_kind_composition`,
+  `cquery_executables_upper_depths_match_full`,
+  `cquery_executables_direct_filter_and_kind_match_full`;
+- executable depth/empty: `cquery_executables_filter_depth_zero`,
+  `cquery_executables_filter_depth_one`,
+  `cquery_executables_filter_upper_depths`,
+  `cquery_executables_kind_depth_zero`,
+  `cquery_executables_kind_depth_one`,
+  `cquery_executables_kind_upper_depths`,
+  `cquery_executables_chained_depth_zero`,
+  `cquery_executables_chained_depth_one`,
+  `cquery_executables_chained_upper_depths`,
+  `cquery_executables_named_kind_depth_zero`,
+  `cquery_executables_named_kind_depth_one`,
+  `cquery_executables_named_kind_upper_depths`,
+  `cquery_executables_empty_compositions`;
+- ordered sets: `cquery_set_union_set_and_let`,
+  `cquery_set_intersect_and_except`,
+  `cquery_set_exact_prefix_and_missing_filters`,
+  `cquery_set_default_counted_and_filtered_some`;
+- reverse topology: `cquery_deps_depth_zero_and_full_topology`,
+  `cquery_deps_zero_and_one_reverse_topology`,
+  `cquery_deps_full_and_upper_reverse_bounds`,
+  `cquery_deps_negative_reverse_is_empty`;
+- direct/normalized rdeps: `cquery_deps_direct_normalized_default`,
+  `cquery_deps_direct_normalized_negative`,
+  `cquery_deps_direct_normalized_zero`,
+  `cquery_deps_direct_normalized_one`,
+  `cquery_deps_direct_normalized_max`;
+- filtered rdeps/subgraph: `cquery_deps_filtered_default_and_max`,
+  `cquery_deps_filtered_negative`, `cquery_deps_filtered_zero`,
+  `cquery_deps_filtered_one`, `cquery_deps_selected_subgraph`;
+- kind/inner boundaries: `cquery_deps_empty_kind_empty_and_aliases`,
+  `cquery_deps_kind_zero_and_bounded_zero`,
+  `cquery_deps_kind_full_one_and_max`,
+  `cquery_deps_negative_bounds`,
+  `cquery_deps_inner_zero_and_one`,
+  `cquery_deps_inner_two_and_max`, `cquery_deps_composed_zero`;
+- error/edit boundaries: `cquery_deps_broken_unreachable_and_missing`,
+  `cquery_deps_filter_regex_precedence`,
+  `cquery_deps_kind_regex_precedence`,
+  `cquery_deps_universe_default_and_transitioned_seed`,
+  `cquery_deps_build_edit_restore_lifecycle`; and
+- deps closure/tool: `cquery_deps_depth_one_topology`,
+  `cquery_deps_full_and_depth_two`, `cquery_deps_full_and_depth_max`,
+  `cquery_deps_full_and_without_tools`.
+
 ## Scope, caps and validation
 
 Production additions are exactly zero. Test edits are limited to:
@@ -172,21 +250,23 @@ Plan receipts may update this packet, Stage 6 and the canonical plan. No
 analysis, loading, configuration, CLI, REAPI, server, query, Cargo/BUILD,
 fixture or production Core code may change.
 
-The table requires 34 replacement selectors. Shared test-only fixture builders
-may reduce repeated setup but may not cache semantic state across selectors.
-Cap gross proof additions at 1,100 Rust lines. Physical caps are 4,350 lines
-for `build_command_tests.rs`, 1,500 for `cquery_command_tests.rs` and 13,250 for
+The second partition requires 53 replacement selectors. Shared test-only
+fixture builders may reduce repeated setup but may not cache semantic state
+across selectors. Cap gross proof additions from design commit `6a60b4271` at
+1,250 Rust lines. Physical caps are 4,350 lines for
+`build_command_tests.rs`, 1,500 for `cquery_command_tests.rs` and 13,350 for
 `dice.rs`. These large files remain cohesive for this packet because the first
 two are owner-specific included test modules and the third may change only its
 existing test module. A new production owner, new semantic helper, fixture
 file, or cap excess requires replan.
 
-After independent design acceptance, split the tests without changing any
-assertion value. Compile one final Core test binary under the 60-second
-preparation ceiling. Preflight all 34 exact new names against that binary, then
-run each once with the standing 12-second command deadline and 15-second
-absolute ceiling. A single timeout replans. Preserve the frozen 313 passes; do
-not rerun the nine removed names or broaden into another full-Core sweep.
+Remove and replace only the nine timed first-partition bodies without changing
+any assertion value. Compile one final Core test binary under the 60-second
+preparation ceiling. Preflight all 53 exact second-partition names against that
+binary, then run each once with the standing 12-second command deadline and
+15-second absolute ceiling. A timeout or assertion failure replans. Preserve
+the frozen 313 broad passes and 25 first-partition passes; do not rerun any of
+their names or broaden into another full-Core sweep.
 
 Run `cargo fmt --all -- --check`, `git diff --check`, scope/growth checks and
 `python3 scripts/v2_plan_status.py`. Independent final review must compare the

@@ -1364,6 +1364,16 @@ weaken assertions, lengthen deadlines, resume diagnostics, or run F3. After
 independent design review, the replacement selectors must each pass within the
 same 12/15-second limits before remaining R2/group acceptance gates resume.
 
+The first materialized partition is preserved unaccepted at `678ff2e7c`.
+Binary `66ce3e7472d9c9982139e6ad6c5c38cf4a46ee8c8abcaae9f24e25d899de9b16`
+and receipt `3d2c7f0706c0760da702117ed47f9d9cb5a4f8e79be5e43be2630e28b5c59656`
+record 25 exact passes, nine exact timeouts and zero assertion failures. Freeze
+the 25 passing bodies and shared fixtures. Independent replan review accepts a
+53-selector second partition that removes only the nine timed bodies, uses a
+fresh fixture and at most three real public command evaluations per selector,
+and preserves every expression, result class, assertion and edit order. Do not
+rerun any first-partition name.
+
 ## Configurable native alias prerequisite (2026-09-14)
 
 After the computed-default correction, authentic F3 reaches rules_java's

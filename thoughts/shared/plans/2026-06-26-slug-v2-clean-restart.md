@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-6-7A-r2-core-source-test-boundary-reconcile-r1
-Status: Phase B ready; independent design review ACCEPT
+Status: Phase B second partition ready; independent replan review ACCEPT
 
 The reconciled selected-request/configured-conflict and execution-group stack
 remains unaccepted at local commit `1b09dbfa1`. Its frozen Core binary passed
@@ -39,15 +39,16 @@ non-timeout assertion results and hit the exact 12-second deadline in nine
 over-broad public build/cquery selectors. The complete receipt and binary are
 hashed in the current packet. A timeout cannot be waived or retried.
 
-Run the proof-only source/test-boundary packet next. Its assertion-to-owner
-table partitions every claim and semantic return path from the nine timed
-bodies into 34 smaller exact selectors while preserving real public-command
-and DICE lifecycle ownership. Production is frozen, the nine original names
-may not run again, and independent design review precedes test edits. After the
-replacement set passes and final coverage review accepts it, resume the eight
-unchanged-main assertion comparisons and the remaining direct consumer gates.
-Only complete atomic acceptance may merge to `main` and push `main` to the
-authorized ZeromatterOSS remote.
+The first proof-only partition is preserved unaccepted at `678ff2e7c`: 25 of
+34 exact selectors pass and nine still hit the exact deadline, with zero
+assertion failures. Freeze those 25 bodies. The independently reviewed second
+partition replaces only the nine timed bodies with 53 fresh-fixture selectors,
+each executing at most three real public commands. Production and expectations
+remain frozen, and neither earlier timed nor passing names may run again. After
+the replacement set passes and final coverage review accepts it, resume the
+eight unchanged-main assertion comparisons and remaining direct consumer
+gates. Only complete atomic acceptance may merge to `main` and push `main` to
+the authorized ZeromatterOSS remote.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
