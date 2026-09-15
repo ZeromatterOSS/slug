@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-merge-injection-handoff-audit-r1
-Status: design accepted; diagnostic execution pending
+Status: proof-coverage recovery accepted; Core proof pending
 
 ## Accepted predecessor receipt
 
@@ -166,7 +166,7 @@ Temporary Rust edits are limited to
 `app/slug_core_v2/src/runtime/probe_observer/mapping.rs`,
 `app/slug_core_v2/src/runtime/dice.rs`,
 `app/slug_core_v2/tests/path_merge_injection_handoff.rs`,
-`app/slug_cli_v2/src/lib.rs` and `app/slug_cli_v2/tests/cli.rs`. Caps are 130
+`app/slug_cli_v2/src/lib.rs` and `app/slug_cli_v2/tests/cli.rs`. Caps are 133
 gross diagnostic production lines, 140 gross proof lines and 120 changed
 scratch-supervisor lines. No Cargo manifest, DICE crate, workspace/path owner,
 loading owner, fixture or oracle input may change.
@@ -184,3 +184,25 @@ semantics, merge the combined stack or push the review branch.
 Independent design rereview returned `ACCEPT` for marker-last production,
 pending-clear/count-last consumption, rejection of every partial cutoff and
 serialized command-loop ownership.
+
+## Result-review recovery
+
+The sole replay and all six pre-execution hashes are frozen. Independent result
+review found its runtime cutoff coherent but returned `REJECT` because the
+executed production diff is 133 gross lines, not the planned 130: 10 additions
+in `dice.rs`, 116 in `probe_observer.rs`, four in its mapping and three deleted
+CLI adapter lines. Correct the production cap transparently to 133 without
+changing that diff or rerunning any production/CLI artifact.
+
+The same review found the 85-line Core integration proof omitted bucket upper
+boundaries 7, 31 and 127, aggregate counter overflow, and explicit
+value/count/marker/aggregate/clear/commit partial-consumer coverage. The bounded
+recovery may edit only
+`app/slug_core_v2/tests/path_merge_injection_handoff.rs`, remain within the
+existing 140-line proof cap, prepare that same dedicated target once under 60
+seconds, and preflight/run only its exact selector under 12/15 seconds. Preserve
+the frozen production diff, supervisor, CLI harness, Slug binary, fixture and
+replay receipt byte-for-byte. Do not rerun the CLI or select a successor until
+the augmented proof and the same result pass independent rereview.
+Independent recovery review returned `ACCEPT` for the 133-line correction,
+proof-only scope, frozen replay and no-CLI-replay stop.

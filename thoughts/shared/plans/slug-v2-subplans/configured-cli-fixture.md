@@ -500,3 +500,11 @@ the pending value and marker before committing its count last. Exact proof and
 decoder self-checks must reject every partial handoff cutoff.
 Independent design rereview returned `ACCEPT` for marker-last production,
 pending-clear/count-last consumption and serialized cutoff ownership.
+
+The sole handoff replay is frozen and arithmetically coherent, but result review
+rejected acceptance because the production cap was miscounted at 130 instead of
+133 and the Core proof omitted bucket upper boundaries and partial consumer
+states. A recovery may augment and rerun only that exact Core proof. Preserve
+all replay hashes and do not rerun this CLI selector, its siblings or F3.
+Independent recovery review returned `ACCEPT` for this proof-only amendment and
+its frozen replay boundary.

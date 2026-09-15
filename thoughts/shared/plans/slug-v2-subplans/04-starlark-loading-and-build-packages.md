@@ -9152,3 +9152,11 @@ zeroing pending value/marker before committing the consumer count last. Exact
 proof and decoder self-checks reject every partial producer/consumer cutoff.
 Independent design rereview returned `ACCEPT` for marker-last production,
 pending-clear/count-last consumption and serialized cutoff ownership.
+
+The sole handoff replay produced coherent aggregate data, but result review
+rejected acceptance because the frozen production diff is 133 rather than 130
+gross lines and the Core proof omitted three upper bucket boundaries and
+partial consumer states. Preserve all executed hashes, correct the cap to 133,
+and add/run only the missing exact Core proof coverage. The CLI may not replay.
+Independent recovery review returned `ACCEPT` for this proof-only amendment and
+its frozen replay boundary.

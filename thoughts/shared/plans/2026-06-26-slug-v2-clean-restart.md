@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-7A-configured-conflict-path-merge-injection-handoff-audit-r1
-Status: design accepted; diagnostic execution pending
+Status: proof-coverage recovery accepted; Core proof pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -56,6 +56,14 @@ independent design review and existing 12/15-second bounds. No path, shard,
 identity or semantic behavior may cross the boundary.
 Independent design rereview returned `ACCEPT` for marker-last production,
 pending-clear/count-last consumption and serialized cutoff ownership.
+The sole replay produced coherent handoff data, but result review rejected
+acceptance: the frozen production diff is 133 rather than 130 gross lines, and
+the Core proof omitted bucket boundaries 7/31/127 plus required partial consume
+states. Preserve every executed hash and do not replay the CLI. A bounded
+recovery may correct the cap to 133 and add/run only the missing exact Core proof
+coverage before rereviewing the same result.
+Independent recovery review returned `ACCEPT` for the 133-line correction,
+proof-only scope, frozen replay and no-CLI-replay stop.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
