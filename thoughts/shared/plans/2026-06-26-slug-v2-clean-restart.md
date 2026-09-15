@@ -29,38 +29,28 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-configured-conflict-path-observation-typed-invalidation-provenance-r1
-Status: typed provenance replay accepted; diagnostic chain stopped
+Packet: WP-4-6-7A-r2-execution-group-source-invariant-reconcile-r2
+Status: Phase B ready; independent architecture review ACCEPT
 
-Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
-stack and its accepted diagnostic history. The accepted activation audit found
-2,488 legacy-delivered evaluated `PathObservationKey` callbacks with immediate
-exact shard dependencies at a coherent 220/220/219 cutoff. It established no
-invalidation source, necessity, cost or avoidability, so aggregate callback and
-event counting has stopped.
+Reconcile the preserved selected-request/output-conflict R2 and
+named/automatic execution-group stack as one atomic checkpoint. The completed
+audit against pinned Bazel commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` freezes the two automatic-label
+spellings, target-package parsing and mapping, exact property rows, supported
+action-field order, root executable provenance, top-level versus nested depset
+handling, explicit-group precedence and the closed subrule override boundary.
+The existing configured owner, resolution, transition, provider, property,
+runfiles and atomic-publication architecture stays unchanged.
 
-The accepted successor uses DICE's existing typed invalidation-path API inside
-`PathObservationKey::compute`. A doc-hidden marker arms only observer-backed
-transactions; the key retains one fixed-size normal-priority dependency-context
-source category as evaluation data after a shard or epoch dependency resolves.
-Words 54--59 publish total, clean, unknown, source-shard, source-epoch and
-source-other aggregates under the accepted handoff lifecycle and callback
-claim. Missing, wrong, malformed or duplicate-store payloads fail closed.
-Identity and version material cannot cross the boundary. Exact workspace/Core
-proofs, supervisor self-check, artifact freeze and independent preexecution
-review precede one fresh same-selector replay under 230/310/140 temporary caps
-and the existing 12/15-second limits. Independent design review returned
-`ACCEPT`; implementation may begin, but replay remains unauthorized.
-The capped implementation now passes its exact workspace and Core proofs,
-supervisor self-check, exact nonignored listing and fresh-fixture verification.
-Artifacts were frozen in the current packet and independently reviewed before
-the sole replay.
-The sole reviewed replay is accepted at a coherent 222/222/221 cutoff with
-`T=2541`, all categorized as exact shard-source paths, and zero global health,
-typed flags or claims. This aggregate result supplies no identity, pairing or
-evaluation causality and cannot justify optimization. No further replay or
-diagnostic audit is selected; semantic work requires a new docs-first
-architecture packet grounded in source invariants and ordinary proofs.
+Independent review accepts the bounded correction scope and ordinary proof
+replacement. Build the corrected final Core candidate binary before
+preflighting and running all 329 active selectors as separate exact commands;
+earlier binaries are inadmissible. Run the focused analysis, selected-request,
+configured-conflict, direct REAPI/server and compile gates under the standing
+limits. No diagnostic observer, authentic configured CLI conflict replay or F3
+belongs to this packet. After final review, integrate the stack atomically,
+record acceptance on `main`, and push only `main` to the authorized
+ZeromatterOSS remote.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
@@ -80,7 +70,7 @@ partially or integrate `review-evidence/`.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Combined R2-based named/automatic execution-group runtime | ready; freeze the configured-target-owned contract against reconciled R2, implement on that branch, and pass joint gates before atomic acceptance |
+| 1 | Combined R2-based named/automatic execution-group runtime | reviewed source-invariant reconciliation is Phase B ready on the preserved branch; implement the bounded corrections and pass joint gates before atomic acceptance |
 | 2 | Authentic configured CLI fixture | F2 accepted through 28 objects; replay F3 once after combined R2/group activation |
 | 4 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
 | 5 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |

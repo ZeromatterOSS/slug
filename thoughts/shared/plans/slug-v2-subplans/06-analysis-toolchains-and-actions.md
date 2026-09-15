@@ -18,9 +18,10 @@ Those changes are not pending implementation.
 Combined selected-toolchain request/output-conflict R2 is preserved and
 unaccepted. [The fixture/gate ledger](./configured-cli-fixture.md) owns the
 remaining validation state. The detailed contracts below own semantics; the
-current manifest owns scheduling. The named/automatic runtime and its automatic
-qualifier/property correction are preserved unaccepted through `498ea2f49`;
-full corrected analysis passes 164/164. Authentic F3 and all three real CLI
+current manifest owns scheduling. The named/automatic runtime is preserved
+unaccepted through `498ea2f49`. Its source-invariant reconciliation packet is
+independently reviewed and Phase B ready; no runtime correction is accepted
+yet. Authentic F3 and all three real CLI
 gates now clear that invocation and select rules_cc `_def_parser`, an omitted
 `attr.label` computed default whose retained schema already carries
 `cfg = "exec"`. Stage 4 owns its narrow loading-time callback prerequisite;
@@ -1313,6 +1314,33 @@ baseline outcomes. Seven identical exact timeouts remain open and must receive
 bounded discriminating proof. The attempted minimal local-module overrides
 were reverted: they only bypassed authentic module sources and advanced to the
 first missing autoload, so they provide no acceptance evidence.
+
+## R2/group source-invariant reconciliation (2026-09-15)
+
+`WP-4-6-7A-r2-execution-group-source-invariant-reconcile-r2` is independently
+reviewed and Phase B ready. The pinned Bazel 9.2 audit preserves the configured
+group owner and resolution architecture while correcting its boundary
+projections: root automatic runtime names use `//pkg:type`, canonical
+constraint keys use `@@//pkg:type`, and external canonical labels retain their
+repository. Constraint keys parse in the target package and mapping; property
+rows use exact runtime names; action toolchain strings also parse in the target
+context while `ctx.toolchains` retains definition context.
+
+Root actions lower executable/tools fields before group selection. A top-level
+tools depset is flattened for executable-dependency association, while a depset
+nested in the tools sequence is opaque. Provider equality controls omitted
+toolchain ambiguity only for root actions. Subrules allow omitted or `None`
+`exec_group`, reject non-`None` groups, reject every supplied `toolchain`, and
+reject a matching executable File in favor of its `FilesToRunProvider`. An
+omitted subrule toolchain becomes explicit `None` and selects Default.
+
+Acceptance uses ordinary correctness proofs. Compile the corrected final Core
+candidate first, then preflight and run all 329 active selectors separately;
+earlier binaries do not qualify. Focused analysis, selected-request,
+configured-conflict, direct REAPI/server and compile gates complete the
+replacement boundary. Do not repeat the finished diagnostic chain, run an
+authentic configured conflict selector or run F3 before atomic R2/group
+acceptance.
 
 ## Configurable native alias prerequisite (2026-09-14)
 
