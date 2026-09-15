@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-7A-configured-conflict-path-observation-activation-dependency-audit-r1
-Status: corrected docs-first design accepted; implementation pending
+Status: Core proof reactor recovery accepted; corrected proof rerun pending
 
 ## Accepted predecessor receipt
 
@@ -175,3 +175,14 @@ Independent design rereview returned `ACCEPT` after limiting the audit to the
 legacy-delivered callback subset, excluding rich-only reuse, freezing each
 two-or-three-counter publication order and removing any invented global
 activation bound.
+
+The first Core preparation compile exposed only bounded integration defects:
+the legacy dependency iterator required an explicit `next` loop, the included
+proof needed direct imports, and observer capture belongs inside tracker
+construction rather than in the install signature. Independent recovery review
+returned `ACCEPT`; the corrected preparation compiled in 11.57 seconds. The
+exact selector then listed once and began one test, but failed before diagnostic
+assertions because tracker acquisition constructed the cycle detector outside a
+Tokio reactor. Independent recovery review accepted acquiring that tracker
+inside the runtime's existing `block_on` and authorized one corrected exact
+proof rerun. No CLI build, fixture validation or selected replay was consumed.
