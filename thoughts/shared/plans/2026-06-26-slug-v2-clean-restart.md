@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-6-7A-r2-core-source-test-boundary-reconcile-r1
-Status: Phase B second partition ready; independent replan review ACCEPT
+Status: Phase B second partition passed; independent final review ACCEPT
 
 The reconciled selected-request/configured-conflict and execution-group stack
 remains unaccepted at local commit `1b09dbfa1`. Its frozen Core binary passed
@@ -44,11 +44,16 @@ The first proof-only partition is preserved unaccepted at `678ff2e7c`: 25 of
 assertion failures. Freeze those 25 bodies. The independently reviewed second
 partition replaces only the nine timed bodies with 53 fresh-fixture selectors,
 each executing at most three real public commands. Production and expectations
-remain frozen, and neither earlier timed nor passing names may run again. After
-the replacement set passes and final coverage review accepts it, resume the
-eight unchanged-main assertion comparisons and remaining direct consumer
-gates. Only complete atomic acceptance may merge to `main` and push `main` to
-the authorized ZeromatterOSS remote.
+remain frozen, and neither earlier timed nor passing names may run again. The
+final binary `af7fa9c80829856b544d03cfb668df61d83592208044f8342f70ee3fd643396b`
+passed all 53 once under the 12/15-second limits. Atomic receipt
+`35c469ecd891903220ebde8bb7a13d16edf691155d6f9acfdb22c7e4ae6d3bef`
+records zero failures and zero timeouts; independent final review ACCEPT
+confirmed preserved expressions, result classes, assertions, edit order,
+frozen bodies and caps. Resume the eight unchanged-main assertion comparisons
+and remaining direct consumer gates without rerunning either completed
+partition. Only complete atomic acceptance may merge to `main` and push `main`
+to the authorized ZeromatterOSS remote.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

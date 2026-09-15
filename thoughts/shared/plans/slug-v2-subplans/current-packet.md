@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-6-7A-r2-core-source-test-boundary-reconcile-r1
-Status: Phase B second partition ready; independent replan review ACCEPT
+Status: Phase B second partition passed; independent final review ACCEPT
 
 ## Result and acceptance boundary
 
@@ -182,6 +182,18 @@ The nine timed first replacements are
 `cquery_deps_errors_transition_and_edit_restore`, and
 `cquery_deps_depth_closure_and_tool_flag_equivalence`. Remove and replace only
 these bodies. Do not rerun their names.
+
+The final second partition compiled in 32.60 seconds as Core binary
+`af7fa9c80829856b544d03cfb668df61d83592208044f8342f70ee3fd643396b`.
+Preflight found all 53 exact selectors once and nonignored. Atomic approved-host
+receipt `35c469ecd891903220ebde8bb7a13d16edf691155d6f9acfdb22c7e4ae6d3bef`
+records 53 passes, zero failures and zero timeouts under the unchanged 12-second
+command and 15-second absolute ceilings. Independent final review ACCEPT
+confirmed the frozen 25 passing bodies and shared fixtures remain unchanged,
+all original expressions, result classes, assertion values and edit order are
+preserved, and gross additions are 1,219 of the 1,250-line cap. Do not rerun
+these 53 selectors; resume the deferred unchanged-main attribution and the
+remaining predecessor gates.
 
 Every second-partition selector gets a fresh fixture and executes no more than
 three real public command evaluations. Preserve the original expression

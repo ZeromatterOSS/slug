@@ -1374,6 +1374,17 @@ fresh fixture and at most three real public command evaluations per selector,
 and preserves every expression, result class, assertion and edit order. Do not
 rerun any first-partition name.
 
+The accepted second-partition proof binary
+`af7fa9c80829856b544d03cfb668df61d83592208044f8342f70ee3fd643396b`
+compiled in 32.60 seconds. Exact preflight found all 53 selectors once and
+nonignored. Approved-host receipt
+`35c469ecd891903220ebde8bb7a13d16edf691155d6f9acfdb22c7e4ae6d3bef`
+records 53 passes, zero failures and zero timeouts under the standing 12/15
+second limits. Independent final review ACCEPT confirmed the frozen 25 bodies
+and fixtures are unchanged, all public paths and assertion semantics remain,
+and gross additions are 1,219 of 1,250. Preserve this evidence and resume the
+deferred unchanged-main attribution and remaining predecessor gates.
+
 ## Configurable native alias prerequisite (2026-09-14)
 
 After the computed-default correction, authentic F3 reaches rules_java's

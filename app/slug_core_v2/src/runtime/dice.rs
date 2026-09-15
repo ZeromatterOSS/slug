@@ -9932,7 +9932,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
     }
 
     #[test]
-    fn cquery_deps_reverse_depth_and_topology() {
+    fn cquery_deps_depth_zero_and_full_topology() {
         let fixture = CqueryDepsFixture::new();
         let run = |expression: &str, include_implicit: bool, include_tool: bool| {
             fixture.run(expression, include_implicit, include_tool)
@@ -9967,7 +9967,13 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 "  \"//:root (base)\" -> \"//:ordinary (transition)\"",
             ],
         );
-        let reverse_zero = run("rdeps(deps(//:root), //:ordinary, 0)", false, true).unwrap();
+    }
+
+    #[test]
+    fn cquery_deps_zero_and_one_reverse_topology() {
+        let fixture = CqueryDepsFixture::new();
+        let run = |expression: &str| fixture.run(expression, false, true).unwrap();
+        let reverse_zero = run("rdeps(deps(//:root), //:ordinary, 0)");
         let reverse_zero = reverse_zero.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(
             reverse_zero.starlark_label_stdout(),
@@ -9978,7 +9984,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             &["  \"//:ordinary (base)\"", "  \"//:ordinary (transition)\""],
             &[],
         );
-        let reverse_one = run("rdeps(deps(//:root), //:ordinary, 1)", false, true).unwrap();
+        let reverse_one = run("rdeps(deps(//:root), //:ordinary, 1)");
         let reverse_one = reverse_one.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(
             reverse_one.starlark_label_stdout(),
@@ -9998,13 +10004,16 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 "  \"//:root (base)\" -> \"//:ordinary (transition)\"",
             ],
         );
+    }
+
+    #[test]
+    fn cquery_deps_full_and_upper_reverse_bounds() {
+        let fixture = CqueryDepsFixture::new();
+        let run = |expression: &str| fixture.run(expression, false, true).unwrap();
+        let reverse = run("rdeps(deps(//:root), //:ordinary)");
+        let reverse = reverse.terminal_for_test().as_ref().as_ref().unwrap();
         for depth in ["2", "2147483647"] {
-            let bounded = run(
-                &format!("rdeps(deps(//:root), //:ordinary, {depth})"),
-                false,
-                true,
-            )
-            .unwrap();
+            let bounded = run(&format!("rdeps(deps(//:root), //:ordinary, {depth})"));
             assert_eq!(
                 bounded
                     .terminal_for_test()
@@ -10016,12 +10025,18 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 "depth {depth}"
             );
         }
-        let negative = run(
-            "rdeps(deps(//:root), //:ordinary, '-2147483648')",
-            false,
-            true,
-        )
-        .unwrap();
+    }
+
+    #[test]
+    fn cquery_deps_negative_reverse_is_empty() {
+        let fixture = CqueryDepsFixture::new();
+        let negative = fixture
+            .run(
+                "rdeps(deps(//:root), //:ordinary, '-2147483648')",
+                false,
+                true,
+            )
+            .unwrap();
         let negative = negative.terminal_for_test().as_ref().as_ref().unwrap();
         assert!(negative.label_stdout().is_empty());
         assert!(negative.starlark_label_stdout().is_empty());
@@ -10032,453 +10047,220 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         );
     }
 
-    #[test]
-    fn cquery_deps_rdeps_composition_and_selected_subgraph() {
-        let fixture = CqueryDepsFixture::new();
-        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
-            fixture.run(expression, include_implicit, include_tool)
+    #[rustfmt::skip] macro_rules! cquery_deps_eval {
+        ($binding:ident, $fixture:ident, $expression:expr, $implicit:expr, $tool:expr) => {
+            let $binding = $fixture.run($expression, $implicit, $tool).unwrap();
+            let $binding = $binding.terminal_for_test().as_ref().as_ref().unwrap();
         };
-        let reverse = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
-        let reverse = reverse.terminal_for_test().as_ref().as_ref().unwrap();
-        let reverse_zero = run("rdeps(deps(//:root), //:ordinary, 0)", false, true).unwrap();
-        let reverse_zero = reverse_zero.terminal_for_test().as_ref().as_ref().unwrap();
-        let reverse_one = run("rdeps(deps(//:root), //:ordinary, 1)", false, true).unwrap();
-        let reverse_one = reverse_one.terminal_for_test().as_ref().as_ref().unwrap();
-        let negative = run(
-            "rdeps(deps(//:root), //:ordinary, '-2147483648')",
-            false,
-            true,
-        )
-        .unwrap();
-        let negative = negative.terminal_for_test().as_ref().as_ref().unwrap();
-        for depth in ["", ", '-2147483648'", ", 0", ", 1", ", 2147483647"] {
-            let direct = run(&format!("rdeps(//:root, //:ordinary{depth})"), false, true).unwrap();
-            let direct = direct.terminal_for_test().as_ref().as_ref().unwrap();
-            let normalized = run(
-                &format!("rdeps(deps(//:root), //:ordinary{depth})"),
-                false,
-                true,
-            )
-            .unwrap();
-            let normalized = normalized.terminal_for_test().as_ref().as_ref().unwrap();
-            assert_eq!(direct.label_stdout(), normalized.label_stdout(), "{depth}");
-            assert_eq!(
-                direct.label_kind_stdout().unwrap(),
-                normalized.label_kind_stdout().unwrap(),
-                "{depth}"
-            );
-            assert_eq!(
-                direct.starlark_label_stdout(),
-                normalized.starlark_label_stdout(),
-                "{depth}"
-            );
-            assert_eq!(direct.graph_stdout(), normalized.graph_stdout(), "{depth}");
-            assert_eq!(
-                direct
-                    .analyses()
-                    .map(|analysis| analysis.key().clone())
-                    .collect::<Vec<_>>(),
-                normalized
-                    .analyses()
-                    .map(|analysis| analysis.key().clone())
-                    .collect::<Vec<_>>(),
-                "{depth} configured keys"
-            );
-        }
-        for (depth, expected) in [
-            ("", reverse),
-            (", '-2147483648'", negative),
-            (", 0", reverse_zero),
-            (", 1", reverse_one),
-            (", 2147483647", reverse),
-        ] {
-            let filtered = run(
-                &format!("filter('.*', rdeps(//:root, //:ordinary{depth}))"),
-                false,
-                true,
-            )
-            .unwrap();
-            let filtered = filtered.terminal_for_test().as_ref().as_ref().unwrap();
-            assert_eq!(filtered.label_stdout(), expected.label_stdout(), "{depth}");
-            assert_eq!(
-                filtered.label_kind_stdout().unwrap(),
-                expected.label_kind_stdout().unwrap(),
-                "{depth}"
-            );
-            assert_eq!(
-                filtered.starlark_label_stdout(),
-                expected.starlark_label_stdout(),
-                "{depth}"
-            );
-            assert_eq!(filtered.graph_stdout(), expected.graph_stdout(), "{depth}");
-            assert_eq!(
-                filtered
-                    .analyses()
-                    .map(|analysis| analysis.key().clone())
-                    .collect::<Vec<_>>(),
-                expected
-                    .analyses()
-                    .map(|analysis| analysis.key().clone())
-                    .collect::<Vec<_>>(),
-                "{depth} configured keys"
-            );
-        }
-        let selected = run(
-            "filter('ordinary|alias_', rdeps(//:root, //:ordinary))",
-            false,
-            true,
-        )
-        .unwrap();
-        let selected = selected.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(selected.analyses().count(), 4);
-        assert_cquery_deps_topology(
-            selected,
-            &[
-                "  \"//:alias_inner (base)\"",
-                "  \"//:alias_outer (base)\"",
-                "  \"//:ordinary (base)\"",
-                "  \"//:ordinary (transition)\"",
-            ],
-            &[
-                "  \"//:alias_inner (base)\" -> \"//:ordinary (base)\"",
-                "  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\"",
-            ],
-        );
     }
 
-    #[test]
-    fn cquery_deps_filter_kind_and_inner_depth_boundaries() {
-        let fixture = CqueryDepsFixture::new();
-        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
-            fixture.run(expression, include_implicit, include_tool)
+    #[rustfmt::skip] macro_rules! assert_same_cquery_evaluation {
+        ($actual:ident, $expected:ident, $message:expr) => {
+            assert_eq!($actual.label_stdout(), $expected.label_stdout(), "{}", $message);
+            assert_eq!($actual.label_kind_stdout().unwrap(), $expected.label_kind_stdout().unwrap(), "{}", $message);
+            assert_eq!($actual.starlark_label_stdout(), $expected.starlark_label_stdout(), "{}", $message);
+            assert_eq!($actual.graph_stdout(), $expected.graph_stdout(), "{}", $message);
+            assert_eq!($actual.analyses().map(|analysis| analysis.key().clone()).collect::<Vec<_>>(), $expected.analyses().map(|analysis| analysis.key().clone()).collect::<Vec<_>>(), "{} configured keys", $message);
         };
-        let reverse = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
-        let reverse = reverse.terminal_for_test().as_ref().as_ref().unwrap();
-        let reverse_zero = run("rdeps(deps(//:root), //:ordinary, 0)", false, true).unwrap();
-        let reverse_zero = reverse_zero.terminal_for_test().as_ref().as_ref().unwrap();
-        let filtered_empty = run(
-            "filter('never-matches', rdeps(//:root, //:ordinary))",
-            false,
-            true,
-        )
-        .unwrap();
-        let filtered_empty = filtered_empty
-            .terminal_for_test()
-            .as_ref()
-            .as_ref()
-            .unwrap();
+    }
+
+    #[rustfmt::skip] macro_rules! cquery_deps_direct_normalized_test {
+        ($name:ident, $depth:literal) => {
+            #[test]
+            fn $name() {
+                let fixture = CqueryDepsFixture::new();
+                cquery_deps_eval!(direct, fixture, &format!("rdeps(//:root, //:ordinary{})", $depth), false, true);
+                cquery_deps_eval!(normalized, fixture, &format!("rdeps(deps(//:root), //:ordinary{})", $depth), false, true);
+                assert_same_cquery_evaluation!(direct, normalized, $depth);
+            }
+        };
+    }
+    cquery_deps_direct_normalized_test!(cquery_deps_direct_normalized_default, "");
+    cquery_deps_direct_normalized_test!(cquery_deps_direct_normalized_negative, ", '-2147483648'");
+    cquery_deps_direct_normalized_test!(cquery_deps_direct_normalized_zero, ", 0");
+    cquery_deps_direct_normalized_test!(cquery_deps_direct_normalized_one, ", 1");
+    cquery_deps_direct_normalized_test!(cquery_deps_direct_normalized_max, ", 2147483647");
+
+    #[rustfmt::skip] macro_rules! cquery_deps_filtered_bound_test {
+        ($name:ident, $depth:literal) => {
+            #[test]
+            fn $name() {
+                let fixture = CqueryDepsFixture::new();
+                cquery_deps_eval!(expected, fixture, &format!("rdeps(deps(//:root), //:ordinary{})", $depth), false, true);
+                cquery_deps_eval!(filtered, fixture, &format!("filter('.*', rdeps(//:root, //:ordinary{}))", $depth), false, true);
+                assert_same_cquery_evaluation!(filtered, expected, $depth);
+            }
+        };
+    }
+
+    #[rustfmt::skip] #[test] fn cquery_deps_filtered_default_and_max() {
+        let fixture = CqueryDepsFixture::new();
+        cquery_deps_eval!(expected, fixture, "rdeps(deps(//:root), //:ordinary)", false, true);
+        for (depth, expression) in [("", "filter('.*', rdeps(//:root, //:ordinary))"), (", 2147483647", "filter('.*', rdeps(//:root, //:ordinary, 2147483647))")] {
+            cquery_deps_eval!(filtered, fixture, expression, false, true);
+            assert_same_cquery_evaluation!(filtered, expected, depth);
+        }
+    }
+    cquery_deps_filtered_bound_test!(cquery_deps_filtered_negative, ", '-2147483648'");
+    cquery_deps_filtered_bound_test!(cquery_deps_filtered_zero, ", 0");
+    cquery_deps_filtered_bound_test!(cquery_deps_filtered_one, ", 1");
+
+    #[rustfmt::skip] #[test] fn cquery_deps_selected_subgraph() {
+        let fixture = CqueryDepsFixture::new();
+        cquery_deps_eval!(selected, fixture, "filter('ordinary|alias_', rdeps(//:root, //:ordinary))", false, true);
+        assert_eq!(selected.analyses().count(), 4);
+        assert_cquery_deps_topology(selected,
+            &["  \"//:alias_inner (base)\"", "  \"//:alias_outer (base)\"", "  \"//:ordinary (base)\"", "  \"//:ordinary (transition)\""],
+            &["  \"//:alias_inner (base)\" -> \"//:ordinary (base)\"", "  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\""]);
+    }
+
+    #[rustfmt::skip] #[test] fn cquery_deps_empty_kind_empty_and_aliases() {
+        let fixture = CqueryDepsFixture::new();
+        cquery_deps_eval!(filtered_empty, fixture, "filter('never-matches', rdeps(//:root, //:ordinary))", false, true);
         assert!(filtered_empty.label_stdout().is_empty());
-        assert_eq!(
-            filtered_empty.graph_stdout(),
-            "digraph mygraph {\n  node [shape=box];\n}\n"
-        );
-        let kind_zero = run(
-            "kind('^ordinary_rule rule$', rdeps(//:root, //:ordinary, 0))",
-            false,
-            true,
-        )
-        .unwrap();
-        let kind_zero = kind_zero.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(
-            kind_zero.starlark_label_stdout(),
-            "@@//:ordinary\n@@//:ordinary\n"
-        );
-        let zero_keys = kind_zero
-            .analyses()
-            .map(|analysis| analysis.key().clone())
-            .collect::<Vec<_>>();
+        assert_eq!(filtered_empty.graph_stdout(), "digraph mygraph {\n  node [shape=box];\n}\n");
+        cquery_deps_eval!(kind_empty, fixture, "kind('^producer rule$', rdeps(//:root, //:ordinary))", false, true);
+        assert!(kind_empty.label_stdout().is_empty());
+        cquery_deps_eval!(aliases, fixture, "kind('^alias rule$', rdeps(//:root, //:ordinary))", false, true);
+        assert_cquery_deps_topology(aliases, &["  \"//:alias_inner (base)\"", "  \"//:alias_outer (base)\""], &["  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\""]);
+    }
+
+    #[rustfmt::skip] #[test] fn cquery_deps_kind_zero_and_bounded_zero() {
+        let fixture = CqueryDepsFixture::new();
+        cquery_deps_eval!(kind_zero, fixture, "kind('^ordinary_rule rule$', rdeps(//:root, //:ordinary, 0))", false, true);
+        assert_eq!(kind_zero.starlark_label_stdout(), "@@//:ordinary\n@@//:ordinary\n");
+        let zero_keys = kind_zero.analyses().map(|analysis| analysis.key().clone()).collect::<Vec<_>>();
         assert_eq!(zero_keys.len(), 2);
         assert_ne!(zero_keys[0], zero_keys[1]);
-        let kind_full = run(
-            "kind('^ordinary_rule rule$', rdeps(//:root, //:ordinary))",
-            false,
-            true,
-        )
-        .unwrap();
-        let kind_full = kind_full.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(
-            kind_full.starlark_label_stdout(),
-            "@@//:ordinary\n@@//:ordinary\n@@//:root\n"
-        );
-        assert_cquery_deps_topology(
-            kind_full,
-            &[
-                "  \"//:ordinary (base)\"",
-                "  \"//:ordinary (transition)\"",
-                "  \"//:root (base)\"",
-            ],
-            &[
-                "  \"//:root (base)\" -> \"//:ordinary (base)\"",
-                "  \"//:root (base)\" -> \"//:ordinary (transition)\"",
-            ],
-        );
-        let kind_zero_graph = kind_zero.graph_stdout();
-        let kind_full_graph = kind_full.graph_stdout();
-        for (depth, expected) in [
-            ("'-1'", "digraph mygraph {\n  node [shape=box];\n}\n"),
-            ("0", kind_zero_graph.as_str()),
-            ("1", kind_full_graph.as_str()),
-            ("2147483647", kind_full_graph.as_str()),
-        ] {
-            let bounded = run(
-                &format!("kind('^ordinary_rule rule$', rdeps(//:root, //:ordinary, {depth}))"),
-                false,
-                true,
-            )
-            .unwrap();
-            let bounded = bounded.terminal_for_test().as_ref().as_ref().unwrap();
-            assert_eq!(bounded.graph_stdout(), expected, "depth {depth}");
-        }
-        let aliases = run(
-            "kind('^alias rule$', rdeps(//:root, //:ordinary))",
-            false,
-            true,
-        )
-        .unwrap();
-        let aliases = aliases.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_cquery_deps_topology(
-            aliases,
-            &["  \"//:alias_inner (base)\"", "  \"//:alias_outer (base)\""],
-            &["  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\""],
-        );
-        let kind_empty = run(
-            "kind('^producer rule$', rdeps(//:root, //:ordinary))",
-            false,
-            true,
-        )
-        .unwrap();
-        assert!(
-            kind_empty
-                .terminal_for_test()
-                .as_ref()
-                .as_ref()
-                .unwrap()
-                .label_stdout()
-                .is_empty()
-        );
-        let reverse_keys = reverse
-            .analyses()
-            .map(|analysis| analysis.key().clone())
-            .collect::<Vec<_>>();
-        for inner in ["0", "1", "2", "2147483647"] {
-            let normalized = run(
-                &format!("rdeps(deps(//:root, {inner}), //:ordinary)"),
-                false,
-                true,
-            )
-            .unwrap();
-            let normalized = normalized.terminal_for_test().as_ref().as_ref().unwrap();
-            assert_eq!(
-                normalized.graph_stdout(),
-                reverse.graph_stdout(),
-                "inner {inner} graph"
-            );
-            assert_eq!(
-                normalized
-                    .analyses()
-                    .map(|analysis| analysis.key().clone())
-                    .collect::<Vec<_>>(),
-                reverse_keys,
-                "inner {inner} configured keys"
-            );
-        }
-        let composed = run("rdeps(deps(//:root, 0), //:ordinary, 0)", false, true).unwrap();
-        assert_eq!(
-            composed
-                .terminal_for_test()
-                .as_ref()
-                .as_ref()
-                .unwrap()
-                .graph_stdout(),
-            reverse_zero.graph_stdout()
-        );
-        let max_negative = run(
-            "rdeps(deps(//:root, 2147483647), //:ordinary, '-1')",
-            false,
-            true,
-        )
-        .unwrap();
-        assert!(
-            max_negative
-                .terminal_for_test()
-                .as_ref()
-                .as_ref()
-                .unwrap()
-                .label_stdout()
-                .is_empty()
-        );
+        cquery_deps_eval!(bounded, fixture, "kind('^ordinary_rule rule$', rdeps(//:root, //:ordinary, 0))", false, true);
+        assert_eq!(bounded.graph_stdout(), kind_zero.graph_stdout(), "depth 0");
     }
 
-    #[test]
-    fn cquery_deps_errors_transition_and_edit_restore() {
+    #[rustfmt::skip] #[test] fn cquery_deps_kind_full_one_and_max() {
         let fixture = CqueryDepsFixture::new();
-        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
-            fixture.run(expression, include_implicit, include_tool)
+        cquery_deps_eval!(kind_full, fixture, "kind('^ordinary_rule rule$', rdeps(//:root, //:ordinary))", false, true);
+        assert_eq!(kind_full.starlark_label_stdout(), "@@//:ordinary\n@@//:ordinary\n@@//:root\n");
+        assert_cquery_deps_topology(kind_full,
+            &["  \"//:ordinary (base)\"", "  \"//:ordinary (transition)\"", "  \"//:root (base)\""],
+            &["  \"//:root (base)\" -> \"//:ordinary (base)\"", "  \"//:root (base)\" -> \"//:ordinary (transition)\""]);
+        for depth in ["1", "2147483647"] {
+            cquery_deps_eval!(bounded, fixture, &format!("kind('^ordinary_rule rule$', rdeps(//:root, //:ordinary, {depth}))"), false, true);
+            assert_eq!(bounded.graph_stdout(), kind_full.graph_stdout(), "depth {depth}");
+        }
+    }
+
+    #[rustfmt::skip] #[test] fn cquery_deps_negative_bounds() {
+        let fixture = CqueryDepsFixture::new();
+        cquery_deps_eval!(bounded, fixture, "kind('^ordinary_rule rule$', rdeps(//:root, //:ordinary, '-1'))", false, true);
+        assert_eq!(bounded.graph_stdout(), "digraph mygraph {\n  node [shape=box];\n}\n", "depth '-1'");
+        cquery_deps_eval!(max_negative, fixture, "rdeps(deps(//:root, 2147483647), //:ordinary, '-1')", false, true);
+        assert!(max_negative.label_stdout().is_empty());
+    }
+
+    #[rustfmt::skip] macro_rules! cquery_deps_inner_bounds_test {
+        ($name:ident, $first:literal, $second:literal) => {
+            #[test]
+            fn $name() {
+                let fixture = CqueryDepsFixture::new();
+                cquery_deps_eval!(reverse, fixture, "rdeps(deps(//:root), //:ordinary)", false, true);
+                let reverse_keys = reverse.analyses().map(|analysis| analysis.key().clone()).collect::<Vec<_>>();
+                for inner in [$first, $second] {
+                    cquery_deps_eval!(normalized, fixture, &format!("rdeps(deps(//:root, {inner}), //:ordinary)"), false, true);
+                    assert_eq!(normalized.graph_stdout(), reverse.graph_stdout(), "inner {inner} graph");
+                    assert_eq!(normalized.analyses().map(|analysis| analysis.key().clone()).collect::<Vec<_>>(), reverse_keys, "inner {inner} configured keys");
+                }
+            }
         };
-        let broken = run("//:broken", false, true).unwrap();
-        assert!(
-            broken
-                .terminal_for_test()
-                .as_ref()
-                .as_ref()
-                .unwrap_err()
-                .to_string()
-                .contains("seed must not be analyzed")
-        );
-        let unreachable = run("rdeps(//:root, //:broken)", false, true).unwrap();
-        let unreachable = unreachable.terminal_for_test().as_ref().as_ref().unwrap();
+    }
+    cquery_deps_inner_bounds_test!(cquery_deps_inner_zero_and_one, "0", "1");
+    cquery_deps_inner_bounds_test!(cquery_deps_inner_two_and_max, "2", "2147483647");
+
+    #[rustfmt::skip] #[test] fn cquery_deps_composed_zero() {
+        let fixture = CqueryDepsFixture::new();
+        cquery_deps_eval!(reverse_zero, fixture, "rdeps(deps(//:root), //:ordinary, 0)", false, true);
+        cquery_deps_eval!(composed, fixture, "rdeps(deps(//:root, 0), //:ordinary, 0)", false, true);
+        assert_eq!(composed.graph_stdout(), reverse_zero.graph_stdout());
+    }
+
+    #[rustfmt::skip] #[test] fn cquery_deps_broken_unreachable_and_missing() {
+        let fixture = CqueryDepsFixture::new();
+        let broken = fixture.run("//:broken", false, true).unwrap();
+        assert!(broken.terminal_for_test().as_ref().as_ref().unwrap_err().to_string().contains("seed must not be analyzed"));
+        cquery_deps_eval!(unreachable, fixture, "rdeps(//:root, //:broken)", false, true);
         assert!(unreachable.label_stdout().is_empty());
         assert_eq!(unreachable.analyses().count(), 0);
-        let missing = run("rdeps(//:root, //:missing)", false, true).unwrap();
-        assert!(matches!(
-            missing.terminal_for_test().as_ref().as_ref().unwrap_err(),
-            CqueryCommandError::MissingTarget { requested, .. } if requested.as_ref() == "//:missing"
-        ));
-        for expression in [
-            "filter('(', rdeps(//:universe_missing, //:ordinary))",
-            "filter('(', rdeps(//:root, //:missing))",
-            "kind('(', rdeps(//:universe_missing, //:ordinary))",
-            "kind('(', rdeps(//:root, //:missing))",
-        ] {
-            let invalid = run(expression, false, true).unwrap();
-            assert!(matches!(
-                invalid.terminal_for_test().as_ref().as_ref().unwrap_err(),
-                CqueryCommandError::Request(message) if message.contains("invalid Slug regex")
-            ));
-        }
-        let bad_universe = run("rdeps(//:universe_missing, //pending:seed)", false, true).unwrap();
-        assert!(matches!(
-            bad_universe.terminal_for_test().as_ref().as_ref().unwrap_err(),
-            CqueryCommandError::MissingTarget { requested, .. }
-                if requested.as_ref() == "//:universe_missing"
-        ));
-        let default_seed = run("//:transition_only", false, true).unwrap();
-        assert!(
-            default_seed
-                .terminal_for_test()
-                .as_ref()
-                .as_ref()
-                .unwrap_err()
-                .to_string()
-                .contains("default seed must not be analyzed")
-        );
-        let transitioned = run(
-            "rdeps(//:transition_root, //:transition_only, 0)",
-            false,
-            true,
-        )
-        .unwrap();
-        let transitioned = transitioned.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(
-            transitioned.starlark_label_stdout(),
-            "@@//:transition_only\n"
-        );
-        let reverse = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
-        let reverse = reverse.terminal_for_test().as_ref().as_ref().unwrap();
-        let expected_reverse_graph = reverse.graph_stdout();
-        fs::write(
-            fixture.workspace.path().join("BUILD.bazel"),
-            CQUERY_DELEGATING_BUILD
-                .replace("aliased = \":alias_outer\"", "aliased = \":ordinary\""),
-        )
-        .unwrap();
-        let bypass = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
-        let bypass = bypass.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(
-            bypass.starlark_label_stdout(),
-            "@@//:ordinary\n@@//:ordinary\n@@//:root\n"
-        );
-        fs::write(
-            fixture.workspace.path().join("BUILD.bazel"),
-            CQUERY_DELEGATING_BUILD,
-        )
-        .unwrap();
-        let restored = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
-        assert_eq!(
-            restored
-                .terminal_for_test()
-                .as_ref()
-                .as_ref()
-                .unwrap()
-                .graph_stdout(),
-            expected_reverse_graph
-        );
+        let missing = fixture.run("rdeps(//:root, //:missing)", false, true).unwrap();
+        assert!(matches!(missing.terminal_for_test().as_ref().as_ref().unwrap_err(), CqueryCommandError::MissingTarget { requested, .. } if requested.as_ref() == "//:missing"));
     }
 
-    #[test]
-    fn cquery_deps_depth_closure_and_tool_flag_equivalence() {
-        let fixture = CqueryDepsFixture::new();
-        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
-            fixture.run(expression, include_implicit, include_tool)
+    #[rustfmt::skip] macro_rules! cquery_deps_regex_precedence_test {
+        ($name:ident, $operator:literal) => {
+            #[test]
+            fn $name() {
+                let fixture = CqueryDepsFixture::new();
+                for suffix in ["rdeps(//:universe_missing, //:ordinary))", "rdeps(//:root, //:missing))"] {
+                    let invalid = fixture.run(&format!("{}('(', {}", $operator, suffix), false, true).unwrap();
+                    assert!(matches!(invalid.terminal_for_test().as_ref().as_ref().unwrap_err(), CqueryCommandError::Request(message) if message.contains("invalid Slug regex")));
+                }
+            }
         };
-        let full = run("deps(//:root)", false, true).unwrap();
-        let full = full.terminal_for_test().as_ref().as_ref().unwrap();
-        let depth_one = run("deps(//:root, 1)", false, true).unwrap();
-        let depth_one = depth_one.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_cquery_deps_topology(
-            depth_one,
-            &[
-                "  \"//:alias_outer (base)\"",
-                "  \"//:ordinary (base)\"",
-                "  \"//:ordinary (transition)\"",
-                "  \"//:producer.out (base)\"",
-                "  \"//:root (base)\"",
-                "  \"//:source.txt (null)\"",
-                "  \"//:vis_top (null)\"",
-            ],
-            &[
-                "  \"//:root (base)\" -> \"//:alias_outer (base)\"",
-                "  \"//:root (base)\" -> \"//:ordinary (base)\"",
-                "  \"//:root (base)\" -> \"//:ordinary (transition)\"",
-                "  \"//:root (base)\" -> \"//:producer.out (base)\"",
-                "  \"//:root (base)\" -> \"//:source.txt (null)\"",
-                "  \"//:root (base)\" -> \"//:vis_top (null)\"",
-            ],
-        );
+    }
+    cquery_deps_regex_precedence_test!(cquery_deps_filter_regex_precedence, "filter");
+    cquery_deps_regex_precedence_test!(cquery_deps_kind_regex_precedence, "kind");
 
-        let depth_two = run("deps(//:root, 2)", false, true).unwrap();
-        let depth_two = depth_two.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_cquery_deps_topology(
-            depth_two,
-            &[
-                "  \"//:alias_inner (base)\"",
-                "  \"//:alias_outer (base)\"",
-                "  \"//:ordinary (base)\"",
-                "  \"//:ordinary (transition)\"",
-                "  \"//:producer (base)\"",
-                "  \"//:producer.out (base)\"",
-                "  \"//:root (base)\"",
-                "  \"//:source.txt (null)\"",
-                "  \"//:vis_top (null)\"",
-            ],
-            &[
-                "  \"//:alias_inner (base)\" -> \"//:ordinary (base)\"",
-                "  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\"",
-                "  \"//:producer.out (base)\" -> \"//:producer (base)\"",
-                "  \"//:root (base)\" -> \"//:alias_outer (base)\"",
-                "  \"//:root (base)\" -> \"//:ordinary (base)\"",
-                "  \"//:root (base)\" -> \"//:ordinary (transition)\"",
-                "  \"//:root (base)\" -> \"//:producer.out (base)\"",
-                "  \"//:root (base)\" -> \"//:source.txt (null)\"",
-                "  \"//:root (base)\" -> \"//:vis_top (null)\"",
-            ],
-        );
+    #[rustfmt::skip] #[test] fn cquery_deps_universe_default_and_transitioned_seed() {
+        let fixture = CqueryDepsFixture::new();
+        let bad_universe = fixture.run("rdeps(//:universe_missing, //pending:seed)", false, true).unwrap();
+        assert!(matches!(bad_universe.terminal_for_test().as_ref().as_ref().unwrap_err(), CqueryCommandError::MissingTarget { requested, .. } if requested.as_ref() == "//:universe_missing"));
+        let default_seed = fixture.run("//:transition_only", false, true).unwrap();
+        assert!(default_seed.terminal_for_test().as_ref().as_ref().unwrap_err().to_string().contains("default seed must not be analyzed"));
+        cquery_deps_eval!(transitioned, fixture, "rdeps(//:transition_root, //:transition_only, 0)", false, true);
+        assert_eq!(transitioned.starlark_label_stdout(), "@@//:transition_only\n");
+    }
+
+    #[rustfmt::skip] #[test] fn cquery_deps_build_edit_restore_lifecycle() {
+        let fixture = CqueryDepsFixture::new();
+        cquery_deps_eval!(reverse, fixture, "rdeps(deps(//:root), //:ordinary)", false, true);
+        let expected_reverse_graph = reverse.graph_stdout();
+        fs::write(fixture.workspace.path().join("BUILD.bazel"), CQUERY_DELEGATING_BUILD.replace("aliased = \":alias_outer\"", "aliased = \":ordinary\"")).unwrap();
+        cquery_deps_eval!(bypass, fixture, "rdeps(deps(//:root), //:ordinary)", false, true);
+        assert_eq!(bypass.starlark_label_stdout(), "@@//:ordinary\n@@//:ordinary\n@@//:root\n");
+        fs::write(fixture.workspace.path().join("BUILD.bazel"), CQUERY_DELEGATING_BUILD).unwrap();
+        cquery_deps_eval!(restored, fixture, "rdeps(deps(//:root), //:ordinary)", false, true);
+        assert_eq!(restored.graph_stdout(), expected_reverse_graph);
+    }
+
+    #[rustfmt::skip] #[test] fn cquery_deps_depth_one_topology() {
+        let fixture = CqueryDepsFixture::new();
+        cquery_deps_eval!(depth_one, fixture, "deps(//:root, 1)", false, true);
+        assert_cquery_deps_topology(depth_one,
+            &["  \"//:alias_outer (base)\"", "  \"//:ordinary (base)\"", "  \"//:ordinary (transition)\"", "  \"//:producer.out (base)\"", "  \"//:root (base)\"", "  \"//:source.txt (null)\"", "  \"//:vis_top (null)\""],
+            &["  \"//:root (base)\" -> \"//:alias_outer (base)\"", "  \"//:root (base)\" -> \"//:ordinary (base)\"", "  \"//:root (base)\" -> \"//:ordinary (transition)\"", "  \"//:root (base)\" -> \"//:producer.out (base)\"", "  \"//:root (base)\" -> \"//:source.txt (null)\"", "  \"//:root (base)\" -> \"//:vis_top (null)\""]);
+    }
+
+    #[rustfmt::skip] #[test] fn cquery_deps_full_and_depth_two() {
+        let fixture = CqueryDepsFixture::new();
+        cquery_deps_eval!(full, fixture, "deps(//:root)", false, true);
+        cquery_deps_eval!(depth_two, fixture, "deps(//:root, 2)", false, true);
+        assert_cquery_deps_topology(depth_two,
+            &["  \"//:alias_inner (base)\"", "  \"//:alias_outer (base)\"", "  \"//:ordinary (base)\"", "  \"//:ordinary (transition)\"", "  \"//:producer (base)\"", "  \"//:producer.out (base)\"", "  \"//:root (base)\"", "  \"//:source.txt (null)\"", "  \"//:vis_top (null)\""],
+            &["  \"//:alias_inner (base)\" -> \"//:ordinary (base)\"", "  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\"", "  \"//:producer.out (base)\" -> \"//:producer (base)\"", "  \"//:root (base)\" -> \"//:alias_outer (base)\"", "  \"//:root (base)\" -> \"//:ordinary (base)\"", "  \"//:root (base)\" -> \"//:ordinary (transition)\"", "  \"//:root (base)\" -> \"//:producer.out (base)\"", "  \"//:root (base)\" -> \"//:source.txt (null)\"", "  \"//:root (base)\" -> \"//:vis_top (null)\""]);
         assert_eq!(cquery_deps_topology(depth_two), cquery_deps_topology(full));
+    }
 
-        let depth_max = run("deps(//:root, 2147483647)", false, true).unwrap();
-        let depth_max = depth_max.terminal_for_test().as_ref().as_ref().unwrap();
+    #[rustfmt::skip] #[test] fn cquery_deps_full_and_depth_max() {
+        let fixture = CqueryDepsFixture::new();
+        cquery_deps_eval!(full, fixture, "deps(//:root)", false, true);
+        cquery_deps_eval!(depth_max, fixture, "deps(//:root, 2147483647)", false, true);
         assert_eq!(cquery_deps_topology(depth_max), cquery_deps_topology(full));
-        assert_eq!(
-            depth_max.label_kind_stdout().unwrap(),
-            full.label_kind_stdout().unwrap()
-        );
+        assert_eq!(depth_max.label_kind_stdout().unwrap(), full.label_kind_stdout().unwrap());
+    }
 
-        let without_tools = run("deps(//:root)", false, false).unwrap();
-        let without_tools = without_tools.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(
-            without_tools.starlark_label_stdout(),
-            full.starlark_label_stdout()
-        );
+    #[rustfmt::skip] #[test] fn cquery_deps_full_and_without_tools() {
+        let fixture = CqueryDepsFixture::new();
+        cquery_deps_eval!(full, fixture, "deps(//:root)", false, true);
+        cquery_deps_eval!(without_tools, fixture, "deps(//:root)", false, false);
+        assert_eq!(without_tools.starlark_label_stdout(), full.starlark_label_stdout());
         assert_eq!(without_tools.graph_stdout(), full.graph_stdout());
     }
 

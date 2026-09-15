@@ -125,70 +125,55 @@ fn cquery_executables_depth_and_complete_closure() {
     assert!(edges.iter().all(|edge| !edge.contains("//:leaf")));
 }
 
-#[test]
-fn cquery_executables_reverse_depth_and_edges() {
+#[rustfmt::skip] #[test] fn cquery_executables_reverse_self_zero_and_empty() {
     let fixture = CqueryExecutablesFixture::new();
     let run = |expression: &str| fixture.run(expression).unwrap();
     let reverse_self = run("executables(rdeps(//:root, //:root))");
     let reverse_self = reverse_self.terminal_for_test().as_ref().as_ref().unwrap();
     assert_eq!(reverse_self.starlark_label_stdout(), "@@//:root\n");
-
     let reverse_zero = run("executables(rdeps(//:root, //:direct, 0))");
     let reverse_zero = reverse_zero.terminal_for_test().as_ref().as_ref().unwrap();
-    assert_eq!(
-        reverse_zero.starlark_label_stdout(),
-        "@@//:direct\n@@//:direct\n"
-    );
-    let reverse_full = run("executables(rdeps(//:root, //:direct))");
-    let reverse_full = reverse_full.terminal_for_test().as_ref().as_ref().unwrap();
-    assert_eq!(
-        reverse_full.starlark_label_stdout(),
-        "@@//:direct\n@@//:direct\n@@//:root\n"
-    );
-    let reverse_keys = reverse_full
-        .analyses()
-        .map(|analysis| analysis.key().clone())
-        .collect::<Vec<_>>();
-    assert_eq!(reverse_keys.len(), 3);
-    assert_ne!(reverse_keys[0], reverse_keys[1]);
-    let reverse_graph = reverse_full.graph_stdout();
-    assert_eq!(
-        reverse_graph
-            .lines()
-            .filter(|line| line.contains(" -> "))
-            .count(),
-        2
-    );
-    assert!(
-        reverse_graph
-            .lines()
-            .filter(|line| line.contains(" -> "))
-            .all(|line| line.contains("//:root") && line.contains("//:direct"))
-    );
-    for (depth, expected) in [
-        (
-            "'-1'",
-            "digraph mygraph {\n  node [shape=box];\n}\n".to_owned(),
-        ),
-        ("0", reverse_zero.graph_stdout()),
-        ("1", reverse_full.graph_stdout()),
-        ("2147483647", reverse_full.graph_stdout()),
-    ] {
-        let bounded = run(&format!("executables(rdeps(//:root, //:direct, {depth}))"));
-        let bounded = bounded.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(bounded.graph_stdout(), expected, "depth {depth}");
-    }
+    assert_eq!(reverse_zero.starlark_label_stdout(), "@@//:direct\n@@//:direct\n");
     let reverse_empty = run("executables(rdeps(//:root, //:bridge, 0))");
     let reverse_empty = reverse_empty.terminal_for_test().as_ref().as_ref().unwrap();
     assert!(reverse_empty.label_stdout().is_empty());
-    assert_eq!(
-        reverse_empty.graph_stdout(),
-        "digraph mygraph {\n  node [shape=box];\n}\n"
-    );
+    assert_eq!(reverse_empty.graph_stdout(), "digraph mygraph {\n  node [shape=box];\n}\n");
+}
+
+#[rustfmt::skip] #[test] fn cquery_executables_reverse_full_identity_and_upper_bounds() {
+    let fixture = CqueryExecutablesFixture::new();
+    let run = |expression: &str| fixture.run(expression).unwrap();
+    let reverse_full = run("executables(rdeps(//:root, //:direct))");
+    let reverse_full = reverse_full.terminal_for_test().as_ref().as_ref().unwrap();
+    assert_eq!(reverse_full.starlark_label_stdout(), "@@//:direct\n@@//:direct\n@@//:root\n");
+    let reverse_keys = reverse_full.analyses().map(|analysis| analysis.key().clone()).collect::<Vec<_>>();
+    assert_eq!(reverse_keys.len(), 3);
+    assert_ne!(reverse_keys[0], reverse_keys[1]);
+    let reverse_graph = reverse_full.graph_stdout();
+    assert_eq!(reverse_graph.lines().filter(|line| line.contains(" -> ")).count(), 2);
+    assert!(reverse_graph.lines().filter(|line| line.contains(" -> ")).all(|line| line.contains("//:root") && line.contains("//:direct")));
+    for depth in ["1", "2147483647"] {
+        let bounded = run(&format!("executables(rdeps(//:root, //:direct, {depth}))"));
+        let bounded = bounded.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(bounded.graph_stdout(), reverse_full.graph_stdout(), "depth {depth}");
+    }
+}
+
+#[rustfmt::skip] #[test] fn cquery_executables_reverse_negative_and_zero_bounds() {
+    let fixture = CqueryExecutablesFixture::new();
+    let run = |expression: &str| fixture.run(expression).unwrap();
+    let reverse_zero = run("executables(rdeps(//:root, //:direct, 0))");
+    let reverse_zero = reverse_zero.terminal_for_test().as_ref().as_ref().unwrap();
+    let negative = run("executables(rdeps(//:root, //:direct, '-1'))");
+    let negative = negative.terminal_for_test().as_ref().as_ref().unwrap();
+    assert_eq!(negative.graph_stdout(), "digraph mygraph {\n  node [shape=box];\n}\n");
+    let bounded_zero = run("executables(rdeps(//:root, //:direct, 0))");
+    let bounded_zero = bounded_zero.terminal_for_test().as_ref().as_ref().unwrap();
+    assert_eq!(bounded_zero.graph_stdout(), reverse_zero.graph_stdout());
 }
 
 #[test]
-fn cquery_executables_filter_kind_composition() {
+fn cquery_executables_chained_and_named_kind_composition() {
     let fixture = CqueryExecutablesFixture::new();
     let run = |expression: &str| fixture.run(expression).unwrap();
     let full = run("executables(deps(//:root))");
@@ -205,50 +190,6 @@ fn cquery_executables_filter_kind_composition() {
         full.label_kind_stdout().unwrap()
     );
     assert_eq!(chained_full.graph_stdout(), full.graph_stdout());
-
-    let depth_two = run("executables(deps(//:root, 2))");
-    let depth_max = run("executables(deps(//:root, 2147483647))");
-    assert_eq!(
-        depth_two
-            .terminal_for_test()
-            .as_ref()
-            .as_ref()
-            .unwrap()
-            .graph_stdout(),
-        full.graph_stdout()
-    );
-    assert_eq!(
-        depth_max
-            .terminal_for_test()
-            .as_ref()
-            .as_ref()
-            .unwrap()
-            .label_stdout(),
-        full.label_stdout()
-    );
-
-    let filtered = run("filter(':(root|direct|leaf)$', deps(//:root))");
-    let filtered = filtered.terminal_for_test().as_ref().as_ref().unwrap();
-    assert_eq!(filtered.label_stdout(), full.label_stdout());
-    assert_eq!(
-        filtered.starlark_label_stdout(),
-        full.starlark_label_stdout()
-    );
-    assert_eq!(
-        filtered.label_kind_stdout().unwrap(),
-        full.label_kind_stdout().unwrap()
-    );
-    assert_eq!(filtered.graph_stdout(), full.graph_stdout());
-
-    let kind = run("kind('^executable_rule rule$', deps(//:root))");
-    let kind = kind.terminal_for_test().as_ref().as_ref().unwrap();
-    assert_eq!(kind.label_stdout(), full.label_stdout());
-    assert_eq!(kind.starlark_label_stdout(), full.starlark_label_stdout());
-    assert_eq!(
-        kind.label_kind_stdout().unwrap(),
-        full.label_kind_stdout().unwrap()
-    );
-    assert_eq!(kind.graph_stdout(), full.graph_stdout());
 
     let named_kind_full =
         run("filter(':(root|direct|leaf)$', kind('^executable_rule rule$', deps(//:root)))");
@@ -270,84 +211,106 @@ fn cquery_executables_filter_kind_composition() {
 }
 
 #[test]
-fn cquery_executables_depth_boundaries_and_empty_results() {
+fn cquery_executables_upper_depths_match_full() {
     let fixture = CqueryExecutablesFixture::new();
     let run = |expression: &str| fixture.run(expression).unwrap();
-    let depth_zero = run("executables(deps(//:root, 0))");
-    let depth_zero = depth_zero.terminal_for_test().as_ref().as_ref().unwrap();
-    let depth_one = run("executables(deps(//:root, 1))");
-    let depth_one = depth_one.terminal_for_test().as_ref().as_ref().unwrap();
     let full = run("executables(deps(//:root))");
     let full = full.terminal_for_test().as_ref().as_ref().unwrap();
-    for (depth, expected) in [(0, depth_zero), (1, depth_one)] {
-        let filtered = run(&format!(
-            "filter(':(root|direct|leaf)$', deps(//:root, {depth}))"
-        ));
-        let filtered = filtered.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(
-            filtered.graph_stdout(),
-            expected.graph_stdout(),
-            "depth {depth}"
-        );
-    }
-    for depth in [2, i32::MAX] {
-        let filtered = run(&format!(
-            "filter(':(root|direct|leaf)$', deps(//:root, {depth}))"
-        ));
-        let filtered = filtered.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(
-            filtered.graph_stdout(),
-            full.graph_stdout(),
-            "depth {depth}"
-        );
-    }
-    for (depth, expected) in [(0, depth_zero), (1, depth_one)] {
-        let kind = run(&format!(
-            "kind('^executable_rule rule$', deps(//:root, {depth}))"
-        ));
-        let kind = kind.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(
-            kind.graph_stdout(),
-            expected.graph_stdout(),
-            "depth {depth}"
-        );
-    }
-    for depth in [2, i32::MAX] {
-        let kind = run(&format!(
-            "kind('^executable_rule rule$', deps(//:root, {depth}))"
-        ));
-        let kind = kind.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(kind.graph_stdout(), full.graph_stdout(), "depth {depth}");
-    }
-    for (depth, expected) in [(0, depth_zero), (1, depth_one)] {
-        let chained = run(&format!(
-            "filter(':(root|direct|leaf)$', executables(deps(//:root, {depth})))"
-        ));
-        let chained = chained.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(
-            chained.graph_stdout(),
-            expected.graph_stdout(),
-            "depth {depth}"
-        );
-    }
-    for depth in [2, i32::MAX] {
-        let chained = run(&format!(
-            "filter(':(root|direct|leaf)$', executables(deps(//:root, {depth})))"
-        ));
-        let chained = chained.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(chained.graph_stdout(), full.graph_stdout(), "depth {depth}");
-    }
-    for (depth, expected) in [(0, depth_zero), (1, depth_one), (2, full), (i32::MAX, full)] {
-        let named_kind = run(&format!(
-            "filter(':(root|direct|leaf)$', kind('^executable_rule rule$', deps(//:root, {depth})))"
-        ));
-        let named_kind = named_kind.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(
-            named_kind.graph_stdout(),
-            expected.graph_stdout(),
-            "depth {depth}"
-        );
-    }
+    let depth_two = run("executables(deps(//:root, 2))");
+    let depth_max = run("executables(deps(//:root, 2147483647))");
+    assert_eq!(
+        depth_two
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .graph_stdout(),
+        full.graph_stdout()
+    );
+    assert_eq!(
+        depth_max
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .label_stdout(),
+        full.label_stdout()
+    );
+}
+
+#[test]
+fn cquery_executables_direct_filter_and_kind_match_full() {
+    let fixture = CqueryExecutablesFixture::new();
+    let run = |expression: &str| fixture.run(expression).unwrap();
+    let full = run("executables(deps(//:root))");
+    let full = full.terminal_for_test().as_ref().as_ref().unwrap();
+    let filtered = run("filter(':(root|direct|leaf)$', deps(//:root))");
+    let filtered = filtered.terminal_for_test().as_ref().as_ref().unwrap();
+    assert_eq!(filtered.label_stdout(), full.label_stdout());
+    assert_eq!(filtered.starlark_label_stdout(), full.starlark_label_stdout());
+    assert_eq!(
+        filtered.label_kind_stdout().unwrap(),
+        full.label_kind_stdout().unwrap()
+    );
+    assert_eq!(filtered.graph_stdout(), full.graph_stdout());
+    let kind = run("kind('^executable_rule rule$', deps(//:root))");
+    let kind = kind.terminal_for_test().as_ref().as_ref().unwrap();
+    assert_eq!(kind.label_stdout(), full.label_stdout());
+    assert_eq!(kind.starlark_label_stdout(), full.starlark_label_stdout());
+    assert_eq!(
+        kind.label_kind_stdout().unwrap(),
+        full.label_kind_stdout().unwrap()
+    );
+    assert_eq!(kind.graph_stdout(), full.graph_stdout());
+}
+
+#[rustfmt::skip] macro_rules! cquery_executable_projection_depth_test {
+    ($name:ident, $baseline:literal, $projection:literal, $depth:literal) => {
+        #[test]
+        fn $name() {
+            let fixture = CqueryExecutablesFixture::new();
+            let expected = fixture.run($baseline).unwrap();
+            let expected = expected.terminal_for_test().as_ref().as_ref().unwrap();
+            let projected = fixture.run($projection).unwrap();
+            let projected = projected.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(projected.graph_stdout(), expected.graph_stdout(), "depth {}", $depth);
+        }
+    };
+}
+
+#[rustfmt::skip] macro_rules! cquery_executable_projection_upper_test {
+    ($name:ident, $depth_two:literal, $depth_max:literal) => {
+        #[test]
+        fn $name() {
+            let fixture = CqueryExecutablesFixture::new();
+            let full = fixture.run("executables(deps(//:root))").unwrap();
+            let full = full.terminal_for_test().as_ref().as_ref().unwrap();
+            for (depth, expression) in [(2, $depth_two), (i32::MAX, $depth_max)] {
+                let projected = fixture.run(expression).unwrap();
+                let projected = projected.terminal_for_test().as_ref().as_ref().unwrap();
+                assert_eq!(projected.graph_stdout(), full.graph_stdout(), "depth {depth}");
+            }
+        }
+    };
+}
+
+#[rustfmt::skip] cquery_executable_projection_depth_test!(cquery_executables_filter_depth_zero, "executables(deps(//:root, 0))", "filter(':(root|direct|leaf)$', deps(//:root, 0))", 0);
+#[rustfmt::skip] cquery_executable_projection_depth_test!(cquery_executables_filter_depth_one, "executables(deps(//:root, 1))", "filter(':(root|direct|leaf)$', deps(//:root, 1))", 1);
+#[rustfmt::skip] cquery_executable_projection_upper_test!(cquery_executables_filter_upper_depths, "filter(':(root|direct|leaf)$', deps(//:root, 2))", "filter(':(root|direct|leaf)$', deps(//:root, 2147483647))");
+#[rustfmt::skip] cquery_executable_projection_depth_test!(cquery_executables_kind_depth_zero, "executables(deps(//:root, 0))", "kind('^executable_rule rule$', deps(//:root, 0))", 0);
+#[rustfmt::skip] cquery_executable_projection_depth_test!(cquery_executables_kind_depth_one, "executables(deps(//:root, 1))", "kind('^executable_rule rule$', deps(//:root, 1))", 1);
+#[rustfmt::skip] cquery_executable_projection_upper_test!(cquery_executables_kind_upper_depths, "kind('^executable_rule rule$', deps(//:root, 2))", "kind('^executable_rule rule$', deps(//:root, 2147483647))");
+#[rustfmt::skip] cquery_executable_projection_depth_test!(cquery_executables_chained_depth_zero, "executables(deps(//:root, 0))", "filter(':(root|direct|leaf)$', executables(deps(//:root, 0)))", 0);
+#[rustfmt::skip] cquery_executable_projection_depth_test!(cquery_executables_chained_depth_one, "executables(deps(//:root, 1))", "filter(':(root|direct|leaf)$', executables(deps(//:root, 1)))", 1);
+#[rustfmt::skip] cquery_executable_projection_upper_test!(cquery_executables_chained_upper_depths, "filter(':(root|direct|leaf)$', executables(deps(//:root, 2)))", "filter(':(root|direct|leaf)$', executables(deps(//:root, 2147483647)))");
+#[rustfmt::skip] cquery_executable_projection_depth_test!(cquery_executables_named_kind_depth_zero, "executables(deps(//:root, 0))", "filter(':(root|direct|leaf)$', kind('^executable_rule rule$', deps(//:root, 0)))", 0);
+#[rustfmt::skip] cquery_executable_projection_depth_test!(cquery_executables_named_kind_depth_one, "executables(deps(//:root, 1))", "filter(':(root|direct|leaf)$', kind('^executable_rule rule$', deps(//:root, 1)))", 1);
+#[rustfmt::skip] cquery_executable_projection_upper_test!(cquery_executables_named_kind_upper_depths, "filter(':(root|direct|leaf)$', kind('^executable_rule rule$', deps(//:root, 2)))", "filter(':(root|direct|leaf)$', kind('^executable_rule rule$', deps(//:root, 2147483647)))");
+
+#[test]
+fn cquery_executables_empty_compositions() {
+    let fixture = CqueryExecutablesFixture::new();
+    let run = |expression: &str| fixture.run(expression).unwrap();
     let empty = run("filter('^//:missing$', deps(//:root))");
     let empty = empty.terminal_for_test().as_ref().as_ref().unwrap();
     assert!(empty.label_stdout().is_empty());
@@ -593,72 +556,44 @@ fn cquery_set_empty_and_count_preflight() {
     assert!(fixture.activation_audit.take_configured_roots().is_empty());
 }
 
-#[test]
-fn cquery_set_ordered_operators_filter_and_some() {
-    let fixture = CquerySetFixture::new();
-    let run = |expression: &str| {
-        fixture
-            .runtime
-            .cquery_command_with_bzlmod_inputs(
-                expression,
-                true,
-                true,
-                fixture.command_policy.clone(),
+#[rustfmt::skip] macro_rules! cquery_set_output_test {
+    ($name:ident, |$run:ident, $labels:ident| $body:block) => {
+        #[test]
+        fn $name() {
+            let fixture = CquerySetFixture::new();
+            let $run = |expression: &str| fixture.runtime.cquery_command_with_bzlmod_inputs(
+                expression, true, true, fixture.command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-                LockfileMode::Update,
-                &[],
-                root_setting_overlay(None),
-            )
-            .unwrap()
-            .terminal_for_test()
-            .as_ref()
-            .as_ref()
-            .unwrap()
-            .label_stdout()
+                LockfileMode::Update, &[], root_setting_overlay(None),
+            ).unwrap().terminal_for_test().as_ref().as_ref().unwrap().label_stdout();
+            let $labels = |output: String| output.lines().map(|line| line.split_once(" (").unwrap().0.to_owned()).collect::<Vec<_>>();
+            $body
+        }
     };
-    let labels = |output: String| {
-        output
-            .lines()
-            .map(|line| line.split_once(" (").unwrap().0.to_owned())
-            .collect::<Vec<_>>()
-    };
-    assert_eq!(
-        labels(run("//pkg:bin union //pkg:lib")),
-        ["//pkg:bin", "//pkg:lib"]
-    );
-    assert_eq!(
-        labels(run("set(//pkg:bin //pkg:lib //pkg:bin)")),
-        ["//pkg:bin", "//pkg:lib"]
-    );
-    assert_eq!(
-        labels(run("let x = //pkg:bin in $x union //pkg:lib")),
-        ["//pkg:bin", "//pkg:lib"]
-    );
+}
+
+cquery_set_output_test!(cquery_set_union_set_and_let, |run, labels| {
+    assert_eq!(labels(run("//pkg:bin union //pkg:lib")), ["//pkg:bin", "//pkg:lib"]);
+    assert_eq!(labels(run("set(//pkg:bin //pkg:lib //pkg:bin)")), ["//pkg:bin", "//pkg:lib"]);
+    assert_eq!(labels(run("let x = //pkg:bin in $x union //pkg:lib")), ["//pkg:bin", "//pkg:lib"]);
+});
+
+cquery_set_output_test!(cquery_set_intersect_and_except, |run, labels| {
     assert!(run("//pkg:bin intersect //pkg:lib").is_empty());
     assert_eq!(labels(run("//pkg:bin except //pkg:lib")), ["//pkg:bin"]);
-    assert_eq!(
-        labels(run(
-            "filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))"
-        )),
-        ["//pkg:bin"]
-    );
-    assert_eq!(
-        labels(run("filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:lib))")),
-        ["//pkg:lib", "//pkg:bin"]
-    );
+});
+
+cquery_set_output_test!(cquery_set_exact_prefix_and_missing_filters, |run, labels| {
+    assert_eq!(labels(run("filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))")), ["//pkg:bin"]);
+    assert_eq!(labels(run("filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:lib))")), ["//pkg:lib", "//pkg:bin"]);
     assert!(run("filter('^//missing:', set(//pkg:lib //pkg:bin))").is_empty());
+});
+
+cquery_set_output_test!(cquery_set_default_counted_and_filtered_some, |run, labels| {
     assert_eq!(labels(run("some(set(//pkg:lib //pkg:bin))")), ["//pkg:lib"]);
-    assert_eq!(
-        labels(run("some(set(//pkg:lib //pkg:bin //pkg:lib), 2)")),
-        ["//pkg:lib", "//pkg:bin"]
-    );
-    assert_eq!(
-        labels(run(
-            "some(filter('^//pkg:bin$', set(//pkg:lib //pkg:bin)), 10)"
-        )),
-        ["//pkg:bin"]
-    );
-}
+    assert_eq!(labels(run("some(set(//pkg:lib //pkg:bin //pkg:lib), 2)")), ["//pkg:lib", "//pkg:bin"]);
+    assert_eq!(labels(run("some(filter('^//pkg:bin$', set(//pkg:lib //pkg:bin)), 10)")), ["//pkg:bin"]);
+});
 
 #[test]
 fn cquery_some_empty_zero_and_negative_errors() {
