@@ -15,6 +15,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use compact_str::CompactString;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::package::DeclaredExecGroup;
 use slug_loading_v2::package::ToolchainTypeRequirement;
@@ -88,7 +89,63 @@ fn normalize_constraints(
     values.into()
 }
 
+const DEFAULT_EXEC_GROUP_NAME: &str = "default-exec-group";
+
+fn automatic_group_identity(
+    spelling: &str,
+    target: &CanonicalLabel,
+    default_requirements: &[ToolchainTypeRequirement],
+) -> Option<ConfiguredExecGroup> {
+    let label =
+        CanonicalLabel::parse_with_package_context(spelling, target.package(), |requested| {
+            if requested.is_empty() {
+                Ok(CanonicalRepoName::root())
+            } else {
+                Err(format!("unknown apparent repository '@{requested}'"))
+            }
+        })
+        .ok()?;
+    default_requirements
+        .iter()
+        .any(|requirement| requirement.label() == &label)
+        .then(|| ConfiguredExecGroup::automatic(label))
+}
+
+fn qualified_group_identity(
+    spelling: &str,
+    target: &CanonicalLabel,
+    declared_names: &BTreeSet<&str>,
+    default_requirements: &[ToolchainTypeRequirement],
+    use_auto_exec_groups: bool,
+) -> Option<ConfiguredExecGroup> {
+    if spelling == DEFAULT_EXEC_GROUP_NAME {
+        return Some(ConfiguredExecGroup::Default);
+    }
+    if declared_names.contains(spelling) {
+        return Some(ConfiguredExecGroup::Named(CompactString::from(spelling)));
+    }
+    use_auto_exec_groups
+        .then(|| automatic_group_identity(spelling, target, default_requirements))
+        .flatten()
+}
+
+fn platform_group_prefix_matches(prefix: &str, group: &ConfiguredExecGroup) -> bool {
+    match group {
+        ConfiguredExecGroup::Default => prefix == DEFAULT_EXEC_GROUP_NAME,
+        ConfiguredExecGroup::Named(name) => prefix == name,
+        ConfiguredExecGroup::Automatic(label) => {
+            if prefix == label.to_string() {
+                return true;
+            }
+            let package = label.package().package().as_str();
+            let short = format!("//{package}:{}", label.target());
+            prefix == short || (label.package().repo().is_root() && prefix == format!("@{short}"))
+        }
+    }
+}
+
 pub(crate) fn normalize_execution_groups(
+    target: &CanonicalLabel,
     default_requirements: &[ToolchainTypeRequirement],
     declarations: &[(CompactString, DeclaredExecGroup)],
     attributes: &[ResolvedRuleAttribute],
@@ -98,6 +155,16 @@ pub(crate) fn normalize_execution_groups(
         .iter()
         .map(|(name, _)| name.as_str())
         .collect::<BTreeSet<_>>();
+    let explicit_auto = resolved_value(attributes, "_use_auto_exec_groups").map(|value| {
+        if let CoercedAttributeValue::Boolean(value) = value {
+            Ok(*value)
+        } else {
+            Err("resolved _use_auto_exec_groups is not boolean".to_owned())
+        }
+    });
+    let use_auto_exec_groups = explicit_auto
+        .transpose()?
+        .unwrap_or(native_auto_exec_groups);
     let default_constraints = match resolved_value(attributes, "exec_compatible_with") {
         Some(CoercedAttributeValue::LabelList(values)) => values.clone(),
         Some(_) => return Err("resolved exec_compatible_with is not a label list".to_owned()),
@@ -110,12 +177,20 @@ pub(crate) fn normalize_execution_groups(
         }
         None => Arc::from([]),
     };
-    for (name, _) in target_group_constraints.iter() {
-        if !declared_names.contains(name.as_str()) {
+    let mut constraints_by_group = BTreeMap::new();
+    for (name, constraints) in target_group_constraints.iter() {
+        let Some(identity) = qualified_group_identity(
+            name,
+            target,
+            &declared_names,
+            default_requirements,
+            use_auto_exec_groups,
+        ) else {
             return Err(format!(
                 "exec_group_compatible_with names unknown execution group '{name}'"
             ));
-        }
+        };
+        constraints_by_group.insert(identity, constraints);
     }
 
     let raw_properties = match resolved_value(attributes, "exec_properties") {
@@ -124,21 +199,28 @@ pub(crate) fn normalize_execution_groups(
         None => Arc::from([]),
     };
     let mut default_properties = BTreeMap::new();
-    let mut group_properties: BTreeMap<&str, BTreeMap<String, String>> = BTreeMap::new();
+    let mut group_properties: BTreeMap<ConfiguredExecGroup, BTreeMap<String, String>> =
+        BTreeMap::new();
     for (key, value) in raw_properties.iter() {
         if let Some((group, property)) = key.split_once('.') {
-            if !declared_names.contains(group) {
+            let Some(identity) = qualified_group_identity(
+                group,
+                target,
+                &declared_names,
+                default_requirements,
+                use_auto_exec_groups,
+            ) else {
                 return Err(format!(
                     "exec_properties names unknown execution group '{group}'"
                 ));
-            }
+            };
             if property.is_empty() {
                 return Err(format!(
                     "exec_properties has empty property for group '{group}'"
                 ));
             }
             group_properties
-                .entry(group)
+                .entry(identity)
                 .or_default()
                 .insert(property.to_owned(), value.to_string());
         } else {
@@ -146,16 +228,6 @@ pub(crate) fn normalize_execution_groups(
         }
     }
 
-    let explicit_auto = resolved_value(attributes, "_use_auto_exec_groups").map(|value| {
-        if let CoercedAttributeValue::Boolean(value) = value {
-            Ok(*value)
-        } else {
-            Err("resolved _use_auto_exec_groups is not boolean".to_owned())
-        }
-    });
-    let use_auto_exec_groups = explicit_auto
-        .transpose()?
-        .unwrap_or(native_auto_exec_groups);
     let default_declared_requirements: Arc<[ToolchainTypeRequirement]> =
         Arc::from(default_requirements);
     let mut rows = Vec::with_capacity(
@@ -168,18 +240,26 @@ pub(crate) fn normalize_execution_groups(
         } else {
             default_declared_requirements.clone()
         },
-        constraints: normalize_constraints(default_constraints.iter().cloned()),
-        target_exec_properties: BTreeMap::new(),
+        constraints: normalize_constraints(
+            default_constraints.iter().cloned().chain(
+                constraints_by_group
+                    .remove(&ConfiguredExecGroup::Default)
+                    .map(|constraints| constraints.as_ref().to_vec())
+                    .unwrap_or_default(),
+            ),
+        ),
+        target_exec_properties: group_properties
+            .remove(&ConfiguredExecGroup::Default)
+            .unwrap_or_default(),
     });
     for (name, declaration) in declarations {
-        let target_constraints = target_group_constraints
-            .iter()
-            .find_map(|(candidate, constraints)| (candidate == name).then_some(constraints))
-            .into_iter()
-            .flat_map(|constraints| constraints.iter())
-            .cloned();
+        let identity = ConfiguredExecGroup::Named(name.clone());
+        let target_constraints = constraints_by_group
+            .remove(&identity)
+            .map(|constraints| constraints.as_ref().to_vec())
+            .unwrap_or_default();
         rows.push(NormalizedExecGroupRow {
-            identity: ConfiguredExecGroup::Named(name.clone()),
+            identity: identity.clone(),
             requirements: Arc::from(declaration.toolchains()),
             constraints: normalize_constraints(
                 declaration
@@ -188,16 +268,26 @@ pub(crate) fn normalize_execution_groups(
                     .cloned()
                     .chain(target_constraints),
             ),
-            target_exec_properties: group_properties.remove(name.as_str()).unwrap_or_default(),
+            target_exec_properties: group_properties.remove(&identity).unwrap_or_default(),
         });
     }
     if use_auto_exec_groups {
         rows.extend(default_requirements.iter().cloned().map(|requirement| {
+            let identity = ConfiguredExecGroup::automatic(requirement.label().clone());
+            let target_constraints = constraints_by_group
+                .remove(&identity)
+                .map(|constraints| constraints.as_ref().to_vec())
+                .unwrap_or_default();
             NormalizedExecGroupRow {
-                identity: ConfiguredExecGroup::automatic(requirement.label().clone()),
+                identity: identity.clone(),
                 requirements: Arc::from([requirement]),
-                constraints: normalize_constraints(default_constraints.iter().cloned()),
-                target_exec_properties: BTreeMap::new(),
+                constraints: normalize_constraints(
+                    default_constraints
+                        .iter()
+                        .cloned()
+                        .chain(target_constraints),
+                ),
+                target_exec_properties: group_properties.remove(&identity).unwrap_or_default(),
             }
         }));
     }
@@ -222,8 +312,7 @@ pub(crate) fn effective_exec_properties(
             None => {
                 merged.insert(key.clone(), value.clone());
             }
-            Some((prefix, property)) if matches!(group, ConfiguredExecGroup::Named(name) if name == prefix) =>
-            {
+            Some((prefix, property)) if platform_group_prefix_matches(prefix, group) => {
                 platform_group.insert(CompactString::from(property), value.clone());
             }
             Some(_) => {}
@@ -419,8 +508,14 @@ mod tests {
                 CoercedAttributeValue::Boolean(true),
             ),
         ];
-        let normalized =
-            normalize_execution_groups(&default, &declarations, &attributes, false).unwrap();
+        let normalized = normalize_execution_groups(
+            &label("@@//:request"),
+            &default,
+            &declarations,
+            &attributes,
+            false,
+        )
+        .unwrap();
         assert!(normalized.rows()[0].requirements().is_empty());
         assert_eq!(
             normalized.rows()[1].identity(),
@@ -439,29 +534,6 @@ mod tests {
     }
 
     #[test]
-    fn property_precedence_target_default_beats_platform_group() {
-        let platform = Arc::from([
-            ("container".into(), "platform-default".into()),
-            ("link.container".into(), "platform-group".into()),
-        ]);
-        let target_default =
-            BTreeMap::from([("container".to_owned(), "target-default".to_owned())]);
-        let properties = effective_exec_properties(
-            &platform,
-            &ConfiguredExecGroup::Named("link".into()),
-            &target_default,
-            &BTreeMap::new(),
-        );
-        assert_eq!(
-            properties.as_ref(),
-            &[(
-                CompactString::new("container"),
-                CompactString::new("target-default")
-            )]
-        );
-    }
-
-    #[test]
     fn unknown_target_group_prefixes_fail_and_unknown_platform_prefixes_are_unused() {
         let declarations = [(
             CompactString::new("link"),
@@ -475,7 +547,10 @@ mod tests {
                 "bad".into(),
             )])),
         )];
-        assert!(normalize_execution_groups(&[], &declarations, &bad, false).is_err());
+        assert!(
+            normalize_execution_groups(&label("@@//:request"), &[], &declarations, &bad, false,)
+                .is_err()
+        );
         let platform = Arc::from([
             ("missing.container".into(), "unused".into()),
             ("link.container".into(), "selected".into()),
@@ -492,6 +567,74 @@ mod tests {
                 CompactString::new("container"),
                 CompactString::new("selected")
             )]
+        );
+    }
+
+    #[test]
+    fn automatic_constraint_keys_are_canonicalized_and_restricted_to_default_toolchains() {
+        let default = [
+            requirement("@@//rule:first"),
+            requirement("@@//rule:second"),
+        ];
+        let attributes = [
+            attribute(
+                "_use_auto_exec_groups",
+                AttributeKind::Boolean,
+                CoercedAttributeValue::Boolean(true),
+            ),
+            attribute(
+                "exec_group_compatible_with",
+                AttributeKind::LabelListDict,
+                CoercedAttributeValue::LabelListDict(Arc::from([
+                    (
+                        "//rule:first".into(),
+                        Arc::from([label("@@//constraints:first")]),
+                    ),
+                    (
+                        "@//rule:second".into(),
+                        Arc::from([label("@@//constraints:second")]),
+                    ),
+                ])),
+            ),
+        ];
+        let normalized = normalize_execution_groups(
+            &label("@@//consumer:request"),
+            &default,
+            &[],
+            &attributes,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            normalized.rows()[1].constraints().as_ref(),
+            &[label("@@//constraints:first")]
+        );
+        assert_eq!(
+            normalized.rows()[2].constraints().as_ref(),
+            &[label("@@//constraints:second")]
+        );
+
+        let unknown = [
+            attributes[0].clone(),
+            attribute(
+                "exec_group_compatible_with",
+                AttributeKind::LabelListDict,
+                CoercedAttributeValue::LabelListDict(Arc::from([(
+                    "//rule:missing".into(),
+                    Arc::from([label("@@//constraints:first")]),
+                )])),
+            ),
+        ];
+        assert!(
+            normalize_execution_groups(
+                &label("@@//consumer:request"),
+                &default,
+                &[],
+                &unknown,
+                false,
+            )
+            .unwrap_err()
+            .contains("unknown execution group '//rule:missing'")
         );
     }
 }

@@ -4030,6 +4030,193 @@ async fn automatic_exec_group_policy_obeys_attribute_over_flag_aba() {
 }
 
 #[tokio::test]
+async fn automatic_exec_group_target_constraints_select_platform_and_reject_unsatisfied_values() {
+    let workspace = scratch();
+    write_execution_group_fixture(
+        &workspace,
+        r#"rule(
+    implementation = _probe,
+    attrs = {'_use_auto_exec_groups': attr.bool(default = True)},
+    toolchains = ['//:compile_type'],
+)"#,
+        "    return [DefaultInfo()]",
+    );
+    let build = workspace.join("BUILD.bazel");
+    let original = fs::read_to_string(&build)
+        .unwrap()
+        .replace(
+            "toolchain(name = 'compile_tc', toolchain_type = ':compile_type', toolchain = ':compile_impl', exec_compatible_with = [':compile'])",
+            "toolchain(name = 'compile_tc', toolchain_type = ':compile_type', toolchain = ':compile_impl')",
+        )
+        .replace(
+            "constraint_value(name = 'link', constraint_setting = ':kind')",
+            "constraint_value(name = 'link', constraint_setting = ':kind')\nconstraint_value(name = 'missing', constraint_setting = ':kind')",
+        )
+        .replace(
+            "probe(name = 'request')",
+            "probe(name = 'request', exec_group_compatible_with = {'//:compile_type': [':link']})",
+        );
+    fs::write(&build, &original).unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:request").unwrap(),
+        execution_group_configuration(false),
+    );
+    let selected = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    let automatic = selected
+        .exec_groups()
+        .unwrap()
+        .row(&ConfiguredExecGroup::automatic(
+            CanonicalLabel::parse("@@//:compile_type").unwrap(),
+        ))
+        .unwrap();
+    assert_eq!(
+        automatic
+            .action_context()
+            .execution_platform()
+            .unwrap()
+            .label()
+            .to_string(),
+        "@@//:link_platform"
+    );
+
+    fs::write(
+        &build,
+        original.replace(
+            "exec_group_compatible_with = {'//:compile_type':",
+            "exec_group_compatible_with = {'@//:compile_type':",
+        ),
+    )
+    .unwrap();
+    let explicit_main = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        explicit_main
+            .exec_groups()
+            .unwrap()
+            .row(&ConfiguredExecGroup::automatic(
+                CanonicalLabel::parse("@@//:compile_type").unwrap(),
+            ))
+            .unwrap()
+            .action_context()
+            .execution_platform()
+            .unwrap()
+            .label()
+            .to_string(),
+        "@@//:link_platform"
+    );
+
+    fs::write(
+        &build,
+        original.replace(
+            "exec_group_compatible_with = {'//:compile_type': [':link']}",
+            "exec_group_compatible_with = {'//:compile_type': [':missing']}",
+        ),
+    )
+    .unwrap();
+    let error = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        error.contains("no execution platform satisfies execution-group constraints"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn default_and_automatic_exec_properties_obey_all_four_precedence_layers() {
+    let workspace = scratch();
+    write_execution_group_fixture(
+        &workspace,
+        r#"rule(
+    implementation = _probe,
+    attrs = {'_use_auto_exec_groups': attr.bool(default = True)},
+    toolchains = ['//:compile_type'],
+)"#,
+        r#"    default = ctx.actions.declare_file('default.out')
+    automatic = ctx.actions.declare_file('automatic.out')
+    ctx.actions.run(outputs = [default], executable = 'tool', toolchain = None)
+    ctx.actions.run(outputs = [automatic], executable = 'tool', toolchain = '//:compile_type')
+    return [DefaultInfo(files = depset([default, automatic]))]"#,
+    );
+    let build = workspace.join("BUILD.bazel");
+    let source = fs::read_to_string(&build)
+        .unwrap()
+        .replace(
+            "platform(name = 'compile_platform', constraint_values = [':compile'])",
+            r#"platform(name = 'compile_platform', constraint_values = [':compile'], exec_properties = {
+    'only_default': 'platform-default',
+    'platform_group': 'platform-default',
+    'target_default': 'platform-default',
+    'target_group': 'platform-default',
+    'default-exec-group.platform_group': 'platform-default-group',
+    'default-exec-group.target_default': 'platform-default-group',
+    'default-exec-group.target_group': 'platform-default-group',
+    '//:compile_type.platform_group': 'platform-automatic',
+    '//:compile_type.target_default': 'platform-automatic',
+    '//:compile_type.target_group': 'platform-automatic',
+})"#,
+        )
+        .replace(
+            "probe(name = 'request')",
+            r#"probe(name = 'request', exec_properties = {
+    'target_default': 'target-default',
+    'target_group': 'target-default',
+    'default-exec-group.target_group': 'target-default-group',
+    '//:compile_type.target_group': 'target-automatic',
+})"#,
+        );
+    fs::write(build, source).unwrap();
+    let result = analyze_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        &ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:request").unwrap(),
+            execution_group_configuration(false),
+        ),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    for (action, expected_group, expected_values) in [
+        (
+            &result.actions()[0],
+            ConfiguredExecGroup::Default,
+            [
+                "platform-default",
+                "platform-default-group",
+                "target-default",
+                "target-default-group",
+            ],
+        ),
+        (
+            &result.actions()[1],
+            ConfiguredExecGroup::automatic(CanonicalLabel::parse("@@//:compile_type").unwrap()),
+            [
+                "platform-default",
+                "platform-automatic",
+                "target-default",
+                "target-automatic",
+            ],
+        ),
+    ] {
+        assert_eq!(action.context().exec_group(), &expected_group);
+        let properties = &action.context().platform_fact().unwrap().exec_properties;
+        assert_eq!(
+            properties
+                .iter()
+                .map(|(_, value)| value.as_str())
+                .collect::<Vec<_>>(),
+            expected_values
+        );
+    }
+}
+
+#[tokio::test]
 async fn configured_action_context_distinguishes_default_named_and_automatic_groups() {
     let workspace = scratch();
     write_execution_group_fixture(

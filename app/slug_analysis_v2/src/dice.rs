@@ -6020,6 +6020,7 @@ impl ConfiguredNodeAnalysisKey {
             }
         };
         let normalized_exec_groups = match normalize_execution_groups(
+            configured_target.label(),
             implementation.required_toolchains(),
             implementation.declared_exec_groups(),
             &resolved_attributes,
