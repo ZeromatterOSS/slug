@@ -2133,9 +2133,16 @@ fn terminal_epoch_association_installs_terminal_arcs_and_preserves_unrelated_arc
     ));
 }
 
-#[test]
-fn public_singleton_observation_replays_lifecycle_and_isolates_legacy() {
-    let workspace = tempfile::tempdir_in(env!("CARGO_MANIFEST_DIR")).unwrap();
+struct PublicSingletonFixture {
+    _workspace: tempfile::TempDir,
+    build_file: PathBuf,
+    audit: Arc<ExternalQueryActivationAudit>,
+    runtime: WorkspaceRuntime,
+}
+
+impl PublicSingletonFixture {
+    fn new() -> Self {
+        let workspace = tempfile::tempdir_in(env!("CARGO_MANIFEST_DIR")).unwrap();
     fs::write(
         workspace.path().join("MODULE.bazel"),
         "print('MODULE_EVENT')\nmodule(name = 'publication')\n",
@@ -2143,20 +2150,36 @@ fn public_singleton_observation_replays_lifecycle_and_isolates_legacy() {
     .unwrap();
     fs::create_dir(workspace.path().join("pkg")).unwrap();
     let build_file = workspace.path().join("pkg/BUILD.bazel");
-    let write_build = |name: &str| {
+        let audit = Arc::new(ExternalQueryActivationAudit::default());
+        let runtime = test_runtime(workspace.path())
+            .unwrap()
+            .with_activation_audit(audit.dupe());
+        let fixture = Self {
+            _workspace: workspace,
+            build_file,
+            audit,
+            runtime,
+        };
+        fixture.write_build("a");
+        fixture
+    }
+
+    fn write_build(&self, name: &str) {
         fs::write(
-            &build_file,
+            &self.build_file,
             format!("print('PACKAGE_EVENT')\nfilegroup(name = '{name}')\n"),
         )
         .unwrap();
-    };
-    write_build("a");
-    let audit = Arc::new(ExternalQueryActivationAudit::default());
-    let runtime = test_runtime(workspace.path())
-        .unwrap()
-        .with_activation_audit(audit.dupe());
-    let run = |target: &str| {
-        runtime.build_command_with_bzlmod_inputs(
+    }
+
+    fn run(
+        &self,
+        target: &str,
+    ) -> Result<
+        AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+        BuildCommandError,
+    > {
+        self.runtime.build_command_with_bzlmod_inputs(
             &[TargetPattern::parse(target).unwrap()],
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -2164,9 +2187,13 @@ fn public_singleton_observation_replays_lifecycle_and_isolates_legacy() {
             &[],
             root_setting_overlay(None),
         )
-    };
+    }
+}
 
-    let cold = run("//pkg:all").unwrap();
+#[test]
+fn public_singleton_cold_terminal_events_and_observed_route() {
+    let fixture = PublicSingletonFixture::new();
+    let cold = fixture.run("//pkg:all").unwrap();
     let a = cold.terminal_for_test().dupe();
     assert!(a.as_ref().is_ok());
     assert_eq!(
@@ -2174,44 +2201,61 @@ fn public_singleton_observation_replays_lifecycle_and_isolates_legacy() {
         ["MODULE_EVENT", "PACKAGE_EVENT"]
     );
     assert!(
-        accepted_native_snapshot(&runtime)
+        accepted_native_snapshot(&fixture.runtime)
             .selected
             .repository_requests()
             .is_empty()
     );
-    let after_cold = audit.build_root_counts();
+    let after_cold = fixture.audit.build_root_counts();
     assert!(after_cold.0 > 0);
     assert_eq!(after_cold.1, 0);
+}
 
-    let cold_epoch = accepted_native_snapshot(&runtime).path_observations;
-    let warm = run("//pkg:all").unwrap();
+#[test]
+fn public_singleton_warm_reuses_epoch_without_event_replay() {
+    let fixture = PublicSingletonFixture::new();
+    fixture.run("//pkg:all").unwrap();
+    let cold_epoch = accepted_native_snapshot(&fixture.runtime).path_observations;
+    let warm = fixture.run("//pkg:all").unwrap();
     assert_eq!(accepted_output_text(&warm), Vec::<&str>::new());
-    let warm_epoch = accepted_native_snapshot(&runtime).path_observations;
+    let warm_epoch = accepted_native_snapshot(&fixture.runtime).path_observations;
     assert!(
         cold_epoch
             .observations()
             .iter()
             .all(|(demand, result)| { Arc::ptr_eq(result, warm_epoch.get(demand).unwrap()) })
     );
-    write_build("b");
-    let b = run("//pkg:all").unwrap();
+}
+
+#[test]
+fn public_singleton_edit_delete_restore_lifecycle() {
+    let fixture = PublicSingletonFixture::new();
+    let a = fixture.run("//pkg:all").unwrap().terminal_for_test().dupe();
+    fixture.write_build("b");
+    let b = fixture.run("//pkg:all").unwrap();
     assert_ne!(a.as_ref(), b.terminal_for_test().as_ref());
-    fs::remove_file(&build_file).unwrap();
+    fs::remove_file(&fixture.build_file).unwrap();
     assert!(
-        run("//pkg:all")
+        fixture
+            .run("//pkg:all")
             .unwrap()
             .terminal_for_test()
             .as_ref()
             .is_err()
     );
-    write_build("a");
-    let restored = run("//pkg:all").unwrap();
+    fixture.write_build("a");
+    let restored = fixture.run("//pkg:all").unwrap();
     assert_eq!(a.as_ref(), restored.terminal_for_test().as_ref());
+}
 
-    let before_legacy = audit.build_root_counts();
-    let legacy = run("//pkg:a").unwrap();
+#[test]
+fn public_singleton_legacy_route_isolation() {
+    let fixture = PublicSingletonFixture::new();
+    fixture.run("//pkg:all").unwrap();
+    let before_legacy = fixture.audit.build_root_counts();
+    let legacy = fixture.run("//pkg:a").unwrap();
     assert!(legacy.terminal_for_test().as_ref().is_ok());
-    let after_legacy = audit.build_root_counts();
+    let after_legacy = fixture.audit.build_root_counts();
     assert_eq!(after_legacy.0, before_legacy.0);
     assert!(after_legacy.1 > before_legacy.1);
 }
@@ -2552,8 +2596,18 @@ fn observed_multi_reducer_and_selected_superset_preserve_total_order_and_arcs() 
     ));
 }
 
-#[test]
-fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superset() {
+struct PublicMultiFixture {
+    _stable_parent: tempfile::TempDir,
+    workspace: tempfile::TempDir,
+    good_defs: &'static str,
+    audit: Arc<ExternalQueryActivationAudit>,
+    command_policy: BzlmodCommandPolicyKey,
+    runtime: WorkspaceRuntime,
+    targets: [TargetPattern; 3],
+}
+
+impl PublicMultiFixture {
+    fn new() -> Self {
     let stable_parent_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../target/debug/incremental/slug-public-observed-multi");
     fs::create_dir_all(&stable_parent_root).unwrap();
@@ -2589,18 +2643,38 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
         TargetPattern::parse("//:rule").unwrap(),
         TargetPattern::parse("//:two.txt").unwrap(),
     ];
-    let run = || {
-        runtime.build_command_with_bzlmod_inputs(
-            &targets,
-            command_policy.clone(),
+        Self {
+            _stable_parent: stable_parent,
+            workspace,
+            good_defs,
+            audit,
+            command_policy,
+            runtime,
+            targets,
+        }
+    }
+
+    fn run(
+        &self,
+    ) -> Result<
+        AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+        BuildCommandError,
+    > {
+        self.runtime.build_command_with_bzlmod_inputs(
+            &self.targets,
+            self.command_policy.clone(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             &[],
             root_setting_overlay(None),
         )
-    };
-    let checkpoint = audit.checkpoint();
-    let cold = run().unwrap();
+    }
+}
+
+#[test]
+fn public_multi_cold_aggregates_targets_and_repository_inputs() {
+    let fixture = PublicMultiFixture::new();
+    let cold = fixture.run().unwrap();
     assert_eq!(
         accepted_output_text(&cold),
         ["MODULE", "BZL", "BUILD", "LEAF_ANALYSIS", "ANALYSIS"]
@@ -2617,7 +2691,7 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
     assert!(public.targets[0].source_certificate.is_none());
     assert!(public.targets[1].analysis.is_some());
     assert!(public.targets[2].source_certificate.is_none());
-    let snapshot = accepted_native_snapshot(&runtime);
+    let snapshot = accepted_native_snapshot(&fixture.runtime);
     assert_eq!(
         snapshot
             .selected
@@ -2628,18 +2702,33 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
         ["@@platforms", "@@platforms+"]
     );
     assert_eq!(snapshot.selected.repository_validations().len(), 1);
+}
 
-    let host = runtime.process_host.default_configuration_inputs().unwrap();
+#[test]
+fn public_multi_observed_superset_certificate_and_dependency_order() {
+    let fixture = PublicMultiFixture::new();
+    let checkpoint = fixture.audit.checkpoint();
+    let cold = fixture.run().unwrap();
+    let public = cold.terminal_for_test().as_ref().as_ref().unwrap();
+    let snapshot = accepted_native_snapshot(&fixture.runtime);
+    let host = fixture
+        .runtime
+        .process_host
+        .default_configuration_inputs()
+        .unwrap();
     let root = BuildCommandRootKey::new(
-        NormalizedAbsolutePath::new(runtime.workspace.clone()).unwrap(),
-        &targets,
+        NormalizedAbsolutePath::new(fixture.runtime.workspace.clone()).unwrap(),
+        &fixture.targets,
         ConfigurationKey::from_slug(SlugConfiguration::default_target(&host).unwrap()),
     )
     .unwrap();
     let observed_key = BuildCommandRootObservationKey::new(root.clone()).unwrap();
     let tracker = Arc::new(ObservedBuildTracker::default());
-    let observed = runtime.runtime.block_on(compute_observed_build_with_epoch(
-        &runtime,
+    let observed = fixture
+        .runtime
+        .runtime
+        .block_on(compute_observed_build_with_epoch(
+        &fixture.runtime,
         &observed_key,
         snapshot.path_observations.dupe(),
         tracker.dupe(),
@@ -2695,17 +2784,37 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
             })
             .all(|(position, _)| revision < position)
     );
-    let (observed_roots, neutral_roots, legacy_roots) = audit.exact_build_root_counts();
+    let (observed_roots, neutral_roots, legacy_roots) = fixture.audit.exact_build_root_counts();
     assert!(observed_roots > 0);
     assert_eq!((neutral_roots, legacy_roots), (0, 0));
-    audit.assert_phase_clean(checkpoint, 0);
-    assert!(accepted_output_text(&run().unwrap()).is_empty());
+    fixture.audit.assert_phase_clean(checkpoint, 0);
+}
 
-    fs::write(workspace.path().join("one.txt"), b"ONE").unwrap();
-    assert!(accepted_output_text(&run().unwrap()).is_empty());
-    let edited_snapshot = accepted_native_snapshot(&runtime);
-    let edited_outcome = runtime.runtime.block_on(compute_observed_build_with_epoch(
-        &runtime,
+#[test]
+fn public_multi_source_edit_restore_without_event_replay() {
+    let fixture = PublicMultiFixture::new();
+    fixture.run().unwrap();
+    assert!(accepted_output_text(&fixture.run().unwrap()).is_empty());
+    let host = fixture
+        .runtime
+        .process_host
+        .default_configuration_inputs()
+        .unwrap();
+    let root = BuildCommandRootKey::new(
+        NormalizedAbsolutePath::new(fixture.runtime.workspace.clone()).unwrap(),
+        &fixture.targets,
+        ConfigurationKey::from_slug(SlugConfiguration::default_target(&host).unwrap()),
+    )
+    .unwrap();
+    let observed_key = BuildCommandRootObservationKey::new(root).unwrap();
+    fs::write(fixture.workspace.path().join("one.txt"), b"ONE").unwrap();
+    assert!(accepted_output_text(&fixture.run().unwrap()).is_empty());
+    let edited_snapshot = accepted_native_snapshot(&fixture.runtime);
+    let edited_outcome = fixture
+        .runtime
+        .runtime
+        .block_on(compute_observed_build_with_epoch(
+        &fixture.runtime,
         &observed_key,
         edited_snapshot.path_observations.dupe(),
         Arc::new(ObservedBuildTracker::default()),
@@ -2731,22 +2840,26 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
                     )
             })
     );
-    fs::write(workspace.path().join("one.txt"), b"one").unwrap();
-    assert!(accepted_output_text(&run().unwrap()).is_empty());
+    fs::write(fixture.workspace.path().join("one.txt"), b"one").unwrap();
+    assert!(accepted_output_text(&fixture.run().unwrap()).is_empty());
+}
 
-    let broken_defs = good_defs.replace(
+#[test]
+fn public_multi_analysis_failure_is_atomic_and_recovers() {
+    let fixture = PublicMultiFixture::new();
+    let broken_defs = fixture.good_defs.replace(
         "    print('ANALYSIS')\n    return [DefaultInfo(files = depset([]))]",
         "    fail('BROKEN_ANALYSIS')",
     );
-    fs::write(workspace.path().join("defs.bzl"), &broken_defs).unwrap();
+    fs::write(fixture.workspace.path().join("defs.bzl"), &broken_defs).unwrap();
     let failure_audit = Arc::new(ExternalQueryActivationAudit::default());
-    let failure_runtime = test_runtime(workspace.path())
+    let failure_runtime = test_runtime(fixture.workspace.path())
         .unwrap()
         .with_activation_audit(failure_audit.dupe());
     let failure_run = || {
         failure_runtime.build_command_with_bzlmod_inputs(
-            &targets,
-            command_policy.clone(),
+            &fixture.targets,
+            fixture.command_policy.clone(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             &[],
@@ -2768,12 +2881,12 @@ fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superse
     let (observed_roots, neutral_roots, legacy_roots) = failure_audit.exact_build_root_counts();
     assert!(observed_roots > 0);
     assert_eq!((neutral_roots, legacy_roots), (0, 0));
-    fs::write(workspace.path().join("defs.bzl"), good_defs).unwrap();
-    let recovery_runtime = test_runtime(workspace.path()).unwrap();
+    fs::write(fixture.workspace.path().join("defs.bzl"), fixture.good_defs).unwrap();
+    let recovery_runtime = test_runtime(fixture.workspace.path()).unwrap();
     let recovered = recovery_runtime
         .build_command_with_bzlmod_inputs(
-            &targets,
-            command_policy,
+            &fixture.targets,
+            fixture.command_policy,
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             &[],

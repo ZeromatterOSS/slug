@@ -8964,50 +8964,82 @@ mod tests {
     mod query_command_tests {
         include!("tests/query_command_tests.rs");
     }
-    #[test]
-    fn real_build_command_drives_typed_analysis_and_cold_events_without_warm_replay() {
-        let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../target/debug/deps")
-            .canonicalize()
-            .unwrap();
-        let workspace = tempfile::tempdir_in(stable_parent).unwrap();
-        let command_policy = configured_test_command_policy(workspace.path());
-        fs::write(
-            workspace.path().join("MODULE.bazel"),
-            configured_test_module("print(\"MODULE_EVENT\")\nmodule(name = \"driver\")\n"),
-        )
-        .unwrap();
-        fs::write(
-            workspace.path().join("BUILD.bazel"),
-            "load(\"//pkg:defs.bzl\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\n",
-        )
-        .unwrap();
-        fs::create_dir(workspace.path().join("pkg")).unwrap();
-        fs::write(
-            workspace.path().join("pkg/defs.bzl"),
-            "print(\"BZL_EVENT\")\ndef _impl(ctx):\n    print(\"ANALYSIS_EVENT\")\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\ndef _setting(ctx): return []\nstring_setting = rule(implementation = _setting, build_setting = config.string(flag = True))\n",
-        )
-        .unwrap();
-        fs::write(
-            workspace.path().join("pkg/BUILD.bazel"),
-            "load(\":defs.bzl\", \"probe\")\nprint(\"BUILD_EVENT\")\nprobe(name = \"probe\")\n",
-        )
-        .unwrap();
-        let runtime = test_runtime(workspace.path()).unwrap();
-        let target = TargetPattern::parse("//pkg:probe").unwrap();
-        let build =
-            |runtime: &WorkspaceRuntime, targets: &[TargetPattern], setting: Option<&str>| {
-                runtime.build_command_with_bzlmod_inputs(
-                    targets,
-                    command_policy.clone(),
-                    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-                    LockfileMode::Update,
-                    &[],
-                    root_setting_overlay(setting),
-                )
-            };
+    struct RealBuildCommandFixture {
+        workspace: tempfile::TempDir,
+        command_policy: BzlmodCommandPolicyKey,
+        runtime: WorkspaceRuntime,
+        target: TargetPattern,
+    }
 
-        let accepted = build(&runtime, std::slice::from_ref(&target), None).unwrap();
+    impl RealBuildCommandFixture {
+        fn new() -> Self {
+            let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../target/debug/deps")
+                .canonicalize()
+                .unwrap();
+            let workspace = tempfile::tempdir_in(stable_parent).unwrap();
+            let command_policy = configured_test_command_policy(workspace.path());
+            fs::write(
+                workspace.path().join("MODULE.bazel"),
+                configured_test_module("print(\"MODULE_EVENT\")\nmodule(name = \"driver\")\n"),
+            )
+            .unwrap();
+            fs::write(
+                workspace.path().join("BUILD.bazel"),
+                "load(\"//pkg:defs.bzl\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\n",
+            )
+            .unwrap();
+            fs::create_dir(workspace.path().join("pkg")).unwrap();
+            fs::write(
+                workspace.path().join("pkg/defs.bzl"),
+                "print(\"BZL_EVENT\")\ndef _impl(ctx):\n    print(\"ANALYSIS_EVENT\")\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\ndef _setting(ctx): return []\nstring_setting = rule(implementation = _setting, build_setting = config.string(flag = True))\n",
+            )
+            .unwrap();
+            fs::write(
+                workspace.path().join("pkg/BUILD.bazel"),
+                "load(\":defs.bzl\", \"probe\")\nprint(\"BUILD_EVENT\")\nprobe(name = \"probe\")\n",
+            )
+            .unwrap();
+            let runtime = test_runtime(workspace.path()).unwrap();
+            let target = TargetPattern::parse("//pkg:probe").unwrap();
+            Self {
+                workspace,
+                command_policy,
+                runtime,
+                target,
+            }
+        }
+
+        fn build(
+            &self,
+            runtime: &WorkspaceRuntime,
+            targets: &[TargetPattern],
+            setting: Option<&str>,
+        ) -> Result<
+            AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+            BuildCommandError,
+        > {
+            runtime.build_command_with_bzlmod_inputs(
+                targets,
+                self.command_policy.clone(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                root_setting_overlay(setting),
+            )
+        }
+    }
+
+    #[test]
+    fn real_build_cold_counts_and_event_order() {
+        let fixture = RealBuildCommandFixture::new();
+        let accepted = fixture
+            .build(
+                &fixture.runtime,
+                std::slice::from_ref(&fixture.target),
+                None,
+            )
+            .unwrap();
         let evaluation = accepted.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(evaluation.loaded_package_count(), 1);
         assert_eq!(evaluation.analyzed_target_count(), 1);
@@ -9016,7 +9048,23 @@ mod tests {
             accepted_output_text(&accepted),
             ["MODULE_EVENT", "BZL_EVENT", "BUILD_EVENT", "ANALYSIS_EVENT"]
         );
-        let c0 = evaluation
+    }
+
+    #[test]
+    fn real_build_warm_transition_restore_and_output_root() {
+        let fixture = RealBuildCommandFixture::new();
+        let accepted = fixture
+            .build(
+                &fixture.runtime,
+                std::slice::from_ref(&fixture.target),
+                None,
+            )
+            .unwrap();
+        let c0 = accepted
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap()
             .analyses()
             .next()
             .unwrap()
@@ -9024,17 +9072,23 @@ mod tests {
             .expect("current build analysis only contains configured nodes")
             .configuration()
             .clone();
-
-        let warm = build(&runtime, std::slice::from_ref(&target), None).unwrap();
+        let warm = fixture
+            .build(
+                &fixture.runtime,
+                std::slice::from_ref(&fixture.target),
+                None,
+            )
+            .unwrap();
         assert!(warm.terminal_for_test().as_ref().is_ok());
         assert!(accepted_output_text(&warm).is_empty());
 
-        let transitioned = build(
-            &runtime,
-            std::slice::from_ref(&target),
-            Some("transitioned"),
-        )
-        .unwrap();
+        let transitioned = fixture
+            .build(
+                &fixture.runtime,
+                std::slice::from_ref(&fixture.target),
+                Some("transitioned"),
+            )
+            .unwrap();
         let c1 = transitioned
             .terminal_for_test()
             .as_ref()
@@ -9051,16 +9105,22 @@ mod tests {
         assert_eq!(accepted_output_text(&transitioned), ["ANALYSIS_EVENT"]);
         assert_ne!(
             crate::runtime::configured_output_root(
-                workspace.path(),
+                fixture.workspace.path(),
                 c0.slug_configuration().unwrap()
             ),
             crate::runtime::configured_output_root(
-                workspace.path(),
+                fixture.workspace.path(),
                 c1.slug_configuration().unwrap()
             )
         );
 
-        let restored = build(&runtime, std::slice::from_ref(&target), None).unwrap();
+        let restored = fixture
+            .build(
+                &fixture.runtime,
+                std::slice::from_ref(&fixture.target),
+                None,
+            )
+            .unwrap();
         let restored_configuration = restored
             .terminal_for_test()
             .as_ref()
@@ -9074,15 +9134,21 @@ mod tests {
             .configuration();
         assert_eq!(&c0, restored_configuration);
         assert!(accepted_output_text(&restored).is_empty());
+    }
 
-        let empty = build(&runtime, &[], None).unwrap();
+    #[test]
+    fn real_build_empty_and_missing_target_terminal() {
+        let fixture = RealBuildCommandFixture::new();
+        let empty = fixture.build(&fixture.runtime, &[], None).unwrap();
         let evaluation = empty.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(evaluation.loaded_package_count(), 0);
         assert_eq!(evaluation.analyzed_target_count(), 0);
 
-        let missing_runtime = test_runtime(workspace.path()).unwrap();
+        let missing_runtime = test_runtime(fixture.workspace.path()).unwrap();
         let missing_target = TargetPattern::parse("//pkg:missing").unwrap();
-        let missing = build(&missing_runtime, &[missing_target], None).unwrap();
+        let missing = fixture
+            .build(&missing_runtime, &[missing_target], None)
+            .unwrap();
         let error = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
         assert!(matches!(
             error.kind,
@@ -9092,7 +9158,7 @@ mod tests {
             error.to_string(),
             format!(
                 "target `//pkg:missing` was not found in {}",
-                workspace.path().join("pkg/BUILD.bazel").display()
+                fixture.workspace.path().join("pkg/BUILD.bazel").display()
             )
         );
         assert_eq!(
@@ -9153,24 +9219,30 @@ mod tests {
         assert!(recovered.terminal_for_test().as_ref().is_ok());
     }
 
-    #[test]
-    fn retained_runtime_restores_default_transition_configuration_after_explicit_override() {
-        let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../target/debug/build")
-            .canonicalize()
+    struct RetainedConfigurationFixture {
+        workspace: tempfile::TempDir,
+        command_policy: BzlmodCommandPolicyKey,
+        target: TargetPattern,
+    }
+
+    impl RetainedConfigurationFixture {
+        fn new() -> Self {
+            let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../target/debug/build")
+                .canonicalize()
+                .unwrap();
+            let workspace = tempfile::tempdir_in(stable_parent).unwrap();
+            let command_policy = configured_test_command_policy(workspace.path());
+            fs::write(
+                workspace.path().join("MODULE.bazel"),
+                configured_test_module(
+                    "print(\"MODULE_EVENT\")\nmodule(name = \"configuration_driver\")\n",
+                ),
+            )
             .unwrap();
-        let workspace = tempfile::tempdir_in(stable_parent).unwrap();
-        let command_policy = configured_test_command_policy(workspace.path());
-        fs::write(
-            workspace.path().join("MODULE.bazel"),
-            configured_test_module(
-                "print(\"MODULE_EVENT\")\nmodule(name = \"configuration_driver\")\n",
-            ),
-        )
-        .unwrap();
-        fs::write(
-            workspace.path().join("defs.bzl"),
-            r#"SettingInfo = provider(fields = {"value": "value"})
+            fs::write(
+                workspace.path().join("defs.bzl"),
+                r#"SettingInfo = provider(fields = {"value": "value"})
 def _setting(ctx):
     return [SettingInfo(value = ctx.build_setting_value)]
 string_setting = rule(implementation = _setting, build_setting = config.string(flag = True))
@@ -9196,25 +9268,43 @@ def _top(ctx):
     return [DefaultInfo(files = depset([out]))]
 top = rule(implementation = _top, attrs = {"child": attr.label()})
 "#,
-        )
-        .unwrap();
-        fs::write(
-            workspace.path().join("BUILD.bazel"),
-            "load(\":defs.bzl\", \"consumer\", \"parent\", \"string_setting\", \"top\")\nprint(\"BUILD_EVENT\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nconsumer(name = \"consumer\")\nparent(name = \"parent\", child = \":consumer\")\ntop(name = \"top\", child = \":parent\")\n",
-        )
-        .unwrap();
+            )
+            .unwrap();
+            fs::write(
+                workspace.path().join("BUILD.bazel"),
+                "load(\":defs.bzl\", \"consumer\", \"parent\", \"string_setting\", \"top\")\nprint(\"BUILD_EVENT\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nconsumer(name = \"consumer\")\nparent(name = \"parent\", child = \":consumer\")\ntop(name = \"top\", child = \":parent\")\n",
+            )
+            .unwrap();
+            let target = TargetPattern::parse("//:parent").unwrap();
+            Self {
+                workspace,
+                command_policy,
+                target,
+            }
+        }
 
-        let target = TargetPattern::parse("//:parent").unwrap();
-        let build = |runtime: &WorkspaceRuntime, setting: Option<&str>| {
+        fn build(
+            &self,
+            runtime: &WorkspaceRuntime,
+            setting: Option<&str>,
+        ) -> Result<
+            AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+            BuildCommandError,
+        > {
             runtime.build_command_with_bzlmod_inputs(
-                std::slice::from_ref(&target),
-                command_policy.clone(),
+                std::slice::from_ref(&self.target),
+                self.command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
                 root_setting_overlay(setting),
             )
-        };
+        }
+    }
+
+    #[test]
+    fn retained_configuration_c0_c1_c0_topology_and_events() {
+        let fixture = RetainedConfigurationFixture::new();
         let configuration_for =
             |accepted: &AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
              label: &str| {
@@ -9253,15 +9343,15 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                     .collect::<Vec<_>>()
             };
 
-        let retained = test_runtime(workspace.path()).unwrap();
-        let c0_build = build(&retained, None).unwrap();
+        let retained = test_runtime(fixture.workspace.path()).unwrap();
+        let c0_build = fixture.build(&retained, None).unwrap();
         let c0 = configuration_for(&c0_build, "@@//:parent");
         assert_eq!(configuration_string_option(&c0, "@@//:setting"), None);
         assert!(accepted_output_text(&c0_build).contains(&"PARENT_ANALYSIS"));
         assert!(accepted_output_text(&c0_build).contains(&"CONSUMER_ANALYSIS"));
         let c0_topology = topology_for(&c0_build);
 
-        let c1_build = build(&retained, Some("command")).unwrap();
+        let c1_build = fixture.build(&retained, Some("command")).unwrap();
         let c1 = configuration_for(&c1_build, "@@//:parent");
         assert_eq!(
             configuration_string_option(&c1, "@@//:setting"),
@@ -9273,22 +9363,45 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert_eq!(c0_topology, topology_for(&c1_build));
         assert_ne!(
             crate::runtime::configured_output_root(
-                workspace.path(),
+                fixture.workspace.path(),
                 c0.slug_configuration().unwrap()
             ),
             crate::runtime::configured_output_root(
-                workspace.path(),
+                fixture.workspace.path(),
                 c1.slug_configuration().unwrap()
             )
         );
 
-        let restored_build = build(&retained, None).unwrap();
+        let restored_build = fixture.build(&retained, None).unwrap();
         let restored = configuration_for(&restored_build, "@@//:parent");
         assert_eq!(c0, restored);
         assert_eq!(c0_topology, topology_for(&restored_build));
+    }
 
-        let fresh = test_runtime(workspace.path()).unwrap();
-        let one_shot_build = build(&fresh, None).unwrap();
+    #[test]
+    fn retained_configuration_fresh_and_transitive_transition() {
+        let fixture = RetainedConfigurationFixture::new();
+        let configuration_for =
+            |accepted: &AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+             label: &str| {
+                accepted
+                    .terminal_for_test()
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .analyses()
+                    .find(|analysis| analysis.key().label().to_string() == label)
+                    .unwrap()
+                    .configured_target_key()
+                    .expect("current build analysis only contains configured nodes")
+                    .configuration()
+                    .clone()
+            };
+        let retained = test_runtime(fixture.workspace.path()).unwrap();
+        let c0_build = fixture.build(&retained, None).unwrap();
+        let c0 = configuration_for(&c0_build, "@@//:parent");
+        let fresh = test_runtime(fixture.workspace.path()).unwrap();
+        let one_shot_build = fixture.build(&fresh, None).unwrap();
         let one_shot = configuration_for(&one_shot_build, "@@//:parent");
         assert_eq!(c0, one_shot);
         assert_eq!(
@@ -9296,12 +9409,12 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             one_shot.slug_configuration().unwrap().projection()
         );
 
-        let transitive_runtime = test_runtime(workspace.path()).unwrap();
+        let transitive_runtime = test_runtime(fixture.workspace.path()).unwrap();
         let top = TargetPattern::parse("//:top").unwrap();
         let transitive_c0 = transitive_runtime
             .build_command_with_bzlmod_inputs(
                 std::slice::from_ref(&top),
-                command_policy.clone(),
+                fixture.command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -9315,11 +9428,43 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             configuration_string_option(&transitive_consumer, "@@//:setting"),
             Some("left")
         );
+    }
 
+    #[test]
+    fn retained_configuration_top_change_and_setting_default() {
+        let fixture = RetainedConfigurationFixture::new();
+        let configuration_for =
+            |accepted: &AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+             label: &str| {
+                accepted
+                    .terminal_for_test()
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .analyses()
+                    .find(|analysis| analysis.key().label().to_string() == label)
+                    .unwrap()
+                    .configured_target_key()
+                    .expect("current build analysis only contains configured nodes")
+                    .configuration()
+                    .clone()
+            };
+        let transitive_runtime = test_runtime(fixture.workspace.path()).unwrap();
+        let top = TargetPattern::parse("//:top").unwrap();
+        transitive_runtime
+            .build_command_with_bzlmod_inputs(
+                std::slice::from_ref(&top),
+                fixture.command_policy.clone(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                root_setting_overlay(None),
+            )
+            .unwrap();
         let transitive_c1 = transitive_runtime
             .build_command_with_bzlmod_inputs(
                 std::slice::from_ref(&top),
-                command_policy.clone(),
+                fixture.command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -9330,12 +9475,12 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert!(accepted_output_text(&transitive_c1).contains(&"PARENT_ANALYSIS"));
         assert!(!accepted_output_text(&transitive_c1).contains(&"CONSUMER_ANALYSIS"));
 
-        let setting_runtime = test_runtime(workspace.path()).unwrap();
+        let setting_runtime = test_runtime(fixture.workspace.path()).unwrap();
         let setting_target = TargetPattern::parse("//:setting").unwrap();
         let setting_build = setting_runtime
             .build_command_with_bzlmod_inputs(
                 std::slice::from_ref(&setting_target),
-                command_policy.clone(),
+                fixture.command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -9511,35 +9656,118 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert_eq!(accepted_output_text(&accepted), ["ok"]);
     }
 
-    #[test]
-    fn cquery_deps_uses_the_retained_noimplicit_graph_with_null_sources() {
-        let workspace = tempfile::tempdir().unwrap();
-        let command_policy = configured_test_command_policy(workspace.path());
-        fs::write(
-            workspace.path().join("MODULE.bazel"),
-            configured_test_module("module(name = \"deps\")\n"),
-        )
-        .unwrap();
-        fs::write(workspace.path().join("defs.bzl"), CQUERY_DELEGATING_DEFS).unwrap();
-        fs::write(
-            workspace.path().join("BUILD.bazel"),
-            CQUERY_DELEGATING_BUILD,
-        )
-        .unwrap();
-        fs::write(workspace.path().join("source.txt"), "source\n").unwrap();
+    struct CqueryDepsFixture {
+        workspace: tempfile::TempDir,
+        command_policy: BzlmodCommandPolicyKey,
+        runtime: WorkspaceRuntime,
+    }
 
-        let runtime = test_runtime(workspace.path()).unwrap();
-        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
-            runtime.cquery_command_with_bzlmod_inputs(
+    impl CqueryDepsFixture {
+        fn new() -> Self {
+            let workspace = tempfile::tempdir().unwrap();
+            let command_policy = configured_test_command_policy(workspace.path());
+            fs::write(
+                workspace.path().join("MODULE.bazel"),
+                configured_test_module("module(name = \"deps\")\n"),
+            )
+            .unwrap();
+            fs::write(workspace.path().join("defs.bzl"), CQUERY_DELEGATING_DEFS).unwrap();
+            fs::write(
+                workspace.path().join("BUILD.bazel"),
+                CQUERY_DELEGATING_BUILD,
+            )
+            .unwrap();
+            fs::write(workspace.path().join("source.txt"), "source\n").unwrap();
+            let runtime = test_runtime(workspace.path()).unwrap();
+            Self {
+                workspace,
+                command_policy,
+                runtime,
+            }
+        }
+
+        fn run(
+            &self,
+            expression: &str,
+            include_implicit: bool,
+            include_tool: bool,
+        ) -> Result<
+            AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
+            CqueryCommandError,
+        > {
+            self.runtime.cquery_command_with_bzlmod_inputs(
                 expression,
                 include_implicit,
                 include_tool,
-                command_policy.clone(),
+                self.command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
                 root_setting_overlay(None),
             )
+        }
+    }
+
+    fn cquery_deps_topology(evaluation: &CqueryCommandEvaluation) -> (Vec<String>, Vec<String>) {
+        let mut graph = evaluation.graph_stdout();
+        for analysis in evaluation.analyses() {
+            let Some(key) = analysis.configured_target_key() else {
+                continue;
+            };
+            let Some(configuration) = key.configuration().slug_configuration() else {
+                continue;
+            };
+            let name = if configuration_string_option(key.configuration(), "@@//:setting")
+                == Some("transitioned")
+            {
+                "transition"
+            } else {
+                "base"
+            };
+            graph = graph.replace(&configuration.projection().to_string(), name);
+        }
+        let mut nodes = graph
+            .lines()
+            .filter(|line| line.starts_with("  \"") && !line.contains(" -> "))
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        nodes.sort_unstable();
+        let mut edges = graph
+            .lines()
+            .filter(|line| line.contains(" -> "))
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        edges.sort_unstable();
+        (nodes, edges)
+    }
+
+    fn assert_cquery_deps_topology(
+        evaluation: &CqueryCommandEvaluation,
+        expected_nodes: &[&str],
+        expected_edges: &[&str],
+    ) {
+        let (nodes, edges) = cquery_deps_topology(evaluation);
+        assert_eq!(
+            nodes,
+            expected_nodes
+                .iter()
+                .map(|value| (*value).to_owned())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            edges,
+            expected_edges
+                .iter()
+                .map(|value| (*value).to_owned())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn cquery_deps_preflight_depth_null_and_identity() {
+        let fixture = CqueryDepsFixture::new();
+        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
+            fixture.run(expression, include_implicit, include_tool)
         };
 
         let default_error = run("deps(//:root)", true, true).unwrap_err();
@@ -9617,7 +9845,14 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             .collect::<Vec<_>>();
         assert_eq!(ordinary.len(), 2);
         assert_ne!(ordinary[0], ordinary[1]);
+    }
 
+    #[test]
+    fn cquery_deps_structural_filter_and_duplicate_identity() {
+        let fixture = CqueryDepsFixture::new();
+        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
+            fixture.run(expression, include_implicit, include_tool)
+        };
         let structural = run(
             "kind('^(source file|generated file|package group)$', deps(//:root))",
             false,
@@ -9694,59 +9929,17 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .count(),
             0
         );
+    }
 
-        let topology = |evaluation: &CqueryCommandEvaluation| {
-            let mut graph = evaluation.graph_stdout();
-            for analysis in evaluation.analyses() {
-                let Some(key) = analysis.configured_target_key() else {
-                    continue;
-                };
-                let Some(configuration) = key.configuration().slug_configuration() else {
-                    continue;
-                };
-                let name = if configuration_string_option(key.configuration(), "@@//:setting")
-                    == Some("transitioned")
-                {
-                    "transition"
-                } else {
-                    "base"
-                };
-                graph = graph.replace(&configuration.projection().to_string(), name);
-            }
-            let mut nodes = graph
-                .lines()
-                .filter(|line| line.starts_with("  \"") && !line.contains(" -> "))
-                .map(str::to_owned)
-                .collect::<Vec<_>>();
-            nodes.sort_unstable();
-            let mut edges = graph
-                .lines()
-                .filter(|line| line.contains(" -> "))
-                .map(str::to_owned)
-                .collect::<Vec<_>>();
-            edges.sort_unstable();
-            (nodes, edges)
+    #[test]
+    fn cquery_deps_reverse_depth_and_topology() {
+        let fixture = CqueryDepsFixture::new();
+        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
+            fixture.run(expression, include_implicit, include_tool)
         };
-        let assert_topology = |evaluation: &CqueryCommandEvaluation,
-                               expected_nodes: &[&str],
-                               expected_edges: &[&str]| {
-            let (nodes, edges) = topology(evaluation);
-            assert_eq!(
-                nodes,
-                expected_nodes
-                    .iter()
-                    .map(|value| (*value).to_owned())
-                    .collect::<Vec<_>>()
-            );
-            assert_eq!(
-                edges,
-                expected_edges
-                    .iter()
-                    .map(|value| (*value).to_owned())
-                    .collect::<Vec<_>>()
-            );
-        };
-        assert_topology(depth_zero, &["  \"//:root (base)\""], &[]);
+        let depth_zero = run("deps(//:root, 0)", false, true).unwrap();
+        let depth_zero = depth_zero.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_cquery_deps_topology(depth_zero, &["  \"//:root (base)\""], &[]);
 
         let reverse = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
         let reverse = reverse.terminal_for_test().as_ref().as_ref().unwrap();
@@ -9757,7 +9950,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert_eq!(reverse.analyses().count(), 5);
         assert_eq!(reverse.label_stdout().lines().count(), 5);
         assert_eq!(reverse.label_kind_stdout().unwrap().lines().count(), 5);
-        assert_topology(
+        assert_cquery_deps_topology(
             reverse,
             &[
                 "  \"//:alias_inner (base)\"",
@@ -9780,7 +9973,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             reverse_zero.starlark_label_stdout(),
             "@@//:ordinary\n@@//:ordinary\n"
         );
-        assert_topology(
+        assert_cquery_deps_topology(
             reverse_zero,
             &["  \"//:ordinary (base)\"", "  \"//:ordinary (transition)\""],
             &[],
@@ -9791,7 +9984,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             reverse_one.starlark_label_stdout(),
             "@@//:ordinary\n@@//:ordinary\n@@//:root\n@@//:alias_inner\n"
         );
-        assert_topology(
+        assert_cquery_deps_topology(
             reverse_one,
             &[
                 "  \"//:alias_inner (base)\"",
@@ -9837,6 +10030,27 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             negative.graph_stdout(),
             "digraph mygraph {\n  node [shape=box];\n}\n"
         );
+    }
+
+    #[test]
+    fn cquery_deps_rdeps_composition_and_selected_subgraph() {
+        let fixture = CqueryDepsFixture::new();
+        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
+            fixture.run(expression, include_implicit, include_tool)
+        };
+        let reverse = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
+        let reverse = reverse.terminal_for_test().as_ref().as_ref().unwrap();
+        let reverse_zero = run("rdeps(deps(//:root), //:ordinary, 0)", false, true).unwrap();
+        let reverse_zero = reverse_zero.terminal_for_test().as_ref().as_ref().unwrap();
+        let reverse_one = run("rdeps(deps(//:root), //:ordinary, 1)", false, true).unwrap();
+        let reverse_one = reverse_one.terminal_for_test().as_ref().as_ref().unwrap();
+        let negative = run(
+            "rdeps(deps(//:root), //:ordinary, '-2147483648')",
+            false,
+            true,
+        )
+        .unwrap();
+        let negative = negative.terminal_for_test().as_ref().as_ref().unwrap();
         for depth in ["", ", '-2147483648'", ", 0", ", 1", ", 2147483647"] {
             let direct = run(&format!("rdeps(//:root, //:ordinary{depth})"), false, true).unwrap();
             let direct = direct.terminal_for_test().as_ref().as_ref().unwrap();
@@ -9917,7 +10131,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         .unwrap();
         let selected = selected.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(selected.analyses().count(), 4);
-        assert_topology(
+        assert_cquery_deps_topology(
             selected,
             &[
                 "  \"//:alias_inner (base)\"",
@@ -9930,6 +10144,18 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 "  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\"",
             ],
         );
+    }
+
+    #[test]
+    fn cquery_deps_filter_kind_and_inner_depth_boundaries() {
+        let fixture = CqueryDepsFixture::new();
+        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
+            fixture.run(expression, include_implicit, include_tool)
+        };
+        let reverse = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
+        let reverse = reverse.terminal_for_test().as_ref().as_ref().unwrap();
+        let reverse_zero = run("rdeps(deps(//:root), //:ordinary, 0)", false, true).unwrap();
+        let reverse_zero = reverse_zero.terminal_for_test().as_ref().as_ref().unwrap();
         let filtered_empty = run(
             "filter('never-matches', rdeps(//:root, //:ordinary))",
             false,
@@ -9974,7 +10200,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             kind_full.starlark_label_stdout(),
             "@@//:ordinary\n@@//:ordinary\n@@//:root\n"
         );
-        assert_topology(
+        assert_cquery_deps_topology(
             kind_full,
             &[
                 "  \"//:ordinary (base)\"",
@@ -10010,7 +10236,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         )
         .unwrap();
         let aliases = aliases.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_topology(
+        assert_cquery_deps_topology(
             aliases,
             &["  \"//:alias_inner (base)\"", "  \"//:alias_outer (base)\""],
             &["  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\""],
@@ -10081,6 +10307,14 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .label_stdout()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn cquery_deps_errors_transition_and_edit_restore() {
+        let fixture = CqueryDepsFixture::new();
+        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
+            fixture.run(expression, include_implicit, include_tool)
+        };
         let broken = run("//:broken", false, true).unwrap();
         assert!(
             broken
@@ -10139,9 +10373,11 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             transitioned.starlark_label_stdout(),
             "@@//:transition_only\n"
         );
+        let reverse = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
+        let reverse = reverse.terminal_for_test().as_ref().as_ref().unwrap();
         let expected_reverse_graph = reverse.graph_stdout();
         fs::write(
-            workspace.path().join("BUILD.bazel"),
+            fixture.workspace.path().join("BUILD.bazel"),
             CQUERY_DELEGATING_BUILD
                 .replace("aliased = \":alias_outer\"", "aliased = \":ordinary\""),
         )
@@ -10153,7 +10389,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             "@@//:ordinary\n@@//:ordinary\n@@//:root\n"
         );
         fs::write(
-            workspace.path().join("BUILD.bazel"),
+            fixture.workspace.path().join("BUILD.bazel"),
             CQUERY_DELEGATING_BUILD,
         )
         .unwrap();
@@ -10167,10 +10403,19 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .graph_stdout(),
             expected_reverse_graph
         );
+    }
 
+    #[test]
+    fn cquery_deps_depth_closure_and_tool_flag_equivalence() {
+        let fixture = CqueryDepsFixture::new();
+        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
+            fixture.run(expression, include_implicit, include_tool)
+        };
+        let full = run("deps(//:root)", false, true).unwrap();
+        let full = full.terminal_for_test().as_ref().as_ref().unwrap();
         let depth_one = run("deps(//:root, 1)", false, true).unwrap();
         let depth_one = depth_one.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_topology(
+        assert_cquery_deps_topology(
             depth_one,
             &[
                 "  \"//:alias_outer (base)\"",
@@ -10193,7 +10438,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
 
         let depth_two = run("deps(//:root, 2)", false, true).unwrap();
         let depth_two = depth_two.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_topology(
+        assert_cquery_deps_topology(
             depth_two,
             &[
                 "  \"//:alias_inner (base)\"",
@@ -10218,11 +10463,11 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 "  \"//:root (base)\" -> \"//:vis_top (null)\"",
             ],
         );
-        assert_eq!(topology(depth_two), topology(full));
+        assert_eq!(cquery_deps_topology(depth_two), cquery_deps_topology(full));
 
         let depth_max = run("deps(//:root, 2147483647)", false, true).unwrap();
         let depth_max = depth_max.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(topology(depth_max), topology(full));
+        assert_eq!(cquery_deps_topology(depth_max), cquery_deps_topology(full));
         assert_eq!(
             depth_max.label_kind_stdout().unwrap(),
             full.label_kind_stdout().unwrap()

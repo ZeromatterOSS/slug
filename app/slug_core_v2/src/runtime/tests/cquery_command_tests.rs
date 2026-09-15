@@ -1,18 +1,24 @@
 use super::*;
 
-#[test]
-fn cquery_executables_deps_filters_complete_closure_and_induces_edges() {
-    let workspace = tempfile::tempdir().unwrap();
-    let command_policy = configured_test_command_policy(workspace.path());
-    fs::write(
-        workspace.path().join("MODULE.bazel"),
-        configured_test_module("module(name = \"executable_deps\")\n"),
-    )
-    .unwrap();
-    fs::write(
-        workspace.path().join("defs.bzl"),
-        format!(
-            r##"{CQUERY_DELEGATING_DEFS}
+struct CqueryExecutablesFixture {
+    _workspace: tempfile::TempDir,
+    command_policy: BzlmodCommandPolicyKey,
+    runtime: WorkspaceRuntime,
+}
+
+impl CqueryExecutablesFixture {
+    fn new() -> Self {
+        let workspace = tempfile::tempdir().unwrap();
+        let command_policy = configured_test_command_policy(workspace.path());
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            configured_test_module("module(name = \"executable_deps\")\n"),
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("defs.bzl"),
+            format!(
+                r##"{CQUERY_DELEGATING_DEFS}
 def _executable(ctx):
     out = ctx.actions.declare_file(ctx.label.name + ".sh")
     ctx.actions.write(out, "#!/bin/sh\n")
@@ -23,12 +29,12 @@ executable_rule = rule(implementation = _executable, executable = True, attrs = 
     "bridge": attr.label(),
 }})
 "##
-        ),
-    )
-    .unwrap();
-    fs::write(
-        workspace.path().join("BUILD.bazel"),
-        r#"load(":defs.bzl", "executable_rule", "ordinary_rule", "string_setting")
+            ),
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            r#"load(":defs.bzl", "executable_rule", "ordinary_rule", "string_setting")
 string_setting(name = "setting", build_setting_default = "default")
 executable_rule(name = "direct")
 executable_rule(name = "leaf")
@@ -40,23 +46,40 @@ executable_rule(
     bridge = ":bridge",
 )
 "#,
-    )
-    .unwrap();
-    let runtime = test_runtime(workspace.path()).unwrap();
-    let run = |expression: &str| {
-        runtime
-            .cquery_command_with_bzlmod_inputs(
-                expression,
-                false,
-                true,
-                command_policy.clone(),
-                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-                LockfileMode::Update,
-                &[],
-                root_setting_overlay(None),
-            )
-            .unwrap()
-    };
+        )
+        .unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
+        Self {
+            _workspace: workspace,
+            command_policy,
+            runtime,
+        }
+    }
+
+    fn run(
+        &self,
+        expression: &str,
+    ) -> Result<
+        AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
+        CqueryCommandError,
+    > {
+        self.runtime.cquery_command_with_bzlmod_inputs(
+            expression,
+            false,
+            true,
+            self.command_policy.clone(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            &[],
+            root_setting_overlay(None),
+        )
+    }
+}
+
+#[test]
+fn cquery_executables_depth_and_complete_closure() {
+    let fixture = CqueryExecutablesFixture::new();
+    let run = |expression: &str| fixture.run(expression).unwrap();
 
     let depth_zero = run("executables(deps(//:root, 0))");
     let depth_zero = depth_zero.terminal_for_test().as_ref().as_ref().unwrap();
@@ -100,7 +123,12 @@ executable_rule(
             .all(|edge| edge.contains("//:root") && edge.contains("//:direct"))
     );
     assert!(edges.iter().all(|edge| !edge.contains("//:leaf")));
+}
 
+#[test]
+fn cquery_executables_reverse_depth_and_edges() {
+    let fixture = CqueryExecutablesFixture::new();
+    let run = |expression: &str| fixture.run(expression).unwrap();
     let reverse_self = run("executables(rdeps(//:root, //:root))");
     let reverse_self = reverse_self.terminal_for_test().as_ref().as_ref().unwrap();
     assert_eq!(reverse_self.starlark_label_stdout(), "@@//:root\n");
@@ -157,7 +185,14 @@ executable_rule(
         reverse_empty.graph_stdout(),
         "digraph mygraph {\n  node [shape=box];\n}\n"
     );
+}
 
+#[test]
+fn cquery_executables_filter_kind_composition() {
+    let fixture = CqueryExecutablesFixture::new();
+    let run = |expression: &str| fixture.run(expression).unwrap();
+    let full = run("executables(deps(//:root))");
+    let full = full.terminal_for_test().as_ref().as_ref().unwrap();
     let chained_full = run("filter(':(root|direct|leaf)$', executables(deps(//:root)))");
     let chained_full = chained_full.terminal_for_test().as_ref().as_ref().unwrap();
     assert_eq!(chained_full.label_stdout(), full.label_stdout());
@@ -232,7 +267,18 @@ executable_rule(
         full.label_kind_stdout().unwrap()
     );
     assert_eq!(named_kind_full.graph_stdout(), full.graph_stdout());
+}
 
+#[test]
+fn cquery_executables_depth_boundaries_and_empty_results() {
+    let fixture = CqueryExecutablesFixture::new();
+    let run = |expression: &str| fixture.run(expression).unwrap();
+    let depth_zero = run("executables(deps(//:root, 0))");
+    let depth_zero = depth_zero.terminal_for_test().as_ref().as_ref().unwrap();
+    let depth_one = run("executables(deps(//:root, 1))");
+    let depth_one = depth_one.terminal_for_test().as_ref().as_ref().unwrap();
+    let full = run("executables(deps(//:root))");
+    let full = full.terminal_for_test().as_ref().as_ref().unwrap();
     for (depth, expected) in [(0, depth_zero), (1, depth_one)] {
         let filtered = run(&format!(
             "filter(':(root|direct|leaf)$', deps(//:root, {depth}))"
@@ -459,37 +505,57 @@ async fn cquery_rdeps_universe_need_precedes_seed_validation() {
     );
 }
 
-#[test]
-fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
-    let workspace = tempfile::tempdir().unwrap();
-    let command_policy = configured_test_command_policy(workspace.path());
-    fs::write(
-        workspace.path().join("MODULE.bazel"),
-        "module(name = \"sets\")\nbazel_dep(name = \"platforms\", version = \"1.0.0\")\nlocal_path_override(module_name = \"platforms\", path = \".slug_test_builtin/platforms\")\n",
-    )
-    .unwrap();
-    fs::create_dir(workspace.path().join("pkg")).unwrap();
-    fs::write(
+struct CquerySetFixture {
+    _workspace: tempfile::TempDir,
+    command_policy: BzlmodCommandPolicyKey,
+    activation_audit: Arc<ExternalQueryActivationAudit>,
+    runtime: WorkspaceRuntime,
+}
+
+impl CquerySetFixture {
+    fn new() -> Self {
+        let workspace = tempfile::tempdir().unwrap();
+        let command_policy = configured_test_command_policy(workspace.path());
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "module(name = \"sets\")\nbazel_dep(name = \"platforms\", version = \"1.0.0\")\nlocal_path_override(module_name = \"platforms\", path = \".slug_test_builtin/platforms\")\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("pkg")).unwrap();
+        fs::write(
             workspace.path().join("pkg/defs.bzl"),
             "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
         )
         .unwrap();
-    fs::write(
-        workspace.path().join("pkg/BUILD.bazel"),
-        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"bin\")\nprobe(name = \"lib\")\n",
-    )
-    .unwrap();
-    let activation_audit = Arc::new(ExternalQueryActivationAudit::default());
-    let runtime = test_runtime(workspace.path())
-        .unwrap()
-        .with_activation_audit(activation_audit.clone());
+        fs::write(
+            workspace.path().join("pkg/BUILD.bazel"),
+            "load(\":defs.bzl\", \"probe\")\nprobe(name = \"bin\")\nprobe(name = \"lib\")\n",
+        )
+        .unwrap();
+        let activation_audit = Arc::new(ExternalQueryActivationAudit::default());
+        let runtime = test_runtime(workspace.path())
+            .unwrap()
+            .with_activation_audit(activation_audit.clone());
+        Self {
+            _workspace: workspace,
+            command_policy,
+            activation_audit,
+            runtime,
+        }
+    }
+}
+
+#[test]
+fn cquery_set_empty_and_count_preflight() {
+    let fixture = CquerySetFixture::new();
     let empty = |expression: &str| {
-        runtime
+        fixture
+            .runtime
             .cquery_command_with_bzlmod_inputs(
                 expression,
                 true,
                 true,
-                command_policy.clone(),
+                fixture.command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -503,14 +569,15 @@ fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
         assert!(evaluation.label_stdout().is_empty());
         assert_eq!(evaluation.analyses().count(), 0);
         assert!(evaluation.starlark_label_stdout().is_empty());
-        assert!(activation_audit.take_configured_roots().is_empty());
+        assert!(fixture.activation_audit.take_configured_roots().is_empty());
     }
-    let invalid_count = runtime
+    let invalid_count = fixture
+        .runtime
         .cquery_command_with_bzlmod_inputs(
             "some(//pkg:missing, 2147483648)",
             true,
             true,
-            command_policy.clone(),
+            fixture.command_policy.clone(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             &[],
@@ -523,14 +590,20 @@ fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
             .to_string()
             .contains("expected an integer literal: '2147483648'")
     );
-    assert!(activation_audit.take_configured_roots().is_empty());
+    assert!(fixture.activation_audit.take_configured_roots().is_empty());
+}
+
+#[test]
+fn cquery_set_ordered_operators_filter_and_some() {
+    let fixture = CquerySetFixture::new();
     let run = |expression: &str| {
-        runtime
+        fixture
+            .runtime
             .cquery_command_with_bzlmod_inputs(
                 expression,
                 true,
                 true,
-                command_policy.clone(),
+                fixture.command_policy.clone(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
                 &[],
@@ -585,8 +658,14 @@ fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
         )),
         ["//pkg:bin"]
     );
+}
+
+#[test]
+fn cquery_some_empty_zero_and_negative_errors() {
+    let fixture = CquerySetFixture::new();
     for expression in ["some(set())", "some(//pkg:bin, 0)", "some(//pkg:bin, '-1')"] {
-        let accepted = runtime
+        let accepted = fixture
+            .runtime
             .cquery_command_with_bzlmod_inputs(
                 expression,
                 true,
@@ -604,7 +683,13 @@ fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
             "{expression}"
         );
     }
-    let starlark = runtime
+}
+
+#[test]
+fn cquery_set_starlark_and_error_precedence() {
+    let fixture = CquerySetFixture::new();
+    let starlark = fixture
+        .runtime
         .cquery_command_with_bzlmod_inputs(
             "let x = set(//pkg:bin //pkg:lib //pkg:bin) in ($x except //pkg:lib) union //pkg:lib",
             true,
@@ -626,7 +711,8 @@ fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
         "@@//pkg:bin\n@@//pkg:lib\n"
     );
 
-    let missing = runtime
+    let missing = fixture
+        .runtime
         .cquery_command_with_bzlmod_inputs(
             "//pkg:missing union //pkg:also_missing",
             true,
@@ -641,7 +727,8 @@ fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
     let error = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
     assert!(error.missing_stderr().unwrap().contains("//pkg:missing"));
 
-    let missing_before_malformed = runtime
+    let missing_before_malformed = fixture
+        .runtime
         .cquery_command_with_bzlmod_inputs(
             "filter('(', //pkg:missing)",
             true,
@@ -660,7 +747,8 @@ fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
         .unwrap_err();
     assert!(error.missing_stderr().unwrap().contains("//pkg:missing"));
 
-    let malformed = runtime
+    let malformed = fixture
+        .runtime
         .cquery_command_with_bzlmod_inputs(
             "filter('(', //pkg:bin)",
             true,
@@ -676,19 +764,24 @@ fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
     assert!(error.to_string().contains("invalid Slug regex"));
 }
 
-#[test]
-fn cquery_restores_structural_configuration_and_display_projection() {
-    let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../target/slug-cquery-restores-structural-configuration");
-    fs::create_dir_all(&stable_parent).unwrap();
-    let workspace = tempfile::tempdir_in(stable_parent).unwrap();
-    let command_policy = configured_test_command_policy(workspace.path());
-    fs::write(
-        workspace.path().join("MODULE.bazel"),
-        configured_test_module("module(name = \"cquery_configuration\")\n"),
-    )
-    .unwrap();
-    fs::write(
+struct CqueryConfigurationFixture {
+    workspace: tempfile::TempDir,
+    command_policy: BzlmodCommandPolicyKey,
+}
+
+impl CqueryConfigurationFixture {
+    fn new() -> Self {
+        let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/slug-cquery-restores-structural-configuration");
+        fs::create_dir_all(&stable_parent).unwrap();
+        let workspace = tempfile::tempdir_in(stable_parent).unwrap();
+        let command_policy = configured_test_command_policy(workspace.path());
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            configured_test_module("module(name = \"cquery_configuration\")\n"),
+        )
+        .unwrap();
+        fs::write(
             workspace.path().join("defs.bzl"),
             r#"SettingInfo = provider(fields = {"value": "value"})
 def _setting(ctx):
@@ -707,12 +800,23 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
 "#,
         )
         .unwrap();
-    fs::write(
+        fs::write(
             workspace.path().join("BUILD.bazel"),
             "load(\":defs.bzl\", \"consumer\", \"parent\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nconsumer(name = \"consumer\")\nparent(name = \"parent\", child = \":consumer\")\n",
         )
         .unwrap();
+        Self {
+            workspace,
+            command_policy,
+        }
+    }
+}
 
+#[test]
+fn cquery_configuration_c0_c1_c0_projection_and_topology() {
+    let fixture = CqueryConfigurationFixture::new();
+    let workspace = &fixture.workspace;
+    let command_policy = fixture.command_policy.clone();
     let target = "//:consumer";
     let run = |runtime: &WorkspaceRuntime, target: &str, setting: Option<&str>| {
         runtime.cquery_command_with_bzlmod_inputs(
@@ -797,7 +901,38 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
     let restored = evaluation(&restored_command);
     assert_eq!(c0_stdout, restored.label_stdout());
     assert_eq!(c0_topology, topology(&restored));
+}
 
+#[test]
+fn cquery_configuration_missing_fresh_and_setting_default() {
+    let fixture = CqueryConfigurationFixture::new();
+    let workspace = &fixture.workspace;
+    let command_policy = fixture.command_policy.clone();
+    let target = "//:consumer";
+    let run = |runtime: &WorkspaceRuntime, target: &str, setting: Option<&str>| {
+        runtime.cquery_command_with_bzlmod_inputs(
+            target,
+            true,
+            true,
+            command_policy.clone(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            &[],
+            root_setting_overlay(setting),
+        )
+    };
+    let evaluation =
+        |accepted: &AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>| {
+            accepted
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .clone()
+        };
+    let retained = test_runtime(workspace.path()).unwrap();
+    let c0_command = run(&retained, target, None).unwrap();
+    let c0_stdout = evaluation(&c0_command).label_stdout();
     let missing = "//:missing";
     let missing_command = run(&retained, missing, Some("command")).unwrap();
     let missing_error = missing_command
@@ -825,7 +960,34 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
             .and_then(|option| option.value().as_str()),
         None
     );
+}
 
+#[test]
+fn cquery_configuration_transitioned_child() {
+    let fixture = CqueryConfigurationFixture::new();
+    let command_policy = fixture.command_policy.clone();
+    let run = |runtime: &WorkspaceRuntime, target: &str, setting: Option<&str>| {
+        runtime.cquery_command_with_bzlmod_inputs(
+            target,
+            true,
+            true,
+            command_policy.clone(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            &[],
+            root_setting_overlay(setting),
+        )
+    };
+    let evaluation =
+        |accepted: &AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>| {
+            accepted
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .clone()
+        };
+    let retained = test_runtime(fixture.workspace.path()).unwrap();
     let parent = "//:parent";
     let parent_command = run(&retained, parent, None).unwrap();
     let parent = evaluation(&parent_command);
@@ -902,21 +1064,30 @@ fn cquery_batch_reduction_inspects_all_children_before_terminal_precedence() {
     assert!(error.to_string().contains("ConflictingRepositoryRequest"));
 }
 
-#[test]
-fn cquery_uses_only_observed_families_and_replays_child_events_once() {
-    let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../target/slug-cquery-observed-family-events");
-    fs::create_dir_all(&stable_parent).unwrap();
-    let workspace = tempfile::tempdir_in(stable_parent).unwrap();
-    let command_policy = configured_test_command_policy(workspace.path());
-    fs::write(
-        workspace.path().join("MODULE.bazel"),
-        configured_test_module("print(\"MODULE_EVENT\")\nmodule(name = \"observed_cquery\")\n"),
-    )
-    .unwrap();
-    fs::write(
-        workspace.path().join("defs.bzl"),
-        r#"print("BZL_EVENT")
+struct CqueryObservedFixture {
+    _workspace: tempfile::TempDir,
+    command_policy: BzlmodCommandPolicyKey,
+    audit: Arc<ExternalQueryActivationAudit>,
+    runtime: WorkspaceRuntime,
+}
+
+impl CqueryObservedFixture {
+    fn new() -> Self {
+        let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/slug-cquery-observed-family-events");
+        fs::create_dir_all(&stable_parent).unwrap();
+        let workspace = tempfile::tempdir_in(stable_parent).unwrap();
+        let command_policy = configured_test_command_policy(workspace.path());
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            configured_test_module(
+                "print(\"MODULE_EVENT\")\nmodule(name = \"observed_cquery\")\n",
+            ),
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("defs.bzl"),
+            r#"print("BZL_EVENT")
 def _leaf(ctx):
     print("LEAF_ANALYSIS")
     return [DefaultInfo(files = depset([]))]
@@ -926,31 +1097,51 @@ def _root(ctx):
     return [DefaultInfo(files = depset([]))]
 root = rule(implementation = _root, attrs = {"child": attr.label()})
 "#,
-    )
-    .unwrap();
-    fs::write(
+        )
+        .unwrap();
+        fs::write(
             workspace.path().join("BUILD.bazel"),
             "print(\"BUILD_EVENT\")\nload(\":defs.bzl\", \"leaf\", \"root\")\nleaf(name = \"leaf\")\nroot(name = \"root\", child = \":leaf\")\n",
         )
         .unwrap();
-    fs::create_dir(workspace.path().join("bazel-out")).unwrap();
-    let audit = Arc::new(ExternalQueryActivationAudit::default());
-    let runtime = test_runtime(workspace.path())
-        .unwrap()
-        .with_activation_audit(audit.clone());
-    let run = |expression: &str| {
-        runtime
-            .cquery_command_with_bzlmod_inputs(
-                expression,
-                false,
-                true,
-                command_policy.clone(),
-                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-                LockfileMode::Off,
-                &[],
-                root_setting_overlay(None),
-            )
+        fs::create_dir(workspace.path().join("bazel-out")).unwrap();
+        let audit = Arc::new(ExternalQueryActivationAudit::default());
+        let runtime = test_runtime(workspace.path())
             .unwrap()
+            .with_activation_audit(audit.clone());
+        Self {
+            _workspace: workspace,
+            command_policy,
+            audit,
+            runtime,
+        }
+    }
+
+    fn run(
+        &self,
+        expression: &str,
+    ) -> Result<
+        AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
+        CqueryCommandError,
+    > {
+        self.runtime.cquery_command_with_bzlmod_inputs(
+            expression,
+            false,
+            true,
+            self.command_policy.clone(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Off,
+            &[],
+            root_setting_overlay(None),
+        )
+    }
+}
+
+#[test]
+fn cquery_observed_cold_warm_events_and_epoch_reuse() {
+    let fixture = CqueryObservedFixture::new();
+    let run = |expression: &str| {
+        fixture.run(expression).unwrap()
     };
 
     let cold = run("deps(//:root)");
@@ -965,11 +1156,11 @@ root = rule(implementation = _root, attrs = {"child": attr.label()})
             "ROOT_ANALYSIS",
         ]
     );
-    let cold_snapshot = accepted_native_snapshot(&runtime);
+    let cold_snapshot = accepted_native_snapshot(&fixture.runtime);
     assert!(!cold_snapshot.path_observations.observations().is_empty());
     let warm = run("deps(//:root)");
     assert!(accepted_output_text(&warm).is_empty());
-    let warm_snapshot = accepted_native_snapshot(&runtime);
+    let warm_snapshot = accepted_native_snapshot(&fixture.runtime);
     assert_eq!(
         cold_snapshot.path_observations.observations().len(),
         warm_snapshot.path_observations.observations().len()
@@ -984,8 +1175,13 @@ root = rule(implementation = _root, attrs = {"child": attr.label()})
         assert_eq!(cold_result, warm_result, "{cold_demand:?}");
         assert!(Arc::ptr_eq(cold_result, warm_result));
     }
+}
 
-    let mut prior = audit.cquery_family_counts();
+#[test]
+fn cquery_observed_family_route_isolation() {
+    let fixture = CqueryObservedFixture::new();
+    let run = |expression: &str| fixture.run(expression).unwrap();
+    let mut prior = fixture.audit.cquery_family_counts();
     for (expression, observes_seed_package) in [
         ("//:root", false),
         ("//:root union //:leaf", false),
@@ -996,7 +1192,7 @@ root = rule(implementation = _root, attrs = {"child": attr.label()})
             accepted.terminal_for_test().as_ref().is_ok(),
             "{expression}"
         );
-        let counts = audit.cquery_family_counts();
+        let counts = fixture.audit.cquery_family_counts();
         assert_eq!(counts.0, 0, "legacy package activation: {expression}");
         assert_eq!(counts.2, 0, "legacy analysis activation: {expression}");
         assert_eq!(
