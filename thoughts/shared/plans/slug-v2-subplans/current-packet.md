@@ -1,273 +1,181 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-7A-configured-conflict-path-shard-dice-event-audit-r1
-Status: CLI target-selection recovery accepted; correction pending
+Packet: WP-4-7A-configured-conflict-path-observation-dice-event-audit-r1
+Status: corrected docs-first design accepted; implementation pending
 
 ## Accepted predecessor receipt
 
-The aggregate merge-to-committed-injection handoff audit is accepted. Its sole
-configured replay reached the 12-second deadline after 12.0088119506836 seconds
-in `RootCompute`. It recorded 218 installed path merges and 218 matching
-successful injection commits, 1,591 total potentially exposed prior residents,
-a maximum exposure of 85 and buckets `[52, 125, 24, 17, 0]`. Pending value and
-marker, flags and reserved state were zero. Observer and reaped PID were both
-692127; base counters were `[55217, 55208, 48837, 48832, 8043, 8039]` with
-overflow, dropped samples and activity claim zero. Process group, children,
-pipes and telemetry cleanup were clear.
+The sole `PathObservationShardKey` armed-window replay is accepted as a valid
+negative result and returns `REPLAN`. The exact nonignored selector
+`configured_action_conflicts::one_shot_build_conflict_is_atomic_and_recovers`
+listed once, then reached the 12-second wall deadline after
+12.0113899707794 seconds in `RootCompute`. Observer and sole reaped run PID were
+both 717911. Process group, children, pipes and telemetry cleanup were clear.
+Global event counters were `[58308, 58292, 51889, 51877, 8095, 8091]`; base
+overflow, dropped samples and activity claim were zero.
 
-The authentic fixture remained 28 objects, 177 metadata entries and 8,004,740
-bytes at inventory SHA-256
+Raw observer words 51--63 were
+`[221, 221, 220, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]`: 221 installed merges reached
+221 successful commits, 220 prior windows closed, the final window remained
+active, pending/flags/reserved were zero, and all six exact
+`PathObservationShardKey` event counters were zero. The decoder therefore
+returned `zero-filtered-events` and the supervised command exited 2 as designed.
+This is a negative observation across 221 coherently armed windows. It does not
+prove global absence outside atomic window edges, invalidation behavior,
+causality, cost or avoidable work. It is consistent with
+`PathObservationShardKey` being an `InjectedKey`, whose injection is not an
+ordinary DICE computation event.
+
+The authentic fixture again verified 28 objects, 177 metadata entries and
+8,004,740 bytes at inventory SHA-256
 `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`.
 Frozen pre-execution SHA-256 values were:
 
 | Artifact | SHA-256 |
 |---|---|
 | accepted supervisor | `3b4d48a4a7c729ec0c8c17ffd2aed3ddab8677699bdce9d8bb24d97afbeab69c` |
-| scratch supervisor | `c811d782293e2a876489249d1d41c7e477cbf81181cdf92213141f961a0e9a72` |
-| exact temporary Rust diff | `7c9c2cc7b90b6d65ad6a7c0060465029c304c5ffb5257086f864ee57d92dc5e8` |
-| initial Core proof harness | `56c8a68c0e2b3c03c09d8f6f61fe1cde8e4da350e4a59c6438ba947da14a91f5` |
-| CLI integration harness | `d9f40f34d09cf478925e3b3ab2f5e511a38cf7f620ac3545af3e7f9ab6a94e84` |
-| spawned Slug binary | `303be94ae38f921638b23d351dbde850ba79aaa48f220e9852968aa15b8b8701` |
+| scratch supervisor | `3de26b4616b98c1c2f83e1537aa8841000ed5e7bffaaea5101bb9a08ce3a94d5` |
+| exact temporary Rust diff | `b2f50117bc7d60f9a6049bfe14a3101b8c2d78c2e50a66f614951c525531d1fa` |
+| Core proof harness | `32cdf2435b5558d382d724eb7201bd6e09b0cfc47658802409283671371b5cf5` |
+| CLI integration harness | `28ed7bbaaa513b87a4b1a165ad4f0acd81e290967d66f94b6167495657845de9` |
+| spawned Slug binary | `81799c7bf7179ca32daf78d85255b519ed0e241ca42deb3bc867a5fb274cc878` |
 
-The executed diagnostic was 133 production lines against the transparently
-corrected 133-line cap. Initial result review rejected its incomplete 85-line
-Core proof. The reviewed proof-only recovery added bucket boundaries 7, 31 and
-127, aggregate overflow, every required consumer partial state and invalid
-aggregate-before-clear arithmetic. The resulting 95-line Core file plus 14 CLI
-proof lines totaled 109/140. Its dedicated target rebuilt in 5.05 seconds, the
-exact selector listed once and passed 1/1. No production, supervisor, CLI,
-binary, fixture or replay artifact changed, and the CLI did not rerun.
-Independent rereview returned `ACCEPT` for the augmented proof and frozen
-result. This proves only that aggregate potential shard exposure was handed to
-successful injection commits. It does not prove shard-key events, invalidation,
-checking, recomputation, causality, cost or avoidable work. All temporary source
-and scratch artifacts were removed and both worktrees were clean.
+The corrected dedicated Core target prepared in 4.83 seconds and its exact
+selector passed 1/1. The final `cli` integration target prepared in 11.42
+seconds and its exact nonignored selector preflight passed. A prior 7.60-second
+library-harness preparation was rejected before execution because it selected
+the older ignored probe. The final supervisor passed decoder plus normal,
+deadline, exception, telemetry-cap and cleanup self-checks. Temporary totals
+were 100/130/86 against 100/130/120 production/proof/scratch caps. Independent
+preexecution review returned `EXECUTE`; independent result review returned
+`REPLAN` and selected only the immediate ordinary dependent below. All
+temporary source and scratch artifacts were removed, both worktrees were clean,
+and the shard-key-instrumented audit will not rerun.
 
 ## Observable result
 
 Audit whether any of the six existing DICE event categories for the exact
-static tag `PathObservationShardKey` occur while an aggregate observation
-window is armed by a successfully committed installed-merge handoff. Count only
-`Started`, `Finished`, `CheckDepsStarted`, `CheckDepsFinished`,
+static tag `PathObservationKey` occur while an aggregate observation window is
+armed by a successfully committed installed-merge handoff. This is the
+immediate ordinary `Key` whose `compute` reads `PathObservationShardKey`. Count
+only `Started`, `Finished`, `CheckDepsStarted`, `CheckDepsFinished`,
 `ComputeStarted` and `ComputeFinished` in `Observer::event`.
 
-A positive result establishes only that shard-key events occur after committed
-path handoffs within the command-loop windows described below. It cannot
-attribute any event to a particular merge, shard, demand or invalidation; prove
-that the event was necessary or causal; distinguish checking from useful work;
-or measure cost.
+A positive result establishes only that direct-dependent events occurred during
+armed windows. It cannot attribute an event to a merge, shard, demand or
+invalidation; prove necessity or causality; distinguish checking from useful
+work; or measure cost. A zero result ends this window-based diagnostic chain;
+do not broaden automatically to `ResolvedPathObservationKey`.
 
 ## Window lifecycle and ordering
 
-Reuse the serialized command-loop boundaries from the accepted handoff audit,
-but retain no exposure value. After a merged path epoch is successfully
-assigned in `NativeDemandSession::progress_inner`, close the currently armed
-window, if any, and then publish one pending installed merge. The next
-successful transaction commit immediately after `guard.inject_attempt` consumes
-that pending merge and arms the next window before `AttemptInjectionRevision`
-finishes. Initial and non-path commits are neutral when no merge is pending.
+Reuse the accepted merge/commit window protocol and words 51--63 unchanged.
+After a merged path epoch is successfully assigned in
+`NativeDemandSession::progress_inner`, close the active window, if any, and
+publish one pending installed merge. The next successful transaction commit
+immediately after `guard.inject_attempt` consumes it and arms the next window
+before `AttemptInjectionRevision` finishes. Initial and non-path commits are
+neutral when no merge is pending.
 
 The producer first requires no pending marker, produced equal to committed and
-`committed = closed + active`. If a window is active, clear its active marker;
-then increment produced, increment closed when a window was cleared, and publish
-the pending marker last with release ordering. This order makes the state after
-every individual write decoder-invalid until publication completes. The
-consumer requires a pending marker, produced equal to committed plus one, no
-active window and committed equal to closed. It clears pending first, increments
-committed, then publishes the active marker last with release ordering. An
-absent-pending consumer is neutral only while produced equals committed. Any
-overwrite, unmatched count, invalid marker or arithmetic overflow sets sticky
-state and refuses further publication.
+`committed = closed + active`. If active, clear that marker; increment produced;
+increment closed for the cleared window; then publish pending last with release
+ordering. The consumer requires pending one, produced equal to committed plus
+one, active zero and committed equal to closed. It clears pending, increments
+committed, then publishes active last with release ordering. Invalid state or
+arithmetic overflow sets sticky state and refuses publication.
 
-`Observer::event` first preserves the existing global counters and activity
-sampling. It then compares the callback's static tag exactly with
-`PathObservationShardKey`. When the active marker is one under acquire ordering,
-it increments exactly the counter matching the event variant. Wrong tags and
-events observed while disarmed are neutral. Event callbacks may be concurrent;
-the audit therefore claims only membership in an atomically observed aggregate
-armed interval, not per-event linearization at the close boundary.
+`Observer::event` preserves its global counter and activity work first. It then
+compares the static tag exactly with `PathObservationKey`; if active is one
+under acquire ordering, it increments only the matching filtered event counter.
+Wrong tags and disarmed events are neutral. Concurrent callbacks make this only
+atomically observed aggregate window membership, with no per-event
+linearization claim at a close edge.
 
-## Fixed observer layout and cutoff
-
-Reuse only words 51--63 of the accepted 512-byte mapping:
+## Fixed layout and valid cutoff
 
 | Word | Aggregate |
 |---:|---|
 | 51 | installed path merges produced |
-| 52 | pending merges reaching successful injection commit |
+| 52 | merges reaching successful injection commit |
 | 53 | armed windows closed by a later installed merge |
-| 54 | `PathObservationShardKey` `Started` |
-| 55 | `PathObservationShardKey` `Finished` |
-| 56 | `PathObservationShardKey` `CheckDepsStarted` |
-| 57 | `PathObservationShardKey` `CheckDepsFinished` |
-| 58 | `PathObservationShardKey` `ComputeStarted` |
-| 59 | `PathObservationShardKey` `ComputeFinished` |
+| 54--59 | exact `PathObservationKey` counters in the six existing event-variant order |
 | 60 | pending merge marker, only 0 or 1 |
 | 61 | active window marker, only 0 or 1 |
-| 62 | sticky flags: bit 0 state/order failure, bit 1 lifecycle or filtered-counter overflow |
+| 62 | sticky state/order or lifecycle/filtered-counter overflow flags |
 | 63 | reserved zero |
 
-Let `P`, `C`, `W` be produced, committed and closed. A valid post-reap cutoff
-requires flags and reserved state zero, both markers in range, pending zero,
-`P = C > 0`, and `C = W + active`. Require the checked sum of the six filtered
-counters to be nonzero and each filtered counter to be no greater than its
-corresponding existing global counter in words 8--13. No inequality between
-filtered categories is valid: an armed boundary may bisect a concurrent event
-pair, and one evaluation may both check dependencies and compute. The decoder
-reports all six counts and markers without identity material. Any zero armed
-handoff, zero filtered total, filtered/global mismatch, overflow or lifecycle
-arithmetic failure forces `REPLAN`.
+For produced `P`, committed `C` and closed `W`, require flags/reserved zero,
+pending zero, active one, `P = C > 0`, and `W = C - 1`. Reject the unreachable
+`active = 0, W = C` state as well as every partial publication state. Require the
+checked sum of filtered counters nonzero and each filtered counter no greater
+than its corresponding global counter in words 8--13. No cross-event
+inequality is valid across concurrent window edges. Zero handoffs, zero
+filtered total, filtered/global mismatch, overflow or invalid lifecycle forces
+`REPLAN`.
 
 ## Proof and sole replay
 
 Add one exact feature-enabled dedicated Core integration selector,
-`path_shard_dice_events_follow_committed_path_handoffs`. Exercise the production
-producer, consumer and event-filter helpers through initial neutral commit;
-first production and consume; next-merge close and rearm; wrong-tag and
-disarmed events; all six exact event variants; overwrite and unmatched states;
-lifecycle and each filtered-counter overflow; and every partial close,
-producer, consume and arm snapshot. Prove marker-last publication, active-last
-arming, close-clear/produce/close-count ordering, filtered/global bounds,
-unchanged words 0--50, reserved word 63 and exact tag discrimination. Prepare only this target once under 60 seconds
-with the pinned toolchain and shared target directory, then preflight and run
-only its exact selector under the existing 12/15-second bounds.
+`path_observation_dice_events_follow_committed_path_handoffs`. Drive the
+production producer, consumer and filter helpers through neutral commit, first
+produce/consume, next-merge close/rearm, exact and wrong tags, disarmed events,
+all six variants, overwrite/unmatched states, lifecycle and every filtered
+overflow, filtered/global bounds, the unreachable inactive completed state, and
+every partial close/produce/consume/arm snapshot. Prove producer and consumer
+helpers leave words 0--50 and reserved word 63 unchanged. For the filter helper,
+prove inherited global counter/activity behavior is preserved and only the
+matching word 54--59 receives its additional filtered update. Prepare the target
+once under 60 seconds, then preflight/run only its exact selector under 12/15
+seconds.
 
-Copy the accepted supervisor to an excluded scratch file and extend only its
-words 51--63 decoder and result. Its self-check must cover the lifecycle
-equations, marker ranges, all partial cutoffs, each filtered/global bound and
-checked sum, zero-event rejection, both sticky flags, output cap and normal/deadline/
-exception cleanup. Preserve namespace/resource isolation, observer ownership,
-exact reads, wall deadline, kill/reap finalizer and caps.
+Derive one excluded scratch supervisor from the accepted bytes. Its decoder and
+self-check cover lifecycle equations, marker ranges, every partial cutoff and
+consumer-arm state, the unreachable inactive completed state, checked filtered
+sum, filtered/global bounds, zero-event rejection, flags, output cap
+and normal/deadline/exception cleanup. Preserve namespace isolation, observer
+ownership, exact reads, wall deadline and kill/reap finalization.
 
-Compile the feature-enabled CLI integration harness once under 60 seconds,
-preflight the same exact nonignored configured build-conflict selector,
-reassemble and verify the accepted fixture, and hash accepted/scratch
-supervisors, exact Rust diff, Core/CLI harnesses and Slug binary. Run that one
-selector once through the scratch supervisor under 12/15 seconds. F3 and every
-sibling selector remain stopped. Evidence also requires valid observer
-header/version/base counters and sampling, clear base overflow/drop/claim,
-exact installed/reaped PID, output caps and complete process/descriptor cleanup.
+Compile only the feature-enabled `cli` integration target once under 60 seconds.
+Only the selected configured-conflict test adopts the inherited observer before
+its external-fixture `one_shot_case` and retains the guard throughout. Its
+feature-only workspace uses `SLUG_SENTINEL_SCRATCH/workspace`; ordinary fixture
+assembly remains unchanged. Preflight with `--list --exact
+configured_action_conflicts::one_shot_build_conflict_is_atomic_and_recovers`,
+then run only `--exact
+configured_action_conflicts::one_shot_build_conflict_is_atomic_and_recovers
+--nocapture`; neither command may use `--ignored`. Verify the fresh accepted
+fixture, freeze all hashes and obtain independent preexecution review first.
+Invoke the 0644 scratch supervisor through `/bin/bash` under the established
+namespace/ptrace escalation and the 12/15-second limits. Accept evidence only at
+the expected wall deadline in `RootCompute`, with one selected test, valid
+header/frames/counters, zero overflow/drop/claim, exact installed and reaped PID,
+bounded output and complete process/descriptor cleanup. F3 and every sibling
+remain stopped.
 
 ## Scope, caps and stops
 
 Durable edits are limited to scheduling/status sections in the canonical plan,
 this manifest, Stage 4, bootstrap readiness and the configured CLI ledger.
-Temporary Rust edits are limited to
-`app/slug_core_v2/src/runtime/probe_observer.rs`,
-`app/slug_core_v2/src/runtime/probe_observer/mapping.rs`,
-`app/slug_core_v2/src/runtime/dice.rs`,
-`app/slug_core_v2/tests/path_shard_dice_events.rs`,
-`app/slug_cli_v2/src/lib.rs` and `app/slug_cli_v2/tests/cli.rs`. Caps are 100
-gross diagnostic production lines, 130 gross proof lines and 120 changed
-scratch-supervisor lines. No Cargo manifest, DICE crate, workspace/path owner,
-loading owner, fixture or oracle input may change.
+Temporary Rust owners are only `runtime/dice.rs`, `probe_observer.rs`, its
+`mapping.rs`, `tests/path_observation_dice_events.rs`, `slug_cli_v2/src/lib.rs`
+and `slug_cli_v2/tests/cli.rs`; use one excluded scratch supervisor. Caps are
+100 gross production, 130 gross proof and 120 changed scratch lines. No Cargo
+manifest, DICE crate, workspace/path owner, loading owner, fixture or oracle
+input may change.
 
 Restore all temporary source and scratch artifacts before recording the result;
 prove both worktrees clean except for the documentation receipt and run the
 plan-status and diff checks. Independently review this design before execution
-and the result before selecting a successor.
+and the result before selecting any successor.
 
-Do not rerun the handoff, shard, batching or census audit; F3; a sibling
-selector; or the selected selector without this event instrumentation. Do not
-raise a limit, acquire a payload, emit identity material, change merge,
-injection or DICE semantics, merge the combined stack or push the review branch.
+Do not rerun the shard-key audit, handoff, shard, batching or census audit; F3;
+a sibling selector; or the selected selector without this exact instrumentation.
+Do not raise limits, acquire a payload, emit identity material, change merge,
+injection or DICE semantics, broaden to `ResolvedPathObservationKey`, merge the
+combined stack or push the review branch.
 
-Independent design review returned `ACCEPT` after requiring the producer to
-increment produced before closed, eliminating a decoder-valid partial cutoff,
-and replacing unsound event-pair inequalities with exact filtered-to-global
-counter bounds across concurrent window edges.
-
-## Core preparation recovery
-
-The first pinned dedicated-target preparation exited 101 after 4.73 seconds on
-one proof-only type mismatch: `libc::pwrite` requires its offset as `off_t`, but
-`write_word` supplied `index * 8` as `usize`. The production library compiled;
-no test executable, preflight, proof, supervisor, CLI build or replay occurred.
-The frozen production diff SHA-256 is
-`4183595095e1e951575fd88e21bcd438c50f45fb27accac54f1cc1b90c429b5f`.
-The uncorrected exact 130-line proof SHA-256 is
-`c6b12f38bf7231babb0e277a207f6b279d827a7d0f4d222b2af82e71cc96f0bc`.
-
-One recovery may change only that proof expression to an explicit checked or
-lossless `libc::off_t` conversion and prepare the same dedicated target once
-under the unchanged 60-second ceiling. It may then preflight and run only the
-same exact selector under 12/15 seconds. Preserve the 99-line production diff,
-130-line proof cap, scratch supervisor, CLI and replay stops. The earlier
-unpinned `rustfmt` launcher also failed before formatting through the blocked
-system Snap wrapper; the corrected absolute pinned `rustfmt` invocation passed
-and may not be repeated without a later source change.
-Independent recovery review returned `ACCEPT` for a checked multiplication and
-`libc::off_t::try_from` conversion or an equivalently proven lossless
-conversion, with the same target and limits.
-
-The checked proof correction preserved the 130-line cap. The same dedicated
-target then prepared successfully in 4.83 seconds, produced exactly one
-executable, and its exact nonignored selector preflighted and passed 1/1. The
-production diff remains 99/100 lines.
-
-The first scratch-supervisor self-check launcher exited 126 immediately because
-the accepted script and its copied scratch file both have mode 0644, so
-`timeout` could not execute the path directly. It entered no script code and
-ran no self-check case, compiler, fixture or replay. The scratch diff is 80
-additions and 11 deletions against the 120-line cap, at SHA-256
-`53b5ed8b94bcaebca30b54a48815f2eda55ec0079365d546f2cb13e981e93409`.
-One recovery may invoke this unchanged file through `/bin/bash` under the same
-15-second outer bound and run its self-check once. It may not repeat the direct
-nonexecutable-path launcher or proceed to CLI preparation/replay until the
-self-check succeeds.
-Independent recovery review returned `ACCEPT` because the failed command entered
-no script code. Use `/bin/bash` for the self-check and every later invocation of
-the unchanged 0644 scratch artifact.
-
-The corrected launcher first stopped in the sandbox's namespace/ptrace
-preflight with `PTRACE_TRACEME: Operation not permitted`; per the environment
-contract it was rerun with escalation. That preflight passed and the Perl
-self-check reached its decoder matrix, then exited 255 because the synthetic
-`zero-filtered-events` case cleared only word 54 while words 55--59 remained
-one. The decoder correctly found a nonzero filtered sum, so the expected reason
-was absent. No cleanup self-check case, compiler, fixture assembly or replay ran.
-
-One recovery may change only that scratch self-check fixture to zero all six
-filtered words 54--59 before expecting `zero-filtered-events`. Preserve the
-decoder, production/proof artifacts, 91-line scratch cap accounting and all CLI
-and replay stops. Re-run the self-check once through the reviewed `/bin/bash`
-launcher with the required namespace/ptrace escalation.
-Independent recovery review returned `ACCEPT` for zeroing words 54--59 together
-without changing the decoder or runtime behavior. Keep the scratch edit
-line-neutral within its recorded 91 changed lines.
-
-The corrected final scratch artifact then passed its decoder matrix and normal,
-deadline and exception cleanup self-checks under the required escalation. Its
-portable-run result path was aligned with the reviewed event cutoff, reducing
-the final scratch delta to 66 additions and 14 deletions.
-
-The next CLI preparation exposed a target-selection error before any fixture or
-replay. The feature-enabled library-test harness compiled successfully in 7.60
-seconds and exactly listed the ignored
-`payload_demand_probe::authentic_sentinel_demand`, but the active chain requires
-the existing nonignored first configured-conflict integration selector,
-`configured_action_conflicts::one_shot_build_conflict_is_atomic_and_recovers`.
-That wrong harness is invalid evidence and may not run.
-
-One recovery may restore the intended temporary CLI adapter: remove only the
-feature's non-test compile guard in `app/slug_cli_v2/src/lib.rs`. In the allowed
-`app/slug_cli_v2/tests/cli.rs`, only the selected test adopts the inherited
-observer descriptor before calling `workspace()`/`sentinel_outputs`, retains
-the `ProbeGuard` through its whole `one_shot_case` call, and under the feature
-uses `SLUG_SENTINEL_SCRATCH/workspace`. Preserve the ordinary non-feature
-workspace assembler unchanged.
-
-Bring the combined totals back to at most 100 production and 130 proof lines
-only through token/assertion-preserving line folding or blank-line removal in
-the existing Core diagnostic and proof. If any production or Core proof token
-changes, prepare, preflight and run the dedicated Core selector again before
-CLI preparation. Then format and compile only the `cli` integration target once
-under 60 seconds. The scratch portable preflight and run commands must be
-exactly `--list --exact <selector>` and `--exact <selector> --nocapture`, with
-both old `--ignored` arguments removed. Rerun the scratch self-check because
-its bytes changed, then freeze hashes. The CLI selector itself, every sibling
-and F3 remain stopped until the sole reviewed replay.
-Independent recovery review returned `ACCEPT` for the exact nonignored
-commands, selected-test-only observer lifetime, preserved ordinary assembler,
-and token-preserving cap correction with mandatory Core reproving after any
-token change.
+Independent design rereview returned `ACCEPT` after requiring the final active
+window and `W = C - 1`, rejecting inactive completed cutoffs, covering every
+consumer-arm partial, preserving inherited event accounting in the filter
+proof, and restoring the exact selector, launcher and evidence gates.

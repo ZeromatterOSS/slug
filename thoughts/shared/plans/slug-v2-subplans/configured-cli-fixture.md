@@ -510,24 +510,24 @@ and buckets `[52, 125, 24, 17, 0]`. Its corrected 133-line production cap and
 recovered 109/140 exact proof passed independent rereview without another CLI
 replay. This establishes only aggregate delivery to commit.
 
-The selected successor is one docs-first armed-window event audit. A matched
-commit arms observation until the next installed merge, and only the six
-existing DICE event variants for exact tag `PathObservationShardKey` are
-counted. Words 51--63 retain lifecycle counts, six filtered counters,
-pending/active markers and sticky state. The same exact selector may run once
-after its exact production-helper proof, supervisor self-check, hashes and
-independent design review; the other nine selectors and F3 remain stopped.
-Even positive counts prove no per-merge attribution, invalidation, causality or
-cost.
-Independent design review returned `ACCEPT` for the corrected lifecycle
-publication order and per-category filtered-to-global bounds.
-The first dedicated Core preparation exited 101 after 4.73 seconds on one
-proof-only `usize`/`off_t` mismatch. It created no executable and ran no
-selector. A reviewed correction may change only that conversion and prepare
-the same target once; the CLI and replay remain stopped.
-Independent recovery review returned `ACCEPT` for that proof-only conversion.
-The corrected Core target prepared in 4.83 seconds and its exact selector
-passed 1/1. The first scratch-supervisor self-check launcher exited 126 before
-script entry because the copied file was mode 0644. One reviewed `/bin/bash`
-launcher correction may run only the self-check; the CLI and replay remain
-stopped.
+The sole armed-window replay reached the 12-second deadline in `RootCompute`.
+Its valid cutoff recorded 221 installed merges, 221 successful commits, 220
+closed windows and the final window active, with zero events in every exact
+`PathObservationShardKey` category. Pending, flags, reserved state, observer
+overflow/drop/claim, PID/reap, output and cleanup gates passed. Independent
+review accepts this only as a negative within the measured windows.
+
+The selected successor retains the exact configured-conflict selector,
+fixture, lifecycle, observer layout and 12/15-second limits, but filters the six
+events for `PathObservationKey`, the immediate ordinary dependent. Its exact
+Core proof, scratch self-check, `cli` integration preflight, fresh fixture and
+artifact hashes precede independent preexecution review and one replay of exact
+selector `configured_action_conflicts::one_shot_build_conflict_is_atomic_and_recovers`.
+Preflight uses `--list --exact`; execution uses `--exact ... --nocapture`, never
+`--ignored`, through `/bin/bash` and the established ptrace escalation. Accept
+only the expected wall-deadline `RootCompute` cutoff with one selected test,
+valid observer state and complete cleanup. The other nine selectors and F3
+remain stopped. A zero result ends this diagnostic chain; it does not authorize
+broadening to `ResolvedPathObservationKey`.
+Independent design rereview returned `ACCEPT` for the exact target, invocation,
+cutoff, evidence and cleanup boundaries.

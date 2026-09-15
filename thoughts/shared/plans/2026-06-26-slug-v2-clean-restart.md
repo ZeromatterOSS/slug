@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-configured-conflict-path-shard-dice-event-audit-r1
-Status: CLI target-selection recovery accepted; correction pending
+Packet: WP-4-7A-configured-conflict-path-observation-dice-event-audit-r1
+Status: docs-first design pending independent review
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
@@ -49,49 +49,29 @@ buckets `[52, 125, 24, 17, 0]` at a valid `RootCompute` cutoff. Its corrected
 rereview without another CLI replay. That result proves only that aggregate
 potential exposure reached successful injection commits.
 
-The active docs-first successor arms an aggregate window after each matched
-successful commit and counts only the six existing DICE event variants for the
-exact static `PathObservationShardKey` tag until the next installed merge
-closes the window. Words 51--63 retain produced/committed/closed lifecycle
-counts, six filtered event counters, pending/active markers and sticky state.
-One exact production-helper proof and one same-selector replay remain subject
-to independent design review and existing 12/15-second bounds. Even a positive
-result cannot establish per-merge attribution, invalidation, causal
-recomputation, cost or avoidable work.
-Independent design review returned `ACCEPT` for the corrected partial-cutoff
-ordering and concurrent filtered-to-global counter bounds.
-The first pinned dedicated Core preparation exited 101 after 4.73 seconds on a
-proof-only `usize` versus `off_t` argument mismatch before producing an
-executable or running a selector. One reviewed recovery may correct only that
-conversion and prepare the same target once under the unchanged limit; all
-production, CLI and replay boundaries remain frozen.
-Independent recovery review returned `ACCEPT` for the proof-only conversion and
-unchanged target, cap and execution stops.
-The corrected target then prepared in 4.83 seconds and its exact selector
-passed 1/1. The first scratch-supervisor self-check launcher exited 126 before
-entering the script because the copied file was mode 0644. One reviewed recovery
-may invoke the unchanged scratch script through `/bin/bash`; no CLI or replay
-has run.
-Independent recovery review returned `ACCEPT` and requires `/bin/bash` for every
-later invocation of the unchanged 0644 scratch artifact.
-The sandbox namespace/ptrace preflight required the prescribed escalation. The
-escalated self-check then exposed only a synthetic fixture error: its zero-event
-case cleared one of six counters. A reviewed scratch-only correction may clear
-all six and rerun the self-check; no cleanup case, CLI build or replay ran.
-Independent recovery review returned `ACCEPT` for that line-neutral scratch-only
-fixture correction.
-The corrected scratch artifact passed its complete self-check. The next CLI
-preparation compiled and listed the wrong ignored library probe rather than the
-required nonignored first configured-conflict integration selector; no fixture
-or replay ran. One reviewed recovery may restore the bounded CLI adapter,
-shrink line accounting without dropping proof, compile only the `cli`
-integration target and preflight its exact selected test.
-The recovery must preserve Core tokens while folding lines, let only that test
-hold the observer across its external-fixture call, and remove `--ignored` from
-both scratch commands. Any Core token change invalidates and must rerun its
-exact proof before CLI preparation.
-Independent recovery review returned `ACCEPT` for those exact selector,
-observer-lifetime, fixture and cap constraints.
+The sole armed-window replay then reached the 12-second deadline after
+12.0113899707794 seconds in `RootCompute`. It recorded 221 installed merges,
+221 matching commits and 220 closed windows with the final window active, but
+all six exact `PathObservationShardKey` event counters were zero. Pending,
+flags, reserved state, overflow, dropped samples and activity claim were zero;
+PID/reap, output and cleanup gates passed. Independent result review accepts
+this as a valid negative across 221 coherent windows. It is consistent with an
+injected key producing no ordinary DICE compute event and proves no global
+absence outside these atomic window edges.
+
+The selected successor reuses that exact lifecycle, requires the final window
+active with `closed = committed - 1`, and counts the six event variants only
+for `PathObservationKey`, the immediate ordinary key whose
+compute reads the shard key. Words 51--63 and the 100/130/120 temporary
+production/proof/scratch caps remain fixed. One exact helper proof, supervisor
+self-check including every consumer-arm partial, frozen artifact set,
+independent preexecution review and one exact configured-conflict-selector
+replay remain under the existing 12/15-second bounds. A positive
+result proves only aggregate direct-dependent event membership in the armed
+windows. A zero result ends this diagnostic chain; do not broaden it to
+`ResolvedPathObservationKey`.
+Independent design rereview returned `ACCEPT` for the corrected cutoff,
+consumer-arm proof and exact replay gates.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

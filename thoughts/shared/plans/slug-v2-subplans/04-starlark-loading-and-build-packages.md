@@ -9146,40 +9146,23 @@ residents, maximum 85 and buckets `[52, 125, 24, 17, 0]` at a valid
 109/140 exact proof passed independent rereview without another CLI replay.
 This proves only that potential exposure reached successful commits.
 
-The selected docs-first successor is one aggregate armed-window event audit.
-After a committed installed-merge handoff, count only the six existing DICE
-event variants for exact static tag `PathObservationShardKey`; close that window
-at the next installed merge. Publish only produced/committed/closed lifecycle
-counts, the six filtered counters, pending/active markers and overflow/reserved
-state in words 51--63. One exact production-helper proof and one same-selector
-replay require independent design review. Even positive counts prove no
-per-merge event attribution, invalidation, causal recomputation or cost.
-Independent design review returned `ACCEPT` for the corrected lifecycle
-publication order and per-category filtered-to-global bounds.
-The first dedicated Core preparation then exited 101 after 4.73 seconds on one
-proof-only `usize`/`off_t` mismatch before creating an executable or running a
-selector. A reviewed correction may change only that conversion and prepare the
-same target once under the unchanged limit.
-Independent recovery review returned `ACCEPT` for that proof-only conversion.
-The corrected target prepared in 4.83 seconds and its exact selector passed
-1/1. A direct scratch-supervisor launcher then exited 126 before script entry
-because the copied file was mode 0644. One reviewed `/bin/bash` launcher
-correction may run only its self-check; the CLI and replay remain stopped.
-Independent recovery review returned `ACCEPT` and preserves the unchanged
-scratch bytes through an explicit `/bin/bash` launcher.
-After the required ptrace escalation, the decoder self-check exposed a fixture
-bug: its zero-event case cleared only one of six filtered counters. One reviewed
-scratch-only correction may clear all six and rerun the self-check; no CLI or
-replay ran.
-Independent recovery review returned `ACCEPT` for that line-neutral scratch-only
-fixture correction.
-The corrected scratch artifact passed its full self-check. A subsequent CLI
-preparation selected the wrong ignored library probe instead of the required
-first nonignored configured-conflict test. It ran no fixture or replay. One
-reviewed adapter and target correction must restore the exact selected test
-within the original caps before execution.
-The corrected scratch commands must remove `--ignored`; only the selected test
-may hold the observer across the external-fixture call. Cap recovery is limited
-to Core line folding/blank removal unless its exact proof reruns.
-Independent recovery review returned `ACCEPT` for those exact selector,
-observer-lifetime, fixture and cap constraints.
+The sole armed-window replay reached the 12-second wall deadline in
+`RootCompute` with a coherent negative cutoff: 221 installed merges, 221
+successful commits, 220 closed windows, the final window active and zero events
+in all six exact `PathObservationShardKey` categories. Pending, flags, reserved
+state, observer overflow/drop/claim, PID/reap, output and cleanup gates passed.
+Independent review accepts only a negative observation inside those windows;
+the injected-key implementation explains the result without proving absence
+outside the measured edges.
+
+The selected docs-first successor reuses the lifecycle and fixed words 51--63
+to count only exact `PathObservationKey` events. This immediate ordinary key
+reads the injected shard key. Its exact helper proof must cover every partial
+publication and consumer-arm state, reject an inactive completed cutoff,
+preserve inherited event accounting, and cover every event variant, tag
+discrimination and filtered/global bound before one independently reviewed
+exact configured-conflict-selector replay. A positive count
+proves only aggregate direct-dependent event membership. A zero count ends the
+window diagnostic chain and must not select `ResolvedPathObservationKey`.
+Independent design rereview returned `ACCEPT` for the corrected cutoff,
+consumer-arm and inherited-accounting proof, and exact replay gates.
