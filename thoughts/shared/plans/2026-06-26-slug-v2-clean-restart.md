@@ -29,36 +29,33 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-7A-configured-conflict-path-shard-exposure-audit-r1
+Packet: WP-4-7A-configured-conflict-path-merge-injection-handoff-audit-r1
 Status: design accepted; diagnostic execution pending
 
 Preserve the corrected but unaccepted R2/execution-group/computed-default/alias
 stack and its independently accepted initializer and diagnostic checkpoints.
-The accepted diagnostic chain narrowed cold evaluation from sampled progress to
-exact key counts, a post-sharding path-demand census and aggregate frontier
-batching. The batching proof and sole replay passed after reviewed resource and
-launcher recoveries. At a valid `RootCompute` cutoff, 215 successful path
-progress rounds requested 468 demands, all unseen at their round boundary.
-The six batch buckets were `[0, 164, 29, 8, 9, 5]`, maximum 21. Observer
-overflow/drop/claim, arithmetic, PID/reap, output and cleanup gates passed.
+The accepted diagnostic chain narrowed cold evaluation through exact key counts,
+a post-sharding census, frontier batching and installed-merge shard exposure.
+The sole shard replay produced a valid `RootCompute` cutoff: 209 installed
+merges changed 438 shards while adding 462 demands, with 1,528 prior residents
+in changed shards. Maxima were 18 changed shards and 112 prior residents; the
+exposure buckets were `[49, 124, 21, 15, 0]`. All observer, arithmetic,
+PID/reap, output and cleanup gates passed.
 
-Independent result review accepts only that many frontiers are small. It does
-not identify a producer, establish avoidable work or attribute the deadline.
-The active docs-first successor may compare current and successfully merged
-epochs through the accepted 64-way `path_observation_shards` projection at
-`NativeDemandSession::progress_inner`, after the merged epoch is assigned and
-only while both epochs fit the inherited 4,096-demand cap. It publishes only successful merge
-count, total/maximum changed shards, total/maximum prior demands resident in
-changed shards, newly added total, a fixed prior-exposure histogram and
-overflow/reserved state. Call these potential next-injection exposures, not
-completed DICE invalidations. One exact aggregation proof and one same-selector
-replay remain subject to independent design review and the existing 12/15-second
-bounds. The proof drives the production shard-comparison helper, and decoder
-arithmetic bounds every histogram bucket. No path, identity or semantic
-behavior may cross the boundary.
-Independent design review returned `ACCEPT` after requiring post-assignment
-publication, the 4,096-demand admission cap, production-helper proof coverage
-and maximum-attainment decoder bounds.
+Independent result review accepts these only as potential exposures before a
+later injection. The active docs-first successor audits their handoff to the
+next successfully committed DICE transaction after `guard.inject_attempt` in
+`drive_command`. One aggregate pending exposure slot may record produced and
+committed counts, committed exposure total/maximum and fixed buckets, with
+explicit overwrite/unmatched/overflow and reserved state. A positive result
+means only that potential exposure reached a committed injection transaction.
+The serialized producer publishes its marker last and the consumer clears the
+pending value/marker before committing its count last, so every partial cutoff
+is invalid. One exact helper proof and one same-selector replay remain subject to
+independent design review and existing 12/15-second bounds. No path, shard,
+identity or semantic behavior may cross the boundary.
+Independent design rereview returned `ACCEPT` for marker-last production,
+pending-clear/count-last consumption and serialized cutoff ownership.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

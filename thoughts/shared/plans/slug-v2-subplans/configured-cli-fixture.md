@@ -476,3 +476,27 @@ the other nine selectors and F3 remain stopped.
 Independent design review returned `ACCEPT` after adding post-assignment
 publication, the 4,096-demand cap, production-helper proof coverage and
 maximum-attainment decoder bounds.
+
+The production-helper proof and full supervisor self-check passed. The sole
+configured replay reached its 12-second wall deadline in `RootCompute` with 209
+installed merges, 438 changed shards, 462 newly added demands and 1,528 prior
+residents in changed shards. Maxima were 18 changed shards and 112 prior
+residents; buckets were `[49, 124, 21, 15, 0]`. Observer, arithmetic, PID/reap,
+output and cleanup gates passed. Independent review accepts these only as
+potential exposures before later injection.
+
+The selected successor is one docs-first aggregate handoff audit from an
+installed merge to the next successfully committed transaction after
+`inject_attempt`. It may retain one pending exposure integer and publish only
+produced/committed counts, committed total/maximum and five buckets with
+overwrite/unmatched/overflow flags. Even a positive result proves only that
+potential exposure reached a committed injection transaction. The same exact
+selector may run once after its exact helper proof, supervisor self-check,
+hashes and independent design review; the other nine selectors and F3 remain
+stopped.
+
+The serialized producer publishes its pending marker last; the consumer zeros
+the pending value and marker before committing its count last. Exact proof and
+decoder self-checks must reject every partial handoff cutoff.
+Independent design rereview returned `ACCEPT` for marker-last production,
+pending-clear/count-last consumption and serialized cutoff ownership.

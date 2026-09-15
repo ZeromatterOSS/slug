@@ -9131,3 +9131,24 @@ review remains required; no path, identity or semantic change is authorized.
 Independent design review returned `ACCEPT` after adding post-assignment
 publication, the 4,096-demand admission cap, exact production-helper coverage
 and maximum-attainment decoder bounds.
+
+The exact helper proof, supervisor self-check and sole shard-exposure replay
+passed. At a valid `RootCompute` cutoff, 209 installed merges changed 438 shards
+while adding 462 demands and potentially exposed 1,528 prior residents. Maxima
+were 18 changed shards and 112 prior residents; buckets were
+`[49, 124, 21, 15, 0]`. Independent review accepts no DICE invalidation,
+checking, recomputation or cost conclusion.
+
+The selected docs-first successor audits only the aggregate handoff from an
+installed path merge to the next successfully committed injection transaction.
+One pending exposure integer may publish produced/committed counts, committed
+total/maximum and five buckets with overwrite/unmatched/overflow flags. A
+positive result means only that potential exposure reached the commit. One
+exact helper proof and one same-selector replay require independent design
+review; no path, shard, identity or semantic change is authorized.
+
+The serialized handoff must publish its producer marker last, then consume by
+zeroing pending value/marker before committing the consumer count last. Exact
+proof and decoder self-checks reject every partial producer/consumer cutoff.
+Independent design rereview returned `ACCEPT` for marker-last production,
+pending-clear/count-last consumption and serialized cutoff ownership.
