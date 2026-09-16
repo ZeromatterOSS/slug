@@ -196,6 +196,12 @@ readiness row remain open.
 The selected source-only successor audits whether the three unresolved
 `_bs.flags` producers can emit additional named `feature=...` cfgs. It
 cannot infer actual generated values or close compilation/readiness gates.
+The pinned source audit rules out additional named feature cfgs from
+`ahash` and `rustix` build-script output paths, but `num-traits`'s inherited
+probe stdout remains opaque. Independent final review `ACCEPT` confirmed
+source analysis SHA-256
+`0befd1d6b4187984859ee3a07769a50ff314f092217d8b1d303f5bc14251bb17`.
+No action ran and the first readiness row remains open.
 
 ## Readiness matrix
 

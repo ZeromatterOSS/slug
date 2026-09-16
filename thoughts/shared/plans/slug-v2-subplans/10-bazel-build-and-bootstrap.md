@@ -378,6 +378,12 @@ The selected `WP-7-10-m7a-three-build-script-feature-cfg-source-r1` audits
 the three pinned build scripts and runner to bound whether generated
 `_bs.flags` can add named feature cfgs. It requires no action execution or
 test and cannot establish full generated flag bytes or compilation.
+The source-only audit found no path for `ahash` or `rustix` to add named
+feature cfgs, but `num-traits`'s autocfg probe inherits child stdout and
+keeps that one path open. Source analysis SHA-256 is
+`0befd1d6b4187984859ee3a07769a50ff314f092217d8b1d303f5bc14251bb17`;
+independent final review `ACCEPT` confirmed the partial bound. No Cargo/Bazel
+command, build or test ran, and full generated arguments are still unproved.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
