@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-production-inventory-reconcile-r1
-Status: live production inventory reconciliation ready; independent design review ACCEPT
+Packet: WP-7-10-m7a-production-inventory-bazel-recovery-r1
+Status: Bazel inventory-query supervisor recovery ready; independent design review ACCEPT
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -104,6 +104,20 @@ every local package, feature, proc-macro, build-script and generated-source
 delta plus their explicit path mapping. It runs no build, test, action, oracle,
 repin, payload acquisition or F3 replay and admits no behavior from reachability
 alone.
+
+The Cargo snapshot completed with a 35-local/310-external Linux normal/build
+closure; receipt
+`b3886868867d6b2c6f8d1d49575fbc0f4322ab83216e1da456ae7e2f1e2c5e2`
+is frozen. The sole Bazel query emitted no row and exited 37 because its fresh
+network namespace left loopback down, triggering a Bazel 9.2 metrics-collector
+null dereference; receipt
+`0c4df4f51470fb1b98ae60f606c2cac1bf354480646eb16050e05fcec2b6660f`
+records exact cleanup and no reachability evidence. The Bazel-only recovery may
+invoke the identical bounded query once after asserting the namespace contains
+only `lo` and bringing that loopback device up. External interfaces remain
+zero; its receipt must record pre/post interface names `["lo"]`, loopback UP
+and `external_interfaces=0`. No Cargo rerun or other scope change is allowed; a
+second failure ends the inventory evidence path.
 
 #### Historical gate progression
 

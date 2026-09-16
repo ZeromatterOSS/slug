@@ -42,6 +42,17 @@ manifests, lockfiles, toolchains or fixed developer manifest; executes no
 action/test; invokes no upstream oracle; and admits no capability from query
 reachability alone.
 
+The Cargo side completed with a 35-local/310-external Linux normal/build
+closure and frozen receipt `b3886868867d6b2c6f8d1d49575fbc0f4322ab83216e1da456ae7e2f1e2c5e2`.
+The sole Bazel query exited 37 before emitting any query row because the fresh
+namespace left loopback down and Bazel 9.2's metrics collector crashed.
+Recovery packet `WP-7-10-m7a-production-inventory-bazel-recovery-r1` permits
+one identical query after asserting the namespace contains only `lo` and
+bringing that device up; zero external interfaces and every prior query limit
+remain fixed. Its receipt records pre/post interface names `["lo"]`, loopback
+UP and `external_interfaces=0`. Cargo may not rerun, and another failure ends
+this inventory path.
+
 ## Readiness matrix
 
 “Accepted bounded” means only the stated slice has proof. “Open” or “configured

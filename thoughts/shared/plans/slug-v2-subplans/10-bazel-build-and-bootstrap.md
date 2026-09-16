@@ -124,6 +124,15 @@ separate with an explicit path mapping. The packet records exact deltas before
 any M7A family packet is selected; it does not build, test, repin, execute
 actions or change the fixed developer manifest.
 
+The Cargo inventory view completed. The Bazel query emitted no row and exited
+37 because loopback remained down inside its fresh namespace, triggering a
+Bazel 9.2 metrics-collector null dereference. A separately reviewed recovery
+may run the identical query once after asserting the namespace exposes only
+`lo` and bringing that loopback device up. This does not add an external
+interface, relax no-fetch/download controls or authorize another Cargo
+snapshot. The receipt must persist pre/post interface names `["lo"]`, loopback
+UP and `external_interfaces=0`.
+
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
 processes starlark_syntax's grammar; vendored protoc/tonic-build generate Rust

@@ -1,9 +1,59 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-10-m7a-production-inventory-reconcile-r1
-Status: live production inventory reconciliation ready; independent design review ACCEPT
+Packet: WP-7-10-m7a-production-inventory-bazel-recovery-r1
+Status: Bazel inventory-query supervisor recovery ready; independent design review ACCEPT
 
 ## Result and acceptance boundary
+
+Recover only the missing Bazel declared-reachability view from the accepted
+inventory reconciliation packet. Freeze clean main `eae5de370`, all nine
+authority hashes, the Cargo metadata/analysis receipts and the failed Bazel
+receipt below. Do not rerun Cargo, change the root/query/output format, alter
+manifests/locks/toolchains, build/test/execute actions, permit repository
+fetches, acquire payloads, invoke an oracle or reopen F3.
+
+Authorize exactly one supervisor-corrected invocation of the identical cached
+Bazel 9.2.0 binary, SHA, working directory, batch/no-rc query and
+no-fetch/download-disabled/lock-error flags under the unchanged 60-second
+TERM/three-second KILL and 16 MiB per-stream limits. Create a fresh user/network
+namespace, assert `/sys/class/net` contains exactly `lo`, bring only `lo` up,
+then exec the bounded query. This preserves zero external interfaces while
+providing the loopback state Bazel's metrics collector requires. Require
+complete streamed JSON, exact PID/process-group cleanup and no persistent
+server. The recovery receipt must persist interface names before and after
+setup as exactly `["lo"]`, record `lo` UP after the fixed
+`ip link set dev lo up` operation and record `external_interfaces=0`. A stop,
+cap, namespace mismatch, cached-repository failure, malformed row, cleanup
+defect or root mismatch ends the inventory evidence path without retry.
+
+On success, finish the original separate Cargo-selected/Bazel-unconfigured
+comparison and complete receipts under the accepted evidence limits below. The
+supervisor correction supplies no reachability or behavioral evidence itself.
+Independent review must accept this recovery before execution and the combined
+inventory result before any M7A behavior packet is selected.
+
+## Completed r1 inventory evidence
+
+The sole Cargo snapshot exited 0 with complete metadata SHA-256
+`a290e48f9c8740fae0e0657997220343898cec44d2ae6bef58ca5ed303743d2f`.
+Its Linux normal/build closure contains 345 packages and 957 traversed edges:
+35 local and 310 external packages, five local proc macros and five local build
+scripts. Analysis SHA-256 is
+`dad20c2240aa421f5d99fe30190cbe7fa9035b4e388ad64aa30e762afaf9cd10`;
+receipt SHA-256 is
+`b3886868867d6b2c6f8d1d49575fbc0f4322ab83216e1da456ae7e2f1e2c5e2`.
+
+The sole Bazel query exited 37 before emitting any JSON row. Its fresh network
+namespace contained no active loopback interface, causing Bazel 9.2
+`NetworkMetricsCollector` to dereference a null loopback-interface set. Stderr
+SHA-256 is
+`605b480a27ffe687c13568e322df0366cd8b4150bf3c3f275705c633d7a51b76`;
+receipt SHA-256 is
+`0c4df4f51470fb1b98ae60f606c2cac1bf354480646eb16050e05fcec2b6660f`.
+Cleanup was exact with no server, Bazel or Java process. This is an incomplete
+supervisor result and supplies no query reachability.
+
+## Accepted r1 inventory contract
 
 Reconcile the accepted Stage 10 production inventory with the live
 `//app/slug_cli_v2:slug` root at clean main `39e3a89ac`. This is an accounting
