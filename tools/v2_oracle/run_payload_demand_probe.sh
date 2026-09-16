@@ -6,8 +6,18 @@ for probe_tool in unshare prlimit strace perl timeout; do
     command -v "$probe_tool" >/dev/null
 done
 probe_harness=
-probe_portable=0
-if [[ $# == 3 && "$1" == "--portable-run" ]]; then
+probe_portable=0 probe_limits_only=0 probe_deadline=12
+probe_portable_cpu=15 probe_shell_timeout=15 probe_python_timeout=17
+if [[ ( $# == 4 && "$1" == "--portable-run" ) ||
+      ( $# == 2 && "$1" == "--portable-limits" ) ]]; then
+    probe_deadline=${4:-$2}
+    [[ "$probe_deadline" =~ ^[0-9]+$ ]]
+    (( probe_deadline >= 1 && probe_deadline <= 30 ))
+    probe_portable_cpu=$((probe_deadline + 3))
+    probe_shell_timeout=$((probe_deadline + 3))
+    probe_python_timeout=$((probe_deadline + 5))
+fi
+if [[ $# == 4 && "$1" == "--portable-run" ]]; then
     probe_portable=1
     probe_scratch=$2
     probe_harness=$3
@@ -15,6 +25,8 @@ if [[ $# == 3 && "$1" == "--portable-run" ]]; then
     [[ -d "$probe_scratch/workspace" && -d "$probe_scratch/registry" && -d "$probe_scratch/mirror" ]]
     [[ "$probe_harness" == /* && -x "$probe_harness" ]]
 else
+    [[ $# != 2 || "$1" == "--portable-limits" ]]
+    [[ $# != 2 ]] || probe_limits_only=1
     probe_scratch=$(mktemp -d /tmp/slug-sentinel-demand.XXXXXX)
 fi
 printf 'Diagnostic evidence: %s/logs\n' "$probe_scratch"
@@ -29,8 +41,12 @@ fi
 probe_perl() {
     local -a probe_guard=()
     if [[ "$1" == run ]]; then probe_guard=(timeout --kill-after=2 58); fi
-    if [[ "$1" == portable-run ]]; then probe_guard=(timeout --kill-after=2 15); fi
-    "${probe_guard[@]}" perl - "$probe_scratch" "$1" "$probe_harness" <<'PERL'
+    if [[ "$1" == portable-* ]]; then
+        probe_guard=(timeout --kill-after=2 "$probe_shell_timeout")
+    fi
+    "${probe_guard[@]}" perl - "$probe_scratch" "$1" "$probe_harness" \
+        "$probe_deadline" "$probe_portable_cpu" "$probe_shell_timeout" \
+        "$probe_python_timeout" <<'PERL'
 use strict;
 use warnings;
 use JSON::PP qw(decode_json encode_json);
@@ -43,7 +59,18 @@ use IO::Select;
 use POSIX qw(setsid WNOHANG);
 use Time::HiRes qw(time sleep);
 require 'syscall.ph';
-my ($scratch, $mode, $portable_harness) = @ARGV;
+my ($scratch, $mode, $portable_harness, $portable_deadline, $portable_cpu,
+    $portable_shell_timeout, $portable_python_timeout) = @ARGV;
+my $portable_mode = $mode eq 'portable-run' || $mode eq 'portable-limits';
+if ($portable_mode) {
+    defined($_) && /^\d+$/ or die "portable limit\n" for
+        ($portable_deadline, $portable_cpu, $portable_shell_timeout, $portable_python_timeout);
+    $portable_deadline >= 1 && $portable_deadline <= 30 &&
+        $portable_cpu == $portable_deadline + 3 &&
+        $portable_shell_timeout == $portable_deadline + 3 &&
+        $portable_python_timeout == $portable_deadline + 5
+        or die "portable limit relation\n";
+}
 if ($mode eq 'portable-run') {
     $scratch =~ m{\A/tmp/slug-configured-cli-[A-Za-z0-9_]+/fixture\z}
         or die "portable scratch path\n";
@@ -55,6 +82,13 @@ if ($mode eq 'portable-run') {
     $scratch =~ m{\A/tmp/slug-sentinel-demand\.[A-Za-z0-9]{6}\z} or die "scratch path\n";
 }
 my $logs = "$scratch/logs";
+my $process_cpu_limit = $portable_mode ? $portable_cpu : 15;
+if ($mode eq 'portable-limits') {
+    print encode_json({limits => {deadline_seconds => 0 + $portable_deadline,
+        cpu_seconds => 0 + $portable_cpu, shell_timeout_seconds => 0 + $portable_shell_timeout,
+        python_timeout_seconds => 0 + $portable_python_timeout}}), "\n";
+    exit 0;
+}
 sub read_small {
     my ($path, $cap) = @_;
     open my $in, '<:raw', $path or die "$path: $!\n";
@@ -272,7 +306,7 @@ sub isolated {
     %ENV = (PATH => '/usr/bin:/bin', SLUG_SENTINEL_SCRATCH => $scratch);
     $ENV{SLUG_SENTINEL_OBSERVER_FD} = $observer_fd if defined $observer_fd;
     exec 'unshare', '--user', '--map-root-user', '--net',
-        'prlimit', '--as=2147483648', '--cpu=15', '--fsize=16777216', @command;
+        'prlimit', '--as=2147483648', "--cpu=$process_cpu_limit", '--fsize=16777216', @command;
     die "exec: $!\n";
 }
 if ($mode eq 'self-check') {
@@ -347,7 +381,7 @@ if ($mode eq 'portable-run') {
     my $selector_ok = !$selector->{stop} && defined($selector->{raw_status}) &&
         $selector->{raw_status} == 0 && @listed == 1 && $listed[0] eq "$test: test";
     my ($run, $buffers, $telemetry) = supervise(
-        'portable-proof', 12, [131072,131072,1024],
+        'portable-proof', $portable_deadline, [131072,131072,1024],
         sub { my ($trace_fd, $observer_fd) = @_;
             chdir "$scratch/workspace" or die "chdir: $!\n";
             isolated($observer_fd, $portable_harness, '--ignored', '--exact', $test, '--nocapture');
@@ -366,6 +400,10 @@ if ($mode eq 'portable-run') {
         $publication == 1 && $sentinel == 1;
     my $summary = encode_json({
         result => $success ? 'complete-configured-source-closure' : 'incomplete',
+        limits => {deadline_seconds => 0 + $portable_deadline,
+            cpu_seconds => 0 + $portable_cpu,
+            shell_timeout_seconds => 0 + $portable_shell_timeout,
+            python_timeout_seconds => 0 + $portable_python_timeout},
         selected_tests => $selector_ok ? 1 : 0,
         executed_tests => $executed == 1 ? 1 : 0,
         passed_tests => $passed ? 1 : 0,
@@ -518,6 +556,10 @@ print "stderr:\n$buffers->[1]";
 exit($result eq 'inconclusive' ? 2 : 0);
 PERL
 }
+if [[ $probe_limits_only == 1 ]]; then
+    probe_perl portable-limits
+    exit 0
+fi
 timeout 5 env -i PATH=/usr/bin:/bin unshare --user --map-root-user --net \
     prlimit --as=2147483648 --cpu=2 --fsize=16777216 \
     strace -f -e trace=openat,openat2 -P /dev/null /usr/bin/true \

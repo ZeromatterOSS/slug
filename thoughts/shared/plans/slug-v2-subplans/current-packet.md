@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-5-6-7A-post-activation-f3-bounded-runtime-r1
-Status: bounded F3 runtime recovery ready; independent design review ACCEPT
+Status: bounded F3 runtime recovery implemented; independent implementation review EXECUTE
 
 ## Result and acceptance boundary
 
@@ -53,6 +53,24 @@ A fully supervised typed terminal selects its semantic successor. A 30-second
 deadline, invalid supervision or gate mismatch replans without automatic retry
 or deadline extension. Do not resume the completed invalidation diagnostics,
 infer semantics from an observer sample or alter the M7A inventory artifacts.
+
+## Completed bounded-supervision implementation
+
+The three-file implementation is frozen at SHA-256
+`93db3bea0110582e37eeef31b71ccf4080f3dcb50a2e9c07c3cbfb25765c6336`
+for the Python entry point,
+`155f4611a9dd4df0774adf8518f73f405286770387a4033207ccc660c99199e6`
+for the portable driver and
+`bee0f0a74fa6b5200ad4da4ae51aa078f38105273ac166f471fee5eab2b06845`
+for focused coverage. Tooling is 96 gross/70 physical changed lines and tests
+are 47 lines, within the frozen caps. Bash syntax, Python compilation and diff
+checks pass; all ten focused tests pass in 0.39 seconds. The unchanged full
+supervisor self-check remains accepted with stdout SHA-256
+`c2a8acdc08c100f7845879bb58af2b5f8b97ca1ae8dec82479fe164aa6931b5e2`.
+Independent implementation and necessity review returned `EXECUTE`: the
+timeout hierarchy and receipts agree, the semantic gate is unchanged and the
+ignored public test remains the smallest valid F3 proof. Run it exactly once
+with `N=30`; do not retry or extend it.
 
 ## Superseded exact-deadline conclusion
 

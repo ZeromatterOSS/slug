@@ -42,6 +42,24 @@ class FixtureError(ValueError):
     """The checked-in fixture is incomplete, corrupt, or internally inconsistent."""
 
 
+def _deadline_seconds(value: str) -> int:
+    if not value.isdecimal():
+        raise argparse.ArgumentTypeError("deadline must be an integer")
+    deadline = int(value)
+    if not 1 <= deadline <= 30:
+        raise argparse.ArgumentTypeError("deadline must be between 1 and 30 seconds")
+    return deadline
+
+
+def _proof_limits(deadline: int) -> dict[str, int]:
+    return dict(deadline_seconds=deadline, cpu_seconds=deadline + 3,
+                shell_timeout_seconds=deadline + 3, python_timeout_seconds=deadline + 5)
+
+
+def _driver_limits(stdout: str) -> object:
+    return json.loads(stdout.splitlines()[-1]).get("limits")
+
+
 @dataclass(frozen=True)
 class Object:
     source: str
@@ -420,14 +438,16 @@ def assemble(destination: Path, root: Path = DEFAULT_FIXTURE_ROOT) -> dict[str, 
         raise
 
 
-def _run_portable_proof(harness: Path, fixture_root: Path) -> int:
+def _run_portable_proof(harness: Path, fixture_root: Path, deadline: int) -> int:
     harness = harness.resolve()
     if not harness.is_file() or not os.access(harness, os.X_OK):
         raise FixtureError(f"harness is not an executable file: {harness}")
     with tempfile.TemporaryDirectory(prefix="slug-configured-cli-", dir="/tmp") as scratch:
         assembled = Path(scratch) / "fixture"
         assembly = assemble(assembled, fixture_root)
-        command = ["/bin/bash", str(DRIVER), "--portable-run", str(assembled), str(harness)]
+        limits = _proof_limits(deadline)
+        command = ["/bin/bash", str(DRIVER), "--portable-run", str(assembled),
+                   str(harness), str(deadline)]
         process = subprocess.Popen(
             command,
             cwd=REPO_ROOT,
@@ -438,11 +458,17 @@ def _run_portable_proof(harness: Path, fixture_root: Path) -> int:
             start_new_session=True,
         )
         try:
-            stdout, stderr = process.communicate(timeout=15)
+            stdout, stderr = process.communicate(timeout=limits["python_timeout_seconds"])
         except subprocess.TimeoutExpired:
             os.killpg(process.pid, signal.SIGKILL)
             stdout, stderr = process.communicate()
-            raise FixtureError("portable proof exceeded the 15-second absolute ceiling")
+            raise FixtureError("portable proof exceeded its Python timeout ceiling")
+        try:
+            driver_limits = _driver_limits(stdout)
+        except (IndexError, AttributeError, json.JSONDecodeError) as error:
+            raise FixtureError("portable driver did not emit one JSON summary") from error
+        if driver_limits != limits:
+            raise FixtureError("portable driver limit receipt mismatch")
         if stdout:
             sys.stdout.write(stdout)
         if stderr:
@@ -451,7 +477,8 @@ def _run_portable_proof(harness: Path, fixture_root: Path) -> int:
             return process.returncode
         print(
             json.dumps(
-                {"assembly": assembly, "proof": "F3-configured-source-closure"},
+                {"assembly": assembly, "limits": limits,
+                 "proof": "F3-configured-source-closure"},
                 sort_keys=True,
                 separators=(",", ":"),
             )
@@ -470,6 +497,7 @@ def _parser() -> argparse.ArgumentParser:
     assemble_parser.add_argument("--output", type=Path, required=True)
     prove_parser = subcommands.add_parser("prove", help="assemble and run the bounded F3 proof")
     prove_parser.add_argument("--harness", type=Path, required=True)
+    prove_parser.add_argument("--deadline-seconds", type=_deadline_seconds, default=12)
     return parser
 
 
@@ -495,7 +523,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "assemble":
             print(json.dumps(assemble(args.output, args.fixture_root), sort_keys=True))
             return 0
-        return _run_portable_proof(args.harness, args.fixture_root)
+        return _run_portable_proof(args.harness, args.fixture_root, args.deadline_seconds)
     except FixtureError as error:
         print(f"configured CLI fixture error: {error}", file=sys.stderr)
         return 2

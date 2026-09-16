@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-5-6-7A-post-activation-f3-bounded-runtime-r1
-Status: bounded F3 runtime recovery ready; independent design review ACCEPT
+Status: bounded F3 runtime recovery implemented; independent implementation review EXECUTE
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -127,6 +127,12 @@ opt-in, outside routine suites. The exact selector, fixture, public evaluation,
 observer and persistent success gates remain unchanged. No Cargo compile,
 production Rust change, diagnostic replay, automatic deadline extension or
 semantic inference is allowed.
+
+The bounded-supervision implementation now passes syntax, compilation, diff
+and all ten focused checks; the focused suite completes in 0.39 seconds.
+Independent implementation and necessity review returned `EXECUTE`. One
+`N=30` replay is selected under the frozen 38-second external ceiling, with no
+retry or extension.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

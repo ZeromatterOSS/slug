@@ -222,6 +222,12 @@ opt-in and outside routine suites. No production Rust, fixture, selector,
 semantic predicate or success gate changes. A timeout or invalid receipt
 replans without automatic retry or deadline extension.
 
+The bounded-supervision implementation passed Bash/Python/diff checks and all
+ten focused tests in 0.39 seconds. Independent implementation and necessity
+review returned `EXECUTE`, confirming the unchanged ignored public boundary and
+the `N`, `N+3`, `N+5`, external `N+8` hierarchy. Exactly one `N=30` proof is
+selected, with no retry or extension.
+
 B1 can be investigated independently of fixture construction. The two proven
 baseline failures are
 `build_command_root_selects_each_terminal_producer_once_for_duplicate_targets`

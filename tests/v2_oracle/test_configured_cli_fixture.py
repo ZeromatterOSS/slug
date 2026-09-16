@@ -3,13 +3,18 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from tools.v2_oracle.configured_cli_fixture import (
     DEFAULT_FIXTURE_ROOT,
+    DRIVER,
     FixtureError,
+    _driver_limits,
+    _parser,
+    _proof_limits,
     assemble,
     verify_fixture,
 )
@@ -19,6 +24,48 @@ def _copy_fixture(tmp_path: Path) -> Path:
     fixture = tmp_path / "fixture"
     shutil.copytree(DEFAULT_FIXTURE_ROOT, fixture)
     return fixture
+
+
+@pytest.mark.parametrize("deadline", [1, 12, 30])
+def test_proof_deadline_boundaries_and_forwarding(deadline: int) -> None:
+    args = _parser().parse_args(
+        ["prove", "--harness", "/tmp/harness", "--deadline-seconds", str(deadline)]
+    )
+    assert args.deadline_seconds == deadline
+    assert _proof_limits(deadline) == {
+        "deadline_seconds": deadline,
+        "cpu_seconds": deadline + 3,
+        "shell_timeout_seconds": deadline + 3,
+        "python_timeout_seconds": deadline + 5,
+    }
+    stdout = f"Diagnostic evidence: /tmp/logs\n{json.dumps({'limits': _proof_limits(deadline)})}\n"
+    assert _driver_limits(stdout) == _proof_limits(deadline)
+    assert 'str(harness), str(deadline)]' in (DRIVER.parent / "configured_cli_fixture.py").read_text()
+
+
+def test_proof_deadline_default_and_rejections() -> None:
+    assert _parser().parse_args(["prove", "--harness", "/tmp/harness"]).deadline_seconds == 12
+    for invalid in ("0", "31", "not-an-integer"):
+        with pytest.raises(SystemExit, match="2"):
+            _parser().parse_args(
+                ["prove", "--harness", "/tmp/harness", "--deadline-seconds", invalid]
+            )
+
+
+@pytest.mark.parametrize("deadline", [1, 12, 30])
+def test_portable_driver_receives_checked_deadline_limits(deadline: int) -> None:
+    result = subprocess.run(
+        ["/bin/bash", str(DRIVER), "--portable-limits", str(deadline)],
+        check=True,
+        cwd=DRIVER.parents[2],
+        capture_output=True,
+        text=True,
+    )
+    assert json.loads(result.stdout.splitlines()[-1])["limits"] == _proof_limits(deadline)
+    source = DRIVER.read_text()
+    assert 'probe_guard=(timeout --kill-after=2 "$probe_shell_timeout")' in source
+    assert '"--cpu=$process_cpu_limit"' in source
+    assert "'portable-proof', $portable_deadline" in source
 
 
 def test_authentic_fixture_verifies_and_assembles_offline(tmp_path: Path) -> None:
