@@ -241,6 +241,18 @@ profiler flag to disable system-network collection for one bounded offline
 repin; independent design review `ACCEPT` confirmed the flag-only correction.
 Static BUILD edits remain uncommitted
 until generated lock and final review.
+The flag-only recovery command exited 0 in 6.722 seconds but added two blank
+lines to root `Cargo.lock`'s unused-patch section. Receipt SHA-256 is
+`2322f3a8481e3e7393ca0d81f0572153f979a0a5cf2e8d4c44da73aff4806cfb`.
+Exact root-lock bytes were restored and parsed TOML remained equal, yet the
+packet's byte-hash gate rejects the invocation. Generated-lock candidate
+analysis SHA-256
+`19b365fff8230f71021edf660901769d8a940744879dc2f5d6ac5486b1325997`
+finds all 35/310 selected keys and all 448 registry checksums with nine
+additive crate keys and no removals. The selected
+`WP-7-10-m7a-generated-lock-candidate-validation-r1` permits one read-only,
+fresh-output-base, no-repin lock-coherence check before final static-sync
+review. Bazel graph and M7A evidence remain open.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

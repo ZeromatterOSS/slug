@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-bazel-graph-sync-recovery-r1
-Status: flag-only profiler recovery design ACCEPT; one bounded repin pending
+Packet: WP-7-10-m7a-generated-lock-candidate-validation-r1
+Status: restored-authority, no-repin validation design ACCEPT; one check pending
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -184,10 +184,10 @@ Independent final review `ACCEPT` confirmed the recovered metadata evidence
 and cleanup without a rerun. This closes only the locked-input prerequisite;
 no Bazel command or test followed.
 
-The selected successor now adds the missing configuration BUILD owner and six
-normal consumer edges, then performs one offline Bazel crate-universe repin
-against the verified host Cargo cache. It validates generated lock coverage
-and drift without running a query, build or test. Fresh Bazel reachability and
+The graph-sync packet added the missing configuration BUILD owner and six
+normal consumer edges, then attempted one offline Bazel crate-universe repin
+against the verified host Cargo cache. It scoped generated-lock coverage
+and drift without a target query, build or test. Fresh Bazel reachability and
 M7A behavior remain separate gates.
 Independent design review `ACCEPT` confirmed this narrow boundary and the
 cached generator; preserve exact pre-run Cargo-lock bytes for recovery if
@@ -198,13 +198,31 @@ Bazel 9.2.0's system-network profiler null dereference. Receipt SHA-256
 `86995d8a436d74b7db448d5fdbb3aa652a30c7f3ab50477036a3f6dca37b1051`
 records clean cleanup, unchanged Cargo/other locks and identical pre/post
 tracked status. Pinned Bazel help exposes a flag to disable only that
-collector. The selected recovery keeps offline/download controls and permits
+collector. The reviewed recovery kept offline/download controls and permitted
 one otherwise identical bounded repin with
 `--noexperimental_collect_system_network_usage`; no build, query or test is
 selected.
 Independent design review `ACCEPT` confirmed the flag disables the crashing
 collector without changing repository or Cargo resolution, and verified the
-unchanged lock/status receipts. One modified attempt is now selected.
+unchanged lock/status receipts. One modified attempt was selected.
+That single recovery command exited 0 in 6.722 seconds but inserted two blank
+lines in root `Cargo.lock`'s unused-patch section, violating its exact byte
+hash gate. Receipt SHA-256 is
+`2322f3a8481e3e7393ca0d81f0572153f979a0a5cf2e8d4c44da73aff4806cfb`.
+The original Cargo-lock bytes were restored; the changed copy parses to the
+same TOML. The generated Bazel-lock candidate reaches 35/35 selected local
+and 310/310 selected external keys, adds exactly nine missing crate keys and
+matches all 448 registry checksums, with no version removal or existing
+external drift. Candidate analysis SHA-256 is
+`19b365fff8230f71021edf660901769d8a940744879dc2f5d6ac5486b1325997`.
+Independent result review returned `REPLAN` under the explicit hash gate.
+The selected successor permits one fresh-output-base, no-repin, offline Bazel
+lock-coherence validation against restored authority; it still runs no target
+query, build or test and admits no M7A behavior.
+Independent design review `ACCEPT` confirmed that the fresh base and
+`--lockfile_mode=off` combination forces extension evaluation, while
+rules_rust's no-repin path checks its generated lock. One 30-second-capped
+validation is selected.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

@@ -88,8 +88,14 @@ The `WP-7-10-m7a-bazel-graph-sync-r2` packet added the static BUILD owner and
 six edges but stopped before generated-lock repair. This readiness row
 still needs fresh declared/configured evidence and the other listed proofs.
 The first repin stopped at Bazel's network profiler before lock generation;
-the selected `WP-7-10-m7a-bazel-graph-sync-recovery-r1` permits one reviewed
+the `WP-7-10-m7a-bazel-graph-sync-recovery-r1` permitted one reviewed
 flag-only recovery. No readiness row closes from these static edits.
+That recovery generated a candidate lock but reformatted two blank lines in
+root Cargo.lock, so its exact-byte gate returned `REPLAN`. Original bytes were
+restored. The selected
+`WP-7-10-m7a-generated-lock-candidate-validation-r1` checks the candidate
+against restored authority once, without build, test or target graph query;
+the first readiness row remains open.
 
 ## Readiness matrix
 
