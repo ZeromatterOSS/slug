@@ -26,6 +26,22 @@ reconcile live source/feature/toolchain/dependency deltas before calling the
 inventory complete. No audit, execution or network access is performed by this
 planning change.
 
+## Selected live inventory reconciliation (2026-09-15)
+
+Current packet `WP-7-10-m7a-production-inventory-reconcile-r1` freezes clean
+main `39e3a89ac` and compares the live `//app/slug_cli_v2:slug` closure with the
+accepted inventory. It authorizes one locked/offline Cargo metadata snapshot
+rooted at the CLI manifest and Linux normal/build edges, plus one
+network-isolated, no-fetch Bazel 9.2 batch query with streamed JSON, each under
+60-second TERM/three-second KILL limits and output caps. Exact binary,
+authority/output and cleanup receipts are mandatory. The result must keep
+Cargo's selected package closure distinct from Bazel's unconfigured declared
+superset, map paths/packages explicitly and enumerate local feature,
+proc-macro, build-script, generated-source and pin deltas. It changes no code,
+manifests, lockfiles, toolchains or fixed developer manifest; executes no
+action/test; invokes no upstream oracle; and admits no capability from query
+reachability alone.
+
 ## Readiness matrix
 
 “Accepted bounded” means only the stated slice has proof. “Open” or “configured

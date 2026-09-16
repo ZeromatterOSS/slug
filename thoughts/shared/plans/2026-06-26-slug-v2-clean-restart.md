@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-5-6-7A-post-activation-f3-source-test-boundary-reconcile-r1
-Status: F3 resource-blocked; independent result review ACCEPT
+Packet: WP-7-10-m7a-production-inventory-reconcile-r1
+Status: live production inventory reconciliation ready; independent design review ACCEPT
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -89,6 +89,21 @@ separate calls repeat the whole evaluation; warm state, smaller targets and
 synthetic stages violate the frozen contract. Record F3 resource-blocked,
 terminate this evidence path and select only independent M7A
 production-inventory reconciliation. No code or test changed and no command ran.
+
+Independent result review ACCEPTS that boundary audit and records F3
+resource-blocked with no rerun or semantic implementation. The selected M7A
+successor freezes clean main `39e3a89ac` and reconciles the live
+`//app/slug_cli_v2:slug` production closure against the accepted 33-package
+inventory. It permits one locked/offline Cargo metadata snapshot and one Bazel
+9.2 streamed-JSON dependency query in a network namespace with fetch/download
+disabled, each under 60-second TERM/three-second KILL limits and output caps.
+Cargo is rooted at the CLI manifest and filtered to Linux normal/build edges;
+Bazel is pinned by absolute executable/SHA and remains an unconfigured declared
+superset. Complete receipts record exact manifest/lock/toolchain hashes and
+every local package, feature, proc-macro, build-script and generated-source
+delta plus their explicit path mapping. It runs no build, test, action, oracle,
+repin, payload acquisition or F3 replay and admits no behavior from reachability
+alone.
 
 #### Historical gate progression
 

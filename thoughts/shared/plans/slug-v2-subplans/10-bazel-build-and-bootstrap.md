@@ -114,6 +114,16 @@ nightly channel selection where needed. Crate-universe rendering uses the root
 manifest/lock, isolation, and generated build scripts. Bazel 9.2 removed `sync`;
 a separately authorized repin uses `CARGO_BAZEL_REPIN=1 bazel mod deps`.
 
+The selected live-inventory packet at main `39e3a89ac` permits only one
+locked/offline Cargo metadata snapshot rooted at the CLI manifest and Linux
+normal/build edges, plus one no-fetch/download-disabled Bazel 9.2 streamed-JSON
+batch query in a network namespace. Each has 60-second TERM/three-second KILL
+limits, output caps and a complete command/output/cleanup receipt. Cargo's
+selected package closure and Bazel's unconfigured declared superset remain
+separate with an explicit path mapping. The packet records exact deltas before
+any M7A family packet is selected; it does not build, test, repin, execute
+actions or change the fixed developer manifest.
+
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
 processes starlark_syntax's grammar; vendored protoc/tonic-build generate Rust

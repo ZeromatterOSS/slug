@@ -1,9 +1,62 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-5-6-7A-post-activation-f3-source-test-boundary-reconcile-r1
-Status: F3 resource-blocked; independent result review ACCEPT
+Packet: WP-7-10-m7a-production-inventory-reconcile-r1
+Status: live production inventory reconciliation ready; independent design review ACCEPT
 
 ## Result and acceptance boundary
+
+Reconcile the accepted Stage 10 production inventory with the live
+`//app/slug_cli_v2:slug` root at clean main `39e3a89ac`. This is an accounting
+packet only. It may update planning ledgers after evidence review, but may not
+change source, tests, BUILD/Cargo manifests, lockfiles, generated repository
+state, toolchains or the fixed 43-test developer manifest. It does not build or
+test Slug, repin dependencies, invoke an upstream oracle, execute an action,
+acquire payloads or reopen resource-blocked F3.
+
+Freeze SHA-256 values for `.bazelversion`, `rust-toolchain`, `Cargo.toml`, `Cargo.lock`,
+`Cargo.Bazel.lock`, `MODULE.bazel`, `MODULE.bazel.lock`,
+`app/slug_cli_v2/BUILD.bazel` and `app/slug_cli_v2/Cargo.toml`. Then capture
+exactly one result from
+`/home/wgray/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo
+metadata --manifest-path app/slug_cli_v2/Cargo.toml --filter-platform
+x86_64-unknown-linux-gnu --locked --offline --format-version 1` under a
+PATH `/home/wgray/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin:/usr/local/bin:/usr/bin:/bin`,
+a 60-second TERM/three-second KILL ceiling and 16 MiB per-stream cap. Traverse
+from the `slug_cli_v2` package through only normal/build `dep_kinds` whose
+target predicate survives the Linux filter. Record local package paths, this
+selected resolution's enabled node features, production target kinds, build
+scripts and proc macros; exclude every dev-only edge and test/example/bench
+target.
+
+Capture exactly one Bazel query from cached Bazel 9.2.0 executable
+`/home/wgray/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel`
+with the identical SHA-256, working directory `/home/wgray/slug`, startup flags
+`--batch --ignore_all_rc_files`, and command flags `--nofetch
+--repository_disable_download --lockfile_mode=error --noshow_progress
+--output=streamed_jsonproto 'deps(//app/slug_cli_v2:slug)'`. Run it inside a
+fresh `unshare --user --map-root-user --net` namespace under the same 60-second
+TERM/three-second KILL ceiling and 16 MiB per-stream cap. Require complete
+JSONL, exact PID/process-group cleanup and no persistent server. Derive
+first-party package/target reachability, rule inputs, generated-file owners,
+local proc macros and external crate-universe references. A stop, cap, missing
+cached repository, malformed row, cleanup defect or root mismatch ends the
+packet as incomplete without retry.
+
+Compare both live views with the accepted 33-package inventory and generated
+source obligations. Record every added, removed or changed local package,
+feature, proc macro, build script, LALRPOP/protobuf owner and lock/toolchain pin.
+Keep Cargo's selected normal/build package closure separate from Bazel query's
+unconfigured declared-reachability superset, including selectable branches,
+and record an explicit path/package mapping between them. For each open M7A
+capability, attach only a compact `Demanded by / evidence` candidate row. Query
+reachability alone remains unproven; behavioral demand requires an existing
+selected/configured artifact. This packet does not admit action families, infer
+semantics from reachability or accept M7A. Freeze complete JSON command receipts
+for both operations with argv/environment, exit, output hashes/counts/caps and
+cleanup. Independent result review must approve the finite delta before any
+behavioral implementation packet is selected.
+
+## Accepted F3 resource-block predecessor
 
 Audit only the source/test boundary of the single authentic F3 expression after
 its valid supervised timeout. Freeze main `43b10a4d3`, harness SHA-256
