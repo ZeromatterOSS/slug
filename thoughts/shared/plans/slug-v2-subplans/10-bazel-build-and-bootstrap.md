@@ -136,9 +136,11 @@ UP and `external_interfaces=0`.
 The recovery later exited at its supervisor/interface gate before Bazel
 invocation, with empty output and exact cleanup recorded in receipt
 `bc4c11d4a939afa8b143f1bbc484d2d70a212a993111f79946f83f703209b252`.
-No current Bazel reachability result exists. Preserve the Cargo inventory and
-defer its partial accounting while the user-clarified F3 runtime packet runs;
-that packet authorizes no Stage 10 query, build or behavioral admission.
+No current Bazel reachability result exists. The user-clarified F3 packet later
+reached its clean 30-second ceiling and closed without acceptance. Resume only
+partial accounting from the preserved Cargo inventory and existing
+authenticated artifacts; no Stage 10 query, build or behavioral admission is
+authorized.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

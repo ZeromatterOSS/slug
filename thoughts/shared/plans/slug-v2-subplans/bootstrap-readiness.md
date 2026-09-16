@@ -58,8 +58,11 @@ invocation. Receipt
 `bc4c11d4a939afa8b143f1bbc484d2d70a212a993111f79946f83f703209b252`
 contains empty streams and exact cleanup, so live Bazel coverage remains
 unknown. Preserve the successful Cargo evidence and defer partial accounting.
-The current packet returns to F3 only because the user clarified that the
-12-second value was a guideline; no M7A query or behavioral admission is
+The clarified F3 replay subsequently reached its clean 30-second ceiling before
+a typed terminal. Independent result review returned `REPLAN`; that F3 path is
+closed without retry or extension. Partial M7A accounting may now resume only
+from the frozen Cargo closure and existing authenticated artifacts. Bazel
+declared reachability remains unknown; no M7A query or behavioral admission is
 reopened.
 
 ## Readiness matrix

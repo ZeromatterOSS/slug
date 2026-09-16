@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-5-6-7A-post-activation-f3-bounded-runtime-r1
-Status: bounded F3 runtime recovery implemented; independent implementation review EXECUTE
+Status: F3 resource-blocked at the 30-second ceiling; independent result review REPLAN
 
 ## Result and acceptance boundary
 
@@ -71,6 +71,32 @@ Independent implementation and necessity review returned `EXECUTE`: the
 timeout hierarchy and receipts agree, the semantic gate is unchanged and the
 ignored public test remains the smallest valid F3 proof. Run it exactly once
 with `N=30`; do not retry or extend it.
+
+## Completed bounded F3 result
+
+The sole authorized replay exited 2 after 30.22 external seconds. Output
+SHA-256 is
+`9b2227715491469686dc400d387ff600b73e7163f94a7b84116768d640f52d27`,
+the time receipt SHA-256 is
+`f5358101ed11a170aeab7587b49234ffb389441ff8f613fb363a2a52e40f77fe`
+and the final receipt SHA-256 is
+`43038196236b120fdf6c254f39ac6f369c0ec8497f227c3c0665c42171f5f888`.
+The selector chose one exact test and exited zero with exact cleanup. The run
+receipt agrees on `N=30`, CPU/shell 33 and Python 35; it stopped at the wall
+deadline after 30.011537 seconds with raw status 9, one exact reaped PID, no
+children, live group or open pipe, and complete cleanup. Observer telemetry was
+available with zero overflow, drops and activity claim, but remained enabled
+at `RootCompute`/`Entry` (6/1). Executed/passed counts, publication and sentinel
+were zero. The last `ConfiguredNodeAnalysisObservationKey` activity sample
+does not establish a semantic result.
+
+Independent result review returned `REPLAN`: this is valid supervised deadline
+evidence, not F3 success or a typed semantic terminal. F3 is resource-blocked
+at its already-proved indivisible public boundary under the user's maximum.
+Close this evidence path without retry or extension. Preserve the supervision
+tooling, then select only partial M7A inventory accounting from the frozen
+Cargo closure and existing authenticated artifacts. Bazel declared reachability
+remains unknown and no capability or M7A acceptance follows.
 
 ## Superseded exact-deadline conclusion
 

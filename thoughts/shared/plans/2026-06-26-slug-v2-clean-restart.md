@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-5-6-7A-post-activation-f3-bounded-runtime-r1
-Status: bounded F3 runtime recovery implemented; independent implementation review EXECUTE
+Status: F3 resource-blocked at the 30-second ceiling; independent result review REPLAN
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -133,6 +133,15 @@ and all ten focused checks; the focused suite completes in 0.39 seconds.
 Independent implementation and necessity review returned `EXECUTE`. One
 `N=30` replay is selected under the frozen 38-second external ceiling, with no
 retry or extension.
+
+The sole proof reached its clean 30-second wall deadline at
+`RootCompute`/`Entry` (6/1), before test completion, publication or sentinel.
+Final receipt SHA-256 is
+`43038196236b120fdf6c254f39ac6f369c0ec8497f227c3c0665c42171f5f888`.
+Independent result review returned `REPLAN`: F3 is unaccepted and
+resource-blocked at its indivisible boundary under the user's maximum. Close
+this path without retry or extension and resume only partial M7A accounting
+from frozen Cargo and authenticated artifacts, with Bazel reachability unknown.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

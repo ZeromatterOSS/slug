@@ -228,6 +228,16 @@ review returned `EXECUTE`, confirming the unchanged ignored public boundary and
 the `N`, `N+3`, `N+5`, external `N+8` hierarchy. Exactly one `N=30` proof is
 selected, with no retry or extension.
 
+That sole proof exited 2 after 30.22 external seconds and a clean 30.011537-
+second supervised wall deadline. Its exact selector and PID/reap/cleanup gates
+passed, but it remained at `RootCompute`/`Entry` (6/1) with zero executed,
+passed, publication and sentinel results. Final receipt SHA-256 is
+`43038196236b120fdf6c254f39ac6f369c0ec8497f227c3c0665c42171f5f888`.
+Independent result review returned `REPLAN`: configured-source F3 remains
+unaccepted and resource-blocked at the indivisible public boundary under the
+user's maximum. Do not retry, extend or infer semantics from the last activity
+sample. This F3 evidence path is closed.
+
 B1 can be investigated independently of fixture construction. The two proven
 baseline failures are
 `build_command_root_selects_each_terminal_producer_once_for_duplicate_targets`
