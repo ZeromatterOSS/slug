@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-five-target-rustc-aquery-r1
-Status: design ACCEPT; one focused offline aquery pending
+Status: REPLAN; five direct Rustc flag sets observed, generated flags unresolved
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -383,6 +383,18 @@ differences. No build, test, edit or M7A admission is selected.
 Independent design review `ACCEPT` followed a correction to require five
 canonical Rust crate owners, exact configuration IDs and agreeing
 Rustc/RustcMetadata feature flags under the pinned binary/output base.
+The first supervisor launch failed a Python preflight name check before
+Bazel spawn; its failure receipt SHA-256 is
+`553a7d46ee477165966a4c4eada941b6422333f3bac270be301fce3e68219166`.
+The sole actual offline aquery exited 0 in 4.191 seconds with 12 action
+rows, no executed build action, clean tracked state and receipt SHA-256
+`040e2e4c49298f445a6be66310f250587c56a476ad05ff360c0173f658eb2606`.
+Five exact non-tool Rustc owners have direct feature flags matching the
+Bazel lock's Linux lists and exceeding their saved Cargo target units;
+analysis SHA-256 is `0f0aaea140a1fda7b15e876cf91c5b6f651f95de06d0468311df4905d37e091f`.
+Independent final review `REPLAN` because three actions reference generated
+`_bs.flags` whose contents are absent, so complete eventual compiler flags
+are not proven. Preserve only the direct-action finding; do not rerun aquery.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

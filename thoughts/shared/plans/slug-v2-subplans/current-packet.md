@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-five-target-rustc-aquery-r1
-Status: design ACCEPT; one focused offline aquery pending
+Status: REPLAN; five direct Rustc flag sets observed, generated flags unresolved
 
 ## Question and frozen inputs
 
@@ -79,3 +79,30 @@ Independent design review initially required exact canonical owners,
 configuration IDs and agreement between Rustc/RustcMetadata feature flags,
 plus pinned binary/output-base paths. The corrected one-command design was
 independently re-reviewed `ACCEPT`.
+
+## Result and stop
+
+The supervisor's first launch had a typo in a preflight constant and stopped
+before Bazel spawn; launcher-failure receipt SHA-256 is
+`553a7d46ee477165966a4c4eada941b6422333f3bac270be301fce3e68219166`.
+Independent review confirmed that it did not consume the sole Bazel query.
+The corrected supervisor then ran that one offline aquery successfully in
+4.191 seconds, with 12 action rows, no executed actions, no truncation,
+clean process-group cleanup and unchanged tracked hashes/status. Its receipt
+SHA-256 is `040e2e4c49298f445a6be66310f250587c56a476ad05ff360c0173f658eb2606`;
+parsed analysis SHA-256 is
+`0f0aaea140a1fda7b15e876cf91c5b6f651f95de06d0468311df4905d37e091f`.
+
+Five exact canonical owners each have one non-tool target-configuration
+`Rustc` action. Their direct `--cfg feature=...` sets equal the generated
+lock's Linux lists and contain the saved Cargo target-unit differences:
+`ahash` adds `default,getrandom,runtime-rng,std`; `lalrpop-util` adds
+`lexer,regex`; `num-traits` adds `libm`; `relative-path` adds `serde`;
+`rustix` adds `termios`. Independent final review `REPLAN` confirmed these
+direct flags but found generated `_bs.flags` inputs on `ahash`, `num-traits`
+and `rustix` whose contents were absent from the jsonproto output. The
+packet's complete-arguments gate therefore failed. These direct additions
+are real configured command arguments; the full eventual feature sets,
+build-script outputs, execution, compilation and M7A remain unresolved.
+Do not rerun this aquery. A separate reviewed successor must establish the
+generated flag content/provenance before claiming full action-feature parity.

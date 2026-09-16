@@ -367,6 +367,13 @@ The selected `WP-7-10-m7a-five-target-rustc-aquery-r1` permits one bounded
 offline action query from the CLI root, filtered to Rustc actions for the
 five differing Linux target crates. It inspects owner/flag evidence only,
 with no action execution, build, test or feature edit.
+The sole aquery exited 0 in 4.191 seconds and returned five exact non-tool
+Rustc owners whose direct feature flags equal the lock's Linux lists and
+exceed their saved Cargo units. Receipt SHA-256 is
+`040e2e4c49298f445a6be66310f250587c56a476ad05ff360c0173f658eb2606`.
+Independent final review `REPLAN`: `ahash`, `num-traits` and `rustix` also
+consume generated `_bs.flags` whose contents the action query cannot show.
+The full compiler-argument gate remains open; no aquery retry is selected.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

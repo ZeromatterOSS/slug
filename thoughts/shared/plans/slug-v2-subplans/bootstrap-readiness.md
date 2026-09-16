@@ -186,6 +186,13 @@ The selected successor inspects one filtered CLI-root `aquery` for the five
 Linux target crates with wider generated-lock feature lists. Exact action
 owners and feature flags may classify those five differences but cannot
 close other host units, compilation or the first readiness row.
+The sole aquery found five exact non-tool Rustc actions whose direct
+feature flags equal the wider lock lists. Independent final review `REPLAN`
+because three actions consume generated `_bs.flags` absent from analysis
+output. Receipt SHA-256 is
+`040e2e4c49298f445a6be66310f250587c56a476ad05ff360c0173f658eb2606`.
+No action ran; complete configured compiler arguments and the first
+readiness row remain open.
 
 ## Readiness matrix
 
