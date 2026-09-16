@@ -1,79 +1,81 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-10-m7a-external-unit-feature-accounting-r1
-Status: saved-graph external unit accounting ACCEPT; configured actions open
+Packet: WP-7-10-m7a-five-target-rustc-aquery-r1
+Status: design ACCEPT; one focused offline aquery pending
 
-## Outcome and authority
+## Question and frozen inputs
 
-Reconcile the existing selected Linux CLI Cargo unit graph against the
-frozen metadata inventory and generated Bazel lock at external package,
-platform-unit and feature-list granularity. The prior Tokio packet accepted
-one root-reachable library-unit match; it did not classify the other units.
-This packet is read-only accounting, not an edit to crate features, a Bazel
-action admission, compilation or M7A readiness.
+Determine whether the five Linux target-unit feature differences found in
+the saved Cargo-versus-lock accounting actually appear in Bazel's configured
+Rustc commands for the CLI root. The generated lock and checked-out crate
+BUILD files are wider than the selected Cargo units for `ahash 0.8.12`,
+`lalrpop-util 0.19.12`, `num-traits 0.2.19`, `relative-path 1.9.3` and
+`rustix 1.1.4`. Those lists are not yet action evidence. This packet only
+observes their actions; it does not compile, edit features, repin or admit
+whole-closure parity or M7A.
 
-Freeze clean main `917c8dcfa`, `Cargo.lock` SHA-256
+Freeze clean main `00499bfe9`, `Cargo.lock` SHA-256
 `a19882e78b50a82ed900fce570f4a6aee778553448790eaf08e2e08a591f76d8`,
 `Cargo.Bazel.lock` SHA-256
 `6335564ccbb3c915d0a2fa23b8aec0d69986911e062b586e13c5ec9812c2f35e`,
 `MODULE.bazel` SHA-256
 `109585b7b40d274ea912d32c73f54c25cc4bef1bc5e60526e18ac9bfe48d210c`,
-selected Cargo metadata analysis SHA-256
-`dad20c2240aa421f5d99fe30190cbe7fa9035b4e388ad64aa30e762afaf9cd10`,
-and accepted Cargo unit-graph stdout SHA-256
-`edd4d806c72dccd3dd8589b20bb9ad897fef3a99a01b6a91692ef8ec3a01f7fd`.
-Its receipt SHA-256 is
-`6a83706f5289c18d00619ddb9e4df96c0feddb7f0d5304bb3ade2b5502955696`.
-No new Cargo/Bazel invocation, network, build or test is selected.
+and accepted external unit feature analysis SHA-256
+`42c2aeb3e1e0624ef705fcab21e05d57037151913ef25fdc0e65c493194a1f7f`.
+The accepted full-root cquery receipt SHA-256
+`459c41aad42c9259adc239b74271c0e7b380bb6970135e4e266ee91e13b322bc`
+contains configured label rows for these five external crate targets, but its
+short display tokens do not prove action identity. Query the CLI root itself.
 
-## Bounded comparison
+## One bounded analysis-only command
 
-1. Re-parse the saved graph, verify one `slug` Linux binary root and traverse
-   dependency indices. Compare its unique package IDs with the 35 local and
-   310 external IDs in the frozen metadata inventory. Record missing and
-   extra IDs explicitly; never infer that metadata reachability is an
-   executable compilation unit.
-2. For every root-reachable external `mode=build` library/proc-macro unit,
-   exclude custom-build scripts and classify `platform` as target Linux or
-   host. Map exact Cargo package ID/name/version to `Cargo.Bazel.lock` key.
-   Compare that unit's feature set with the generated lock's `common` union
-   its `x86_64-unknown-linux-gnu` select. Record each unit index, platform,
-   equal/different result and features on each side, preserving duplicate
-   package units separately. Flag any unexpected platform, target kind,
-   missing lock key or non-unique package mapping as an unresolved error.
-3. Save a deterministic JSON analysis under `/tmp` with source hashes,
-   counts, missing IDs and every mismatch. Independently review its counts
-   and at least all mismatches against raw graph/lock input before recording
-   a plan result.
+Use pinned Bazel 9.2.0 in batch mode, with the existing offline output base,
+verified six-file nightly distdir, nightly Rust toolchain channel,
+`--repository_disable_download`, `--lockfile_mode=error` and the established
+network-profiler disable flag. Run one `aquery` of
+`mnemonic("Rustc.*", outputs(".*(ahash|lalrpop.util|num.traits|relative.path|rustix).*", deps(//app/slug_cli_v2:slug)))`
+with `--output=jsonproto --include_param_files`. [Bazel's aquery reference](https://bazel.build/query/aquery)
+documents post-analysis action inspection without execution and the
+parameter-file content option. The output
+filter limits saved actions, while `deps(root)` retains the root's configured
+closure. Check the five exact owner labels in the returned target table;
+extra regex matches do not count as evidence for a named crate.
+The exact Bazel binary SHA-256 is
+`7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694`;
+reuse output base `/tmp/slug-m7a-configured-offline-cquery-output-base`.
+The five required canonical owners from the accepted root cquery are
+`@@rules_rust++crate+slug_crates__ahash-0.8.12//:ahash`,
+`@@rules_rust++crate+slug_crates__lalrpop-util-0.19.12//:lalrpop_util`,
+`@@rules_rust++crate+slug_crates__num-traits-0.2.19//:num_traits`,
+`@@rules_rust++crate+slug_crates__relative-path-1.9.3//:relative_path`
+and `@@rules_rust++crate+slug_crates__rustix-1.1.4//:rustix`.
+Normalize only the leading Bazel `@`/`@@` spelling if jsonproto differs;
+repo and target names must match exactly. Alias and build-script owners do
+not substitute for these five.
 
-This is a structural lock-versus-Cargo-unit comparison. A generated lock
-feature list is not evidence of an actual configured Bazel compiler action.
-Different host/target Cargo units may legitimately carry distinct features;
-comparison with one lock list cannot alone authorize a feature edit. The
-tracked allowlist is this manifest, canonical plan status, Stage 10 and
-bootstrap readiness. No Cargo or Bazel lockfile may change. Independent
-design review precedes the comparison; independent final review limits any
-claim to saved graph and lock data. External action feature flags, generated
-inputs, compilation and the first M7A readiness row stay open.
-Independent design review `ACCEPT` confirmed the one-root/491-unit graph,
-343 graph package IDs, 344 eligible external compilation units and unique
-lock keys. The reviewer confirmed that the comparison remains structural
-even when a unit's feature set is narrower than the lock list.
+A supervisor caps wall time at 15 seconds and stdout/stderr at 16 MiB each,
+starts a separate process group, then applies TERM and a two-second KILL
+cleanup on a cap. Save raw output and a receipt with exact command, exit,
+elapsed time, stop reason, stream hashes/bytes, output-base status, tracked
+before/after status and frozen hashes. One failed, capped, truncated or
+unparseable attempt stops this packet; no retry or broader query.
 
-## Result
+On exit 0, require a Rustc action and complete arguments/param
+file content for each of the five exact configured owners. `Rustc` and
+`RustcMetadata` actions for one owner are acceptable only when their feature
+sets agree; otherwise the owner is ambiguous. Record configuration IDs and
+parse only each
+`--cfg feature=...` set and compare with the corresponding Cargo Linux unit
+and generated lock list. Record extra/missing features and configuration/owner
+IDs, without claiming compilation or full graph parity. If any owner is
+absent, has ambiguous actions or hides feature arguments, report
+that as a gap and stop. No BUILD or lock edit is authorized by this packet.
 
-Deterministic analysis SHA-256
-`42c2aeb3e1e0624ef705fcab21e05d57037151913ef25fdc0e65c493194a1f7f`
-records all 344 eligible external unit rows and 22 exact mismatches. The one
-Linux `slug` root reaches all 491 saved graph units and 343 package IDs:
-35 local and 308 external. Frozen metadata listed 310 external IDs; only
-`getrandom 0.3.4` and `libm 0.2.16` lack CLI units. There is no graph-only
-package ID. Of 219 Linux target and 125 host external build units, 322 have
-the same feature set as the generated lock's Linux list. All 22 differences
-are lock-only additions: five target units (`ahash`, `lalrpop-util`,
-`num-traits`, `relative-path`, `rustix`) and 17 host units. No unit-only
-feature appears. Independent final review `ACCEPT` recomputed every unit and
-mismatch row against raw frozen inputs and confirmed unchanged tracked state.
-No new Cargo/Bazel command, build or test ran. The generated lock list has
-not been proven to be the configured Bazel action flags; the discrepancies
-must be classified at that boundary before any parity or feature edit.
+The tracked allowlist is this manifest, canonical plan status, Stage 10 and
+bootstrap readiness. Independent design review precedes the one command;
+independent final review checks raw action ownership and flags. Other host
+units, generated inputs, execution, compilation and M7A remain open.
+Independent design review initially required exact canonical owners,
+configuration IDs and agreement between Rustc/RustcMetadata feature flags,
+plus pinned binary/output-base paths. The corrected one-command design was
+independently re-reviewed `ACCEPT`.

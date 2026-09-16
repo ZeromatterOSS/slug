@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-external-unit-feature-accounting-r1
-Status: saved-graph external unit accounting ACCEPT; configured actions open
+Packet: WP-7-10-m7a-five-target-rustc-aquery-r1
+Status: design ACCEPT; one focused offline aquery pending
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -375,6 +375,14 @@ target, 125 host), 322 match the lock's Linux feature list and 22 are
 narrower (five target, 17 host), with no unit-only features. Independent
 final review `ACCEPT` recomputed all rows. This is structural accounting,
 not proof of configured Bazel flags or compilation.
+The selected successor permits one bounded, offline CLI-root `aquery` that
+filters Rustc actions to the five Linux target crates whose lock feature
+lists exceed the saved Cargo unit lists. Exact owner and command/param-file
+flags decide whether those structural differences are configured action
+differences. No build, test, edit or M7A admission is selected.
+Independent design review `ACCEPT` followed a correction to require five
+canonical Rust crate owners, exact configuration IDs and agreeing
+Rustc/RustcMetadata feature flags under the pinned binary/output base.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

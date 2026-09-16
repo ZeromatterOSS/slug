@@ -363,6 +363,10 @@ Linux list and 22 are narrower (five Linux target, 17 host). Analysis
 SHA-256 is `42c2aeb3e1e0624ef705fcab21e05d57037151913ef25fdc0e65c493194a1f7f`;
 independent final review `ACCEPT` recomputed all rows. Configured Bazel
 action flags must be inspected before interpreting these differences.
+The selected `WP-7-10-m7a-five-target-rustc-aquery-r1` permits one bounded
+offline action query from the CLI root, filtered to Rustc actions for the
+five differing Linux target crates. It inspects owner/flag evidence only,
+with no action execution, build, test or feature edit.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

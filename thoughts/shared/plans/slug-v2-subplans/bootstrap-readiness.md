@@ -182,6 +182,10 @@ narrower, including five Linux target units. Independent final review
 `ACCEPT` recomputed the analysis at SHA-256
 `42c2aeb3e1e0624ef705fcab21e05d57037151913ef25fdc0e65c493194a1f7f`.
 This does not establish configured Bazel action flags or close the first row.
+The selected successor inspects one filtered CLI-root `aquery` for the five
+Linux target crates with wider generated-lock feature lists. Exact action
+owners and feature flags may classify those five differences but cannot
+close other host units, compilation or the first readiness row.
 
 ## Readiness matrix
 
