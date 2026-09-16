@@ -1,14 +1,14 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-generated-lock-candidate-validation-r1
-Status: restored-authority, no-repin validation design ACCEPT; one check pending
+Status: static BUILD/lock synchronization ACCEPT; target reachability remains open
 
 ## Outcome and frozen evidence
 
-Decide whether the generated `Cargo.Bazel.lock` candidate is valid against the
+Validate whether the generated `Cargo.Bazel.lock` candidate is valid against the
 exact restored root `Cargo.lock`, without repinning, changing source or
-running any build, test or graph query. Only a validated generated-lock
-candidate may join the seven static BUILD edits in the next final review.
+running any build, test or target graph query. The validated generated-lock
+candidate joins the seven static BUILD edits after independent final review.
 This packet admits no Bazel declared/configured reachability, action behavior,
 exact ActionKey or M7A milestone.
 
@@ -91,3 +91,22 @@ and compilation remain separate M7A prerequisites.
 Independent design review `ACCEPT` verified the fresh-base/lockfile-off
 extension path, the no-repin cargo-bazel query branch and the separate
 Cargo-lock semantic/checksum gates. The single bounded check is selected.
+
+## Observed validation
+
+The sole fresh-output-base, no-repin Bazel command exited 0 in 2.171 seconds
+with no timeout or stream truncation and clean process-group cleanup. Its
+stderr points to the fresh output base's rules_rust extension and contains
+no error: only a JVM deprecation warning, a `no actions running` line and
+unused optional-patch warnings. The exact
+pre/post SHA-256 values for Cargo.lock, Cargo.Bazel.lock, MODULE.bazel.lock
+and all seven BUILD files match; tracked status is identical. Receipt SHA-256:
+`290a3c2fce004a895b4470bd985d3618b047eb890457404daa37b182ebcbe278`.
+The separate parsed-TOML equality, 448 registry checksum census and
+structured candidate analysis remain part of the acceptance evidence.
+No repin, build, test or Bazel target query ran in this validation.
+Independent final review `ACCEPT` checked the full receipt, exact BUILD edges,
+candidate drift, Cargo-lock equality and checksum census. The generated lock
+has exactly the same 497 package name/version keys as root `Cargo.lock`, with
+no missing or extra package. This closes static BUILD/lock synchronization
+only; target graph reachability, buildability and M7A remain open.

@@ -96,6 +96,10 @@ restored. The selected
 `WP-7-10-m7a-generated-lock-candidate-validation-r1` checks the candidate
 against restored authority once, without build, test or target graph query;
 the first readiness row remains open.
+The sole no-repin validation passed under a fresh Bazel output base with
+unchanged authority and BUILD hashes; independent final review of static
+graph/lock synchronization accepted it. No target reachability or M7A row
+closes from that validation alone.
 
 ## Readiness matrix
 

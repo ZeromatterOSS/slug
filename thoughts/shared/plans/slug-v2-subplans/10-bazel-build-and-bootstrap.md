@@ -253,6 +253,18 @@ additive crate keys and no removals. The selected
 `WP-7-10-m7a-generated-lock-candidate-validation-r1` permits one read-only,
 fresh-output-base, no-repin lock-coherence check before final static-sync
 review. Bazel graph and M7A evidence remain open.
+The sole no-repin, fresh-output-base validation exited 0 in 2.171 seconds;
+all tracked authority/BUILD hashes and status stayed unchanged. Receipt
+SHA-256 is
+`290a3c2fce004a895b4470bd985d3618b047eb890457404daa37b182ebcbe278`.
+Together with parsed Cargo-lock equality and all 448 registry checksums,
+this supports the generated-lock candidate for independent final review,
+without admitting target reachability or M7A behavior.
+Independent final review `ACCEPT` found exact 497/497 Cargo-lock package keys,
+448 matching registry checksums and seven BUILD files aligned with Cargo.
+Static BUILD/lock synchronization is accepted. The next packet must obtain
+fresh target graph evidence; this result proves no compilation or M7A
+behavior.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

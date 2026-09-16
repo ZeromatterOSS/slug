@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-generated-lock-candidate-validation-r1
-Status: restored-authority, no-repin validation design ACCEPT; one check pending
+Status: static BUILD/lock synchronization ACCEPT; target reachability remains open
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -223,6 +223,19 @@ Independent design review `ACCEPT` confirmed that the fresh base and
 `--lockfile_mode=off` combination forces extension evaluation, while
 rules_rust's no-repin path checks its generated lock. One 30-second-capped
 validation is selected.
+The sole no-repin validation exited 0 in 2.171 seconds with clean cleanup,
+fresh rules_rust extension evaluation and identical pre/post hashes for
+Cargo.lock, Cargo.Bazel.lock, MODULE.bazel.lock and all seven BUILD files.
+Receipt SHA-256 is
+`290a3c2fce004a895b4470bd985d3618b047eb890457404daa37b182ebcbe278`.
+The candidate's parsed Cargo-lock equality and all 448 registry checksums
+remain separate gates for independent final review. No build, test or Bazel
+target query ran; M7A remains open.
+Independent final review `ACCEPT` verified the generated lock has all 497
+Cargo-lock package name/version keys, no extras, all 448 registry checksums,
+and the seven BUILD edits match normal Cargo edges. This closes only static
+BUILD/lock synchronization; live target graph, compilation and M7A gates
+remain open.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt
@@ -331,8 +344,8 @@ partially or integrate `review-evidence/`.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Static Bazel graph synchronization | add the missing configuration owner/edges and repin the generated lock from unchanged Cargo authority; no test, build or query |
-| 2 | Configured production graph coverage | separately review fresh Bazel declared/configured/action evidence; current packet cannot admit M7A behavior |
+| 1 | Fresh Bazel declared target graph | static BUILD/lock synchronization accepted; obtain one bounded root dependency view without treating it as configured action evidence |
+| 2 | Configured production graph coverage | separately review configured/action closure and compilation evidence; current packet cannot admit M7A behavior |
 | 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |

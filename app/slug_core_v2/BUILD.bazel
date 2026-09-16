@@ -13,6 +13,7 @@ rust_library(
         "//app/slug_analysis_v2",
         "//app/slug_build_api_v2",
         "//app/slug_bzlmod_v2",
+        "//app/slug_configuration_v2",
         "//app/slug_events_v2",
         "//app/slug_identity_v2",
         "//app/slug_loading_v2",

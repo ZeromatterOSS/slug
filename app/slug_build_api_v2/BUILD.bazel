@@ -10,6 +10,7 @@ rust_library(
     edition = crate_edition(),
     deps = all_crate_deps(normal = True) + [
         "//allocative/allocative",
+        "//app/slug_configuration_v2",
         "//app/slug_identity_v2",
         "//gazebo/dupe",
         "//starlark-rust/starlark_map",

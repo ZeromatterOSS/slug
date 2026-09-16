@@ -11,6 +11,7 @@ rust_library(
     deps = all_crate_deps(normal = True) + [
         "//app/slug_bep_v2",
         "//app/slug_bzlmod_v2",
+        "//app/slug_configuration_v2",
         "//app/slug_identity_v2",
         "//app/slug_query_v2",
     ],
