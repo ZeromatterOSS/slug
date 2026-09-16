@@ -29,8 +29,12 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-num-traits-build-script-env-aquery-r1
-Status: result ACCEPT; configured action environment observed, inherited wrapper state unknown
+Packet: WP-7-10-m7a-num-traits-build-script-output-r1
+Status: design ACCEPT; one bounded external build-script output observation pending
+
+The selected successor permits one offline, 20-second-capped Bazel build of
+only the generated `num-traits` build-script alias to inspect `_bs.flags`.
+It cannot establish a CLI build or M7A readiness.
 
 The sole `num-traits` build-script action query exited 0 in 4.154 seconds and
 found the exact non-tool owner plus a separate tool owner. No wrapper key is

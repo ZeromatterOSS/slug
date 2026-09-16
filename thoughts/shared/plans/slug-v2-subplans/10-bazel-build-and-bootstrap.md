@@ -398,6 +398,11 @@ analysis SHA-256 is
 `b3e727f268ad66c7ae9c6ba7cd90c067d5ee041a5d69054bc29f2f3375240ae4`.
 Independent result review `ACCEPT` confirmed the limited observation.
 Complete compiler arguments, compilation and M7A readiness remain open.
+The selected `WP-7-10-m7a-num-traits-build-script-output-r1` allows one
+20-second-capped, offline build of the generated `num-traits` build-script
+alias and its required dependencies. It records the exact `_bs.flags` bytes
+to resolve the inherited probe-output uncertainty only. This is not a CLI
+build, feature-parity correction or M7A admission.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

@@ -214,6 +214,10 @@ analysis SHA-256 is
 `b3e727f268ad66c7ae9c6ba7cd90c067d5ee041a5d69054bc29f2f3375240ae4`.
 Independent result review `ACCEPT` confirmed this narrow bound. No build or
 test action ran and the first readiness row remains open.
+The selected successor builds only the generated `num-traits` build-script
+alias under a 20-second bound to inspect exact `_bs.flags` bytes. A successful
+observation can classify that script's feature cfg output; it cannot prove
+the rest of the compiler graph or close this row.
 
 ## Readiness matrix
 
