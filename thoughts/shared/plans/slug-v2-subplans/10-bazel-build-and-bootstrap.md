@@ -269,6 +269,16 @@ The selected `WP-7-10-m7a-bazel-declared-root-query-r1` permits one fresh
 offline/download-disabled target dependency query under a 30-second ceiling.
 It reports selected local path reachability and any gap; query labels are an
 unconfigured declared view and cannot close configured/action or M7A gates.
+The one query exited 0 in 2.952 seconds and yielded 18,846 valid distinct
+labels. All 35 selected local package paths, the configuration/Starlark
+targets and all eight previously missing selected external repositories are
+present in this unconfigured declared closure. Command receipt SHA-256 is
+`1935a3d026a6a31566d6250ac2fc49747b1f08de04d36819984e9dd34ae89b8a`;
+parsed analysis SHA-256 is
+`f734391152ac608a0787b7443575b6fe3253294b8211494ba161d6f1545f0b13`.
+Independent final review `ACCEPT` confirmed the saved label set and strict
+unconfigured classification. Configured/action and buildability evidence is
+still absent.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

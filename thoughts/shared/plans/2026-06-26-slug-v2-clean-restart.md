@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-bazel-declared-root-query-r1
-Status: read-only declared-root query design ACCEPT; one bounded query pending
+Status: unconfigured declared-root reachability ACCEPT; configured gates remain open
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -244,6 +244,17 @@ selected.
 Independent design review `ACCEPT` confirmed the single fresh-base query and
 label parsing boundary; the result must distinguish root `//` labels from
 external `@` labels.
+The sole pinned root dependency query exited 0 in 2.952 seconds with clean
+cleanup, no repository download and unchanged tracked hashes/status. Command
+receipt SHA-256 is
+`1935a3d026a6a31566d6250ac2fc49747b1f08de04d36819984e9dd34ae89b8a`.
+Its 18,846 valid distinct labels include all 35 selected local package paths,
+the configuration and Starlark targets, and repositories for all eight
+formerly absent selected external lock keys. Parsed analysis receipt SHA-256
+is `f734391152ac608a0787b7443575b6fe3253294b8211494ba161d6f1545f0b13`.
+Independent final review `ACCEPT` confirmed the saved labels, path mapping
+and clean receipt. This is only unconfigured declared reachability; configured
+target/action, generated-input, buildability and M7A gates remain open.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt
@@ -352,8 +363,8 @@ partially or integrate `review-evidence/`.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Fresh Bazel declared target graph | static BUILD/lock synchronization accepted; obtain one bounded root dependency view without treating it as configured action evidence |
-| 2 | Configured production graph coverage | separately review configured/action closure and compilation evidence; current packet cannot admit M7A behavior |
+| 1 | Configured production graph coverage | unconfigured declared 35/35 local path evidence accepted; separately review configured target/features/generated-input closure |
+| 2 | Bazel root compilation and action coverage | select focused build/action evidence only after configured graph accounting; current packet cannot admit M7A behavior |
 | 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |

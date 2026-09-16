@@ -103,6 +103,10 @@ closes from that validation alone.
 The selected `WP-7-10-m7a-bazel-declared-root-query-r1` obtains one fresh
 unconfigured root target view. Even complete declared path reachability does
 not close this row without configured/action and behavioral evidence.
+The fresh query yielded all 35 selected local package paths and the named
+configuration/Starlark targets in its unconfigured declared view; independent
+result review `ACCEPT` confirmed the labels. This does not yet prove configured
+action reachability or close the first readiness row.
 
 ## Readiness matrix
 
@@ -112,7 +116,7 @@ unobserved action families cannot be declared unnecessary by assumption.
 
 | Obligation in the production closure | Current status / reusable evidence | Owner | Required exit evidence |
 |---|---|---|---|
-| Bazel builds the CLI root, its 33-package closure and generated sources | Accepted developer graph; partial live Cargo inventory is 35 local packages with two additions; `slug_configuration_v2` lacks BUILD, `slug_starlark_v2` and eight external keys are absent from `Cargo.Bazel.lock`, and Bazel reachability is unknown | Stage 10 | Add/review missing BUILD ownership, synchronize the lock, then prove live declared/configured root reachability, features, generated inputs and pin correspondence without excluding a production input |
+| Bazel builds the CLI root, its 35-package selected Cargo closure and generated sources | Static configuration BUILD/edge and Bazel-lock synchronization accepted; fresh unconfigured root query reaches all 35 local package paths and eight formerly missing external repositories, independently accepted; configured reachability, features, generated inputs and buildability remain unproved | Stage 10 | Prove configured root reachability, features, generated inputs, pin correspondence and compilation without excluding a production input |
 | Authentic MODULE, registry, archive, built-in and generated repository sources | Partial. Normal Run registry parity accepted at `47163df7b`; authentic complete R2 fixture closure remains unresolved. Stage 5 owns sources and registrations | Stages 4/5 | Portable authentic inputs and ordinary source/mapping/registration demand for the selected production closure; no synthetic package, user-CAS default-test dependency or hidden Bazel semantic delegation |
 | rules_rust/provider/transition/toolchain evaluation | Partial configured analysis; accepted generic declarations/providers/Args/runfiles do not prove the full rules_rust closure. Canonical M7 status names accepted owners | Stages 4/5/6 | Ordinary configured results for the production root with source-derived toolchain/provider/transition dependencies; exact named semantics and structural invalidation |
 | Named/automatic execution groups | Accepted bounded with R2 at main checkpoint `71d9ce4bf`; pinned-source runtime names, target-context parsing, property precedence, action ordering, root provenance/depset shape and subrule boundary passed joint gates | Stages 4/5/6 | Preserve the accepted boundary; authentic F3 remains unaccepted and closed at its 30-second ceiling |

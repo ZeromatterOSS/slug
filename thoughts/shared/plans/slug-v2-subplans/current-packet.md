@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-bazel-declared-root-query-r1
-Status: read-only declared-root query design ACCEPT; one bounded query pending
+Status: unconfigured declared-root reachability ACCEPT; configured gates remain open
 
 ## Outcome and authority
 
@@ -83,3 +83,26 @@ analysis, action execution and buildability need separately scoped evidence.
 Independent design review `ACCEPT` confirmed the fresh-base/offline query
 boundary and strict unconfigured interpretation. The one 30-second-capped
 query is selected.
+
+## Observed result
+
+The sole pinned query exited 0 in 2.952 seconds with no timeout or stream
+truncation, clean process cleanup and identical pre/post tracked hashes/status.
+Its stderr names the rules_rust extension in the fresh output base; Bazel
+materialized cached repository content without a download. Command receipt
+SHA-256 is
+`1935a3d026a6a31566d6250ac2fc49747b1f08de04d36819984e9dd34ae89b8a`.
+The 18,846 stdout rows are distinct valid Bazel labels: 1,084 root-workspace
+and 17,762 external labels. The CLI root, configuration and Starlark V2
+target labels appear. All 35 selected local Cargo package paths appear in
+root-workspace labels; the sole additional root package path is the workspace
+root itself. Repositories for all eight formerly absent selected external
+lock keys also appear. The six static incoming configuration edges match
+frozen normal Cargo edges. Parsed analysis receipt SHA-256 is
+`f734391152ac608a0787b7443575b6fe3253294b8211494ba161d6f1545f0b13`.
+This is unconfigured declared reachability only. No build, test, configured
+target or action proof ran.
+Independent final review `ACCEPT` independently parsed the saved stdout and
+confirmed all counts, path mappings, eight external repositories, clean
+receipt and unchanged hashes. This closes the declared target-graph evidence
+slice only.
