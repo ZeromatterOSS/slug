@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-5-6-7A-post-activation-f3-preparation-recovery-r1
-Status: F3 harness preparation recovery ready; independent design review ACCEPT
+Packet: WP-4-5-6-7A-post-activation-f3-preparation-recovery-r2
+Status: final F3 harness preparation recovery ready; independent design review ACCEPT
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -50,6 +50,15 @@ invalid Cargo receipt replans without retry. Only preparation success permits
 the still-unused single F3 invocation under the accepted 12/15-second limits
 and exact persistent summary, supervisor, PID and observer gates. No source,
 fixture or accepted-gate change/rerun is allowed.
+
+That accepted continuation also stopped at its ceiling: exit 124 after 360
+compiler artifacts, 52 build-script rows and 17 messages, with zero errors,
+malformed rows, executables or `build-finished`. Receipt
+`5de997cd2c5176ab1fcfe0678f7f33b543b876c22948c975de9b37b27e9a9597`
+records clean cleanup and zero F3 invocations. The final recovery permits one
+identical compile-only continuation against the warmed target under a
+360-second ceiling. A preparation defect ends this evidence path without retry;
+only strict success exposes the still-unused single F3 proof.
 
 #### Historical gate progression
 

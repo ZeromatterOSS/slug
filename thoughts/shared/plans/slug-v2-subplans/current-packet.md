@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-5-6-7A-post-activation-f3-preparation-recovery-r1
-Status: F3 harness preparation recovery ready; independent design review ACCEPT
+Packet: WP-4-5-6-7A-post-activation-f3-preparation-recovery-r2
+Status: final F3 harness preparation recovery ready; independent design review ACCEPT
 
 ## Result and acceptance boundary
 
@@ -13,14 +13,14 @@ the now-warmed incremental state. Do not clean, change features/profile,
 prepare another package or change source, tests, Cargo/BUILD, fixture, mirror,
 metadata, assembler, supervisor or observer.
 
-Authorize exactly one same-command compile-only continuation under a
-180-second ceiling. This is a reviewed resource recovery after the initial
-60-second preparation stopped, not an additional invocation under that expired
-contract. Require fully parsed Cargo JSONL, zero compiler errors, exactly one
-successful `build-finished` row, exactly one matching `slug_cli_v2` library
-test executable, its SHA-256 and clean process-tree cleanup. A stop, malformed
-receipt or missing/multiple executable replans with no F3 invocation and no
-compile retry.
+Authorize exactly one final same-command compile-only continuation under a
+360-second ceiling. This is a separately reviewed resource recovery after the
+accepted 180-second continuation stopped, not another invocation under either
+expired preparation contract. Require fully parsed Cargo JSONL, zero compiler
+errors, exactly one successful `build-finished` row, exactly one matching
+`slug_cli_v2` library test executable, its SHA-256 and clean process-tree
+cleanup. A stop, malformed receipt or missing/multiple executable ends this
+evidence path without F3 invocation, another compile recovery or retry.
 
 Only preparation success permits exactly one invocation of
 `python3 tools/v2_oracle/configured_cli_fixture.py prove --harness <executable>`
@@ -29,6 +29,19 @@ post-run receipt gate below. F3 has not run. Preserve the single-execution
 authority: a success accepts only configured-source F3; a fully supervised
 typed terminal selects a reviewed successor; a timeout or invalid supervision
 replans. Do not rerun any accepted R2/group/Core/consumer or diagnostic gate.
+
+## Failed 180-second recovery history
+
+The accepted r1 recovery used clean main `6b328f50c` and the identical pinned
+preparation against the warmed target. Its sole continuation reached the
+180-second wall ceiling with exit 124 after 360 compiler artifacts, 52
+build-script rows and 17 compiler messages, with zero compiler errors,
+malformed rows, executables or `build-finished` rows. Cargo JSON
+`/tmp/slug-f3-cli-recovery-180-compile.json` has SHA-256
+`ca6a99ffb1c10c47ec247812b7b20c71f74a0c13e722719f1864d4e605c8c719`;
+receipt `/tmp/slug-f3-cli-recovery-180-receipt.json` has SHA-256
+`5de997cd2c5176ab1fcfe0678f7f33b543b876c22948c975de9b37b27e9a9597`.
+Cleanup found no Cargo or rustc process, and F3 remains uninvoked.
 
 ## Failed initial F3 preparation history
 

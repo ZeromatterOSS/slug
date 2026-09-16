@@ -161,6 +161,15 @@ identical compile-only command once against the warmed target under a
 produces one valid harness. No retry, source/fixture change or accepted-gate
 replay is permitted.
 
+The accepted 180-second recovery also stopped with exit 124 after 360 compiler
+artifacts, 52 build-script rows and 17 messages, with zero errors, malformed
+rows, executables or `build-finished`. Receipt
+`5de997cd2c5176ab1fcfe0678f7f33b543b876c22948c975de9b37b27e9a9597`
+records clean cleanup and zero F3 invocations. One final separately reviewed
+same-command compile-only continuation may use the warmed target under a
+360-second ceiling. A stop or invalid receipt ends the evidence path; only
+strict harness success exposes the still-unused one-proof authority.
+
 B1 can be investigated independently of fixture construction. The two proven
 baseline failures are
 `build_command_root_selects_each_terminal_producer_once_for_duplicate_targets`
