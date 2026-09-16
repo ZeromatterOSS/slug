@@ -229,6 +229,14 @@ The selected saved-artifact successor checks whether the 22 narrower CLI
 Cargo feature sets correspond to workspace-wide Cargo metadata and pinned
 crate_universe resolution scope. It cannot establish generated flag contents,
 compilation or the first readiness row.
+The static comparison found 343/344 normal external unit rows with Linux
+lock features equal to workspace metadata. Target Tokio alone omits
+metadata-only `windows-sys` on Linux; all 22 CLI-narrower unit rows equal
+metadata at the lock feature set. Independent final review `ACCEPT` confirmed
+analysis SHA-256
+`2d30fd2b80942d2be57e558dca86730f7d897f05d2aaa481cc1b5c048eedb90e`.
+This reconciles saved feature-list scope only; configured flags, generated
+flags, compilation and the first readiness row remain open.
 
 ## Readiness matrix
 

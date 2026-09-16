@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-workspace-feature-scope-reconcile-r1
-Status: design ACCEPT; saved-artifact and pinned-source reconciliation pending
+Status: result ACCEPT; workspace-scope feature lists reconciled structurally
 
 ## Outcome and boundary
 
@@ -71,3 +71,20 @@ Independent design review `ACCEPT` confirmed the frozen 344-unit input and
 pinned workspace-wide `cargo tree` source. The final result must describe
 workspace-scope consistency without claiming exact metadata-to-lock causality,
 and keep Tokio's Linux selection separate from the 22 narrower CLI units.
+
+## Accepted result
+
+The static comparison read saved artifacts and pinned source in under one
+second, with no Cargo/Bazel command, compiler, build or test. Among 344 normal
+external **unit rows** representing 308 distinct external packages, 343
+generated-lock Linux feature lists exactly equal workspace metadata features.
+The sole exception is target Tokio 1.53.1: the Linux lock and CLI unit both
+have 22 features, while unfiltered metadata also includes `windows-sys`.
+All 22 CLI-narrower unit rows have lock feature lists exactly equal to their
+workspace metadata node; no CLI unit feature is missing from the lock list.
+Analysis SHA-256 is
+`2d30fd2b80942d2be57e558dca86730f7d897f05d2aaa481cc1b5c048eedb90e`.
+Independent final review `ACCEPT` recomputed all rows and pinned source.
+This supports workspace-scope consistency, not direct metadata-to-lock
+causality. Configured Bazel flags for all units, generated build-script flags,
+compilation and the first M7A readiness row remain open.

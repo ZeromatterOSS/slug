@@ -414,6 +414,14 @@ The selected `WP-7-10-m7a-workspace-feature-scope-reconcile-r1` compares
 saved CLI-unit, generated-lock and workspace-metadata feature sets against
 pinned crate_universe source. It runs no build, test or new Cargo/Bazel
 command; configured compiler arguments and M7A stay open.
+The saved-artifact comparison found 343 of 344 normal external unit rows
+whose Linux lock features equal workspace metadata; target Tokio alone omits
+metadata's `windows-sys` on Linux. All 22 CLI-narrower unit rows have lock
+features equal to workspace metadata, consistent with pinned crate_universe's
+workspace-wide feature-resolution scope. Analysis SHA-256 is
+`2d30fd2b80942d2be57e558dca86730f7d897f05d2aaa481cc1b5c048eedb90e`;
+independent final review `ACCEPT` recomputed the mapping. This does not prove
+direct metadata-to-lock causality, full configured flags or compilation.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

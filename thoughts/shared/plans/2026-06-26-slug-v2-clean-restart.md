@@ -30,12 +30,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-workspace-feature-scope-reconcile-r1
-Status: design ACCEPT; saved-artifact and pinned-source reconciliation pending
+Status: result ACCEPT; workspace-scope feature lists reconciled structurally
 
 The selected successor compares the accepted CLI Cargo unit graph, generated
 Bazel lock and workspace Cargo metadata using pinned rules_rust feature
 resolution source. It runs no Cargo/Bazel command, compiler, build or test;
 configured action flags, generated outputs and M7A stay open.
+The static comparison found 343 of 344 normal external unit rows with Linux
+lock features equal to workspace metadata. The sole exception is Tokio's
+metadata-only `windows-sys`; all 22 CLI-narrower unit rows match metadata at
+the lock set. Analysis SHA-256 is
+`2d30fd2b80942d2be57e558dca86730f7d897f05d2aaa481cc1b5c048eedb90e`.
+Independent final review `ACCEPT` confirmed workspace-scope consistency only;
+configured flags, generated build-script flags, compilation and M7A stay open.
 
 The selected successor permits one offline, 20-second-capped Bazel build of
 only the generated `num-traits` build-script alias to inspect `_bs.flags`.
