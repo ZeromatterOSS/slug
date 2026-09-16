@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-bazel-graph-sync-r2
-Status: independent design review ACCEPT; metadata mutation pending
+Packet: WP-7-10-m7a-bazel-graph-sync-recovery-r1
+Status: flag-only profiler recovery design ACCEPT; one bounded repin pending
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -192,6 +192,19 @@ M7A behavior remain separate gates.
 Independent design review `ACCEPT` confirmed this narrow boundary and the
 cached generator; preserve exact pre-run Cargo-lock bytes for recovery if
 repin violates its allowlist.
+The static BUILD owner and six normal edges now match frozen Cargo analysis.
+The sole initial repin exited 37 in 1.098 seconds before lock generation at
+Bazel 9.2.0's system-network profiler null dereference. Receipt SHA-256
+`86995d8a436d74b7db448d5fdbb3aa652a30c7f3ab50477036a3f6dca37b1051`
+records clean cleanup, unchanged Cargo/other locks and identical pre/post
+tracked status. Pinned Bazel help exposes a flag to disable only that
+collector. The selected recovery keeps offline/download controls and permits
+one otherwise identical bounded repin with
+`--noexperimental_collect_system_network_usage`; no build, query or test is
+selected.
+Independent design review `ACCEPT` confirmed the flag disables the crashing
+collector without changing repository or Cargo resolution, and verified the
+unchanged lock/status receipts. One modified attempt is now selected.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

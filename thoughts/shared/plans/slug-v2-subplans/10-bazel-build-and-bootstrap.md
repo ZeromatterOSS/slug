@@ -228,11 +228,19 @@ source after Cargo completed; recovered output/cleanup receipt SHA-256 is
 `f5163a1827114cdc71acc9c325369db93f23a3cbc807cf821203e5486fbb5bea`.
 Independent final review `ACCEPT` confirmed the recovered metadata evidence
 without a rerun. The graph and M7A gates remain open.
-The selected `WP-7-10-m7a-bazel-graph-sync-r2` packet uses that accepted
+The `WP-7-10-m7a-bazel-graph-sync-r2` packet used that accepted
 offline cache to add the missing configuration BUILD owner and six normal
-first-party edges, then performs one bounded, offline crate-universe repin.
-It checks generated lock keys and drift only; live Bazel reachability, owner
+first-party edges, then attempted one bounded, offline crate-universe repin.
+The generated lock was not changed; live Bazel reachability, owner
 compilation and M7A readiness remain separate gates.
+The first repin stopped in 1.098 seconds at Bazel 9.2.0's system-network
+profiler null dereference, before generated-lock mutation. Receipt SHA-256
+`86995d8a436d74b7db448d5fdbb3aa652a30c7f3ab50477036a3f6dca37b1051`.
+The selected `WP-7-10-m7a-bazel-graph-sync-recovery-r1` changes only Bazel's
+profiler flag to disable system-network collection for one bounded offline
+repin; independent design review `ACCEPT` confirmed the flag-only correction.
+Static BUILD edits remain uncommitted
+until generated lock and final review.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

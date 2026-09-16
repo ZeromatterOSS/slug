@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-10-m7a-bazel-graph-sync-r2
-Status: independent design review ACCEPT; metadata mutation pending
+Packet: WP-7-10-m7a-bazel-graph-sync-recovery-r1
+Status: flag-only profiler recovery design ACCEPT; one bounded repin pending
 
 ## Outcome and authority
 
@@ -12,7 +12,7 @@ unchanged Cargo authority. This packet does not build or query Bazel targets
 and admits no declared/configured reachability, action behavior, exact
 ActionKey or M7A milestone. Those need separately reviewed live evidence.
 
-Freeze clean main `401b6d953`, root `Cargo.lock` SHA-256
+Freeze design checkpoint main `eda88404a`, root `Cargo.lock` SHA-256
 `a19882e78b50a82ed900fce570f4a6aee778553448790eaf08e2e08a591f76d8`,
 the accepted Cargo Linux-closure analysis SHA-256
 `dad20c2240aa421f5d99fe30190cbe7fa9035b4e388ad64aa30e762afaf9cd10`,
@@ -63,9 +63,10 @@ Leave generator URL/SHA override variables unset. The module's
 only for repin, set `CARGO_BAZEL_ISOLATED=false` and
 `CARGO_HOME=/home/wgray/.cargo` to use the now-verified host cache.
 
-Run exactly one `CARGO_BAZEL_REPIN=1` generation using that absolute Bazel
+Run exactly one reviewed recovery `CARGO_BAZEL_REPIN=1` generation using that absolute Bazel
 binary, startup flags `--batch --ignore_all_rc_files` and command
-`mod deps --repository_disable_download --lockfile_mode=update`.
+`mod deps --repository_disable_download --lockfile_mode=update
+--noexperimental_collect_system_network_usage`.
 Set `CARGO_NET_OFFLINE=true` and keep the restricted network environment.
 The cached rules_rust source maps repin mode `1` to
 `cargo update --workspace`; therefore compare root `Cargo.lock` SHA
@@ -77,7 +78,7 @@ generation, not a test. A missing downloader input, timeout, unexpected
 mutation, generator failure or changed Cargo authority stops without a blind
 retry, alternate generator or network fetch.
 
-After a clean generation, parse the generated lock and compare selected
+After a clean recovery generation, parse the generated lock and compare selected
 Cargo package name/version keys: require all 35 local and 310 external keys,
 including the nine previously absent keys. Review before/after versions,
 sources, checksums, features and any `MODULE.bazel.lock` change; reject
@@ -97,4 +98,31 @@ stay disabled, since `--nofetch` alone can leave stale repository content.
 Independent design review `ACCEPT` confirmed the exact four local owner deps,
 six normal consumer edges, cached default generator and offline host Cargo
 inputs. Retain exact pre-run `Cargo.lock` bytes for restoration/reporting if
-the generator changes that forbidden authority; no retry is authorized.
+the generator changes that forbidden authority; only the reviewed flag-only
+recovery below is authorized after the observed profiler stop.
+
+## First repin stop and recovery rationale
+
+The static owner and six edges were added and checked against the frozen Cargo
+analysis. The first bounded repin then exited 37 in 1.098 seconds before lock
+generation. Its stderr shows Bazel 9.2.0's `NetworkMetricsCollector` null
+dereference because the restricted environment exposes no usable loopback
+interface. Receipt SHA-256:
+`86995d8a436d74b7db448d5fdbb3aa652a30c7f3ab50477036a3f6dca37b1051`.
+The receipt records clean process cleanup, unchanged `Cargo.lock`, identical
+pre/post tracked-file status, and no generated lock change. No build, query
+or test ran. This is the same profiler failure observed by the earlier Bazel
+inventory query; its old network-namespace recovery stopped before Bazel.
+
+Pinned Bazel's local `help --long mod` lists
+`--[no]experimental_collect_system_network_usage` (default true) and says it
+controls profiler collection of system network usage. The recovery changes
+only that flag, disabling the crashing collector while preserving the
+restricted network environment, download disablement, offline Cargo cache,
+absolute binaries and limits. It does not bring up an interface or grant
+outbound access. Recheck all hashes and the exact pre-run BUILD diff before
+the sole modified invocation. A second failure or unexpected mutation ends
+this path for replan; do not vary flags or extend the ceiling automatically.
+Independent recovery design review `ACCEPT` confirmed that pinned Bazel's
+flag prevents registration of the crashing collector and changes monitoring
+only. It verified the unchanged locks/status and exact BUILD diff.

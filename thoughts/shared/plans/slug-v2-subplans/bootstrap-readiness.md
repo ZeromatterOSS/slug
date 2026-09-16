@@ -75,18 +75,21 @@ name/version keys absent from `Cargo.Bazel.lock`; see Stage 10 for the exact
 list. These are proven local graph/lock gaps, not Bazel reachability or
 functional admission. Keep the first readiness row open until the missing
 BUILD owner, lock synchronization and fresh Bazel graph evidence are reviewed.
-The selected `WP-7-10-m7a-cargo-cache-acquisition-r1` packet first stages
-missing full-workspace inputs required by the Bazel lock generator. It runs no
-Bazel command or test and cannot close this or any other M7A row. The BUILD,
+The accepted `WP-7-10-m7a-cargo-cache-acquisition-r1` packet staged
+missing full-workspace inputs required by the Bazel lock generator. It ran no
+Bazel command or test and did not close this or any other M7A row. The BUILD,
 lock and fresh graph repairs require a separately reviewed successor.
 The one locked fetch has populated the host cache and the sole offline
 full-workspace Cargo metadata output contains all 448 locked registry keys;
 the metadata receipt wrapper had a postprocessing defect documented in the
-current packet. Independent final review accepted this input preparation only;
+acquisition receipt. Independent final review accepted this input preparation only;
 the readiness row remains open.
-The selected `WP-7-10-m7a-bazel-graph-sync-r2` now repairs static BUILD and
-generated-lock gaps without a Bazel graph query or test. This readiness row
+The `WP-7-10-m7a-bazel-graph-sync-r2` packet added the static BUILD owner and
+six edges but stopped before generated-lock repair. This readiness row
 still needs fresh declared/configured evidence and the other listed proofs.
+The first repin stopped at Bazel's network profiler before lock generation;
+the selected `WP-7-10-m7a-bazel-graph-sync-recovery-r1` permits one reviewed
+flag-only recovery. No readiness row closes from these static edits.
 
 ## Readiness matrix
 
