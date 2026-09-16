@@ -151,6 +151,16 @@ match. Success accepts only F3. A gate mismatch is invalid supervision and
 replans; only a fully supervised typed terminal selects a new reviewed owner.
 No R2/group/Core/consumer or diagnostic replay is permitted.
 
+The accepted packet's sole 60-second library-harness preparation then stopped
+with exit 124 after 315 compiler artifacts and two messages, with zero errors,
+malformed rows, executables or `build-finished` rows. Receipt
+`4400c7f81af35a53a6ad40ed322062117193608bc3a595ab93490fca17c6ec34`
+records clean cleanup and zero F3 invocations. A narrow recovery may run the
+identical compile-only command once against the warmed target under a
+180-second ceiling, then use the still-unused one-proof authority only if it
+produces one valid harness. No retry, source/fixture change or accepted-gate
+replay is permitted.
+
 B1 can be investigated independently of fixture construction. The two proven
 baseline failures are
 `build_command_root_selects_each_terminal_producer_once_for_duplicate_targets`

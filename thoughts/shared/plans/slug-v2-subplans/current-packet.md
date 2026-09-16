@@ -1,9 +1,49 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-5-6-7A-post-activation-configured-source-f3-r1
-Status: post-activation F3 replay ready; independent design review ACCEPT
+Packet: WP-4-5-6-7A-post-activation-f3-preparation-recovery-r1
+Status: F3 harness preparation recovery ready; independent design review ACCEPT
 
 ## Result and acceptance boundary
+
+Recover only the missing `slug_cli_v2` observer-feature library harness for the
+accepted post-activation F3 packet. Freeze implementation/source checkpoint
+`12d96a4d4`, the original packet's accepted receipt gate, the identical Cargo
+command, pinned toolchain and PATH, shared target directory, one build job and
+the now-warmed incremental state. Do not clean, change features/profile,
+prepare another package or change source, tests, Cargo/BUILD, fixture, mirror,
+metadata, assembler, supervisor or observer.
+
+Authorize exactly one same-command compile-only continuation under a
+180-second ceiling. This is a reviewed resource recovery after the initial
+60-second preparation stopped, not an additional invocation under that expired
+contract. Require fully parsed Cargo JSONL, zero compiler errors, exactly one
+successful `build-finished` row, exactly one matching `slug_cli_v2` library
+test executable, its SHA-256 and clean process-tree cleanup. A stop, malformed
+receipt or missing/multiple executable replans with no F3 invocation and no
+compile retry.
+
+Only preparation success permits exactly one invocation of
+`python3 tools/v2_oracle/configured_cli_fixture.py prove --harness <executable>`
+under the already accepted 12-second internal/15-second absolute limits and
+post-run receipt gate below. F3 has not run. Preserve the single-execution
+authority: a success accepts only configured-source F3; a fully supervised
+typed terminal selects a reviewed successor; a timeout or invalid supervision
+replans. Do not rerun any accepted R2/group/Core/consumer or diagnostic gate.
+
+## Failed initial F3 preparation history
+
+The sole preparation authorized by the accepted r1 packet used clean main
+`12d96a4d4`, the pinned environment, shared target and one build job. It reached
+its 60-second wall ceiling with exit 124 after 315 compiler artifacts and two
+compiler messages, with zero compiler errors, malformed rows, executables or
+`build-finished` rows. Cargo JSON
+`/tmp/slug-f3-cli-compile.json` has SHA-256
+`0f81aa2a0dc4f29f8fbb02699d6aa1b62825713802d42dbcd0d6e2e2d87c6e4f`;
+preparation receipt `/tmp/slug-f3-cli-preparation-receipt.json` has SHA-256
+`4400c7f81af35a53a6ad40ed322062117193608bc3a595ab93490fca17c6ec34`.
+Cleanup found no Cargo or rustc process, and F3 was not invoked.
+
+## Accepted F3 execution contract
 
 Run the one post-activation authentic configured-source F3 proof selected by the
 accepted R2/execution-group boundary. Freeze clean main `8b3294404`, the pinned

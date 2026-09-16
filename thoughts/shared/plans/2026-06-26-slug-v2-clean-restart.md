@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-5-6-7A-post-activation-configured-source-f3-r1
-Status: post-activation F3 replay ready; independent design review ACCEPT
+Packet: WP-4-5-6-7A-post-activation-f3-preparation-recovery-r1
+Status: F3 harness preparation recovery ready; independent design review ACCEPT
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -39,18 +39,17 @@ their reviewed prerequisites as one boundary. All required gates are complete;
 the eight main Core failures remain baseline debt, and authentic F3 is the next
 separate post-activation packet.
 
-The selected successor freezes clean main `8b3294404` and the accepted portable
-configured fixture, prepares one `slug_cli_v2` observer-feature library harness
-under the 60-second ceiling, then runs the repository-owned supervised F3 entry
-point exactly once under its unchanged 12/15-second limits. No implementation,
-fixture or accepted-gate rerun is allowed. A full F3 success accepts only the
-configured-source closure. Its receipt must show clean zero-status selector and
-run supervisors, one run PID reaped equal to the installed observer PID, an
-available/disabled observer with zero overflow/drop/activity claim, terminal
-phase/status 18/2, outer exit 0 and summary fields proving exactly one selector,
-execution, pass, native-publication and sentinel match. Any mismatch is invalid
-supervision and replans; only a fully supervised typed terminal selects a
-separate successor.
+The accepted packet's sole 60-second harness preparation stopped with exit 124,
+315 compiler artifacts, two messages, zero errors and no executable or
+`build-finished`; receipt
+`4400c7f81af35a53a6ad40ed322062117193608bc3a595ab93490fca17c6ec34`
+records clean cleanup and zero F3 invocations. The narrow successor freezes
+source checkpoint `12d96a4d4` and authorizes one identical compile-only
+continuation against the warmed target under a 180-second ceiling. A stop or
+invalid Cargo receipt replans without retry. Only preparation success permits
+the still-unused single F3 invocation under the accepted 12/15-second limits
+and exact persistent summary, supervisor, PID and observer gates. No source,
+fixture or accepted-gate change/rerun is allowed.
 
 #### Historical gate progression
 
