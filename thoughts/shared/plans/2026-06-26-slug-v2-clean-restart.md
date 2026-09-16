@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-bazel-configured-root-nightly-flag-r1
-Status: flag-corrected configured-root cquery design ACCEPT; one query selected
+Packet: WP-7-10-m7a-rust-toolchain-pin-and-cache-r1
+Status: scoped nightly toolchain provenance/cache design ACCEPT; acquisition selected
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -276,6 +276,18 @@ identical fresh-output-base cquery with the existing developer-gate
 ceiling, offline/download-disabled boundary and no-test/no-build scope remain.
 Independent design review `ACCEPT` confirmed that this changes only the
 nightly invocation flag and preserves the one-attempt limits.
+The one corrected cquery exited 1 in 2.933 seconds with zero configured rows:
+nightly toolchain selection succeeded, then the Linux x86_64 toolchain tools
+repository needed an uncached `rustc` archive and downloads were disabled.
+Receipt SHA-256 is
+`9f305306861c887bffc9ca6dbde4c1930cf8733cfa91cbe97b41c3b55364ab5c`;
+all tracked hashes/status and cleanup stayed clean. Independent result review
+confirmed this typed cache-miss boundary, not a BUILD/lock defect. The Rust
+release manifest for 2025-09-14 supplies exact archive SHA-256 values; the
+selected successor pins the required Linux x86_64 toolchain components and
+stages only those verified archives before any further offline cquery.
+Independent design review `ACCEPT` confirmed the six official hashes, the
+2025-09-14 rustfmt correction and the local distdir materialization path.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

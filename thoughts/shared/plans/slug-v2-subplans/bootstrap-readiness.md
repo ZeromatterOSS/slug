@@ -121,6 +121,12 @@ toolchains; this row remains open.
 The selected flag-only successor permits one new full-root cquery with the
 registered nightly channel. No row closes until its configured output, and
 later feature/generated-input/action/compilation evidence, are reviewed.
+That sole corrected cquery reached nightly toolchain selection but stopped at
+an uncached compiler archive with downloads disabled. Receipt
+`9f305306861c887bffc9ca6dbde4c1930cf8733cfa91cbe97b41c3b55364ab5c`
+records zero configured rows, clean cleanup and unchanged tracked inputs.
+The selected successor pins and stages exact Linux x86_64 toolchain archives;
+it does not close this readiness row or run another cquery.
 
 ## Readiness matrix
 

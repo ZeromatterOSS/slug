@@ -1,97 +1,102 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-10-m7a-bazel-configured-root-nightly-flag-r1
-Status: flag-corrected configured-root cquery design ACCEPT; one query selected
+Packet: WP-7-10-m7a-rust-toolchain-pin-and-cache-r1
+Status: scoped nightly toolchain provenance/cache design ACCEPT; acquisition selected
 
-## Outcome and prior evidence
+## Outcome and evidence
 
-Obtain one authentic Bazel 9.2 configured dependency observation for
-`//app/slug_cli_v2:slug` with the repository's registered nightly Rust
-toolchain selected. This corrects only the omitted invocation setting of
-`WP-7-10-m7a-bazel-configured-root-cquery-r1`. It changes no Slug semantic
-owner, BUILD graph, lockfile, toolchain registration or compatibility class.
-The view is diagnostic configured analysis, not a Slug behavior admission:
-full configuration identity, target/exec classification, feature vectors,
-generated inputs, action coverage, compilation, REAPI and M7A remain open.
+Pin and stage the six official 2025-09-14 nightly archives required by the
+registered Linux x86_64 Rust toolchain, then materialize that single Bazel
+toolchain-tools repository from verified local archives. This is exact
+toolchain-content provenance for this host triple, not a Slug semantic
+change. Other target/exec triples, configured-root reachability, generated
+inputs, compilation, actions and M7A remain unsupported/deferred by this
+packet. No cquery, build or test is selected.
 
-The predecessor's only cquery exited 1 in 2.862 seconds with zero stdout,
-clean cleanup and unchanged tracked hashes/status. Receipt SHA-256 is
-`80e255dbdffa001fa48f05d78d3b10d1ba9ed3c489a4c184e95b6238b06cd4d9`;
+The accepted static BUILD/lock and unconfigured root-query evidence remains
+at main `05233f540`. The sole flag-corrected configured cquery exited 1 in
+2.933 seconds with zero stdout, clean cleanup and identical pre/post tracked
+hashes/status. Receipt SHA-256 is
+`9f305306861c887bffc9ca6dbde4c1930cf8733cfa91cbe97b41c3b55364ab5c`;
 stderr SHA-256 is
-`982df292f41c8faaa362e7cea9f521a9a06a4fe080ee52f29541387c609bf3ce`.
-Bazel stopped at Rust toolchain resolution. `MODULE.bazel` registers only
-`nightly/2025-09-14`, the generated registered toolchains require
-`@rules_rust//rust/toolchain/channel:nightly`, and pinned rules_rust defaults
-the channel to stable. Existing developer-gate wrappers set
-`--@rules_rust//rust/toolchain/channel=nightly`. Independent result review
-confirmed this invocation attribution and the flag-only successor; the prior
-failure provides no configured reachability evidence.
+`c6fcc183bade96a355484028c4e7cc557ff34a4f4450deacf457d40daa514f0d`.
+Its registered nightly toolchain selected, but the Linux x86_64 tools
+repository called `ctx.download_and_extract` for an unavailable compiler
+archive while downloads were disabled. Independent final review confirmed a
+typed cache miss, not configured graph evidence or a BUILD/lock defect.
 
-Freeze clean main `848ad9ed5`, root `Cargo.lock` SHA-256
-`a19882e78b50a82ed900fce570f4a6aee778553448790eaf08e2e08a591f76d8`,
-`Cargo.Bazel.lock` SHA-256
-`6335564ccbb3c915d0a2fa23b8aec0d69986911e062b586e13c5ec9812c2f35e`,
-`MODULE.bazel.lock` SHA-256
-`bcdda78dd82aab5fd7ab1796985a78322b50178dceed7669c1b20173c2634302`,
-selected Linux Cargo analysis SHA-256
-`dad20c2240aa421f5d99fe30190cbe7fa9035b4e388ad64aa30e762afaf9cd10`,
-accepted declared-root query receipt/analysis SHA-256 values
-`1935a3d026a6a31566d6250ac2fc49747b1f08de04d36819984e9dd34ae89b8a`
-and `f734391152ac608a0787b7443575b6fe3253294b8211494ba161d6f1545f0b13`,
-and the predecessor receipt/stderr above.
+Pinned rules_rust 0.73 `rust/extensions.bzl` accepts `sha256s` on
+`rust.toolchain`; `rust/private/repository_utils.bzl` uses each matching
+archive hash for `ctx.download_and_extract`. Its built-in hash table has no
+2025-09-14 entry. The extension's default `rustfmt_version` resolves to
+`nightly/2026-07-16`, so set it explicitly to `nightly/2025-09-14` alongside
+the already selected compiler date. Do not add a local compiler override or
+infer that an installed rustup tree is a verified Bazel archive.
 
-## One bounded invocation correction
+The official dated manifest is
+`https://static.rust-lang.org/dist/2025-09-14/channel-rust-nightly.toml`.
+Its official `.sha256` sidecar matches manifest SHA-256
+`2f3d96c78c69647d0dc209aae553150793ec10988fa1011767c3990915173e01`.
+The parsed six-component Linux x86_64 map is saved at
+`/tmp/slug-m7a-rust-nightly-2025-09-14-x86_64-sha-map.json`, SHA-256
+`31fd7e74c0d9fed2744f2cadcf3a1ae6961e081255ac8f8516750f4ea0edf8cb`:
 
-Assert every frozen hash, a clean working tree and absent
-`/tmp/slug-m7a-configured-nightly-cquery-output-base`. Verify the pinned
-Bazel 9.2.0 executable SHA-256
-`7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694`.
-Use that absolute executable at
-`/home/wgray/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel`.
-Run exactly one command with startup flags `--batch --ignore_all_rc_files
---output_base=/tmp/slug-m7a-configured-nightly-cquery-output-base` and command:
+| Dated `.tar.xz` archive basename | Official SHA-256 |
+|---|---|
+| `cargo-nightly-x86_64-unknown-linux-gnu` | `cbc76e93946fb4658b692f9d71dbd4861f942b5b2bf6e34b072ba708d00e89e8` |
+| `clippy-nightly-x86_64-unknown-linux-gnu` | `98bb5375ef6648d6e59fe8558e12df854e73653db2b6c7ee8891ffa0336f7622` |
+| `llvm-tools-nightly-x86_64-unknown-linux-gnu` | `7302ec9a0447d5e21d918428b629a1d76ff934a562660e19b275fad707cf83dc` |
+| `rust-std-nightly-x86_64-unknown-linux-gnu` | `9a0a34cc7a11eb74f408ab7a5eafd063bcce3726c9bb89351ed7f2811fa35b1a` |
+| `rustc-nightly-x86_64-unknown-linux-gnu` | `0aa143cf401827874af7114f6466c0c87d4e31dfd6a2355c50db2e0c71bd45c7` |
+| `rustfmt-nightly-x86_64-unknown-linux-gnu` | `d9206e55ee07ae3ba9de7190142a8e422a72f300726fa8e094a6300c7128aa82` |
 
-```text
-cquery --repository_disable_download --lockfile_mode=off --noexperimental_collect_system_network_usage --@rules_rust//rust/toolchain/channel=nightly --output=label 'deps(//app/slug_cli_v2:slug)'
-```
+Each `sha256s` key has prefix `2025-09-14/` and suffix `.tar.xz`; each URL
+uses the official manifest `xz_url`. The table is the exact allowlist, not
+permission to download a full toolchain matrix.
 
-This is the predecessor's exact command with only the nightly-channel flag
-added and a new output base. Leave `CARGO_BAZEL_REPIN`, `REPIN` and generator
-URL/SHA overrides unset; set `CARGO_BAZEL_ISOLATED=false`,
-`CARGO_HOME=/home/wgray/.cargo`, `CARGO_NET_OFFLINE=true` and prepend the
-pinned nightly-2025-09-14 Cargo binary directory to `PATH`. Keep the
-restricted network environment, no `--nofetch`, and
-`--repository_disable_download` so only cached repository inputs may
-materialize. No build, test, network fetch, repin or action runs.
+## Bounded work
 
-The one full-root analysis has a 30-second TERM/three-second process-group
-KILL ceiling and a finite pipe-drain deadline, with 16 MiB per captured
-stream. This is the minimum full-root configured observation; a smaller
-owner-only cquery cannot establish CLI-root analysis. Record the exact
-command/environment, output hashes, exit/elapsed time, process cleanup,
-pre/post lock and seven BUILD hashes/status in a machine-readable `/tmp`
-receipt. On cache miss, analysis failure, timeout, truncation, unexpected
-tracked write or cleanup failure, record the typed gap and stop without
-another attempt or longer ceiling.
+1. Freeze clean main and root `Cargo.lock` SHA-256
+   `a19882e78b50a82ed900fce570f4a6aee778553448790eaf08e2e08a591f76d8`,
+   `Cargo.Bazel.lock` SHA-256
+   `6335564ccbb3c915d0a2fa23b8aec0d69986911e062b586e13c5ec9812c2f35e`,
+   `MODULE.bazel.lock` SHA-256
+   `bcdda78dd82aab5fd7ab1796985a78322b50178dceed7669c1b20173c2634302`,
+   official manifest/map hashes and the failed-query receipt. Add only the
+   explicit rustfmt date and six `sha256s` entries to `rust.toolchain` in
+   `MODULE.bazel`.
+2. Run one pinned Bazel 9.2 `mod deps` from a fresh output base, with
+   `--repository_disable_download --noexperimental_collect_system_network_usage
+   --lockfile_mode=update`, no repin and offline Cargo. Cap it at 30 seconds
+   TERM/three-second KILL with finite pipe drain and 16 MiB streams. Accept
+   `MODULE.bazel.lock` changes only if parsed diff belongs to the rust
+   toolchain extension and frozen Cargo/Cargo.Bazel bytes and seven BUILD
+   hashes remain exact. Any other write/failure stops; preserve the receipt.
+3. Fetch only the six exact official `.tar.xz` URLs into a new `/tmp`
+   distribution directory using a single supervised acquisition under a
+   90-second absolute ceiling. Verify every complete file against the
+   manifest SHA before admitting it; a missing, partial or mismatched file
+   stops and never enters the verified directory. Record URL, byte count,
+   expected/actual digest, elapsed time and cleanup in a `/tmp` receipt.
+4. Run one pinned Bazel `fetch
+   --repo=@@rules_rust++rust+rust_linux_x86_64__x86_64-unknown-linux-gnu__nightly_tools`
+   from a fresh output base with `--distdir` pointing only to those verified
+   files, `--repository_disable_download`, `--lockfile_mode=error`, the
+   profiler workaround and offline Cargo. Cap repository materialization
+   at 60 seconds TERM/three-second KILL and 16 MiB streams. Verify the
+   selected repository exists and record exact pre/post lock, BUILD and
+   status hashes. A cache miss or any unexpected mutation stops; do not
+   retry with network-enabled Bazel or a longer ceiling.
 
-## Result gate
-
-On success, preserve every raw label/displayed-token row. Bazel 9.2 label
-output shows seven-hex configuration-checksum prefixes or `null`, not full
-unique identities or target/exec classification. Parse actual rows without
-collapsing across tokens and report root-workspace/external row counts,
-distinct root package paths and displayed tokens, null rows, the named
-configuration/Starlark labels and reachability of all 35 Cargo-selected
-local package paths. Any missing path is a gap. Configured label reachability
-alone does not establish features, generated inputs, actions, buildability,
-Slug parity or M7A.
-
-The only tracked edits allowed are this manifest, canonical plan status,
-Stage 10 and bootstrap readiness. Run `git diff --check` and
-`python3 scripts/v2_plan_status.py`. Independent design review precedes the
-single invocation and independent final review checks the receipt, preserved
-rows and strict interpretation. The next capability decision requires a
-separate packet.
-Independent design review `ACCEPT` confirmed the exact flag-only command
-delta, frozen failed receipt, bounded runner and strict label-token evidence
-limit. The single follow-up cquery is selected.
+The only tracked edits allowed are `MODULE.bazel`, its reviewed lockfile
+update, this manifest, canonical status, Stage 10 and bootstrap readiness.
+No action/test, full dependency fetch, cquery or BuildBuddy replay is
+selected. `git diff --check` and `python3 scripts/v2_plan_status.py` are
+required. Independent design review precedes edits/acquisition and
+independent final review checks pinned mapping, exact archive digests,
+lockfile delta, receipts and strict scope. Only a separately selected
+successor may attempt offline configured-root analysis.
+Independent design review `ACCEPT` verified the official six-archive hash
+mapping, rules_rust component and rustfmt-date behavior, and Bazel's
+checksum-keyed distdir lookup before its download-disabled stop. The bounded
+pin/cache work is selected.

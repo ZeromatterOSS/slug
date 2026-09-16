@@ -295,6 +295,14 @@ The selected `WP-7-10-m7a-bazel-configured-root-nightly-flag-r1` corrects
 only that invocation setting for one fresh, offline, 30-second-capped
 full-root cquery. It leaves all configured/action/buildability gates open
 pending a successful result and separate inspection.
+That sole corrected cquery selected the nightly toolchain but exited 1 before
+configured rows because the pinned Linux x86_64 compiler archive was not
+available to the download-disabled repository rule. Receipt SHA-256 is
+`9f305306861c887bffc9ca6dbde4c1930cf8733cfa91cbe97b41c3b55364ab5c`;
+tracked inputs stayed unchanged. The selected toolchain pin/cache packet uses
+the official dated release manifest to pin six Linux x86_64 archives and
+prepare offline repository materialization, without retrying cquery or
+claiming buildability.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
