@@ -133,6 +133,13 @@ interface, relax no-fetch/download controls or authorize another Cargo
 snapshot. The receipt must persist pre/post interface names `["lo"]`, loopback
 UP and `external_interfaces=0`.
 
+The recovery later exited at its supervisor/interface gate before Bazel
+invocation, with empty output and exact cleanup recorded in receipt
+`bc4c11d4a939afa8b143f1bbc484d2d70a212a993111f79946f83f703209b252`.
+No current Bazel reachability result exists. Preserve the Cargo inventory and
+defer its partial accounting while the user-clarified F3 runtime packet runs;
+that packet authorizes no Stage 10 query, build or behavioral admission.
+
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
 processes starlark_syntax's grammar; vendored protoc/tonic-build generate Rust

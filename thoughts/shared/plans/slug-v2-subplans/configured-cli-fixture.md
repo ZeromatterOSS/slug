@@ -198,6 +198,30 @@ synthetic stages are contract changes. F3 is resource-blocked, this evidence
 path terminates without rerun or implementation, and only independent M7A
 production-inventory reconciliation may follow.
 
+## User-clarified bounded F3 runtime (2026-09-15)
+
+The user clarified that 12 seconds is a general guideline rather than an exact
+acceptance limit; tests should be as small as possible. The accepted source
+audit already establishes that the one ignored authentic test is the smallest
+valid end-to-end boundary. Its resource-block classification is superseded only
+with respect to time: the indivisible selector, fixture, public call,
+projection/publication, sentinel and observer gates remain frozen.
+
+The selected recovery adds a validated `prove --deadline-seconds` value from 1
+through 30, defaulting to 12, and threads it to the portable supervisor. The
+internal, driver and Python ceilings are `N`, `N+3` and `N+5`; persistent output
+records the chosen value, with portable CPU and shell both `N+3` and final
+external `N+8`. Driver, Python and final receipts must agree. Changes are
+limited to the fixture entry point, portable driver and focused fixture tests;
+boundary/forwarding tests, the existing three fixture tests, Python/Bash checks
+and supervisor self-check precede independent source/necessity review. Then
+reuse the exact harness SHA-256
+`282633ee493e4f8503974c59de135f7cb2eb9e387c6754b308db095c7367fe97`
+once with `N=30` under an external 38-second ceiling. It remains ignored,
+opt-in and outside routine suites. No production Rust, fixture, selector,
+semantic predicate or success gate changes. A timeout or invalid receipt
+replans without automatic retry or deadline extension.
+
 B1 can be investigated independently of fixture construction. The two proven
 baseline failures are
 `build_command_root_selects_each_terminal_producer_once_for_duplicate_targets`

@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-production-inventory-bazel-recovery-r1
-Status: Bazel inventory-query supervisor recovery ready; independent design review ACCEPT
+Packet: WP-4-5-6-7A-post-activation-f3-bounded-runtime-r1
+Status: bounded F3 runtime recovery ready; independent design review ACCEPT
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -104,6 +104,35 @@ every local package, feature, proc-macro, build-script and generated-source
 delta plus their explicit path mapping. It runs no build, test, action, oracle,
 repin, payload acquisition or F3 replay and admits no behavior from reachability
 alone.
+
+The user's clarification supersedes the plan's treatment of 12/15 seconds as
+an exact acceptance gate: 12 seconds is a general guideline, and tests should
+use the smallest valid semantic scope. The accepted boundary audit already
+proves the one authentic ignored F3 test is indivisible without private-stage,
+warm-state or smaller-target substitution, so it remains the smallest valid
+scope and is no longer resource-blocked solely by the 12-second timeout.
+
+The selected recovery changes only test supervision. It adds a validated
+1--30-second `prove --deadline-seconds` option, retains 12 as the default, and
+threads the chosen value through the portable driver with nested `N`, `N+3`
+and `N+5` bounds, including portable CPU=`N+3`; the final external bound is
+`N+8`. Persistent driver/Python/final receipts must agree on every value.
+Implementation is limited to the fixture entry point, portable driver and
+focused fixture tests under 100/70 tooling and 100/80 test gross/physical caps.
+Boundary/forwarding tests, the existing three fixture tests, Python/Bash checks
+and supervisor self-check precede independent implementation/necessity review.
+The frozen harness may then run once at a
+30-second internal ceiling/38-second external ceiling. It remains ignored and
+opt-in, outside routine suites. The exact selector, fixture, public evaluation,
+observer and persistent success gates remain unchanged. No Cargo compile,
+production Rust change, diagnostic replay, automatic deadline extension or
+semantic inference is allowed.
+
+The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
+at the interface gate before Bazel invocation; receipt
+`bc4c11d4a939afa8b143f1bbc484d2d70a212a993111f79946f83f703209b252`
+records no query output and exact cleanup. That partial inventory work is
+preserved and deferred while the clarified F3 boundary is resolved.
 
 The Cargo snapshot completed with a 35-local/310-external Linux normal/build
 closure; receipt

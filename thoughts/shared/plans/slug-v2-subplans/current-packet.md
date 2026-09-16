@@ -1,9 +1,78 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-10-m7a-production-inventory-bazel-recovery-r1
-Status: Bazel inventory-query supervisor recovery ready; independent design review ACCEPT
+Packet: WP-4-5-6-7A-post-activation-f3-bounded-runtime-r1
+Status: bounded F3 runtime recovery ready; independent design review ACCEPT
 
 ## Result and acceptance boundary
+
+Resume the smallest authentic F3 test after the user's clarification that 12
+seconds is a general test-sizing guideline, not an exact acceptance limit. The
+accepted source audit already proves that the single ignored
+`payload_demand_probe::authentic_sentinel_demand` test is the indivisible public
+evaluation/projection/publication boundary: splitting it would substitute
+private stages, hidden retained state, warm evaluation or a smaller target.
+Therefore retain that one exact test and change only its bounded supervision.
+
+Freeze clean main `1ca67afd6`, harness SHA-256
+`282633ee493e4f8503974c59de135f7cb2eb9e387c6754b308db095c7367fe97`,
+the accepted fixture/inventory and every prior F3 receipt. Add an explicit
+`--deadline-seconds` option to `configured_cli_fixture.py prove` and a matching
+portable-driver argument. Accept integers 1--30, keep 12 as the default
+guideline, and record the selected deadline in persistent summary output. The
+Perl run supervisor uses `N`; portable `prlimit --cpu` and the shell guard both
+use checked `N+3` (preserving CPU/shell 15 at default `N=12`); Python uses
+`N+5` and kills the process group on expiry; the final external bound is
+`N+8`. Self-check, nonportable and preflight limits remain unchanged. The
+portable result and Python proof receipt must persist `N`, CPU/shell `N+3` and
+Python `N+5`; the final receipt also records external `N+8`. Reject any
+disagreement before classifying F3. No production Rust, harness, fixture,
+assembler, observer protocol, selector, semantic gate or success predicate may
+change.
+
+Implementation is limited to `tools/v2_oracle/configured_cli_fixture.py`,
+`tools/v2_oracle/run_payload_demand_probe.sh` and focused coverage in
+`tests/v2_oracle/test_configured_cli_fixture.py`. Cap the combined tooling diff
+at 100 gross/70 physical lines and the focused test diff at 100 gross/80
+physical lines. Tests must prove default 12; acceptance of 1, 12 and 30;
+rejection of 0, 31 and non-integers; exact Python-to-driver forwarding; and that
+checked `N`/`N+3` values reach Perl supervision, GNU timeout and portable
+`prlimit`. Run the existing three fixture tests as regressions, Python
+compilation, Bash syntax and the supervisor self-check without the authentic
+selector. Reuse the frozen harness without Cargo preparation.
+Independent implementation review must confirm the timeout plumbing, exact
+receipt gate and necessity of this indivisible end-to-end proof before one
+authentic replay with `--deadline-seconds 30` under an external 38-second
+TERM/three-second KILL ceiling. The test remains ignored and opt-in; it is never
+part of a routine suite. Thirty seconds is a one-time evidence ceiling for the
+same one-test scope, not a target duration or broader test.
+
+F3 still requires the accepted persistent summary, selector/run cleanup,
+PID/reap, observer-disabled, zero overflow/drop/claim and terminal phase/status
+18/2 gates. Record actual elapsed time. Success accepts configured-source F3.
+A fully supervised typed terminal selects its semantic successor. A 30-second
+deadline, invalid supervision or gate mismatch replans without automatic retry
+or deadline extension. Do not resume the completed invalidation diagnostics,
+infer semantics from an observer sample or alter the M7A inventory artifacts.
+
+## Superseded exact-deadline conclusion
+
+The earlier resource-block conclusion was correct only under the then-recorded
+assumption that 12/15 seconds was an exact gate. The user's clarification
+supersedes that assumption. The indivisibility audit remains authoritative and
+now establishes that this single end-to-end test is the smallest valid F3
+scope; it no longer prohibits a reviewed bounded runtime extension.
+
+## Frozen partial M7A inventory evidence
+
+The Cargo inventory receipt
+`b3886868867d6b2c6f8d1d49575fbc0f4322ab83216e1da456ae7e2f1e2c5e2`
+remains valid. The Bazel recovery exited at its interface gate before Bazel
+invocation; receipt
+`bc4c11d4a939afa8b143f1bbc484d2d70a212a993111f79946f83f703209b252`
+records empty streams and exact cleanup. No further inventory query is selected
+in this packet; partial accounting resumes only after F3 disposition.
+
+## Completed M7A Bazel supervisor recovery
 
 Recover only the missing Bazel declared-reachability view from the accepted
 inventory reconciliation packet. Freeze clean main `eae5de370`, all nine

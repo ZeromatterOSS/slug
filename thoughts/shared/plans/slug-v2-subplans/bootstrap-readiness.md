@@ -53,6 +53,15 @@ remain fixed. Its receipt records pre/post interface names `["lo"]`, loopback
 UP and `external_interfaces=0`. Cargo may not rerun, and another failure ends
 this inventory path.
 
+The recovery subsequently exited at its supervisor/interface gate before Bazel
+invocation. Receipt
+`bc4c11d4a939afa8b143f1bbc484d2d70a212a993111f79946f83f703209b252`
+contains empty streams and exact cleanup, so live Bazel coverage remains
+unknown. Preserve the successful Cargo evidence and defer partial accounting.
+The current packet returns to F3 only because the user clarified that the
+12-second value was a guideline; no M7A query or behavioral admission is
+reopened.
+
 ## Readiness matrix
 
 “Accepted bounded” means only the stated slice has proof. “Open” or “configured
