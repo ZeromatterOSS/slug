@@ -1,9 +1,64 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-5-6-7A-post-activation-f3-preparation-recovery-r2
-Status: final F3 harness preparation recovery ready; independent design review ACCEPT
+Packet: WP-4-5-6-7A-post-activation-f3-source-test-boundary-reconcile-r1
+Status: F3 source/test boundary reconciliation ready; independent design review ACCEPT
 
 ## Result and acceptance boundary
+
+Audit only the source/test boundary of the single authentic F3 expression after
+its valid supervised timeout. Freeze main `43b10a4d3`, harness SHA-256
+`282633ee493e4f8503974c59de135f7cb2eb9e387c6754b308db095c7367fe97`,
+the accepted 28-object/177-metadata fixture and the initial, 180-second,
+360-second and proof receipts below. Inspect the exact
+`evaluate_workspace_build_command_with_bzlmod_inputs` call in
+`payload_demand_probe::authentic_sentinel_demand` and its outer acceptance,
+terminal projection, publication and sentinel paths. This packet permits source
+and existing-test inspection plus documentation only; it runs no build, test,
+fixture assembly, supervisor or oracle.
+
+Determine whether a finite set of test-only partitions can each remain within
+the existing 12-second internal/15-second absolute limits while collectively
+preserving the authentic fixture, exact public expression and return paths,
+`AcceptedCommand` projection/publication, exit-zero assertion and success
+sentinel. A partition may not replace the public call with internal stage calls,
+retain hidden runtime state between tests, synthesize or eliminate command
+work, substitute a warm cache, reduce/change `//:root`, or treat smaller targets
+as F3. Any proposed boundary must identify its exact source seam, independent
+failure discrimination and how the original end-to-end result remains proved.
+
+No F3 rerun, deadline increase, invalidation-diagnostic replay, production or
+fixture change, payload acquisition or semantic inference from the latest
+`ExternalBzlModuleObservationKey` sample is allowed. If inspection cannot
+preserve the indivisible public result under those constraints, record F3 as
+resource-blocked, terminate this evidence path and select only independent M7A
+production-inventory reconciliation from `bootstrap-readiness.md`. The timeout
+does not authorize a semantic implementation.
+
+## Completed final preparation and F3 result
+
+The final preparation succeeded within the authorized 360-second ceiling on
+clean main `43b10a4d3`.
+Cargo JSON SHA-256
+`0873195b5bea7a62eb125078430f8b2f09597b18442e9a80ff890196cb10c8f8`
+contains 433 compiler artifacts, 57 build-script rows, 150 messages, zero
+errors/malformed rows, one successful `build-finished` and exactly one CLI
+library harness. Preparation receipt SHA-256 is
+`bade864a71cbd9a79fdb6d9626c7d7cc8f67906a0e0d709ef542ffb8a13b311f`.
+
+The sole F3 invocation then exited 2 after 12.146 seconds. Its selector passed
+and cleanup was complete with the sole run PID reaped, but the run stopped at
+the 12-second wall deadline with raw status 9, zero executed/passed tests and
+no publication or sentinel. The observer remained enabled at
+`RootCompute`/`Entry` (6/1); overflow, drops and activity claim were zero. Proof
+output SHA-256 is
+`db1f0f5ab3f6bc94d6f8c239085f080bb28c882af47d692bb58f51db32d996a5`;
+proof receipt SHA-256 is
+`918ffa9c556b6a8cd242dc847303d47dedce2feff235a9db7e353239b3bd54d9`.
+Independent result review returns REPLAN: this is valid timeout evidence and
+invalid supervision under the accepted gate, never F3 success or a typed
+semantic terminal. Do not rerun it.
+
+## Completed preparation recovery contract
 
 Recover only the missing `slug_cli_v2` observer-feature library harness for the
 accepted post-activation F3 packet. Freeze implementation/source checkpoint

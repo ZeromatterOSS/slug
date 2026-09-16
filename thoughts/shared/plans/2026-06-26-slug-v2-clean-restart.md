@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-5-6-7A-post-activation-f3-preparation-recovery-r2
-Status: final F3 harness preparation recovery ready; independent design review ACCEPT
+Packet: WP-4-5-6-7A-post-activation-f3-source-test-boundary-reconcile-r1
+Status: F3 source/test boundary reconciliation ready; independent design review ACCEPT
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -59,6 +59,25 @@ records clean cleanup and zero F3 invocations. The final recovery permits one
 identical compile-only continuation against the warmed target under a
 360-second ceiling. A preparation defect ends this evidence path without retry;
 only strict success exposes the still-unused single F3 proof.
+
+The final preparation succeeded within the authorized 360-second ceiling with
+one harness and a valid receipt. The sole F3 proof then exited 2 after 12.146 seconds: selector and
+cleanup gates passed, but the run hit its 12-second deadline with raw status 9,
+zero executed/passed tests and no publication/sentinel while the observer
+remained enabled at `RootCompute`/`Entry`. Proof receipt
+`918ffa9c556b6a8cd242dc847303d47dedce2feff235a9db7e353239b3bd54d9`
+is trustworthy timeout evidence but semantically nonselecting. Independent
+result review returns REPLAN; F3 is unaccepted and may not rerun.
+
+The selected docs-first successor audits whether finite test-only partitions
+can preserve the exact authentic fixture, public evaluation/return paths,
+terminal projection, publication and sentinel assertions within the unchanged
+12/15-second limits. It permits inspection and documentation only. No deadline
+increase, F3/diagnostic replay, production/fixture change, warm-cache
+substitution, smaller-target acceptance, payload acquisition or semantic
+inference from the last observer sample is allowed. If the public result is
+indivisible, terminate the F3 evidence path as resource-blocked and select only
+independent M7A production-inventory reconciliation.
 
 #### Historical gate progression
 

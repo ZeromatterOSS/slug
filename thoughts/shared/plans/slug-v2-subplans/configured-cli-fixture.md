@@ -170,6 +170,24 @@ same-command compile-only continuation may use the warmed target under a
 360-second ceiling. A stop or invalid receipt ends the evidence path; only
 strict harness success exposes the still-unused one-proof authority.
 
+The final preparation succeeded within the authorized 360-second ceiling with
+one valid harness. The sole F3 proof then exited 2 after 12.146 seconds: the selector, PID/reap and cleanup
+gates passed, but the run hit its 12-second deadline with raw status 9, no
+execution/pass/publication/sentinel and an enabled observer at
+`RootCompute`/`Entry`. Receipt
+`918ffa9c556b6a8cd242dc847303d47dedce2feff235a9db7e353239b3bd54d9`
+is valid timeout evidence but cannot select semantics. Independent result review
+returns REPLAN; F3 remains unaccepted and must not rerun.
+
+The next docs-first packet inspects only whether finite test partitions can
+preserve the authentic fixture and exact public evaluation, outer acceptance,
+terminal projection/publication and sentinel contract within the existing
+12/15-second limits. It may not use internal stage substitutes, hidden retained
+state, warm caches, smaller targets, deadline increases, production/fixture
+changes, payload acquisition or the completed invalidation-diagnostic chain. If
+the public result is indivisible, record F3 resource-blocked and proceed only to
+independent M7A production-inventory reconciliation.
+
 B1 can be investigated independently of fixture construction. The two proven
 baseline failures are
 `build_command_root_selects_each_terminal_producer_once_for_duplicate_targets`
