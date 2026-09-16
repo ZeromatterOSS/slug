@@ -1,78 +1,94 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-10-m7a-spawn-paramfile-source-audit-r1
-Status: result ACCEPT; callback admission is the first known CLI Spawn blocker
+Packet: WP-7-12-m7a-rustc-callback-proof-entrypoint-r1
+Status: result REPLAN; authentic local inputs and same-DICE harness required
 
 ## Outcome and classification
 
-Identify the first implementation boundary on the CLI root's `rules_rust`
-Spawn parameter-file path without running Bazel, Cargo, a build or a test.
-This packet admits no new behavior. Pinned Bazel 9.2 source establishes the
-exact virtual-input mechanism; Slug's eventual structural identity and REAPI
-Action digest remain separate Slug-native domains until implementation proof.
+Determine the smallest **real loaded-source** command path that could prove
+the pinned `rules_rust` Rustc `Args.add_all` callsite and later same-DICE
+source A/B/A for the unaccepted regular crate-root adapter. This packet
+admits no behavior. The candidate remains local at review branch
+`review/wp-7-11-rustc-crate-root-map-each`, commit `ea5fcc6fd`, based on
+accepted main `77ea40e89`; do not merge or push it as an accepted slice.
+The candidate class is finite pinned-output compatibility with Slug-native
+error timing, not generic Bazel callback support.
 
-The generated-input aquery at `e4c7435e2` proved two first-party build-script
-tree edges, not execution. Independent design review rejected an explicit
-`ArgsWriteSpec` executor proposal because that family is not demonstrated in
-the finite CLI closure. It also rejected an `--include_param_files` aquery
-proposal before invocation: the demanded Spawn files are virtual inputs, not
-artifact-backed `ParameterFileWriteAction`s. Neither query ran or advanced a
-readiness row.
+The accepted source audit `77ea40e89` identified callback admission as the
+first known configured CLI Spawn blocker. Candidate compilation and focused
+tests establish only the structural recipe and existing callback rejection.
+Independent final-delta review returned `REPLAN` because no real loaded
+`rustc.bzl:1169` positive or same-DICE source A/B/A proof exists. A focused
+attempt with checked-in fixture
+`tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace`
+selected its single `//pkg:support` rust_library. The existing analysis test
+helper stopped before rules_rust loading: first on a noncanonical test path,
+then, after canonicalization, on missing `RootModuleRegistryUrlsKey`.
+Both attempts took under 0.03 seconds, were removed from the candidate, and
+do not count as callback evidence. Source review confirms the selected
+source-file route reaches `ConfiguredNodeKind::SourceFile` only after a DICE
+`PathNodeKind::RegularFile` observation (`dice.rs:5318-5350`); the generic
+`AnalysisArtifact::Source` type does not encode that fact.
 
-## Pinned-source result
+## Read-only decision
 
-In pinned `rules_rust`, `rust/private/rustc.bzl:1167-1168` sets multiline
-format and `@%s`, conditionally always writing a param file;
-`cargo/private/cargo_build_script.bzl:354` sets
-`--cargo_manifest_args=@%s` and `use_always=True`. These policies belong to
-Spawn Args snapshots, not standalone ArgsWrite actions.
+The normal one-shot `aquery` route enters
+`evaluate_workspace_build_command_with_repository_environment` and injects
+the root module policy, registry URLs/request generation, and repository
+materialization generation (`app/slug_core_v2/src/runtime/dice.rs:6333-6367`).
+It could reach the real callback after source preparation, but the public
+wrapper constructs a fresh `WorkspaceRuntime` per call
+(`runtime/mod.rs:150-173`). Repeating that command cannot prove same-DICE
+source A/B/A. A daemon or a focused test retaining one `WorkspaceRuntime`
+would be needed for the invalidation gate.
 
-[Bazel 9.2 `CommandLines.java`](https://raw.githubusercontent.com/bazelbuild/bazel/9.2.0/src/main/java/com/google/devtools/build/lib/actions/CommandLines.java)
-`expand:88-157` receives the primary output as the param-file base, numbers
-materialized files from zero, makes replacement argv from each policy's flag
-format, and returns `ParamFileActionInput` virtual files. A non-always policy
-can keep arguments inline when the conservative command-length check passes;
-its result depends on command-line limits and previous argument lengths.
-`CommandLines.java:200-239` writes a virtual file through
-`ParameterFile.writeParameterFile` and exposes its execution path.
-[Bazel 9.2 `SpawnAction.java`](https://raw.githubusercontent.com/bazelbuild/bazel/9.2.0/src/main/java/com/google/devtools/build/lib/analysis/actions/SpawnAction.java)
-`getSpawn:358-379` passes expanded argv and virtual files to `ActionSpawn`,
-using the primary output exec path as the base. Its `getArguments:206-209`
-instead calls `allArguments`, which does not make param-file replacement argv.
-Pinned `ActionGraphDump.java:143-160,225-236` populates aquery `paramFiles`
-only from artifact-backed `ParameterFileWriteAction` content and Artifact
-inputs; the virtual files are not observable through that field. Exact
-virtual-file byte serialization, path mapping, size fallback and CAS staging
-still require an implementation contract and discriminating tests.
+The checked-in tiny workspace depends on `rules_rust` 0.73.0 and `platforms`
+1.1.0 and registers a generated Rust toolchain. It contains neither a local
+registry for those versions nor their source trees/archives or a lockfile.
+The command defaults to `https://bcr.bazel.build/` when no `--registry` is
+provided (`registry.rs:69-80`); Bazel's external cache is not a Slug
+repository materialization. There is no bounded, fully local command proof
+from this fixture as checked in. The missing prerequisite is a pinned,
+locally materializable registry/repository fixture with exact source hashes,
+including the candidate's authenticated `@@rules_rust+//rust/private:rustc.bzl`
+and `rustc.bzl:1169`, plus a harness that keeps the command runtime/DICE
+instance while changing an observed regular source file A/B/A. That fixture
+must also prove toolchain registration and root command policy through the
+ordinary source path. Do not claim the preserved callback candidate from
+the two pre-loading diagnostics or from a copied Bazel cache tree.
 
-Slug's `RetainedSpawnArgsSnapshot` preserves recipe and policy, but
-`SpawnSpec::render_argv` flattens the recipe; typed Spawn REAPI lowering
-still fails closed. Earlier on the demanded source path, `rustc.bzl:1169`
-calls `rustc_flags.add_all(..., map_each = _get_crate_root_path)`, and
-`cargo_build_script.bzl:357` calls
-`args.add_all(..., map_each = _runfiles_map, allow_closure = True)`.
-`app/slug_loading_v2/src/subrule_invocation.rs:287-302,335-347,446-453`
-rejects callback options during Args evaluation. Thus callback
-retention/evaluation is the first known Slug blocker for those paths;
-solving virtual parameter-file staging alone cannot produce their configured
-Spawn actions.
+This is `REPLAN` for the callback candidate's missing proof prerequisite, not
+a semantic failure of its passing structural test. The candidate remains on
+`review/wp-7-11-rustc-crate-root-map-each` (`ea5fcc6fd`) and is not merged.
+No M7A readiness row advances. The next independent demanded implementation
+packet is `WP-7-13-m7a-reapi-cache-core-leaf-r1`: establish a graph-independent
+protocol/digest/CAS/AC leaf from the existing `slug_reapi_v2` code and route
+the admitted FileWrite consumer through it, preserving exact REAPI/CAS bytes.
+Stage 11's bootstrap cache-core contract and Stage 7's accepted FileWrite
+handoff govern that packet. Its design must first pin the existing and
+upstream protocol inputs, name the actual leaf API and Cargo/Bazel dependency
+edges, and get independent review of the shared public boundary before code.
+It must not activate Spawn, virtual param files, or the parked callback.
 
-## Next implementation boundary and checks
+## Inspection scope and validation
 
-The next packet should admit only demanded `map_each` callback cases with
-source-backed callable lifetime, dependency/equality and expansion semantics,
-then preserve each Args snapshot's policy through Spawn projection. Keep
-configured identity distinct from the final REAPI digest: effective rendered
-argv, virtual-file bytes, outputs, environment and selected effective
-properties determine that digest, not recipe object identity or platform
-label alone. Path derivation, forced/length-based selection, format bytes and
-virtual CAS ownership remain later proof obligations. The full CLI graph,
-execution, compilation and M7A stay open; these need not be the only blockers.
+Inspection covered the existing command-runtime registry/repository injection,
+the checked-in tiny rules_rust fixture, the one-shot aquery wrapper, and the
+reusable cache-core owner contract. It found no exact runnable proof route
+without new local external inputs and a retained-runtime harness.
 
-Allowlist: this manifest, canonical Live Status, Stage 7 and bootstrap
-readiness. Source/structure review, `python3 scripts/v2_plan_status.py` and
-`git diff --check` passed without a test or long command. Independent final
-review `ACCEPT` confirmed the pinned source anchors, Slug callback guard,
-no-execution claims and successor order. No compile, test, build or Bazel
-action query ran; review elapsed time was not measured. This read-only packet
-records no runtime result.
+Use local source inspection only; do not run another Cargo compile, test,
+Bazel/Slug query, network fetch, build action, or daemon in this packet. The
+two failed diagnostics already identify the missing inputs, so repeating them
+would add no evidence. No fixture, source copy, DICE key, helper, callback
+adapter, ActionSpec, or REAPI behavior changes here. The natural owners remain
+the command runtime's injected request, existing Bzl source observations,
+configured action recipe, and final acceptance boundary. No new retained
+memory, cache, utility extraction, or lifecycle owner is selected.
+
+Allowlist: this manifest, canonical Live Status, and Stage 7/bootstrap
+readiness only if the handoff contract changes. Validate with targeted source
+inspection, `python3 scripts/v2_plan_status.py`, and `git diff --check`.
+No runtime result is claimed from this read-only packet. Subsequent
+tests should be as small as possible, avoid repeating runs over a few
+seconds, and scrutinize any test over roughly 30 seconds before selection.

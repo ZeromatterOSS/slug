@@ -29,18 +29,23 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-spawn-paramfile-source-audit-r1
-Status: result ACCEPT; callback admission is the first known CLI Spawn blocker
+Packet: WP-7-12-m7a-rustc-callback-proof-entrypoint-r1
+Status: result REPLAN; authentic local inputs and same-DICE harness required
 
-The CLI rules_rust Rustc and cargo build-script paths use Spawn virtual
-parameter files. Pinned Bazel source shows aquery's `paramFiles` field would
-not expose those virtual inputs; the planned query was cancelled before it ran.
-Slug also rejects the `map_each` callbacks used by those paths during Args
-evaluation, before parameter-file staging. This audit selects that callback
-boundary as the next demanded implementation decision. It runs no build or
-test and admits no Slug execution or M7A behavior.
-Independent final review `ACCEPT` confirmed the source anchors and successor
-order after a citation correction.
+The source-pinned regular crate-root callback candidate is preserved locally
+at `review/wp-7-11-rustc-crate-root-map-each` (`ea5fcc6fd`) and is unaccepted.
+Its compile and narrow structural tests passed, but it has no real loaded
+`rustc.bzl:1169` positive or same-DICE source A/B/A proof. The small rules_rust
+fixture stopped before source loading because the analysis helper lacks
+registry request inputs. The command runtime supplies those inputs, but the
+fixture has no pinned local registry/source materialization, and the one-shot
+wrapper creates a new DICE runtime per call. `REPLAN` requires a local
+authentic registry and retained-runtime proof harness before this candidate
+can resume. No runtime result or M7A readiness admission follows. The next
+independent demanded implementation packet is
+`WP-7-13-m7a-reapi-cache-core-leaf-r1` under Stage 7/11; its public boundary
+needs a reviewed, fully scoped manifest before implementation. Accepted
+predecessor source audit remains at `77ea40e89`.
 
 The selected successor checks the CLI root's configured build-script and
 Rustc action edges for first-party LALRPOP and REAPI proto generation. One
