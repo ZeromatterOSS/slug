@@ -135,6 +135,10 @@ and fetch receipt
 `1a47242a21971bbd5b63ae5d21f49f9a7a079d916643e8b02e187ef4ab7e8b10`
 prove input preparation only. The first readiness row still needs configured
 root, feature, generated-input, action and compilation evidence.
+The selected successor permits one offline configured-root cquery from the
+prepared toolchain cache. This remains observation only; the first readiness
+row still requires later feature, generated-input, action and compilation
+proof even if all selected package paths appear.
 
 ## Readiness matrix
 

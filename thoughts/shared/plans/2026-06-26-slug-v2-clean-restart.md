@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-rust-toolchain-pin-and-cache-r1
-Status: exact Linux x86_64 toolchain pin/cache result ACCEPT; configured root open
+Packet: WP-7-10-m7a-bazel-configured-root-offline-r1
+Status: scoped offline configured-root cquery design ACCEPT; one query selected
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -304,6 +304,12 @@ This is verified input preparation only; configured-root analysis remains open.
 Independent final review `ACCEPT` confirmed the six archive digests,
 MODULE-only change and clean materialization receipt; it does not infer
 whether Bazel read each archive from distdir or its checksum-keyed cache.
+The selected successor permits one fresh-output-base, 30-second-capped,
+download-disabled `cquery deps(//app/slug_cli_v2:slug)` with the nightly
+channel and verified six-file distdir. It records configured label/token
+rows or an exact analysis failure, with no build/test or M7A admission.
+Independent design review `ACCEPT` confirmed the exact six-file preflight,
+offline one-command limit and narrow label-token evidence claim.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

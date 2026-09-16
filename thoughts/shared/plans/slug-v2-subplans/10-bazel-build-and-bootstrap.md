@@ -316,6 +316,10 @@ configured CLI analysis and buildability are still open.
 Independent final review `ACCEPT` confirmed exact official archive hashes,
 the MODULE delta and clean selected-repository materialization; the bytes may
 have come from the supplied distdir or Bazel's checksum-keyed cache.
+The selected `WP-7-10-m7a-bazel-configured-root-offline-r1` now obtains one
+full-root configured cquery using the pinned nightly toolchain, verified
+archives and download-disabled Bazel. It cannot infer features, generated
+inputs, action execution or buildability from label rows alone.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
