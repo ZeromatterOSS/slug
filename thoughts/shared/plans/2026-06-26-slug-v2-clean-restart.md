@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-partial-inventory-accounting-r1
-Status: corrected partial Cargo/static inventory ACCEPT; Bazel reachability and M7A remain open
+Packet: WP-7-10-m7a-cargo-cache-acquisition-r1
+Status: scoped locked-input acquisition design; independent design review pending
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -155,6 +155,22 @@ selected external package versions absent from `Cargo.Bazel.lock`.
 Independent correction rereview `ACCEPT` confirmed the 34/35 local and 302/310
 external lock-key intersections. M7A remains open.
 
+An offline graph-sync draft was rejected at design review before any BUILD or
+Bazel lock change. Its intended repin invokes full-workspace Cargo resolution,
+but the host cache lacks archive/source pairs for 54 of the 448 registry
+packages in the frozen `Cargo.lock`; 16 archives exist in Bazel's downloader
+cache and 38 need acquisition. One read-only, full-workspace locked/offline
+metadata preflight failed in 0.15 seconds on missing `anstyle-wincon 3.0.11`
+(stderr SHA-256
+`529cdff554a4b7edbf576fef4ff48ef9d4ec8e8f68e22e61c57dae9826c30dde`).
+The selected docs-first acquisition packet freezes the exact gap inventory
+SHA-256 `5c8294dcbebbefea8602f891c28ee2545ff701d572084ae236049fdd0eba3189`.
+After independent design review, it permits one bounded `cargo fetch --locked`
+for all platforms and one short locked/offline metadata verification. It runs
+no BUILD change, Bazel repin/query/build or test. Graph synchronization and
+fresh Bazel reachability require a separate reviewed successor; M7A remains
+open.
+
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt
 `bc4c11d4a939afa8b143f1bbc484d2d70a212a993111f79946f83f703209b252`
@@ -262,8 +278,8 @@ partially or integrate `review-evidence/`.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Partial M7A production inventory | corrected static 35-package accounting accepted; `slug_configuration_v2` lacks BUILD, `slug_starlark_v2` and eight external package versions lack Bazel-lock entries, and live Bazel reachability is unknown |
-| 2 | Bazel production graph coverage | correct static BUILD and lock gaps, then obtain separately reviewed live/configured graph evidence; no new query is selected by the current packet |
+| 1 | Locked Cargo cache acquisition | fetch the exact missing full-workspace inputs, verify every locked registry archive and offline metadata; no test or Bazel invocation |
+| 2 | Bazel production graph synchronization and configured coverage | separately review the missing configuration owner/edges, generated lock and fresh Bazel evidence; current packet cannot admit M7A behavior |
 | 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |

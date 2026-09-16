@@ -75,6 +75,10 @@ name/version keys absent from `Cargo.Bazel.lock`; see Stage 10 for the exact
 list. These are proven local graph/lock gaps, not Bazel reachability or
 functional admission. Keep the first readiness row open until the missing
 BUILD owner, lock synchronization and fresh Bazel graph evidence are reviewed.
+The selected `WP-7-10-m7a-cargo-cache-acquisition-r1` packet first stages
+missing full-workspace inputs required by the Bazel lock generator. It runs no
+Bazel command or test and cannot close this or any other M7A row. The BUILD,
+lock and fresh graph repairs require a separately reviewed successor.
 
 ## Readiness matrix
 

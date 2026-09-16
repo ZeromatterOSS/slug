@@ -207,6 +207,18 @@ separate reviewed packet and obtaining Bazel evidence are prerequisites to
 closing M7A coverage; this accounting admits no action family, exact key,
 REAPI behavior or self-hosting.
 
+The first graph-sync design was rejected before mutation: rules_rust repin
+needs full-workspace Cargo inputs, while the host cache lacks 54 of 448 locked
+registry archive/source pairs. A locked/offline full-workspace metadata
+preflight failed on `anstyle-wincon 3.0.11` in 0.15 seconds. The selected
+`WP-7-10-m7a-cargo-cache-acquisition-r1` stages exact lock inputs only, under
+one bounded locked fetch and a short offline metadata gate. Its frozen gap
+inventory SHA-256 is
+`5c8294dcbebbefea8602f891c28ee2545ff701d572084ae236049fdd0eba3189`.
+The missing configuration BUILD owner, six normal consumer edges, generated
+Bazel lock synchronization, fresh graph evidence and M7A readiness remain
+unaccepted and require a separate reviewed packet.
+
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
 processes starlark_syntax's grammar; vendored protoc/tonic-build generate Rust
