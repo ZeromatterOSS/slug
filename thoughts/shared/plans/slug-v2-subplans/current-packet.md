@@ -1,9 +1,61 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-6-7A-r2-main-core-attribution-final-preparation-r2
-Status: atomic R2/execution-group stack accepted on main; independent review ACCEPT
+Packet: WP-4-5-6-7A-post-activation-configured-source-f3-r1
+Status: post-activation F3 replay ready; independent design review ACCEPT
 
 ## Result and acceptance boundary
+
+Run the one post-activation authentic configured-source F3 proof selected by the
+accepted R2/execution-group boundary. Freeze clean main `8b3294404`, the pinned
+nightly toolchain, Bazel source authority
+`8220c6198837d5c13d53fea211cf3282aa12408a`, and the accepted portable fixture:
+28 objects, 177 registry metadata files, 8,004,740 source bytes and inventory
+SHA-256 `4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`.
+No source, test, Cargo/BUILD, fixture, mirror, metadata or assembler change is
+allowed in this replay packet.
+
+Prepare exactly one `slug_cli_v2` library harness with
+`--features native-probe-observer --lib --no-run --message-format=json`, the
+pinned PATH, shared target directory and one build job under the existing
+60-second preparation ceiling. Require complete Cargo JSON, zero compiler
+errors, one successful build-finished row, exactly one matching library test
+executable and its SHA-256. A preparation stop or malformed/multiple executable
+result replans without running F3.
+
+On preparation success, invoke exactly once:
+`python3 tools/v2_oracle/configured_cli_fixture.py prove --harness <executable>`.
+The repository-owned entry point must assemble a fresh `/tmp` fixture, verify
+the exact ignored selector
+`payload_demand_probe::authentic_sentinel_demand`, and reuse the existing
+portable supervisor. Its internal command deadline remains 12 seconds and its
+absolute ceiling 15 seconds. Capture combined bounded output and its hash,
+process exit, selected/executed/passed counts, native publication exit,
+`SLUG_SENTINEL_NATIVE_SUCCESS_PUBLISHED_0`, observer validity, PID/reap and
+cleanup state.
+
+The post-run receipt gate requires both `selector_supervision` and
+`run_supervision` to have `stop=null`, `raw_status=0`,
+`cleanup_complete=true`, `group_alive=0`, `no_children=1`, `open_pipes=0` and
+`telemetry_error=null`. `run_supervision.reaped_pids` must contain exactly one
+PID equal to `observer.installed_pid`. The observer must report
+`available=true`, `disabled=1`, `overflow_flags=0`,
+`dropped_activity_samples=0`, `activity_claim=0` and latest phase/status
+`TerminalRelease`/`Exit` (`observer.phase.phase=18`,
+`observer.phase.status=2`). The outer proof must exit 0 and its persistent
+summary must report `selected_tests=1`, `executed_tests=1`, `passed_tests=1`,
+`native_publication_exit_zero=true` and `sentinel_success=true`. Those fields
+are authoritative because the frozen driver sets them only when the exact
+selector, executed-test, passing-result, native-publication and sentinel
+matches each occur once.
+
+F3 passes only when that receipt gate and process/native exit-zero result hold.
+Any gate mismatch is invalid supervision and REPLAN, never a typed semantic
+terminal. Only a fully supervised typed missing/unsupported-source or semantic
+terminal selects a separate reviewed successor. Do not retry F3, rerun any
+accepted R2/group/Core/consumer gate, resume the completed invalidation
+diagnostic chain, or infer payload demand from catalog membership.
+
+## Accepted predecessor evidence
 
 Independent final atomic review ACCEPTS implementation checkpoint `71d9ce4bf`
 for fast-forward integration on `main`. The accepted boundary combines the

@@ -103,10 +103,18 @@ This opt-in probe uses its explicit ignored-selector check; the ordinary
 nonignored preflight helper must remain strict. Reuse selector evidence only
 while this executable is unchanged.
 
-F3 requires one selected/executed/passed test, process exit 0, native publication
-exit 0 and `SLUG_SENTINEL_NATIVE_SUCCESS_PUBLISHED_0`, with valid observer evidence
-and no timeout, output overflow or cleanup failure. This proves the retained
-configured source boundary on the recorded current source revision; R2's later
+F3 requires both selector and run supervisors to report null stop/telemetry
+error, raw status 0, complete cleanup, dead process group, no children and zero
+open pipes. The run must reap exactly one PID equal to the installed observer
+PID. The observer must be available and disabled with zero overflow, dropped
+samples and activity claim, ending in `TerminalRelease`/`Exit` (18/2). Require
+outer exit 0 and persistent summary values `selected_tests=1`,
+`executed_tests=1`, `passed_tests=1`, `native_publication_exit_zero=true` and
+`sentinel_success=true`. The frozen driver sets those values only when its exact
+selector, execution, pass, native-publication and sentinel matches each occur
+once. Any mismatch is invalid supervision and REPLAN, never a typed semantic
+terminal. This proves the retained configured source boundary on the recorded
+current source revision; R2's later
 conflict-rejection proof is separate. Missing/unsupported source diagnostics,
 sentinel non-demand or hashes alone cannot pass F3. Record source/features,
 fixture hashes, command, counts, status and supervisor receipt.
@@ -123,6 +131,25 @@ fixture hashes, command, counts, status and supervisor receipt.
 | R2 production consumer gates | accepted bounded at `71d9ce4bf`; configured-conflict replacements, direct REAPI/server consumers and compile linkage pass | preserve pre-RPC/materialization rejection and independent cquery behavior |
 | R3 positive sharing and closure | accepted bounded at `71d9ce4bf`; the validated execution view emits one REAPI representative while semantic/aquery owners remain complete | preserve the validated closure handoff |
 | R4 owner/dependent regression and review | complete for the accepted boundary; partitioned suites, baseline attribution and independent atomic review ACCEPT | retain receipts; broader action families remain separately gated |
+
+## Post-activation F3 selection (2026-09-15)
+
+Main checkpoint `8b3294404` contains the independently accepted atomic
+R2/execution-group stack and receipt. The next packet changes no source or
+fixture. It compiles exactly one `slug_cli_v2` library harness with
+`native-probe-observer` under the 60-second preparation ceiling, then invokes
+`configured_cli_fixture.py prove` exactly once. The accepted 28-object,
+177-metadata, 8,004,740-byte fixture and inventory
+`4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f`
+remain frozen. The supervisor retains its exact ignored-selector check,
+12-second command deadline, 15-second absolute ceiling, observer and cleanup
+requirements. Its receipt gate requires clean zero-status selector/run
+supervisors, exactly one reaped run PID equal to the observer PID, zero observer
+overflow/drop/activity claim, terminal phase/status 18/2, outer exit 0 and
+summary fields proving exactly one selector/execution/pass/publication/sentinel
+match. Success accepts only F3. A gate mismatch is invalid supervision and
+replans; only a fully supervised typed terminal selects a new reviewed owner.
+No R2/group/Core/consumer or diagnostic replay is permitted.
 
 B1 can be investigated independently of fixture construction. The two proven
 baseline failures are

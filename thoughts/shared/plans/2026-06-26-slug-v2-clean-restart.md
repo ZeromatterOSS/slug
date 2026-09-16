@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-6-7A-r2-main-core-attribution-final-preparation-r2
-Status: atomic R2/execution-group stack accepted on main; independent review ACCEPT
+Packet: WP-4-5-6-7A-post-activation-configured-source-f3-r1
+Status: post-activation F3 replay ready; independent design review ACCEPT
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -38,6 +38,19 @@ configured-action conflict validation, named/automatic execution groups and
 their reviewed prerequisites as one boundary. All required gates are complete;
 the eight main Core failures remain baseline debt, and authentic F3 is the next
 separate post-activation packet.
+
+The selected successor freezes clean main `8b3294404` and the accepted portable
+configured fixture, prepares one `slug_cli_v2` observer-feature library harness
+under the 60-second ceiling, then runs the repository-owned supervised F3 entry
+point exactly once under its unchanged 12/15-second limits. No implementation,
+fixture or accepted-gate rerun is allowed. A full F3 success accepts only the
+configured-source closure. Its receipt must show clean zero-status selector and
+run supervisors, one run PID reaped equal to the installed observer PID, an
+available/disabled observer with zero overflow/drop/activity claim, terminal
+phase/status 18/2, outer exit 0 and summary fields proving exactly one selector,
+execution, pass, native-publication and sentinel match. Any mismatch is invalid
+supervision and replans; only a fully supervised typed terminal selects a
+separate successor.
 
 #### Historical gate progression
 
