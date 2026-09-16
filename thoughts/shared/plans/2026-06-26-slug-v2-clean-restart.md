@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-5-6-7A-post-activation-f3-bounded-runtime-r1
-Status: F3 resource-blocked at the 30-second ceiling; independent result review REPLAN
+Packet: WP-7-10-m7a-partial-inventory-accounting-r1
+Status: partial Cargo/static inventory ACCEPT; Bazel reachability and M7A remain open
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -143,6 +143,15 @@ resource-blocked at its indivisible boundary under the user's maximum. Close
 this path without retry or extension and resume only partial M7A accounting
 from frozen Cargo and authenticated artifacts, with Bazel reachability unknown.
 
+That partial accounting now identifies exactly two local Cargo additions to
+the accepted 33-package inventory: `slug_configuration_v2` and
+`slug_starlark_v2`. The former is a normal dependency in the selected Cargo
+closure but has no BUILD file; the latter has a static BUILD target. This
+establishes a concrete Bazel ownership gap, not live Bazel reachability or
+behavioral admission. Independent result review `ACCEPT` verified the six
+normal incoming configuration edges, source/path mapping and frozen receipts;
+partial accounting is accepted while M7A remains open.
+
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt
 `bc4c11d4a939afa8b143f1bbc484d2d70a212a993111f79946f83f703209b252`
@@ -250,16 +259,20 @@ partially or integrate `review-evidence/`.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Combined R2-based named/automatic execution-group runtime | reviewed source-invariant reconciliation is Phase B ready on the preserved branch; implement the bounded corrections and pass joint gates before atomic acceptance |
-| 2 | Authentic configured CLI fixture | F2 accepted through 28 objects; replay F3 once after combined R2/group activation |
-| 4 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
-| 5 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
-| 6 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
-| 7 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |
+| 1 | Partial M7A production inventory | review the frozen Cargo/static 35-package accounting; `slug_configuration_v2` lacks BUILD and live Bazel reachability is unknown |
+| 2 | Bazel production graph coverage | correct the static missing owner, then obtain separately reviewed live/configured graph evidence; no new query is selected by the current packet |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
+| 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
+| 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
+| 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |
 
-Tests retain the user's 12-second deadline/15-second absolute ceiling.
-Compile/preparation is separate and bounded to 60 seconds; split/check smaller
-units when necessary. An unattributed timeout is not a semantic failure.
+The user treats 12 seconds as a guideline, not an exact test rule. Keep tests
+as small as the semantic boundary allows; anything over a few seconds should
+run infrequently, and a test over roughly 30 seconds needs serious necessity
+review. The one opt-in 30-second F3 proof was independently reviewed, ran once
+and is closed without success. Compile/preparation remains separate and must
+be split or checked in smaller units when necessary. An unattributed timeout
+is not a semantic failure.
 Cumulative path-epoch fanout remains a separate measured concern: the recorded
 retry 116 recomputed 109 path keys and checked 163 module/192 registry keys.
 It is not evidence of a semantic loop or authority for checkout-wide replay.

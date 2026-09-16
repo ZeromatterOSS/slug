@@ -65,6 +65,15 @@ from the frozen Cargo closure and existing authenticated artifacts. Bazel
 declared reachability remains unknown; no M7A query or behavioral admission is
 reopened.
 
+The partial reconciliation finds 35 Cargo-selected local packages, exactly the
+accepted 33 plus `slug_configuration_v2` and `slug_starlark_v2`. Static mapping
+finds a BUILD target for 34; `app/slug_configuration_v2` has none despite normal
+Cargo dependencies from the CLI closure. The five local proc macros and five
+build scripts are enumerated in [Stage 10](./10-bazel-build-and-bootstrap.md#partial-live-cargo-inventory-reconciliation-2026-09-16).
+This is a proven local inventory gap, not Bazel reachability or functional
+admission. Keep the first readiness row open until the missing BUILD owner and
+fresh Bazel graph evidence are reviewed.
+
 ## Readiness matrix
 
 “Accepted bounded” means only the stated slice has proof. “Open” or “configured
@@ -73,12 +82,12 @@ unobserved action families cannot be declared unnecessary by assumption.
 
 | Obligation in the production closure | Current status / reusable evidence | Owner | Required exit evidence |
 |---|---|---|---|
-| Bazel builds the CLI root, its 33-package closure and generated sources | Accepted developer graph; Stage 10 baseline Gates A–C and fixed manifest. Live coverage delta not re-audited | Stage 10 | Reconciled root labels, source/features/toolchain/lock inventory and explicit delta; no excluded production input |
+| Bazel builds the CLI root, its 33-package closure and generated sources | Accepted developer graph; partial live Cargo inventory is 35 local packages with two additions; `slug_configuration_v2` lacks BUILD; Bazel reachability unknown | Stage 10 | Add/review missing BUILD ownership, then prove live declared/configured root reachability, features, generated inputs and pin correspondence without excluding a production input |
 | Authentic MODULE, registry, archive, built-in and generated repository sources | Partial. Normal Run registry parity accepted at `47163df7b`; authentic complete R2 fixture closure remains unresolved. Stage 5 owns sources and registrations | Stages 4/5 | Portable authentic inputs and ordinary source/mapping/registration demand for the selected production closure; no synthetic package, user-CAS default-test dependency or hidden Bazel semantic delegation |
 | rules_rust/provider/transition/toolchain evaluation | Partial configured analysis; accepted generic declarations/providers/Args/runfiles do not prove the full rules_rust closure. Canonical M7 status names accepted owners | Stages 4/5/6 | Ordinary configured results for the production root with source-derived toolchain/provider/transition dependencies; exact named semantics and structural invalidation |
-| Named/automatic execution groups | Accepted bounded with R2 at main checkpoint `71d9ce4bf`; pinned-source runtime names, target-context parsing, property precedence, action ordering, root provenance/depset shape and subrule boundary passed joint gates | Stages 4/5/6 | Preserve the accepted boundary; authentic F3 remains the separate post-activation closure proof |
-| `attr.label` computed-default invocation | Accepted with the atomic stack at `71d9ce4bf`; omitted invocation, typed Label/None, explicit bypass, lexical context, A/B/A and configured Exec proofs pass | Stages 4/6 | Preserve accepted ownership while F3 proceeds to later configured-source obligations |
-| Native configurable `alias.actual` | Accepted with the atomic stack at `71d9ce4bf`; retained expression, selected branch/conditions, target/exec A/B/A and query proofs pass | Stages 4/6 | Preserve accepted ownership while F3 proceeds beyond the alias |
+| Named/automatic execution groups | Accepted bounded with R2 at main checkpoint `71d9ce4bf`; pinned-source runtime names, target-context parsing, property precedence, action ordering, root provenance/depset shape and subrule boundary passed joint gates | Stages 4/5/6 | Preserve the accepted boundary; authentic F3 remains unaccepted and closed at its 30-second ceiling |
+| `attr.label` computed-default invocation | Accepted with the atomic stack at `71d9ce4bf`; omitted invocation, typed Label/None, explicit bypass, lexical context, A/B/A and configured Exec proofs pass | Stages 4/6 | Preserve accepted ownership; F3 supplies no further configured-source admission |
+| Native configurable `alias.actual` | Accepted with the atomic stack at `71d9ce4bf`; retained expression, selected branch/conditions, target/exec A/B/A and query proofs pass | Stages 4/6 | Preserve accepted ownership; F3 supplies no further configured-source admission |
 | Requested-root output conflict freedom | Accepted bounded with execution groups at `71d9ce4bf`; `ValidatedActionClosure`, pre-execution rejection, positive sharing and direct consumers passed, with eight Core nonpasses attributed to unchanged main | Stage 6/Core | Preserve root-set validation before build/aquery/Run success; cold/warm A+B conflicts produce no execution or materialization even if A and B separately succeed |
 | FileWrite | Accepted bounded aquery/REAPI handoff, Stage 7 canonical FileWrite projection and M5/M6 evidence. Its exact ActionKey projection remains queued | Stages 6/8/7 | Preserve accepted content/platform/protobuf/cache proof and named Slug-native token exception; land exact projection when separately selected |
 | Spawn: compiler, linker, proc-macro/build-script and generated-source tool invocations | Configured common non-callback Spawn/FilesToRun expansion accepted (`bfe6f2690`, `21db5d7b8`); broader aquery/REAPI activation open; exact ActionKey deferred | Stages 6/8/7 | Source-derived invocation/tool/env/input/output semantics for observed production actions, structural invalidation, classified aquery fields and same-owner REAPI projection |

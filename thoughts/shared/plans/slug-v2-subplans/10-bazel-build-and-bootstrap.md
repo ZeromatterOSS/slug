@@ -142,6 +142,61 @@ partial accounting from the preserved Cargo inventory and existing
 authenticated artifacts; no Stage 10 query, build or behavioral admission is
 authorized.
 
+#### Partial live Cargo inventory reconciliation (2026-09-16)
+
+The frozen locked/offline Linux normal/build Cargo receipt
+`b3886868867d6b2c6f8d1d49575fbc0f4322ab83216e1da456ae7e2f1e2c5e2`
+contains 345 selected packages and 957 selected edges: 35 first-party and 310
+external packages. Its analysis SHA-256 is
+`dad20c2240aa421f5d99fe30190cbe7fa9035b4e388ad64aa30e762afaf9cd10`.
+Set comparison against the accepted 33-package list above finds exactly two
+additions, `slug_configuration_v2` and `slug_starlark_v2`, and no removal. This
+is a Cargo-selected delta, not a Bazel configured or declared-reachability
+result.
+
+The explicit path mapping for all 35 local packages is: every `slug_*_v2`
+package maps to `app/<package>` (16 packages); `allocative` and
+`allocative_derive` map to `allocative/<package>`; `dice`, `dice_error` and
+`dice_futures` map to `dice/<package>`; `cmp_any`, `display_container`, `dupe`,
+`dupe_derive`, `gazebo`, `gazebo_derive`, `strong_hash` and
+`strong_hash_derive` map to `gazebo/<package>`; `lock_free_hashtable` and
+`lock_free_vec` map to `shed/<package>`; and `starlark`, `starlark_derive`,
+`starlark_map` and `starlark_syntax` map to `starlark-rust/<package>`.
+Thirty-four directories currently contain a `BUILD.bazel` with a Rust target
+named for the package. `app/slug_configuration_v2` has no BUILD file or target;
+its absence is a static graph gap, not evidence about a completed Bazel query.
+The new `//app/slug_starlark_v2:slug_starlark_v2` target is statically named by
+the Core, loading and bzlmod BUILD files. `slug_configuration_v2` is a normal
+Cargo dependency of analysis, build API, commands, Core, loading and server
+packages, so its missing Bazel package is material to the selected CLI
+closure. The generated `Cargo.Bazel.lock` contains its path package, but a lock
+entry does not create the missing BUILD target.
+
+The five selected local proc macros remain `allocative_derive`, `dupe_derive`,
+`gazebo_derive`, `starlark_derive` and `strong_hash_derive`. The five selected
+build scripts are `allocative`, `slug_reapi_v2`, `starlark`, `starlark_map` and
+`starlark_syntax`. Their checked-in BUILD files still declare script owners:
+three `rust_nightly` probes, the five checked-in REAPI/protobuf inputs with
+vendored protoc, and the Starlark syntax LALRPOP grammar. The Cargo receipt
+records enabled local features. Only six packages have nonempty feature sets:
+`slug_cli_v2`, `slug_core_v2` and `starlark_map` have `default`; `gazebo` has
+`str_pattern_extensions`; `strong_hash` has `num-bigint,triomphe`; and
+`allocative` has the 19-feature set in the frozen analysis. The other 29 have
+no enabled features in this selected resolution. The accepted 33-package
+inventory did not freeze feature vectors, so this cannot establish a feature
+delta against that baseline.
+
+The nine authority-file SHA-256 values in the frozen receipt still match the
+current files, including `.bazelversion`, `rust-toolchain`, both Cargo locks,
+`MODULE.bazel` and its lock. This proves no authority-file change since that
+Cargo snapshot; it does not prove historical pin parity with the original
+33-package developer gate. The live Bazel query and its recovery produced zero
+rows. Bazel declared reachability, generated action coverage, external
+crate-universe selection, and Cargo-to-Bazel feature equivalence remain
+unknown. Fixing the static configuration BUILD gap and obtaining separately
+reviewed Bazel evidence are prerequisites to closing M7A coverage; this
+accounting admits no action family, exact key, REAPI behavior or self-hosting.
+
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
 processes starlark_syntax's grammar; vendored protoc/tonic-build generate Rust
