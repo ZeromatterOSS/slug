@@ -112,6 +112,15 @@ CLI root's configured label/token view once. Its seven-character tokens do
 not prove full configuration identity or target/exec classification; even
 successful cquery rows need separate
 feature, generated-input, action and compilation proof for this row.
+The sole configured cquery stopped at Rust toolchain resolution with zero
+configured rows. Receipt
+`80e255dbdffa001fa48f05d78d3b10d1ba9ed3c489a4c184e95b6238b06cd4d9`
+records a clean 2.862-second failure and unchanged tracked inputs. The
+invocation omitted the nightly channel setting required by the registered
+toolchains; this row remains open.
+The selected flag-only successor permits one new full-root cquery with the
+registered nightly channel. No row closes until its configured output, and
+later feature/generated-input/action/compilation evidence, are reviewed.
 
 ## Readiness matrix
 

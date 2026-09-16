@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-bazel-configured-root-cquery-r1
-Status: scoped configured-root observation design ACCEPT; one query selected
+Packet: WP-7-10-m7a-bazel-configured-root-nightly-flag-r1
+Status: flag-corrected configured-root cquery design ACCEPT; one query selected
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -264,6 +264,18 @@ successful cquery alone cannot admit actions, generated inputs or M7A.
 Independent design review `ACCEPT` confirmed that the saved output will be
 interpreted only as displayed label/token rows and that the runner has bounded
 process-group and pipe cleanup.
+The sole cquery instead exited 1 in 2.862 seconds at Rust toolchain resolution
+before emitting any configured row. Its receipt SHA-256 is
+`80e255dbdffa001fa48f05d78d3b10d1ba9ed3c489a4c184e95b6238b06cd4d9`;
+all frozen tracked hashes and Git status stayed unchanged. The invocation
+omitted the nightly channel setting required by the registered Rust toolchain,
+so configured-root reachability remains open.
+The selected successor freezes that failed receipt and permits one otherwise
+identical fresh-output-base cquery with the existing developer-gate
+`--@rules_rust//rust/toolchain/channel=nightly` setting. Its 30-second
+ceiling, offline/download-disabled boundary and no-test/no-build scope remain.
+Independent design review `ACCEPT` confirmed that this changes only the
+nightly invocation flag and preserves the one-attempt limits.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

@@ -284,6 +284,17 @@ full-root configured dependency view with cached offline inputs and a
 30-second ceiling. It preserves only displayed seven-character configuration
 tokens, not full identities or target/exec classification, and records any
 analysis failure; no build, action, test or M7A behavior is selected.
+That one cquery exited 1 in 2.862 seconds with no configured rows because
+the registered nightly Rust toolchains did not match the default stable
+channel setting. Receipt SHA-256 is
+`80e255dbdffa001fa48f05d78d3b10d1ba9ed3c489a4c184e95b6238b06cd4d9`;
+tracked inputs stayed unchanged. Configured reachability remains open; the
+existing developer-gate invocation supplies the missing
+`--@rules_rust//rust/toolchain/channel=nightly` flag.
+The selected `WP-7-10-m7a-bazel-configured-root-nightly-flag-r1` corrects
+only that invocation setting for one fresh, offline, 30-second-capped
+full-root cquery. It leaves all configured/action/buildability gates open
+pending a successful result and separate inspection.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
