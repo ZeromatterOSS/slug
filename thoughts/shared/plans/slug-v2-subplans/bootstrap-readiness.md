@@ -202,6 +202,9 @@ probe stdout remains opaque. Independent final review `ACCEPT` confirmed
 source analysis SHA-256
 `0befd1d6b4187984859ee3a07769a50ff314f092217d8b1d303f5bc14251bb17`.
 No action ran and the first readiness row remains open.
+The selected `num-traits` action-environment query narrows the remaining
+inherited probe-child stdout question to configured wrapper variables.
+Generated flag bytes, execution and the first readiness row stay open.
 
 ## Readiness matrix
 

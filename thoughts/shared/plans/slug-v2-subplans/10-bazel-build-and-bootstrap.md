@@ -384,6 +384,10 @@ keeps that one path open. Source analysis SHA-256 is
 `0befd1d6b4187984859ee3a07769a50ff314f092217d8b1d303f5bc14251bb17`;
 independent final review `ACCEPT` confirmed the partial bound. No Cargo/Bazel
 command, build or test ran, and full generated arguments are still unproved.
+The selected `WP-7-10-m7a-num-traits-build-script-env-aquery-r1` permits one
+bounded offline CLI-root action query for the `num-traits` build-script run
+environment. It can classify configured wrapper variables only, without
+running the script or revealing generated flags.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
