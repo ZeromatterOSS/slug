@@ -343,6 +343,10 @@ feature-set mismatch. Pinned rules_rust source hashes and diff/plan checks
 passed; no Cargo/Bazel command, build or test ran. Independent final review
 `ACCEPT` confirmed the mapping and unchanged frozen locks/MODULE. This is
 local attribute parity only; action and buildability gates remain open.
+The selected `WP-7-10-m7a-external-tokio-feature-probe-r1` classifies one
+Cargo metadata versus platform-select feature ambiguity for Tokio. It allows
+one offline, capped unit-graph observation of the Linux CLI without build
+actions. No external feature parity or compilation claim is selected.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

@@ -162,6 +162,10 @@ final review `ACCEPT` confirmed unchanged frozen locks/MODULE and the narrow
 static claim. No Cargo/Bazel command, build or test ran. The first readiness
 row remains open for external features, generated inputs, configured actions
 and compilation.
+The selected Tokio feature probe checks whether Cargo metadata's
+`windows-sys` feature is present in the actual Linux CLI Tokio unit. Its
+single offline unit-graph command performs no compilation and cannot close
+the external feature, action, build or first-readiness-row gates alone.
 
 ## Readiness matrix
 

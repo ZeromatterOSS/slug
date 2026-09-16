@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-local-feature-flags-r1
-Status: local feature-attribute correction ACCEPT; configured action/build gates open
+Packet: WP-7-10-m7a-external-tokio-feature-probe-r1
+Status: design ACCEPT; one bounded Cargo unit-graph observation pending
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -341,6 +341,15 @@ Cargo/Bazel command, build or test. Independent final review `ACCEPT` repeated
 the exact 41-target check and frozen-input/allowlist audit. This closes only
 local feature-attribute parity; configured actions, generated inputs,
 compilation and M7A remain open.
+The selected successor isolates the only remaining external feature-list
+ambiguity in a static Cargo/Bazel lock comparison: Tokio's `windows-sys`
+appears in frozen Cargo metadata but only the Bazel lock's Windows select.
+One offline, 10-second-capped Cargo unit-graph command may inspect the actual
+Linux CLI Tokio feature set without compiling. It admits no external parity,
+configured action, build or M7A claim by itself.
+Independent design review `ACCEPT` followed a correction to select only
+`--bin slug`, bound each output stream and process group, and classify only
+Tokio's normal Linux target-library unit.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt
