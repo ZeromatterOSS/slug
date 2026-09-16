@@ -29,23 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-12-m7a-rustc-callback-proof-entrypoint-r1
-Status: result REPLAN; authentic local inputs and same-DICE harness required
+Packet: WP-7-13-m7a-reapi-cache-core-leaf-r1
+Status: ready; reviewed graph-independent cache core and FileWrite consumer
 
-The source-pinned regular crate-root callback candidate is preserved locally
-at `review/wp-7-11-rustc-crate-root-map-each` (`ea5fcc6fd`) and is unaccepted.
-Its compile and narrow structural tests passed, but it has no real loaded
-`rustc.bzl:1169` positive or same-DICE source A/B/A proof. The small rules_rust
-fixture stopped before source loading because the analysis helper lacks
-registry request inputs. The command runtime supplies those inputs, but the
-fixture has no pinned local registry/source materialization, and the one-shot
-wrapper creates a new DICE runtime per call. `REPLAN` requires a local
-authentic registry and retained-runtime proof harness before this candidate
-can resume. No runtime result or M7A readiness admission follows. The next
-independent demanded implementation packet is
-`WP-7-13-m7a-reapi-cache-core-leaf-r1` under Stage 7/11; its public boundary
-needs a reviewed, fully scoped manifest before implementation. Accepted
-predecessor source audit remains at `77ea40e89`.
+The active Stage 7/11 packet extracts a graph-independent REAPI protocol,
+digest, CAS and AC leaf from the existing adapter and routes the admitted
+FileWrite consumer through it. It must pin authentic upstream protocol
+sources, preserve accepted FileWrite wire/digest bytes, prove the dependency
+boundary and focused cold/hit behavior, and receive independent design and
+final review; independent design review accepted the corrected contract.
+This does not activate Spawn or advance an M7A readiness row
+until its own proof passes. The callback candidate remains unaccepted at local
+`review/wp-7-11-rustc-crate-root-map-each` (`ea5fcc6fd`); its real loaded
+source and same-DICE A/B/A proof requires a pinned local registry and retained
+runtime harness, as recorded at `6a6f48c1e`.
 
 The selected successor checks the CLI root's configured build-script and
 Rustc action edges for first-party LALRPOP and REAPI proto generation. One
