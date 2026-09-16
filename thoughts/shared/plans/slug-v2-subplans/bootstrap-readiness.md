@@ -79,6 +79,11 @@ The selected `WP-7-10-m7a-cargo-cache-acquisition-r1` packet first stages
 missing full-workspace inputs required by the Bazel lock generator. It runs no
 Bazel command or test and cannot close this or any other M7A row. The BUILD,
 lock and fresh graph repairs require a separately reviewed successor.
+The one locked fetch has populated the host cache and the sole offline
+full-workspace Cargo metadata output contains all 448 locked registry keys;
+the metadata receipt wrapper had a postprocessing defect documented in the
+current packet. Independent final review accepted this input preparation only;
+the readiness row remains open.
 
 ## Readiness matrix
 

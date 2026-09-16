@@ -208,7 +208,7 @@ closing M7A coverage; this accounting admits no action family, exact key,
 REAPI behavior or self-hosting.
 
 The first graph-sync design was rejected before mutation: rules_rust repin
-needs full-workspace Cargo inputs, while the host cache lacks 54 of 448 locked
+needs full-workspace Cargo inputs, while the host cache then lacked 54 of 448 locked
 registry archive/source pairs. A locked/offline full-workspace metadata
 preflight failed on `anstyle-wincon 3.0.11` in 0.15 seconds. The selected
 `WP-7-10-m7a-cargo-cache-acquisition-r1` stages exact lock inputs only, under
@@ -218,6 +218,16 @@ inventory SHA-256 is
 The missing configuration BUILD owner, six normal consumer edges, generated
 Bazel lock synchronization, fresh graph evidence and M7A readiness remain
 unaccepted and require a separate reviewed packet.
+The single locked fetch and checksum check now found all 448 registry archives
+and source directories present, with unchanged `Cargo.lock`; the sole offline
+full-workspace metadata output includes exactly those 448 registry keys.
+Fetch receipt SHA-256 is
+`861309ac82fcf02d8d8385b25622757ea0f4c04ffd4e568122532db0031f31b6`.
+Its metadata wrapper failed only while processing a local package with null
+source after Cargo completed; recovered output/cleanup receipt SHA-256 is
+`f5163a1827114cdc71acc9c325369db93f23a3cbc807cf821203e5486fbb5bea`.
+Independent final review `ACCEPT` confirmed the recovered metadata evidence
+without a rerun. The graph and M7A gates remain open.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-cargo-cache-acquisition-r1
-Status: scoped locked-input acquisition design; independent design review pending
+Status: acquisition and offline verification ACCEPT; Bazel graph work remains open
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -157,9 +157,9 @@ external lock-key intersections. M7A remains open.
 
 An offline graph-sync draft was rejected at design review before any BUILD or
 Bazel lock change. Its intended repin invokes full-workspace Cargo resolution,
-but the host cache lacks archive/source pairs for 54 of the 448 registry
+but the host cache then lacked archive/source pairs for 54 of the 448 registry
 packages in the frozen `Cargo.lock`; 16 archives exist in Bazel's downloader
-cache and 38 need acquisition. One read-only, full-workspace locked/offline
+cache and 38 needed acquisition. One read-only, full-workspace locked/offline
 metadata preflight failed in 0.15 seconds on missing `anstyle-wincon 3.0.11`
 (stderr SHA-256
 `529cdff554a4b7edbf576fef4ff48ef9d4ec8e8f68e22e61c57dae9826c30dde`).
@@ -170,6 +170,19 @@ for all platforms and one short locked/offline metadata verification. It runs
 no BUILD change, Bazel repin/query/build or test. Graph synchronization and
 fresh Bazel reachability require a separate reviewed successor; M7A remains
 open.
+
+Independent design review accepted the acquisition packet. The one locked
+fetch completed in 3.117 seconds with clean cleanup, unchanged tree/lock and
+all 448 locked registry archives checksum-verified; receipt SHA-256
+`861309ac82fcf02d8d8385b25622757ea0f4c04ffd4e568122532db0031f31b6`.
+The one offline full-workspace metadata command produced all 448 registry
+keys and complete sources in under 0.224 seconds. Its receipt wrapper failed
+afterward on a local package's null `source`, so the saved command output was
+verified read-only and the wrapper defect recorded in recovered receipt SHA-256
+`f5163a1827114cdc71acc9c325369db93f23a3cbc807cf821203e5486fbb5bea`.
+Independent final review `ACCEPT` confirmed the recovered metadata evidence
+and cleanup without a rerun. This closes only the locked-input prerequisite;
+no Bazel command or test followed.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

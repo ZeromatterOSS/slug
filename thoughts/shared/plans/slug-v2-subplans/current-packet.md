@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-cargo-cache-acquisition-r1
-Status: scoped locked-input acquisition design; independent design review pending
+Status: acquisition and offline verification ACCEPT; Bazel graph work remains open
 
 ## Outcome and authority
 
@@ -86,3 +86,30 @@ select a new graph-sync packet for BUILD owner/edges, generated lock and fresh
 Bazel evidence. That future packet must permit fresh local repository
 materialization while downloads stay disabled; `--nofetch` alone can expose
 stale generated repository content after a repin.
+
+## Observed result
+
+Independent design review returned `ACCEPT` before acquisition. The one
+locked, all-target fetch completed in 3.117 seconds with exit 0, no timeout or
+stream truncation, clean process-group cleanup, unchanged tracked status and
+unchanged `Cargo.lock`. Fetch receipt SHA-256:
+`861309ac82fcf02d8d8385b25622757ea0f4c04ffd4e568122532db0031f31b6`.
+All 448 registry archives are now present with exact lock checksums; all 448
+extracted source directories exist, and the locked `sorted_vector_map` Git
+checkout is at the exact commit above.
+
+The sole locked/offline full-workspace metadata command produced valid JSON
+with all 448 registry keys, no extra keys and no missing sources in less than
+0.224 seconds. Its 638-byte stderr contains only unused optional
+`perf-event` patch warnings. The receipt wrapper then exited 1 during
+postprocessing because it called `startswith` on a local workspace package's
+null `source` field. The saved command stdout/stderr and the wrapper's branch
+show Cargo itself exited 0; a separate read-only analysis verified the JSON,
+locked keys, unchanged tree/lock and no surviving metadata process without
+rerunning Cargo. Recovered metadata receipt SHA-256:
+`f5163a1827114cdc71acc9c325369db93f23a3cbc807cf821203e5486fbb5bea`.
+Independent final review `ACCEPT` confirmed the saved JSON and warnings,
+rehash-verified all 448 archives and source directories, and verified from the
+wrapper's guarded branch that Cargo exited 0 before postprocessing failed.
+The wrapper defect is preserved in the receipt; no rerun, Bazel command or
+test ran. This closes the acquisition prerequisite only.
