@@ -388,6 +388,16 @@ The selected `WP-7-10-m7a-num-traits-build-script-env-aquery-r1` permits one
 bounded offline CLI-root action query for the `num-traits` build-script run
 environment. It can classify configured wrapper variables only, without
 running the script or revealing generated flags.
+The sole query exited 0 in 4.154 seconds, found the exact non-tool `_bs`
+owner and a separate tool-configuration owner, and executed no actions.
+The selected action has no wrapper key in its aquery-visible fixed environment;
+inherited/default-shell wrapper values and generated `_bs.flags` remain
+unknown. Receipt SHA-256 is
+`ffba1990df9f5a6051cf180859f562a949f632d9949851abd0461570e12696dd`;
+analysis SHA-256 is
+`b3e727f268ad66c7ae9c6ba7cd90c067d5ee041a5d69054bc29f2f3375240ae4`.
+Independent result review `ACCEPT` confirmed the limited observation.
+Complete compiler arguments, compilation and M7A readiness remain open.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

@@ -205,6 +205,15 @@ No action ran and the first readiness row remains open.
 The selected `num-traits` action-environment query narrows the remaining
 inherited probe-child stdout question to configured wrapper variables.
 Generated flag bytes, execution and the first readiness row stay open.
+The sole query exited 0 in 4.154 seconds and found the exact non-tool
+`num-traits` build-script action plus a separate tool action. No wrapper key
+appears in the selected action's aquery-visible fixed environment; inherited
+wrapper state and generated flag bytes remain unknown. Receipt SHA-256 is
+`ffba1990df9f5a6051cf180859f562a949f632d9949851abd0461570e12696dd`;
+analysis SHA-256 is
+`b3e727f268ad66c7ae9c6ba7cd90c067d5ee041a5d69054bc29f2f3375240ae4`.
+Independent result review `ACCEPT` confirmed this narrow bound. No build or
+test action ran and the first readiness row remains open.
 
 ## Readiness matrix
 

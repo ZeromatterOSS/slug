@@ -30,7 +30,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-num-traits-build-script-env-aquery-r1
-Status: design ACCEPT; one bounded build-script action query pending
+Status: result ACCEPT; configured action environment observed, inherited wrapper state unknown
+
+The sole `num-traits` build-script action query exited 0 in 4.154 seconds and
+found the exact non-tool owner plus a separate tool owner. No wrapper key is
+present in the aquery-visible fixed environment; inherited wrapper values and
+generated `_bs.flags` remain unknown. Independent result review `ACCEPT`
+confirmed this limited observation. Receipt SHA-256 is
+`ffba1990df9f5a6051cf180859f562a949f632d9949851abd0461570e12696dd`;
+analysis SHA-256 is
+`b3e727f268ad66c7ae9c6ba7cd90c067d5ee041a5d69054bc29f2f3375240ae4`.
+No build or test action ran; the first M7A readiness row stays open.
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
