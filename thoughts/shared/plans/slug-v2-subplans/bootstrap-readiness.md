@@ -127,6 +127,14 @@ an uncached compiler archive with downloads disabled. Receipt
 records zero configured rows, clean cleanup and unchanged tracked inputs.
 The selected successor pins and stages exact Linux x86_64 toolchain archives;
 it does not close this readiness row or run another cquery.
+The toolchain packet pinned all six official Linux x86_64 hashes, left the
+module lock and other frozen inputs unchanged, and locally materialized the
+nightly tools repo with downloads disabled. Acquisition receipt
+`c84576af16f7c46bac05eb878d052b2196278473e32a280db9e2219b072162e2`
+and fetch receipt
+`1a47242a21971bbd5b63ae5d21f49f9a7a079d916643e8b02e187ef4ab7e8b10`
+prove input preparation only. The first readiness row still needs configured
+root, feature, generated-input, action and compilation evidence.
 
 ## Readiness matrix
 

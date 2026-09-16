@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-rust-toolchain-pin-and-cache-r1
-Status: scoped nightly toolchain provenance/cache design ACCEPT; acquisition selected
+Status: exact Linux x86_64 toolchain pin/cache result ACCEPT; configured root open
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -288,6 +288,22 @@ selected successor pins the required Linux x86_64 toolchain components and
 stages only those verified archives before any further offline cquery.
 Independent design review `ACCEPT` confirmed the six official hashes, the
 2025-09-14 rustfmt correction and the local distdir materialization path.
+The six pin entries in `MODULE.bazel` match the sidecar-verified manifest.
+Offline `bazel mod deps` exited 0 in 2.068 seconds without changing
+`MODULE.bazel.lock` or other frozen inputs. All six official archives matched
+their SHA-256 values after a 1.627-second, 171,520,576-byte acquisition;
+receipt SHA-256 is
+`c84576af16f7c46bac05eb878d052b2196278473e32a280db9e2219b072162e2`.
+The corrected download-disabled Bazel repository fetch exited 0 in 11.147
+seconds from a fresh output base, materialized the dated Linux x86_64
+toolchain tools repo and left tracked hashes/status unchanged; receipt SHA-256
+is `1a47242a21971bbd5b63ae5d21f49f9a7a079d916643e8b02e187ef4ab7e8b10`.
+Its preceding launcher-only option-placement failure is preserved at receipt
+`65e69361f3592520c062f6e3edb362f852a86541b49f13ebf5eb65d6bcd20547`.
+This is verified input preparation only; configured-root analysis remains open.
+Independent final review `ACCEPT` confirmed the six archive digests,
+MODULE-only change and clean materialization receipt; it does not infer
+whether Bazel read each archive from distdir or its checksum-keyed cache.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

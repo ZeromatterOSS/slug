@@ -303,6 +303,19 @@ tracked inputs stayed unchanged. The selected toolchain pin/cache packet uses
 the official dated release manifest to pin six Linux x86_64 archives and
 prepare offline repository materialization, without retrying cquery or
 claiming buildability.
+The six Linux x86_64 archive hashes and matching rustfmt date are now in
+`MODULE.bazel`. Offline module resolution changed no lockfile; all six
+official archives passed the manifest checksum gate, and one corrected
+download-disabled Bazel fetch materialized the selected toolchain-tools repo
+in 11.147 seconds with tracked inputs unchanged. Acquisition and fetch
+receipt SHA-256 values are
+`c84576af16f7c46bac05eb878d052b2196278473e32a280db9e2219b072162e2`
+and `1a47242a21971bbd5b63ae5d21f49f9a7a079d916643e8b02e187ef4ab7e8b10`.
+This proves Linux x86_64 toolchain input provenance/materialization only;
+configured CLI analysis and buildability are still open.
+Independent final review `ACCEPT` confirmed exact official archive hashes,
+the MODULE delta and clean selected-repository materialization; the bytes may
+have come from the supplied distdir or Bazel's checksum-keyed cache.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

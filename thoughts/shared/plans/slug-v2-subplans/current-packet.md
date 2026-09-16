@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-rust-toolchain-pin-and-cache-r1
-Status: scoped nightly toolchain provenance/cache design ACCEPT; acquisition selected
+Status: exact Linux x86_64 toolchain pin/cache result ACCEPT; configured root open
 
 ## Outcome and evidence
 
@@ -100,3 +100,33 @@ Independent design review `ACCEPT` verified the official six-archive hash
 mapping, rules_rust component and rustfmt-date behavior, and Bazel's
 checksum-keyed distdir lookup before its download-disabled stop. The bounded
 pin/cache work is selected.
+
+## Observed result
+
+`MODULE.bazel` now pins the six reviewed SHA-256s and the matching
+`nightly/2025-09-14` rustfmt version. A static comparison exactly matched
+all six entries to the sidecar-verified official manifest. The sole offline
+`bazel mod deps` exited 0 in 2.068 seconds; `MODULE.bazel.lock`, both Cargo
+locks, seven BUILD files and Git status stayed unchanged. Its receipt SHA-256
+is `b55177b30806613e15c7827154c2cd6615dd5554d50038df1961b8311bbdd60c`.
+
+The one supervised official acquisition completed in 1.627 seconds,
+downloading 171,520,576 bytes across exactly six `.tar.xz` files. Every
+archive SHA-256 matched the frozen manifest map before the verified distdir
+was admitted. Acquisition receipt SHA-256 is
+`c84576af16f7c46bac05eb878d052b2196278473e32a280db9e2219b072162e2`.
+The initial Bazel fetch launcher rejected `--distdir` as a startup option
+before making an output base or repository request (exit 2, 0.022 seconds);
+its receipt SHA-256 is
+`65e69361f3592520c062f6e3edb362f852a86541b49f13ebf5eb65d6bcd20547`.
+The invocation-only correction placed that option after `fetch`. Its sole
+repository materialization exited 0 in 11.147 seconds with the selected
+Linux x86_64 tools repository present and generated `iso_date = "2025-09-14"`.
+Download-disabled Bazel had the verified distdir and its checksum-keyed cache
+available. All tracked hashes
+and status remained exact; recovery receipt SHA-256 is
+`1a47242a21971bbd5b63ae5d21f49f9a7a079d916643e8b02e187ef4ab7e8b10`.
+No cquery, build, test, Slug behavior or M7A gate ran or closed.
+Independent final review `ACCEPT` rehashed all six official archives,
+confirmed the exact MODULE delta, both fetch receipts and the materialized
+repository, and retained the strict configured-root and M7A boundaries.

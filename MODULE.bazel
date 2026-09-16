@@ -15,6 +15,15 @@ bazel_dep(
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
     edition = "2024",
+    rustfmt_version = "nightly/2025-09-14",
+    sha256s = {
+        "2025-09-14/cargo-nightly-x86_64-unknown-linux-gnu.tar.xz": "cbc76e93946fb4658b692f9d71dbd4861f942b5b2bf6e34b072ba708d00e89e8",
+        "2025-09-14/clippy-nightly-x86_64-unknown-linux-gnu.tar.xz": "98bb5375ef6648d6e59fe8558e12df854e73653db2b6c7ee8891ffa0336f7622",
+        "2025-09-14/llvm-tools-nightly-x86_64-unknown-linux-gnu.tar.xz": "7302ec9a0447d5e21d918428b629a1d76ff934a562660e19b275fad707cf83dc",
+        "2025-09-14/rust-std-nightly-x86_64-unknown-linux-gnu.tar.xz": "9a0a34cc7a11eb74f408ab7a5eafd063bcce3726c9bb89351ed7f2811fa35b1a",
+        "2025-09-14/rustc-nightly-x86_64-unknown-linux-gnu.tar.xz": "0aa143cf401827874af7114f6466c0c87d4e31dfd6a2355c50db2e0c71bd45c7",
+        "2025-09-14/rustfmt-nightly-x86_64-unknown-linux-gnu.tar.xz": "d9206e55ee07ae3ba9de7190142a8e422a72f300726fa8e094a6300c7128aa82",
+    },
     versions = ["nightly/2025-09-14"],
 )
 use_repo(rust, "rust_toolchains")
