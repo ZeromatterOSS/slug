@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-5-6-7A-post-activation-f3-source-test-boundary-reconcile-r1
-Status: F3 source/test boundary reconciliation ready; independent design review ACCEPT
+Status: F3 resource-blocked; independent result review ACCEPT
 
 ## Result and acceptance boundary
 
@@ -33,6 +33,35 @@ preserve the indivisible public result under those constraints, record F3 as
 resource-blocked, terminate this evidence path and select only independent M7A
 production-inventory reconciliation from `bootstrap-readiness.md`. The timeout
 does not authorize a semantic implementation.
+
+## Source/test boundary audit result
+
+No admissible partition exists. The public
+`evaluate_workspace_build_command_with_bzlmod_inputs` expression constructs a
+fresh private `WorkspaceRuntime`, attaches the observer and synchronously calls
+`build_command_with_bzlmod_inputs`; it exposes no runtime, continuation or
+checkpoint before returning. `WorkspaceRuntime::drive_command` privately owns
+the DICE transaction, native-demand lease, repository session, retry loop,
+root-compute result, terminal selection, revision finalization and final
+acceptance. Intermediate `Need` and revision-retry states remain inside that
+single loop. Only `guard.accept_prepared` produces the `AcceptedCommand` that
+the public expression can return.
+
+The outer test cannot project or publish before that return.
+`AcceptedCommand::project` consumes the accepted terminal/events pair, and
+`CommandOutput::publish` consumes the projected pair before `into_parts`
+supplies the exit code and streams used by the exit-zero and sentinel
+assertions. A test-only split before acceptance would have to call private
+stages or retain hidden runtime/session state. A split after acceptance does
+not shorten the timed public evaluation. Separate exact-public-call partitions
+would each repeat the same indivisible evaluation; using a warmed instance,
+smaller target or synthetic stage would change the accepted F3 contract.
+
+Therefore finite test-only partitions cannot preserve the required authentic
+end-to-end result within the frozen limits. F3 is resource-blocked and its
+evidence path terminates without implementation or rerun. The only permitted
+successor is independent M7A production-inventory reconciliation from
+`bootstrap-readiness.md`; this result supplies no semantic correction.
 
 ## Completed final preparation and F3 result
 

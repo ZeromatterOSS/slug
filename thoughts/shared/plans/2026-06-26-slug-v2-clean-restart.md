@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-5-6-7A-post-activation-f3-source-test-boundary-reconcile-r1
-Status: F3 source/test boundary reconciliation ready; independent design review ACCEPT
+Status: F3 resource-blocked; independent result review ACCEPT
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -78,6 +78,17 @@ substitution, smaller-target acceptance, payload acquisition or semantic
 inference from the last observer sample is allowed. If the public result is
 indivisible, terminate the F3 evidence path as resource-blocked and select only
 independent M7A production-inventory reconciliation.
+
+Source inspection finds the exact public result indivisible. The public call
+creates a private `WorkspaceRuntime` and synchronously owns its DICE/native
+demand/repository retry loop through terminal selection and final acceptance;
+no continuation or checkpoint escapes. Projection and publication consume the
+returned accepted terminal/events afterward, so they cannot partition the
+timed evaluation. Any earlier split needs private stages or retained state, and
+separate calls repeat the whole evaluation; warm state, smaller targets and
+synthetic stages violate the frozen contract. Record F3 resource-blocked,
+terminate this evidence path and select only independent M7A
+production-inventory reconciliation. No code or test changed and no command ran.
 
 #### Historical gate progression
 

@@ -188,6 +188,16 @@ changes, payload acquisition or the completed invalidation-diagnostic chain. If
 the public result is indivisible, record F3 resource-blocked and proceed only to
 independent M7A production-inventory reconciliation.
 
+Inspection finds no admissible partition. The public expression constructs a
+private runtime and synchronously owns its DICE/native-demand/repository retry
+loop through final acceptance. Only then does it return the accepted
+terminal/events consumed by projection and publication. Splitting sooner needs
+private stages or retained state; splitting later does not shorten evaluation;
+separate calls repeat the whole expression. Warm state, smaller targets and
+synthetic stages are contract changes. F3 is resource-blocked, this evidence
+path terminates without rerun or implementation, and only independent M7A
+production-inventory reconciliation may follow.
+
 B1 can be investigated independently of fixture construction. The two proven
 baseline failures are
 `build_command_root_selects_each_terminal_producer_once_for_duplicate_targets`
