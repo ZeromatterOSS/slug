@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-external-tokio-feature-probe-r1
-Status: design ACCEPT; one bounded Cargo unit-graph observation pending
+Status: Linux Tokio feature-unit observation ACCEPT; external closure still open
 
 ## Question and frozen inputs
 
@@ -64,3 +64,21 @@ and the first M7A readiness row stay open.
 Independent design review first requested exact binary selection, finite
 stream/process cleanup and target-platform unit filtering. The corrected
 design was independently re-reviewed `ACCEPT` with those controls.
+
+## Result
+
+The sole offline unit-graph command exited 0 in 0.506 seconds, with no build
+actions and clean target-directory cleanup. Its receipt SHA-256 is
+`6a83706f5289c18d00619ddb9e4df96c0feddb7f0d5304bb3ade2b5502955696`;
+the raw JSON graph SHA-256 is
+`edd4d806c72dccd3dd8589b20bb9ad897fef3a99a01b6a91692ef8ec3a01f7fd`;
+the parsed Tokio analysis SHA-256 is
+`f0959cf454597e0576ffc42f5ba20325b557ab368baab59baae5ee2f04291ef4`.
+The one CLI binary root reaches exactly one Tokio 1.53.1 normal Linux
+library unit. Its 22 features exactly match the Bazel lock's common plus
+Linux select list and omit `windows-sys`; frozen Cargo metadata contains
+that one extra feature. Locks/MODULE and tracked status stayed unchanged.
+Independent final review `ACCEPT` re-parsed the 491-unit graph, exact Tokio
+row, receipt bounds and clean input hashes. This resolves only the Tokio
+Linux feature-list ambiguity. Other external units, configured actions,
+generated inputs, compilation and M7A remain open.

@@ -347,6 +347,11 @@ The selected `WP-7-10-m7a-external-tokio-feature-probe-r1` classifies one
 Cargo metadata versus platform-select feature ambiguity for Tokio. It allows
 one offline, capped unit-graph observation of the Linux CLI without build
 actions. No external feature parity or compilation claim is selected.
+The one unit-graph observation exited 0 in 0.506 seconds without compiling.
+The CLI root reaches one normal Linux Tokio library unit, whose 22 features
+match the lock's Linux selection and omit metadata-only `windows-sys`.
+Receipt SHA-256 `6a83706f5289c18d00619ddb9e4df96c0feddb7f0d5304bb3ade2b5502955696`
+and independent final review `ACCEPT` preserve this one-unit claim only.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

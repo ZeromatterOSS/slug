@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-external-tokio-feature-probe-r1
-Status: design ACCEPT; one bounded Cargo unit-graph observation pending
+Status: Linux Tokio feature-unit observation ACCEPT; external closure still open
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -350,6 +350,15 @@ configured action, build or M7A claim by itself.
 Independent design review `ACCEPT` followed a correction to select only
 `--bin slug`, bound each output stream and process group, and classify only
 Tokio's normal Linux target-library unit.
+The sole unit-graph command exited 0 in 0.506 seconds without compilation.
+The one root-reachable Linux Tokio library unit's 22 features exactly match
+the Bazel lock's Linux list and omit metadata-only `windows-sys`. Receipt and
+parsed-analysis SHA-256 values are
+`6a83706f5289c18d00619ddb9e4df96c0feddb7f0d5304bb3ade2b5502955696`
+and `f0959cf454597e0576ffc42f5ba20325b557ab368baab59baae5ee2f04291ef4`.
+Independent final review `ACCEPT` re-parsed the 491-unit graph, verified
+bounds/clean inputs and limited the claim to this Tokio unit. Whole external
+feature parity, configured actions, compilation and M7A remain open.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

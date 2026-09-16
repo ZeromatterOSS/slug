@@ -166,6 +166,11 @@ The selected Tokio feature probe checks whether Cargo metadata's
 `windows-sys` feature is present in the actual Linux CLI Tokio unit. Its
 single offline unit-graph command performs no compilation and cannot close
 the external feature, action, build or first-readiness-row gates alone.
+The sole unit-graph command exited 0 in 0.506 seconds without compiling.
+The one root-reachable normal Linux Tokio library unit matches the Bazel
+lock's 22 Linux features and omits metadata-only `windows-sys`; independent
+final review `ACCEPT` confirmed the raw row and clean receipt. This resolves
+only Tokio's feature-list ambiguity; the first readiness row stays open.
 
 ## Readiness matrix
 
