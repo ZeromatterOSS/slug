@@ -1432,6 +1432,16 @@ matches every main row to the candidate by selector, timing class, terminal
 assertion/panic family and material expected/actual diagnostic. These eight
 outcomes are baseline-attributed; preserve all evidence for final atomic review.
 
+Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`, fast-forwarded
+from main `4824a0861`. The selected-request/configured-action-closure and
+named/automatic execution-group owners, source-invariant corrections and
+reviewed loading/query/consumer prerequisites are accepted as one atomic
+boundary. Focused owner suites, partitioned Core proofs, direct REAPI/server
+consumers, query/server/CLI linkage and all unchanged-main comparisons are
+complete. The eight exit-101 comparisons remain baseline debt. Authentic F3 is
+the next separately selected post-activation packet; no broader action-family,
+C++/Java or exact identity boundary is implied.
+
 ## Configurable native alias prerequisite (2026-09-14)
 
 After the computed-default correction, authentic F3 reaches rules_java's

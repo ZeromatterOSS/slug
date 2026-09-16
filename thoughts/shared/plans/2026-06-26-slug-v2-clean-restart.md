@@ -30,7 +30,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-6-7A-r2-main-core-attribution-final-preparation-r2
-Status: unchanged-main attribution passed; independent atomic review pending
+Status: atomic R2/execution-group stack accepted on main; independent review ACCEPT
+
+Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
+fast-forwarded from `4824a0861`, integrating selected-request identity,
+configured-action conflict validation, named/automatic execution groups and
+their reviewed prerequisites as one boundary. All required gates are complete;
+the eight main Core failures remain baseline debt, and authentic F3 is the next
+separate post-activation packet.
+
+#### Historical gate progression
 
 The reconciled selected-request/configured-conflict and execution-group stack
 remains unaccepted at local commit `1b09dbfa1`. Its frozen Core binary passed
@@ -90,6 +99,14 @@ Comparison receipt
 matches every selector, timing class, panic/assertion family and material
 diagnostic to the frozen candidate row. The eight nonpasses are baseline facts;
 the complete atomic stack now awaits independent final review.
+
+Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
+fast-forwarded from `4824a0861` to that checkpoint, integrating selected-request
+identity, configured-action conflict validation, named/automatic execution
+groups and their reviewed prerequisites as one boundary. All focused, Core,
+direct-consumer, compile and baseline-attribution gates are complete. The eight
+main Core failures remain recorded baseline debt. Authentic F3 is the next
+separate post-activation packet and was not run or accepted here.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

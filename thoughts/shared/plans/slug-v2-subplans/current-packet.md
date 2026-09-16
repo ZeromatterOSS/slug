@@ -1,9 +1,23 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-6-7A-r2-main-core-attribution-final-preparation-r2
-Status: unchanged-main attribution passed; independent atomic review pending
+Status: atomic R2/execution-group stack accepted on main; independent review ACCEPT
 
 ## Result and acceptance boundary
+
+Independent final atomic review ACCEPTS implementation checkpoint `71d9ce4bf`
+for fast-forward integration on `main`. The accepted boundary combines the
+selected-toolchain request identity, configured-action closure/conflict owner,
+named/automatic execution groups and their reviewed loading/query/consumer
+prerequisites. All focused, partitioned Core, direct REAPI/server, compile and
+unchanged-main attribution gates are complete. Main was fast-forwarded from
+`4824a0861` to `71d9ce4bf` with no merge commit. The eight Core exit-101 rows
+remain explicit pre-existing main debt; they are not candidate regressions.
+
+This acceptance does not accept authentic configured-source F3, broader action
+families, computed C++/Java semantics or exact configuration/output/ActionKey
+bytes. F3 is the next separately selected post-activation packet. Preserve all
+receipts; no completed acceptance selector needs another run.
 
 The final continuation completed successfully in 81 seconds. Complete Cargo
 JSONL receipt `97ac6aa2b4bacb80c30107631b62cd0c8610eeebcd4a6b0e1c94a86c56378978`
@@ -23,7 +37,10 @@ exit/timing class, assertion or panic family and material expected/actual
 diagnostic. The eight candidate nonpasses are baseline-attributed. Preserve all
 receipts and run no additional selector before independent atomic review.
 
-Run one final compile-only continuation for the missing unchanged-main Core
+## Final preparation contract (completed)
+
+The final preparation packet authorized one compile-only continuation for the
+missing unchanged-main Core
 comparator, using clean main `4824a0861`, frozen feature `055b6fe18`, the
 identical absolute Cargo command, working directory, pinned PATH/toolchain,
 environment, single build job and warmed target directory. Do not clean, change
@@ -32,13 +49,14 @@ first. Exactly one invocation is authorized under a 360-second ceiling. This is
 a newly reviewed resource recovery for the final `slug_core_v2` crate, not a
 retry of the failed 180-second packet.
 
-Success requires completely parsed Cargo JSONL, zero compiler errors, one
+Success required completely parsed Cargo JSONL, zero compiler errors, one
 `build-finished` row with `success=true`, exactly one `slug_core_v2` test
 executable, clean sole process-tree cleanup and the executable SHA-256. A stop,
 malformed receipt or multiple/missing executable ends this evidence path as an
 external resource blocker; do not retry or raise the ceiling again.
 
-Only after success, exact-list the eight frozen names once, require each exactly
+Only after success could the eight frozen names be exact-listed once, each
+required exactly
 once and nonignored, then run only those eight once under the unchanged
 12-second TERM/three-second kill limits into one atomic receipt. Compare each
 main row with its frozen candidate row by selector, exit/timing class, terminal
@@ -46,7 +64,8 @@ assertion or panic family and material expected/actual diagnostic. A pass,
 timeout, missing or different row, or incomplete comparison rejects baseline
 attribution.
 
-Freeze every passing feature artifact and both earlier preparation records. No
+The packet froze every passing feature artifact and both earlier preparation
+records. No
 candidate rerun, source/test/lockfile/Cargo change, historical-timeout selector,
 replacement partition, full sweep, CLI conflict, F3, merge, acceptance commit
 or push is allowed.
