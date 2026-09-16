@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-five-target-rustc-aquery-r1
-Status: REPLAN; five direct Rustc flag sets observed, generated flags unresolved
+Packet: WP-7-10-m7a-three-build-script-feature-cfg-source-r1
+Status: design ACCEPT; pinned source-closure audit pending
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -395,6 +395,13 @@ analysis SHA-256 is `0f0aaea140a1fda7b15e876cf91c5b6f651f95de06d0468311df4905d37
 Independent final review `REPLAN` because three actions reference generated
 `_bs.flags` whose contents are absent, so complete eventual compiler flags
 are not proven. Preserve only the direct-action finding; do not rerun aquery.
+The selected successor audits the exact three build-script sources and
+rules_rust runner that can populate the unresolved `_bs.flags`. It asks only
+whether those pinned paths can emit additional named `feature=...` cfgs;
+it runs no build script, Cargo/Bazel command or test. Other generated cfg
+bytes and compilation remain open.
+Independent design review `ACCEPT` followed an added hash inventory for all
+compiled `version_check` and `autocfg` helper modules.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

@@ -374,6 +374,10 @@ exceed their saved Cargo units. Receipt SHA-256 is
 Independent final review `REPLAN`: `ahash`, `num-traits` and `rustix` also
 consume generated `_bs.flags` whose contents the action query cannot show.
 The full compiler-argument gate remains open; no aquery retry is selected.
+The selected `WP-7-10-m7a-three-build-script-feature-cfg-source-r1` audits
+the three pinned build scripts and runner to bound whether generated
+`_bs.flags` can add named feature cfgs. It requires no action execution or
+test and cannot establish full generated flag bytes or compilation.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

@@ -1,108 +1,76 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-10-m7a-five-target-rustc-aquery-r1
-Status: REPLAN; five direct Rustc flag sets observed, generated flags unresolved
+Packet: WP-7-10-m7a-three-build-script-feature-cfg-source-r1
+Status: design ACCEPT; pinned source-closure audit pending
 
-## Question and frozen inputs
+## Question and authority
 
-Determine whether the five Linux target-unit feature differences found in
-the saved Cargo-versus-lock accounting actually appear in Bazel's configured
-Rustc commands for the CLI root. The generated lock and checked-out crate
-BUILD files are wider than the selected Cargo units for `ahash 0.8.12`,
-`lalrpop-util 0.19.12`, `num-traits 0.2.19`, `relative-path 1.9.3` and
-`rustix 1.1.4`. Those lists are not yet action evidence. This packet only
-observes their actions; it does not compile, edit features, repin or admit
-whole-closure parity or M7A.
+Determine whether the three unresolved generated `_bs.flags` inputs in the
+accepted five-target Rustc aquery can add *named* `feature="..."` cfg values.
+The prior packet was `REPLAN`: its five direct Rustc feature sets were
+accepted, but `_bs.flags` contents were unavailable without executing build
+scripts. This successor audits exact pinned sources only. It does not run a
+build script, Bazel command, Cargo command or test, and cannot prove all
+runtime flag bytes or compilation.
 
-Freeze clean main `00499bfe9`, `Cargo.lock` SHA-256
+Freeze clean main `15945268a`, `Cargo.lock` SHA-256
 `a19882e78b50a82ed900fce570f4a6aee778553448790eaf08e2e08a591f76d8`,
 `Cargo.Bazel.lock` SHA-256
 `6335564ccbb3c915d0a2fa23b8aec0d69986911e062b586e13c5ec9812c2f35e`,
 `MODULE.bazel` SHA-256
 `109585b7b40d274ea912d32c73f54c25cc4bef1bc5e60526e18ac9bfe48d210c`,
-and accepted external unit feature analysis SHA-256
-`42c2aeb3e1e0624ef705fcab21e05d57037151913ef25fdc0e65c493194a1f7f`.
-The accepted full-root cquery receipt SHA-256
-`459c41aad42c9259adc239b74271c0e7b380bb6970135e4e266ee91e13b322bc`
-contains configured label rows for these five external crate targets, but its
-short display tokens do not prove action identity. Query the CLI root itself.
+and accepted five-action analysis SHA-256
+`0f0aaea140a1fda7b15e876cf91c5b6f651f95de06d0468311df4905d37e091f`.
+The three actual Bazel external-repository `build.rs` inputs match the
+cached Cargo source bytes: ahash 0.8.12 SHA-256
+`d7dd5428c78b80bb3c99068561641ec661f0f94defbda17f85b443e358ab6396`,
+num-traits 0.2.19 SHA-256
+`d3969209fc1c9d201c66ed11820d0b328600d75b3971f8ceebeab04900bc0587`,
+and rustix 1.1.4 SHA-256
+`74cb32e64aa6fe99c2496a425b016e22f4e43c438a8237966b8acae04a98eaf9`.
+The pinned rules_rust build-script runner `lib.rs` SHA-256 is
+`54e90953ecd2016994b08fc51330b75cf9cdaf155c27163229f7bb506070ce4b`.
+It maps emitted `cargo:rustc-cfg=...` to `--cfg=...` in `_bs.flags`, including
+`feature=...` if a script emits it.
 
-## One bounded analysis-only command
+## Bounded source audit
 
-Use pinned Bazel 9.2.0 in batch mode, with the existing offline output base,
-verified six-file nightly distdir, nightly Rust toolchain channel,
-`--repository_disable_download`, `--lockfile_mode=error` and the established
-network-profiler disable flag. Run one `aquery` of
-`mnemonic("Rustc.*", outputs(".*(ahash|lalrpop.util|num.traits|relative.path|rustix).*", deps(//app/slug_cli_v2:slug)))`
-with `--output=jsonproto --include_param_files`. [Bazel's aquery reference](https://bazel.build/query/aquery)
-documents post-analysis action inspection without execution and the
-parameter-file content option. The output
-filter limits saved actions, while `deps(root)` retains the root's configured
-closure. Check the five exact owner labels in the returned target table;
-extra regex matches do not count as evidence for a named crate.
-The exact Bazel binary SHA-256 is
-`7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694`;
-reuse output base `/tmp/slug-m7a-configured-offline-cquery-output-base`.
-The five required canonical owners from the accepted root cquery are
-`@@rules_rust++crate+slug_crates__ahash-0.8.12//:ahash`,
-`@@rules_rust++crate+slug_crates__lalrpop-util-0.19.12//:lalrpop_util`,
-`@@rules_rust++crate+slug_crates__num-traits-0.2.19//:num_traits`,
-`@@rules_rust++crate+slug_crates__relative-path-1.9.3//:relative_path`
-and `@@rules_rust++crate+slug_crates__rustix-1.1.4//:rustix`.
-Normalize only the leading Bazel `@`/`@@` spelling if jsonproto differs;
-repo and target names must match exactly. Alias and build-script owners do
-not substitute for these five.
-
-A supervisor caps wall time at 15 seconds and stdout/stderr at 16 MiB each,
-starts a separate process group, then applies TERM and a two-second KILL
-cleanup on a cap. Save raw output and a receipt with exact command, exit,
-elapsed time, stop reason, stream hashes/bytes, output-base status, tracked
-before/after status and frozen hashes. One failed, capped, truncated or
-unparseable attempt stops this packet; no retry or broader query.
-
-On exit 0, require a Rustc action and complete arguments/param
-file content for each of the five exact configured owners. `Rustc` and
-`RustcMetadata` actions for one owner are acceptable only when their feature
-sets agree; otherwise the owner is ambiguous. Record configuration IDs and
-parse only each
-`--cfg feature=...` set and compare with the corresponding Cargo Linux unit
-and generated lock list. Record extra/missing features and configuration/owner
-IDs, without claiming compilation or full graph parity. If any owner is
-absent, has ambiguous actions or hides feature arguments, report
-that as a gap and stop. No BUILD or lock edit is authorized by this packet.
+- Read each entire actual Bazel `build.rs` and check for `include!`, modules,
+  subprocess stdout forwarding, `rustc-flags` or arbitrary `rustc-cfg`
+  construction. Enumerate every reachable build-script output path and its
+  possible `rustc-cfg` values, without assuming which environment branches
+  execute. The `version_check 0.9.5` helper used by ahash is pinned at
+  `01bb86088ba281d511ae002aa939bb30b747f47ace5ea13a46de554a3117806e`;
+  the `autocfg 1.5.1` helper used by num-traits is pinned at
+  `772630d0e09d06f343fd72284c8330eacde87d2a4ee22f70af62a0e2119fbf05`.
+  Include all compiled helper modules: `version_check` `channel.rs`
+  `bb3eae79aaf224591f1e9dddedcabbea3fc01bc6c06eafedcd87d7b770a35aca`,
+  `version.rs` `dba18a25983ec6e37b952f4cdc5219c9e5abba2c3a76cef87465e1fba6f8ac89`,
+  `date.rs` `09580a0a2008fad2ccbc43fb42a88f42221b98b01692702022a296dc9c86bf37`;
+  `autocfg` `rustc.rs`
+  `a8a213ddb64a05c1a1af933bcb331a98879e942b167c33d8f94f9f60ebb14e29`,
+  `version.rs` `4f7d23b36f01c7be1871be86c038d6cb4689e145d67c82d3793690e9aa05b133`,
+  and `error.rs`
+  `fd8ff67c64f7cd1b9f81325a81de4baa34c39d6ae298bdb33f9829cc91acac39`.
+  Both libraries' `tests` modules are behind `cfg(test)` and excluded from
+  these build-script dependencies. Inspect the compiled helper source
+  closure, called implementations and subprocess output capture for any
+  output side effects.
+- Classify only whether any of these pinned source paths can emit a named
+  `rustc-cfg=feature=...` or `rustc-flags` containing such a cfg. If no,
+  combine that source-owned bound with the prior five direct action sets to
+  close the **named feature cfg set** for those five actions. Leave actual
+  generated cfg values, complete argument bytes, build-script execution and
+  compilation open. If a path is dynamic or opaque, record it as a gap.
+- Save a concise deterministic source-audit receipt under `/tmp` with all
+  hashes, output paths and source anchors. Independent final review checks
+  every emit path and that the claim does not expand beyond named features.
 
 The tracked allowlist is this manifest, canonical plan status, Stage 10 and
-bootstrap readiness. Independent design review precedes the one command;
-independent final review checks raw action ownership and flags. Other host
-units, generated inputs, execution, compilation and M7A remain open.
-Independent design review initially required exact canonical owners,
-configuration IDs and agreement between Rustc/RustcMetadata feature flags,
-plus pinned binary/output-base paths. The corrected one-command design was
-independently re-reviewed `ACCEPT`.
-
-## Result and stop
-
-The supervisor's first launch had a typo in a preflight constant and stopped
-before Bazel spawn; launcher-failure receipt SHA-256 is
-`553a7d46ee477165966a4c4eada941b6422333f3bac270be301fce3e68219166`.
-Independent review confirmed that it did not consume the sole Bazel query.
-The corrected supervisor then ran that one offline aquery successfully in
-4.191 seconds, with 12 action rows, no executed actions, no truncation,
-clean process-group cleanup and unchanged tracked hashes/status. Its receipt
-SHA-256 is `040e2e4c49298f445a6be66310f250587c56a476ad05ff360c0173f658eb2606`;
-parsed analysis SHA-256 is
-`0f0aaea140a1fda7b15e876cf91c5b6f651f95de06d0468311df4905d37e091f`.
-
-Five exact canonical owners each have one non-tool target-configuration
-`Rustc` action. Their direct `--cfg feature=...` sets equal the generated
-lock's Linux lists and contain the saved Cargo target-unit differences:
-`ahash` adds `default,getrandom,runtime-rng,std`; `lalrpop-util` adds
-`lexer,regex`; `num-traits` adds `libm`; `relative-path` adds `serde`;
-`rustix` adds `termios`. Independent final review `REPLAN` confirmed these
-direct flags but found generated `_bs.flags` inputs on `ahash`, `num-traits`
-and `rustix` whose contents were absent from the jsonproto output. The
-packet's complete-arguments gate therefore failed. These direct additions
-are real configured command arguments; the full eventual feature sets,
-build-script outputs, execution, compilation and M7A remain unresolved.
-Do not rerun this aquery. A separate reviewed successor must establish the
-generated flag content/provenance before claiming full action-feature parity.
+bootstrap readiness. No source, BUILD or lockfile edit is authorized.
+Independent design review precedes the audit; independent result review
+precedes acceptance. Other host-unit flags, generated input bytes, action
+execution, compilation and M7A remain open.
+Independent design review first requested pins for all six compiled helper
+modules omitted from the initial draft. The corrected complete source
+closure was independently re-reviewed `ACCEPT`.

@@ -193,6 +193,9 @@ output. Receipt SHA-256 is
 `040e2e4c49298f445a6be66310f250587c56a476ad05ff360c0173f658eb2606`.
 No action ran; complete configured compiler arguments and the first
 readiness row remain open.
+The selected source-only successor audits whether the three unresolved
+`_bs.flags` producers can emit additional named `feature=...` cfgs. It
+cannot infer actual generated values or close compilation/readiness gates.
 
 ## Readiness matrix
 
