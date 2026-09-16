@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-external-unit-feature-accounting-r1
-Status: design ACCEPT; saved-graph accounting pending
+Status: saved-graph external unit accounting ACCEPT; configured actions open
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -366,6 +366,15 @@ Cargo/Bazel command, build or test. Lock-list differences are recorded as
 structural discrepancies until configured Bazel actions are inspected.
 Independent design review `ACCEPT` confirmed the exact graph filters and
 unique lock mapping for this static-only accounting.
+Deterministic analysis SHA-256
+`42c2aeb3e1e0624ef705fcab21e05d57037151913ef25fdc0e65c493194a1f7f`
+records 491 root-reachable units in 343 package IDs: 35 local and 308
+external, leaving only `getrandom 0.3.4` and `libm 0.2.16` from frozen
+metadata without CLI units. Of 344 normal external build units (219 Linux
+target, 125 host), 322 match the lock's Linux feature list and 22 are
+narrower (five target, 17 host), with no unit-only features. Independent
+final review `ACCEPT` recomputed all rows. This is structural accounting,
+not proof of configured Bazel flags or compilation.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-external-unit-feature-accounting-r1
-Status: design ACCEPT; saved-graph accounting pending
+Status: saved-graph external unit accounting ACCEPT; configured actions open
 
 ## Outcome and authority
 
@@ -59,3 +59,21 @@ Independent design review `ACCEPT` confirmed the one-root/491-unit graph,
 343 graph package IDs, 344 eligible external compilation units and unique
 lock keys. The reviewer confirmed that the comparison remains structural
 even when a unit's feature set is narrower than the lock list.
+
+## Result
+
+Deterministic analysis SHA-256
+`42c2aeb3e1e0624ef705fcab21e05d57037151913ef25fdc0e65c493194a1f7f`
+records all 344 eligible external unit rows and 22 exact mismatches. The one
+Linux `slug` root reaches all 491 saved graph units and 343 package IDs:
+35 local and 308 external. Frozen metadata listed 310 external IDs; only
+`getrandom 0.3.4` and `libm 0.2.16` lack CLI units. There is no graph-only
+package ID. Of 219 Linux target and 125 host external build units, 322 have
+the same feature set as the generated lock's Linux list. All 22 differences
+are lock-only additions: five target units (`ahash`, `lalrpop-util`,
+`num-traits`, `relative-path`, `rustix`) and 17 host units. No unit-only
+feature appears. Independent final review `ACCEPT` recomputed every unit and
+mismatch row against raw frozen inputs and confirmed unchanged tracked state.
+No new Cargo/Bazel command, build or test ran. The generated lock list has
+not been proven to be the configured Bazel action flags; the discrepancies
+must be classified at that boundary before any parity or feature edit.

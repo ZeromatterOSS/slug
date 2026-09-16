@@ -175,6 +175,13 @@ The selected saved-graph successor accounts for all external Cargo unit IDs
 and host/target feature lists against the generated Bazel lock. It introduces
 no new build or test; structural list differences require later configured
 action evidence before this readiness row can close.
+The saved CLI graph has 308 external package IDs; frozen metadata's
+`getrandom 0.3.4` and `libm 0.2.16` have no CLI unit. Among 344 normal
+external units, 322 feature sets equal the lock's Linux list and 22 are
+narrower, including five Linux target units. Independent final review
+`ACCEPT` recomputed the analysis at SHA-256
+`42c2aeb3e1e0624ef705fcab21e05d57037151913ef25fdc0e65c493194a1f7f`.
+This does not establish configured Bazel action flags or close the first row.
 
 ## Readiness matrix
 

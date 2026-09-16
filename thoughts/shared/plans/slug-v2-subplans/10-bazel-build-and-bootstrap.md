@@ -356,6 +356,13 @@ The selected `WP-7-10-m7a-external-unit-feature-accounting-r1` compares all
 root-reachable external Cargo compilation units in that saved graph with
 generated lock feature lists, separating host and Linux target units. It
 runs no new Cargo/Bazel command and cannot prove configured Bazel flags.
+The saved-graph comparison found 35 local and 308 external package IDs in
+the CLI unit graph; two frozen metadata external IDs have no CLI unit. Of
+344 normal external units, 322 feature sets equal the generated lock's
+Linux list and 22 are narrower (five Linux target, 17 host). Analysis
+SHA-256 is `42c2aeb3e1e0624ef705fcab21e05d57037151913ef25fdc0e65c493194a1f7f`;
+independent final review `ACCEPT` recomputed all rows. Configured Bazel
+action flags must be inspected before interpreting these differences.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
