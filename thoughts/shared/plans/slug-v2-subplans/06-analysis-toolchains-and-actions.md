@@ -1419,6 +1419,19 @@ as an external resource blocker. Only after success may the frozen eight main
 comparators run once under 12-second TERM/three-second kill limits; all other
 tests, source changes, merge and push remain prohibited.
 
+The final r2 continuation succeeded in 81 seconds. Compile receipt
+`97ac6aa2b4bacb80c30107631b62cd0c8610eeebcd4a6b0e1c94a86c56378978`
+contains zero errors, one successful build-finished row and one main Core
+binary, SHA-256
+`31b941d3ec87a59a6cae2d7c399bd2ee6fb0182cd5284c54c35d957580fb149e`.
+Exact preflight admitted only the frozen eight. Main receipt
+`7f87d741e0ad8edaa08b9d98f13b4488f478c1a8afa1704264e5651a73dca68c`
+records eight exit-101 results with no timeout or forced kill. Comparison
+receipt `9819e9487d30d089ffa6b59900a26c1ea5f10990c698b6047242162e86ca2eb6`
+matches every main row to the candidate by selector, timing class, terminal
+assertion/panic family and material expected/actual diagnostic. These eight
+outcomes are baseline-attributed; preserve all evidence for final atomic review.
+
 ## Configurable native alias prerequisite (2026-09-14)
 
 After the computed-default correction, authentic F3 reaches rules_java's

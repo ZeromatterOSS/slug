@@ -1,9 +1,27 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-4-6-7A-r2-main-core-attribution-final-preparation-r2
-Status: final comparator preparation recovery ready; independent replan review ACCEPT
+Status: unchanged-main attribution passed; independent atomic review pending
 
 ## Result and acceptance boundary
+
+The final continuation completed successfully in 81 seconds. Complete Cargo
+JSONL receipt `97ac6aa2b4bacb80c30107631b62cd0c8610eeebcd4a6b0e1c94a86c56378978`
+contains 367 compiler artifacts, 51 build-script rows, 22 compiler messages,
+zero errors, exactly one successful `build-finished` row and exactly one Core
+test executable. Clean main remained at `4824a0861`; process cleanup was clean.
+The main Core binary SHA-256 is
+`31b941d3ec87a59a6cae2d7c399bd2ee6fb0182cd5284c54c35d957580fb149e`.
+
+Exact preflight found the frozen eight names once and nonignored. Atomic main
+receipt `7f87d741e0ad8edaa08b9d98f13b4488f478c1a8afa1704264e5651a73dca68c`
+records eight exit-101 results, zero passes, zero timeouts and zero forced
+kills. Comparison receipt
+`9819e9487d30d089ffa6b59900a26c1ea5f10990c698b6047242162e86ca2eb6`
+matches all eight main rows to their frozen candidate rows by selector,
+exit/timing class, assertion or panic family and material expected/actual
+diagnostic. The eight candidate nonpasses are baseline-attributed. Preserve all
+receipts and run no additional selector before independent atomic review.
 
 Run one final compile-only continuation for the missing unchanged-main Core
 comparator, using clean main `4824a0861`, frozen feature `055b6fe18`, the

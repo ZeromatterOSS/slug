@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-4-6-7A-r2-main-core-attribution-final-preparation-r2
-Status: final comparator preparation recovery ready; independent replan review ACCEPT
+Status: unchanged-main attribution passed; independent atomic review pending
 
 The reconciled selected-request/configured-conflict and execution-group stack
 remains unaccepted at local commit `1b09dbfa1`. Its frozen Core binary passed
@@ -77,6 +77,19 @@ build-finished row and one hashed Core executable before only the eight frozen
 comparators may run once at 12/15 seconds. Another preparation stop ends this
 path as an external resource blocker; no further retry, source change, merge or
 push is allowed.
+
+The final continuation completed in 81 seconds. Compile receipt
+`97ac6aa2b4bacb80c30107631b62cd0c8610eeebcd4a6b0e1c94a86c56378978`
+has zero errors, one successful build-finished row and one main Core binary,
+SHA-256 `31b941d3ec87a59a6cae2d7c399bd2ee6fb0182cd5284c54c35d957580fb149e`.
+All eight exact main comparators then returned exit 101 without timeout or
+forced kill in receipt
+`7f87d741e0ad8edaa08b9d98f13b4488f478c1a8afa1704264e5651a73dca68c`.
+Comparison receipt
+`9819e9487d30d089ffa6b59900a26c1ea5f10990c698b6047242162e86ca2eb6`
+matches every selector, timing class, panic/assertion family and material
+diagnostic to the frozen candidate row. The eight nonpasses are baseline facts;
+the complete atomic stack now awaits independent final review.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
