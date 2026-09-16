@@ -1,132 +1,81 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-10-m7a-bazel-configured-root-offline-r1
-Status: configured-root label/path observation ACCEPT; later M7A gates open
+Packet: WP-7-10-m7a-local-feature-flags-r1
+Status: design ACCEPT; bounded four-BUILD edit pending
 
 ## Outcome and authority
 
-Obtain one authentic Bazel 9.2 configured dependency view of the full
-`//app/slug_cli_v2:slug` root after the reviewed graph/lock sync and exact
-Linux x86_64 Rust toolchain cache preparation. This is read-only oracle
-analysis, with no Slug semantic owner or compatibility-class change.
-Configured label reachability may inform the first M7A readiness row, but
-does not admit Cargo feature parity, generated inputs, action families,
-compilation, REAPI, self-hosting or M7A. Other target/exec platform
-toolchains remain unsupported/deferred by the cache packet.
+Make the checked-in production Bazel Rust rules expose the selected local
+Cargo feature names that are currently missing, including build-script
+feature environment. This is exact feature-name parity for the named local
+rules under the frozen Linux CLI closure. It changes no Slug semantic owner,
+external crate features, generated input contents, action-family admission,
+compilation, REAPI or M7A status. Other target platforms and unobserved
+feature selections remain unsupported/deferred.
 
-The earlier unconfigured query produced 18,846 valid labels and all 35
-Cargo-selected local package paths; its receipt SHA-256 is
-`1935a3d026a6a31566d6250ac2fc49747b1f08de04d36819984e9dd34ae89b8a`.
-The first configured cquery omitted the nightly setting and emitted zero
-rows; receipt SHA-256 is
-`80e255dbdffa001fa48f05d78d3b10d1ba9ed3c489a4c184e95b6238b06cd4d9`.
-The flag-corrected cquery selected the nightly toolchain but stopped at an
-uncached Rust compiler archive; receipt SHA-256 is
-`9f305306861c887bffc9ca6dbde4c1930cf8733cfa91cbe97b41c3b55364ab5c`.
-No configured-root coverage was inferred from either failure.
-
-Accepted checkpoint `54a206095` pins official SHA-256s for the six Linux
-x86_64 nightly-2025-09-14 `.tar.xz` components and the same-date rustfmt
-version in `MODULE.bazel`. The sidecar-verified release manifest SHA-256 is
-`2f3d96c78c69647d0dc209aae553150793ec10988fa1011767c3990915173e01`.
-The exact six-file acquisition receipt SHA-256 is
-`c84576af16f7c46bac05eb878d052b2196278473e32a280db9e2219b072162e2`;
-the download-disabled selected toolchain repository fetch receipt SHA-256 is
-`1a47242a21971bbd5b63ae5d21f49f9a7a079d916643e8b02e187ef4ab7e8b10`.
-That fetch exited 0 with a materialized Linux x86_64 tools repo and
-unchanged tracked files. It did not run configured analysis.
-
-Freeze clean main `54a206095`, pinned Bazel executable SHA-256
-`7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694`,
-root `Cargo.lock` SHA-256
+Freeze clean main `9bc029215`, root `Cargo.lock` SHA-256
 `a19882e78b50a82ed900fce570f4a6aee778553448790eaf08e2e08a591f76d8`,
 `Cargo.Bazel.lock` SHA-256
 `6335564ccbb3c915d0a2fa23b8aec0d69986911e062b586e13c5ec9812c2f35e`,
 `MODULE.bazel` SHA-256
 `109585b7b40d274ea912d32c73f54c25cc4bef1bc5e60526e18ac9bfe48d210c`,
-`MODULE.bazel.lock` SHA-256
-`bcdda78dd82aab5fd7ab1796985a78322b50178dceed7669c1b20173c2634302`,
 selected Linux Cargo analysis SHA-256
 `dad20c2240aa421f5d99fe30190cbe7fa9035b4e388ad64aa30e762afaf9cd10`,
-the prior query/acquisition/fetch receipts and every verified archive hash.
+and accepted configured-root query receipt/analysis SHA-256 values
+`459c41aad42c9259adc239b74271c0e7b380bb6970135e4e266ee91e13b322bc`
+and `266cf64932c2ef555ca5d36bb8d87ad95a8b0fe6a641a4c41973527f0c711dde`.
+That query proved all 35 selected local package paths have a non-null
+configured label row; it did not inspect their feature attributes or
+execute compiler actions.
 
-## One necessary configured-root query
+The frozen Cargo analysis has six local packages with nonempty features.
+`allocative` has its 19 named features, `gazebo` has
+`str_pattern_extensions`, and `strong_hash` has `num-bigint,triomphe`;
+their checked-in library rule lists already match. `slug_cli_v2`,
+`slug_core_v2` and `starlark_map` each enable `default` in Cargo, but their
+production `rust_library` and CLI `rust_binary` rules omit it. All three
+`default` definitions currently expand to empty arrays; the named
+`feature="default"` cfg is nevertheless a distinct compile input.
+The selected `allocative` and `starlark_map` build scripts omit their
+package's activated feature lists. The other three selected local build
+scripts have no enabled features.
 
-Assert all frozen hashes, a clean tree and an absent
-`/tmp/slug-m7a-configured-offline-cquery-output-base`. Use the absolute
-pinned Bazel executable at
-`/home/wgray/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel`.
-Run exactly one invocation with startup flags `--batch --ignore_all_rc_files
---output_base=/tmp/slug-m7a-configured-offline-cquery-output-base` and command:
+Pinned rules_rust 0.73 `rust/private/rustc.bzl` emits each `crate_features`
+value as `--cfg feature="%s"` (source SHA-256
+`a7712508f50e5952f3f51e33c98acbe8ba39554e9c6f6edc26f16820d7c2a9e4`).
+Its `cargo/private/cargo_build_script.bzl` maps each feature to
+`CARGO_FEATURE_<NAME>=1` (SHA-256
+`6147df938723ec58cef646169814c85a72fa0f74080471756e3c1891d02f4630`),
+and `cargo/private/cargo_build_script_wrapper.bzl` forwards the same list
+to the underlying script Rust binary (SHA-256
+`4db7f9fd06ea44106813e3696ae0d28469ced3178613dd1c349836edb58ee866`).
+These source-owned transformations, the accepted Cargo feature snapshot,
+and exact checked-in rule inputs are the discriminating source regression;
+no new oracle command or test is needed for this static correction.
+Independent design review `ACCEPT` confirmed the six nonempty local feature
+sets, five build-script owners, CLI binary mapping, pinned source hashes and
+static-only validation boundary.
 
-```text
-cquery --distdir=/tmp/slug-m7a-rust-nightly-2025-09-14-distdir --repository_disable_download --lockfile_mode=error --noexperimental_collect_system_network_usage --@rules_rust//rust/toolchain/channel=nightly --output=label 'deps(//app/slug_cli_v2:slug)'
-```
+## Bounded edit and validation
 
-The verified six-file distdir is the only extra archive source; Bazel's
-checksum-keyed local repository cache may also satisfy the pinned requests.
-Do not infer which one Bazel used without explicit evidence. Leave
-`CARGO_BAZEL_REPIN`, `REPIN` and generator URL/SHA overrides unset; set
-`CARGO_BAZEL_ISOLATED=false`, `CARGO_HOME=/home/wgray/.cargo`,
-`CARGO_NET_OFFLINE=true` and prepend the pinned nightly Cargo directory to
-`PATH`. Keep the restricted network environment. No fetch with network,
-repin, build, action or test is selected.
+- In `allocative/allocative/BUILD.bazel`, reuse one exact 19-feature list
+  for its existing `rust_library` and `cargo_build_script`. Preserve order,
+  spelling, dependencies and generated-source declarations.
+- In `app/slug_cli_v2/BUILD.bazel`, add `crate_features = ["default"]` to
+  `slug_cli_v2` and `slug`; in `app/slug_core_v2/BUILD.bazel`, add it to
+  `slug_core_v2`; in `starlark-rust/starlark_map/BUILD.bazel`, add it to
+  `starlark_map` and its `build_script`.
+- Compare every selected local package's frozen Cargo feature set to its
+  checked-in production Rust rule inputs; compare all five local build
+  script feature inputs to their package sets. Record any difference as a
+  gap, not an inferred match. Check the pinned rules_rust source hashes,
+  `git diff --check` and `python3 scripts/v2_plan_status.py`. Do not rerun
+  Cargo metadata, full-root Bazel analysis, a build or a test.
 
-Full-root configured analysis is needed to test the production root;
-owner-only cquery cannot answer this graph question. Cap the one command at
-30 seconds TERM/three-second process-group KILL with a finite drain deadline
-and 16 MiB per captured stream. Record exact command/environment,
-output hashes, exit/elapsed time, cleanup, pre/post lock, MODULE and seven
-BUILD hashes/status in a machine-readable `/tmp` receipt. A cache miss,
-analysis failure, timeout, truncated output, unexpected tracked write or
-cleanup failure is a typed gap and stops without retry or deadline increase.
-
-## Result and stop
-
-On success, preserve complete raw label/displayed-token rows. Bazel 9.2
-`cquery --output=label` displays seven-hex configuration checksum prefixes
-or `null`; these are not full, guaranteed-unique identities and do not
-classify target versus exec. Parse actual rows without collapsing tokens;
-report root-workspace and external row counts, distinct root package paths,
-displayed tokens and null rows. Compare the named configuration/Starlark
-labels and all 35 selected local Cargo package paths, recording missing
-paths as gaps. A successful query still does not establish features,
-generated inputs, actions, buildability, Slug parity or M7A.
-
-The only tracked edits allowed are this manifest, canonical plan status,
-Stage 10 and bootstrap readiness for the result. Run `git diff --check` and
-`python3 scripts/v2_plan_status.py`. Independent design review precedes
-the query; independent final review checks the receipt, parsing and strict
-scope. No follow-on command is selected by this packet.
-Independent design review `ACCEPT` confirmed the full-root command, strict
-label-token interpretation and a preflight that requires exactly six
-regular, hash-verified distdir archives while freezing both prior failures.
-The one offline configured-root cquery is selected.
-
-## Observed result
-
-The sole pinned offline cquery exited 0 in 5.337 seconds, with no timeout,
-truncation, cleanup failure, download or tracked-file change. Bazel reported
-the CLI root analyzed successfully and zero actions executed. Command receipt
-SHA-256 is
-`459c41aad42c9259adc239b74271c0e7b380bb6970135e4e266ee91e13b322bc`;
-raw stdout SHA-256 is
-`8d16e02dcf5dd433ebe7c4aff5982a88d9501cd141784a272d2b681c52574f3a`.
-All 17,685 raw rows are distinct and match the label plus displayed-token
-format. There are 1,085 root-workspace rows, 16,600 external rows and
-16,261 explicit `null` rows. Displayed non-null tokens `72a5446`,
-`3ebebd5` and `3030ed4` occur 725, 653 and 46 times respectively;
-193 labels appear with more than one displayed token. The 36 root package
-paths consist of all 35 selected
-local Cargo package paths plus the workspace root. Every selected local
-path has at least one non-null row. The CLI, configuration and Starlark V2
-named targets each appear with displayed token `72a5446`. Parsed analysis
-SHA-256 is `266cf64932c2ef555ca5d36bb8d87ad95a8b0fe6a641a4c41973527f0c711dde`.
-These are displayed checksum prefixes, not complete identities or a
-target/exec classification. Successful configured label analysis does not
-prove Cargo feature parity, generated inputs, action coverage, compilation,
-Slug behavior or M7A readiness.
-Independent final review `ACCEPT` independently parsed every saved row,
-matched the 35 non-null local package paths directly to frozen Cargo
-manifest parents, confirmed the named labels and clean receipt, and retained
-the displayed-token and no-action/buildability limits.
+The tracked allowlist is those four BUILD files, this manifest, canonical
+plan status, Stage 10 and bootstrap readiness. No Cargo or Bazel lockfile
+may change. Independent design review precedes the edit; independent final
+review checks exact list mapping and source anchors. This packet accepts
+only local feature flag inputs, not external feature equivalence or
+compilation/buildability. A later selected packet must inspect actual
+configured actions and resolve any remaining external feature questions.

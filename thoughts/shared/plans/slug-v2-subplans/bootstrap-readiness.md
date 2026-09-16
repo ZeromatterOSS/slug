@@ -151,6 +151,11 @@ open.
 Independent final review `ACCEPT` confirmed the 35 non-null selected paths
 against frozen Cargo manifests. This closes only the configured label/path
 observation slice, not the first readiness row.
+The selected local feature-flag packet compares all 35 selected local Cargo
+package feature sets with checked-in Rust rules and five build-script feature
+inputs. It scopes a four-BUILD correction for missing `default` names and two
+build-script lists. This does not close external features, generated inputs,
+configured actions, compilation or the first readiness row.
 
 ## Readiness matrix
 

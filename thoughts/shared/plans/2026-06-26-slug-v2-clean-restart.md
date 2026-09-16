@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-bazel-configured-root-offline-r1
-Status: configured-root label/path observation ACCEPT; later M7A gates open
+Packet: WP-7-10-m7a-local-feature-flags-r1
+Status: design ACCEPT; bounded four-BUILD edit pending
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -323,6 +323,17 @@ Independent final review `ACCEPT` re-parsed all 17,685 saved rows and
 matched all 35 non-null root paths directly to frozen Cargo manifests.
 Configured label/path reachability is accepted; the first readiness row
 remains open.
+
+The selected successor compares the frozen 35-package Cargo feature snapshot
+with checked-in local Rust and build-script rules. It scopes only missing
+`default` flags and two build-script feature lists in four BUILD files, using
+pinned rules_rust source to verify flag and environment propagation. Static
+source/attribute comparison is the packet's regression check; no new Bazel
+query, build or test is selected. External feature equivalence, generated
+inputs, configured actions, compilation and M7A remain open.
+Independent design review `ACCEPT` confirmed the exact local feature mapping,
+five build-script owners and pinned rules_rust propagation; the bounded edit
+may proceed with static-only validation.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

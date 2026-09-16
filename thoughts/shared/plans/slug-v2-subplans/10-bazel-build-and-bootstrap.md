@@ -331,6 +331,12 @@ features, generated inputs, actions and buildability still need proof.
 Independent final review `ACCEPT` independently confirmed every row and
 the 35 Cargo manifest-parent paths, without widening the configured-label
 claim to action or buildability evidence.
+The selected `WP-7-10-m7a-local-feature-flags-r1` corrects only selected local
+Rust rule and build-script feature inputs against the frozen Cargo snapshot.
+Its discriminating check is exact attribute comparison plus pinned rules_rust
+source transformation; no new Bazel analysis, build or test is selected.
+External feature parity, generated inputs, actions and buildability remain
+open.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP
