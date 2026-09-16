@@ -1385,6 +1385,26 @@ and fixtures are unchanged, all public paths and assertion semantics remain,
 and gross additions are 1,219 of 1,250. Preserve this evidence and resume the
 deferred unchanged-main attribution and remaining predecessor gates.
 
+Direct-consumer recovery is complete at feature checkpoint `055b6fe18`: both
+required REAPI selectors pass in receipt
+`1fca8402a39c0007f65ed57dc3c6a4de624e00d6ae992877cd9cc443ee7f691b`,
+the required server selector passes in receipt
+`1a61d473b634226b683cc42ca945db1237c8cf2fae9051671c162ba182845076`,
+and query/server/CLI compile linkage passes. Final predecessor review still
+returns REPLAN because the eight candidate Core assertion failures lack an
+unchanged-main classification. Six resumed 60-second main preparations ran no
+tests and produced no binary, repeatedly stopping during `slug_bzlmod_v2`.
+
+The docs-first successor freezes every passing artifact and allows exactly one
+same-command main Core preparation at clean `4824a0861` under a 180-second
+compile-only ceiling. It changes no test deadline. Success requires complete
+Cargo JSON, one Core executable and its hash; failure cannot retry. Only the
+eight frozen failure selectors may then preflight and run once under the
+unchanged 12-second TERM/three-second kill limits. Every main row must reproduce
+the candidate exit/timing and material assertion family. Any pass, timeout,
+missing selector, different failure or incomplete receipt replans. Merge and
+push remain prohibited pending successful attribution and final atomic review.
+
 ## Configurable native alias prerequisite (2026-09-14)
 
 After the computed-default correction, authentic F3 reaches rules_java's

@@ -1,9 +1,57 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-6-7A-r2-core-source-test-boundary-reconcile-r1
-Status: Phase B second partition passed; independent final review ACCEPT
+Packet: WP-4-6-7A-r2-main-core-attribution-preparation-r1
+Status: comparator preparation recovery ready; independent replan review ACCEPT
 
 ## Result and acceptance boundary
+
+Recover only the missing unchanged-main attribution for the eight frozen
+candidate Core assertion failures. Freeze clean feature checkpoint `055b6fe18`
+and its accepted artifacts: Core proof receipt
+`35c469ecd891903220ebde8bb7a13d16edf691155d6f9acfdb22c7e4ae6d3bef`,
+REAPI receipt `1fca8402a39c0007f65ed57dc3c6a4de624e00d6ae992877cd9cc443ee7f691b`,
+server receipt `1a61d473b634226b683cc42ca945db1237c8cf2fae9051671c162ba182845076`
+and the successful query/server/CLI compile check. Do not rerun any of them.
+
+The unchanged-main worktree is clean at exact commit `4824a0861`. Six resumed
+60-second `slug_core_v2 --lib --no-run --message-format=json` preparation
+slices ran zero tests and produced no valid current-main Core binary; the last
+three repeatedly restarted `slug_bzlmod_v2`. This packet authorizes exactly one
+same-command preparation with the pinned toolchain, environment and warmed
+target directory under a 180-second ceiling. This resource-boundary exception
+does not change any test deadline. Require complete Cargo JSON, zero compiler
+errors, `build-finished` success, exactly one Core test executable, clean
+process-tree cleanup and the executable SHA-256. Do not retry if it stops.
+
+If preparation succeeds, preflight only the eight frozen selector names below,
+then run each exactly once into one atomic receipt with the unchanged 12-second
+TERM and three-second kill envelope. Compare every main row with its frozen
+candidate row by selector, exit/timing class, terminal assertion or panic
+family, and material expected/actual diagnostic. All eight must reproduce the
+candidate failure class to become baseline-attributed. A main pass, missing or
+ignored selector, timeout, different assertion class, incomplete receipt or
+180-second preparation stop requires replan. Source inspection cannot waive a
+result.
+
+No source, test, lockfile, fixture, candidate, Cargo/BUILD or production change
+is allowed. Do not run the nine prohibited original timeouts, either completed
+replacement partition, a candidate selector, a full Core sweep, authentic CLI
+conflict, or F3. Merge, the main acceptance commit and the authorized main push
+remain prohibited until this attribution succeeds and independent final atomic
+review accepts every predecessor gate.
+
+## Frozen eight-selector comparator set
+
+- `runtime::dice::tests::build_command_tests::build_command_root_selects_each_terminal_producer_once_for_duplicate_targets`;
+- `runtime::dice::tests::build_command_tests::build_command_root_terminal_closure_retains_reused_and_clears_retry_only_batches`;
+- `runtime::dice::tests::build_command_tests::multi_target_exported_sources_do_not_enter_revision_bridge`;
+- `runtime::dice::tests::build_command_tests::public_external_single_uses_observed_family_and_full_source_certificate`;
+- `runtime::dice::tests::build_command_tests::resolved_run_view_reuses_exact_executable_filewrite_relation`;
+- `runtime::dice::tests::build_command_tests::root_exported_source_revision_bridge_retries_changed_terminal_and_preserves_epoch`;
+- `runtime::dice::tests::cquery_drives_only_the_requested_root_across_platform_retries`; and
+- `runtime::dice::tests::query_command_tests::direct_external_query_uses_host_route_native_materialization_and_apparent_output`.
+
+## Completed proof history
 
 Replace nine over-broad Core tests that exceeded the standing 12-second exact
 deadline with a proof-only set of smaller exact selectors. Preserve every

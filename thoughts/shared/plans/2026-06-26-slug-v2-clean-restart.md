@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-6-7A-r2-core-source-test-boundary-reconcile-r1
-Status: Phase B second partition passed; independent final review ACCEPT
+Packet: WP-4-6-7A-r2-main-core-attribution-preparation-r1
+Status: comparator preparation recovery ready; independent replan review ACCEPT
 
 The reconciled selected-request/configured-conflict and execution-group stack
 remains unaccepted at local commit `1b09dbfa1`. Its frozen Core binary passed
@@ -54,6 +54,17 @@ frozen bodies and caps. Resume the eight unchanged-main assertion comparisons
 and remaining direct consumer gates without rerunning either completed
 partition. Only complete atomic acceptance may merge to `main` and push `main`
 to the authorized ZeromatterOSS remote.
+
+Final predecessor review returned REPLAN solely because the eight candidate
+Core exit-101 rows still lack unchanged-main attribution. Freeze feature
+checkpoint `055b6fe18`, its 53/53 Core proof, passing direct REAPI/server
+receipts and compile linkage. Six 60-second main preparations ran no tests and
+produced no binary. The narrow successor allows one same-command 180-second
+compile-only preparation at clean main `4824a0861`; on success it may preflight
+and run only the eight frozen comparator selectors once under unchanged
+12/15-second test limits. Any preparation stop, missing selector, main pass,
+timeout or different failure class replans. No source change, completed proof
+rerun, full sweep, CLI conflict, F3, merge or push is allowed.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source
