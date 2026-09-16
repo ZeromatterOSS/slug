@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-bazel-declared-root-query-r1
-Status: unconfigured declared-root reachability ACCEPT; configured gates remain open
+Packet: WP-7-10-m7a-bazel-configured-root-cquery-r1
+Status: scoped configured-root observation design ACCEPT; one query selected
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -255,6 +255,15 @@ is `f734391152ac608a0787b7443575b6fe3253294b8211494ba161d6f1545f0b13`.
 Independent final review `ACCEPT` confirmed the saved labels, path mapping
 and clean receipt. This is only unconfigured declared reachability; configured
 target/action, generated-input, buildability and M7A gates remain open.
+The selected successor permits one fresh-output-base, download-disabled
+`bazel cquery deps(//app/slug_cli_v2:slug)` under a 30-second ceiling. Its
+label output preserves each displayed seven-character configuration token
+to identify root analysis coverage or a concrete failure; full configuration
+identity and target/exec classification remain open. No build or test runs, and a
+successful cquery alone cannot admit actions, generated inputs or M7A.
+Independent design review `ACCEPT` confirmed that the saved output will be
+interpreted only as displayed label/token rows and that the runner has bounded
+process-group and pipe cleanup.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

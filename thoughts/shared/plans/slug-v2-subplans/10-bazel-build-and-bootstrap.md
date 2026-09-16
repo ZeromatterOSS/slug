@@ -279,6 +279,11 @@ parsed analysis SHA-256 is
 Independent final review `ACCEPT` confirmed the saved label set and strict
 unconfigured classification. Configured/action and buildability evidence is
 still absent.
+The selected `WP-7-10-m7a-bazel-configured-root-cquery-r1` obtains one
+full-root configured dependency view with cached offline inputs and a
+30-second ceiling. It preserves only displayed seven-character configuration
+tokens, not full identities or target/exec classification, and records any
+analysis failure; no build, action, test or M7A behavior is selected.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

@@ -100,13 +100,18 @@ The sole no-repin validation passed under a fresh Bazel output base with
 unchanged authority and BUILD hashes; independent final review of static
 graph/lock synchronization accepted it. No target reachability or M7A row
 closes from that validation alone.
-The selected `WP-7-10-m7a-bazel-declared-root-query-r1` obtains one fresh
+The accepted `WP-7-10-m7a-bazel-declared-root-query-r1` obtained one fresh
 unconfigured root target view. Even complete declared path reachability does
 not close this row without configured/action and behavioral evidence.
 The fresh query yielded all 35 selected local package paths and the named
 configuration/Starlark targets in its unconfigured declared view; independent
 result review `ACCEPT` confirmed the labels. This does not yet prove configured
 action reachability or close the first readiness row.
+The selected `WP-7-10-m7a-bazel-configured-root-cquery-r1` checks the full
+CLI root's configured label/token view once. Its seven-character tokens do
+not prove full configuration identity or target/exec classification; even
+successful cquery rows need separate
+feature, generated-input, action and compilation proof for this row.
 
 ## Readiness matrix
 
