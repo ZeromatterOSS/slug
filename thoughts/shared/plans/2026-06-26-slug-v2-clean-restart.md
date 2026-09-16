@@ -29,8 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-local-generated-input-aquery-r1
-Status: result ACCEPT; two first-party generated-input action edges observed
+Packet: WP-7-10-m7a-spawn-paramfile-source-audit-r1
+Status: result ACCEPT; callback admission is the first known CLI Spawn blocker
+
+The CLI rules_rust Rustc and cargo build-script paths use Spawn virtual
+parameter files. Pinned Bazel source shows aquery's `paramFiles` field would
+not expose those virtual inputs; the planned query was cancelled before it ran.
+Slug also rejects the `map_each` callbacks used by those paths during Args
+evaluation, before parameter-file staging. This audit selects that callback
+boundary as the next demanded implementation decision. It runs no build or
+test and admits no Slug execution or M7A behavior.
+Independent final review `ACCEPT` confirmed the source anchors and successor
+order after a citation correction.
 
 The selected successor checks the CLI root's configured build-script and
 Rustc action edges for first-party LALRPOP and REAPI proto generation. One

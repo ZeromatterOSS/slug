@@ -28,11 +28,20 @@ family/input-tree/execution capability. Each family first passes its Stage 6/8
 semantic and aquery gates; completing every formatter or backend is not a
 prerequisite. Remaining breadth stays in M7B or a later product packet.
 
-Consume the retained Stage 6 action and owner context used by aquery. Once the
-preserved output-conflict R2 design has been accepted and applied, consume its
-`ValidatedActionClosure` at the requested-root handoff. Do not reconstruct or
-bypass that validation from an individually valid action or cached child. R2
-remains unapplied; this future dependency does not authorize its restoration.
+The CLI rules_rust Rustc and cargo build-script `Args.use_param_file` calls
+produce virtual Spawn inputs during execution expansion. Pinned Bazel 9.2
+`CommandLines.expand` and `SpawnAction.getSpawn` own replacement argv, paths
+and virtual bytes; `ActionGraphDump`'s optional `paramFiles` field covers
+artifact-backed `ParameterFileWriteAction`s only. The M7A source audit in
+[the current packet](./current-packet.md) also finds demanded `map_each`
+callbacks rejected before Slug can produce those Spawn actions. Admit that
+analysis boundary before virtual parameter-file staging; neither source
+finding widens the bounded FileWrite executor.
+
+Consume the retained Stage 6 action and owner context used by aquery. The
+accepted requested-root output-conflict R2 implementation supplies
+`ValidatedActionClosure` at the handoff; consume it without reconstructing or
+bypassing validation from an individually valid action or cached child.
 
 Before activating a broader family, prove A and B may each succeed but their
 conflicting combined root set publishes no successful closure, Execute request,
