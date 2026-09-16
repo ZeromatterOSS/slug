@@ -8,6 +8,7 @@ cargo_build_script(
     name = "build_script",
     srcs = ["build.rs"],
     aliases = aliases(build = True, build_proc_macro = True),
+    crate_features = ["default"],
     edition = crate_edition(),
     deps = all_crate_deps(build = True),
     proc_macro_deps = all_crate_deps(build_proc_macro = True),
@@ -17,6 +18,7 @@ rust_library(
     name = "starlark_map",
     srcs = glob(["src/**/*.rs"]),
     aliases = aliases(),
+    crate_features = ["default"],
     edition = crate_edition(),
     deps = all_crate_deps(normal = True) + [
         ":build_script",

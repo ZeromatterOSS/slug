@@ -156,6 +156,12 @@ package feature sets with checked-in Rust rules and five build-script feature
 inputs. It scopes a four-BUILD correction for missing `default` names and two
 build-script lists. This does not close external features, generated inputs,
 configured actions, compilation or the first readiness row.
+The four BUILD edits passed the frozen 35-package/41-target local feature-set
+comparison with zero mismatches, including all five build scripts. Independent
+final review `ACCEPT` confirmed unchanged frozen locks/MODULE and the narrow
+static claim. No Cargo/Bazel command, build or test ran. The first readiness
+row remains open for external features, generated inputs, configured actions
+and compilation.
 
 ## Readiness matrix
 
@@ -165,7 +171,7 @@ unobserved action families cannot be declared unnecessary by assumption.
 
 | Obligation in the production closure | Current status / reusable evidence | Owner | Required exit evidence |
 |---|---|---|---|
-| Bazel builds the CLI root, its 35-package selected Cargo closure and generated sources | Static configuration BUILD/edge and Bazel-lock synchronization accepted; fresh unconfigured root query reaches all 35 local package paths and eight formerly missing external repositories, independently accepted; configured reachability, features, generated inputs and buildability remain unproved | Stage 10 | Prove configured root reachability, features, generated inputs, pin correspondence and compilation without excluding a production input |
+| Bazel builds the CLI root, its 35-package selected Cargo closure and generated sources | Static configuration BUILD/edge and Bazel-lock synchronization accepted; configured root cquery reaches all 35 local package paths; local feature-attribute parity accepted; external feature parity, configured actions, generated inputs and buildability remain unproved | Stage 10 | Prove configured root/action reachability, remaining features, generated inputs, pin correspondence and compilation without excluding a production input |
 | Authentic MODULE, registry, archive, built-in and generated repository sources | Partial. Normal Run registry parity accepted at `47163df7b`; authentic complete R2 fixture closure remains unresolved. Stage 5 owns sources and registrations | Stages 4/5 | Portable authentic inputs and ordinary source/mapping/registration demand for the selected production closure; no synthetic package, user-CAS default-test dependency or hidden Bazel semantic delegation |
 | rules_rust/provider/transition/toolchain evaluation | Partial configured analysis; accepted generic declarations/providers/Args/runfiles do not prove the full rules_rust closure. Canonical M7 status names accepted owners | Stages 4/5/6 | Ordinary configured results for the production root with source-derived toolchain/provider/transition dependencies; exact named semantics and structural invalidation |
 | Named/automatic execution groups | Accepted bounded with R2 at main checkpoint `71d9ce4bf`; pinned-source runtime names, target-context parsing, property precedence, action ordering, root provenance/depset shape and subrule boundary passed joint gates | Stages 4/5/6 | Preserve the accepted boundary; authentic F3 remains unaccepted and closed at its 30-second ceiling |

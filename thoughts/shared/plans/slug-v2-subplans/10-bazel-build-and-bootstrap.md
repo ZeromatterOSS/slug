@@ -337,6 +337,12 @@ Its discriminating check is exact attribute comparison plus pinned rules_rust
 source transformation; no new Bazel analysis, build or test is selected.
 External feature parity, generated inputs, actions and buildability remain
 open.
+The four BUILD edits passed a frozen Cargo snapshot comparison for all 35
+local packages, 36 production Rust rules and five build scripts, with no
+feature-set mismatch. Pinned rules_rust source hashes and diff/plan checks
+passed; no Cargo/Bazel command, build or test ran. Independent final review
+`ACCEPT` confirmed the mapping and unchanged frozen locks/MODULE. This is
+local attribute parity only; action and buildability gates remain open.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

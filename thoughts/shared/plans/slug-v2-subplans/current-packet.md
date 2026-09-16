@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-local-feature-flags-r1
-Status: design ACCEPT; bounded four-BUILD edit pending
+Status: local feature-attribute correction ACCEPT; configured action/build gates open
 
 ## Outcome and authority
 
@@ -79,3 +79,15 @@ review checks exact list mapping and source anchors. This packet accepts
 only local feature flag inputs, not external feature equivalence or
 compilation/buildability. A later selected packet must inspect actual
 configured actions and resolve any remaining external feature questions.
+
+## Result
+
+The four BUILD files now set exact frozen Cargo feature names on all selected
+production Rust rules and build scripts. A static parse compared 35 package
+sets, 36 Rust rules and five build scripts with zero mismatches; the six
+nonempty package sets and empty sets for the other 29 packages match exactly.
+The three pinned rules_rust source hashes, `git diff --check` and plan status
+passed. No Cargo metadata, Bazel command, build or test ran. Independent final
+review `ACCEPT` repeated the 41-target comparison, checked the allowed diff
+and frozen Cargo/Bazel locks and MODULE hashes, and retained configured
+actions, generated inputs, compilation and M7A as open gates.

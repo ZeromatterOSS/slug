@@ -11,6 +11,7 @@ rust_library(
     ),
     aliases = aliases(),
     crate_root = "src/lib.rs",
+    crate_features = ["default"],
     edition = crate_edition(),
     deps = all_crate_deps(normal = True) + [
         "//app/slug_commands_v2",
@@ -30,6 +31,7 @@ rust_test(
 rust_binary(
     name = "slug",
     crate_root = "src/main.rs",
+    crate_features = ["default"],
     edition = crate_edition(),
     srcs = ["src/main.rs"],
     deps = [":slug_cli_v2"],

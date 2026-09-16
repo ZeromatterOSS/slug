@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-local-feature-flags-r1
-Status: design ACCEPT; bounded four-BUILD edit pending
+Status: local feature-attribute correction ACCEPT; configured action/build gates open
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -334,6 +334,13 @@ inputs, configured actions, compilation and M7A remain open.
 Independent design review `ACCEPT` confirmed the exact local feature mapping,
 five build-script owners and pinned rules_rust propagation; the bounded edit
 may proceed with static-only validation.
+The four BUILD edits now match the frozen Cargo feature sets for all 35 local
+packages, 36 production Rust rules and five build scripts. The static parse,
+three pinned rules_rust hashes, diff check and plan status passed without a
+Cargo/Bazel command, build or test. Independent final review `ACCEPT` repeated
+the exact 41-target check and frozen-input/allowlist audit. This closes only
+local feature-attribute parity; configured actions, generated inputs,
+compilation and M7A remain open.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt
@@ -442,7 +449,7 @@ partially or integrate `review-evidence/`.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Configured production graph coverage | unconfigured declared 35/35 local path evidence accepted; separately review configured target/features/generated-input closure |
+| 1 | Configured production graph coverage | configured 35/35 local path and local feature-attribute evidence accepted; separately review external features, configured actions and generated inputs |
 | 2 | Bazel root compilation and action coverage | select focused build/action evidence only after configured graph accounting; current packet cannot admit M7A behavior |
 | 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
