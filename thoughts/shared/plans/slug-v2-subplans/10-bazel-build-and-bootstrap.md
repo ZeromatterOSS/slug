@@ -352,6 +352,10 @@ The CLI root reaches one normal Linux Tokio library unit, whose 22 features
 match the lock's Linux selection and omit metadata-only `windows-sys`.
 Receipt SHA-256 `6a83706f5289c18d00619ddb9e4df96c0feddb7f0d5304bb3ade2b5502955696`
 and independent final review `ACCEPT` preserve this one-unit claim only.
+The selected `WP-7-10-m7a-external-unit-feature-accounting-r1` compares all
+root-reachable external Cargo compilation units in that saved graph with
+generated lock feature lists, separating host and Linux target units. It
+runs no new Cargo/Bazel command and cannot prove configured Bazel flags.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

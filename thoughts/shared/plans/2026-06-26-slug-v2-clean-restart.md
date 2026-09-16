@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-external-tokio-feature-probe-r1
-Status: Linux Tokio feature-unit observation ACCEPT; external closure still open
+Packet: WP-7-10-m7a-external-unit-feature-accounting-r1
+Status: design ACCEPT; saved-graph accounting pending
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -359,6 +359,13 @@ and `f0959cf454597e0576ffc42f5ba20325b557ab368baab59baae5ee2f04291ef4`.
 Independent final review `ACCEPT` re-parsed the 491-unit graph, verified
 bounds/clean inputs and limited the claim to this Tokio unit. Whole external
 feature parity, configured actions, compilation and M7A remain open.
+The selected successor reuses the saved 491-unit Cargo graph to account for
+all external package IDs and compare each normal host/target compilation-unit
+feature set with the generated Bazel lock's Linux list. It requires no new
+Cargo/Bazel command, build or test. Lock-list differences are recorded as
+structural discrepancies until configured Bazel actions are inspected.
+Independent design review `ACCEPT` confirmed the exact graph filters and
+unique lock mapping for this static-only accounting.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt

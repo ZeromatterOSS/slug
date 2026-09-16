@@ -171,6 +171,10 @@ The one root-reachable normal Linux Tokio library unit matches the Bazel
 lock's 22 Linux features and omits metadata-only `windows-sys`; independent
 final review `ACCEPT` confirmed the raw row and clean receipt. This resolves
 only Tokio's feature-list ambiguity; the first readiness row stays open.
+The selected saved-graph successor accounts for all external Cargo unit IDs
+and host/target feature lists against the generated Bazel lock. It introduces
+no new build or test; structural list differences require later configured
+action evidence before this readiness row can close.
 
 ## Readiness matrix
 

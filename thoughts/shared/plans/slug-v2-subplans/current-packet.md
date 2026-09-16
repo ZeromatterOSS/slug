@@ -1,84 +1,61 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-10-m7a-external-tokio-feature-probe-r1
-Status: Linux Tokio feature-unit observation ACCEPT; external closure still open
+Packet: WP-7-10-m7a-external-unit-feature-accounting-r1
+Status: design ACCEPT; saved-graph accounting pending
 
-## Question and frozen inputs
+## Outcome and authority
 
-Determine whether the frozen Cargo metadata's `tokio 1.53.1` feature
-`windows-sys` is actually an enabled feature of the selected Linux CLI
-production compilation unit. This is a read-only classification packet; it
-cannot edit external crate rules, repin the lock, compile, test or admit M7A.
+Reconcile the existing selected Linux CLI Cargo unit graph against the
+frozen metadata inventory and generated Bazel lock at external package,
+platform-unit and feature-list granularity. The prior Tokio packet accepted
+one root-reachable library-unit match; it did not classify the other units.
+This packet is read-only accounting, not an edit to crate features, a Bazel
+action admission, compilation or M7A readiness.
 
-Freeze main `1998461eb`, `Cargo.lock` SHA-256
+Freeze clean main `917c8dcfa`, `Cargo.lock` SHA-256
 `a19882e78b50a82ed900fce570f4a6aee778553448790eaf08e2e08a591f76d8`,
 `Cargo.Bazel.lock` SHA-256
 `6335564ccbb3c915d0a2fa23b8aec0d69986911e062b586e13c5ec9812c2f35e`,
 `MODULE.bazel` SHA-256
 `109585b7b40d274ea912d32c73f54c25cc4bef1bc5e60526e18ac9bfe48d210c`,
-and frozen selected-Linux Cargo analysis SHA-256
-`dad20c2240aa421f5d99fe30190cbe7fa9035b4e388ad64aa30e762afaf9cd10`.
-The prior packet accepted exact local rule feature attributes against that
-snapshot, not external effective feature parity or compilation.
+selected Cargo metadata analysis SHA-256
+`dad20c2240aa421f5d99fe30190cbe7fa9035b4e388ad64aa30e762afaf9cd10`,
+and accepted Cargo unit-graph stdout SHA-256
+`edd4d806c72dccd3dd8589b20bb9ad897fef3a99a01b6a91692ef8ec3a01f7fd`.
+Its receipt SHA-256 is
+`6a83706f5289c18d00619ddb9e4df96c0feddb7f0d5304bb3ade2b5502955696`.
+No new Cargo/Bazel invocation, network, build or test is selected.
 
-Static comparison of 310 selected external Cargo metadata package feature
-sets with generated `Cargo.Bazel.lock` gives 303 exact common sets. Six of
-seven differences are present in the lock's `x86_64-unknown-linux-gnu`
-feature select: bitflags `std`, errno `default`, lalrpop-util `lexer,regex`,
-libc `extra_traits`, phf_shared `default` and rustix `termios`. The seventh,
-Tokio `windows-sys`, is in Cargo metadata but only the lock's Windows
-select. Tokio's cached Cargo.toml lists `windows-sys/Win32_*` in `net`,
-`process` and `signal` feature definitions while declaring the optional
-`windows-sys` dependency under `cfg(windows)`. Metadata resolution may not
-represent the effective Linux compiler feature flags for this one unit.
+## Bounded comparison
 
-## One bounded observation
+1. Re-parse the saved graph, verify one `slug` Linux binary root and traverse
+   dependency indices. Compare its unique package IDs with the 35 local and
+   310 external IDs in the frozen metadata inventory. Record missing and
+   extra IDs explicitly; never infer that metadata reachability is an
+   executable compilation unit.
+2. For every root-reachable external `mode=build` library/proc-macro unit,
+   exclude custom-build scripts and classify `platform` as target Linux or
+   host. Map exact Cargo package ID/name/version to `Cargo.Bazel.lock` key.
+   Compare that unit's feature set with the generated lock's `common` union
+   its `x86_64-unknown-linux-gnu` select. Record each unit index, platform,
+   equal/different result and features on each side, preserving duplicate
+   package units separately. Flag any unexpected platform, target kind,
+   missing lock key or non-unique package mapping as an unresolved error.
+3. Save a deterministic JSON analysis under `/tmp` with source hashes,
+   counts, missing IDs and every mismatch. Independently review its counts
+   and at least all mismatches against raw graph/lock input before recording
+   a plan result.
 
-Use the pinned local Cargo 1.91.0-nightly binary and matching rustc for one
-`cargo build --unit-graph` invocation with exact selection
-`--manifest-path app/slug_cli_v2/Cargo.toml --bin slug --target
-x86_64-unknown-linux-gnu --frozen -Z unstable-options` and an isolated
-temporary target directory. Cargo's `--unit-graph` prints a JSON graph
-without invoking build actions. A supervisor starts a new process group,
-caps stdout and stderr at 16 MiB each and wall time at 10 seconds, sends
-TERM on a cap, gives two seconds to drain, then sends KILL to the group if
-needed. Save raw stdout/stderr and a receipt with the exact command,
-exit/stop reason, elapsed time, byte counts, hashes, tracked before/after
-status and preflight hashes. Do not retry if the unit graph is unsupported,
-needs unavailable inputs or hits a cap.
-
-On exit 0, parse only Tokio's normal target-platform library unit(s),
-excluding host/build/test units. Compare that selected Linux feature set to
-the frozen Cargo metadata and the lock's common plus Linux select set.
-Report whether `windows-sys` is present, absent or not classifiable, and
-identify any other observed difference without claiming whole-closure
-parity. If the target-kind/platform identification or feature set is not
-unambiguous, stop and select a narrower successor. No BUILD or lock edit is
-authorized by this packet.
-
-The tracked allowlist is this manifest, canonical plan status, Stage 10 and
-bootstrap readiness. Independent design review precedes the one command;
-independent result review checks the raw unit row and scoped inference.
-Generated inputs, configured actions, compilation, external feature parity
-and the first M7A readiness row stay open.
-Independent design review first requested exact binary selection, finite
-stream/process cleanup and target-platform unit filtering. The corrected
-design was independently re-reviewed `ACCEPT` with those controls.
-
-## Result
-
-The sole offline unit-graph command exited 0 in 0.506 seconds, with no build
-actions and clean target-directory cleanup. Its receipt SHA-256 is
-`6a83706f5289c18d00619ddb9e4df96c0feddb7f0d5304bb3ade2b5502955696`;
-the raw JSON graph SHA-256 is
-`edd4d806c72dccd3dd8589b20bb9ad897fef3a99a01b6a91692ef8ec3a01f7fd`;
-the parsed Tokio analysis SHA-256 is
-`f0959cf454597e0576ffc42f5ba20325b557ab368baab59baae5ee2f04291ef4`.
-The one CLI binary root reaches exactly one Tokio 1.53.1 normal Linux
-library unit. Its 22 features exactly match the Bazel lock's common plus
-Linux select list and omit `windows-sys`; frozen Cargo metadata contains
-that one extra feature. Locks/MODULE and tracked status stayed unchanged.
-Independent final review `ACCEPT` re-parsed the 491-unit graph, exact Tokio
-row, receipt bounds and clean input hashes. This resolves only the Tokio
-Linux feature-list ambiguity. Other external units, configured actions,
-generated inputs, compilation and M7A remain open.
+This is a structural lock-versus-Cargo-unit comparison. A generated lock
+feature list is not evidence of an actual configured Bazel compiler action.
+Different host/target Cargo units may legitimately carry distinct features;
+comparison with one lock list cannot alone authorize a feature edit. The
+tracked allowlist is this manifest, canonical plan status, Stage 10 and
+bootstrap readiness. No Cargo or Bazel lockfile may change. Independent
+design review precedes the comparison; independent final review limits any
+claim to saved graph and lock data. External action feature flags, generated
+inputs, compilation and the first M7A readiness row stay open.
+Independent design review `ACCEPT` confirmed the one-root/491-unit graph,
+343 graph package IDs, 344 eligible external compilation units and unique
+lock keys. The reviewer confirmed that the comparison remains structural
+even when a unit's feature set is narrower than the lock list.
