@@ -30,11 +30,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-num-traits-build-script-output-r1
-Status: design ACCEPT; one bounded external build-script output observation pending
+Status: result REPLAN; sole build timed out without generated flags
 
 The selected successor permits one offline, 20-second-capped Bazel build of
 only the generated `num-traits` build-script alias to inspect `_bs.flags`.
 It cannot establish a CLI build or M7A readiness.
+That sole build stopped at its 20-second limit (exit 143) while Bazel was
+bootstrapping rules_rust tools; no `_bs.flags` bytes were observed. Receipt
+SHA-256 is
+`5b998a1de1942c4d54d4d1131be659b07467371729df6e042b7e466ccc3f0d74`.
+Independent result review `REPLAN` confirmed clean cleanup and unchanged
+frozen/tracked inputs. No automatic retry is selected; generated flags and
+M7A remain open.
 
 The sole `num-traits` build-script action query exited 0 in 4.154 seconds and
 found the exact non-tool owner plus a separate tool owner. No wrapper key is

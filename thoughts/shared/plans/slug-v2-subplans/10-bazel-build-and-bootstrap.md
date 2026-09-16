@@ -403,6 +403,13 @@ The selected `WP-7-10-m7a-num-traits-build-script-output-r1` allows one
 alias and its required dependencies. It records the exact `_bs.flags` bytes
 to resolve the inherited probe-output uncertainty only. This is not a CLI
 build, feature-parity correction or M7A admission.
+The sole build reached its 20-second cap and exited 143 after TERM. It was
+still bootstrapping rules_rust tool actions and produced no exact `_bs.flags`
+output. Receipt SHA-256 is
+`5b998a1de1942c4d54d4d1131be659b07467371729df6e042b7e466ccc3f0d74`.
+Independent result review `REPLAN` confirmed clean cleanup and unchanged
+tracked/frozen inputs. No retry is selected from this cache state. Continue
+with static/source evidence; complete compiler flags and M7A remain open.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

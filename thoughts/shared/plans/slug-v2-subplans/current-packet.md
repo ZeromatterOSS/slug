@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-num-traits-build-script-output-r1
-Status: design ACCEPT; one bounded external build-script output observation pending
+Status: result REPLAN; sole build timed out without generated flags
 
 ## Outcome and boundary
 
@@ -79,3 +79,20 @@ claim limit. Compilation beyond this build-script target and M7A remain open.
 Independent design review `ACCEPT` confirmed the alias/output wiring,
 single-invocation bound, exact output-file cap and fail-closed flag
 classification. The result must remain scoped to the wrapper-scrubbed run.
+
+## Stopped result
+
+The sole offline build of the exact alias stopped at the 20-second limit
+(20.095 seconds elapsed, exit 143 after TERM). Bazel analyzed the target and
+reported progress through 211 of 246 actions, mostly while bootstrapping
+rules_rust tools; that counter neither proves the `num-traits` `_bs` run
+action executed nor predicts completion time. No `_bs.flags` output was
+observed. The supervisor confirmed clean process-group cleanup, stream sizes
+below caps, scrubbed wrapper variables, and unchanged frozen/tracked inputs.
+Receipt SHA-256 is
+`5b998a1de1942c4d54d4d1131be659b07467371729df6e042b7e466ccc3f0d74`.
+Independent result review `REPLAN` confirmed a resource stop, not a semantic
+failure or a named-feature result. The packet forbids a retry. A warmer cache
+alone does not justify another build under the user's preference for short,
+infrequent checks. Generated flags, compiler arguments, external feature
+parity and M7A remain open; continue with read-only/source evidence.

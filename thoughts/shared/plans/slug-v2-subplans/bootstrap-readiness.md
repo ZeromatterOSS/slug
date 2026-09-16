@@ -218,6 +218,13 @@ The selected successor builds only the generated `num-traits` build-script
 alias under a 20-second bound to inspect exact `_bs.flags` bytes. A successful
 observation can classify that script's feature cfg output; it cannot prove
 the rest of the compiler graph or close this row.
+The sole build stopped at its 20-second bound before producing `_bs.flags`;
+the 211/246 action progress counter does not prove the requested run action
+executed. Receipt SHA-256 is
+`5b998a1de1942c4d54d4d1131be659b07467371729df6e042b7e466ccc3f0d74`.
+Independent result review `REPLAN` confirmed clean cleanup and unchanged
+tracked/frozen inputs. The packet has no retry; generated flags, compilation
+and the first readiness row remain open.
 
 ## Readiness matrix
 
