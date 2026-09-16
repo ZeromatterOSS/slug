@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-partial-inventory-accounting-r1
-Status: partial Cargo/static inventory ACCEPT; Bazel reachability and M7A remain open
+Status: corrected partial Cargo/static inventory ACCEPT; Bazel reachability and M7A remain open
 
 ## Result and boundary
 
@@ -41,6 +41,11 @@ The decisive static gap is `app/slug_configuration_v2`: six selected local
 Cargo packages depend on it normally, and `Cargo.Bazel.lock` names its path,
 but there is no BUILD file or Rust target in that directory. By contrast,
 `slug_starlark_v2` has a named BUILD target and static first-party references.
+It is absent from `Cargo.Bazel.lock`'s `workspace_members`, and eight of the
+310 selected external name/version keys are absent from that lock's `crates`
+map. Stage 10 records each missing key. This is a second, independent static
+graph gap; the lock must be synchronized from authoritative manifests and
+Cargo resolution rather than edited by hand.
 These checks do not replace the missing Bazel query. Treat BUILD files and the
 lock as declarations only; neither proves selected/configured reachability,
 features, actions or generated inputs. The nine frozen authority hashes still
@@ -59,15 +64,18 @@ separation between static declarations and Bazel reachability before this
 partial accounting is accepted. A source/receipt mismatch, missing owner
 misclassification or unsupported reachability claim returns `REPLAN`.
 
-Independent result review returned `ACCEPT` after correcting a dev-only REAPI
-edge excluded by the frozen normal/build policy. It verified all counts, path
-mapping, six normal configuration dependents, build-script/proc-macro owners,
-feature snapshot and authority hashes, and confirmed that the Bazel recovery
-invoked no query. This accepts only the partial accounting.
+The first result review corrected a dev-only REAPI edge and accepted the
+35-package/path/build-owner accounting, but subsequent full static lock-key
+comparison exposed the missing local and eight external entries above. That
+material finding reopens only the partial result review; the frozen Cargo and
+zero-row Bazel receipts remain unchanged.
+Independent correction rereview returned `ACCEPT` after confirming the 34/35
+local and 302/310 selected external lock-key intersections and all nine
+missing keys. This accepts static accounting only.
 
 On acceptance, preserve the Cargo receipt and missing Bazel view. The next
 implementation packet may correct the static `slug_configuration_v2` BUILD
-owner under its own scoped validation, but it cannot accept the M7A production
-closure without separately reviewed live Bazel/configured evidence and the
-remaining readiness gates. No other inventory query or F3 replay is selected
-here.
+owner and synchronize the Bazel lock under its own scoped validation, but it
+cannot accept the M7A production closure without separately reviewed live
+Bazel/configured evidence and the remaining readiness gates. No other
+inventory query or F3 replay is selected here.

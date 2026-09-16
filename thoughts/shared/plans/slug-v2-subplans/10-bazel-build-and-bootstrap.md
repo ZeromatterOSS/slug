@@ -190,12 +190,22 @@ The nine authority-file SHA-256 values in the frozen receipt still match the
 current files, including `.bazelversion`, `rust-toolchain`, both Cargo locks,
 `MODULE.bazel` and its lock. This proves no authority-file change since that
 Cargo snapshot; it does not prove historical pin parity with the original
-33-package developer gate. The live Bazel query and its recovery produced zero
-rows. Bazel declared reachability, generated action coverage, external
-crate-universe selection, and Cargo-to-Bazel feature equivalence remain
-unknown. Fixing the static configuration BUILD gap and obtaining separately
-reviewed Bazel evidence are prerequisites to closing M7A coverage; this
-accounting admits no action family, exact key, REAPI behavior or self-hosting.
+33-package developer gate. Static key comparison finds only 34 of the 35
+selected local packages in `Cargo.Bazel.lock`'s `workspace_members`:
+`slug_starlark_v2 0.1.0` is absent despite its BUILD target. Of 310 selected
+external package name/version keys, 302 appear in its `crates` map; the eight
+absent keys are `adler2 2.0.1`, `crc32fast 1.5.1`, `filetime 0.2.29`,
+`flate2 1.1.9`, `miniz_oxide 0.8.9`, `simd-adler32 0.3.10`, `tar 0.4.46`
+and `xattr 1.6.1`. These are missing pinned package entries, not a proven
+Bazel configured dependency set or a license to invent lock contents.
+
+The live Bazel query and its recovery produced zero rows. Bazel declared
+reachability, generated action coverage, package source/checksum equality and
+Cargo-to-Bazel feature equivalence remain unknown. Fixing the static
+configuration BUILD gap, synchronizing the missing lock entries under a
+separate reviewed packet and obtaining Bazel evidence are prerequisites to
+closing M7A coverage; this accounting admits no action family, exact key,
+REAPI behavior or self-hosting.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

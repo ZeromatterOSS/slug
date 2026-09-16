@@ -70,9 +70,11 @@ accepted 33 plus `slug_configuration_v2` and `slug_starlark_v2`. Static mapping
 finds a BUILD target for 34; `app/slug_configuration_v2` has none despite normal
 Cargo dependencies from the CLI closure. The five local proc macros and five
 build scripts are enumerated in [Stage 10](./10-bazel-build-and-bootstrap.md#partial-live-cargo-inventory-reconciliation-2026-09-16).
-This is a proven local inventory gap, not Bazel reachability or functional
-admission. Keep the first readiness row open until the missing BUILD owner and
-fresh Bazel graph evidence are reviewed.
+Static key comparison also finds `slug_starlark_v2` and eight selected external
+name/version keys absent from `Cargo.Bazel.lock`; see Stage 10 for the exact
+list. These are proven local graph/lock gaps, not Bazel reachability or
+functional admission. Keep the first readiness row open until the missing
+BUILD owner, lock synchronization and fresh Bazel graph evidence are reviewed.
 
 ## Readiness matrix
 
@@ -82,7 +84,7 @@ unobserved action families cannot be declared unnecessary by assumption.
 
 | Obligation in the production closure | Current status / reusable evidence | Owner | Required exit evidence |
 |---|---|---|---|
-| Bazel builds the CLI root, its 33-package closure and generated sources | Accepted developer graph; partial live Cargo inventory is 35 local packages with two additions; `slug_configuration_v2` lacks BUILD; Bazel reachability unknown | Stage 10 | Add/review missing BUILD ownership, then prove live declared/configured root reachability, features, generated inputs and pin correspondence without excluding a production input |
+| Bazel builds the CLI root, its 33-package closure and generated sources | Accepted developer graph; partial live Cargo inventory is 35 local packages with two additions; `slug_configuration_v2` lacks BUILD, `slug_starlark_v2` and eight external keys are absent from `Cargo.Bazel.lock`, and Bazel reachability is unknown | Stage 10 | Add/review missing BUILD ownership, synchronize the lock, then prove live declared/configured root reachability, features, generated inputs and pin correspondence without excluding a production input |
 | Authentic MODULE, registry, archive, built-in and generated repository sources | Partial. Normal Run registry parity accepted at `47163df7b`; authentic complete R2 fixture closure remains unresolved. Stage 5 owns sources and registrations | Stages 4/5 | Portable authentic inputs and ordinary source/mapping/registration demand for the selected production closure; no synthetic package, user-CAS default-test dependency or hidden Bazel semantic delegation |
 | rules_rust/provider/transition/toolchain evaluation | Partial configured analysis; accepted generic declarations/providers/Args/runfiles do not prove the full rules_rust closure. Canonical M7 status names accepted owners | Stages 4/5/6 | Ordinary configured results for the production root with source-derived toolchain/provider/transition dependencies; exact named semantics and structural invalidation |
 | Named/automatic execution groups | Accepted bounded with R2 at main checkpoint `71d9ce4bf`; pinned-source runtime names, target-context parsing, property precedence, action ordering, root provenance/depset shape and subrule boundary passed joint gates | Stages 4/5/6 | Preserve the accepted boundary; authentic F3 remains unaccepted and closed at its 30-second ceiling |
