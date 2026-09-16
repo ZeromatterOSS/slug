@@ -100,6 +100,9 @@ The sole no-repin validation passed under a fresh Bazel output base with
 unchanged authority and BUILD hashes; independent final review of static
 graph/lock synchronization accepted it. No target reachability or M7A row
 closes from that validation alone.
+The selected `WP-7-10-m7a-bazel-declared-root-query-r1` obtains one fresh
+unconfigured root target view. Even complete declared path reachability does
+not close this row without configured/action and behavioral evidence.
 
 ## Readiness matrix
 

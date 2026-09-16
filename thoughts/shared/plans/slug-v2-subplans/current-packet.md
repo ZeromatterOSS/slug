@@ -1,112 +1,85 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-10-m7a-generated-lock-candidate-validation-r1
-Status: static BUILD/lock synchronization ACCEPT; target reachability remains open
+Packet: WP-7-10-m7a-bazel-declared-root-query-r1
+Status: read-only declared-root query design ACCEPT; one bounded query pending
 
-## Outcome and frozen evidence
+## Outcome and authority
 
-Validate whether the generated `Cargo.Bazel.lock` candidate is valid against the
-exact restored root `Cargo.lock`, without repinning, changing source or
-running any build, test or target graph query. The validated generated-lock
-candidate joins the seven static BUILD edits after independent final review.
-This packet admits no Bazel declared/configured reachability, action behavior,
-exact ActionKey or M7A milestone.
+Obtain the first fresh Bazel declared target-dependency view of
+`//app/slug_cli_v2:slug` after accepted static BUILD/lock synchronization.
+This is an unconfigured `bazel query` result. It can prove that named
+targets are declared and reachable in that view; it cannot prove Cargo feature
+parity, configured/action reachability, compilation, execution or M7A
+readiness.
 
-Freeze main `a64259308`; root `Cargo.lock` SHA-256
+Freeze clean main `0447958f5`, root `Cargo.lock` SHA-256
 `a19882e78b50a82ed900fce570f4a6aee778553448790eaf08e2e08a591f76d8`,
+generated `Cargo.Bazel.lock` SHA-256
+`6335564ccbb3c915d0a2fa23b8aec0d69986911e062b586e13c5ec9812c2f35e`,
 `MODULE.bazel.lock` SHA-256
 `bcdda78dd82aab5fd7ab1796985a78322b50178dceed7669c1b20173c2634302`,
-generated `Cargo.Bazel.lock` candidate SHA-256
-`6335564ccbb3c915d0a2fa23b8aec0d69986911e062b586e13c5ec9812c2f35e`,
-and the first repin/recovery receipt SHA-256 values
-`86995d8a436d74b7db448d5fdbb3aa652a30c7f3ab50477036a3f6dca37b1051`
-and `2322f3a8481e3e7393ca0d81f0572153f979a0a5cf2e8d4c44da73aff4806cfb`.
-The profiler recovery's pinned Bazel 9.2.0 command exited 0 in 6.722 seconds,
-but rules_rust added exactly two blank lines to `Cargo.lock`'s unused-patch
-section. Its changed byte hash violated that packet's explicit gate, so
-independent review returned `REPLAN`. Exact original bytes were restored
-from the pre-run copy. The changed copy remains at
-`/tmp/slug-m7a-repin-mutated-Cargo.lock`, SHA-256
-`e89b952a48620d1e2096b54c0221e02eb7167f4364c0f7d3e16d98589b8abe17`.
-The two TOML documents parse identically; package versions, sources and
-checksums did not change.
-
-The structured candidate analysis at
-`/tmp/slug-m7a-generated-lock-analysis.json`, SHA-256
-`19b365fff8230f71021edf660901769d8a940744879dc2f5d6ac5486b1325997`,
-records 35/35 selected local and 310/310 selected external lock keys, exactly
-nine additive crate keys (eight selected external and `slug_starlark_v2`),
-no removals or existing external-crate drift, and all 448 registry archive
-checksums equal to root Cargo.lock. Six changed existing lock entries are
-local crates whose added dependencies/features match current Cargo metadata;
-`MODULE.bazel.lock` is unchanged. These static facts preserve the candidate,
-but do not alone prove the generator will accept it under restored inputs.
-
-## Single validation
-
-First recheck every frozen hash, the exact seven BUILD edits, parsed-TOML
-equality, all 448 registry checksum mappings and the structural diff above.
-Assert that `/tmp/slug-m7a-lock-validation-output-base` does not exist.
-Use pinned Bazel 9.2.0 SHA-256
-`7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694`,
-at `/home/wgray/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel`,
-rules_rust 0.73.0, and the verified host Cargo cache. Run one no-repin
-`mod deps` validation with startup flags
-`--batch --ignore_all_rc_files
---output_base=/tmp/slug-m7a-lock-validation-output-base` and command flags
-`--repository_disable_download --lockfile_mode=off
---noexperimental_collect_system_network_usage`. Leave
-`CARGO_BAZEL_REPIN`, `REPIN` and generator URL/SHA overrides unset. Set
-`CARGO_BAZEL_ISOLATED=false`, `CARGO_HOME=/home/wgray/.cargo`,
-`CARGO_NET_OFFLINE=true` and put
-`/home/wgray/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin`
-first in `PATH`.
-Keep the restricted network environment.
-
-A fresh output base prevents Skyframe/repository reuse, while Bazel
-`--lockfile_mode=off` skips `MODULE.bazel.lock` extension reuse. Pinned
-rules_rust's `determine_repin` calls cargo-bazel `query` when repin is unset
-and the generated lock exists. Its digest hashes parsed context, config,
-manifest metadata and tool versions rather than raw Cargo.lock bytes; that
-is why parsed-TOML equality and checksum census remain separate gates.
-This command validates generated-lock coherence only, not target graph
-reachability. The one attempt has a 30-second TERM/three-second KILL ceiling
-and 16 MiB per-stream cap. Record executable/hash, exact arguments/environment,
-fresh-base assertion, output hashes, elapsed time, exit, process cleanup and
-pre/post tracked-file hashes in a machine-readable `/tmp` receipt. A cache
-miss, failure, timeout, unexpected write or invalid cleanup ends this path
-without automatic retry, repin, network fetch or longer ceiling.
-
-## Result gate
-
-Success requires Bazel exit 0, no stream truncation, exact unchanged hashes
-for root Cargo.lock, Cargo.Bazel.lock, MODULE.bazel.lock and the seven BUILD
-files, and only the new `/tmp` output base outside the repository.
-No other tracked file may change. Independently review the complete receipt
-and candidate analysis before accepting static graph/lock synchronization.
-Run `git diff --check` and `python3 scripts/v2_plan_status.py`.
-No Cargo/Bazel build, test, Bazel target query, F3, developer-gate sweep or
-BuildBuddy replay is selected. Fresh declared/configured/action reachability
-and compilation remain separate M7A prerequisites.
-Independent design review `ACCEPT` verified the fresh-base/lockfile-off
-extension path, the no-repin cargo-bazel query branch and the separate
-Cargo-lock semantic/checksum gates. The single bounded check is selected.
-
-## Observed validation
-
-The sole fresh-output-base, no-repin Bazel command exited 0 in 2.171 seconds
-with no timeout or stream truncation and clean process-group cleanup. Its
-stderr points to the fresh output base's rules_rust extension and contains
-no error: only a JVM deprecation warning, a `no actions running` line and
-unused optional-patch warnings. The exact
-pre/post SHA-256 values for Cargo.lock, Cargo.Bazel.lock, MODULE.bazel.lock
-and all seven BUILD files match; tracked status is identical. Receipt SHA-256:
+the accepted 35-local/310-external Linux Cargo analysis SHA-256
+`dad20c2240aa421f5d99fe30190cbe7fa9035b4e388ad64aa30e762afaf9cd10`,
+and the successful no-repin generated-lock validation receipt SHA-256
 `290a3c2fce004a895b4470bd985d3618b047eb890457404daa37b182ebcbe278`.
-The separate parsed-TOML equality, 448 registry checksum census and
-structured candidate analysis remain part of the acceptance evidence.
-No repin, build, test or Bazel target query ran in this validation.
-Independent final review `ACCEPT` checked the full receipt, exact BUILD edges,
-candidate drift, Cargo-lock equality and checksum census. The generated lock
-has exactly the same 497 package name/version keys as root `Cargo.lock`, with
-no missing or extra package. This closes static BUILD/lock synchronization
-only; target graph reachability, buildability and M7A remain open.
+That prior check used a fresh Bazel output base and accepted the candidate
+under exact restored Cargo authority; independent final review accepted only
+static BUILD/lock synchronization. The earlier inventory Bazel query and
+recovery yielded zero rows.
+
+## One bounded query
+
+Assert a clean working tree, all frozen hashes, pinned Bazel 9.2.0 executable
+SHA-256
+`7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694`,
+and absent `/tmp/slug-m7a-declared-query-output-base`. Use the absolute
+Bazel executable at
+`/home/wgray/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel`.
+Run one query with startup flags `--batch --ignore_all_rc_files
+--output_base=/tmp/slug-m7a-declared-query-output-base` and command:
+
+```text
+query --repository_disable_download --lockfile_mode=off --noexperimental_collect_system_network_usage --output=label 'deps(//app/slug_cli_v2:slug)'
+```
+
+Leave `CARGO_BAZEL_REPIN`, `REPIN` and generator URL/SHA overrides unset.
+Set `CARGO_BAZEL_ISOLATED=false`, `CARGO_HOME=/home/wgray/.cargo`,
+`CARGO_NET_OFFLINE=true` and put the pinned nightly-2025-09-14 Cargo
+binary directory first in `PATH`. Use the restricted network environment.
+A fresh output base and `--lockfile_mode=off` force current extension
+evaluation; omit `--nofetch` so Bazel may materialize only cached local
+repository content. `--repository_disable_download` forbids repository
+downloads. This preserves the no-repin, restored Cargo authority.
+
+The one query has a 30-second TERM/three-second KILL ceiling and 16 MiB cap
+per captured stream. Record exact command/environment, fresh-base assertion,
+exit/elapsed/cleanup, stream hashes and pre/post tracked-file hashes/status
+in a machine-readable `/tmp` receipt. A cache miss, failure, timeout,
+unexpected tracked write, invalid cleanup or truncated output stops without
+automatic retry, fetch, build, repin or longer ceiling. No test is selected.
+
+## Analysis and result gate
+
+On clean exit, parse the label output as a set and record every line/hash.
+Reject non-label stdout rows; count root-workspace packages only from labels
+beginning `//`, with apparent/canonical `@` labels classified as external.
+Require the root label and report whether the configuration and Starlark V2
+package labels are present. Map the 35 selected local Cargo manifests to
+their repository package paths and record the reached/missing path sets.
+Report external repo labels separately; the unconfigured Bazel target graph
+is not the selected Linux Cargo closure. Do not infer configured action
+coverage from lock keys, BUILD declarations or a successful query. Compare
+the six direct configuration consumer edges from tracked BUILD declarations
+to the frozen Cargo normal edges; this static check does not turn them into
+configured evidence.
+
+The only tracked edits allowed are this manifest, canonical plan status,
+Stage 10 and bootstrap readiness for the result. Run `git diff --check` and
+`python3 scripts/v2_plan_status.py`. Independent design review precedes
+the query; independent final review checks the receipt, labels, path mapping
+and strict unconfigured classification. A valid zero/missing-key result is
+recorded as a gap, not silently accepted as full breadth. Configured target
+analysis, action execution and buildability need separately scoped evidence.
+Independent design review `ACCEPT` confirmed the fresh-base/offline query
+boundary and strict unconfigured interpretation. The one 30-second-capped
+query is selected.

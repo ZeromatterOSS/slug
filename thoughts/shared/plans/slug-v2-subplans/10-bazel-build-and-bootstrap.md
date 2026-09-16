@@ -265,6 +265,10 @@ Independent final review `ACCEPT` found exact 497/497 Cargo-lock package keys,
 Static BUILD/lock synchronization is accepted. The next packet must obtain
 fresh target graph evidence; this result proves no compilation or M7A
 behavior.
+The selected `WP-7-10-m7a-bazel-declared-root-query-r1` permits one fresh
+offline/download-disabled target dependency query under a 30-second ceiling.
+It reports selected local path reachability and any gap; query labels are an
+unconfigured declared view and cannot close configured/action or M7A gates.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

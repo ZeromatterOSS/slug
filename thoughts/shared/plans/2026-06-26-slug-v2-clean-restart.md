@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-generated-lock-candidate-validation-r1
-Status: static BUILD/lock synchronization ACCEPT; target reachability remains open
+Packet: WP-7-10-m7a-bazel-declared-root-query-r1
+Status: read-only declared-root query design ACCEPT; one bounded query pending
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -236,6 +236,14 @@ Cargo-lock package name/version keys, no extras, all 448 registry checksums,
 and the seven BUILD edits match normal Cargo edges. This closes only static
 BUILD/lock synchronization; live target graph, compilation and M7A gates
 remain open.
+The selected successor obtains one fresh, bounded, download-disabled Bazel
+declared dependency view of `//app/slug_cli_v2:slug`. It compares selected
+local package paths and records gaps without treating an unconfigured query
+as configured/action, compilation or M7A evidence. No build or test is
+selected.
+Independent design review `ACCEPT` confirmed the single fresh-base query and
+label parsing boundary; the result must distinguish root `//` labels from
+external `@` labels.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt
