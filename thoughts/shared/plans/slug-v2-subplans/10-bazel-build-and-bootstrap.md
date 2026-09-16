@@ -320,6 +320,17 @@ The selected `WP-7-10-m7a-bazel-configured-root-offline-r1` now obtains one
 full-root configured cquery using the pinned nightly toolchain, verified
 archives and download-disabled Bazel. It cannot infer features, generated
 inputs, action execution or buildability from label rows alone.
+The one offline cquery exited 0 in 5.337 seconds with 17,685 valid
+configured label/token rows and unchanged tracked inputs. All 35 selected
+local package paths have non-null rows; the CLI, configuration and Starlark
+V2 targets appear. Receipt and parsed analysis SHA-256 values are
+`459c41aad42c9259adc239b74271c0e7b380bb6970135e4e266ee91e13b322bc`
+and `266cf64932c2ef555ca5d36bb8d87ad95a8b0fe6a641a4c41973527f0c711dde`.
+This is configured label reachability only; full configuration identity,
+features, generated inputs, actions and buildability still need proof.
+Independent final review `ACCEPT` independently confirmed every row and
+the 35 Cargo manifest-parent paths, without widening the configured-label
+claim to action or buildability evidence.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

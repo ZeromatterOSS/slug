@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-10-m7a-bazel-configured-root-offline-r1
-Status: scoped offline configured-root cquery design ACCEPT; one query selected
+Status: configured-root label/path observation ACCEPT; later M7A gates open
 
 ## Outcome and authority
 
@@ -102,3 +102,31 @@ Independent design review `ACCEPT` confirmed the full-root command, strict
 label-token interpretation and a preflight that requires exactly six
 regular, hash-verified distdir archives while freezing both prior failures.
 The one offline configured-root cquery is selected.
+
+## Observed result
+
+The sole pinned offline cquery exited 0 in 5.337 seconds, with no timeout,
+truncation, cleanup failure, download or tracked-file change. Bazel reported
+the CLI root analyzed successfully and zero actions executed. Command receipt
+SHA-256 is
+`459c41aad42c9259adc239b74271c0e7b380bb6970135e4e266ee91e13b322bc`;
+raw stdout SHA-256 is
+`8d16e02dcf5dd433ebe7c4aff5982a88d9501cd141784a272d2b681c52574f3a`.
+All 17,685 raw rows are distinct and match the label plus displayed-token
+format. There are 1,085 root-workspace rows, 16,600 external rows and
+16,261 explicit `null` rows. Displayed non-null tokens `72a5446`,
+`3ebebd5` and `3030ed4` occur 725, 653 and 46 times respectively;
+193 labels appear with more than one displayed token. The 36 root package
+paths consist of all 35 selected
+local Cargo package paths plus the workspace root. Every selected local
+path has at least one non-null row. The CLI, configuration and Starlark V2
+named targets each appear with displayed token `72a5446`. Parsed analysis
+SHA-256 is `266cf64932c2ef555ca5d36bb8d87ad95a8b0fe6a641a4c41973527f0c711dde`.
+These are displayed checksum prefixes, not complete identities or a
+target/exec classification. Successful configured label analysis does not
+prove Cargo feature parity, generated inputs, action coverage, compilation,
+Slug behavior or M7A readiness.
+Independent final review `ACCEPT` independently parsed every saved row,
+matched the 35 non-null local package paths directly to frozen Cargo
+manifest parents, confirmed the named labels and clean receipt, and retained
+the displayed-token and no-action/buildability limits.

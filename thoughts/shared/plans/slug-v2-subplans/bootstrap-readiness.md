@@ -139,6 +139,18 @@ The selected successor permits one offline configured-root cquery from the
 prepared toolchain cache. This remains observation only; the first readiness
 row still requires later feature, generated-input, action and compilation
 proof even if all selected package paths appear.
+The one offline cquery yielded 17,685 valid configured label/token rows in
+5.337 seconds with unchanged tracked inputs. All 35 selected local package
+paths have non-null rows, but seven-character display tokens do not prove
+full configuration identity or the other required row evidence. Receipt
+`459c41aad42c9259adc239b74271c0e7b380bb6970135e4e266ee91e13b322bc`
+and parsed analysis
+`266cf64932c2ef555ca5d36bb8d87ad95a8b0fe6a641a4c41973527f0c711dde`
+advance configured label reachability only; the first readiness row stays
+open.
+Independent final review `ACCEPT` confirmed the 35 non-null selected paths
+against frozen Cargo manifests. This closes only the configured label/path
+observation slice, not the first readiness row.
 
 ## Readiness matrix
 

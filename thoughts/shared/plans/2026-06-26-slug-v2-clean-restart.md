@@ -30,7 +30,7 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-10-m7a-bazel-configured-root-offline-r1
-Status: scoped offline configured-root cquery design ACCEPT; one query selected
+Status: configured-root label/path observation ACCEPT; later M7A gates open
 
 Independent final atomic review ACCEPTS checkpoint `71d9ce4bf`. Main was
 fast-forwarded from `4824a0861`, integrating selected-request identity,
@@ -310,6 +310,19 @@ channel and verified six-file distdir. It records configured label/token
 rows or an exact analysis failure, with no build/test or M7A admission.
 Independent design review `ACCEPT` confirmed the exact six-file preflight,
 offline one-command limit and narrow label-token evidence claim.
+The sole offline cquery exited 0 in 5.337 seconds with 17,685 valid distinct
+label/token rows, including all 35 selected local package paths with non-null
+rows and the named CLI/configuration/Starlark targets. Receipt SHA-256 is
+`459c41aad42c9259adc239b74271c0e7b380bb6970135e4e266ee91e13b322bc`;
+parsed analysis SHA-256 is
+`266cf64932c2ef555ca5d36bb8d87ad95a8b0fe6a641a4c41973527f0c711dde`.
+All frozen tracked hashes/status stayed unchanged. Displayed short tokens
+cannot establish full configuration identity, action reachability,
+generated inputs, compilation or M7A readiness.
+Independent final review `ACCEPT` re-parsed all 17,685 saved rows and
+matched all 35 non-null root paths directly to frozen Cargo manifests.
+Configured label/path reachability is accepted; the first readiness row
+remains open.
 
 The M7A Cargo inventory receipt remains frozen. Its Bazel recovery later exited
 at the interface gate before Bazel invocation; receipt
