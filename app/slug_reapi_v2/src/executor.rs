@@ -17,6 +17,9 @@ use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_core_v2::runtime::ResolvedFileWriteSemanticView;
+use slug_reapi_cache_v2::CacheClient;
+use slug_reapi_cache_v2::CacheError;
+use slug_reapi_cache_v2::TransferPolicy;
 
 use crate::action_cache::ActionResult;
 use crate::cas::GeneratedOutput;
@@ -241,25 +244,23 @@ async fn execute_prepared(
     let platform_properties = command.platform_properties.clone();
     let owned_blobs = owned_blobs(&command, &identity, &input_tree);
 
-    let mut cas =
-        proto::content_addressable_storage_client::ContentAddressableStorageClient::connect(
-            endpoint.clone(),
-        )
+    let channel = tonic::transport::Endpoint::from_shared(endpoint.clone())
+        .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
+        .connect()
         .await
         .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
-    let requested = required_digests(&input_tree, &owned_blobs);
-    let missing = cas
-        .find_missing_blobs(proto::FindMissingBlobsRequest {
-            instance_name: config.instance_name.clone().unwrap_or_default(),
-            blob_digests: requested.iter().map(digest_to_proto).collect(),
-        })
+    let mut cache = CacheClient::new(
+        channel.clone(),
+        config.instance_name.clone().unwrap_or_default(),
+        TransferPolicy::default(),
+    )
+    .map_err(cache_error)?;
+    cache
+        .apply_server_batch_limit()
         .await
-        .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
-        .into_inner()
-        .missing_blob_digests
-        .into_iter()
-        .map(|digest| digest_from_proto(&digest))
-        .collect::<Result<BTreeSet<_>, _>>()?;
+        .map_err(cache_error)?;
+    let requested = required_digests(&input_tree, &owned_blobs);
+    let missing = cache.find_missing(&requested).await.map_err(cache_error)?;
 
     let blob_by_digest = owned_blobs
         .iter()
@@ -277,48 +278,25 @@ async fn execute_prepared(
         .filter_map(|digest| blob_by_digest.get(digest).copied())
         .collect::<Vec<_>>();
     if !uploads.is_empty() {
-        let response = cas
-            .batch_update_blobs(proto::BatchUpdateBlobsRequest {
-                instance_name: config.instance_name.clone().unwrap_or_default(),
-                requests: uploads
+        cache
+            .upload_missing(
+                &uploads
                     .iter()
-                    .map(|blob| proto::batch_update_blobs_request::Request {
-                        digest: Some(digest_to_proto(blob.digest())),
-                        data: blob.data().to_vec(),
-                    })
-                    .collect(),
-            })
+                    .map(|blob| (*blob).clone())
+                    .collect::<Vec<_>>(),
+            )
             .await
-            .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
-            .into_inner();
-        for response in response.responses {
-            if let Some(status) = response.status
-                && status.code != 0
-            {
-                return Err(RemoteExecutionError::Protocol(status.message));
-            }
-        }
+            .map_err(cache_error)?;
     }
 
-    let mut execution = proto::execution_client::ExecutionClient::connect(endpoint.clone())
+    let mut execution = proto::execution_client::ExecutionClient::new(channel);
+    let ac_result = cache
+        .get_action_result(&identity.action_digest, inline_output_files.clone())
         .await
-        .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
-
-    let mut ac_client = proto::action_cache_client::ActionCacheClient::connect(endpoint)
-        .await
-        .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
-    let ac_result = ac_client
-        .get_action_result(proto::GetActionResultRequest {
-            instance_name: config.instance_name.clone().unwrap_or_default(),
-            action_digest: Some(digest_to_proto(&identity.action_digest)),
-            inline_stdout: true,
-            inline_stderr: true,
-            inline_output_files: inline_output_files.clone(),
-        })
-        .await;
+        .map_err(cache_error)?;
     let (result, cached_result) = match ac_result {
-        Ok(cached) => (cached.into_inner(), true),
-        Err(_) => {
+        Some(cached) => (cached, true),
+        None => {
             // AC miss: proceed to Execute.
             let result =
                 execute_through_server(&mut execution, config, &identity, inline_output_files)
@@ -334,7 +312,8 @@ async fn execute_prepared(
         )));
     }
 
-    let output_blobs = fetch_outputs(&mut cas, config, &result).await?;
+    validate_result_shape(&result, &command)?;
+    let output_blobs = fetch_outputs(&cache, &result).await?;
     let outputs = result
         .output_files
         .iter()
@@ -393,6 +372,7 @@ async fn execute_through_server(
             inline_stdout: true,
             inline_stderr: true,
             inline_output_files,
+            ..Default::default()
         })
         .await
         .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
@@ -600,59 +580,80 @@ fn decode_execute_response(
     }
 }
 
+fn cache_error(error: CacheError) -> RemoteExecutionError {
+    match error {
+        CacheError::Transport(status) => RemoteExecutionError::Transport(status.to_string()),
+        other => RemoteExecutionError::Protocol(other.to_string()),
+    }
+}
+
+#[allow(deprecated)]
+fn validate_result_shape(
+    result: &proto::ActionResult,
+    command: &ReapiCommand,
+) -> Result<(), RemoteExecutionError> {
+    if !result.output_directories.is_empty()
+        || !result.output_symlinks.is_empty()
+        || !result.output_file_symlinks.is_empty()
+        || !result.output_directory_symlinks.is_empty()
+    {
+        return Err(RemoteExecutionError::Protocol(
+            "unsupported REAPI output directory or symlink".to_owned(),
+        ));
+    }
+    let expected = command.output_files.iter().collect::<BTreeSet<_>>();
+    let actual = result
+        .output_files
+        .iter()
+        .map(|output| &output.path)
+        .collect::<BTreeSet<_>>();
+    if actual.len() != result.output_files.len() || actual != expected {
+        return Err(RemoteExecutionError::Protocol(
+            "ActionResult output paths differ from requested files".to_owned(),
+        ));
+    }
+    if result
+        .output_files
+        .iter()
+        .any(|output| output.node_properties.is_some())
+    {
+        return Err(RemoteExecutionError::Protocol(
+            "ActionResult output has unsupported node properties".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
 async fn fetch_outputs(
-    cas: &mut proto::content_addressable_storage_client::ContentAddressableStorageClient<
-        tonic::transport::Channel,
-    >,
-    config: &RemoteConfig,
+    cache: &CacheClient,
     result: &proto::ActionResult,
 ) -> Result<BTreeMap<String, Vec<u8>>, RemoteExecutionError> {
     let mut output_blobs = BTreeMap::new();
-    let mut missing = Vec::new();
     for output in &result.output_files {
-        let digest = output.digest.as_ref().ok_or_else(|| {
+        let wire_digest = output.digest.as_ref().ok_or_else(|| {
             RemoteExecutionError::Protocol(format!("output {} has no digest", output.path))
         })?;
+        let digest = digest_from_proto(wire_digest)?;
         if !output.contents.is_empty() {
+            digest.verify_bytes(&output.contents).map_err(|actual| {
+                RemoteExecutionError::OutputDigest {
+                    path: output.path.clone(),
+                    expected: digest.clone(),
+                    actual,
+                }
+            })?;
             output_blobs.insert(output.path.clone(), output.contents.clone());
         } else {
-            missing.push(digest.clone());
+            let mut scratch = Vec::new();
+            cache
+                .read_blob_verified(&digest, |chunk| {
+                    scratch.extend_from_slice(chunk);
+                    Ok(())
+                })
+                .await
+                .map_err(cache_error)?;
+            output_blobs.insert(output.path.clone(), scratch);
         }
-    }
-    if missing.is_empty() {
-        return Ok(output_blobs);
-    }
-    let response = cas
-        .batch_read_blobs(proto::BatchReadBlobsRequest {
-            instance_name: config.instance_name.clone().unwrap_or_default(),
-            digests: missing,
-        })
-        .await
-        .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
-        .into_inner();
-    let by_digest = result
-        .output_files
-        .iter()
-        .filter_map(|output| {
-            output
-                .digest
-                .as_ref()
-                .map(|digest| (digest.hash.clone(), output.path.clone()))
-        })
-        .collect::<BTreeMap<_, _>>();
-    for response in response.responses {
-        if let Some(status) = response.status
-            && status.code != 0
-        {
-            return Err(RemoteExecutionError::Protocol(status.message));
-        }
-        let digest = response.digest.ok_or_else(|| {
-            RemoteExecutionError::Protocol("BatchReadBlobs response has no digest".to_owned())
-        })?;
-        let path = by_digest.get(&digest.hash).ok_or_else(|| {
-            RemoteExecutionError::Protocol(format!("unexpected output digest {}", digest.hash))
-        })?;
-        output_blobs.insert(path.clone(), response.data);
     }
     Ok(output_blobs)
 }
@@ -717,6 +718,59 @@ mod tests {
             false,
             "pkg/out.txt",
             &[("container-image", "selected:v1")],
+        );
+        let hex = |bytes: &[u8]| {
+            bytes
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+        };
+        // Frozen from the accepted FileWrite wire projection before the
+        // handwritten schema was replaced by the pinned upstream protocol.
+        assert_eq!(
+            hex(&plan.command.serialized()),
+            concat!(
+                "0a0273680a022d630a256370202d2d202224312220222432222026262063686d6f642030343434202d2d2022243222",
+                "0a0e736c75672d66696c6577726974650a1a5f5f736c75675f66696c6577726974655f5f2f636f6e74656e74",
+                "0a0b706b672f6f75742e7478741a0b706b672f6f75742e7478742a200a1e0a0f636f6e7461696e65722d",
+                "696d616765120b73656c65637465643a76313a0b706b672f6f75742e747874"
+            )
+        );
+        let directories = plan.input_tree.directory_blobs();
+        assert_eq!(
+            directories[0].digest().to_string(),
+            "194f7bf386517234dc45ca2d673cc8b2345a39dc8b1d96b6cd61fe8b9998031a/81"
+        );
+        assert_eq!(
+            hex(directories[0].data()),
+            concat!(
+                "0a4f0a07636f6e74656e7412440a406262343734313136613463363330316231623565346436613861393463303366",
+                "3665323534313137373439656334306337623531333161616138326535386538100c"
+            )
+        );
+        assert_eq!(
+            directories[1].digest().to_string(),
+            "b11993b23ee57b023315bcf3cda89ed3b5a4545d72a491f645ec195dc19286e3/92"
+        );
+        assert_eq!(
+            hex(directories[1].data()),
+            concat!(
+                "125a0a125f5f736c75675f66696c6577726974655f5f12440a403139346637626633383635313732333464633435",
+                "63613264363733636338623233343561333964633862316439366236636436316665386239393938303331611051"
+            )
+        );
+        assert_eq!(
+            plan.identity.action_digest.to_string(),
+            "4efde9fa35a64b7cda6c3fa50a8d0a524a37256a5cfdbffc8bcc12c650cecab4/175"
+        );
+        assert_eq!(
+            hex(plan.identity.action_bytes()),
+            concat!(
+                "0a450a4063613062643232323331333732626664303230353564383731316536633436623633613463383037626261",
+                "33633633303935303434653634643033633038363810a40112440a406231313939336232336565353762303233333135",
+                "6263663363646138396564336235613435343564373261343931663634356563313935646331393238366533105c5220",
+                "0a1e0a0f636f6e7461696e65722d696d616765120b73656c65637465643a7631"
+            )
         );
 
         assert_eq!(
@@ -794,6 +848,38 @@ mod tests {
         assert_eq!(restored, baseline);
         assert!(restored.command.argv[2].contains("chmod 0444"));
         assert!(plan("a", true, "pkg/out.txt", &[]).command.argv[2].contains("chmod 0555"));
+    }
+
+    #[test]
+    fn file_write_action_key_is_not_the_reapi_action_digest() {
+        let oracle: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../tests/v2_oracle/fixtures/action-query-identity-evidence/expected/oracle.json"
+        ))
+        .unwrap();
+        let action_key = |name: &str| {
+            let command = oracle["commands"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|command| command["name"] == name)
+                .unwrap();
+            let output = command["normalized_stdout"].as_str().unwrap();
+            output.split_once("ActionKey: ").unwrap().1[..64].to_owned()
+        };
+        // Bazel's pinned FileWrite oracle keeps its ActionKey across an
+        // output-path edit; the REAPI Command and Action encode that path.
+        let bazel_a = action_key("baseline_c0_p0_content_a_path_a_text");
+        let bazel_b = action_key("output_path_b_text");
+        assert_eq!(bazel_a, bazel_b);
+        let reapi_a = plan("content-A", false, "path-A.txt", &[])
+            .identity
+            .action_digest;
+        let reapi_b = plan("content-A", false, "path-B.txt", &[])
+            .identity
+            .action_digest;
+        assert_ne!(reapi_a, reapi_b);
+        assert_ne!(reapi_a.hash(), bazel_a);
+        assert_ne!(reapi_b.hash(), bazel_b);
     }
 
     #[test]
@@ -888,6 +974,50 @@ mod tests {
         )
         .await
         .unwrap();
+
+        assert_eq!(execution.evidence.ac_misses, 1);
+        assert_eq!(execution.evidence.ac_hits, 0);
+        let replay = execute_prepared(
+            &config,
+            plan.command().clone(),
+            plan.input_tree().clone(),
+            plan.identity().clone(),
+            plan.command().output_files.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(replay.evidence.ac_hits, 1);
+        assert_eq!(replay.evidence.ac_misses, 0);
+        assert!(replay.evidence.uploaded_digests.is_empty());
+        assert_eq!(replay.output_blobs, execution.output_blobs);
+
+        let channel = tonic::transport::Endpoint::from_shared(
+            tonic_endpoint(config.executor.as_ref().unwrap()).unwrap(),
+        )
+        .unwrap()
+        .connect()
+        .await
+        .unwrap();
+        let cache = CacheClient::new(
+            channel,
+            String::new(),
+            TransferPolicy {
+                max_batch_bytes: 1,
+                chunk_bytes: 3,
+            },
+        )
+        .unwrap();
+        let streamed = ReapiBlob::from_bytes(b"tiny streamed CAS proof".to_vec());
+        cache.upload_missing(&[streamed.clone()]).await.unwrap();
+        let mut streamed_read = Vec::new();
+        cache
+            .read_blob_verified(streamed.digest(), |chunk| {
+                streamed_read.extend_from_slice(chunk);
+                Ok(())
+            })
+            .await
+            .unwrap();
+        assert_eq!(streamed_read, streamed.data());
 
         assert_eq!(execution.output_blobs["pkg/write_file.txt"], content);
         let expected_digest = ReapiDigest::of_bytes(content);

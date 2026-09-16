@@ -22,6 +22,14 @@ Make REAPI the primary and routine execution boundary for Slug V2.
 
 Canonical Live Status and [current-packet.md](./current-packet.md) own scheduling.
 Bounded FileWrite M5/M6 are accepted; their NativeLink proofs remain regressions.
+WP-7-13 routes that admitted FileWrite transport through the graph-independent
+`slug_reapi_cache_v2` leaf. Stage 7 still owns the Action projection, Execute,
+result-shape validation and output publication; the leaf owns protocol,
+CAS/AC and verified bounded transfers. This does not admit a new action family.
+Its direct NativeLink regression passed cold FileWrite execution, same-action
+AC hit with no upload, and a forced three-byte ByteStream CAS round trip in
+0.29 seconds of test execution. The older `reapi-action-cache-hit` fixture
+uses typed Spawn and remains outside this FileWrite-only packet.
 Broader Stage 7 work enters M7A only when the
 [bootstrap readiness matrix](./bootstrap-readiness.md) identifies a required
 family/input-tree/execution capability. Each family first passes its Stage 6/8

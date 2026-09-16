@@ -15,25 +15,31 @@ fn main() {
         .unwrap_or_else(|| {
             protoc_bin_vendored::protoc_bin_path().expect("vendored protoc is available")
         });
-    // Build scripts run before any async/DICE work. The vendored compiler keeps
-    // this narrow REAPI surface hermetic across Cargo and Bazel environments.
     unsafe {
         std::env::set_var("PROTOC", protoc);
     }
-    let manifest_dir = std::path::PathBuf::from(
+    let proto_dir = std::path::PathBuf::from(
         std::env::var_os("CARGO_MANIFEST_DIR").expect("Cargo manifest directory is available"),
-    );
-    let proto_dir = manifest_dir.join("proto");
-    let protos = [
-        proto_dir.join("reapi_v2.proto"),
-        proto_dir.join("google/protobuf/any.proto"),
-        proto_dir.join("google/protobuf/duration.proto"),
-        proto_dir.join("google/rpc/status.proto"),
-        proto_dir.join("google/longrunning/operations.proto"),
-    ];
+    )
+    .join("proto");
+    let sources = [
+        "build/bazel/remote/execution/v2/remote_execution.proto",
+        "build/bazel/semver/semver.proto",
+        "google/api/annotations.proto",
+        "google/api/client.proto",
+        "google/api/http.proto",
+        "google/api/launch_stage.proto",
+        "google/bytestream/bytestream.proto",
+        "google/longrunning/operations.proto",
+        "google/rpc/status.proto",
+    ]
+    .map(|path| proto_dir.join(path));
+    for source in &sources {
+        println!("cargo:rerun-if-changed={}", source.display());
+    }
     tonic_build::configure()
         .build_client(true)
         .build_server(false)
-        .compile_protos(&protos, &[proto_dir])
-        .expect("REAPI protocol subset compiles");
+        .compile_protos(&sources, &[proto_dir])
+        .expect("pinned REAPI and Google protocol definitions compile");
 }

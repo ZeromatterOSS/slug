@@ -52,7 +52,7 @@ filegroup(
         ":macos_x86_64": ["@slug_protoc_macos_x86_64//:bin/protoc"],
         ":windows_x86_64": ["@slug_protoc_windows_x86_64//:bin/protoc.exe"],
     }),
-    visibility = ["//app/slug_reapi_v2:__pkg__"],
+    visibility = ["//app/slug_reapi_cache_v2:__pkg__"],
 )
 
 # rules_rust 0.73 uses cargo_build_script.tools for exec-configured location
@@ -70,7 +70,7 @@ filegroup(
         "@slug_protoc_macos_x86_64//:bin/protoc",
         "@slug_protoc_windows_x86_64//:bin/protoc.exe",
     ],
-    visibility = ["//app/slug_reapi_v2:__pkg__"],
+    visibility = ["//app/slug_reapi_cache_v2:__pkg__"],
 )
 
 exports_files([

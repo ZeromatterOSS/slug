@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-13-m7a-reapi-cache-core-leaf-r1
-Status: ready; reviewed graph-independent cache core and FileWrite consumer
+Status: accepted; graph-independent cache core and FileWrite consumer
 
 ## Outcome and compatibility
 
@@ -122,10 +122,15 @@ not a large test file. Add exact before/after
 FileWrite Command/Directory/Action byte and digest vectors, a negative
 ActionKey-vs-REAPI identity check, and a FileWrite cold/hit regression through
 the routed consumer. Keep unsupported action families rejected before any RPC.
-The existing `reapi-action-cache-hit` NativeLink fixture is the mandatory
-focused live transport proof; an unavailable backend is an unproved gate, not
-a skipped pass. One focused live fixture is enough;
-do not rerun broad oracle or Rust suites. Verify the Cargo/Bazel leaf dependency
+The focused live transport proof is the existing direct FileWrite NativeLink
+test extended to exercise cold execution and a same-action AC hit. The older
+`reapi-action-cache-hit` fixture currently declares `ctx.actions.run_shell`,
+which lowers to typed Spawn and is rejected before RPC by this packet's
+FileWrite-only admission; it cannot serve as this packet's transport gate.
+The `simple-rule-action` fixture also fails before any action on the current
+module-toolchain loader's unsupported `rules_python` `_rule_name` repository
+attribute. Those fixture failures do not widen the action or loader allowlist.
+Do not rerun broad oracle or Rust suites. Verify the Cargo/Bazel leaf dependency
 graphs and compile named direct consumers. Compile once, select exact tests
 with the repo preflight, then run only those tests. Target test runtime is a few
 seconds; scrutinize any test over roughly 30 seconds for strict necessity.
@@ -144,3 +149,27 @@ rules_rust, callback, Spawn activation, disk-cache format, standalone public
 release, or cross-tool AC sharing. Run `python3 scripts/v2_plan_status.py`,
 format changed Rust, and `git diff --check`; commit and push only an accepted
 packet checkpoint.
+
+## Accepted implementation receipt (2026-09-16)
+
+`slug_reapi_cache_v2` owns the pinned upstream protocol import closure and
+request-local CAS/AC client. `slug_reapi_v2` now consumes it for the admitted
+FileWrite route; the old handwritten schema and adapter build script are
+retired. The frozen Command/Directory/Action wire vectors pass unchanged.
+The pinned aquery oracle shows FileWrite ActionKey stable across an output-path
+edit while the corresponding REAPI Action digests differ.
+
+Focused leaf tests passed 10/10 (test execution below 0.01 seconds; final
+incremental compile plus test command 1.13 seconds). The FileWrite wire and
+ActionKey tests each passed as named tests. The direct NativeLink test passed
+cold FileWrite execution, same-action AC hit with no upload, and forced
+three-byte ByteStream upload/verified read (test execution 0.29 seconds).
+The one CLI preflight build compiled the CLI and server in 4 minutes 51 seconds;
+later named CLI/server `cargo check` completed in 1.6 seconds. A configured
+Bazel leaf `cquery` completed in 3.4 seconds with the required nightly channel
+flag; its closure contains the new protoc producer and no Slug graph crate.
+Cargo/Bazel locks were refreshed. The two older fixture attempts stopped
+before REAPI for the typed-Spawn and rules_python loader reasons above.
+Independent final review returned `ACCEPT` after focused digest-safety and
+malformed-response proof corrections. This receipt does not prove a Bazel
+Rustc build or the refreshed CLI-root generated-input/coverage audit.

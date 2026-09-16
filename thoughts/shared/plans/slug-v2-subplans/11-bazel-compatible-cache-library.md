@@ -68,6 +68,17 @@ packet and route Slug through it. Avoid duplicate cache implementations. Keep
 Cargo and Bazel dependency declarations, generated bindings, licenses and the
 Stage 10 production inventory synchronized.
 
+WP-7-13 selects `app/slug_reapi_cache_v2` for this leaf. Its request-local
+`CacheClient` accepts a caller-owned tonic channel and instance, returns the
+full protocol ActionResult on AC hit, and handles verified CAS upload/download
+with bounded batch or ByteStream transfers. The `slug_reapi_v2` adapter retains
+graph-dependent input trees, action lowering, Execute and publication. The
+upstream pins and copied-file checksums are in the leaf's `PROVENANCE.md`.
+The WP-7-13 bounded leaf passed independent final review after canonical
+digest, malformed CAS response, interrupted Write-status and cross-domain
+ActionKey proof corrections. General cache-only writes and standalone release
+remain the later slices below.
+
 ## Implementation slices
 
 ### 11.1 Bootstrap cache core — M7A/M8

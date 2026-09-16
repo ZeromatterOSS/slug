@@ -119,6 +119,7 @@ impl ReapiCommand {
                 .map(|(name, value)| proto::command::EnvironmentVariable {
                     name: name.clone(),
                     value: value.clone(),
+                    ..Default::default()
                 })
                 .collect(),
             output_files: self.output_files.clone(),
@@ -132,6 +133,7 @@ impl ReapiCommand {
                 .chain(&self.output_directories)
                 .cloned()
                 .collect(),
+            ..Default::default()
         }
     }
 }
@@ -166,6 +168,7 @@ impl ReapiActionIdentity {
             do_not_cache: false,
             salt: Vec::new(),
             platform: Some(platform_from_properties(&command.platform_properties)),
+            ..Default::default()
         };
         let action_bytes = action.encode_to_vec();
         Self {
@@ -189,6 +192,7 @@ pub(crate) fn digest_to_proto(digest: &ReapiDigest) -> proto::Digest {
             .size_bytes()
             .try_into()
             .expect("REAPI digest size fits in i64"),
+        ..Default::default()
     }
 }
 
@@ -199,7 +203,9 @@ fn platform_from_properties(properties: &BTreeMap<String, String>) -> proto::Pla
             .map(|(name, value)| proto::platform::Property {
                 name: name.clone(),
                 value: value.clone(),
+                ..Default::default()
             })
             .collect(),
+        ..Default::default()
     }
 }

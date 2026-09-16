@@ -17,6 +17,7 @@ use slug_build_api_v2::ActionInput;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::ParamFile;
 use slug_build_api_v2::ParamFileFormat;
+pub use slug_reapi_cache_v2::ReapiBlob;
 
 use crate::command::digest_to_proto;
 use crate::digest::ReapiDigest;
@@ -65,28 +66,6 @@ pub struct ReapiInputTree {
     root_digest: ReapiDigest,
     directory_blobs: Vec<ReapiBlob>,
     inline_blobs: Vec<ReapiBlob>,
-}
-
-/// A byte-bearing REAPI CAS object owned by the action projection.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ReapiBlob {
-    digest: ReapiDigest,
-    data: Vec<u8>,
-}
-
-impl ReapiBlob {
-    pub fn from_bytes(data: Vec<u8>) -> Self {
-        let digest = ReapiDigest::of_bytes(&data);
-        Self { digest, data }
-    }
-
-    pub fn digest(&self) -> &ReapiDigest {
-        &self.digest
-    }
-
-    pub fn data(&self) -> &[u8] {
-        &self.data
-    }
 }
 
 impl ReapiInputTree {
@@ -281,6 +260,7 @@ fn serialize_directory(directory: &DirectoryBuilder, blobs: &mut Vec<ReapiBlob>)
         .map(|(name, child)| proto::DirectoryNode {
             name: name.clone(),
             digest: Some(digest_to_proto(&serialize_directory(child, blobs))),
+            ..Default::default()
         })
         .collect();
     let files = directory
@@ -290,9 +270,17 @@ fn serialize_directory(directory: &DirectoryBuilder, blobs: &mut Vec<ReapiBlob>)
             name: name.clone(),
             digest: Some(digest_to_proto(digest)),
             is_executable: false,
+            ..Default::default()
         })
         .collect();
-    let blob = ReapiBlob::from_bytes(proto::Directory { files, directories }.encode_to_vec());
+    let blob = ReapiBlob::from_bytes(
+        proto::Directory {
+            files,
+            directories,
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    );
     let digest = blob.digest().clone();
     blobs.push(blob);
     digest

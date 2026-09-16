@@ -3583,21 +3583,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "slug_reapi_cache_v2"
+version = "0.1.0"
+dependencies = [
+ "futures 0.3.33",
+ "prost",
+ "prost-types",
+ "protoc-bin-vendored",
+ "rand 0.9.5",
+ "sha2",
+ "tokio",
+ "tonic",
+ "tonic-build",
+]
+
+[[package]]
 name = "slug_reapi_v2"
 version = "0.1.0"
 dependencies = [
  "prost",
  "prost-types",
- "protoc-bin-vendored",
- "sha2",
+ "serde_json",
  "slug_analysis_v2",
  "slug_build_api_v2",
  "slug_configuration_v2",
  "slug_core_v2",
  "slug_identity_v2",
+ "slug_reapi_cache_v2",
  "tokio",
  "tonic",
- "tonic-build",
 ]
 
 [[package]]

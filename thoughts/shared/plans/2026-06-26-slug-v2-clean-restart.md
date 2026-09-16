@@ -30,16 +30,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 ### Current packet
 
 Packet: WP-7-13-m7a-reapi-cache-core-leaf-r1
-Status: ready; reviewed graph-independent cache core and FileWrite consumer
+Status: accepted; graph-independent cache core and FileWrite consumer
 
-The active Stage 7/11 packet extracts a graph-independent REAPI protocol,
-digest, CAS and AC leaf from the existing adapter and routes the admitted
-FileWrite consumer through it. It must pin authentic upstream protocol
-sources, preserve accepted FileWrite wire/digest bytes, prove the dependency
-boundary and focused cold/hit behavior, and receive independent design and
-final review; independent design review accepted the corrected contract.
-This does not activate Spawn or advance an M7A readiness row
-until its own proof passes. The callback candidate remains unaccepted at local
+The Stage 7/11 packet extracted a graph-independent REAPI protocol, digest,
+CAS and AC leaf and routed the admitted FileWrite consumer through it. Pinned
+upstream sources, frozen FileWrite wire bytes, Cargo/Bazel dependency boundaries,
+direct NativeLink cold/AC-hit and forced tiny-chunk ByteStream behavior passed;
+independent final review returned `ACCEPT`. This does not activate Spawn or
+advance the CLI-root bootstrap readiness row. The callback candidate remains unaccepted at local
 `review/wp-7-11-rustc-crate-root-map-each` (`ea5fcc6fd`); its real loaded
 source and same-DICE A/B/A proof requires a pinned local registry and retained
 runtime harness, as recorded at `6a6f48c1e`.

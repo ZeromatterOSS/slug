@@ -107,6 +107,24 @@ crate universe. This is the accepted inventory, not a fresh audit of every
 current Cargo change. Before bootstrap admission, reconcile live Cargo/Bazel
 coverage against it and record any delta in the readiness matrix.
 
+#### Live WP-7-13 cache-core inventory delta (2026-09-16)
+
+The historical 33-package receipt above is unchanged. The live Cargo root now
+adds the first-party `slug_reapi_cache_v2` leaf under `slug_reapi_v2`; it owns
+the pinned REAPI/Google protocol inputs, digest and blob values, and CAS/AC
+transport. The `slug_reapi_v2` build script and its five handwritten proto
+inputs are retired. The `slug_reapi_cache_v2` build script now owns the
+upstream protocol import closure and the existing vendored protoc tool. This
+is a new production dependency and generated-input owner, so the old
+33-package and five-proto counts do not certify the live closure. Cargo and
+Bazel lockfiles were repinned for this delta; a fresh CLI-root generated-input
+and coverage audit remains a bootstrap readiness gate.
+The focused leaf Bazel `cquery` exited 0 in 3.4 seconds with the explicit
+nightly Rust channel flag; it includes the moved protoc producer and copied
+protocol inputs and no Slug graph crate. Cargo CLI/server direct-consumer
+checks exited 0 in 1.6 seconds after the final code change. Neither check
+replaces the historical full-root receipt or proves a new Bazel Rustc action.
+
 Cargo remains authoritative for dependency declarations/resolution. Review
 `Cargo.lock`, `Cargo.Bazel.lock`, `MODULE.bazel.lock`, toolchain and manifest
 changes together. The accepted toolchain is `nightly/2025-09-14`; retain explicit

@@ -1,5 +1,5 @@
 {
-  "checksum": "201616bd4651cdab4c2ff8cc32f1f1ff47a94517467939d8844084cf5ff6ad01",
+  "checksum": "9dba5c5f9c3177be22cc463c0daf131fe8dc2b6d57f3d2072efe11213297f1d8",
   "crates": {
     "Inflector 0.11.4": {
       "name": "Inflector",
@@ -22125,15 +22125,15 @@
       ],
       "license_file": null
     },
-    "slug_reapi_v2 0.1.0": {
-      "name": "slug_reapi_v2",
+    "slug_reapi_cache_v2 0.1.0": {
+      "name": "slug_reapi_cache_v2",
       "version": "0.1.0",
       "package_url": "https://github.com/ZeromatterOSS/slug",
       "repository": null,
       "targets": [
         {
           "Library": {
-            "crate_name": "slug_reapi_v2",
+            "crate_name": "slug_reapi_cache_v2",
             "crate_root": "src/lib.rs",
             "srcs": {
               "allow_empty": true,
@@ -22156,7 +22156,7 @@
           }
         }
       ],
-      "library_target_name": "slug_reapi_v2",
+      "library_target_name": "slug_reapi_cache_v2",
       "common_attrs": {
         "compile_data_glob": [
           "**"
@@ -22164,12 +22164,20 @@
         "deps": {
           "common": [
             {
+              "id": "futures 0.3.33",
+              "target": "futures"
+            },
+            {
               "id": "prost 0.13.5",
               "target": "prost"
             },
             {
               "id": "prost-types 0.13.5",
               "target": "prost_types"
+            },
+            {
+              "id": "rand 0.9.5",
+              "target": "rand"
             },
             {
               "id": "sha2 0.10.9",
@@ -22218,6 +22226,70 @@
           ],
           "selects": {}
         }
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": null
+    },
+    "slug_reapi_v2 0.1.0": {
+      "name": "slug_reapi_v2",
+      "version": "0.1.0",
+      "package_url": "https://github.com/ZeromatterOSS/slug",
+      "repository": null,
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "slug_reapi_v2",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "slug_reapi_v2",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "prost 0.13.5",
+              "target": "prost"
+            },
+            {
+              "id": "prost-types 0.13.5",
+              "target": "prost_types"
+            },
+            {
+              "id": "tokio 1.53.1",
+              "target": "tokio"
+            },
+            {
+              "id": "tonic 0.12.3",
+              "target": "tonic"
+            }
+          ],
+          "selects": {}
+        },
+        "deps_dev": {
+          "common": [
+            {
+              "id": "serde_json 1.0.151",
+              "target": "serde_json"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2024",
+        "version": "0.1.0"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -31022,6 +31094,7 @@
     "slug_identity_v2 0.1.0": "app/slug_identity_v2",
     "slug_loading_v2 0.1.0": "app/slug_loading_v2",
     "slug_query_v2 0.1.0": "app/slug_query_v2",
+    "slug_reapi_cache_v2 0.1.0": "app/slug_reapi_cache_v2",
     "slug_reapi_v2 0.1.0": "app/slug_reapi_v2",
     "slug_server_v2 0.1.0": "app/slug_server_v2",
     "slug_starlark_v2 0.1.0": "app/slug_starlark_v2",
