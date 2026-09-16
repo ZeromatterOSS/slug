@@ -29,8 +29,13 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-10-m7a-num-traits-build-script-output-r1
-Status: result REPLAN; sole build timed out without generated flags
+Packet: WP-7-10-m7a-workspace-feature-scope-reconcile-r1
+Status: design ACCEPT; saved-artifact and pinned-source reconciliation pending
+
+The selected successor compares the accepted CLI Cargo unit graph, generated
+Bazel lock and workspace Cargo metadata using pinned rules_rust feature
+resolution source. It runs no Cargo/Bazel command, compiler, build or test;
+configured action flags, generated outputs and M7A stay open.
 
 The selected successor permits one offline, 20-second-capped Bazel build of
 only the generated `num-traits` build-script alias to inspect `_bs.flags`.

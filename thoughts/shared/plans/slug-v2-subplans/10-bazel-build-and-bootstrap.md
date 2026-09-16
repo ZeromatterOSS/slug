@@ -410,6 +410,10 @@ output. Receipt SHA-256 is
 Independent result review `REPLAN` confirmed clean cleanup and unchanged
 tracked/frozen inputs. No retry is selected from this cache state. Continue
 with static/source evidence; complete compiler flags and M7A remain open.
+The selected `WP-7-10-m7a-workspace-feature-scope-reconcile-r1` compares
+saved CLI-unit, generated-lock and workspace-metadata feature sets against
+pinned crate_universe source. It runs no build, test or new Cargo/Bazel
+command; configured compiler arguments and M7A stay open.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

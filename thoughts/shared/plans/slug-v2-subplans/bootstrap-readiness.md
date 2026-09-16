@@ -225,6 +225,10 @@ executed. Receipt SHA-256 is
 Independent result review `REPLAN` confirmed clean cleanup and unchanged
 tracked/frozen inputs. The packet has no retry; generated flags, compilation
 and the first readiness row remain open.
+The selected saved-artifact successor checks whether the 22 narrower CLI
+Cargo feature sets correspond to workspace-wide Cargo metadata and pinned
+crate_universe resolution scope. It cannot establish generated flag contents,
+compilation or the first readiness row.
 
 ## Readiness matrix
 
