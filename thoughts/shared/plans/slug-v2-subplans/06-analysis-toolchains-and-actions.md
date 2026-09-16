@@ -1405,6 +1405,20 @@ the candidate exit/timing and material assertion family. Any pass, timeout,
 missing selector, different failure or incomplete receipt replans. Merge and
 push remain prohibited pending successful attribution and final atomic review.
 
+The accepted r1 recovery's single 180-second preparation exited 124 while
+compiling `slug_core_v2` after dependencies completed. Receipt
+`232d6ce07b1cfaefaf8ddfde359d3c728751e26281c780534fd3f930ec5684c7`
+contains 366 compiler artifacts, 51 build-script rows, 17 messages, zero errors,
+zero executables, no build-finished row and zero tests; cleanup and main state
+are clean. Final r2 resource recovery authorizes one identical continuation
+with the warmed target under a 360-second compile-only ceiling, without any
+clean, feature/job/profile/incremental change or intervening package build.
+Success requires complete JSON, one successful build-finished row, exactly one
+hashed Core executable and clean cleanup. Another stop ends this evidence path
+as an external resource blocker. Only after success may the frozen eight main
+comparators run once under 12-second TERM/three-second kill limits; all other
+tests, source changes, merge and push remain prohibited.
+
 ## Configurable native alias prerequisite (2026-09-14)
 
 After the computed-default correction, authentic F3 reaches rules_java's

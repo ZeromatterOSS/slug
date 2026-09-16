@@ -29,8 +29,8 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-4-6-7A-r2-main-core-attribution-preparation-r1
-Status: comparator preparation recovery ready; independent replan review ACCEPT
+Packet: WP-4-6-7A-r2-main-core-attribution-final-preparation-r2
+Status: final comparator preparation recovery ready; independent replan review ACCEPT
 
 The reconciled selected-request/configured-conflict and execution-group stack
 remains unaccepted at local commit `1b09dbfa1`. Its frozen Core binary passed
@@ -65,6 +65,18 @@ and run only the eight frozen comparator selectors once under unchanged
 12/15-second test limits. Any preparation stop, missing selector, main pass,
 timeout or different failure class replans. No source change, completed proof
 rerun, full sweep, CLI conflict, F3, merge or push is allowed.
+
+The one authorized 180-second preparation then exited 124 while compiling the
+final `slug_core_v2` crate. Receipt
+`232d6ce07b1cfaefaf8ddfde359d3c728751e26281c780534fd3f930ec5684c7`
+contains 366 compiler artifacts, 51 build-script rows, 17 messages, zero errors,
+zero executables, no `build-finished` and zero tests. The final r2 recovery
+allows one identical continuation with the warmed target under a 360-second
+compile-only ceiling. Success still requires complete JSON, one successful
+build-finished row and one hashed Core executable before only the eight frozen
+comparators may run once at 12/15 seconds. Another preparation stop ends this
+path as an external resource blocker; no further retry, source change, merge or
+push is allowed.
 
 Normal run registry propagation is accepted at `47163df7b`, typed registration
 error identity at `a06f3ddfc`, bounded observer at `64c7d2475`, and source

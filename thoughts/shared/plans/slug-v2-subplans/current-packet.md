@@ -1,9 +1,50 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-4-6-7A-r2-main-core-attribution-preparation-r1
-Status: comparator preparation recovery ready; independent replan review ACCEPT
+Packet: WP-4-6-7A-r2-main-core-attribution-final-preparation-r2
+Status: final comparator preparation recovery ready; independent replan review ACCEPT
 
 ## Result and acceptance boundary
+
+Run one final compile-only continuation for the missing unchanged-main Core
+comparator, using clean main `4824a0861`, frozen feature `055b6fe18`, the
+identical absolute Cargo command, working directory, pinned PATH/toolchain,
+environment, single build job and warmed target directory. Do not clean, change
+features, alter profile or incremental settings, or prepare another package
+first. Exactly one invocation is authorized under a 360-second ceiling. This is
+a newly reviewed resource recovery for the final `slug_core_v2` crate, not a
+retry of the failed 180-second packet.
+
+Success requires completely parsed Cargo JSONL, zero compiler errors, one
+`build-finished` row with `success=true`, exactly one `slug_core_v2` test
+executable, clean sole process-tree cleanup and the executable SHA-256. A stop,
+malformed receipt or multiple/missing executable ends this evidence path as an
+external resource blocker; do not retry or raise the ceiling again.
+
+Only after success, exact-list the eight frozen names once, require each exactly
+once and nonignored, then run only those eight once under the unchanged
+12-second TERM/three-second kill limits into one atomic receipt. Compare each
+main row with its frozen candidate row by selector, exit/timing class, terminal
+assertion or panic family and material expected/actual diagnostic. A pass,
+timeout, missing or different row, or incomplete comparison rejects baseline
+attribution.
+
+Freeze every passing feature artifact and both earlier preparation records. No
+candidate rerun, source/test/lockfile/Cargo change, historical-timeout selector,
+replacement partition, full sweep, CLI conflict, F3, merge, acceptance commit
+or push is allowed.
+
+## Failed 180-second preparation history
+
+The accepted r1 recovery invoked the identical main Core preparation once under
+its 180-second ceiling. It exited 124 while compiling `slug_core_v2`, after
+clearing bzlmod, loading and analysis, and ran zero tests. JSON receipt
+`/tmp/slug-main-core-attribution-180-compile.json` has SHA-256
+`232d6ce07b1cfaefaf8ddfde359d3c728751e26281c780534fd3f930ec5684c7`:
+366 compiler artifacts, 51 build-script rows, 17 compiler messages, zero
+compiler errors, zero executables and no `build-finished` row. The process tree
+and main worktree were clean afterward.
+
+## Prior comparator recovery contract
 
 Recover only the missing unchanged-main attribution for the eight frozen
 candidate Core assertion failures. Freeze clean feature checkpoint `055b6fe18`
