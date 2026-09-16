@@ -228,6 +228,11 @@ source after Cargo completed; recovered output/cleanup receipt SHA-256 is
 `f5163a1827114cdc71acc9c325369db93f23a3cbc807cf821203e5486fbb5bea`.
 Independent final review `ACCEPT` confirmed the recovered metadata evidence
 without a rerun. The graph and M7A gates remain open.
+The selected `WP-7-10-m7a-bazel-graph-sync-r2` packet uses that accepted
+offline cache to add the missing configuration BUILD owner and six normal
+first-party edges, then performs one bounded, offline crate-universe repin.
+It checks generated lock keys and drift only; live Bazel reachability, owner
+compilation and M7A readiness remain separate gates.
 
 Generated sources remain declared build outputs: build scripts supply
 `rust_nightly` configuration for allocative/starlark/starlark_map; LALRPOP

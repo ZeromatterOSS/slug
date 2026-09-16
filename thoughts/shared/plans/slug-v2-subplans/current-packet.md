@@ -1,115 +1,100 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-10-m7a-cargo-cache-acquisition-r1
-Status: acquisition and offline verification ACCEPT; Bazel graph work remains open
+Packet: WP-7-10-m7a-bazel-graph-sync-r2
+Status: independent design review ACCEPT; metadata mutation pending
 
 ## Outcome and authority
 
-Stage the exact root `Cargo.lock` dependencies needed for a later, separately
-reviewed Bazel crate-universe repin. This is preparation only: it changes the
-host Cargo cache, not source or repository build metadata, and admits no
-package reachability, action behavior, exact ActionKey or M7A milestone.
+Repair the Bazel developer graph metadata for the frozen Linux CLI Cargo
+closure: add the missing `slug_configuration_v2` library owner and its six
+normal first-party incoming edges, then regenerate `Cargo.Bazel.lock` from
+unchanged Cargo authority. This packet does not build or query Bazel targets
+and admits no declared/configured reachability, action behavior, exact
+ActionKey or M7A milestone. Those need separately reviewed live evidence.
 
-Freeze clean main `5ee216bd8`, root `Cargo.lock` SHA-256
+Freeze clean main `401b6d953`, root `Cargo.lock` SHA-256
 `a19882e78b50a82ed900fce570f4a6aee778553448790eaf08e2e08a591f76d8`,
-the accepted Linux-closure receipt SHA-256
-`b3886868867d6b2c6f8d1d49575fbc0f4322ab83216e1da456ae7e2f1e2c5e2`,
-and the cache-gap inventory at `/tmp/slug-m7a-cache-gap.json`, SHA-256
-`5c8294dcbebbefea8602f891c28ee2545ff701d572084ae236049fdd0eba3189`.
-That inventory lists 448 locked registry packages and 54 missing host-cache
-archive/source pairs by exact name, version and lock checksum. Sixteen missing
-archives exist in Bazel's downloader cache; 38 do not. The selected Linux CLI
-closure had its 309 registry packages locally, but rules_rust repin invokes a
-full-workspace Cargo update and cannot rely on that smaller closure.
+the accepted Cargo Linux-closure analysis SHA-256
+`dad20c2240aa421f5d99fe30190cbe7fa9035b4e388ad64aa30e762afaf9cd10`,
+and accepted locked-cache fetch/metadata receipt SHA-256 values
+`861309ac82fcf02d8d8385b25622757ea0f4c04ffd4e568122532db0031f31b6`
+and `f5163a1827114cdc71acc9c325369db93f23a3cbc807cf821203e5486fbb5bea`.
+The latter verification found all 448 registry archives and source directories,
+their individual Cargo-lock checksums and full-workspace offline metadata.
+The selected CLI Cargo closure has 35 local/310 external packages. Its static
+Bazel lock has only 34/35 local and 302/310 selected external name/version
+keys. The missing local lock member is `slug_starlark_v2 0.1.0`; Stage 10
+lists all eight absent external keys. `slug_configuration_v2` is in the
+lock but has no BUILD owner, and six normal local consumers omit its Bazel
+edge. The prior Bazel query and recovery yielded zero rows.
 
-One read-only full-workspace preflight of pinned Cargo `metadata --locked
---offline` exited 101 in 0.15 seconds with zero stdout: `anstyle-wincon
-v3.0.11` was unavailable offline. Its stderr SHA-256 is
-`529cdff554a4b7edbf576fef4ff48ef9d4ec8e8f68e22e61c57dae9826c30dde`.
-The previously drafted offline graph-sync packet is superseded, unaccepted and
-unexecuted; no BUILD or Bazel lock file was changed. The static M7A graph gaps
-remain the missing `slug_configuration_v2` BUILD owner, six normal consumer
-edges, and the 34/35 local and 302/310 external selected lock-key coverage.
+## Mutation boundary
 
-## Allowed work
+Create `app/slug_configuration_v2/BUILD.bazel` with one public
+`rust_library(name = "slug_configuration_v2")`, a source glob, crate-universe
+aliases/edition, normal external dependencies, proc-macro dependencies if
+provided by crate-universe, and four explicit local dependencies:
+`//allocative/allocative`, `//app/slug_identity_v2`, `//gazebo/dupe` and
+`//gazebo/strong_hash`. Add `//app/slug_configuration_v2` only to the
+`rust_library` dependency lists in `slug_analysis_v2`,
+`slug_build_api_v2`, `slug_commands_v2`, `slug_core_v2`,
+`slug_loading_v2` and `slug_server_v2`. The REAPI configuration dependency
+is dev-only in the frozen Cargo resolution and is outside the production
+correction. No test target is added.
 
-First verify the frozen hashes, current main and gap rows against root
-`Cargo.lock`. Then run exactly one pinned nightly-2025-09-14 Cargo command
-from the repository root:
+The tracked-file allowlist is the new configuration BUILD file, those six
+existing BUILD files, generated `Cargo.Bazel.lock` and `MODULE.bazel.lock`
+only if Bazel emits it, plus this manifest, canonical status, Stage 10 and
+bootstrap readiness. Do not edit any Rust source, Cargo manifest/lock,
+`MODULE.bazel`, toolchain pin, fixture, target manifest, REAPI code, DICE
+value or fallback. Handwritten BUILD growth should stay under 50 lines;
+inspect generated locks structurally instead of applying a line cap.
 
-```text
-cargo fetch --locked --manifest-path Cargo.toml
-```
+## Generation and verification
 
-Use the absolute executable under
-`/home/wgray/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/`.
-Leave `--target` unset so Cargo fetches all platform dependencies recorded by
-the lock; use the existing `/home/wgray/.cargo` cache. Allow outbound access
-only for this locked fetch. It may populate registry archives, extracted
-sources, sparse-index entries and locked Git sources in the host cache.
-`--locked` and the frozen lock checksum prohibit a new version or changed
-Cargo authority. Do not copy archives out of Bazel's cache into Cargo's cache
-or hand-edit sparse-index entries.
+Before Bazel, verify frozen hashes, static target syntax/labels and the six
+normal Cargo edges. Confirm the pinned Bazel 9.2.0 executable SHA-256
+`7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694`
+and rules_rust 0.73.0 default `x86_64-unknown-linux-musl` cargo-bazel
+generator cached at SHA-256
+`482b82fc521cf3bbc5b4b3946198c0f273608ee63f1691c54c2e7efc3bece656`.
+Leave generator URL/SHA override variables unset. The module's
+`crate.from_cargo(isolated = True)` uses an empty generated Cargo home;
+only for repin, set `CARGO_BAZEL_ISOLATED=false` and
+`CARGO_HOME=/home/wgray/.cargo` to use the now-verified host cache.
 
-The fetch has a 120-second TERM/three-second KILL ceiling and 16 MiB cap per
-captured stream. Record the exact executable, environment, command, elapsed
-time, exit status, stream hashes, process cleanup and pre/post tracked-file
-status in a machine-readable `/tmp` receipt. A sandbox-only network denial
-may be corrected by one authorized unsandboxed execution of the same locked
-command; a network/download error, timeout, changed lock, unexpected tracked
-file mutation or invalid cleanup stops without an automatic retry. This is
-dependency acquisition, not a test. Do not run Bazel, repin, builds, tests,
-F3, payload acquisition unrelated to `Cargo.lock` or any graph query.
+Run exactly one `CARGO_BAZEL_REPIN=1` generation using that absolute Bazel
+binary, startup flags `--batch --ignore_all_rc_files` and command
+`mod deps --repository_disable_download --lockfile_mode=update`.
+Set `CARGO_NET_OFFLINE=true` and keep the restricted network environment.
+The cached rules_rust source maps repin mode `1` to
+`cargo update --workspace`; therefore compare root `Cargo.lock` SHA
+afterward and reject a change. The one-time generator has a 120-second
+TERM/three-second KILL ceiling and 16 MiB per-stream cap. Record exact
+command/environment, output hashes, elapsed time, exit, cleanup and
+pre/post tracked-file status in a `/tmp` receipt. This is metadata
+generation, not a test. A missing downloader input, timeout, unexpected
+mutation, generator failure or changed Cargo authority stops without a blind
+retry, alternate generator or network fetch.
 
-## Verification and result
+After a clean generation, parse the generated lock and compare selected
+Cargo package name/version keys: require all 35 local and 310 external keys,
+including the nine previously absent keys. Review before/after versions,
+sources, checksums, features and any `MODULE.bazel.lock` change; reject
+unexplained drift or new authority. Static key coverage does not prove Bazel
+reachability or package content parity. Run `git diff --check` and
+`python3 scripts/v2_plan_status.py`. Do not run Bazel query/build, Cargo
+build/test, F3, developer gates or BuildBuddy replay in this packet. The
+user's test guidance favors the smallest valid checks; no test is needed
+for this metadata-only correction.
 
-After a successful fetch, verify that the root `Cargo.lock` SHA-256 is still
-frozen; all 448 registry `.crate` archives are present and hash to their
-individual lock checksums; and the locked Git checkout for
-`sorted_vector_map` is at commit
-`84a82026bc1d1a89e7f6ec86e0e52d5479f12ccc`. Record exact counts and
-any missing/mismatched inputs. Then run one full-workspace, locked, offline
-`cargo metadata --manifest-path Cargo.toml --locked --offline
---format-version 1` under a ten-second TERM/two-second KILL ceiling with
-captured output and cleanup. Its success is the gate for local source and
-sparse-index sufficiency; compare its registry package keys to the 448 locked
-keys and check extracted source directories for those keys. Do not infer that
-this proves the Bazel repin or graph will succeed.
+Independent design review precedes mutation, and independent final review
+checks generated diffs and receipts. Success closes only static graph/lock
+synchronization. Select a separate focused Bazel evidence packet afterward;
+it must obtain fresh generated repository content after repin while downloads
+stay disabled, since `--nofetch` alone can leave stale repository content.
 
-The only tracked edits allowed for this packet are its result/status in this
-manifest, the canonical plan, Stage 10 and bootstrap readiness. Run
-`git diff --check` and `python3 scripts/v2_plan_status.py`. Independent design
-review precedes fetch; independent final review checks the receipt, lock and
-cache verification before this acquisition packet closes. Failure returns
-`REPLAN` with the exact missing input or environmental limit. On success,
-select a new graph-sync packet for BUILD owner/edges, generated lock and fresh
-Bazel evidence. That future packet must permit fresh local repository
-materialization while downloads stay disabled; `--nofetch` alone can expose
-stale generated repository content after a repin.
-
-## Observed result
-
-Independent design review returned `ACCEPT` before acquisition. The one
-locked, all-target fetch completed in 3.117 seconds with exit 0, no timeout or
-stream truncation, clean process-group cleanup, unchanged tracked status and
-unchanged `Cargo.lock`. Fetch receipt SHA-256:
-`861309ac82fcf02d8d8385b25622757ea0f4c04ffd4e568122532db0031f31b6`.
-All 448 registry archives are now present with exact lock checksums; all 448
-extracted source directories exist, and the locked `sorted_vector_map` Git
-checkout is at the exact commit above.
-
-The sole locked/offline full-workspace metadata command produced valid JSON
-with all 448 registry keys, no extra keys and no missing sources in less than
-0.224 seconds. Its 638-byte stderr contains only unused optional
-`perf-event` patch warnings. The receipt wrapper then exited 1 during
-postprocessing because it called `startswith` on a local workspace package's
-null `source` field. The saved command stdout/stderr and the wrapper's branch
-show Cargo itself exited 0; a separate read-only analysis verified the JSON,
-locked keys, unchanged tree/lock and no surviving metadata process without
-rerunning Cargo. Recovered metadata receipt SHA-256:
-`f5163a1827114cdc71acc9c325369db93f23a3cbc807cf821203e5486fbb5bea`.
-Independent final review `ACCEPT` confirmed the saved JSON and warnings,
-rehash-verified all 448 archives and source directories, and verified from the
-wrapper's guarded branch that Cargo exited 0 before postprocessing failed.
-The wrapper defect is preserved in the receipt; no rerun, Bazel command or
-test ran. This closes the acquisition prerequisite only.
+Independent design review `ACCEPT` confirmed the exact four local owner deps,
+six normal consumer edges, cached default generator and offline host Cargo
+inputs. Retain exact pre-run `Cargo.lock` bytes for restoration/reporting if
+the generator changes that forbidden authority; no retry is authorized.

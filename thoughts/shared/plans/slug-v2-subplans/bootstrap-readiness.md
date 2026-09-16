@@ -84,6 +84,9 @@ full-workspace Cargo metadata output contains all 448 locked registry keys;
 the metadata receipt wrapper had a postprocessing defect documented in the
 current packet. Independent final review accepted this input preparation only;
 the readiness row remains open.
+The selected `WP-7-10-m7a-bazel-graph-sync-r2` now repairs static BUILD and
+generated-lock gaps without a Bazel graph query or test. This readiness row
+still needs fresh declared/configured evidence and the other listed proofs.
 
 ## Readiness matrix
 
