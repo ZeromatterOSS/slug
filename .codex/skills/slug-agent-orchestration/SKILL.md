@@ -89,10 +89,14 @@ correcting within the accepted contract when the design remains valid.
 ## Recovery and candidate ownership
 
 User instructions and session authorization take precedence over packet-local
-stops. Preserve explicit resource and permission limits. The historical
-12-second test deadline/15-second absolute ceiling remains in force unless
-the user changes it; compile separately, with preparation bounded to 60 seconds.
-A packet must distinguish inherited user limits from its own estimates.
+stops. Preserve explicit resource and permission limits. Keep tests as small as
+possible. Tests taking more than a few seconds should run infrequently; any test
+expected to exceed roughly 30 seconds needs a concrete justification that it is
+strictly required and that smaller checks cannot establish the same evidence.
+The user clarified that 12 seconds was a guideline, not a hard deadline; the
+historical 12/15-second test ceilings no longer apply as general user limits.
+Compile separately, with preparation bounded to 60 seconds. A packet must
+distinguish explicit user limits from its own estimates and operation caps.
 
 - **Invocation/environment failure:** launcher failure, zero selected tests,
   or an attributed environment problem leaves a gate unproved. Correct the
