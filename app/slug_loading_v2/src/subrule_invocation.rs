@@ -31,6 +31,7 @@ use slug_build_api_v2::RetainedParamFileFormat;
 use slug_build_api_v2::RetainedScalarArg;
 use slug_build_api_v2::RetainedScalarValue;
 use slug_build_api_v2::RetainedVectorOptions;
+use slug_build_api_v2::RustCrateArgMapper;
 use slug_identity_v2::CanonicalLabel;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
@@ -177,6 +178,7 @@ pub struct EvaluatorVectorArgGen<V> {
 pub enum PinnedVectorMapEach {
     RulesRustCrateRoot,
     RegularFileDirnames,
+    RulesRustCrates(RustCrateArgMapper),
 }
 
 #[derive(Debug, Clone, Allocative, Trace)]
@@ -310,12 +312,7 @@ fn starlark_args_methods(builder: &mut MethodsBuilder) {
         let args = StarlarkArgs::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("Args.add_all receiver is invalid"))?;
         let (arg_name, source) = vector_positionals(arg_name_or_values, values, "add_all")?;
-        let map_each = classify_add_all_callback(
-            map_each,
-            allow_closure,
-            omit_if_empty && vector_source_is_empty(&source),
-            eval,
-        )?;
+        let map_each = classify_add_all_callback(map_each, allow_closure, eval)?;
         if let Some(format) = format_each {
             validate_named_format("format_each", format)?;
         }
@@ -475,7 +472,6 @@ fn reject_callback_options(
 fn classify_add_all_callback(
     map_each: Option<Value<'_>>,
     allow_closure: bool,
-    omitted_empty_source: bool,
     eval: &Evaluator<'_, '_, '_>,
 ) -> anyhow::Result<Option<PinnedVectorMapEach>> {
     let Some(map_each) = map_each.filter(|value| !value.is_none()) else {
@@ -515,9 +511,28 @@ fn classify_add_all_callback(
         (1098, 1098) | (1227, 1227) | (1274, 1274) | (1424, 1424) => {
             Ok(Some(PinnedVectorMapEach::RegularFileDirnames))
         }
-        // The pinned source supplies top-level functions at these expressions.
-        // Bazel omits these vectors without invoking their callback when empty.
-        (2572, 2572) | (2574, 2574) if omitted_empty_source => Ok(None),
+        (2572, 2572) => {
+            // Only these two immutable module bindings can reach this pinned
+            // expression. Repr distinguishes the branch after authentication.
+            let repr = map_each.to_repr();
+            let mapper =
+                if repr == format!("<function _crate_to_link_flag from {}>", span.filename()) {
+                    RustCrateArgMapper::Extern
+                } else if repr
+                    == format!(
+                        "<function _crate_to_link_flag_metadata from {}>",
+                        span.filename()
+                    )
+                {
+                    RustCrateArgMapper::ExternMetadata
+                } else {
+                    anyhow::bail!("Args.add_all callback forms are not supported");
+                };
+            Ok(Some(PinnedVectorMapEach::RulesRustCrates(mapper)))
+        }
+        (2574, 2574) => Ok(Some(PinnedVectorMapEach::RulesRustCrates(
+            RustCrateArgMapper::DependencyDir,
+        ))),
         _ => anyhow::bail!("Args.add_all callback forms are not supported"),
     }
 }

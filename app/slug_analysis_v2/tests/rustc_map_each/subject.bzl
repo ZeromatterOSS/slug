@@ -1,10 +1,23 @@
-load("@rules_rust//rust/private:rustc.bzl", "construct_arguments")
+load("@rules_rust//rust/private:providers.bzl", "CrateInfo")
+load("@rules_rust//rust/private:rustc.bzl", "AliasableDepInfo", "construct_arguments")
 
 _NESTED_ROOT_LABEL = Label("@@//nested:unused")
 _NESTED_EXTERNAL_LABEL = Label("//nested:unused")
 
 def _no_coverage():
     return False
+
+def _dependency_crates(ctx):
+    files = ctx.attr.dependency_files
+    if not files:
+        return depset(), depset()
+    a = CrateInfo(name = "a", output = files[0], metadata = files[1], metadata_supports_pipelining = True)
+    b = CrateInfo(name = "b", output = files[2], metadata = files[3], metadata_supports_pipelining = False)
+    # No pipelining field is read when metadata is absent.
+    c = CrateInfo(name = "c", output = files[4], metadata = None)
+    direct = depset([AliasableDepInfo(name = ctx.attr.dependency_alias, dep = a), b])
+    transitive = depset([c], transitive = [depset([a, b])])
+    return direct, transitive
 
 def _impl(ctx):
     output = ctx.actions.declare_file("out/probe.rlib")
@@ -25,6 +38,7 @@ def _impl(ctx):
         root = ctx.actions.declare_file("generated/input.rs")
         ctx.actions.write(root, "pub fn generated() {}\n")
     stdlib = depset(ctx.attr.stdlib[1:], transitive = [depset(ctx.attr.stdlib[:1])])
+    direct_crates, transitive_crates = _dependency_crates(ctx)
     # Exercise the argument-builder API with a real source File and native
     # actions. These explicit inputs select only the admitted callback slice.
     argument_ctx = struct(
@@ -77,7 +91,7 @@ def _impl(ctx):
         cc_toolchain = None,
         feature_configuration = None,
         crate_info = crate,
-        dep_info = struct(transitive_build_infos = depset(), direct_crates = depset(), transitive_crates = depset()),
+        dep_info = struct(transitive_build_infos = depset(), direct_crates = direct_crates, transitive_crates = transitive_crates),
         linkstamp_outs = [],
         ambiguous_libs = {},
         output_hash = None,
@@ -89,8 +103,10 @@ def _impl(ctx):
         emit = [],
         remap_path_prefix = None,
         skip_expanding_rustc_env = True,
+        force_depend_on_objects = ctx.attr.force_objects,
+        force_all_deps_direct = ctx.attr.force_direct,
     )
-    inputs = depset([root] + ([] if ctx.attr.sysroot == None else [ctx.attr.sysroot]), transitive = [stdlib])
+    inputs = depset([root] + ctx.attr.dependency_files + ([] if ctx.attr.sysroot == None else [ctx.attr.sysroot]), transitive = [stdlib])
     ctx.actions.run(outputs = [output], executable = "process_wrapper", arguments = args.all, inputs = inputs, env = env)
     return [DefaultInfo(files = depset([output]))]
 
@@ -99,4 +115,8 @@ subject = rule(implementation = _impl, attrs = {
     "stdlib": attr.label_list(allow_files = True),
     "sysroot": attr.label(allow_single_file = True),
     "generated": attr.bool(default = False),
+    "dependency_files": attr.label_list(allow_files = True),
+    "dependency_alias": attr.string(default = "renamed"),
+    "force_objects": attr.bool(default = False),
+    "force_direct": attr.bool(default = False),
 })

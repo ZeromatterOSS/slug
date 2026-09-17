@@ -206,9 +206,9 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
             "requires a string root path",
         ),
         (
-            "transitive_crates = depset()",
+            "transitive_crates = transitive_crates",
             "transitive_crates = depset([ctx.attr.src])",
-            "Args.add_all callback forms are not supported",
+            "requires pinned CrateInfo",
         ),
     ] {
         assert_eq!(proof.matches(from).count(), 1);
@@ -335,5 +335,127 @@ async fn pinned_rustc_file_dirnames_preserve_order_and_generated_root() {
         let error = request(&dice, &workspace).await.unwrap_err();
         assert!(error.contains(expected), "{error}");
     }
+    fs::remove_dir_all(workspace).unwrap();
+}
+
+#[tokio::test]
+async fn pinned_rustc_dependencies_select_aliases_metadata_and_restore() {
+    let workspace = workspace();
+    let files = [
+        "deps/a/liba.rlib",
+        "deps/a/liba.rmeta",
+        "deps/b/libb.rlib",
+        "deps/b/libb.rmeta",
+        "deps/b/libc.rlib",
+    ];
+    for name in files {
+        let path = workspace.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "dependency fixture\n").unwrap();
+    }
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        format!("exports_files(['lib.rs'] + {files:?})\n"),
+    )
+    .unwrap();
+    let labels = files.map(|name| format!("@@//:{name}"));
+    let build_path = workspace.join("rules_rust/BUILD.bazel");
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut initial = None;
+    for (objects, direct, alias) in [
+        (false, false, "renamed"),
+        (true, false, "renamed"),
+        (false, true, "renamed"),
+        (false, false, "edited"),
+        (false, false, "renamed"),
+    ] {
+        let build = format!(
+            "load(':proof.bzl', 'subject')\nsubject(name = 'subject', src = '@@//:lib.rs', dependency_files = {labels:?}, force_objects = {}, force_direct = {}, dependency_alias = '{alias}')\n",
+            if objects { "True" } else { "False" },
+            if direct { "True" } else { "False" }
+        );
+        fs::write(&build_path, build).unwrap();
+        let result = request(&dice, &workspace).await.unwrap();
+        assert_eq!(result.actions().len(), 1);
+        let spawn = result.actions()[0].spawn_spec().unwrap();
+        let argv = spawn.render_argv();
+        let selected = if objects {
+            "deps/a/liba.rlib"
+        } else {
+            "deps/a/liba.rmeta"
+        };
+        let mut expected = vec![
+            format!("--extern={alias}={selected}"),
+            "--extern=b=deps/b/libb.rlib".to_owned(),
+        ];
+        if direct {
+            expected.extend([
+                "--extern=a=deps/a/liba.rmeta".to_owned(),
+                "--extern=c=deps/b/libc.rlib".to_owned(),
+            ]);
+        }
+        assert_eq!(
+            argv.iter()
+                .filter(|arg| arg.starts_with("--extern="))
+                .cloned()
+                .collect::<Vec<_>>(),
+            expected
+        );
+        assert_eq!(
+            argv.iter()
+                .filter(|arg| arg.starts_with("-Ldependency="))
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            ["-Ldependency=deps/a", "-Ldependency=deps/b"]
+        );
+        let RetainedCommandLineSegment::ArgsSnapshot(rustc) = &spawn.command_line().segments()[2]
+        else {
+            panic!("missing rustc Args")
+        };
+        let text = rustc.recipe().render_write_content();
+        for flag in expected {
+            assert!(text.contains(&format!("\n{flag}\n")), "{text}");
+        }
+        assert!(text.contains("\n-Ldependency=deps/a\n-Ldependency=deps/b\n"));
+        if !objects && !direct && alias == "renamed" {
+            if let Some(first) = &initial {
+                assert_eq!(first, &result);
+            } else {
+                initial = Some(result);
+            }
+        } else {
+            assert_ne!(initial.as_ref().unwrap(), &result);
+        }
+    }
+    let proof_path = workspace.join("rules_rust/proof.bzl");
+    let proof = fs::read_to_string(&proof_path).unwrap();
+    fs::write(
+        &proof_path,
+        proof.replace(
+            "metadata_supports_pipelining = True",
+            "metadata_supports_pipelining = 'invalid'",
+        ),
+    )
+    .unwrap();
+    let error = request(&dice, &workspace).await.unwrap_err();
+    assert!(
+        error.contains("metadata_supports_pipelining must be a bool"),
+        "{error}"
+    );
+    fs::write(&proof_path, &proof).unwrap();
+    assert_eq!(initial.unwrap(), request(&dice, &workspace).await.unwrap());
+    fs::write(
+        &proof_path,
+        proof.replace(
+            "a = CrateInfo(name =",
+            "a = CrateInfo(aliases = _no_coverage, name =",
+        ),
+    )
+    .unwrap();
+    let error = request(&dice, &workspace).await.unwrap_err();
+    assert!(
+        error.contains("unsupported analysis value of type `function`"),
+        "{error}"
+    );
     fs::remove_dir_all(workspace).unwrap();
 }

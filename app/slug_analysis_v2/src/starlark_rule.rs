@@ -1570,6 +1570,20 @@ fn lower_vector_arg<'v>(
         lower_rules_rust_crate_root(value.source)?
     } else if value.map_each == Some(PinnedVectorMapEach::RegularFileDirnames) {
         lower_regular_file_dirnames(value.source, lowerer)?
+    } else if let Some(PinnedVectorMapEach::RulesRustCrates(mapper)) = value.map_each {
+        let EvaluatorVectorSourceGen::Depset(source) = value.source else {
+            anyhow::bail!("rules_rust crate Args requires a depset");
+        };
+        let lowered = lowerer
+            .lower(source, "rules_rust crate Args")
+            .map_err(anyhow::Error::msg)?;
+        let AnalysisValueKind::Depset(depset) = lowered.kind() else {
+            anyhow::bail!("rules_rust crate Args requires a depset");
+        };
+        RetainedVectorSource::RulesRustCrates(
+            slug_build_api_v2::RetainedRustCrateArgs::new(depset.clone(), mapper)
+                .map_err(|error| anyhow::anyhow!(error.to_string()))?,
+        )
     } else {
         match value.source {
             EvaluatorVectorSourceGen::Sequence(values) => RetainedVectorSource::Sequence(

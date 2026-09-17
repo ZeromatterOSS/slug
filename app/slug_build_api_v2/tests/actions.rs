@@ -201,6 +201,235 @@ fn default_vector_options() -> RetainedVectorOptions {
     }
 }
 
+fn rust_crate_value(fields: Vec<(&str, AnalysisValue)>) -> AnalysisValue {
+    AnalysisValue::provider(slug_build_api_v2::ProviderOccurrence::new(
+        slug_build_api_v2::ProviderIdentity::user(
+            slug_build_api_v2::ProviderId::new(
+                "@@rules_rust+//rust/private:providers.bzl",
+                "CrateInfo",
+            )
+            .unwrap(),
+        ),
+        fields,
+    ))
+}
+
+fn rust_crate_depset(value: AnalysisValue) -> AnalysisDepset {
+    AnalysisDepset::new(DepsetOrder::Default, vec![value], Vec::new()).unwrap()
+}
+
+fn rust_crate_recipe(
+    values: Vec<(AnalysisDepset, slug_build_api_v2::RustCrateArgMapper)>,
+) -> RetainedArgsRecipe {
+    RetainedArgsRecipe::new(
+        values
+            .into_iter()
+            .map(|(depset, mapper)| {
+                RetainedArgCall::AddAll(RetainedVectorArg::new(
+                    RetainedVectorSource::RulesRustCrates(
+                        slug_build_api_v2::RetainedRustCrateArgs::new(depset, mapper).unwrap(),
+                    ),
+                    default_vector_options(),
+                ))
+            })
+            .collect::<Vec<_>>(),
+        RetainedParamFileFormat::Multiline,
+    )
+}
+
+#[test]
+fn rust_crate_args_validate_provider_fields_and_retain_identity() {
+    use slug_build_api_v2::RetainedRustCrateArgs;
+    use slug_build_api_v2::RustCrateArgMapper as Mapper;
+    let crate_for = |output| {
+        rust_crate_value(vec![
+            ("name", AnalysisValue::string("dep")),
+            ("output", AnalysisValue::artifact(output)),
+            ("metadata", AnalysisValue::none()),
+        ])
+    };
+    let first = crate_for(derived_artifact("out/dep.rlib", ActionOutputKind::File));
+    let alternate = crate_for(AnalysisArtifact::Derived {
+        owner: AnalysisConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//pkg:other").unwrap(),
+            b"cfg".as_slice(),
+        ),
+        output: ActionOutput::new("out/dep.rlib", ActionOutputKind::File),
+    });
+    let ordinary = rust_crate_recipe(vec![(rust_crate_depset(first.clone()), Mapper::Extern)]);
+    let metadata = rust_crate_recipe(vec![(
+        rust_crate_depset(first.clone()),
+        Mapper::ExternMetadata,
+    )]);
+    let changed_owner = rust_crate_recipe(vec![(rust_crate_depset(alternate), Mapper::Extern)]);
+    for other in [metadata, changed_owner] {
+        assert_eq!(ordinary.render(), other.render());
+        assert_ne!(ordinary, other);
+    }
+    let alias = AnalysisValue::provider(slug_build_api_v2::ProviderOccurrence::new(
+        slug_build_api_v2::ProviderIdentity::user(
+            slug_build_api_v2::ProviderId::new(
+                "@@rules_rust+//rust/private:rustc.bzl",
+                "AliasableDepInfo",
+            )
+            .unwrap(),
+        ),
+        [
+            ("name", AnalysisValue::string("dep")),
+            ("dep", first.clone()),
+        ],
+    ));
+    let aliased = rust_crate_recipe(vec![(rust_crate_depset(alias.clone()), Mapper::Extern)]);
+    assert_eq!(ordinary.render(), aliased.render());
+    assert_ne!(ordinary, aliased);
+    assert!(RetainedRustCrateArgs::new(rust_crate_depset(alias), Mapper::DependencyDir).is_err());
+    let base_fields = vec![
+        ("name", AnalysisValue::string("dep")),
+        (
+            "output",
+            AnalysisValue::artifact(source_artifact("dep.rlib")),
+        ),
+        ("metadata", AnalysisValue::none()),
+    ];
+    let foreign = AnalysisValue::provider(slug_build_api_v2::ProviderOccurrence::new(
+        slug_build_api_v2::ProviderIdentity::user(
+            slug_build_api_v2::ProviderId::new("@@//:forged.bzl", "CrateInfo").unwrap(),
+        ),
+        base_fields.clone(),
+    ));
+    for value in [
+        foreign,
+        AnalysisValue::strukt(base_fields.clone()),
+        AnalysisValue::string("not-a-provider"),
+        crate_for(derived_artifact("tree", ActionOutputKind::Directory)),
+    ] {
+        assert!(
+            RetainedRustCrateArgs::new(rust_crate_depset(value), Mapper::ExternMetadata).is_err()
+        );
+    }
+    for (field, value) in [
+        ("name", AnalysisValue::integer(3)),
+        ("output", AnalysisValue::string("not-a-file")),
+        (
+            "metadata",
+            AnalysisValue::artifact(derived_artifact("tree", ActionOutputKind::Directory)),
+        ),
+    ] {
+        let mut fields = base_fields.clone();
+        fields
+            .iter_mut()
+            .find(|(name, _)| *name == field)
+            .unwrap()
+            .1 = value;
+        assert!(
+            RetainedRustCrateArgs::new(
+                rust_crate_depset(rust_crate_value(fields)),
+                Mapper::ExternMetadata
+            )
+            .is_err()
+        );
+    }
+    let with_metadata = |supports| {
+        rust_crate_value(vec![
+            ("name", AnalysisValue::string("dep")),
+            (
+                "output",
+                AnalysisValue::artifact(source_artifact("dep.rlib")),
+            ),
+            (
+                "metadata",
+                AnalysisValue::artifact(source_artifact("dep.rmeta")),
+            ),
+            ("metadata_supports_pipelining", supports),
+        ])
+    };
+    assert!(
+        RetainedRustCrateArgs::new(
+            rust_crate_depset(with_metadata(AnalysisValue::string("invalid"))),
+            Mapper::ExternMetadata
+        )
+        .is_err()
+    );
+    for (supports, path) in [(true, "pkg/dep.rmeta"), (false, "pkg/dep.rlib")] {
+        assert_eq!(
+            rust_crate_recipe(vec![(
+                rust_crate_depset(with_metadata(AnalysisValue::boolean(supports))),
+                Mapper::ExternMetadata
+            )])
+            .render(),
+            [format!("--extern=dep={path}")]
+        );
+    }
+}
+
+#[test]
+fn rust_crate_args_preserve_depset_alias_and_retained_shape() {
+    use slug_build_api_v2::RustCrateArgMapper as Mapper;
+    let value = |name| {
+        rust_crate_value(vec![
+            ("name", AnalysisValue::string(name)),
+            (
+                "output",
+                AnalysisValue::artifact(source_artifact("dep.rlib")),
+            ),
+        ])
+    };
+    let shared = rust_crate_depset(value("a"));
+    let aliased = rust_crate_recipe(vec![
+        (shared.clone(), Mapper::Extern),
+        (shared, Mapper::DependencyDir),
+    ]);
+    let split = rust_crate_recipe(vec![
+        (rust_crate_depset(value("a")), Mapper::Extern),
+        (rust_crate_depset(value("a")), Mapper::DependencyDir),
+    ]);
+    assert_eq!(aliased.render(), split.render());
+    assert_ne!(aliased, split);
+    let shared = rust_crate_depset(value("a"));
+    assert_eq!(
+        aliased,
+        rust_crate_recipe(vec![
+            (shared.clone(), Mapper::Extern),
+            (shared, Mapper::DependencyDir)
+        ])
+    );
+    let flat = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![value("a"), value("b")],
+        Vec::new(),
+    )
+    .unwrap();
+    let leaf = |name| {
+        AnalysisDepsetGraphNode::new(
+            AnalysisDepsetOccurrence::new(),
+            DepsetOrder::Default,
+            1,
+            AnalysisDepsetGraphRow::Successors(vec![AnalysisDepsetGraphInput::Direct(value(name))]),
+        )
+    };
+    let nested = AnalysisDepset::from_local_graph(vec![
+        leaf("a"),
+        leaf("b"),
+        AnalysisDepsetGraphNode::new(
+            AnalysisDepsetOccurrence::new(),
+            DepsetOrder::Default,
+            2,
+            AnalysisDepsetGraphRow::Successors(vec![
+                AnalysisDepsetGraphInput::Local(0),
+                AnalysisDepsetGraphInput::Local(1),
+            ]),
+        ),
+    ])
+    .unwrap()
+    .pop()
+    .unwrap();
+    assert_eq!(flat.to_list(), nested.to_list());
+    let flat = rust_crate_recipe(vec![(flat, Mapper::Extern)]);
+    let nested = rust_crate_recipe(vec![(nested, Mapper::Extern)]);
+    assert_eq!(flat.render(), nested.render());
+    assert_ne!(flat, nested);
+}
+
 fn spawn_action(inputs: AnalysisDepset, tools: AnalysisDepset) -> ActionSpec {
     let recipe = RetainedArgsRecipe::new(
         vec![

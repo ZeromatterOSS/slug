@@ -12,6 +12,7 @@ pub mod ctx_actions;
 pub mod reapi_projection;
 pub mod registry;
 pub mod runfiles_support;
+mod rust_crate_args;
 pub mod spec;
 
 pub use ctx_actions::CtxActions;
@@ -20,6 +21,9 @@ pub use registry::ActionError;
 pub use registry::ActionRegistry;
 pub use runfiles_support::RunfilesSupportActionSpec;
 pub use runfiles_support::RunfilesSymlinkMode;
+pub use rust_crate_args::RetainedRustCrateArgs;
+pub use rust_crate_args::RustCrateArgMapper;
+pub use rust_crate_args::RustCrateArgsError;
 pub use spec::ActionInput;
 pub use spec::ActionKind;
 pub use spec::ActionOutput;

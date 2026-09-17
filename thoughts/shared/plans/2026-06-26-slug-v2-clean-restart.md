@@ -29,17 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-21-m7a-rustc-file-dirnames-r1
+Packet: WP-7-22-m7a-rustc-crate-dependencies-r1
 Status: accepted; reviewed checkpoint ready for integration
 
-The four demanded regular-File directory mappings in the pinned rules_rust
-argument builder are accepted using existing artifact/depset owners. Bare
-relative File.dirname now returns `.`. Nine selected tests pass in subsecond
-batches; direct dependents compile and independent final review accepts.
-WP-7-20 at `ff14d4e33` accepted the regular-crate-root callback, File.is_source,
-default-layout Label.workspace_root and authentic configured-source A/B/A.
-M7A remains open for other demanded callbacks and execution staging; the
-manifest records the accepted scope and validation.
+Pinned Rustc dependency-provider callbacks are accepted for aliased extern
+flags, metadata fallback and transitive dependency directories. Twelve selected
+tests pass in subsecond batches; direct query/REAPI checks and independent final
+review accept the retained-provider boundary.
+WP-7-21 at `73ba48a41` accepted four regular-File directory mappings and the
+root dirname correction, preserving the real-source proof from WP-7-20.
+The manifest records the accepted retained-provider contract and validation. M7A
+remains open for other callbacks and execution staging.
 
 ### Earlier generated-input receipt
 
