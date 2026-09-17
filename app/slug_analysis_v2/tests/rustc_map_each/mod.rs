@@ -479,3 +479,128 @@ async fn pinned_rustc_dependencies_select_aliases_metadata_and_restore() {
     );
     fs::remove_dir_all(workspace).unwrap();
 }
+
+#[tokio::test]
+async fn pinned_rustc_native_link_flags_authenticate_imports_and_restore() {
+    let workspace = workspace();
+    let files = [
+        "native/static/libplain.a",
+        "native/pic/libplain.pic.a",
+        "native/static/libalways.a",
+        "native/dyn/libshared.so.1.2",
+        "native/alias/librenamed.a",
+        "native/lib/rustlib/libstd-xyz.a",
+        "native/iface/libapi.ifso",
+        "tools/ld",
+    ];
+    for name in files {
+        let path = workspace.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "native link fixture\n").unwrap();
+    }
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        format!("exports_files(['lib.rs'] + {files:?})\n"),
+    )
+    .unwrap();
+    let labels = files.map(|name| format!("@@//:{name}"));
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut first = None;
+    for (direct, include, flag) in [
+        (false, true, "-z,now"),
+        (true, true, "-z,now"),
+        (true, false, "-z,now"),
+        (false, true, "-changed"),
+        (false, true, "-z,now"),
+    ] {
+        fs::write(workspace.join("rules_rust/BUILD.bazel"), format!(
+            "load(':proof.bzl', 'subject')\nsubject(name = 'subject', src = '@@//:lib.rs', native_files = {labels:?}, direct_linker = {}, include_native_flags = {}, native_user_flag = '{flag}')\n",
+            if direct {"True"} else {"False"}, if include {"True"} else {"False"},
+        )).unwrap();
+        let result = request(&dice, &workspace).await.unwrap();
+        let spawn = result.actions()[0].spawn_spec().unwrap();
+        let argv = spawn.render_argv();
+        assert!(argv.contains(&"--codegen=linker=tools/ld".to_owned()));
+        let native = argv
+            .iter()
+            .filter(|arg| {
+                arg.starts_with("-Lnative=")
+                    || arg.starts_with("-lstatic=")
+                    || arg.starts_with("-ldylib=")
+                    || arg.starts_with("-Clink-arg=")
+                    || arg.starts_with("--codegen=link-arg=")
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut expected = [
+            "-Lnative=native/pic",
+            "-Lnative=native/static",
+            "-Lnative=native/dyn",
+            "-Lnative=native/iface",
+            "-Lnative=native/lib/rustlib",
+            "-Lnative=native/alias",
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        if include {
+            expected.extend(["-lstatic=renamed", "-Clink-arg=-lrenamed"].map(str::to_owned));
+        }
+        let prefix = if direct { "" } else { "-Wl," };
+        expected.extend([
+            format!("-Clink-arg={prefix}--whole-archive"),
+            "-Clink-arg=native/static/libalways.a".to_owned(),
+            format!("-Clink-arg={prefix}--no-whole-archive"),
+        ]);
+        if include {
+            expected.extend(
+                [
+                    "-ldylib=shared",
+                    "-ldylib=api",
+                    "-lstatic=std-xyz",
+                    "-lstatic=renamed",
+                    "-Clink-arg=-lrenamed",
+                ]
+                .map(str::to_owned),
+            );
+        }
+        expected.extend([
+            format!("--codegen=link-arg={flag}"),
+            "--codegen=link-arg=-pthread".to_owned(),
+        ]);
+        if include {
+            expected.extend(["-lstatic=renamed", "-Clink-arg=-lrenamed"].map(str::to_owned));
+        }
+        assert_eq!(native, expected);
+        let expanded = spawn.expand_forced_param_files().unwrap();
+        assert_eq!(expanded.param_files().len(), 1);
+        let bytes = std::str::from_utf8(expanded.param_files()[0].bytes()).unwrap();
+        assert!(bytes.contains(&(expected.join("\n") + "\n")), "{bytes}");
+        if let Some(initial) = &first {
+            assert_eq!(initial == &result, !direct && include && flag == "-z,now");
+        } else {
+            first = Some(result);
+        }
+    }
+    let utils_path = workspace.join("rules_rust/rust/private/utils.bzl");
+    let utils = fs::read_to_string(&utils_path).unwrap();
+    fs::write(&utils_path, format!("{utils}\n")).unwrap();
+    let error = request(&dice, &workspace).await.unwrap_err();
+    assert!(
+        error.contains("requires pinned utils.bzl source provenance"),
+        "{error}"
+    );
+    fs::write(&utils_path, utils).unwrap();
+    assert_eq!(
+        first.as_ref().unwrap(),
+        &request(&dice, &workspace).await.unwrap()
+    );
+
+    let proof_path = workspace.join("rules_rust/proof.bzl");
+    let proof = fs::read_to_string(&proof_path).unwrap();
+    let from = "first = struct(libraries = libraries, user_link_flags = (ctx.attr.native_user_flag, \"-pthread\"))";
+    assert_eq!(proof.matches(from).count(), 1);
+    fs::write(&proof_path,proof.replace(from,"first = struct(libraries = libraries, user_link_flags = (ctx.attr.native_user_flag, \"-pthread\"), unused_callable = _no_coverage)")).unwrap();
+    let error = request(&dice, &workspace).await.unwrap_err();
+    assert!(error.contains("function"), "{error}");
+    fs::remove_dir_all(workspace).unwrap();
+}

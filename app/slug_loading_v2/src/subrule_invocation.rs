@@ -180,6 +180,7 @@ pub enum PinnedVectorMapEach {
     RulesRustCrateRoot,
     RegularFileDirnames,
     RulesRustCrates(RustCrateArgMapper),
+    RulesRustNativeLinks(slug_build_api_v2::RustNativeLinkArgMapper),
 }
 
 #[derive(Debug, Clone, Allocative, Trace)]
@@ -502,7 +503,7 @@ fn classify_add_all_callback(
     }
     match (callsite.begin.line, callsite.end.line) {
         (1168, 1168) => Ok(Some(PinnedVectorMapEach::RulesRustCrateRoot)),
-        (1098, 1098) | (1227, 1227) | (1274, 1274) | (1424, 1424) => {
+        (1098, 1098) | (1227, 1227) | (1274, 1274) | (1424, 1424) | (2889, 2889) => {
             Ok(Some(PinnedVectorMapEach::RegularFileDirnames))
         }
         (2572, 2572) => {
@@ -527,7 +528,50 @@ fn classify_add_all_callback(
         (2574, 2574) => Ok(Some(PinnedVectorMapEach::RulesRustCrates(
             RustCrateArgMapper::DependencyDir,
         ))),
+        (2880, 2880) | (2895, 2895) => {
+            require_pinned_rust_utils(&identities)?;
+            use slug_build_api_v2::RustNativeLinkArgMapper as Mapper;
+            let mapper = if callsite.begin.line == 2880 {
+                Mapper::Directories
+            } else if map_each.to_repr()
+                == format!(
+                    "<function _make_link_flags_default_direct from {}>",
+                    span.filename()
+                )
+            {
+                Mapper::DefaultDirect
+            } else if map_each.to_repr()
+                == format!(
+                    "<function _make_link_flags_default_indirect from {}>",
+                    span.filename()
+                )
+            {
+                Mapper::DefaultIndirect
+            } else {
+                anyhow::bail!("Args.add_all callback forms are not supported");
+            };
+            Ok(Some(PinnedVectorMapEach::RulesRustNativeLinks(mapper)))
+        }
         _ => anyhow::bail!("Args.add_all callback forms are not supported"),
+    }
+}
+
+fn require_pinned_rust_utils(
+    sources: &[(CompactString, BzlModuleSourceProvenance)],
+) -> anyhow::Result<()> {
+    const SHA: [u8; 32] = [
+        0x8a, 0xa4, 0x9b, 0x93, 0x12, 0xd4, 0xae, 0x5c, 0x4a, 0xed, 0x03, 0x3a, 0xba, 0x65, 0x39,
+        0x2a, 0x03, 0x9a, 0x68, 0x1b, 0x3e, 0xe2, 0x1c, 0xa8, 0x3d, 0xa0, 0xf0, 0x5a, 0xca, 0xc2,
+        0x8a, 0xce,
+    ];
+    let mut matches = sources.iter().filter(|(_, source)| {
+        source.identity.label.to_string() == "@@rules_rust+//rust/private:utils.bzl"
+    });
+    match (matches.next(), matches.next()) {
+        (Some((_, source)), None) if source.source_digest == SHA => Ok(()),
+        _ => {
+            anyhow::bail!("rules_rust native link Args requires pinned utils.bzl source provenance")
+        }
     }
 }
 

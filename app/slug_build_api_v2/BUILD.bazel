@@ -20,7 +20,8 @@ rust_library(
 
 rust_test(
     name = "actions_test",
-    srcs = ["tests/actions.rs"],
+    srcs = ["tests/actions.rs", "tests/native_link_args/mod.rs"],
+    crate_root = "tests/actions.rs",
     edition = crate_edition(),
     size = "small",
     visibility = ["//visibility:private"],

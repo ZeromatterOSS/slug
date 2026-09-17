@@ -19,6 +19,26 @@ def _dependency_crates(ctx):
     transitive = depset([c], transitive = [depset([a, b])])
     return direct, transitive
 
+def _native_library(static = None, pic = None, dynamic = None, interface = None, alwayslink = False):
+    return struct(static_library = static, pic_static_library = pic, dynamic_library = dynamic, interface_library = interface, alwayslink = alwayslink)
+
+def _native_inputs(ctx):
+    files = ctx.attr.native_files
+    if not files:
+        return depset(), {}
+    static = _native_library(static = files[0], pic = files[1])
+    libraries = (
+        static,
+        _native_library(static = files[2], alwayslink = True),
+        _native_library(dynamic = files[3]),
+        _native_library(interface = files[6], dynamic = files[3]),
+        _native_library(static = files[5]),
+        static,
+    )
+    first = struct(libraries = libraries, user_link_flags = (ctx.attr.native_user_flag, "-pthread"))
+    second = struct(libraries = (static,), user_link_flags = ())
+    return depset([second], transitive = [depset([first])]), {files[1].short_path: files[4]}
+
 def _impl(ctx):
     output = ctx.actions.declare_file("out/probe.rlib")
     if not ctx.attr.src.is_source or output.is_source:
@@ -39,6 +59,7 @@ def _impl(ctx):
         ctx.actions.write(root, "pub fn generated() {}\n")
     stdlib = depset(ctx.attr.stdlib[1:], transitive = [depset(ctx.attr.stdlib[:1])])
     direct_crates, transitive_crates = _dependency_crates(ctx)
+    native_inputs, ambiguous_libs = _native_inputs(ctx)
     # Exercise the argument-builder API with a real source File and native
     # actions. These explicit inputs select only the admitted callback slice.
     argument_ctx = struct(
@@ -50,9 +71,14 @@ def _impl(ctx):
         genfiles_dir = struct(path = "genfiles"),
         configuration = struct(coverage_enabled = False),
         coverage_instrumented = _no_coverage,
+        fragments = struct(cpp = struct(linkopts = [])),
     )
     toolchain = struct(
         target_arch = "x86_64",
+        target_abi = "gnu",
+        linker = ctx.attr.native_files[7] if ctx.attr.native_files else None,
+        linker_type = "direct" if ctx.attr.direct_linker else "indirect",
+        linker_preference = "rust",
         target_os = "linux",
         target_flag_value = "x86_64-unknown-linux-gnu",
         compilation_mode_opts = {"dbg": struct(opt_level = "0", debug_info = "2", strip_level = "none")},
@@ -74,7 +100,7 @@ def _impl(ctx):
         root = root,
         root_path = "unused-for-regular-file.rs",
         name = "probe",
-        type = "rlib",
+        type = "bin" if ctx.attr.native_files else "rlib",
         output = output,
         rustc_output = None,
         rustc_env = {},
@@ -91,22 +117,23 @@ def _impl(ctx):
         cc_toolchain = None,
         feature_configuration = None,
         crate_info = crate,
-        dep_info = struct(transitive_build_infos = depset(), direct_crates = direct_crates, transitive_crates = transitive_crates),
+        dep_info = struct(transitive_build_infos = depset(), direct_crates = direct_crates, transitive_crates = transitive_crates, transitive_noncrates = native_inputs),
         linkstamp_outs = [],
-        ambiguous_libs = {},
+        ambiguous_libs = ambiguous_libs,
         output_hash = None,
         rust_flags = [],
         out_dir = None,
         build_env_files = [],
         build_flags_files = depset(),
         tool_path = "rustc",
-        emit = [],
+        emit = ["link"] if ctx.attr.native_files else [],
+        include_link_flags = ctx.attr.include_native_flags,
         remap_path_prefix = None,
         skip_expanding_rustc_env = True,
         force_depend_on_objects = ctx.attr.force_objects,
         force_all_deps_direct = ctx.attr.force_direct,
     )
-    inputs = depset([root] + ctx.attr.dependency_files + ([] if ctx.attr.sysroot == None else [ctx.attr.sysroot]), transitive = [stdlib])
+    inputs = depset([root] + ctx.attr.dependency_files + ctx.attr.native_files + ([] if ctx.attr.sysroot == None else [ctx.attr.sysroot]), transitive = [stdlib])
     ctx.actions.run(outputs = [output], executable = "process_wrapper", arguments = args.all, inputs = inputs, env = env)
     return [DefaultInfo(files = depset([output]))]
 
@@ -117,6 +144,10 @@ subject = rule(implementation = _impl, attrs = {
     "generated": attr.bool(default = False),
     "dependency_files": attr.label_list(allow_files = True),
     "dependency_alias": attr.string(default = "renamed"),
+    "native_files": attr.label_list(allow_files = True),
+    "direct_linker": attr.bool(default = False),
+    "include_native_flags": attr.bool(default = True),
+    "native_user_flag": attr.string(default = "-z,now"),
     "force_objects": attr.bool(default = False),
     "force_direct": attr.bool(default = False),
 })

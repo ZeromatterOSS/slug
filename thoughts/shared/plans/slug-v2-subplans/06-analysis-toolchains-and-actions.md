@@ -44,8 +44,8 @@ and mapper identity; source authentication precedes the two-function branch
 discriminator. The production-loader proof publishes a configured Spawn and rejects/restores changed source in one DICE
 service. File.is_source and default-layout Label.workspace_root are exact for
 the admitted artifact/repository shapes; generated paths and error timing keep
-their existing Slug-native classification. Generic callbacks, directories,
-native-link mappers and sibling layout remain unsupported. No callable
+their existing Slug-native classification. Generic callbacks, directories and
+sibling layout remain unsupported; the native-link slice below is separate. No callable
 or evaluator heap crosses publication, and no new semantic cache/key is added.
 
 WP-7-23 adds `SpawnSpec::expand_forced_param_files`: one immutable action-local
@@ -63,7 +63,21 @@ shared filename/provenance table into `AnalysisEvaluationContext`. Rule equality
 includes the table; the pinned Args classifier compares manifest, evaluated
 caller and pinned digests. This prepares authentication of imported native-link
 helpers without retaining evaluator objects or reading source files in analysis.
-Native-link callbacks and Cc constructors remain unadmitted.
+Cc constructors and native Cc value lowering remain unadmitted.
+
+WP-7-25 admits the pinned native-library directory and default direct/indirect
+link flag callbacks plus ambiguous-library directory mapping. Loading checks the
+caller and the single canonical utils.bzl observed SHA; only the two immutable
+default callback bindings are accepted. `RetainedRustNativeLinkArgs` retains full
+four-field AnalysisValue tuples via the shared lowerer and publication equality
+state, including otherwise unused fields and depset aliases across Spawn inputs.
+It validates regular-library shapes, maps PIC/static/interface/dynamic preference,
+whole-archive flags, ambiguity/name/version handling and user flags before Args
+formatting/uniquification. The real Linux builder proof uses explicit linker
+input/toolchain structs and the Rust linker fallback, with direct/indirect and
+include-flags branches, parameter bytes, imported-source A/B/A and unused-callable
+rejection. This is argument mapping, not native Cc providers/toolchains or execution;
+Windows/Darwin and C++ runtime-library callbacks remain unsupported.
 
 ### Analysis surface
 

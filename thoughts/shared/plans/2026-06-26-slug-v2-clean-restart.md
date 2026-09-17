@@ -29,15 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-24-m7a-bzl-source-provenance-r1
-Status: accepted; reviewed checkpoint ready for integration
+Packet: WP-7-25-m7a-rustc-native-link-args-r1
+Status: accepted; independent final ACCEPT; ready to integrate
 
-Observed per-module source digests now travel through the existing Bzl manifest
-and configured evaluator carrier. Ten focused tests, direct consumer checks and
-independent final review pass. Future native-link recipes can authenticate their
-imported utility implementations without host reads.
-WP-7-23 at `d26b42a51` accepted forced virtual argv/bytes and atomic REAPI input
-composition. Native-link callback and typed execution admission remain open.
+The accepted checkpoint retains pinned native-library search/link arguments
+from the authentic Rustc builder, authenticating imported utility source via
+WP-7-24's observed provenance (`3a72e4d7a`). Full Cc providers/toolchains and
+Spawn execution remain open. Nine focused tests and direct query/REAPI checks
+pass. The manifest owns the finite mapping contract and acceptance receipt.
 
 ### Earlier generated-input receipt
 

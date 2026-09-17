@@ -25,6 +25,7 @@ use slug_configuration_v2::RetainedActionEnvironment;
 
 use crate::actions::runfiles_support::RunfilesSupportActionSpec;
 use crate::actions::rust_crate_args::RetainedRustCrateArgs;
+use crate::actions::rust_native_link_args::RetainedRustNativeLinkArgs;
 use crate::analysis_value::AnalysisArtifact;
 use crate::analysis_value::AnalysisDepset;
 use crate::analysis_value::AnalysisValueKind;
@@ -282,6 +283,7 @@ pub enum RetainedVectorSource {
     /// Validated by `regular_file_dirnames`; retains artifact/depset identity.
     RegularFileDirnames(ArtifactInputs),
     RulesRustCrates(RetainedRustCrateArgs),
+    RulesRustNativeLinks(RetainedRustNativeLinkArgs),
     /// Pinned rules_rust `_get_crate_root_path` for a regular crate-root File.
     RulesRustRegularCrateRoot {
         artifact: AnalysisArtifact,
@@ -315,6 +317,7 @@ impl RetainedVectorSource {
             Self::Sequence(values) => values.iter().map(RetainedScalarValue::render).collect(),
             Self::Depset(values) => values.render(),
             Self::RulesRustCrates(values) => values.render(),
+            Self::RulesRustNativeLinks(values) => values.render(),
             Self::RegularFileDirnames(inputs) => {
                 let mut values = Vec::new();
                 inputs
@@ -330,6 +333,9 @@ impl RetainedVectorSource {
         match (self, other) {
             (Self::Sequence(left), Self::Sequence(right)) => left == right,
             (Self::Depset(left), Self::Depset(right)) => left.publication_eq_with(right, state),
+            (Self::RulesRustNativeLinks(left), Self::RulesRustNativeLinks(right)) => {
+                left.publication_eq_with(right, state)
+            }
             (Self::RulesRustCrates(left), Self::RulesRustCrates(right)) => {
                 left.publication_eq_with(right, state)
             }

@@ -1,112 +1,120 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-24-m7a-bzl-source-provenance-r1
-Status: accepted; independent design and final reviews ACCEPT
+Packet: WP-7-25-m7a-rustc-native-link-args-r1
+Status: accepted; independent final ACCEPT; ready to integrate
 
-## Outcome and demand
+## Outcome and compatibility
 
-Retain each loaded Bzl module's observed source SHA alongside its lexical
-identity, and transport that provenance through the existing source-filename
-carrier to configured evaluation. Existing pinned Args callback classification
-must compare the caller's evaluated source with its manifest-owned digest.
-This is Slug-native source/admission integrity, not a new Bazel surface.
+Admit the pinned rules_rust native-library directory and default-platform link
+flag callbacks into immutable retained Args recipes. The authentic Linux Rustc
+`construct_arguments` proof will produce native search paths, static/dynamic
+flags, direct/indirect whole-archive flags, ambiguity substitutions and user link
+flags, including their forced parameter bytes and same-DICE source restoration.
+This advances the bootstrap Rustc/linker argument gap. Exact mapping/order and
+ASCII numeric-version stripping follow pinned source; File paths/short_path
+retain Slug-native spelling. Conservative input-shape rejection is Slug-native.
 
-Demand: the next native-link callbacks in pinned rules_rust rustc.bzl
-(`_libraries_dirnames`, `_make_link_flags_default_*`) depend on imported
-utils.bzl `get_preferred_artifact` and `get_lib_name_default`. Hashing the native
-caller's rustc.bzl span cannot authenticate those imported implementations.
-At d26b42a51 the manifest retains their aggregate fingerprint but discards each
-source SHA needed by the consumer. That prerequisite must be fixed before
-mapping those functions into retained Rust recipes. No native-link callbacks,
-Cc constructors, or execution surfaces are admitted by this packet.
+No Cc constructors, Cc toolchain discovery, compiler execution, Windows/Darwin
+flag families, C++ runtime library callbacks, tree artifacts or M7A completion.
+The proof supplies explicit toolchain/linker-input structs to the unchanged
+upstream builder, as existing proofs do. It selects the real Linux fallback Rust
+linker path with cc_toolchain=None; no fake native API or copied function body.
+Actual native Cc object production/lowering remains a prerequisite to full CLI.
 
-## Ownership and representation
+## Source and ownership
 
-`BzlLoadManifest::new` receives observed root source bytes' SHA in all three
-loading routes. Its flat first-seen reachable closure will retain
-`BzlModuleSourceProvenance { identity, source_digest }` per module. Keep lexical
-`BzlModuleIdentity`, load order/dedup, aggregate fingerprint, repository mapping
-and frozen-module lifetime ownership unchanged. The two projections
-`manifest_starlark_sources` and `package_bzl_call_sources` derive filename plus
-that provenance. Replace the existing shared carrier throughout loading and
-analysis; do not introduce a parallel digest bag, filesystem read, cache or
-fallback for missing evidence. Non-source consumers borrow the identity field.
+Pinned rules_rust 0.73.0 rustc.bzl SHA
+`a7712508f50e5952f3f51e33c98acbe8ba39554e9c6f6edc26f16820d7c2a9e4`:
+`_libraries_dirnames` at add_all line 2881, `_make_link_flags_default_direct` /
+`_make_link_flags_default_indirect` at line 2896, and `_get_dirname` at line 2890
+for ambiguous-library search paths. Imported utils.bzl SHA
+`8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace`:
+`get_preferred_artifact` and `get_lib_name_default`. Bazel 9.2
+8220c6198837d5c13d53fea211cf3282aa12408a LinkerInputApi supplies sequence fields;
+StringModule.isDigit specifies nonempty ASCII [0-9]. Existing Args mapping and
+forced-file source anchors/contracts remain inherited from WP-7-20/23.
 
-This is loading/DICE-retained semantic memory using existing immutable Arc
-slices, CompactString, SmallSet and Allocative (Stage 9 utility dispositions).
-Digests come only from the already observed source used to evaluate the module.
-Source changes continue through child manifests and their aggregate fingerprint;
-provenance participates in equality and rule publication. Frozen values and
-source-text scratch do not become provenance. Release follows existing
-manifest/context/rule lifetimes; no lock or async ownership changes.
+Loading authenticates caller source/manifest/span as before; the two new mapping
+sites also require exactly one canonical utils provenance row with the pinned
+observed SHA. Pinned rustc relative loads and immutable bindings fix the helper
+identities. The link callback repr distinguishes only the two fixed default
+branches after authentication; unknown branches fail closed. No host reads,
+callable invocation or evaluator retention. Ambiguous directory uses the existing
+regular-File recipe after caller authentication.
 
-Research: current parsed/evaluated source flow in bzl_module.rs; pinned Bazel
-9.2 BzlLoadFunction:858–879 source/transitive digest ownership at
-8220c6198837d5c13d53fea211cf3282aa12408a; DICE principles
-in docs/developers/dice.md. Existing diamond/observed-source tests supply the
-first-seen order, shared-child, update/delete/restore and event contracts.
-No new upstream fixture is needed. This is a prerequisite implementation packet
-because imported-function authentication otherwise has no retained source owner.
+New Build API `rust_native_link_args.rs` owns RetainedRustNativeLinkArgs with
+immutable Arc<[AnalysisValue]> input rows and a closed mapper enum. Analysis
+lowers complete `(linker_input, use_pic, ambiguous_libs, include_link_flags)`
+tuples with the existing shared AnalysisValueLowerer. Struct/provider fields,
+sequence shape, unused values and alias/depset sharing remain structurally
+retained; publication uses the same PublicationEqState as other Spawn inputs.
+Constructor validates regular File/None library slots, bool selectors/alwayslink,
+string user flags and string-to-regular-File ambiguity maps. Libraries and user
+flags are ordered sequences. No flattened string cache or parallel identity.
 
-## Scope and validation
+The recipe implements preferred PIC/static/interface/dynamic selection,
+per-row directory dedup before generic uniquify, whole-archive ordering,
+include_link_flags suppression (alwayslink/user flags survive), static library
+sandwich flags, standard libstd/libtest special case, versioned dynamic names,
+and ambiguity remapping only where the pinned portable flags apply. Full input
+values remain the owner even if a selected branch does not render a field.
+This is DICE-retained semantic data using existing Arc/Allocative/SmallSet
+patterns (Stage 9); rendering is action scratch, released with its consumer.
+No new DICE key, lock or global cache; source/action invalidation stays owned by
+existing loading/configured dependencies.
 
-Allowlist: app/slug_loading_v2/src/{bzl_module.rs,provider.rs,package.rs,
-subrule_invocation.rs,builtin_restriction.rs,analysis_fragments.rs,attrs.rs,
-lib.rs} and affected source-carrier/manifest tests in that crate; direct analysis
-source-carrier signature/constructor corrections only; manifest, canonical and
-Stage 4/6/9/bootstrap summaries; scripts/v2_archive_status.sh for the stale
-explicit V2-crate allowlist correction (accepted slug_reapi_cache_v2 only). Large existing files receive bounded transport
-edits; the provenance type remains next to its sole manifest owner. No new
-collection abstraction or compatibility shim is needed.
+## Scope and gates
 
-Test observed external diamond provenance (exact root/helper bytes, dedup/order,
-shared cold/warm, helper edit/restoration on one Dice), manifest/context transport
-and caller mismatch rejection. Protect existing authentic Rustc callback/source
-restoration plus one ordinary configured Args test. Compile direct analysis,
-query and REAPI consumers. Compile separately under 60s preparation operations;
-preflight exact selectors; expected tests subsecond and only focused batches.
-Tests above a few seconds run sparingly; over roughly 30s need strict necessity.
-No daemon, full CLI, Bazel/compiler action or broad suite. Run rustfmt, diff,
-archive and plan checks. Independent final review is required before integration.
+Allowlist: Build API actions/{rust_native_link_args.rs,mod.rs,spec.rs}, lib.rs,
+and tests/actions.rs plus a focused tests/native_link_args/mod.rs included
+module and BUILD.bazel src declaration if needed; loading subrule_invocation.rs;
+analysis starlark_rule.rs and tests/rustc_map_each/{mod.rs,subject.bzl}, existing
+fixture.toml provenance; canonical/manifest and Stage 6/7/9/bootstrap summaries.
+New recipe and focused API tests get separate cohesive files; existing large
+files receive bounded dispatch. No new copied Bzl bodies or fixture closure.
 
-Missing/ambiguous imported rows must be rejected by the later callback admission;
-this packet only establishes and proves the authentic carrier. If any production
-route cannot provide its observed source digest, resolve that ownership instead
-of filling a sentinel or reading host files.
+API proof covers selection priority/fallback, regular-file rejection, both
+mapper branches, name edge cases, ambiguity, bool/type negatives, order,
+include flags, retained unused-field/shape/alias identity. Real-source proof
+covers nonempty Linux native rows, direct/indirect selection, include false,
+input/source A/B/A, changed imported utility rejection, generated param bytes
+and a retained unused-callable negative. Preserve prior root/provider callback
+proofs and generic Args. Compile direct query/REAPI consumers. Exact preflight
+and small subsecond test batches; separate pinned-nightly preparation operations
+capped 60s, rustfmt/diff/archive/plan checks. Tests above a few seconds run rarely;
+above roughly 30s require strict necessity scrutiny. No broad/daemon/transport
+or Bazel/compiler action. Independent design and final review required.
 
-Predecessor WP-7-23 at d26b42a51 accepted forced virtual parameter-file expansion
-and atomic REAPI tree composition with 11 focused tests and independent review.
+If source provenance cannot authenticate a transitive helper, or real builder
+reaches unowned native behavior, resolve that dependency before widening the
+recipe. Predecessor WP-7-24 at 3a72e4d7a supplies observed per-module SHA transport;
 M7A and typed Spawn execution remain open.
 
 ## Acceptance receipt
 
-Observed provenance is retained by the sole manifest constructor in all three
-production loading routes. The existing filename table carries it through
-loading and configured evaluation; lexical identity and aggregate fingerprint
-algorithms are unchanged. The pinned callback now rejects manifest/span digest
-mismatch. No imported native-link callback or Cc constructor was activated.
+The retained recipe implements the pinned native-link projections with full
+tuple ownership and shared publication equality. Authentic Linux builder tests
+prove direct/indirect selection, include-flags suppression, ambiguity, user
+flags, forced parameter bytes and imported-source rejection/restoration.
+Cross-Spawn depset alias tests and unused-callable rejection protect ownership.
+No copied upstream bodies or fixture files were added.
 
-Pinned nightly direct binaries (the already verified fallback for the unavailable
-rustup snap launcher) compiled loading in 20.89s. After routine test-constructor
-corrections, separate `cargo test --no-run --message-format=json` preparation
-succeeded for loading unit tests in 38.25s, Bzl invalidation integration in
-23.75s and authentic analysis in 33.90s. All preparation operations stayed
-within their 60s cap. Exact-selector preflight/execution passed:
+Pinned nightly direct binaries compiled the final API tests in 1.71s and
+analysis tests in 34.43s, separately from execution and within the 60s preparation
+cap. Exact-selector preflight and execution passed:
 
-- Loading 6/6, 0.04s: imported-helper source SHA/order/A/B/A, observed diamond
-  cold/warm events, pinned caller digest mismatch, lexical caller identity and
-  private API checks.
-- Bzl invalidation 2/2, 0.03s: first-seen diamond and leaf/load-edge changes.
-- Analysis 2/2, 0.43s: authentic Rustc source-edit/restoration and generic Args.
+- API 5/5 in 0.00s (0.002s wrapper): three native-link tests plus existing
+  ArgsWrite formatting and Rust crate retained-shape/alias checks.
+- Analysis 4/4 in 0.45s (0.461s wrapper): native-link source authentication and
+  restoration, prior Rustc root/dependency callbacks, and generic Args policy.
 
-`cargo check -p slug_analysis_v2 -p slug_query_v2 -p slug_reapi_v2` exited 0
-in 14.83s, with three existing REAPI deprecation warnings. Rustfmt, diff, archive
-and plan checks pass. The archive checker required one reviewed allowlist entry
-for the already accepted V2 cache crate; no V1 negative was weakened.
-Receipts: `target/wp724/`. Total packet/review wall time was not separately
-measured. No full suite, daemon, compiler action or live transport ran.
+`cargo check -p slug_query_v2 -p slug_reapi_v2` exited 0 in 14.47s, with three
+existing REAPI deprecation warnings. Rustfmt, diff, archive and plan checks pass.
+Receipts are in `target/wp725/`. Packet/review wall time was not separately
+measured. No broad suite, daemon, compiler action or live transport ran.
 
-Independent final review ACCEPT confirmed owner/equality/lifetime and evidence.
-This closes the imported-source provenance prerequisite only; native-link
-callback authentication/recipes, ordinary input resolution and Spawn execution
-remain required M7A work.
+Independent final review ACCEPT found no material algorithm, provenance,
+retained-value or scope blocker. The observable advance is native-link Args
+publication and forced parameter bytes through the unchanged Rustc builder.
+Native Cc construction/lowering, toolchain discovery and resolved Spawn execution
+remain required; this checkpoint does not close M7A or full CLI buildability.

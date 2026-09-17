@@ -1570,6 +1570,21 @@ fn lower_vector_arg<'v>(
         lower_rules_rust_crate_root(value.source)?
     } else if value.map_each == Some(PinnedVectorMapEach::RegularFileDirnames) {
         lower_regular_file_dirnames(value.source, lowerer)?
+    } else if let Some(PinnedVectorMapEach::RulesRustNativeLinks(mapper)) = value.map_each {
+        let EvaluatorVectorSourceGen::Sequence(rows) = value.source else {
+            anyhow::bail!("rules_rust native link Args requires tuple sequence");
+        };
+        let rows = rows
+            .into_iter()
+            .map(|row| {
+                lowerer
+                    .lower(row, "rules_rust native link Args")
+                    .map_err(anyhow::Error::msg)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        RetainedVectorSource::RulesRustNativeLinks(
+            slug_build_api_v2::RetainedRustNativeLinkArgs::new(rows, mapper)?,
+        )
     } else if let Some(PinnedVectorMapEach::RulesRustCrates(mapper)) = value.map_each {
         let EvaluatorVectorSourceGen::Depset(source) = value.source else {
             anyhow::bail!("rules_rust crate Args requires a depset");

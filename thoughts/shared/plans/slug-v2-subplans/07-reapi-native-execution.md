@@ -47,9 +47,11 @@ proofs. WP-7-23 adds forced virtual parameter-file expansion and atomic
 `ReapiInputTree::with_spawn_param_files` composition: preserve base entries and
 inline blobs, reject equal paths even with equal digests and both file/directory
 prefix conflicts, then publish exact CAS bytes and deterministic Merkle topology.
-The authentic Rustc proof asserts replacement argv and multiline bytes. Other
-builder paths, native-link callbacks, conditional spilling and resolved Spawn
-execution staging remain open. These components do not widen the bounded
+The authentic Rustc proof asserts replacement argv and multiline bytes.
+WP-7-25 adds native-library search and default direct/indirect link recipes,
+including their forced parameter bytes through the real Linux argument builder.
+Other callback families, native Cc providers/toolchains, conditional spilling
+and resolved Spawn execution staging remain open. These components do not widen the bounded
 FileWrite executor or bypass `ValidatedActionClosure`.
 
 Consume the retained Stage 6 action and owner context used by aquery. The
