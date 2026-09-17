@@ -665,3 +665,152 @@ fn remote_action_cache_detects_orphaned_output_blobs() {
         }
     );
 }
+
+fn forced_command(value: &str) -> slug_build_api_v2::ExpandedSpawnCommandLine {
+    use slug_build_api_v2::RetainedArgCall;
+    use slug_build_api_v2::RetainedCommandLineSegment;
+    use slug_build_api_v2::RetainedScalarArg;
+    use slug_build_api_v2::RetainedScalarValue;
+    use slug_build_api_v2::RetainedSpawnArgsSnapshot;
+    use slug_build_api_v2::RetainedSpawnParamFilePolicy;
+    let action = typed_spawn_action();
+    let spawn = action.spawn_spec().unwrap();
+    SpawnSpec::new(
+        spawn.invocation().clone(),
+        RetainedCommandLine::new(vec![RetainedCommandLineSegment::ArgsSnapshot(
+            RetainedSpawnArgsSnapshot::new(
+                RetainedArgsRecipe::new(
+                    vec![RetainedArgCall::Scalar(RetainedScalarArg::new(
+                        None::<&str>,
+                        RetainedScalarValue::String(value.into()),
+                        None::<&str>,
+                    ))],
+                    RetainedParamFileFormat::Multiline,
+                ),
+                Some(RetainedSpawnParamFilePolicy::new("@%s", true)),
+            ),
+        )]),
+        spawn.inputs().clone(),
+        spawn.tools().clone(),
+        spawn.outputs().to_vec(),
+        None,
+        spawn.environment().clone(),
+        spawn.execution_requirements().clone(),
+        "Action",
+        None::<&str>,
+    )
+    .expand_forced_param_files()
+    .unwrap()
+}
+
+#[test]
+fn forced_param_files_merge_exact_bytes_and_merkle_topology() {
+    use slug_build_api_v2::ActionInput;
+    use slug_build_api_v2::ParamFile;
+    use slug_build_api_v2::ParamFileFormat;
+    use slug_reapi_v2::InputTreeEntryKind;
+    let input = ReapiDigest::of_bytes(b"source");
+    let action = ActionSpec::new(ActionKind::Run, "Spawn", vec![])
+        .with_inputs(vec![ActionInput::new("src/input", Some(input.to_string()))])
+        .with_param_files(vec![ParamFile::new(
+            "existing",
+            vec!["base".to_owned()],
+            ParamFileFormat::Multiline,
+        )]);
+    let base = ReapiInputTree::from_action(&action).unwrap();
+    let original = base.clone();
+    let command = forced_command("héllo world");
+    assert_eq!(command.argv(), ["tools/runner", "@pkg/out.txt-0.params"]);
+    let merged = base.with_spawn_param_files(&command).unwrap();
+    assert_eq!(base, original);
+    assert_eq!(merged, base.with_spawn_param_files(&command).unwrap());
+    assert_eq!(merged.inline_blobs()[0], base.inline_blobs()[0]);
+    assert_eq!(merged.inline_blobs().len(), 2);
+    let blob = &merged.inline_blobs()[1];
+    assert_eq!(blob.data(), "héllo world\n".as_bytes());
+    assert_eq!(
+        blob.digest(),
+        &ReapiDigest::of_bytes("héllo world\n".as_bytes())
+    );
+    let entry = merged
+        .entries()
+        .iter()
+        .find(|entry| entry.path() == "pkg/out.txt-0.params")
+        .unwrap();
+    assert_eq!(entry.digest(), blob.digest());
+    assert_eq!(entry.kind(), InputTreeEntryKind::ParamFile);
+    assert!(merged.entries().contains(&base.entries()[1]));
+    let decode = |digest: &ReapiDigest| {
+        let blob = merged
+            .directory_blobs()
+            .iter()
+            .find(|blob| blob.digest() == digest)
+            .unwrap();
+        assert_eq!(blob.digest(), &ReapiDigest::of_bytes(blob.data()));
+        slug_reapi_v2::proto::Directory::decode(blob.data()).unwrap()
+    };
+    let root = decode(merged.root_digest());
+    assert_eq!(root.files.len(), 1);
+    assert_eq!(root.files[0].name, "existing");
+    assert_eq!(
+        root.directories
+            .iter()
+            .map(|node| node.name.as_str())
+            .collect::<Vec<_>>(),
+        ["pkg", "src"]
+    );
+    let pkg_digest = root.directories[0].digest.as_ref().unwrap();
+    let pkg = decode(
+        &ReapiDigest::parse(&format!("{}/{}", pkg_digest.hash, pkg_digest.size_bytes)).unwrap(),
+    );
+    assert_eq!(pkg.files.len(), 1);
+    assert_eq!(pkg.files[0].name, "out.txt-0.params");
+    assert!(!pkg.files[0].is_executable);
+    assert_eq!(
+        pkg.files[0].digest.as_ref().unwrap().hash,
+        blob.digest().hash()
+    );
+    assert_eq!(
+        pkg.files[0].digest.as_ref().unwrap().size_bytes,
+        blob.data().len() as i64
+    );
+    assert!(pkg.directories.is_empty());
+    assert_eq!(merged.directory_blobs().len(), 3);
+    assert_ne!(merged.root_digest(), base.root_digest());
+    assert_ne!(
+        merged.root_digest(),
+        base.with_spawn_param_files(&forced_command("changed"))
+            .unwrap()
+            .root_digest()
+    );
+    assert!(merged.with_spawn_param_files(&command).is_err());
+}
+
+#[test]
+fn forced_param_files_reject_input_collisions_atomically() {
+    use slug_build_api_v2::ActionInput;
+    use slug_reapi_v2::InputTreeError;
+    let command = forced_command("value");
+    for (path, bytes) in [
+        ("pkg/out.txt-0.params", b"value\n".as_slice()),
+        ("pkg/out.txt-0.params", b"different".as_slice()),
+        ("pkg", b"ancestor".as_slice()),
+        ("pkg/out.txt-0.params/child", b"descendant".as_slice()),
+    ] {
+        let action =
+            ActionSpec::new(ActionKind::Run, "Spawn", vec![]).with_inputs(vec![ActionInput::new(
+                path,
+                Some(ReapiDigest::of_bytes(bytes).to_string()),
+            )]);
+        let base = ReapiInputTree::from_action(&action).unwrap();
+        let original = base.clone();
+        assert!(
+            matches!(
+                base.with_spawn_param_files(&command),
+                Err(InputTreeError::ConflictingPath { .. })
+            ),
+            "{path}"
+        );
+        assert_eq!(base, original);
+    }
+}

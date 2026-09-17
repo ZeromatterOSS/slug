@@ -178,6 +178,26 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
     );
     assert_eq!(rustc.param_file().unwrap().flag_format(), "@%s");
     assert!(rustc.param_file().unwrap().use_always());
+    let expanded = spawn.expand_forced_param_files().unwrap();
+    assert_eq!(expanded.param_files().len(), 1);
+    let file = &expanded.param_files()[0];
+    assert_eq!(file.path(), "out/probe.rlib-0.params");
+    assert_eq!(
+        file.bytes(),
+        rustc.recipe().render_write_content().as_bytes()
+    );
+    assert!(file.bytes().starts_with(b"lib.rs\n"));
+    let mut expected = spawn.invocation().render_prefix();
+    for (index, segment) in spawn.command_line().segments().iter().enumerate() {
+        if index == 2 {
+            expected.push("@out/probe.rlib-0.params".to_owned());
+        } else {
+            expected.extend(
+                slug_build_api_v2::RetainedCommandLine::new(vec![segment.clone()]).render(),
+            );
+        }
+    }
+    assert_eq!(expanded.argv(), expected);
 
     let source_path = workspace.join("rules_rust/rust/private/rustc.bzl");
     let source = fs::read_to_string(&source_path).unwrap();

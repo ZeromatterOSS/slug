@@ -1679,3 +1679,173 @@ fn run_actions_project_to_reapi_command_shape() {
     assert_eq!(projection.output_directories, vec!["pkg/tree".to_owned()]);
     assert_eq!(projection.platform_properties, exec_properties);
 }
+
+fn param_spawn(segments: Vec<RetainedCommandLineSegment>, outputs: &[&str]) -> SpawnSpec {
+    SpawnSpec::new(
+        RetainedSpawnInvocation::Executable(SpawnExecutable::Path(
+            NormalizedBazelPath::new(HostPathFlavor::Unix, "tools/runner").unwrap(),
+        )),
+        RetainedCommandLine::new(segments),
+        ArtifactInputs::new(Vec::new()),
+        ArtifactInputs::new(Vec::new()),
+        outputs
+            .iter()
+            .map(|path| ActionOutput::new(*path, ActionOutputKind::File))
+            .collect::<Vec<_>>(),
+        None,
+        RetainedActionEnvironment::default(),
+        CanonicalStringMap::default(),
+        "Action",
+        None::<&str>,
+    )
+}
+
+fn param_args(
+    format: RetainedParamFileFormat,
+    values: &[(Option<&str>, &str)],
+    policy: Option<(&str, bool)>,
+) -> RetainedCommandLineSegment {
+    RetainedCommandLineSegment::ArgsSnapshot(RetainedSpawnArgsSnapshot::new(
+        RetainedArgsRecipe::new(
+            values
+                .iter()
+                .map(|(name, value)| {
+                    RetainedArgCall::Scalar(RetainedScalarArg::new(
+                        *name,
+                        RetainedScalarValue::String((*value).into()),
+                        None::<&str>,
+                    ))
+                })
+                .collect::<Vec<_>>(),
+            format,
+        ),
+        policy.map(|(format, always)| RetainedSpawnParamFilePolicy::new(format, always)),
+    ))
+}
+
+#[test]
+fn forced_param_files_preserve_formats_order_and_spill_numbering() {
+    use RetainedParamFileFormat::FlagPerLine;
+    use RetainedParamFileFormat::Multiline;
+    use RetainedParamFileFormat::Shell;
+    let values = [(Some("--flag"), "two words"), (None, "quote'd"), (None, "")];
+    let spec = param_spawn(
+        vec![
+            RetainedCommandLineSegment::LiteralRun(Arc::from(["before".into()])),
+            param_args(Shell, &[(None, "inline")], None),
+            param_args(Shell, &values, Some(("@%s", true))),
+            RetainedCommandLineSegment::LiteralRun(Arc::from(["between".into()])),
+            param_args(Multiline, &values, Some(("--params=%%%s%%", true))),
+            param_args(FlagPerLine, &values, Some(("@%s", true))),
+            param_args(Multiline, &[], Some(("@%s", true))),
+            RetainedCommandLineSegment::LiteralRun(Arc::from(["after".into()])),
+        ],
+        &["pkg/primary", "pkg/secondary"],
+    );
+    let expanded = spec.expand_forced_param_files().unwrap();
+    assert_eq!(
+        expanded.argv(),
+        [
+            "tools/runner",
+            "before",
+            "inline",
+            "@pkg/primary-0.params",
+            "between",
+            "--params=%pkg/primary-1.params%",
+            "@pkg/primary-2.params",
+            "quote'd",
+            "",
+            "@pkg/primary-3.params",
+            "after"
+        ]
+    );
+    assert_eq!(
+        expanded
+            .param_files()
+            .iter()
+            .map(|file| (file.path(), file.bytes()))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                "pkg/primary-0.params",
+                b"--flag\n'two words'\n'quote'\\''d'\n''\n".as_slice()
+            ),
+            (
+                "pkg/primary-1.params",
+                b"--flag\ntwo words\nquote'd\n\n".as_slice()
+            ),
+            ("pkg/primary-2.params", b"--flag=two words\n".as_slice()),
+            ("pkg/primary-3.params", b"".as_slice()),
+        ]
+    );
+    assert_eq!(expanded, spec.expand_forced_param_files().unwrap());
+    let reordered = param_spawn(
+        spec.command_line().segments().to_vec(),
+        &["pkg/secondary", "pkg/primary"],
+    );
+    assert_eq!(
+        reordered.expand_forced_param_files().unwrap().param_files()[0].path(),
+        "pkg/secondary-0.params"
+    );
+    let inline = param_spawn(vec![param_args(Multiline, &values, None)], &[]);
+    assert_eq!(
+        inline.expand_forced_param_files().unwrap().argv(),
+        inline.render_argv()
+    );
+}
+
+#[test]
+fn forced_param_files_reject_unowned_limits_invalid_paths_and_output_collisions() {
+    use slug_build_api_v2::SpawnCommandLineError;
+    let forced = || param_args(RetainedParamFileFormat::Multiline, &[], Some(("@%s", true)));
+    assert_eq!(
+        param_spawn(
+            vec![param_args(
+                RetainedParamFileFormat::Shell,
+                &[],
+                Some(("@%s", false))
+            )],
+            &["out"]
+        )
+        .expand_forced_param_files(),
+        Err(SpawnCommandLineError::ConditionalParamFileUnsupported)
+    );
+    assert_eq!(
+        param_spawn(vec![forced()], &[]).expand_forced_param_files(),
+        Err(SpawnCommandLineError::MissingPrimaryOutput)
+    );
+    for path in [
+        "",
+        "/out",
+        "pkg/",
+        "pkg//out",
+        "pkg/./out",
+        "pkg/../out",
+        r"pkg\out",
+        r"\out",
+    ] {
+        assert_eq!(
+            param_spawn(vec![forced()], &[path]).expand_forced_param_files(),
+            Err(SpawnCommandLineError::InvalidPrimaryOutput {
+                path: path.to_owned()
+            })
+        );
+    }
+    for (primary, conflict) in [
+        ("pkg/out", "pkg/out-0.params"),
+        ("pkg/out", "pkg/out-0.params/child"),
+        ("pkg/out", "pkg"),
+    ] {
+        assert_eq!(
+            param_spawn(vec![forced()], &[primary, conflict]).expand_forced_param_files(),
+            Err(SpawnCommandLineError::OutputConflict {
+                param_path: format!("{primary}-0.params"),
+                output_path: conflict.to_owned()
+            })
+        );
+    }
+    // Similar string prefixes are not path-component conflicts.
+    param_spawn(vec![forced()], &["pkg/out", "pkg/out-0.params-other"])
+        .expand_forced_param_files()
+        .unwrap();
+}

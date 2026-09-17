@@ -29,17 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-22-m7a-rustc-crate-dependencies-r1
+Packet: WP-7-23-m7a-forced-virtual-paramfiles-r1
 Status: accepted; reviewed checkpoint ready for integration
 
-Pinned Rustc dependency-provider callbacks are accepted for aliased extern
-flags, metadata fallback and transitive dependency directories. Twelve selected
-tests pass in subsecond batches; direct query/REAPI checks and independent final
-review accept the retained-provider boundary.
-WP-7-21 at `73ba48a41` accepted four regular-File directory mappings and the
-root dirname correction, preserving the real-source proof from WP-7-20.
-The manifest records the accepted retained-provider contract and validation. M7A
-remains open for other callbacks and execution staging.
+Forced Spawn parameter-file expansion and atomic REAPI input-tree composition
+are accepted with output/input collision checks, authentic Rustc argv/bytes and
+11 focused passing tests. Independent final review and direct consumers pass;
+typed execution remains gated.
+WP-7-22 at `36cb5fa3a` accepted the two crate-provider callback sites with real
+builder/metadata/alias and same-DICE proofs. The manifest owns the virtual-input
+contract. Full Rustc/CLI execution and M7A remain open.
 
 ### Earlier generated-input receipt
 

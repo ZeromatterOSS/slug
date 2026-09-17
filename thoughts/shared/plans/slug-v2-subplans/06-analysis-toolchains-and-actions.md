@@ -48,6 +48,16 @@ their existing Slug-native classification. Generic callbacks, directories,
 native-link mappers and sibling layout remain unsupported. No callable
 or evaluator heap crosses publication, and no new semantic cache/key is added.
 
+WP-7-23 adds `SpawnSpec::expand_forced_param_files`: one immutable action-local
+aggregate owns replacement argv and virtual file bytes derived from the retained
+recipe and first declared output. Forced shell/multiline/flag-per-line formats
+share ArgsWrite rendering; flag-only positionals follow their replacement arg.
+Empty files, spill numbering and substitution follow pinned Bazel 9.2; paths
+retain Slug-native spelling. Expansion validates primary paths and rejects
+virtual-file collisions with every output. Conditional spilling is unsupported
+pending command-line-limit ownership. No retained identity or DICE key changes.
+Stage 7 owns atomic input-tree composition; execution admission remains open.
+
 ### Analysis surface
 
 - configured target keys and analysis DICE keys;

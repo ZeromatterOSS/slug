@@ -8,6 +8,9 @@ oracle_notes = "Focused source regression, not full rust_library or CLI equivale
 bazel_release = "9.2.0"
 bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
 source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/actions/CommandLines.java#expand",
+  "src/main/java/com/google/devtools/build/lib/actions/ParameterFile.java#writeParameterFile",
+  "src/main/java/com/google/devtools/build/lib/analysis/actions/SpawnAction.java#getSpawn",
   "src/main/java/com/google/devtools/build/lib/analysis/starlark/Args.java#validateMapEach",
   "src/main/java/com/google/devtools/build/lib/analysis/starlark/Args.java#addVectorArg",
   "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkCustomCommandLine.java#applyMapEach",
@@ -24,6 +27,6 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/vfs/PathFragment.java#getSafePathString",
   "rules_cc 0.2.17 cc/extensions.bzl#_compatibility_proxy_repo_impl",
 ]
-translation_notes = "sources.json pins the complete top-level load closure of rustc.bzl. The tests supply regular source/generated Files, optional standard-library and sysroot Files and native Spawn registration; no compiler or toolchain discovery executes. The generated proxy matches the >=9 branch of the separately hashed upstream writer."
+translation_notes = "sources.json pins the complete top-level load closure of rustc.bzl. The tests supply regular source/generated Files, optional standard-library and sysroot Files and native Spawn registration; forced multiline parameter-file replacement argv and bytes are asserted without compiler or toolchain discovery execution. The generated proxy matches the >=9 branch of the separately hashed upstream writer."
 generation_command = "Copy the sources.json load closure verbatim from the pinned Bazel repositories, retaining Apache notices and licenses; generate the compatibility proxy using the recorded upstream writer branch."
 verification_command = "Run exact Rust selectors rustc_map_each::pinned_rustc_arguments_publish_and_restore_after_source_edit, rustc_map_each::pinned_rustc_file_dirnames_preserve_order_and_generated_root, and rustc_map_each::pinned_rustc_dependencies_select_aliases_metadata_and_restore after compile-only preparation and v2_test_preflight.py."

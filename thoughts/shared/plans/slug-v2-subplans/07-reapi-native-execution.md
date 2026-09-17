@@ -43,9 +43,14 @@ and virtual bytes; `ActionGraphDump`'s optional `paramFiles` field covers
 artifact-backed `ParameterFileWriteAction`s only. M7A packets WP-7-20/21/22
 admit pinned regular-crate-root, four regular-File dirname and the two
 nonempty crate-provider `map_each` sites through authentic configured Spawn
-proofs. Other demanded builder paths, native-link callbacks and virtual
-parameter-file staging remain open. These configured proofs do not widen
-the bounded FileWrite executor.
+proofs. WP-7-23 adds forced virtual parameter-file expansion and atomic
+`ReapiInputTree::with_spawn_param_files` composition: preserve base entries and
+inline blobs, reject equal paths even with equal digests and both file/directory
+prefix conflicts, then publish exact CAS bytes and deterministic Merkle topology.
+The authentic Rustc proof asserts replacement argv and multiline bytes. Other
+builder paths, native-link callbacks, conditional spilling and resolved Spawn
+execution staging remain open. These components do not widen the bounded
+FileWrite executor or bypass `ValidatedActionClosure`.
 
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies

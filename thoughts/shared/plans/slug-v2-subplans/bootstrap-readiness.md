@@ -272,9 +272,11 @@ different, artifact-backed action path, so it cannot establish those virtual
 bytes. WP-7-20/21/22 accept source-pinned regular-crate-root, four regular-File
 dirname and two nonempty crate-provider sites, with real `construct_arguments`
 configured Spawn, metadata/alias selection, parameter bytes and same-DICE
-A/B/A proofs. Other builder paths, native-link callbacks and virtual-input
+A/B/A proofs. WP-7-23 adds forced replacement argv/virtual bytes and atomic
+REAPI input-tree composition with output/input collision checks. Other builder
+paths, native-link callbacks, conditional spilling and resolved-input execution
 staging remain open. The Spawn and Args/param-file rows therefore remain open;
-these configured slices do not prove Rustc execution.
+these configured/component slices do not prove Rustc execution.
 
 “Accepted bounded” means only the stated slice has proof. “Open” or “configured
 only” is not a runtime admission. The table is a finite set of exit obligations;
@@ -291,7 +293,7 @@ unobserved action families cannot be declared unnecessary by assumption.
 | Requested-root output conflict freedom | Accepted bounded with execution groups at `71d9ce4bf`; `ValidatedActionClosure`, pre-execution rejection, positive sharing and direct consumers passed, with eight Core nonpasses attributed to unchanged main | Stage 6/Core | Preserve root-set validation before build/aquery/Run success; cold/warm A+B conflicts produce no execution or materialization even if A and B separately succeed |
 | FileWrite | Accepted bounded aquery/REAPI handoff, Stage 7 canonical FileWrite projection and M5/M6 evidence. Its exact ActionKey projection remains queued | Stages 6/8/7 | Preserve accepted content/platform/protobuf/cache proof and named Slug-native token exception; land exact projection when separately selected |
 | Spawn: compiler, linker, proc-macro/build-script and generated-source tool invocations | Configured common non-callback Spawn/FilesToRun expansion accepted (`bfe6f2690`, `21db5d7b8`), plus source-pinned root/dirname/crate-provider callback publication (WP-7-20/21/22); broader aquery/REAPI activation open; exact ActionKey deferred | Stages 6/8/7 | Source-derived invocation/tool/env/input/output semantics for observed production actions, structural invalidation, classified aquery fields and same-owner REAPI projection |
-| ArgsWrite / paramfiles | Configured vector Args/param-file ownership accepted (`a01a23fe7`); execution/aquery family admission open; exact ActionKey deferred | Stages 6/8/7 | Exact encoding/content/order, declared input-tree placement and CAS bytes; typed comparator provenance for generated paths and classified ActionKey field |
+| ArgsWrite / paramfiles | Configured vector Args/param-file ownership accepted (`a01a23fe7`); forced virtual argv/bytes and atomic input-tree composition added in WP-7-23; execution/aquery family admission open; exact ActionKey deferred | Stages 6/8/7 | Exact encoding/content/order, declared input-tree placement and CAS bytes; typed comparator provenance for generated paths and classified ActionKey field |
 | Symlink and runfiles-support action families | Typed symlink declarations, runfiles and four support actions/FilesToRun expansion are configured-only admission (`f346c209a`, `f46a009a0`, `21db5d7b8`); execution/aquery open; exact ActionKeys deferred | Stages 6/8/7 | Inventory names each required family; admit its semantic aquery/REAPI projections and outputs/runfiles behavior with explicit ActionKey classification, or prove absence from this closure |
 | Ordinary source/generated/tree input transfer and output materialization | Bounded FileWrite inline input accepted; ordinary source/generated trees and broader materializer remain open | Stages 6/7 | Exact Directory topology/content/digests, declared output ownership/type/mode/symlinks, generated-output consumer/reupload and missing/corrupt data behavior; validated-root-only publication |
 | Per-family graph/comparator coverage | Bounded FileWrite text/literal/deps admission accepted; production action graph comparison open | Stages 6/8/10 | Matched focused per-family graphs and selected formats, preserved accepted exact ActionKeys, explicit per-family deferred/native key allowances, typed argv/env/paramfile path correspondence and discriminating negatives |

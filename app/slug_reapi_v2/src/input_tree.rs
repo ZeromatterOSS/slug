@@ -15,6 +15,7 @@ use std::fmt;
 use prost::Message;
 use slug_build_api_v2::ActionInput;
 use slug_build_api_v2::ActionSpec;
+use slug_build_api_v2::ExpandedSpawnCommandLine;
 use slug_build_api_v2::ParamFile;
 use slug_build_api_v2::ParamFileFormat;
 pub use slug_reapi_cache_v2::ReapiBlob;
@@ -103,6 +104,45 @@ impl ReapiInputTree {
         })
     }
 
+    /// Atomically compose expansion-owned virtual files with resolved input entries.
+    /// This component does not authorize typed Spawn execution.
+    pub fn with_spawn_param_files(
+        &self,
+        command: &ExpandedSpawnCommandLine,
+    ) -> Result<Self, InputTreeError> {
+        let mut entries: BTreeMap<_, _> = self
+            .entries
+            .iter()
+            .map(|entry| (entry.path().to_owned(), entry.clone()))
+            .collect();
+        let mut inline_blobs = self.inline_blobs.clone();
+        for file in command.param_files() {
+            if entries.contains_key(file.path()) {
+                return Err(InputTreeError::ConflictingPath {
+                    path: file.path().to_owned(),
+                });
+            }
+            let blob = ReapiBlob::from_bytes(file.bytes().to_vec());
+            insert_entry(
+                &mut entries,
+                ReapiInputTreeEntry::new(
+                    file.path(),
+                    blob.digest().clone(),
+                    InputTreeEntryKind::ParamFile,
+                ),
+            )?;
+            inline_blobs.push(blob);
+        }
+        let entries = entries.into_values().collect::<Vec<_>>();
+        let (root_digest, directory_blobs) = merkle_directories(&entries)?;
+        Ok(Self {
+            entries,
+            root_digest,
+            directory_blobs,
+            inline_blobs,
+        })
+    }
+
     pub(crate) fn from_inline_file(
         path: &str,
         data: &[u8],
@@ -162,10 +202,7 @@ impl fmt::Display for InputTreeError {
             Self::InvalidDigest { path, error } => {
                 write!(f, "REAPI input {path} has an invalid digest: {error}")
             }
-            Self::ConflictingPath { path } => write!(
-                f,
-                "REAPI input path declared twice with different digests: {path}"
-            ),
+            Self::ConflictingPath { path } => write!(f, "conflicting REAPI input path: {path}"),
             Self::InvalidPath { path } => write!(
                 f,
                 "REAPI input path must contain non-empty normal segments: {path}"
@@ -243,6 +280,11 @@ fn merkle_directories(
                     });
                 }
             } else {
+                if directory.files.contains_key(segment) {
+                    return Err(InputTreeError::ConflictingPath {
+                        path: entry.path().to_owned(),
+                    });
+                }
                 directory = directory.directories.entry(segment.to_owned()).or_default();
             }
         }

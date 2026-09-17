@@ -498,19 +498,26 @@ impl RetainedArgsRecipe {
     }
 
     pub fn render_write_content(&self) -> String {
-        let mut lines = Vec::new();
-        for call in self.calls.iter() {
-            let group = call.render_group();
-            match self.write_format {
-                RetainedParamFileFormat::FlagPerLine => lines.extend(flag_per_line_group(group)),
-                RetainedParamFileFormat::Shell => {
-                    lines.extend(group.iter().map(|value| shell_escape(value)));
-                }
-                RetainedParamFileFormat::Multiline => {
-                    lines.extend(group);
-                }
-            }
-        }
+        self.render_param_lines(self.render())
+    }
+
+    pub(super) fn render_virtual_param_file(&self) -> (String, Vec<String>) {
+        let (lines, positional) = if self.write_format == RetainedParamFileFormat::FlagPerLine {
+            self.render()
+                .into_iter()
+                .partition(|arg| arg.starts_with("--"))
+        } else {
+            (self.render(), Vec::new())
+        };
+        (self.render_param_lines(lines), positional)
+    }
+
+    fn render_param_lines(&self, lines: Vec<String>) -> String {
+        let lines = if self.write_format == RetainedParamFileFormat::Shell {
+            lines.iter().map(|value| shell_escape(value)).collect()
+        } else {
+            lines
+        };
         if lines.is_empty() {
             String::new()
         } else {
@@ -1038,7 +1045,7 @@ fn shell_escape(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
 }
 
-fn apply_validated_format(format: &str, value: &str) -> String {
+pub(super) fn apply_validated_format(format: &str, value: &str) -> String {
     let mut result = String::with_capacity(format.len() + value.len());
     let mut chars = format.chars();
     while let Some(character) = chars.next() {

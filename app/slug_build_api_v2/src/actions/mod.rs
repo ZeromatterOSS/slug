@@ -13,6 +13,7 @@ pub mod reapi_projection;
 pub mod registry;
 pub mod runfiles_support;
 mod rust_crate_args;
+mod spawn_command_line;
 pub mod spec;
 
 pub use ctx_actions::CtxActions;
@@ -24,6 +25,9 @@ pub use runfiles_support::RunfilesSymlinkMode;
 pub use rust_crate_args::RetainedRustCrateArgs;
 pub use rust_crate_args::RustCrateArgMapper;
 pub use rust_crate_args::RustCrateArgsError;
+pub use spawn_command_line::ExpandedSpawnCommandLine;
+pub use spawn_command_line::SpawnCommandLineError;
+pub use spawn_command_line::VirtualParamFile;
 pub use spec::ActionInput;
 pub use spec::ActionKind;
 pub use spec::ActionOutput;
