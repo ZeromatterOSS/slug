@@ -29,18 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-16-m7a-reapi-adapter-bazel-compile-r1
-Status: accepted partial observation; cache leaf Rustc built, adapter blocked by embedded Bazel inputs
+Packet: WP-7-17-m7a-builtin-catalog-bazel-inputs-r1
+Status: accepted; exact embedded catalog inputs and direct adapter Bazel build pass
 
-WP-7-15 at `03455689d` built the cache-leaf proto script. The current
-adapter-target build compiled the cache-leaf library but exited 1 in 42.34
-seconds when `slug_bzlmod_v2` could not read 48 pinned `bazel_tools` files
-from its Rustc sandbox. All 49 files exist in the checkout; nested upstream
-BUILD packages keep the parent Bazel `compile_data` glob from declaring 48 of
-them. The adapter, CLI root and M7A remain open. The next correction must
-declare those exact bytes without altering the catalog. The callback candidate
-remains unaccepted at local `review/wp-7-11-rustc-crate-root-map-each`
-(`ea5fcc6fd`).
+WP-7-16 at `869dfa4e5` found 48 checked-in pinned `bazel_tools` files absent
+from the `slug_bzlmod_v2` Rustc sandbox. The current packet adds nine Bazel-only
+sidecars and explicit filegroups while preserving all 49 upstream bytes. Its
+filegroup query names exactly those 49 files; the direct `slug_reapi_v2`
+adapter build exits 0 in 40.67 seconds, and the one selected catalog-assets
+test passes in 0.00-second runtime. CLI compilation and M7A remain open. The
+callback candidate remains unaccepted at local
+`review/wp-7-11-rustc-crate-root-map-each` (`ea5fcc6fd`).
 
 ### Earlier generated-input receipt
 

@@ -1,74 +1,105 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-16-m7a-reapi-adapter-bazel-compile-r1
-Status: accepted partial observation; cache leaf Rustc built, adapter blocked by embedded Bazel inputs
+Packet: WP-7-17-m7a-builtin-catalog-bazel-inputs-r1
+Status: accepted; exact embedded catalog inputs and direct adapter Bazel build pass
 
 ## Outcome and compatibility
 
-Build the existing `//app/slug_reapi_v2:slug_reapi_v2` Bazel library target.
-Its declared direct dependency on `//app/slug_reapi_cache_v2` makes one
-successful build cover both first-party Rustc actions after WP-7-15's
-generated-proto materialization. This is buildability evidence only: it changes
-no Slug semantic owner or compatibility class and cannot prove the CLI root,
-runtime REAPI behavior, or M7A readiness.
+Make all 49 existing verbatim Bazel 9.2 `@bazel_tools` catalog files declared
+inputs to `//app/slug_bzlmod_v2:slug_bzlmod_v2`'s Rustc action, then rebuild
+the directly blocked `//app/slug_reapi_v2:slug_reapi_v2` target. This repairs
+Bazel packaging only. Runtime source bytes, catalog paths/modes/digests,
+Slug DICE ownership and compatibility classification remain unchanged; adapter
+compilation cannot by itself prove CLI buildability or M7A readiness.
 
-WP-7-15 at `03455689d` built the cache leaf's proto build script in 31.36
-seconds and inspected all six nonempty generated Rust modules. The library
-Rustc action and its direct adapter consumer still need a live compile.
+WP-7-16 at `869dfa4e5` built the new cache-leaf library but stopped in the
+`slug_bzlmod_v2` Rustc action: its parent `compile_data = glob(["builtin/**"])`
+sees only `MODULE.bazel`. All other 48 embedded files exist below nine pinned
+upstream BUILD package boundaries. Bazel cannot load one of those verbatim
+upstream BUILD files as a package in this checkout because its labels are
+relative to the upstream repository.
 
-## Bounded build and decision
+## Packaging decision and invariants
 
-The checked-in leaf/adapter Rust sources, BUILD rules, Cargo/Bazel locks,
-`MODULE.bazel`, pinned rules_rust 0.73 and nightly 2025-09-14 toolchain own
-this target. Bazel's output is command scratch, never a Slug DICE fact or a
-semantic compatibility oracle. Preserve the four input locks and first-party
-sources exactly; no implementation edit or test is selected here.
+Keep the 49 pinned files byte-for-byte and mode-for-mode unchanged. Add one
+local `BUILD.bazel` sidecar beside each of the nine upstream `BUILD` files.
+The sidecars select Bazel package metadata in this checkout without changing
+the `BUILD` bytes that Slug embeds. A shared parent-package macro creates one
+filegroup per sidecar, containing that package's pinned files (including its
+upstream `BUILD`) and excluding the sidecar itself. A parent aggregate
+filegroup combines those nine groups with the root catalog `MODULE.bazel`;
+both `rust_library.compile_data` and the catalog test's `data` use it. No
+undeclared host path, source copy, symlink, generated substitute, or runtime
+catalog extension is admitted.
 
-From clean main, run one `bazel --ignore_all_rc_files --batch build` of this
-one target with `--@rules_rust//rust/toolchain/channel=nightly` and
-`--lockfile_mode=error`. Bound compilation at 60 seconds with TERM/short KILL
-cleanup and a 128 MiB output-file cap. Record elapsed time, exit status,
-stdout/stderr digests, Bazel action/target result and tracked status. If it
-succeeds, inspect the target's output and the named cache-leaf dependency
-output. A timeout or compiler error is not success; record the precise
-failure, do not repeat an unchanged command, and select a corrective successor.
-This is a compilation gate, not a test run. The prior WP-7-14 graph already
-proves the declared consumer edge; this packet checks execution of Rustc.
+Update the checked-in catalog test to assert exactly the 49 pinned source
+paths plus the nine named sidecars in the checkout. Its existing per-file
+digest/mode checks continue to validate the pinned bytes, and the Bazel
+compile proves the inputs enter Rustc's sandbox. Sidecars are build metadata,
+never `BuiltinBazelToolsSnapshot` entries or materialized `@bazel_tools`
+content. No DICE key, action semantics or source acquisition path changes.
 
-Validation is the build receipt, source/lock status, plan status checker and
-`git diff --check`. Allowlist: this manifest, canonical Live Status, Stage 10's
-live inventory delta, and bootstrap-readiness's first row. Commit and push a
-reviewable result. Do not broaden to the CLI root or tests in this packet.
+## Scope and validation
 
-## Build receipt (2026-09-16)
+Allowlist: `app/slug_bzlmod_v2/BUILD.bazel`, a new parent
+`catalog_bazel_inputs.bzl`, `tests/builtin_bazel_tools.rs`, nine new
+`builtin/bazel_tools/**/BUILD.bazel` sidecars adjacent to existing upstream
+BUILD files, this manifest, canonical Live Status, Stage 10's live inventory
+delta and bootstrap-readiness's first row. The original 49 catalog files,
+Cargo manifests/locks, module locks, and unrelated code are frozen.
 
-With only packet documentation modified from main `03455689d`, the sole build
-used a 128 MiB file cap and this command:
+First verify the static path inventory and original-file Git diff. Build only
+`//app/slug_reapi_v2:slug_reapi_v2` with the pinned nightly toolchain and
+`--lockfile_mode=error`, under a 60-second TERM/short KILL cap. This is the
+necessary compile continuation after WP-7-16; do not repeat the unchanged
+failed graph. If compilation passes, run only the exact catalog-assets test,
+with compile preparation separate from its short runtime. Keep test runtime
+as small as possible; investigate any run over a few seconds and scrutinize
+one over roughly 30 seconds. Record selected/passed count, elapsed time,
+output and tracked status. A new compiler or packaging error requires a new
+diagnosis, not an identical retry. Run `python3 scripts/v2_plan_status.py` and
+`git diff --check`; no broad suite or CLI-root build is selected.
+
+Commit and push only after the original 49-file inventory and focused
+compile/test gates pass. If the sidecar technique cannot preserve the exact
+catalog assertion and Bazel sandbox inputs, stop and record `REPLAN` for an
+alternative source-package boundary.
+
+## Acceptance receipt (2026-09-16)
+
+The original 49 catalog files have no tracked diff; the checkout contains
+exactly those files plus the nine named `BUILD.bazel` sidecars. A no-fetch
+Bazel query of `deps(//app/slug_bzlmod_v2:builtin_bazel_tools_files)` exited 0
+in 1.61 seconds and returned 59 labels: 49 exact catalog file labels, nine
+nested filegroups, and the parent aggregate. No sidecar label entered the
+filegroup closure. Query output SHA-256 is
+`269fadbbf5616816f355c47b837ffc108c682038b8b155ab1589eeae1b4ba961`.
+The first query exposed two packages with empty non-BUILD globs; setting
+`allow_empty = True` corrected that local Starlark declaration before the
+successful query.
+
+The sole post-fix adapter compile used:
 
 ```text
-/usr/bin/time -f 'elapsed_seconds=%e\nexit_status=%x' -o target/wp716/time.txt timeout -k 3s 60s bazel --ignore_all_rc_files --batch build --lockfile_mode=error --@rules_rust//rust/toolchain/channel=nightly //app/slug_reapi_v2:slug_reapi_v2 > target/wp716/stdout.txt 2> target/wp716/stderr.txt
+ulimit -f 131072
+/usr/bin/time -f 'elapsed_seconds=%e\nexit_status=%x' -o target/wp717/build_time.txt timeout -k 3s 60s bazel --ignore_all_rc_files --batch build --lockfile_mode=error --@rules_rust//rust/toolchain/channel=nightly //app/slug_reapi_v2:slug_reapi_v2 > target/wp717/build_stdout.txt 2> target/wp717/build_stderr.txt
 ```
 
-It exited 1 in 42.34 seconds, before the 60-second cap. Bazel reported 961
-processes (216 internal, 745 linux-sandbox) and 395 action-cache hits. The new
-cache leaf Rustc output exists at
-`bazel-bin/app/slug_reapi_cache_v2/libslug_reapi_cache_v2-1303892456.rlib`;
-the adapter output does not. The first failure is the separate
-`//app/slug_bzlmod_v2:slug_bzlmod_v2` Rustc action: 48 `include_bytes!` paths
-under `builtin/bazel_tools/` are absent from its compile sandbox. All 49
-pinned catalog files exist in the checkout; the sole file visible to Rustc is
-`MODULE.bazel`. The other 48 fall below nine nested upstream `BUILD` package
-boundaries, which the parent `compile_data = glob(["builtin/**"])` cannot
-cross. A 1.1-second read-only Bazel visibility query for a nested source also
-failed while loading its verbatim upstream BUILD because it refers to labels
-relative to the upstream Bazel repository, not this checkout.
+It exited 0 in 40.67 seconds (seven processes, 1,354 action-cache hits),
+producing both `libslug_bzlmod_v2-1540755102.rlib` and
+`libslug_reapi_v2-2512936149.rlib`. Stderr SHA-256 is
+`bba62c11bd9575d9a43b3ea4320035a8f0ed5b0a8708ace0b4d42ea471c9a5e0`;
+stdout is empty. Only this direct adapter compile is proved; the CLI root is
+not built.
 
-Stdout is empty (SHA-256
-`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`);
-the 28,406-byte stderr SHA-256 is
-`aa958f442a9cdcb5b4d2ae096865eae548597eb355bf00865d2412dfaee3f948`.
-The ignored `target/wp716/` directory retains the streams and timing. No
-tracked source, BUILD, module or lock input changed and no test ran. This
-proves the leaf library Rustc action, but not the adapter; the next packet
-must supply all 49 verbatim catalog files as declared Bazel compile inputs
-without changing their bytes or weakening the exact catalog assertion.
+The changed catalog test executable compiled in 6.11 seconds, and after a
+runfiles-path correction recompiled in 6.17 seconds. The initial direct
+invocation lacked Bazel runfiles; a subsequent Bazel launcher run exposed the
+old test's source-checkout-only path. Neither failure reached a catalog-byte
+assertion. Final preflight selected one exact, nonignored test. The final
+`bazel test` passed that one test in 0.00-second test runtime (3.88 seconds
+including Bazel startup), with three tests filtered out; test-log SHA-256 is
+`2e64e99ac60c269bea60d73a073086c5d2298518211c78b8cd0f0d1366c219d6`.
+The test runfiles manifest contains the 49 original files and zero sidecars.
+Ignored `target/wp717/` retains command streams and timing. No Cargo, module,
+lock, pinned catalog byte or runtime semantic owner changed; M7A remains open.

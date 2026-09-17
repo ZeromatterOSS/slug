@@ -344,9 +344,25 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
 }
 
 #[test]
-fn checked_in_assets_are_exactly_the_reviewed_catalog() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("builtin/bazel_tools");
+fn embedded_catalog_paths_remain_exact_with_bazel_input_metadata() {
+    let root = if let Some(runfiles) = std::env::var_os("TEST_SRCDIR") {
+        std::path::PathBuf::from(runfiles).join("_main/app/slug_bzlmod_v2/builtin/bazel_tools")
+    } else {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("builtin/bazel_tools")
+    };
     let mut paths = files_below(&root, &root);
+    let bazel_input_sidecars = [
+        "src/conditions/BUILD.bazel",
+        "src/tools/launcher/BUILD.bazel",
+        "src/tools/launcher/util/BUILD.bazel",
+        "tools/BUILD.bazel",
+        "tools/build_defs/cc/BUILD.bazel",
+        "tools/build_defs/repo/BUILD.bazel",
+        "tools/launcher/BUILD.bazel",
+        "tools/res/BUILD.bazel",
+        "tools/test/BUILD.bazel",
+    ];
+    paths.retain(|path| !bazel_input_sidecars.contains(&path.as_str()));
     paths.sort();
     assert_eq!(
         paths,

@@ -147,6 +147,14 @@ Rustc output but failed after 42.34 seconds in `slug_bzlmod_v2`: its parent
 `include_bytes!` inputs sit below nine embedded upstream BUILD package
 boundaries. All 49 bytes are checked in, so this is a Bazel declaration gap,
 not missing source acquisition. The adapter and CLI buildability remain open.
+WP-7-17 added checkout-only Bazel `BUILD.bazel` sidecars at the nine pinned
+upstream BUILD package boundaries, leaving the original 49 bytes untouched.
+The parent filegroup now declares exactly those 49 files to the library Rustc
+action and the catalog test's runfiles; sidecars are excluded. The direct
+`slug_reapi_v2` Bazel target compiles in 40.67 seconds, including the repaired
+`slug_bzlmod_v2` dependency, and the exact catalog-path test passes. This
+closes the named input-declaration and direct-adapter build gap, not the CLI
+root or all M7A production inputs.
 
 Cargo remains authoritative for dependency declarations/resolution. Review
 `Cargo.lock`, `Cargo.Bazel.lock`, `MODULE.bazel.lock`, toolchain and manifest

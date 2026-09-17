@@ -1,0 +1,3 @@
+load("//app/slug_bzlmod_v2:catalog_bazel_inputs.bzl", "slug_builtin_catalog_files")
+
+slug_builtin_catalog_files()
