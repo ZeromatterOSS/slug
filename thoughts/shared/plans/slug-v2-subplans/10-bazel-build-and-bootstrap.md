@@ -467,6 +467,15 @@ output. Receipt SHA-256 is
 Independent result review `REPLAN` confirmed clean cleanup and unchanged
 tracked/frozen inputs. No retry is selected from this cache state. Continue
 with static/source evidence; complete compiler flags and M7A remain open.
+The later successful WP-7-18 CLI-root build materialized that output without
+rerunning the earlier failed probe. WP-7-19 parsed the saved producer/consumer
+action graph and read all five `ahash`, `num-traits` and `rustix` target/exec
+`_bs.flags` artifacts. They contain only ten ordered non-feature `--cfg`
+lines across the three target values; target/exec copies of `num-traits` and
+`rustix` are byte-equal. None adds a named `feature=...` cfg. Analysis SHA-256
+is `d57bac183041db61fbdc4718a8d2ca83d05c897034ba8b0df033f551f8d025df`.
+This closes those generated-flag byte uncertainties, not broader compiler
+arguments, external feature equivalence or M7A.
 The selected `WP-7-10-m7a-workspace-feature-scope-reconcile-r1` compares
 saved CLI-unit, generated-lock and workspace-metadata feature sets against
 pinned crate_universe source. It runs no build, test or new Cargo/Bazel

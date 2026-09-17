@@ -29,16 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-18-m7a-cli-root-bazel-build-r1
-Status: accepted; pinned Bazel CLI root builds
+Packet: WP-7-19-m7a-external-build-script-flags-r1
+Status: accepted; five exact generated-flag artifacts add no named feature cfg
 
-WP-7-17 at `54c1eb905` declared all 49 verbatim `bazel_tools` inputs and
-built the direct REAPI adapter. The current packet's one Bazel build of the
-production CLI root exits 0 in 10.69 seconds, producing a Linux x86-64 ELF
-and nonempty LALRPOP/proto generated sources. This closes the named root
-buildability gate, not feature/pin correspondence, Slug action/runtime
-admission, M7A or self-hosting. The callback candidate remains unaccepted at local
-`review/wp-7-11-rustc-crate-root-map-each` (`ea5fcc6fd`).
+The accepted CLI-root Bazel build at `8f3ddef8b` materialized five previously
+unobserved `_bs.flags` artifacts for `ahash`, `num-traits` and `rustix` in
+target/exec configurations. The current packet ties their exact bytes to the
+saved producer/consumer graph: all contain only non-feature cfgs, and both
+target/exec pairs are byte-equal. No new build or test ran. Other external
+feature/pin correspondence and M7A remain open. The callback candidate
+remains unaccepted at local `review/wp-7-11-rustc-crate-root-map-each`
+(`ea5fcc6fd`).
 
 ### Earlier generated-input receipt
 
