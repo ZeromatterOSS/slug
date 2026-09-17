@@ -141,6 +141,12 @@ leaf `tonic::include_proto!` name. This establishes materialized generated
 bytes and build-script tool/dependency resolution for this one leaf, without
 proving its library Rustc action or the CLI root. The build changed no tracked
 lock or source input; M7A remains open.
+WP-7-16's direct adapter-target build produced the new cache-leaf library
+Rustc output but failed after 42.34 seconds in `slug_bzlmod_v2`: its parent
+`compile_data` glob sees only the catalog root `MODULE.bazel`, while 48
+`include_bytes!` inputs sit below nine embedded upstream BUILD package
+boundaries. All 49 bytes are checked in, so this is a Bazel declaration gap,
+not missing source acquisition. The adapter and CLI buildability remain open.
 
 Cargo remains authoritative for dependency declarations/resolution. Review
 `Cargo.lock`, `Cargo.Bazel.lock`, `MODULE.bazel.lock`, toolchain and manifest
