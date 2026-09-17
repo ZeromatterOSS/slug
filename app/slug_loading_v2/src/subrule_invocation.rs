@@ -22,6 +22,8 @@ use std::sync::Mutex;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use sha2::Digest;
+use sha2::Sha256;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
@@ -63,6 +65,7 @@ use starlark_map::small_set::SmallSet;
 
 use crate::BzlModuleIdentity;
 use crate::analysis_fragments::SubruleFragmentCollection;
+use crate::builtin_restriction::source_identities_for_evaluator;
 use crate::provider::alloc_starlark_label;
 use crate::starlark_label::StarlarkLabel;
 use crate::subrule::SubruleIdentity;
@@ -166,6 +169,13 @@ pub struct EvaluatorVectorArgGen<V> {
     pub source: EvaluatorVectorSourceGen<V>,
     #[trace(unsafe_ignore)]
     pub options: RetainedVectorOptions,
+    #[trace(unsafe_ignore)]
+    pub map_each: Option<PinnedVectorMapEach>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]
+pub enum PinnedVectorMapEach {
+    RulesRustCrateRoot,
 }
 
 #[derive(Debug, Clone, Allocative, Trace)]
@@ -294,11 +304,17 @@ fn starlark_args_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = true)] expand_directories: bool,
         #[starlark(require = named)] terminate_with: Option<&str>,
         #[starlark(require = named, default = false)] allow_closure: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
         let args = StarlarkArgs::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("Args.add_all receiver is invalid"))?;
         let (arg_name, source) = vector_positionals(arg_name_or_values, values, "add_all")?;
-        reject_callback_options(map_each, allow_closure, "add_all")?;
+        let map_each = classify_add_all_callback(
+            map_each,
+            allow_closure,
+            omit_if_empty && vector_source_is_empty(&source),
+            eval,
+        )?;
         if let Some(format) = format_each {
             validate_named_format("format_each", format)?;
         }
@@ -322,6 +338,7 @@ fn starlark_args_methods(builder: &mut MethodsBuilder) {
                     expand_directories,
                     terminate_with: terminate_with.map(Into::into),
                 },
+                map_each,
             }));
         Ok(this)
     }
@@ -370,6 +387,7 @@ fn starlark_args_methods(builder: &mut MethodsBuilder) {
                     expand_directories,
                     terminate_with: None,
                 },
+                map_each: None,
             }));
         Ok(this)
     }
@@ -451,6 +469,53 @@ fn reject_callback_options(
         anyhow::bail!("Args.{operation} callback forms are not supported")
     }
     Ok(())
+}
+
+fn classify_add_all_callback(
+    map_each: Option<Value<'_>>,
+    allow_closure: bool,
+    omitted_empty_source: bool,
+    eval: &Evaluator<'_, '_, '_>,
+) -> anyhow::Result<Option<PinnedVectorMapEach>> {
+    let Some(map_each) = map_each.filter(|value| !value.is_none()) else {
+        reject_callback_options(None, allow_closure, "add_all")?;
+        return Ok(None);
+    };
+    if allow_closure || map_each.get_type() != "function" {
+        anyhow::bail!("Args.add_all callback forms are not supported");
+    }
+    let span = eval
+        .call_stack_top_location()
+        .ok_or_else(|| anyhow::anyhow!("Args.add_all callback source is unavailable"))?;
+    let identities = source_identities_for_evaluator(eval)?;
+    let mut matches = identities
+        .iter()
+        .filter(|(filename, _)| filename.as_str() == span.filename());
+    let Some((_, source)) = matches.next() else {
+        anyhow::bail!("Args.add_all callback source is not in the loaded Bzl manifest");
+    };
+    if matches.next().is_some() {
+        anyhow::bail!("Args.add_all callback source is ambiguous");
+    }
+    const RUSTC_SOURCE_SHA256: [u8; 32] = [
+        0xa7, 0x71, 0x25, 0x08, 0xf5, 0x0e, 0x59, 0x52, 0xf3, 0xf5, 0x1e, 0x33, 0xc9, 0x8a, 0xcb,
+        0xe8, 0xba, 0x39, 0x55, 0x4e, 0x9c, 0x6f, 0x6e, 0xdc, 0x26, 0xf1, 0x68, 0x20, 0xd7, 0xc2,
+        0xa9, 0xe4,
+    ];
+    let loaded_digest: [u8; 32] = Sha256::digest(span.file.source().as_bytes()).into();
+    let callsite = span.resolve_span();
+    if source.label.to_string() != "@@rules_rust+//rust/private:rustc.bzl"
+        || loaded_digest != RUSTC_SOURCE_SHA256
+    {
+        anyhow::bail!("Args.add_all callback forms are not supported");
+    }
+    match (callsite.begin.line, callsite.end.line) {
+        (1168, 1168) => Ok(Some(PinnedVectorMapEach::RulesRustCrateRoot)),
+        // The pinned source supplies top-level functions at these expressions.
+        // Bazel omits these vectors without invoking their callback when empty.
+        (1274, 1274) | (2572, 2572) | (2574, 2574) if omitted_empty_source => Ok(None),
+        _ => anyhow::bail!("Args.add_all callback forms are not supported"),
+    }
 }
 
 fn vector_source_is_empty(source: &EvaluatorVectorSourceGen<Value<'_>>) -> bool {
@@ -578,6 +643,10 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
             "short_path" => Some(heap.alloc_str(&self.path()).to_value()),
             "basename" => Some(heap.alloc_str(&self.basename()).to_value()),
             "dirname" => Some(heap.alloc_str(&self.dirname()).to_value()),
+            "is_source" => Some(Value::new_bool(matches!(
+                self.artifact,
+                AnalysisArtifact::Source(_)
+            ))),
             "label" => Some(alloc_starlark_label(
                 heap,
                 match &self.artifact {
@@ -590,9 +659,16 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        ["basename", "dirname", "label", "path", "short_path"]
-            .map(str::to_owned)
-            .to_vec()
+        [
+            "basename",
+            "dirname",
+            "is_source",
+            "label",
+            "path",
+            "short_path",
+        ]
+        .map(str::to_owned)
+        .to_vec()
     }
 }
 

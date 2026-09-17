@@ -28,6 +28,18 @@ gates now clear that invocation and select rules_cc `_def_parser`, an omitted
 existing configured dependency resolution consumes the resulting label. R2,
 groups, and that prerequisite remain one atomic acceptance stack.
 
+WP-7-20 accepts the finite rules_rust 0.73.0 regular-crate-root Args callback.
+Loading authenticates the canonical loaded source identity, SHA-256 and native
+call span; analysis lowers one regular `(File, str)` pair into an immutable
+artifact/root-path recipe with structural equality. Three other pinned call
+sites permit only validated empty omissions. The production-loader proof
+publishes a configured Spawn and rejects/restores changed source in one DICE
+service. File.is_source and default-layout Label.workspace_root are exact for
+the admitted artifact/repository shapes; generated paths and error timing keep
+their existing Slug-native classification. Generic callbacks, directories,
+nonempty dependency mappers and sibling layout remain unsupported. No callable
+or evaluator heap crosses publication, and no new semantic cache/key is added.
+
 ### Analysis surface
 
 - configured target keys and analysis DICE keys;

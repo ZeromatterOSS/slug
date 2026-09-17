@@ -155,6 +155,8 @@ use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::path_observation_shards;
 use starlark_map::small_map::SmallMap;
 
+mod rustc_map_each;
+
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
 enum EventKind {
     Evaluated,
@@ -11192,28 +11194,28 @@ def _format(ctx):
     ctx.actions.args().add("value", format = "%s:%s")
     return []
 
-def _map(value):
+def _get_crate_root_path(value):
     return value
 
 def _bad_args(ctx):
     args = ctx.actions.args()
     mode = ctx.attr.mode
     if mode == "source_order":
-        args.add_all(1, map_each = _map)
+        args.add_all(1, map_each = _get_crate_root_path)
     elif mode == "name_order":
-        args.add_all(1, [], map_each = _map)
+        args.add_all(1, [], map_each = _get_crate_root_path)
     elif mode == "callback_order":
-        args.add_all("--x", 1, map_each = _map)
+        args.add_all("--x", 1, map_each = _get_crate_root_path)
     elif mode == "callback":
-        args.add_all([], map_each = _map)
+        args.add_all([], map_each = _get_crate_root_path)
     elif mode == "joined_source_order":
-        args.add_joined(1, join_with = ",", map_each = _map)
+        args.add_joined(1, join_with = ",", map_each = _get_crate_root_path)
     elif mode == "joined_name_order":
-        args.add_joined(1, [], join_with = ",", map_each = _map)
+        args.add_joined(1, [], join_with = ",", map_each = _get_crate_root_path)
     elif mode == "joined_callback_order":
-        args.add_joined("--x", 1, join_with = ",", map_each = _map)
+        args.add_joined("--x", 1, join_with = ",", map_each = _get_crate_root_path)
     elif mode == "joined_callback":
-        args.add_joined([], join_with = ",", map_each = _map)
+        args.add_joined([], join_with = ",", map_each = _get_crate_root_path)
     elif mode == "closure":
         args.add_all([], allow_closure = True)
     elif mode == "value":

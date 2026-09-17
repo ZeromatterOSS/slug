@@ -85,6 +85,7 @@ use slug_loading_v2::subrule_invocation::EvaluatorArgCallGen;
 use slug_loading_v2::subrule_invocation::EvaluatorArgsSnapshot;
 use slug_loading_v2::subrule_invocation::EvaluatorVectorArgGen;
 use slug_loading_v2::subrule_invocation::EvaluatorVectorSourceGen;
+use slug_loading_v2::subrule_invocation::PinnedVectorMapEach;
 use slug_loading_v2::subrule_invocation::PreparedSubruleInvocation;
 use slug_loading_v2::subrule_invocation::StarlarkArgs;
 use starlark::PrintHandler;
@@ -1565,28 +1566,65 @@ fn lower_vector_arg<'v>(
     value: EvaluatorVectorArgGen<Value<'v>>,
     lowerer: &mut AnalysisValueLowerer<'v>,
 ) -> anyhow::Result<RetainedVectorArg> {
-    let source = match value.source {
-        EvaluatorVectorSourceGen::Sequence(values) => RetainedVectorSource::Sequence(
-            values
-                .into_iter()
-                .map(vector_scalar_value)
-                .collect::<anyhow::Result<Vec<_>>>()?
-                .into(),
-        ),
-        EvaluatorVectorSourceGen::Depset(value) => {
-            let lowered = lowerer
-                .lower(value, "Args vector depset")
-                .map_err(anyhow::Error::msg)?;
-            let AnalysisValueKind::Depset(depset) = lowered.kind() else {
-                anyhow::bail!("Args vector values must be a sequence or depset")
-            };
-            RetainedVectorSource::Depset(
-                RetainedArgsDepset::new(depset.clone())
-                    .map_err(|error| anyhow::anyhow!(error.to_string()))?,
-            )
+    let source = if value.map_each == Some(PinnedVectorMapEach::RulesRustCrateRoot) {
+        lower_rules_rust_crate_root(value.source)?
+    } else {
+        match value.source {
+            EvaluatorVectorSourceGen::Sequence(values) => RetainedVectorSource::Sequence(
+                values
+                    .into_iter()
+                    .map(vector_scalar_value)
+                    .collect::<anyhow::Result<Vec<_>>>()?
+                    .into(),
+            ),
+            EvaluatorVectorSourceGen::Depset(value) => {
+                let lowered = lowerer
+                    .lower(value, "Args vector depset")
+                    .map_err(anyhow::Error::msg)?;
+                let AnalysisValueKind::Depset(depset) = lowered.kind() else {
+                    anyhow::bail!("Args vector values must be a sequence or depset")
+                };
+                RetainedVectorSource::Depset(
+                    RetainedArgsDepset::new(depset.clone())
+                        .map_err(|error| anyhow::anyhow!(error.to_string()))?,
+                )
+            }
         }
     };
     Ok(RetainedVectorArg::new(source, value.options))
+}
+
+fn lower_rules_rust_crate_root(
+    source: EvaluatorVectorSourceGen<Value<'_>>,
+) -> anyhow::Result<RetainedVectorSource> {
+    let EvaluatorVectorSourceGen::Sequence(values) = source else {
+        anyhow::bail!("rules_rust crate-root Args requires one (File, str) tuple")
+    };
+    let [value] = values.as_slice() else {
+        anyhow::bail!("rules_rust crate-root Args requires one (File, str) tuple")
+    };
+    let tuple = TupleRef::from_value(*value)
+        .ok_or_else(|| anyhow::anyhow!("rules_rust crate-root Args requires (File, str)"))?;
+    let mut fields = tuple.iter();
+    let (Some(file), Some(root_path), None) = (fields.next(), fields.next(), fields.next()) else {
+        anyhow::bail!("rules_rust crate-root Args requires (File, str)")
+    };
+    let file = AnalysisArtifactValue::from_starlark(file)
+        .ok_or_else(|| anyhow::anyhow!("rules_rust crate-root Args requires a File"))?;
+    let root_path = root_path
+        .unpack_str()
+        .ok_or_else(|| anyhow::anyhow!("rules_rust crate-root Args requires a string root path"))?;
+    let artifact = file.artifact().clone();
+    if matches!(
+        &artifact,
+        AnalysisArtifact::Derived { output, .. } if output.kind() != ActionOutputKind::File
+    ) {
+        anyhow::bail!("rules_rust crate-root Args requires a regular File")
+    }
+    Ok(RetainedVectorSource::RulesRustRegularCrateRoot {
+        artifact,
+        root_path: root_path.into(),
+    })
 }
 
 fn vector_scalar_value(value: Value<'_>) -> anyhow::Result<slug_build_api_v2::RetainedScalarValue> {

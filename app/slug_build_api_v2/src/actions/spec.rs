@@ -274,6 +274,11 @@ impl RetainedArgsDepset {
 pub enum RetainedVectorSource {
     Sequence(Arc<[RetainedScalarValue]>),
     Depset(RetainedArgsDepset),
+    /// Pinned rules_rust `_get_crate_root_path` for a regular crate-root File.
+    RulesRustRegularCrateRoot {
+        artifact: AnalysisArtifact,
+        root_path: CompactString,
+    },
 }
 
 impl RetainedVectorSource {
@@ -281,6 +286,7 @@ impl RetainedVectorSource {
         match self {
             Self::Sequence(values) => values.iter().map(RetainedScalarValue::render).collect(),
             Self::Depset(values) => values.render(),
+            Self::RulesRustRegularCrateRoot { artifact, .. } => vec![artifact.path().into_owned()],
         }
     }
 
@@ -288,6 +294,16 @@ impl RetainedVectorSource {
         match (self, other) {
             (Self::Sequence(left), Self::Sequence(right)) => left == right,
             (Self::Depset(left), Self::Depset(right)) => left.publication_eq_with(right, state),
+            (
+                Self::RulesRustRegularCrateRoot {
+                    artifact: left_artifact,
+                    root_path: left_root_path,
+                },
+                Self::RulesRustRegularCrateRoot {
+                    artifact: right_artifact,
+                    root_path: right_root_path,
+                },
+            ) => left_artifact == right_artifact && left_root_path == right_root_path,
             _ => false,
         }
     }

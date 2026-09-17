@@ -877,6 +877,39 @@ fn vector_depsets_share_publication_alias_state_with_spawn_inputs() {
 }
 
 #[test]
+fn pinned_regular_crate_root_retains_artifact_and_root_path_identity() {
+    let owner = |name: &str| AnalysisArtifact::Derived {
+        owner: AnalysisConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//pkg:{name}")).unwrap(),
+            b"cfg".as_slice(),
+        ),
+        output: ActionOutput::new("pkg/src/lib.rs", ActionOutputKind::File),
+    };
+    let recipe = |artifact, root_path: &str| {
+        RetainedArgsRecipe::new(
+            vec![RetainedArgCall::AddAll(RetainedVectorArg::new(
+                RetainedVectorSource::RulesRustRegularCrateRoot {
+                    artifact,
+                    root_path: root_path.into(),
+                },
+                default_vector_options(),
+            ))],
+            RetainedParamFileFormat::Multiline,
+        )
+    };
+    let a = recipe(owner("first"), "lib.rs");
+    let same = recipe(owner("first"), "lib.rs");
+    let other_owner = recipe(owner("second"), "lib.rs");
+    let other_root = recipe(owner("first"), "generated.rs");
+    for value in [&a, &same, &other_owner, &other_root] {
+        assert_eq!(value.render(), ["pkg/src/lib.rs"]);
+    }
+    assert_eq!(a, same);
+    assert_ne!(a, other_owner);
+    assert_ne!(a, other_root);
+}
+
+#[test]
 fn retained_args_graph_values_are_allocative_and_cheap_to_clone() {
     fn assert_allocative<T: Allocative>() {}
     fn assert_dupe<T: Dupe>() {}

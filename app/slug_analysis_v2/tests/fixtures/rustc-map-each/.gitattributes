@@ -1,0 +1,2 @@
+# Preserve the exact bytes emitted by the pinned upstream proxy writer.
+cc_compatibility_proxy/symbols.bzl whitespace=-blank-at-eol,-blank-at-eof

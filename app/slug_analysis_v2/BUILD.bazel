@@ -69,7 +69,11 @@ rust_test(
 
 rust_test(
     name = "starlark_rule_test",
-    srcs = ["tests/starlark_rule.rs"],
+    srcs = ["tests/starlark_rule.rs"] + glob(["tests/rustc_map_each/*.rs"]),
+    compile_data = glob([
+        "tests/fixtures/rustc-map-each/**/*.bzl",
+        "tests/rustc_map_each/*.bzl",
+    ]),
     edition = crate_edition(),
     size = "small",
     visibility = ["//visibility:private"],

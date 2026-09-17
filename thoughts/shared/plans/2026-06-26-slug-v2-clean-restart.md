@@ -29,17 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-19-m7a-external-build-script-flags-r1
-Status: accepted; five exact generated-flag artifacts add no named feature cfg
+Packet: WP-7-20-m7a-rustc-callback-proof-r1
+Status: accepted; committing and pushing the reviewed checkpoint
 
-The accepted CLI-root Bazel build at `8f3ddef8b` materialized five previously
-unobserved `_bs.flags` artifacts for `ahash`, `num-traits` and `rustix` in
-target/exec configurations. The current packet ties their exact bytes to the
-saved producer/consumer graph: all contain only non-feature cfgs, and both
-target/exec pairs are byte-equal. No new build or test ran. Other external
-feature/pin correspondence and M7A remain open. The callback candidate
-remains unaccepted at local `review/wp-7-11-rustc-crate-root-map-each`
-(`ea5fcc6fd`).
+The pinned regular-crate-root callback is accepted through the real loaded
+rules_rust argument builder, configured Spawn publication and same-DICE source
+A/B/A. The demanded File.is_source and default-layout Label.workspace_root
+properties are accepted with it. Focused/protected/API tests pass in subsecond
+batches, direct dependents compile, and independent final review accepts the
+55-file source closure. M7A remains open: remaining demanded callbacks and
+virtual parameter-file staging still require admission. The manifest records
+scope, source provenance and validation; WP-7-19 at `18ef4288b` remains the
+accepted predecessor.
 
 ### Earlier generated-input receipt
 

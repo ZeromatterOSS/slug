@@ -85,8 +85,29 @@ impl<'v> StarlarkValue<'v> for StarlarkLabel {
             "repo_name" | "workspace_name" => {
                 Some(heap.alloc_str(self.0.package().repo().as_str()).to_value())
             }
+            "workspace_root" => {
+                let repository = self.0.package().repo().as_str();
+                let root = if repository.is_empty() {
+                    String::new()
+                } else {
+                    format!("external/{repository}")
+                };
+                Some(heap.alloc_str(&root).to_value())
+            }
             _ => None,
         }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        [
+            "name",
+            "package",
+            "repo_name",
+            "workspace_name",
+            "workspace_root",
+        ]
+        .map(str::to_owned)
+        .to_vec()
     }
 
     fn get_methods() -> Option<&'static Methods> {
