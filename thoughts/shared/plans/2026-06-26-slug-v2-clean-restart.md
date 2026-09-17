@@ -29,16 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-23-m7a-forced-virtual-paramfiles-r1
+Packet: WP-7-24-m7a-bzl-source-provenance-r1
 Status: accepted; reviewed checkpoint ready for integration
 
-Forced Spawn parameter-file expansion and atomic REAPI input-tree composition
-are accepted with output/input collision checks, authentic Rustc argv/bytes and
-11 focused passing tests. Independent final review and direct consumers pass;
-typed execution remains gated.
-WP-7-22 at `36cb5fa3a` accepted the two crate-provider callback sites with real
-builder/metadata/alias and same-DICE proofs. The manifest owns the virtual-input
-contract. Full Rustc/CLI execution and M7A remain open.
+Observed per-module source digests now travel through the existing Bzl manifest
+and configured evaluator carrier. Ten focused tests, direct consumer checks and
+independent final review pass. Future native-link recipes can authenticate their
+imported utility implementations without host reads.
+WP-7-23 at `d26b42a51` accepted forced virtual argv/bytes and atomic REAPI input
+composition. Native-link callback and typed execution admission remain open.
 
 ### Earlier generated-input receipt
 

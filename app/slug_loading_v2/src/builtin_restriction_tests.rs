@@ -150,16 +150,18 @@ fn pinned_allowlist_inventory_and_repository_branches_are_exact() {
 
 #[test]
 fn caller_manifest_participates_structurally() {
-    let first: Arc<[(CompactString, BzlModuleIdentity)]> =
-        Arc::from([("defs.bzl".into(), identity("", "user", &[("rules_cc", "")]))]);
-    let second: Arc<[(CompactString, BzlModuleIdentity)]> = Arc::from([(
+    let first: Arc<[(CompactString, BzlModuleSourceProvenance)]> = Arc::from([(
         "defs.bzl".into(),
-        identity("", "user", &[("rules_rust", "")]),
+        BzlModuleSourceProvenance::new(identity("", "user", &[("rules_cc", "")]), [0; 32]),
+    )]);
+    let second: Arc<[(CompactString, BzlModuleSourceProvenance)]> = Arc::from([(
+        "defs.bzl".into(),
+        BzlModuleSourceProvenance::new(identity("", "user", &[("rules_rust", "")]), [0; 32]),
     )]);
     assert_ne!(first, second);
-    assert!(allows(&first[0].1));
-    assert!(!allows(&second[0].1));
-    assert!(allows(&first[0].1));
+    assert!(allows(&first[0].1.identity));
+    assert!(!allows(&second[0].1.identity));
+    assert!(allows(&first[0].1.identity));
 }
 
 struct OneModuleLoader {
@@ -229,9 +231,15 @@ fn invoke_configured_restriction_function(
 fn custom_private_api_checks_tuple_coercion_depth_and_caller_identity() {
     let allowed = identity("rules_cc+0.2.17", "cc/private", &[]);
     let denied = identity("consumer+1.0", "app", &[]);
-    let identities: Arc<[(CompactString, BzlModuleIdentity)]> = Arc::from([
-        ("allowed.bzl".into(), allowed.clone()),
-        ("denied.bzl".into(), denied),
+    let identities: Arc<[(CompactString, BzlModuleSourceProvenance)]> = Arc::from([
+        (
+            "allowed.bzl".into(),
+            BzlModuleSourceProvenance::new(allowed.clone(), [0; 32]),
+        ),
+        (
+            "denied.bzl".into(),
+            BzlModuleSourceProvenance::new(denied, [0; 32]),
+        ),
     ]);
     let context = BzlEvaluationContext::macro_runtime_context(allowed, identities);
     let allowed_module = freeze_restriction_source(

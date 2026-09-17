@@ -1400,7 +1400,10 @@ compatibility=module_extension(implementation=impl)
             "@@rules_cc+//cc/toolchains:toolchain_config_utils.bzl"
         );
         assert_eq!(
-            observed_module.manifest.reachable[2].label.to_string(),
+            observed_module.manifest.reachable[2]
+                .identity
+                .label
+                .to_string(),
             "@@rules_cc+//cc/private/toolchain:escape.bzl"
         );
 
@@ -2241,7 +2244,10 @@ ext=module_extension(implementation=impl)
         let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
             root: owner.clone(),
             direct_children: Arc::from([]),
-            reachable: Arc::from([owner]),
+            reachable: [owner]
+                .into_iter()
+                .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+                .collect(),
             fingerprint: [0; 32],
         });
         let ast = AstModule::parse(

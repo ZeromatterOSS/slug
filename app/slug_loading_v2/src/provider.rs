@@ -68,6 +68,7 @@ use starlark_map::small_map::SmallMap;
 
 use crate::bzl_module::BzlLoadManifest;
 use crate::bzl_module::BzlModuleIdentity;
+use crate::bzl_module::BzlModuleSourceProvenance;
 use crate::bzl_module::manifest_starlark_sources;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::starlark_label::StarlarkLabel;
@@ -212,7 +213,7 @@ impl<'v> StarlarkValue<'v> for RunEnvironmentInfo {
 pub(crate) struct BzlEvaluationContext {
     source_label: CompactString,
     source_identity: BzlModuleIdentity,
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     bzl_load_visibility: RefCell<Option<BzlLoadVisibility>>,
 }
 
@@ -225,7 +226,7 @@ pub struct TransitionEvaluationContext(BzlEvaluationContext);
 impl TransitionEvaluationContext {
     pub fn new(
         source_identity: BzlModuleIdentity,
-        source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+        source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     ) -> Self {
         Self(BzlEvaluationContext::macro_runtime_context(
             source_identity,
@@ -352,10 +353,12 @@ impl BzlEvaluationContext {
         if caller.is_none() && self.source_identities_by_filename.is_empty() {
             return Ok(&self.source_identity);
         }
-        let mut identities = self
-            .source_identities_by_filename
-            .iter()
-            .filter_map(|(source, identity)| (source.as_str() == filename).then_some(identity));
+        let mut identities =
+            self.source_identities_by_filename
+                .iter()
+                .filter_map(|(source, identity)| {
+                    (source.as_str() == filename).then_some(&identity.identity)
+                });
         let identity = identities.next().ok_or_else(|| {
             anyhow::anyhow!(
                 "Starlark caller source is not present in the recursive Bzl manifest: {filename}"
@@ -369,7 +372,7 @@ impl BzlEvaluationContext {
 
     pub(crate) fn macro_runtime_context(
         source_identity: BzlModuleIdentity,
-        source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+        source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     ) -> Self {
         let canonical_source = source_identity.label.to_string();
         let source_label = if source_identity.label.package().repo().is_root() {
@@ -390,7 +393,7 @@ impl BzlEvaluationContext {
 
     pub(crate) fn source_identities_by_filename(
         &self,
-    ) -> Arc<[(CompactString, BzlModuleIdentity)]> {
+    ) -> Arc<[(CompactString, BzlModuleSourceProvenance)]> {
         self.source_identities_by_filename.clone()
     }
 

@@ -214,6 +214,23 @@ pub struct BzlModuleIdentity {
     pub repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
 }
 
+/// Observed bytes associated with a lexical module identity. This is produced
+/// from the same source used for evaluation, never from a later host read.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct BzlModuleSourceProvenance {
+    pub identity: BzlModuleIdentity,
+    pub source_digest: [u8; 32],
+}
+
+impl BzlModuleSourceProvenance {
+    pub fn new(identity: BzlModuleIdentity, source_digest: [u8; 32]) -> Self {
+        Self {
+            identity,
+            source_digest,
+        }
+    }
+}
+
 /// Flat, immutable loading provenance for one evaluated `.bzl` root.
 ///
 /// Direct children retain source order with label-first deduplication.
@@ -224,7 +241,7 @@ pub struct BzlModuleIdentity {
 pub struct BzlLoadManifest {
     pub root: BzlModuleIdentity,
     pub direct_children: Arc<[BzlModuleIdentity]>,
-    pub reachable: Arc<[BzlModuleIdentity]>,
+    pub reachable: Arc<[BzlModuleSourceProvenance]>,
     pub fingerprint: [u8; 32],
 }
 
@@ -605,13 +622,13 @@ impl BzlLoadManifest {
                 direct_indices.push(index);
             }
         }
-        let mut reachable = vec![root.clone()];
+        let mut reachable = vec![BzlModuleSourceProvenance::new(root.clone(), source_digest)];
         let mut seen_labels = SmallSet::with_capacity(direct_children.len() + 1);
         seen_labels.insert(root.label.clone());
         for module in &direct_modules {
-            for identity in module.borrow().manifest.reachable.iter() {
-                if seen_labels.insert(identity.label.clone()) {
-                    reachable.push(identity.clone());
+            for provenance in module.borrow().manifest.reachable.iter() {
+                if seen_labels.insert(provenance.identity.label.clone()) {
+                    reachable.push(provenance.clone());
                 }
             }
         }
@@ -1404,12 +1421,12 @@ pub(crate) fn starlark_source_name(path: &Path) -> Option<String> {
 
 pub(crate) fn manifest_starlark_sources(
     manifest: &BzlLoadManifest,
-) -> Arc<[(CompactString, BzlModuleIdentity)]> {
+) -> Arc<[(CompactString, BzlModuleSourceProvenance)]> {
     manifest
         .reachable
         .iter()
         .map(|identity| {
-            let source = starlark_source_name(&identity.workspace_path)
+            let source = starlark_source_name(&identity.identity.workspace_path)
                 .expect("manifest paths were accepted as Starlark source names");
             (source.into(), identity.clone())
         })
@@ -7834,14 +7851,14 @@ fn first_seen_direct_roots(loaded_modules: &[(String, FrozenBzlModule)]) -> Vec<
 
 fn package_bzl_call_sources(
     loaded_modules: &[(String, FrozenBzlModule)],
-) -> Option<Arc<[(CompactString, BzlModuleIdentity)]>> {
+) -> Option<Arc<[(CompactString, BzlModuleSourceProvenance)]>> {
     let mut seen_labels = SmallSet::new();
     let sources = loaded_modules
         .iter()
         .flat_map(|(_, module)| module.manifest.reachable.iter())
-        .filter(|identity| seen_labels.insert(identity.label.clone()))
+        .filter(|identity| seen_labels.insert(identity.identity.label.clone()))
         .map(|identity| {
-            let source = starlark_source_name(&identity.workspace_path)
+            let source = starlark_source_name(&identity.identity.workspace_path)
                 .expect("manifest paths were accepted as Starlark source names");
             (source.into(), identity.clone())
         })

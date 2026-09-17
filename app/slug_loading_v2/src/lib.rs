@@ -82,6 +82,7 @@ pub use bzl_module::BuildFileCompanion;
 pub use bzl_module::BzlLoadManifest;
 pub use bzl_module::BzlModuleEvaluator;
 pub use bzl_module::BzlModuleIdentity;
+pub use bzl_module::BzlModuleSourceProvenance;
 pub use bzl_module::EvaluatedBzlModule;
 #[doc(hidden)]
 pub use bzl_module::ObservedRepositoryPackageLoad;

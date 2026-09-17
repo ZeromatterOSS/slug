@@ -6,6 +6,7 @@ use compact_str::CompactString;
 use starlark::eval::Evaluator;
 
 use crate::BzlModuleIdentity;
+use crate::BzlModuleSourceProvenance;
 use crate::provider::BzlEvaluationContext;
 use crate::subrule_invocation::AnalysisEvaluationContext;
 
@@ -23,7 +24,7 @@ pub(crate) struct CustomAllowlistEntry {
 
 pub(crate) fn source_identities_for_evaluator(
     eval: &Evaluator<'_, '_, '_>,
-) -> anyhow::Result<Arc<[(CompactString, BzlModuleIdentity)]>> {
+) -> anyhow::Result<Arc<[(CompactString, BzlModuleSourceProvenance)]>> {
     if let Ok(context) = BzlEvaluationContext::from_evaluator(eval) {
         return Ok(context.source_identities_by_filename());
     }
@@ -154,7 +155,7 @@ const INTERNAL_STARLARK_API_ALLOWLIST: &[AllowlistEntry] = &[
 
 pub(crate) fn check_default_allowlist(
     eval: &Evaluator<'_, '_, '_>,
-    identities: &Arc<[(CompactString, BzlModuleIdentity)]>,
+    identities: &Arc<[(CompactString, BzlModuleSourceProvenance)]>,
 ) -> anyhow::Result<()> {
     let filename = eval
         .native_caller_function_filename()
@@ -168,7 +169,7 @@ pub(crate) fn check_default_allowlist(
 
 pub(crate) fn check_custom_allowlist(
     eval: &Evaluator<'_, '_, '_>,
-    identities: &Arc<[(CompactString, BzlModuleIdentity)]>,
+    identities: &Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     allowlist: &[CustomAllowlistEntry],
     depth: usize,
 ) -> anyhow::Result<()> {
@@ -191,11 +192,11 @@ pub(crate) fn check_custom_allowlist(
 
 fn identity_for_filename<'a>(
     filename: &str,
-    identities: &'a Arc<[(CompactString, BzlModuleIdentity)]>,
+    identities: &'a Arc<[(CompactString, BzlModuleSourceProvenance)]>,
 ) -> anyhow::Result<&'a BzlModuleIdentity> {
-    let mut matches = identities
-        .iter()
-        .filter_map(|(candidate, identity)| (candidate.as_str() == filename).then_some(identity));
+    let mut matches = identities.iter().filter_map(|(candidate, identity)| {
+        (candidate.as_str() == filename).then_some(&identity.identity)
+    });
     let identity = matches.next().ok_or_else(|| {
         anyhow::anyhow!(
             "Starlark caller source is not present in the recursive Bzl manifest: {filename}"

@@ -65,6 +65,7 @@ use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 use crate::BzlModuleIdentity;
+use crate::BzlModuleSourceProvenance;
 use crate::analysis_fragments::SubruleFragmentCollection;
 use crate::builtin_restriction::source_identities_for_evaluator;
 use crate::provider::alloc_starlark_label;
@@ -494,16 +495,9 @@ fn classify_add_all_callback(
     if matches.next().is_some() {
         anyhow::bail!("Args.add_all callback source is ambiguous");
     }
-    const RUSTC_SOURCE_SHA256: [u8; 32] = [
-        0xa7, 0x71, 0x25, 0x08, 0xf5, 0x0e, 0x59, 0x52, 0xf3, 0xf5, 0x1e, 0x33, 0xc9, 0x8a, 0xcb,
-        0xe8, 0xba, 0x39, 0x55, 0x4e, 0x9c, 0x6f, 0x6e, 0xdc, 0x26, 0xf1, 0x68, 0x20, 0xd7, 0xc2,
-        0xa9, 0xe4,
-    ];
     let loaded_digest: [u8; 32] = Sha256::digest(span.file.source().as_bytes()).into();
     let callsite = span.resolve_span();
-    if source.label.to_string() != "@@rules_rust+//rust/private:rustc.bzl"
-        || loaded_digest != RUSTC_SOURCE_SHA256
-    {
+    if !is_pinned_rustc_source(source, loaded_digest) {
         anyhow::bail!("Args.add_all callback forms are not supported");
     }
     match (callsite.begin.line, callsite.end.line) {
@@ -534,6 +528,49 @@ fn classify_add_all_callback(
             RustCrateArgMapper::DependencyDir,
         ))),
         _ => anyhow::bail!("Args.add_all callback forms are not supported"),
+    }
+}
+
+fn is_pinned_rustc_source(source: &BzlModuleSourceProvenance, evaluated_digest: [u8; 32]) -> bool {
+    const RUSTC_SOURCE_SHA256: [u8; 32] = [
+        0xa7, 0x71, 0x25, 0x08, 0xf5, 0x0e, 0x59, 0x52, 0xf3, 0xf5, 0x1e, 0x33, 0xc9, 0x8a, 0xcb,
+        0xe8, 0xba, 0x39, 0x55, 0x4e, 0x9c, 0x6f, 0x6e, 0xdc, 0x26, 0xf1, 0x68, 0x20, 0xd7, 0xc2,
+        0xa9, 0xe4,
+    ];
+    source.identity.label.to_string() == "@@rules_rust+//rust/private:rustc.bzl"
+        && source.source_digest == evaluated_digest
+        && evaluated_digest == RUSTC_SOURCE_SHA256
+}
+
+#[cfg(test)]
+mod source_provenance_tests {
+    use super::*;
+
+    #[test]
+    fn pinned_args_source_requires_matching_observed_digest() {
+        // Pinned rustc.bzl content SHA from the authentic source fixture.
+        let hex = "a7712508f50e5952f3f51e33c98acbe8ba39554e9c6f6edc26f16820d7c2a9e4";
+        let digest = std::array::from_fn(|index| {
+            u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).unwrap()
+        });
+        let mut source = BzlModuleSourceProvenance::new(
+            BzlModuleIdentity {
+                label: CanonicalLabel::parse("@@rules_rust+//rust/private:rustc.bzl").unwrap(),
+                workspace_path: std::path::PathBuf::from("/workspace/rustc.bzl"),
+                repository_mapping: Arc::from([]),
+            },
+            digest,
+        );
+        assert!(is_pinned_rustc_source(&source, digest));
+        source.source_digest[0] ^= 1;
+        assert!(!is_pinned_rustc_source(&source, digest));
+        assert!(!is_pinned_rustc_source(&source, source.source_digest));
+        source.source_digest = digest;
+        let mut evaluated = digest;
+        evaluated[1] ^= 1;
+        assert!(!is_pinned_rustc_source(&source, evaluated));
+        source.identity.label = CanonicalLabel::parse("@@other+//rust/private:rustc.bzl").unwrap();
+        assert!(!is_pinned_rustc_source(&source, digest));
     }
 }
 
@@ -780,7 +817,7 @@ struct AnalysisEvaluationPayload {
     action_sink: Arc<dyn AnalysisActionSink>,
     cpp_fragment: FrozenValue,
     coverage_fragment: FrozenValue,
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
 }
 
 impl AnalysisEvaluationContext {
@@ -790,7 +827,7 @@ impl AnalysisEvaluationContext {
         target_label: CanonicalLabel,
         action_sink: Arc<dyn AnalysisActionSink>,
         cpp_fragment: FrozenValue,
-        source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+        source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     ) -> Self {
         Self::new_with_coverage(
             direct,
@@ -810,7 +847,7 @@ impl AnalysisEvaluationContext {
         action_sink: Arc<dyn AnalysisActionSink>,
         cpp_fragment: FrozenValue,
         coverage_fragment: FrozenValue,
-        source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+        source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     ) -> Self {
         let stack = Arc::new(Mutex::new(AnalysisCallStack {
             next: 1,
@@ -855,7 +892,7 @@ impl AnalysisEvaluationContext {
 
     pub(crate) fn source_identities_by_filename(
         &self,
-    ) -> &Arc<[(CompactString, BzlModuleIdentity)]> {
+    ) -> &Arc<[(CompactString, BzlModuleSourceProvenance)]> {
         &self.payload.source_identities_by_filename
     }
 

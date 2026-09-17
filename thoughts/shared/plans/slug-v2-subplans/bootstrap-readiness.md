@@ -273,7 +273,8 @@ bytes. WP-7-20/21/22 accept source-pinned regular-crate-root, four regular-File
 dirname and two nonempty crate-provider sites, with real `construct_arguments`
 configured Spawn, metadata/alias selection, parameter bytes and same-DICE
 A/B/A proofs. WP-7-23 adds forced replacement argv/virtual bytes and atomic
-REAPI input-tree composition with output/input collision checks. Other builder
+REAPI input-tree composition with output/input collision checks. WP-7-24 adds
+observed per-module source provenance needed to authenticate imported helpers. Other builder
 paths, native-link callbacks, conditional spilling and resolved-input execution
 staging remain open. The Spawn and Args/param-file rows therefore remain open;
 these configured/component slices do not prove Rustc execution.

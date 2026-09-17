@@ -26,6 +26,7 @@ use slug_identity_v2::CanonicalRepoName;
 use starlark::values::FrozenValue;
 
 use crate::bzl_module::BzlModuleIdentity;
+use crate::bzl_module::BzlModuleSourceProvenance;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
 pub enum AttributeKind {
@@ -545,7 +546,7 @@ pub struct TransitionDefinition {
     inputs: Arc<[TransitionSetting]>,
     outputs: Arc<[TransitionSetting]>,
     definition_source: Arc<BzlModuleIdentity>,
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
 }
 impl TransitionDefinition {
     pub fn new(
@@ -553,7 +554,7 @@ impl TransitionDefinition {
         inputs: Arc<[TransitionSetting]>,
         outputs: Arc<[TransitionSetting]>,
         definition_source: Arc<BzlModuleIdentity>,
-        source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+        source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     ) -> Self {
         Self {
             implementation,
@@ -575,7 +576,9 @@ impl TransitionDefinition {
     pub fn definition_source(&self) -> &Arc<BzlModuleIdentity> {
         &self.definition_source
     }
-    pub fn source_identities_by_filename(&self) -> &Arc<[(CompactString, BzlModuleIdentity)]> {
+    pub fn source_identities_by_filename(
+        &self,
+    ) -> &Arc<[(CompactString, BzlModuleSourceProvenance)]> {
         &self.source_identities_by_filename
     }
 }

@@ -1259,7 +1259,7 @@ fn package_manifest_preserves_direct_edges_and_first_seen_diamond_closure() {
         a.manifest
             .reachable
             .iter()
-            .map(|identity| identity.label.to_string())
+            .map(|identity| identity.identity.label.to_string())
             .collect::<Vec<_>>(),
         vec!["@@//pkg:a.bzl", "@@//pkg:shared.bzl", "@@//pkg:other.bzl",]
     );

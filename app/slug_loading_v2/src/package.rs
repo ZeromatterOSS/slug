@@ -97,6 +97,7 @@ use crate::attrs::RuleClassAdmissibility;
 use crate::attrs::TransitionDefinition as LoadingTransitionDefinition;
 use crate::attrs::TransitionSetting;
 use crate::bzl_module::BzlModuleIdentity;
+use crate::bzl_module::BzlModuleSourceProvenance;
 use crate::bzl_module::FrozenBzlLifetimeEntry;
 use crate::bzl_module::LoadingPrintCapture;
 use crate::bzl_visibility::bzl_visibility_globals;
@@ -878,7 +879,7 @@ pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
     implementation: FrozenValue,
     definition_source: Arc<BzlModuleIdentity>,
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     dependencies: Arc<[CanonicalLabel]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     declared_exec_groups: Arc<[(CompactString, DeclaredExecGroup)]>,
@@ -932,7 +933,9 @@ impl StarlarkRuleImplementation {
     }
 
     #[doc(hidden)]
-    pub fn source_identities_by_filename(&self) -> &Arc<[(CompactString, BzlModuleIdentity)]> {
+    pub fn source_identities_by_filename(
+        &self,
+    ) -> &Arc<[(CompactString, BzlModuleSourceProvenance)]> {
         &self.source_identities_by_filename
     }
 
@@ -1295,7 +1298,7 @@ pub(crate) struct PackageRecorder {
     package: CompactString,
     package_identifier: PackageIdentifier,
     repository_mapping: PackageRecorderRepositoryMapping,
-    bzl_call_sources: Option<Arc<[(CompactString, BzlModuleIdentity)]>>,
+    bzl_call_sources: Option<Arc<[(CompactString, BzlModuleSourceProvenance)]>>,
     print_capture: Option<Rc<LoadingPrintCapture>>,
     state: RefCell<PackageState>,
 }
@@ -1340,7 +1343,7 @@ impl PackageRecorder {
 
     pub(crate) fn with_bzl_call_sources(
         mut self,
-        sources: Option<Arc<[(CompactString, BzlModuleIdentity)]>>,
+        sources: Option<Arc<[(CompactString, BzlModuleSourceProvenance)]>>,
     ) -> Self {
         debug_assert!(sources.as_ref().is_none_or(|sources| !sources.is_empty()));
         self.bzl_call_sources = sources;
@@ -1364,9 +1367,9 @@ impl PackageRecorder {
             .bzl_call_sources
             .as_deref()
             .ok_or_else(|| anyhow::anyhow!(DIRECT_ALIAS_ERROR))?;
-        let mut matches = sources
-            .iter()
-            .filter_map(|(source, identity)| (source.as_str() == filename).then_some(identity));
+        let mut matches = sources.iter().filter_map(|(source, identity)| {
+            (source.as_str() == filename).then_some(&identity.identity)
+        });
         let identity = matches.next().ok_or_else(|| {
             if filename.ends_with(".bzl") {
                 anyhow::anyhow!(
@@ -1732,7 +1735,7 @@ impl PackageRecorder {
         name: String,
         implementation: FrozenValue,
         definition_source: Arc<BzlModuleIdentity>,
-        source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+        source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
         required_toolchains: Arc<[ToolchainTypeRequirement]>,
         declared_exec_groups: Arc<[(CompactString, DeclaredExecGroup)]>,
         advertised_providers: Arc<[ProviderIdentity]>,
@@ -3965,7 +3968,7 @@ struct RuleDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     definition_source: Arc<BzlModuleIdentity>,
     #[trace(unsafe_ignore)]
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     #[trace(unsafe_ignore)]
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     #[trace(unsafe_ignore)]
@@ -3999,7 +4002,7 @@ pub(crate) struct FrozenRuleDefinition {
     declared_exec_groups: Option<Arc<[(CompactString, DeclaredExecGroup)]>>,
     named_exec_transition_attributes: Option<Arc<[(u32, CompactString)]>>,
     definition_source: Arc<BzlModuleIdentity>,
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     required_toolchains: Arc<[ToolchainTypeRequirement]>,
     advertised_providers: Arc<[ProviderIdentity]>,
     required_fragments: Arc<[CompactString]>,
@@ -4152,7 +4155,7 @@ struct SymbolicMacroDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     definition_source: Arc<BzlModuleIdentity>,
     #[trace(unsafe_ignore)]
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     #[trace(unsafe_ignore)]
     attributes: Arc<[MacroAttributeSchema]>,
     #[trace(unsafe_ignore)]
@@ -4168,7 +4171,7 @@ type SymbolicMacroDefinition<'v> = SymbolicMacroDefinitionGen<Value<'v>>;
 struct FrozenSymbolicMacroDefinition {
     implementation: FrozenValue,
     definition_source: Arc<BzlModuleIdentity>,
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     attributes: Arc<[MacroAttributeSchema]>,
     documentation: Option<CompactString>,
     exported_name: CompactString,
@@ -5599,7 +5602,7 @@ pub(crate) struct TransitionDefinitionGen<V> {
     definition_source: Arc<BzlModuleIdentity>,
     #[trace(unsafe_ignore)]
     #[freeze(identity)]
-    source_identities_by_filename: Arc<[(CompactString, BzlModuleIdentity)]>,
+    source_identities_by_filename: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
 }
 type TransitionDefinition<'v> = TransitionDefinitionGen<Value<'v>>;
 pub(crate) type FrozenTransitionDefinition = TransitionDefinitionGen<FrozenValue>;
@@ -5642,7 +5645,7 @@ impl FrozenTransitionDefinition {
     #[cfg(test)]
     pub(crate) fn source_identities_by_filename(
         &self,
-    ) -> &Arc<[(CompactString, BzlModuleIdentity)]> {
+    ) -> &Arc<[(CompactString, BzlModuleSourceProvenance)]> {
         &self.source_identities_by_filename
     }
 }

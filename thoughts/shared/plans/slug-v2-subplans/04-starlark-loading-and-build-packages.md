@@ -10,6 +10,17 @@ current/next/stop language in the detailed owner record below describes its
 historical packet; it cannot override the live contract or current user request.
 Read a particular retained decision as needed, not this complete chronology.
 
+WP-7-24 enriches each `BzlLoadManifest.reachable` row with observed source
+SHA-256 beside its unchanged lexical `BzlModuleIdentity`. All three loading
+routes supply the digest of the source they evaluate. The first-seen recursive
+closure and both filename projections carry that single provenance row through
+rules, macros, transitions, fragments and configured evaluation. No separate
+digest map or host read is introduced; aggregate fingerprint and frozen-module
+lifetime ownership remain unchanged. Existing pinned Args admission requires
+agreement between this observed digest, the evaluated caller span and the pinned
+source SHA. Imported helper authentication can consume the same carrier when
+its callback family is separately admitted.
+
 ## Goal
 
 Load and evaluate Bazel `BUILD.bazel` and `.bzl` files with starlark-rust,

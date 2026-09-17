@@ -238,7 +238,10 @@ fn frozen_macro(source: &str) -> FrozenBzlModule {
         manifest: BzlLoadManifest {
             root: identity.clone(),
             direct_children: Arc::from([]),
-            reachable: Arc::from([identity]),
+            reachable: [identity]
+                .into_iter()
+                .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+                .collect(),
             fingerprint: digest(source),
         },
         retained_bzl_modules: Arc::from([]),

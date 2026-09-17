@@ -58,6 +58,13 @@ virtual-file collisions with every output. Conditional spilling is unsupported
 pending command-line-limit ownership. No retained identity or DICE key changes.
 Stage 7 owns atomic input-tree composition; execution admission remains open.
 
+WP-7-24 carries each loaded module's observed source SHA through the existing
+shared filename/provenance table into `AnalysisEvaluationContext`. Rule equality
+includes the table; the pinned Args classifier compares manifest, evaluated
+caller and pinned digests. This prepares authentication of imported native-link
+helpers without retaining evaluator objects or reading source files in analysis.
+Native-link callbacks and Cc constructors remain unadmitted.
+
 ### Analysis surface
 
 - configured target keys and analysis DICE keys;

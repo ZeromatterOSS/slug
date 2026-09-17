@@ -1,133 +1,112 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-23-m7a-forced-virtual-paramfiles-r1
-Status: accepted; independently reviewed checkpoint ready for integration
+Packet: WP-7-24-m7a-bzl-source-provenance-r1
+Status: accepted; independent design and final reviews ACCEPT
 
-## Outcome, demand and compatibility
+## Outcome and demand
 
-Expand typed Spawn Args with `use_param_file(..., use_always=True)` into one
-immutable result containing replacement argv and virtual parameter-file bytes,
-then merge those virtual inputs into an existing REAPI input tree atomically.
-Demand: pinned rules_rust rustc.bzl:1168 selects multiline `@%s` with use_always
-when the process wrapper is present; the authentic configured Spawn at
-`36cb5fa3a` proves that retained policy. Its real-source proof will now assert
-expanded argv and bytes. Complete this generic forced-spill behavior for the
-three already-admitted Args formats (shell/multiline/flag_per_line), including
-flag-only partitioning, empty files, numbering and interleaved literal chunks.
+Retain each loaded Bzl module's observed source SHA alongside its lexical
+identity, and transport that provenance through the existing source-filename
+carrier to configured evaluation. Existing pinned Args callback classification
+must compare the caller's evaluated source with its manifest-owned digest.
+This is Slug-native source/admission integrity, not a new Bazel surface.
 
-Filename suffix, substitution, partition order and content use pinned Bazel
-9.2 algorithms. The base output/artifact paths retain Slug-native spelling;
-parameter files do not establish exact Bazel output identity. Exact CAS digests
-and protobuf topology apply to the actual produced bytes. Conservative collision
-and invalid-path rejection are Slug-native validation. Conditional spill
-(use_always=False) stays unsupported until its command-line-limit policy has an
-authoritative owner; do not guess host limits. Output-path stripping is deferred.
+Demand: the next native-link callbacks in pinned rules_rust rustc.bzl
+(`_libraries_dirnames`, `_make_link_flags_default_*`) depend on imported
+utils.bzl `get_preferred_artifact` and `get_lib_name_default`. Hashing the native
+caller's rustc.bzl span cannot authenticate those imported implementations.
+At d26b42a51 the manifest retains their aggregate fingerprint but discards each
+source SHA needed by the consumer. That prerequisite must be fixed before
+mapping those functions into retained Rust recipes. No native-link callbacks,
+Cc constructors, or execution surfaces are admitted by this packet.
 
-This admits expansion and input-tree composition, not typed Spawn execution,
-source/generated-file resolution, inherited env resolution, aquery activation,
-transport or M7A. Existing typed-action rejection and resolved-closure execution
-gates remain. The new result is a required component for that later handoff.
+## Ownership and representation
 
-## Source and ownership
+`BzlLoadManifest::new` receives observed root source bytes' SHA in all three
+loading routes. Its flat first-seen reachable closure will retain
+`BzlModuleSourceProvenance { identity, source_digest }` per module. Keep lexical
+`BzlModuleIdentity`, load order/dedup, aggregate fingerprint, repository mapping
+and frozen-module lifetime ownership unchanged. The two projections
+`manifest_starlark_sources` and `package_bzl_call_sources` derive filename plus
+that provenance. Replace the existing shared carrier throughout loading and
+analysis; do not introduce a parallel digest bag, filesystem read, cache or
+fallback for missing evidence. Non-source consumers borrow the identity field.
 
-Bazel source commit `8220c6198837d5c13d53fea211cf3282aa12408a`:
-CommandLines.expand (74–153), ParameterFile.derivePath/writeParameterFile
-(73–99), Args.getParamFileInfo/setParamFileFormat, and SpawnAction.getSpawn
-(358–379). Base path is the first declared primary output; forced files are
-numbered in spilled-chunk order as `<output>-0.params`, `-1.params`, etc.
-FlagPerLine groups already belong to RetainedArgsRecipe; virtual files contain
-only `--`-prefixed rendered flags, with other rendered arguments kept after the
-replacement argument. Shell quoting and newline rendering reuse the existing
-ArgsWrite recipe owner; an empty recipe produces zero bytes, still one file.
+This is loading/DICE-retained semantic memory using existing immutable Arc
+slices, CompactString, SmallSet and Allocative (Stage 9 utility dispositions).
+Digests come only from the already observed source used to evaluate the module.
+Source changes continue through child manifests and their aggregate fingerprint;
+provenance participates in equality and rule publication. Frozen values and
+source-text scratch do not become provenance. Release follows existing
+manifest/context/rule lifetimes; no lock or async ownership changes.
 
-Pinned CommandLinesTest cases expand_paramFileUseAlways,
-expand_mixOfCommandLinesAndParamFiles and expand_flagsOnly supply focused test
-themes. Conditional-limit and path-mapper tests are deferred with those surfaces.
-No new copied oracle fixture; extend the accepted source regression's provenance.
+Research: current parsed/evaluated source flow in bzl_module.rs; pinned Bazel
+9.2 BzlLoadFunction:858–879 source/transitive digest ownership at
+8220c6198837d5c13d53fea211cf3282aa12408a; DICE principles
+in docs/developers/dice.md. Existing diamond/observed-source tests supply the
+first-seen order, shared-child, update/delete/restore and event contracts.
+No new upstream fixture is needed. This is a prerequisite implementation packet
+because imported-function authentication otherwise has no retained source owner.
 
-Build API owns a new actions/spawn_command_line.rs module containing
-ExpandedSpawnCommandLine and VirtualParamFile with private immutable fields,
-plus an expansion error. SpawnSpec::expand_forced_param_files derives primary
-path from its retained outputs and invocation/segments from the same spec.
-Rendering helpers stay in spec.rs, shared with ArgsWrite. No new retained action
-identity: the expansion is action/RPC scratch derived from the retained recipe,
-with no callable, heap, host read or semantic cache. Output/template strings
-already validated by analysis remain that owner's contract; expansion rejects
-missing/invalid primary paths and unsupported conditional policy. Each generated
-virtual path must reject equality or file/directory prefix conflicts with every
-declared output, including secondary outputs; cover equality and both prefix
-directions in focused API negatives.
+## Scope and validation
 
-REAPI owns ReapiInputTree::with_spawn_param_files(&ExpandedSpawnCommandLine).
-Build the merged path map, blobs and Merkle directories in scratch; publish only
-on success, leaving the input tree unchanged on failure. Reject any virtual-file
-path equal to an existing entry, even with equal bytes; reject file/directory
-prefix conflicts in either direction. The existing Merkle builder must check a
-file before descending into the same-named directory. Preserve ordinary entries
-and inline bytes. No public mutable virtual-input bag or command-side repair.
+Allowlist: app/slug_loading_v2/src/{bzl_module.rs,provider.rs,package.rs,
+subrule_invocation.rs,builtin_restriction.rs,analysis_fragments.rs,attrs.rs,
+lib.rs} and affected source-carrier/manifest tests in that crate; direct analysis
+source-carrier signature/constructor corrections only; manifest, canonical and
+Stage 4/6/9/bootstrap summaries; scripts/v2_archive_status.sh for the stale
+explicit V2-crate allowlist correction (accepted slug_reapi_cache_v2 only). Large existing files receive bounded transport
+edits; the provenance type remains next to its sole manifest owner. No new
+collection abstraction or compatibility shim is needed.
 
-DICE ownership is unchanged (docs/developers/dice.md): source/provider/recipe
-changes invalidate configured actions before expansion, and accepted output
-conflict validation must still precede execution. The aggregate keeps argv and
-its virtual files together; no independent semantic side store is introduced.
-Scratch vectors/blobs live with their expansion/tree and are released normally.
-No performance claim is made.
+Test observed external diamond provenance (exact root/helper bytes, dedup/order,
+shared cold/warm, helper edit/restoration on one Dice), manifest/context transport
+and caller mismatch rejection. Protect existing authentic Rustc callback/source
+restoration plus one ordinary configured Args test. Compile direct analysis,
+query and REAPI consumers. Compile separately under 60s preparation operations;
+preflight exact selectors; expected tests subsecond and only focused batches.
+Tests above a few seconds run sparingly; over roughly 30s need strict necessity.
+No daemon, full CLI, Bazel/compiler action or broad suite. Run rustfmt, diff,
+archive and plan checks. Independent final review is required before integration.
 
-## Scope and gates
+Missing/ambiguous imported rows must be rejected by the later callback admission;
+this packet only establishes and proves the authentic carrier. If any production
+route cannot provide its observed source digest, resolve that ownership instead
+of filling a sentinel or reading host files.
 
-Allowlist: app/slug_build_api_v2/src/actions/{spawn_command_line.rs,mod.rs,spec.rs},
-src/lib.rs and tests/actions.rs; app/slug_reapi_v2/src/input_tree.rs and
-tests/reapi.rs; app/slug_analysis_v2/tests/rustc_map_each/mod.rs; fixture.toml
-provenance; manifest/canonical and Stage 6/7/bootstrap summaries at acceptance.
-The new responsibility gets its own module; existing large files receive bounded
-dispatch/rendering changes. New fixture bodies and loader code are unnecessary.
-
-API tests cover forced replacement/order/numbering, all three formats, flags-only
-positionals, empty content, escaped templates, primary-output ownership, and
-conditional/missing/invalid-path negatives. The authentic Rustc proof checks its
-actual retained policy/recipe against expanded argv and bytes. REAPI tests check
-exact blob SHA, decoded Directory path/mode/topology, retained input bytes,
-collisions (equal and different bytes, both prefix directions), deterministic
-replay and changed-content digest. Existing typed-action projection/transport
-rejection remains a protected gate; no transport invocation is selected.
-
-Compile separately with pinned nightly under 60-second preparation operations;
-preflight exact selectors and execute small API/analysis/REAPI batches (expected
-subsecond). Compile direct query/reapi dependents; run rustfmt/diff/plan checks.
-Tests over a few seconds run infrequently; over roughly 30 seconds require strict
-necessity scrutiny. No daemon, full CLI, Bazel build or compiler action. Independent
-design and final review are required for the new public/ownership boundary.
-If expansion needs unowned limits/path mapping or runtime activation requires
-bypassing resolved closure/inputs, resolve the prerequisite before extending scope.
+Predecessor WP-7-23 at d26b42a51 accepted forced virtual parameter-file expansion
+and atomic REAPI tree composition with 11 focused tests and independent review.
+M7A and typed Spawn execution remain open.
 
 ## Acceptance receipt
 
-Independent design and final reviews ACCEPT. Review added all-output path
-collision checks and reused registration's primary-path validator, including
-backslash negatives. No REPLAN or semantic scope expansion was needed.
+Observed provenance is retained by the sole manifest constructor in all three
+production loading routes. The existing filename table carries it through
+loading and configured evaluation; lexical identity and aggregate fingerprint
+algorithms are unchanged. The pinned callback now rejects manifest/span digest
+mismatch. No imported native-link callback or Cc constructor was activated.
 
-Pinned nightly direct binaries were used after the rustup snap launcher failed
-before compilation. Separate `cargo test --no-run --message-format=json`
-preparation: API 3.67s then 1.85s after validation correction; REAPI 37.99s then
-7.88s; analysis 24.51s. Every preparation operation exited 0 within its 60s cap.
-Exact-selector preflight and execution passed:
+Pinned nightly direct binaries (the already verified fallback for the unavailable
+rustup snap launcher) compiled loading in 20.89s. After routine test-constructor
+corrections, separate `cargo test --no-run --message-format=json` preparation
+succeeded for loading unit tests in 38.25s, Bzl invalidation integration in
+23.75s and authentic analysis in 33.90s. All preparation operations stayed
+within their 60s cap. Exact-selector preflight/execution passed:
 
-- API: forced formats/order/numbering, invalid policy/path/output collisions,
-  and protected ArgsWrite formatting: 3/3, 0.00s (wrapper 0.001s).
-- REAPI: exact virtual bytes/Merkle topology, atomic input collision rejection,
-  both typed execution/projection rejection tests and legacy paramfiles: 5/5,
-  0.00s (wrapper 0.002s).
-- Analysis: authentic Rustc source-edit/restoration with expanded argv/bytes,
-  generic Args/param policy and Spawn/symlink snapshots: 3/3, 0.35s
-  (wrapper 0.362s).
+- Loading 6/6, 0.04s: imported-helper source SHA/order/A/B/A, observed diamond
+  cold/warm events, pinned caller digest mismatch, lexical caller identity and
+  private API checks.
+- Bzl invalidation 2/2, 0.03s: first-seen diamond and leaf/load-edge changes.
+- Analysis 2/2, 0.43s: authentic Rustc source-edit/restoration and generic Args.
 
-Direct `cargo check -p slug_query_v2 -p slug_reapi_v2` exited 0 in 11.60s;
-only three existing deprecated REAPI proto-field warnings. Rustfmt check,
-`git diff --check` and plan status passed. Local receipts: `target/wp723/`.
-Review and total packet wall time were not separately measured. No broad suite,
-daemon, Bazel/compiler action or live transport ran; no fixture bodies grew.
+`cargo check -p slug_analysis_v2 -p slug_query_v2 -p slug_reapi_v2` exited 0
+in 14.83s, with three existing REAPI deprecation warnings. Rustfmt, diff, archive
+and plan checks pass. The archive checker required one reviewed allowlist entry
+for the already accepted V2 cache crate; no V1 negative was weakened.
+Receipts: `target/wp724/`. Total packet/review wall time was not separately
+measured. No full suite, daemon, compiler action or live transport ran.
 
-The observable advance is forced virtual argv/bytes plus collision-safe REAPI
-input-tree composition, including the authentic Rustc builder. M7A remains open:
-conditional spill, other callbacks, source/generated input resolution, inherited
-environment and typed Spawn execution/aquery still need their own admission.
+Independent final review ACCEPT confirmed owner/equality/lifetime and evidence.
+This closes the imported-source provenance prerequisite only; native-link
+callback authentication/recipes, ordinary input resolution and Spawn execution
+remain required M7A work.

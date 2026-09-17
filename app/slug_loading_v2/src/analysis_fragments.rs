@@ -21,7 +21,7 @@ use starlark::values::Value;
 use starlark::values::starlark_value;
 use starlark_map::small_set::SmallSet;
 
-use crate::BzlModuleIdentity;
+use crate::BzlModuleSourceProvenance;
 use crate::builtin_restriction::check_default_allowlist;
 use crate::provider::alloc_starlark_label;
 use crate::subrule_invocation::AnalysisCallToken;
@@ -42,13 +42,13 @@ const ACTIVE_FRAGMENT_NAMES_EXCEPT_CPP_AND_COVERAGE: &[&str] = &[
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct CppFragmentValue {
     projection: CppFragmentProjection,
-    callers: Arc<[(CompactString, BzlModuleIdentity)]>,
+    callers: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
 }
 
 impl CppFragmentValue {
     pub fn new(
         projection: CppFragmentProjection,
-        callers: Arc<[(CompactString, BzlModuleIdentity)]>,
+        callers: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
     ) -> Self {
         Self {
             projection,

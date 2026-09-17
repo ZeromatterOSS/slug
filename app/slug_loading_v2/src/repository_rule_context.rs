@@ -977,7 +977,10 @@ mod tests {
         BzlLoadManifest {
             root: root.clone(),
             direct_children: Arc::from([]),
-            reachable: Arc::from([root]),
+            reachable: [root]
+                .into_iter()
+                .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+                .collect(),
             fingerprint: [0; 32],
         }
     }
@@ -1591,7 +1594,10 @@ def implementation(ctx):
         let helper_manifest = BzlLoadManifest {
             root: helper_identity.clone(),
             direct_children: Arc::from([]),
-            reachable: Arc::from([helper_identity.clone()]),
+            reachable: [helper_identity.clone()]
+                .into_iter()
+                .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+                .collect(),
             fingerprint: [1; 32],
         };
         let helper = freeze_bzl(
@@ -1607,7 +1613,10 @@ def implementation(ctx):
         let manifest = BzlLoadManifest {
             root: root_identity.clone(),
             direct_children: Arc::from([helper_identity.clone()]),
-            reachable: Arc::from([root_identity.clone(), helper_identity]),
+            reachable: [root_identity.clone(), helper_identity]
+                .into_iter()
+                .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+                .collect(),
             fingerprint: [2; 32],
         };
         let loader = ModuleLoader(vec![("//helpers:support.bzl".to_owned(), helper)]);
@@ -1649,7 +1658,10 @@ def implementation(ctx):
             b"@@direct_dep+//pkg:direct\n@@direct_dep+//pkg:direct\n@@helper_dep+//pkg:helper"
         );
         let missing = BzlLoadManifest {
-            reachable: Arc::from([root_identity.clone()]),
+            reachable: [root_identity.clone()]
+                .into_iter()
+                .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+                .collect(),
             ..manifest.clone()
         };
         assert!(matches!(
@@ -1657,7 +1669,10 @@ def implementation(ctx):
             Err(RepositoryRuleInvocationError::Evaluation(_))
         ));
         let ambiguous = BzlLoadManifest {
-            reachable: Arc::from([root_identity.clone(), root_identity]),
+            reachable: [root_identity.clone(), root_identity]
+                .into_iter()
+                .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+                .collect(),
             ..manifest
         };
         assert!(matches!(

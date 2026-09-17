@@ -3608,7 +3608,7 @@ async fn external_bzl_module_evaluates_recursive_bazel_keyword_only_structs() {
     assert_eq!(
         sources
             .iter()
-            .map(|(_, id)| id.label.target().as_str())
+            .map(|(_, id)| id.identity.label.target().as_str())
             .collect::<Vec<_>>(),
         ["root.bzl", "support.bzl"]
     );
@@ -23355,7 +23355,10 @@ fn eval_bzl_with_loaded_children(
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
         root: owner,
         direct_children: child_identities.into(),
-        reachable: reachable.into(),
+        reachable: reachable
+            .into_iter()
+            .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+            .collect(),
         fingerprint: [0; 32],
     });
     let ast = AstModule::parse(&filename, source.to_owned(), &Dialect::Bazel)
@@ -32460,7 +32463,10 @@ fn external_bzl_module_freezes_exact_lint_test_child_without_invocation() {
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
         root: parent_owner.clone(),
         direct_children: Arc::from([child_owner.clone()]),
-        reachable: Arc::from([parent_owner.clone(), child_owner]),
+        reachable: [parent_owner.clone(), child_owner]
+            .into_iter()
+            .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+            .collect(),
         fingerprint: [0; 32],
     });
     let source = r#"load(
@@ -34217,7 +34223,10 @@ fn eval_bzl_with_identity_and_globals_and_visibility(
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
         root: owner.clone(),
         direct_children: Arc::from([]),
-        reachable: Arc::from([owner]),
+        reachable: [owner]
+            .into_iter()
+            .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+            .collect(),
         fingerprint: [0; 32],
     });
     let module = Module::new();
@@ -34415,7 +34424,10 @@ RUN_ENVIRONMENT_CALLABLE = RunEnvironmentInfo
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
         root: owner.clone(),
         direct_children: Arc::from([]),
-        reachable: Arc::from([owner.clone()]),
+        reachable: [owner.clone()]
+            .into_iter()
+            .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+            .collect(),
         fingerprint: [0; 32],
     });
     let fresh_module = Module::new();
@@ -35273,7 +35285,10 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
         root: owner.clone(),
         direct_children: Arc::from([]),
-        reachable: Arc::from([owner.clone()]),
+        reachable: [owner.clone()]
+            .into_iter()
+            .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+            .collect(),
         fingerprint: [0; 32],
     });
     let ast = AstModule::parse(
@@ -35297,7 +35312,10 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
         root: root.clone(),
         direct_children: Arc::from([owner.clone()]),
-        reachable: Arc::from([root, owner]),
+        reachable: [root, owner]
+            .into_iter()
+            .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+            .collect(),
         fingerprint: [0; 32],
     });
     let ast = AstModule::parse(
@@ -35434,7 +35452,10 @@ IDEMPOTENT = Label(Label('@alias//:same')) == Label('@alias//:same')
     let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
         root: conflicting.clone(),
         direct_children: Arc::from([]),
-        reachable: Arc::from([conflicting]),
+        reachable: [conflicting]
+            .into_iter()
+            .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+            .collect(),
         fingerprint: [0; 32],
     });
     let ast = AstModule::parse(
@@ -35705,6 +35726,17 @@ fn package_label_call_source_lookup_is_sparse_and_fail_closed() {
     let defs =
         eval_bzl_with_identity("def invoke(): return Label(':target')\n", owner.clone()).unwrap();
     let run = |sources: Option<Arc<[(compact_str::CompactString, BzlModuleIdentity)]>>| {
+        let sources = sources.map(|sources| {
+            sources
+                .iter()
+                .map(|(filename, identity)| {
+                    (
+                        filename.clone(),
+                        crate::BzlModuleSourceProvenance::new(identity.clone(), [0; 32]),
+                    )
+                })
+                .collect()
+        });
         let ast = AstModule::parse(
             "/workspace/dep/BUILD.bazel",
             "load(':defs.bzl','invoke')\nX=invoke()\n".to_owned(),
@@ -36945,7 +36977,7 @@ async fn external_bzl_module_retains_canonical_manifest_lifetime_and_local_event
             .manifest
             .reachable
             .iter()
-            .map(|identity| identity.label.to_string())
+            .map(|identity| identity.identity.label.to_string())
             .collect::<Vec<_>>(),
         [
             "@@dep+//:root.bzl",
@@ -38893,4 +38925,103 @@ async fn repository_package_load_renders_missing_and_cycle_and_recovers_on_same_
         .await
         .unwrap();
     assert_eq!(repository_package_terminal(&fixed).targets[0].name, "x");
+}
+
+#[tokio::test]
+async fn observed_external_bzl_source_provenance_tracks_helper_revision() {
+    let root = b"load(':left.bzl', 'LEFT')\nload(':right.bzl', 'RIGHT')\nRESULT = LEFT + RIGHT\n";
+    let left = b"load(':helper.bzl', 'H')\nLEFT = H\n";
+    let right = b"load(':helper.bzl', 'H')\nRIGHT = H\n";
+    let original = b"H = 1\n";
+    let edited = b"H = 2\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut first = None;
+    for (variant, helper, restored) in [
+        (810, original, true),
+        (811, edited, false),
+        (812, original, true),
+    ] {
+        let files: &[(&str, &[u8])] = &[
+            ("root.bzl", root),
+            ("left.bzl", left),
+            ("right.bzl", right),
+            ("helper.bzl", helper),
+        ];
+        let mut transaction = transaction(
+            &dice,
+            EpochBuilder::external_sources(files, variant).build(),
+            false,
+            None,
+        )
+        .await;
+        let route = external_route(&mut transaction).await;
+        let value = transaction
+            .compute(&observed_external_bzl_key(route, "", "root.bzl"))
+            .await
+            .unwrap();
+        let module = observed_external(&value)
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+        let provenance = &module.manifest.reachable;
+        assert_eq!(
+            provenance
+                .iter()
+                .map(|row| row.identity.label.to_string())
+                .collect::<Vec<_>>(),
+            [
+                "@@dep+//:root.bzl",
+                "@@dep+//:left.bzl",
+                "@@dep+//:helper.bzl",
+                "@@dep+//:right.bzl"
+            ]
+        );
+        for row in provenance.iter() {
+            let source = files
+                .iter()
+                .find(|(name, _)| *name == row.identity.label.target().as_str())
+                .unwrap()
+                .1;
+            assert_eq!(row.source_digest, Sha256::digest(source).as_slice());
+        }
+        let context = BzlEvaluationContext::from_manifest(&module.manifest);
+        let sources = context.source_identities_by_filename();
+        assert_eq!(
+            sources
+                .iter()
+                .map(|(_, row)| row.clone())
+                .collect::<Vec<_>>(),
+            provenance.as_ref()
+        );
+        let package_sources =
+            super::package_bzl_call_sources(&[(":root.bzl".to_owned(), module.clone())]).unwrap();
+        assert_eq!(sources, package_sources);
+        // Existing runtime transport shares the immutable carrier, including digests.
+        let runtime = BzlEvaluationContext::macro_runtime_context(
+            module.manifest.root.clone(),
+            sources.clone(),
+        );
+        assert!(Arc::ptr_eq(
+            &sources,
+            &runtime.source_identities_by_filename()
+        ));
+        if let Some(first) = &first {
+            let first: &BzlLoadManifest = first;
+            assert_eq!(module.manifest == *first, restored);
+            assert_eq!(module.manifest.fingerprint == first.fingerprint, restored);
+            assert_eq!(module.manifest.root, first.root);
+            assert_eq!(
+                provenance[0].source_digest,
+                first.reachable[0].source_digest
+            );
+            assert_eq!(provenance[2].identity, first.reachable[2].identity);
+            assert_eq!(
+                provenance[2].source_digest == first.reachable[2].source_digest,
+                restored
+            );
+        } else {
+            first = Some(module.manifest.clone());
+        }
+    }
 }
