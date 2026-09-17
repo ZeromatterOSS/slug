@@ -176,6 +176,7 @@ pub struct EvaluatorVectorArgGen<V> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]
 pub enum PinnedVectorMapEach {
     RulesRustCrateRoot,
+    RegularFileDirnames,
 }
 
 #[derive(Debug, Clone, Allocative, Trace)]
@@ -511,9 +512,12 @@ fn classify_add_all_callback(
     }
     match (callsite.begin.line, callsite.end.line) {
         (1168, 1168) => Ok(Some(PinnedVectorMapEach::RulesRustCrateRoot)),
+        (1098, 1098) | (1227, 1227) | (1274, 1274) | (1424, 1424) => {
+            Ok(Some(PinnedVectorMapEach::RegularFileDirnames))
+        }
         // The pinned source supplies top-level functions at these expressions.
         // Bazel omits these vectors without invoking their callback when empty.
-        (1274, 1274) | (2572, 2572) | (2574, 2574) if omitted_empty_source => Ok(None),
+        (2572, 2572) | (2574, 2574) if omitted_empty_source => Ok(None),
         _ => anyhow::bail!("Args.add_all callback forms are not supported"),
     }
 }
@@ -612,9 +616,7 @@ impl AnalysisArtifactValue {
     }
 
     fn dirname(&self) -> String {
-        self.path()
-            .rsplit_once('/')
-            .map_or_else(String::new, |(dirname, _)| dirname.to_owned())
+        self.artifact.dirname()
     }
 }
 

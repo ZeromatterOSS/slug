@@ -201,6 +201,8 @@ pub struct RetainedArgsDepset(AnalysisDepset);
 pub enum RetainedArgsDepsetError {
     ValueType(AnalysisValueType),
     Directory,
+    NonRegularFile,
+    FilesToRun,
 }
 
 impl fmt::Display for RetainedArgsDepsetError {
@@ -211,6 +213,8 @@ impl fmt::Display for RetainedArgsDepsetError {
                 "Args vector requires strings, integers, or regular Files, got depset of {value_type}"
             ),
             Self::Directory => write!(f, "Args vector directory expansion is not supported"),
+            Self::NonRegularFile => write!(f, "Args file dirname mapping requires regular Files"),
+            Self::FilesToRun => write!(f, "Args file dirname mapping does not accept FilesToRun"),
         }
     }
 }
@@ -274,6 +278,8 @@ impl RetainedArgsDepset {
 pub enum RetainedVectorSource {
     Sequence(Arc<[RetainedScalarValue]>),
     Depset(RetainedArgsDepset),
+    /// Validated by `regular_file_dirnames`; retains artifact/depset identity.
+    RegularFileDirnames(ArtifactInputs),
     /// Pinned rules_rust `_get_crate_root_path` for a regular crate-root File.
     RulesRustRegularCrateRoot {
         artifact: AnalysisArtifact,
@@ -282,10 +288,37 @@ pub enum RetainedVectorSource {
 }
 
 impl RetainedVectorSource {
+    pub fn regular_file_dirnames(inputs: ArtifactInputs) -> Result<Self, RetainedArgsDepsetError> {
+        if inputs
+            .sources()
+            .iter()
+            .any(|source| matches!(source, ArtifactInputSource::FilesToRun(_)))
+        {
+            return Err(RetainedArgsDepsetError::FilesToRun);
+        }
+        let mut regular = true;
+        inputs.visit(|artifact| {
+            if matches!(artifact, AnalysisArtifact::Derived { output, .. } if output.kind() != ActionOutputKind::File) {
+                regular = false;
+            }
+        }).map_err(|error| RetainedArgsDepsetError::ValueType(error.value_type()))?;
+        if !regular {
+            return Err(RetainedArgsDepsetError::NonRegularFile);
+        }
+        Ok(Self::RegularFileDirnames(inputs))
+    }
+
     fn render(&self) -> Vec<String> {
         match self {
             Self::Sequence(values) => values.iter().map(RetainedScalarValue::render).collect(),
             Self::Depset(values) => values.render(),
+            Self::RegularFileDirnames(inputs) => {
+                let mut values = Vec::new();
+                inputs
+                    .visit(|artifact| values.push(artifact.dirname()))
+                    .expect("validated File dirname inputs");
+                values
+            }
             Self::RulesRustRegularCrateRoot { artifact, .. } => vec![artifact.path().into_owned()],
         }
     }
@@ -294,6 +327,9 @@ impl RetainedVectorSource {
         match (self, other) {
             (Self::Sequence(left), Self::Sequence(right)) => left == right,
             (Self::Depset(left), Self::Depset(right)) => left.publication_eq_with(right, state),
+            (Self::RegularFileDirnames(left), Self::RegularFileDirnames(right)) => {
+                left.publication_eq_with(right, state)
+            }
             (
                 Self::RulesRustRegularCrateRoot {
                     artifact: left_artifact,

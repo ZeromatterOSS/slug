@@ -269,9 +269,10 @@ The Spawn parameter-file source audit in the current packet found that the
 CLI rules_rust Rustc and cargo build-script paths use virtual
 `Args.use_param_file` inputs. Aquery `--include_param_files` covers a
 different, artifact-backed action path, so it cannot establish those virtual
-bytes. WP-7-20 accepts the source-pinned regular-crate-root callback and three
-empty omissions, with a real `construct_arguments` configured Spawn and
-same-DICE A/B/A proof. Nonempty dependency callbacks, other builder paths and
+bytes. WP-7-20/21 accept the source-pinned regular-crate-root callback and four
+regular-File dirname sites, with real `construct_arguments` configured Spawn,
+stdlib/sysroot/generated-root parameter bytes and same-DICE A/B/A proofs. Two
+dependency mapper sites permit only validated empty omissions. Nonempty dependency callbacks, other builder paths and
 virtual-input staging remain open. The Spawn and Args/param-file rows therefore
 remain open; this configured slice does not prove Rustc execution.
 
@@ -289,7 +290,7 @@ unobserved action families cannot be declared unnecessary by assumption.
 | Native configurable `alias.actual` | Accepted with the atomic stack at `71d9ce4bf`; retained expression, selected branch/conditions, target/exec A/B/A and query proofs pass | Stages 4/6 | Preserve accepted ownership; F3 supplies no further configured-source admission |
 | Requested-root output conflict freedom | Accepted bounded with execution groups at `71d9ce4bf`; `ValidatedActionClosure`, pre-execution rejection, positive sharing and direct consumers passed, with eight Core nonpasses attributed to unchanged main | Stage 6/Core | Preserve root-set validation before build/aquery/Run success; cold/warm A+B conflicts produce no execution or materialization even if A and B separately succeed |
 | FileWrite | Accepted bounded aquery/REAPI handoff, Stage 7 canonical FileWrite projection and M5/M6 evidence. Its exact ActionKey projection remains queued | Stages 6/8/7 | Preserve accepted content/platform/protobuf/cache proof and named Slug-native token exception; land exact projection when separately selected |
-| Spawn: compiler, linker, proc-macro/build-script and generated-source tool invocations | Configured common non-callback Spawn/FilesToRun expansion accepted (`bfe6f2690`, `21db5d7b8`), plus source-pinned regular-crate-root callback publication (WP-7-20); broader aquery/REAPI activation open; exact ActionKey deferred | Stages 6/8/7 | Source-derived invocation/tool/env/input/output semantics for observed production actions, structural invalidation, classified aquery fields and same-owner REAPI projection |
+| Spawn: compiler, linker, proc-macro/build-script and generated-source tool invocations | Configured common non-callback Spawn/FilesToRun expansion accepted (`bfe6f2690`, `21db5d7b8`), plus source-pinned regular-crate-root and file-dirname callback publication (WP-7-20/21); broader aquery/REAPI activation open; exact ActionKey deferred | Stages 6/8/7 | Source-derived invocation/tool/env/input/output semantics for observed production actions, structural invalidation, classified aquery fields and same-owner REAPI projection |
 | ArgsWrite / paramfiles | Configured vector Args/param-file ownership accepted (`a01a23fe7`); execution/aquery family admission open; exact ActionKey deferred | Stages 6/8/7 | Exact encoding/content/order, declared input-tree placement and CAS bytes; typed comparator provenance for generated paths and classified ActionKey field |
 | Symlink and runfiles-support action families | Typed symlink declarations, runfiles and four support actions/FilesToRun expansion are configured-only admission (`f346c209a`, `f46a009a0`, `21db5d7b8`); execution/aquery open; exact ActionKeys deferred | Stages 6/8/7 | Inventory names each required family; admit its semantic aquery/REAPI projections and outputs/runfiles behavior with explicit ActionKey classification, or prove absence from this closure |
 | Ordinary source/generated/tree input transfer and output materialization | Bounded FileWrite inline input accepted; ordinary source/generated trees and broader materializer remain open | Stages 6/7 | Exact Directory topology/content/digests, declared output ownership/type/mode/symlinks, generated-output consumer/reupload and missing/corrupt data behavior; validated-root-only publication |

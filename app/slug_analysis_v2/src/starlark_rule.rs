@@ -1568,6 +1568,8 @@ fn lower_vector_arg<'v>(
 ) -> anyhow::Result<RetainedVectorArg> {
     let source = if value.map_each == Some(PinnedVectorMapEach::RulesRustCrateRoot) {
         lower_rules_rust_crate_root(value.source)?
+    } else if value.map_each == Some(PinnedVectorMapEach::RegularFileDirnames) {
+        lower_regular_file_dirnames(value.source, lowerer)?
     } else {
         match value.source {
             EvaluatorVectorSourceGen::Sequence(values) => RetainedVectorSource::Sequence(
@@ -1592,6 +1594,36 @@ fn lower_vector_arg<'v>(
         }
     };
     Ok(RetainedVectorArg::new(source, value.options))
+}
+
+fn lower_regular_file_dirnames<'v>(
+    source: EvaluatorVectorSourceGen<Value<'v>>,
+    lowerer: &mut AnalysisValueLowerer<'v>,
+) -> anyhow::Result<RetainedVectorSource> {
+    let inputs = match source {
+        EvaluatorVectorSourceGen::Sequence(values) => values
+            .into_iter()
+            .map(|value| {
+                let file = AnalysisArtifactValue::from_starlark(value)
+                    .ok_or_else(|| anyhow::anyhow!("Args file dirname mapping requires Files"))?;
+                Ok(ArtifactInputSource::Direct(file.artifact().clone()))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?,
+        EvaluatorVectorSourceGen::Depset(value) => {
+            let lowered = lowerer
+                .lower(value, "Args file dirname depset")
+                .map_err(anyhow::Error::msg)?;
+            let AnalysisValueKind::Depset(depset) = lowered.kind() else {
+                anyhow::bail!("Args file dirname mapping requires a sequence or depset of Files");
+            };
+            vec![ArtifactInputSource::Depset(
+                RetainedArtifactInputs::new(depset.clone())
+                    .map_err(|error| anyhow::anyhow!(error.to_string()))?,
+            )]
+        }
+    };
+    RetainedVectorSource::regular_file_dirnames(ArtifactInputs::new(inputs))
+        .map_err(|error| anyhow::anyhow!(error.to_string()))
 }
 
 fn lower_rules_rust_crate_root(

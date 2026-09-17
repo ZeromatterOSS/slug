@@ -7,7 +7,7 @@ def _no_coverage():
     return False
 
 def _impl(ctx):
-    output = ctx.actions.declare_file("probe.rlib")
+    output = ctx.actions.declare_file("out/probe.rlib")
     if not ctx.attr.src.is_source or output.is_source:
         fail("File.is_source must distinguish source and generated artifacts")
     if "is_source" not in dir(ctx.attr.src) or "is_source" not in dir(output):
@@ -18,6 +18,13 @@ def _impl(ctx):
         fail("Label.workspace_root must be discoverable")
     if _NESTED_ROOT_LABEL.workspace_root != "" or _NESTED_EXTERNAL_LABEL.workspace_root != "external/rules_rust+":
         fail("Label.workspace_root must ignore package and target components")
+    if ctx.attr.src.dirname != "." or output.dirname != "out":
+        fail("File.dirname must distinguish the execution root and nested directories")
+    root = ctx.attr.src
+    if ctx.attr.generated:
+        root = ctx.actions.declare_file("generated/input.rs")
+        ctx.actions.write(root, "pub fn generated() {}\n")
+    stdlib = depset(ctx.attr.stdlib[1:], transitive = [depset(ctx.attr.stdlib[:1])])
     # Exercise the argument-builder API with a real source File and native
     # actions. These explicit inputs select only the admitted callback slice.
     argument_ctx = struct(
@@ -35,12 +42,13 @@ def _impl(ctx):
         target_os = "linux",
         target_flag_value = "x86_64-unknown-linux-gnu",
         compilation_mode_opts = {"dbg": struct(opt_level = "0", debug_info = "2", strip_level = "none")},
-        rust_std = depset(),
+        rust_std = stdlib,
         lto = struct(mode = "manual"),
         _codegen_units = 0,
         coverage_supported = False,
         _experimental_link_std_dylib = False,
-        _toolchain_generated_sysroot = False,
+        _toolchain_generated_sysroot = ctx.attr.sysroot != None,
+        sysroot_anchor = ctx.attr.sysroot,
         _rename_first_party_crates = False,
         extra_rustc_flags_for_crate_types = {},
         extra_exec_rustc_flags = [],
@@ -49,7 +57,7 @@ def _impl(ctx):
         env = {},
     )
     crate = struct(
-        root = ctx.attr.src,
+        root = root,
         root_path = "unused-for-regular-file.rs",
         name = "probe",
         type = "rlib",
@@ -82,7 +90,13 @@ def _impl(ctx):
         remap_path_prefix = None,
         skip_expanding_rustc_env = True,
     )
-    ctx.actions.run(outputs = [output], executable = "process_wrapper", arguments = args.all, inputs = [ctx.attr.src], env = env)
+    inputs = depset([root] + ([] if ctx.attr.sysroot == None else [ctx.attr.sysroot]), transitive = [stdlib])
+    ctx.actions.run(outputs = [output], executable = "process_wrapper", arguments = args.all, inputs = inputs, env = env)
     return [DefaultInfo(files = depset([output]))]
 
-subject = rule(implementation = _impl, attrs = {"src": attr.label(allow_single_file = True)})
+subject = rule(implementation = _impl, attrs = {
+    "src": attr.label(allow_single_file = True),
+    "stdlib": attr.label_list(allow_files = True),
+    "sysroot": attr.label(allow_single_file = True),
+    "generated": attr.bool(default = False),
+})

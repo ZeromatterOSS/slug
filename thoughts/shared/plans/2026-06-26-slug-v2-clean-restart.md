@@ -29,18 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-20-m7a-rustc-callback-proof-r1
-Status: accepted; committing and pushing the reviewed checkpoint
+Packet: WP-7-21-m7a-rustc-file-dirnames-r1
+Status: accepted; reviewed checkpoint ready for integration
 
-The pinned regular-crate-root callback is accepted through the real loaded
-rules_rust argument builder, configured Spawn publication and same-DICE source
-A/B/A. The demanded File.is_source and default-layout Label.workspace_root
-properties are accepted with it. Focused/protected/API tests pass in subsecond
-batches, direct dependents compile, and independent final review accepts the
-55-file source closure. M7A remains open: remaining demanded callbacks and
-virtual parameter-file staging still require admission. The manifest records
-scope, source provenance and validation; WP-7-19 at `18ef4288b` remains the
-accepted predecessor.
+The four demanded regular-File directory mappings in the pinned rules_rust
+argument builder are accepted using existing artifact/depset owners. Bare
+relative File.dirname now returns `.`. Nine selected tests pass in subsecond
+batches; direct dependents compile and independent final review accepts.
+WP-7-20 at `ff14d4e33` accepted the regular-crate-root callback, File.is_source,
+default-layout Label.workspace_root and authentic configured-source A/B/A.
+M7A remains open for other demanded callbacks and execution staging; the
+manifest records the accepted scope and validation.
 
 ### Earlier generated-input receipt
 

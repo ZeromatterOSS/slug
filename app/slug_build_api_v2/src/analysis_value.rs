@@ -331,6 +331,18 @@ pub enum AnalysisArtifact {
 }
 
 impl AnalysisArtifact {
+    /// Directory of the existing path projection, using Bazel's `.` spelling
+    /// for a relative basename. This string is scratch, never artifact identity.
+    pub fn dirname(&self) -> String {
+        let path = self.path();
+        path.rsplit_once('/')
+            .map_or(
+                ".",
+                |(parent, _)| if parent.is_empty() { "/" } else { parent },
+            )
+            .to_owned()
+    }
+
     /// Returns the Bazel-path projection used by phase-scratch consumers.
     ///
     /// The artifact remains the semantic owner; this projection is never

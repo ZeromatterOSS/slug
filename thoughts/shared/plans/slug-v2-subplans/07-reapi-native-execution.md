@@ -41,8 +41,9 @@ produce virtual Spawn inputs during execution expansion. Pinned Bazel 9.2
 `CommandLines.expand` and `SpawnAction.getSpawn` own replacement argv, paths
 and virtual bytes; `ActionGraphDump`'s optional `paramFiles` field covers
 artifact-backed `ParameterFileWriteAction`s only. The M7A callback packet
-WP-7-20 admits the pinned regular-crate-root `map_each` and three validated
-empty omissions through an authentic configured Spawn proof. Nonempty
+WP-7-20/21 admit pinned regular-crate-root and four regular-File dirname
+`map_each` sites through authentic configured Spawn proofs. Two dependency
+mapper sites allow validated empty omissions. Nonempty
 dependency callbacks and other demanded builder paths still need analysis
 admission before the full Rustc closure can publish. Virtual parameter-file
 staging remains open; the configured proof does not widen the bounded

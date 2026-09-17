@@ -206,8 +206,8 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
             "requires a string root path",
         ),
         (
-            "rust_std = depset()",
-            "rust_std = depset([ctx.attr.src])",
+            "transitive_crates = depset()",
+            "transitive_crates = depset([ctx.attr.src])",
             "Args.add_all callback forms are not supported",
         ),
     ] {
@@ -218,5 +218,122 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
     }
     fs::write(&proof_path, proof).unwrap();
     assert!(first == request(&dice, &workspace).await.unwrap());
+    fs::remove_dir_all(workspace).unwrap();
+}
+
+#[tokio::test]
+async fn pinned_rustc_file_dirnames_preserve_order_and_generated_root() {
+    let workspace = workspace();
+    let files = [
+        "lib.rs",
+        "std/a/libstd.rlib",
+        "std/a/liballoc.rlib",
+        "std/b/libcore.rlib",
+        "sysroot/anchor",
+    ];
+    for name in files {
+        let path = workspace.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "fixture\n").unwrap();
+    }
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        format!("exports_files({files:?})\n"),
+    )
+    .unwrap();
+    let build = "load(':proof.bzl', 'subject')\nsubject(name = 'subject', src = '@@//:lib.rs', stdlib = ['@@//:std/a/libstd.rlib', '@@//:std/a/liballoc.rlib', '@@//:std/b/libcore.rlib'], sysroot = '@@//:sysroot/anchor', generated = False)\n";
+    let build_path = workspace.join("rules_rust/BUILD.bazel");
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut initial = None;
+    for generated in [false, true, false] {
+        fs::write(
+            &build_path,
+            build.replace(
+                "generated = False",
+                if generated {
+                    "generated = True"
+                } else {
+                    "generated = False"
+                },
+            ),
+        )
+        .unwrap();
+        let result = request(&dice, &workspace).await.unwrap();
+        assert_eq!(result.actions().len(), if generated { 2 } else { 1 });
+        let spawn = result
+            .actions()
+            .iter()
+            .find_map(|action| action.spawn_spec())
+            .unwrap();
+        let argv = spawn.render_argv();
+        let root = if generated {
+            "generated/input.rs"
+        } else {
+            "lib.rs"
+        };
+        assert!(
+            argv.windows(3).any(|args| args == ["--", "rustc", root]),
+            "{argv:?}"
+        );
+        assert_eq!(argv.iter().filter(|arg| *arg == "--out-dir=out").count(), 1);
+        assert_eq!(
+            argv.iter()
+                .filter(|arg| *arg == "--sysroot=sysroot")
+                .count(),
+            1
+        );
+        let search = argv
+            .windows(2)
+            .filter(|args| args[0] == "-L")
+            .map(|args| args[1].as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(search, ["std/a", "std/b"]);
+        if generated {
+            assert!(
+                argv.windows(2)
+                    .any(|args| args == ["--subst", "cargo_manifest_dir=out"]),
+                "{argv:?}"
+            );
+            assert_eq!(
+                spawn.environment().fixed().get("CARGO_MANIFEST_DIR"),
+                Some("${pwd}/${cargo_manifest_dir}")
+            );
+        }
+        let RetainedCommandLineSegment::ArgsSnapshot(rustc) = &spawn.command_line().segments()[2]
+        else {
+            panic!("missing rustc Args")
+        };
+        let bytes = rustc.recipe().render_write_content();
+        assert!(bytes.starts_with(&format!("{root}\n")));
+        assert!(bytes.contains("\n--out-dir=out\n"));
+        assert!(bytes.contains("\n-L\nstd/a\n-L\nstd/b\n"));
+        assert!(bytes.contains("\n--sysroot=sysroot\n"));
+        if !generated {
+            if let Some(first) = &initial {
+                assert_eq!(first, &result);
+            } else {
+                initial = Some(result);
+            }
+        }
+    }
+    let proof_path = workspace.join("rules_rust/proof.bzl");
+    let proof = fs::read_to_string(&proof_path).unwrap();
+    for (from, to, expected) in [
+        (
+            "rust_std = stdlib",
+            "rust_std = depset(['not-a-file'])",
+            "action inputs require a depset of File",
+        ),
+        (
+            "sysroot_anchor = ctx.attr.sysroot",
+            "sysroot_anchor = 'not-a-file'",
+            "Args file dirname mapping requires Files",
+        ),
+    ] {
+        assert_eq!(proof.matches(from).count(), 1);
+        fs::write(&proof_path, proof.replace(from, to)).unwrap();
+        let error = request(&dice, &workspace).await.unwrap_err();
+        assert!(error.contains(expected), "{error}");
+    }
     fs::remove_dir_all(workspace).unwrap();
 }

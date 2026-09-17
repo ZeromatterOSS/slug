@@ -31,8 +31,13 @@ groups, and that prerequisite remain one atomic acceptance stack.
 WP-7-20 accepts the finite rules_rust 0.73.0 regular-crate-root Args callback.
 Loading authenticates the canonical loaded source identity, SHA-256 and native
 call span; analysis lowers one regular `(File, str)` pair into an immutable
-artifact/root-path recipe with structural equality. Three other pinned call
-sites permit only validated empty omissions. The production-loader proof
+artifact/root-path recipe with structural equality. Two dependency-mapper call
+sites permit only validated empty omissions. WP-7-21 also admits regular-File
+dirname mapping at the four generated-manifest/output/stdlib/sysroot sites.
+It retains ArtifactInputs, including shared depset shape and alias identity,
+and maps before formatting/uniquification. One AnalysisArtifact.dirname
+projection serves both File and retained rendering and spells the execution
+root as `.`. Constructor validation rejects directories and FilesToRun. The production-loader proof
 publishes a configured Spawn and rejects/restores changed source in one DICE
 service. File.is_source and default-layout Label.workspace_root are exact for
 the admitted artifact/repository shapes; generated paths and error timing keep

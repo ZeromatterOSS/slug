@@ -877,6 +877,181 @@ fn vector_depsets_share_publication_alias_state_with_spawn_inputs() {
 }
 
 #[test]
+fn file_dirname_recipes_preserve_identity_and_map_before_uniquify() {
+    let recipe = |artifacts: Vec<AnalysisArtifact>| {
+        let mut options = default_vector_options();
+        options.before_each = Some("-L".into());
+        options.format_each = Some("dir=%s".into());
+        options.uniquify = true;
+        RetainedArgsRecipe::new(
+            vec![RetainedArgCall::AddAll(RetainedVectorArg::new(
+                RetainedVectorSource::regular_file_dirnames(ArtifactInputs::new(
+                    artifacts
+                        .into_iter()
+                        .map(ArtifactInputSource::Direct)
+                        .collect::<Vec<_>>(),
+                ))
+                .unwrap(),
+                options,
+            ))],
+            RetainedParamFileFormat::Multiline,
+        )
+    };
+    let root = AnalysisArtifact::Source(CanonicalLabel::parse("@@//:root.rs").unwrap());
+    let nested = source_artifact("src/lib.rs");
+    let a = derived_artifact("out/a.rlib", ActionOutputKind::File);
+    let b = derived_artifact("out/b.rlib", ActionOutputKind::File);
+    assert_eq!(root.dirname(), ".");
+    assert_eq!(nested.dirname(), "pkg/src");
+    assert_eq!(
+        derived_artifact("bare.rlib", ActionOutputKind::File).dirname(),
+        "."
+    );
+    let result = recipe(vec![root, a.clone(), b.clone(), nested]);
+    assert_eq!(
+        result.render(),
+        ["-L", "dir=.", "-L", "dir=out", "-L", "dir=pkg/src"]
+    );
+    assert_eq!(
+        result.render_write_content(),
+        "-L\ndir=.\n-L\ndir=out\n-L\ndir=pkg/src\n"
+    );
+    let other_owner = AnalysisArtifact::Derived {
+        owner: AnalysisConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//pkg:other").unwrap(),
+            b"cfg".as_slice(),
+        ),
+        output: ActionOutput::new("out/a.rlib", ActionOutputKind::File),
+    };
+    let first = recipe(vec![a.clone()]);
+    assert_eq!(first, recipe(vec![a]));
+    for different in [recipe(vec![b]), recipe(vec![other_owner])] {
+        assert_eq!(first.render(), different.render());
+        assert_ne!(first, different);
+    }
+    for kind in [
+        ActionOutputKind::Directory,
+        ActionOutputKind::Symlink,
+        ActionOutputKind::RunfilesTree,
+    ] {
+        let directory = derived_artifact("out/tree", kind);
+        let depset = AnalysisDepset::new(
+            DepsetOrder::Default,
+            vec![AnalysisValue::artifact(directory.clone())],
+            Vec::new(),
+        )
+        .unwrap();
+        for source in [
+            ArtifactInputSource::Direct(directory),
+            ArtifactInputSource::Depset(RetainedArtifactInputs::new(depset).unwrap()),
+        ] {
+            assert!(
+                RetainedVectorSource::regular_file_dirnames(ArtifactInputs::new(vec![source]))
+                    .is_err()
+            );
+        }
+    }
+    assert!(
+        RetainedVectorSource::regular_file_dirnames(ArtifactInputs::new(vec![
+            ArtifactInputSource::FilesToRun(files_to_run_provider("tool"))
+        ]))
+        .is_err()
+    );
+    let non_file = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::string("not-a-file")],
+        Vec::new(),
+    )
+    .unwrap();
+    assert!(RetainedArtifactInputs::new(non_file).is_err());
+}
+
+#[test]
+fn file_dirname_depsets_share_publication_alias_state_with_spawn_inputs() {
+    let inputs = |depset| {
+        ArtifactInputs::new(vec![ArtifactInputSource::Depset(
+            RetainedArtifactInputs::new(depset).unwrap(),
+        )])
+    };
+    let make = |args: AnalysisDepset, input: AnalysisDepset| {
+        SpawnSpec::new(
+            RetainedSpawnInvocation::Executable(SpawnExecutable::Path(
+                NormalizedBazelPath::new(HostPathFlavor::Unix, "tool").unwrap(),
+            )),
+            RetainedCommandLine::new(vec![RetainedCommandLineSegment::ArgsSnapshot(
+                RetainedSpawnArgsSnapshot::new(
+                    RetainedArgsRecipe::new(
+                        vec![RetainedArgCall::AddAll(RetainedVectorArg::new(
+                            RetainedVectorSource::regular_file_dirnames(inputs(args)).unwrap(),
+                            default_vector_options(),
+                        ))],
+                        RetainedParamFileFormat::Multiline,
+                    ),
+                    None,
+                ),
+            )]),
+            inputs(input),
+            ArtifactInputs::new(Vec::new()),
+            vec![ActionOutput::new("out", ActionOutputKind::File)],
+            None,
+            RetainedActionEnvironment::default(),
+            CanonicalStringMap::default(),
+            "Action",
+            None::<&str>,
+        )
+    };
+    let shared = artifact_depset("same");
+    let aliased = make(shared.clone(), shared);
+    let split = make(artifact_depset("same"), artifact_depset("same"));
+    assert_eq!(aliased.render_argv(), split.render_argv());
+    assert_ne!(aliased, split);
+    let another = artifact_depset("same");
+    assert_eq!(aliased, make(another.clone(), another));
+    // Use the retained-graph constructor: the ordinary depset constructor
+    // canonicalizes these simple children into leaves before retention.
+    let leaf = |name| {
+        AnalysisDepsetGraphNode::new(
+            AnalysisDepsetOccurrence::new(),
+            DepsetOrder::Default,
+            1,
+            AnalysisDepsetGraphRow::Successors(vec![AnalysisDepsetGraphInput::Direct(
+                AnalysisValue::artifact(source_artifact(name)),
+            )]),
+        )
+    };
+    let nested = AnalysisDepset::from_local_graph(vec![
+        leaf("same"),
+        leaf("other"),
+        AnalysisDepsetGraphNode::new(
+            AnalysisDepsetOccurrence::new(),
+            DepsetOrder::Default,
+            2,
+            AnalysisDepsetGraphRow::Successors(vec![
+                AnalysisDepsetGraphInput::Local(0),
+                AnalysisDepsetGraphInput::Local(1),
+            ]),
+        ),
+    ])
+    .unwrap()
+    .pop()
+    .unwrap();
+    let flat = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![
+            AnalysisValue::artifact(source_artifact("same")),
+            AnalysisValue::artifact(source_artifact("other")),
+        ],
+        Vec::new(),
+    )
+    .unwrap();
+    assert_eq!(flat.to_list(), nested.to_list());
+    let flattened = make(flat, artifact_depset("same"));
+    let reshaped = make(nested, artifact_depset("same"));
+    assert_eq!(flattened.render_argv(), reshaped.render_argv());
+    assert_ne!(flattened, reshaped);
+}
+
+#[test]
 fn pinned_regular_crate_root_retains_artifact_and_root_path_identity() {
     let owner = |name: &str| AnalysisArtifact::Derived {
         owner: AnalysisConfiguredTargetKey::new(
