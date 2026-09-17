@@ -155,6 +155,14 @@ action and the catalog test's runfiles; sidecars are excluded. The direct
 `slug_bzlmod_v2` dependency, and the exact catalog-path test passes. This
 closes the named input-declaration and direct-adapter build gap, not the CLI
 root or all M7A production inputs.
+WP-7-18's single `--lockfile_mode=error` Bazel build of
+`//app/slug_cli_v2:slug` exited 0 in 10.69 seconds and produced a
+129,251,216-byte Linux x86-64 ELF. It also confirmed nonempty LALRPOP
+`syntax/grammar.rs` and the six cache-leaf proto modules in Bazel output
+trees. The 1,370-action current build graph completed with 1,360 cache hits
+and no tracked source/lock change. This establishes the named configured
+Bazel production-root build, while Cargo/Bazel feature and pin correspondence,
+Slug runtime/action admission and self-hosting remain separate M7A/M8 gates.
 
 Cargo remains authoritative for dependency declarations/resolution. Review
 `Cargo.lock`, `Cargo.Bazel.lock`, `MODULE.bazel.lock`, toolchain and manifest

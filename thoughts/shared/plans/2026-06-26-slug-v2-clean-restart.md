@@ -29,16 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-17-m7a-builtin-catalog-bazel-inputs-r1
-Status: accepted; exact embedded catalog inputs and direct adapter Bazel build pass
+Packet: WP-7-18-m7a-cli-root-bazel-build-r1
+Status: accepted; pinned Bazel CLI root builds
 
-WP-7-16 at `869dfa4e5` found 48 checked-in pinned `bazel_tools` files absent
-from the `slug_bzlmod_v2` Rustc sandbox. The current packet adds nine Bazel-only
-sidecars and explicit filegroups while preserving all 49 upstream bytes. Its
-filegroup query names exactly those 49 files; the direct `slug_reapi_v2`
-adapter build exits 0 in 40.67 seconds, and the one selected catalog-assets
-test passes in 0.00-second runtime. CLI compilation and M7A remain open. The
-callback candidate remains unaccepted at local
+WP-7-17 at `54c1eb905` declared all 49 verbatim `bazel_tools` inputs and
+built the direct REAPI adapter. The current packet's one Bazel build of the
+production CLI root exits 0 in 10.69 seconds, producing a Linux x86-64 ELF
+and nonempty LALRPOP/proto generated sources. This closes the named root
+buildability gate, not feature/pin correspondence, Slug action/runtime
+admission, M7A or self-hosting. The callback candidate remains unaccepted at local
 `review/wp-7-11-rustc-crate-root-map-each` (`ea5fcc6fd`).
 
 ### Earlier generated-input receipt
