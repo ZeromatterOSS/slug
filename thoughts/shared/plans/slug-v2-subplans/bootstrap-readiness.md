@@ -276,8 +276,10 @@ A/B/A proofs. WP-7-23 adds forced replacement argv/virtual bytes and atomic
 REAPI input-tree composition with output/input collision checks. WP-7-24 adds
 observed per-module source provenance needed to authenticate imported helpers.
 WP-7-25 uses it for native-library directory and default direct/indirect link
-callbacks, with real Linux builder/parameter-byte proofs. Other builder paths,
-native Cc providers/toolchains, conditional spilling and resolved-input execution
+callbacks, with real Linux builder/parameter-byte proofs. WP-7-26 runs public
+static/PIC rules_cc constructors into those recipes and retains full CcInfo with
+empty native HeaderInfo identity. Other builder paths,
+full Cc toolchains/operations, conditional spilling and resolved-input execution
 staging remain open. The Spawn and Args/param-file rows therefore remain open;
 these configured/component slices do not prove Rustc execution.
 

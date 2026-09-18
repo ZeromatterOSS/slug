@@ -1,120 +1,147 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-25-m7a-rustc-native-link-args-r1
+Packet: WP-7-26-m7a-cc-immutable-collections-r1
 Status: accepted; independent final ACCEPT; ready to integrate
 
-## Outcome and compatibility
+## Outcome and evidence
 
-Admit the pinned rules_rust native-library directory and default-platform link
-flag callbacks into immutable retained Args recipes. The authentic Linux Rustc
-`construct_arguments` proof will produce native search paths, static/dynamic
-flags, direct/indirect whole-archive flags, ambiguity substitutions and user link
-flags, including their forced parameter bytes and same-DICE source restoration.
-This advances the bootstrap Rustc/linker argument gap. Exact mapping/order and
-ASCII numeric-version stripping follow pinned source; File paths/short_path
-retain Slug-native spelling. Conservative input-shape rejection is Slug-native.
+Run pinned rules_cc public static/PIC library and linker-input constructors into
+retained Rustc native-link Args using their real provider values. Inspection
+found these are Starlark providers already in the authentic fixture closure;
+`cc_internal.freeze` accepting only empty lists is the immediate missing bridge.
+Do not invent native Cc constructors or flatten provider fields into structs.
 
-No Cc constructors, Cc toolchain discovery, compiler execution, Windows/Darwin
-flag families, C++ runtime library callbacks, tree artifacts or M7A completion.
-The proof supplies explicit toolchain/linker-input structs to the unchanged
-upstream builder, as existing proofs do. It selects the real Linux fallback Rust
-linker path with cc_toolchain=None; no fake native API or copied function body.
-Actual native Cc object production/lowering remains a prerequisite to full CLI.
+Bazel 9.2 commit 8220c6198837d5c13d53fea211cf3282aa12408a:
+CcStarlarkInternal.freeze copies Dict shallowly to an immutable dictionary,
+copies Iterable shallowly to an immutable list, and returns other values.
+StarlarkList.copyOf/immutableCopyOf and Dict.immutableCopyOf preserve contents;
+both checkHashable methods reject direct hashing even for frozen containers.
+StarlarkInfoWithSchema.isImmutable checks exported provider fields. Existing
+Slug structural provider/depset hashing and AnalysisValueLowerer remain owners.
+Pinned rules_cc 0.2.17 create_library_to_link.bzl, create_linker_input.bzl and
+cc_info.bzl in the existing source-pinned fixture establish constructor behavior.
 
-## Source and ownership
+Admit list/tuple-to-list and dict-to-dict shallow immutable copies plus
+non-iterable Starlark-value pass-through needed by these constructors. Java
+string/bool values are rejected by the pinned StarlarkValue signature; local
+range/set iterable conversion remains unsupported and rejects explicitly. Preserve order, container
+type, element identity and nested mutability. Direct list/dict hashing remains
+unsupported as in Bazel. Exact admitted collection operations/mutation rejection;
+conservative rejection of structurally mutable nested provider hash inputs and
+unsupported iterable forms is Slug-native. Paths retain existing Slug-native
+identity; no change to exact configuration/output bytes.
 
-Pinned rules_rust 0.73.0 rustc.bzl SHA
-`a7712508f50e5952f3f51e33c98acbe8ba39554e9c6f6edc26f16820d7c2a9e4`:
-`_libraries_dirnames` at add_all line 2881, `_make_link_flags_default_direct` /
-`_make_link_flags_default_indirect` at line 2896, and `_get_dirname` at line 2890
-for ambiguous-library search paths. Imported utils.bzl SHA
-`8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace`:
-`get_preferred_artifact` and `get_lib_name_default`. Bazel 9.2
-8220c6198837d5c13d53fea211cf3282aa12408a LinkerInputApi supplies sequence fields;
-StringModule.isDigit specifies nonempty ASCII [0-9]. Existing Args mapping and
-forced-file source anchors/contracts remain inherited from WP-7-20/23.
+## Ownership and representation
 
-Loading authenticates caller source/manifest/span as before; the two new mapping
-sites also require exactly one canonical utils provenance row with the pinned
-observed SHA. Pinned rustc relative loads and immutable bindings fix the helper
-identities. The link callback repr distinguishes only the two fixed default
-branches after authentication; unknown branches fail closed. No host reads,
-callable invocation or evaluator retention. Ambiguous directory uses the existing
-regular-File recipe after caller authentication.
+Use separate read-only evaluator collection variants under existing ListGen /
+ListLike and DictGen / DictLike abstractions; do not add a flag to every normal
+list/dict or reuse the hashable dictionary variant. Boxed immutable list slices
+and SmallMap dictionary storage have Trace/Freeze/Allocative ownership. ListRef,
+DictRef, collection operations and module freeze must recognize these values.
+No unsafe reinterpretation of live values as FrozenValue. Review optimized VM
+paths: construction-only mutation may use unchecked mutable access; ordinary
+mutation must reject read-only values. Keep generic algorithms at their current
+owners and isolate additional representations in cohesive files where possible.
 
-New Build API `rust_native_link_args.rs` owns RetainedRustNativeLinkArgs with
-immutable Arc<[AnalysisValue]> input rows and a closed mapper enum. Analysis
-lowers complete `(linker_input, use_pic, ambiguous_libs, include_link_flags)`
-tuples with the existing shared AnalysisValueLowerer. Struct/provider fields,
-sequence shape, unused values and alias/depset sharing remain structurally
-retained; publication uses the same PublicationEqState as other Spawn inputs.
-Constructor validates regular File/None library slots, bool selectors/alwayslink,
-string user flags and string-to-regular-File ambiguity maps. Libraries and user
-flags are ordered sequences. No flattened string cache or parallel identity.
+Collections live in evaluator/module heaps; configured lowering copies through
+the existing shared AnalysisValueLowerer, preserving all provider fields and
+depset alias identity. No evaluator value enters DICE or action storage, no
+new cache, DICE key, lock or alternative semantic identity. Module freeze and
+GC preserve collection content/alias lifetime. Mutable nested values remain
+mutable through a shallow copy; they cannot silently acquire a stable hash.
 
-The recipe implements preferred PIC/static/interface/dynamic selection,
-per-row directory dedup before generic uniquify, whole-archive ordering,
-include_link_flags suppression (alwayslink/user flags survive), static library
-sandwich flags, standard libstd/libtest special case, versioned dynamic names,
-and ambiguity remapping only where the pinned portable flags apply. Full input
-values remain the owner even if a selected branch does not render a field.
-This is DICE-retained semantic data using existing Arc/Allocative/SmallSet
-patterns (Stage 9); rendering is action scratch, released with its consumer.
-No new DICE key, lock or global cache; source/action invalidation stays owned by
-existing loading/configured dependencies.
+Full CcInfo publication exposed its native empty HeaderInfo leaf. The pinned
+CcCompilationContext.HeaderInfo (lines 558, 744-758) owns an identity token,
+equals/hash by that token, and is immutable. Retain a typed Arc-backed
+CcHeaderInfoOccurrence through the existing live empty HeaderInfo, module
+freeze, AnalysisValue lowering and materialization. Starlark/direct retained
+Eq/Hash use token identity; PublicationEqState uses a bidirectional occurrence
+mapping to preserve alias partitions across recomputation. Fresh-versus-shared
+occurrence behavior follows pinned source; token storage/publication identity
+is Slug-native, not Bazel SymbolGenerator bytes. No counter, zero
+marker, provider/struct surrogate or pointer-derived persistent identity.
+Nonempty HeaderInfo construction remains unsupported; no hidden nonempty state
+can enter the empty producer. Prove native equality/hash, distinct/shared
+occurrences and materialization round-trip plus full CcInfo publication.
 
-## Scope and gates
+## Scope and validation
 
-Allowlist: Build API actions/{rust_native_link_args.rs,mod.rs,spec.rs}, lib.rs,
-and tests/actions.rs plus a focused tests/native_link_args/mod.rs included
-module and BUILD.bazel src declaration if needed; loading subrule_invocation.rs;
-analysis starlark_rule.rs and tests/rustc_map_each/{mod.rs,subject.bzl}, existing
-fixture.toml provenance; canonical/manifest and Stage 6/7/9/bootstrap summaries.
-New recipe and focused API tests get separate cohesive files; existing large
-files receive bounded dispatch. No new copied Bzl bodies or fixture closure.
+Allowlist: starlark-rust/starlark/src/values/types/{list,dict,structs} and their
+module export files for read-only allocation/views and structural traversal;
+app/slug_loading_v2/src/cc_common.rs plus focused tests (new module preferred)
+and obsolete empty-only rejection assertions in host_package_load_tests.rs;
+Build API src/{cc_header_info.rs,analysis_value.rs,lib.rs} and tests/analysis_value.rs,
+loading lib.rs exports, analysis src/analysis_value.rs and focused round-trip test;
+analysis tests/rustc_map_each/{mod.rs,subject.bzl} and fixture.toml; canonical,
+manifest, Stage 6/9/bootstrap summaries. The independently reviewed native
+HeaderInfo leaf is the documented lowering gap;
+no other production analysis/action changes.
+No copied upstream body or fixture closure growth. Existing large files receive
+bounded dispatch; independent design and final review required.
 
-API proof covers selection priority/fallback, regular-file rejection, both
-mapper branches, name edge cases, ambiguity, bool/type negatives, order,
-include flags, retained unused-field/shape/alias identity. Real-source proof
-covers nonempty Linux native rows, direct/indirect selection, include false,
-input/source A/B/A, changed imported utility rejection, generated param bytes
-and a retained unused-callable negative. Preserve prior root/provider callback
-proofs and generic Args. Compile direct query/REAPI consumers. Exact preflight
-and small subsecond test batches; separate pinned-nightly preparation operations
-capped 60s, rustfmt/diff/archive/plan checks. Tests above a few seconds run rarely;
-above roughly 30s require strict necessity scrutiny. No broad/daemon/transport
-or Bazel/compiler action. Independent design and final review required.
+Prove list/dict type, ordering, equality, indexing, slicing, iteration, ordinary
+copy/concat behavior, every mutator category, direct hash rejection, shallow
+alias/mutation, module freeze/GC and provider/depset structural behavior. Real
+public cc_common static/PIC/alwayslink library -> linker_input -> linking_context
+-> CcInfo -> Rustc builder proof checks retained providers, exact argv/param
+bytes and same-DICE edit/restoration. Existing struct-backed dynamic/indirect
+proof stays a regression; no claim to dynamic solib/LTO/toolchain execution.
 
-If source provenance cannot authenticate a transitive helper, or real builder
-reaches unowned native behavior, resolve that dependency before widening the
-recipe. Predecessor WP-7-24 at 3a72e4d7a supplies observed per-module SHA transport;
-M7A and typed Spawn execution remain open.
+Compile owner/dependents separately with pinned nightly under 60s preparation
+caps. Preflight exact selectors, run focused expected-subsecond tests; tests
+over a few seconds are infrequent and over roughly 30s require strict necessity.
+Check direct analysis/query/REAPI consumers, rustfmt, diff/archive/plan. Do not run
+full-suite, daemon, compiler action, live transport or Bazel build.
+
+Resolve any immutable representation/VM safety contradiction before activation.
+A constructor reaching toolchain/solib/LTO behavior cannot be faked or bypassed;
+retain it as an explicit required future dependency. Full M7A requires remaining
+Rustc callbacks, Cc toolchain support and resolved Spawn/input execution.
+
+Predecessor WP-7-25 at 1dbb0ad07 is pushed: native-link Args with imported-source
+authentication and full tuple/publication identity; nine focused tests and
+independent final ACCEPT. The overall bootstrap goal remains open.
 
 ## Acceptance receipt
 
-The retained recipe implements the pinned native-link projections with full
-tuple ownership and shared publication equality. Authentic Linux builder tests
-prove direct/indirect selection, include-flags suppression, ambiguity, user
-flags, forced parameter bytes and imported-source rejection/restoration.
-Cross-Spawn depset alias tests and unused-callable rejection protect ownership.
-No copied upstream bodies or fixture files were added.
+The unchanged public rules_cc static/PIC and alwayslink library constructors,
+linker-input and linking-context constructors, and CcInfo initializer now feed
+real providers to the unchanged Rustc builder. Full CcInfo publication retains
+its empty native HeaderInfo. The proof changes an otherwise unused linker input
+(same argv, different retained result), restores it, reloads/restores cc_info.bzl
+(new HeaderInfo token, equal publication), and rejects invalid library extensions.
+Exact native argv and forced multiline parameter bytes are asserted.
 
-Pinned nightly direct binaries compiled the final API tests in 1.71s and
-analysis tests in 34.43s, separately from execution and within the 60s preparation
-cap. Exact-selector preflight and execution passed:
+Separate pinned-nightly preparation operations stayed within 60s: the largest
+observed test preparation was 47.35s; final API, loading and analysis preparation
+finished in 2.30s, 6.12s and 11.15s respectively. The unavailable rustup snap
+launcher used the previously verified direct pinned binaries. Initial focused
+checks caught and corrected the special-list allocation flag and test-harness
+source-path/scope/GC/TupleRef mistakes. Only affected gates were repeated.
+Exact-selector preflight and final execution passed:
 
-- API 5/5 in 0.00s (0.002s wrapper): three native-link tests plus existing
-  ArgsWrite formatting and Rust crate retained-shape/alias checks.
-- Analysis 4/4 in 0.45s (0.461s wrapper): native-link source authentication and
-  restoration, prior Rustc root/dependency callbacks, and generic Args policy.
+- Loading 7/7 in 0.01s: reads, all mutator categories, shallow aliases, direct
+  hash rejection, GC (automatic/disabled/forced), module freeze/cycle,
+  provider/depset hash, native HeaderInfo identities and iterable/scalar negatives.
+- Build API 3/3 in 0.00s: HeaderInfo occurrence/publication aliases (including
+  cross-provider pairs), prior provider alias and frozen-container barriers.
+- Analysis unit 1/1 in 0.00s: native type, fields, hash/alias preservation and
+  lower/materialize/lower round-trip.
+- Authentic analysis 2/2 in 0.55s: public CcInfo/Rustc proof and prior native-link
+  callback/source restoration regression.
 
-`cargo check -p slug_query_v2 -p slug_reapi_v2` exited 0 in 14.47s, with three
-existing REAPI deprecation warnings. Rustfmt, diff, archive and plan checks pass.
-Receipts are in `target/wp725/`. Packet/review wall time was not separately
-measured. No broad suite, daemon, compiler action or live transport ran.
+`cargo check -p slug_query_v2 -p slug_reapi_v2` exited 0 in 18.63s with existing
+warnings. Rustfmt, diff, archive and plan checks pass. Receipts: `target/wp726/`.
+Packet/review wall time was not separately measured. No broad suite, daemon,
+compiler action, live transport or Bazel build ran.
 
-Independent final review ACCEPT found no material algorithm, provenance,
-retained-value or scope blocker. The observable advance is native-link Args
-publication and forced parameter bytes through the unchanged Rustc builder.
-Native Cc construction/lowering, toolchain discovery and resolved Spawn execution
-remain required; this checkpoint does not close M7A or full CLI buildability.
+Fixture hygiene review reused the same 54 pinned source files plus the recorded
+reused source/generated proxy; all 54 source digests/lengths match, no copied
+implementation or load-closure file was added. Added proofs reuse the existing
+workspace constructor, provider lowerer and argument builder.
+
+Independent final review ACCEPT confirmed shallow collection semantics,
+Freeze/GC ownership, native occurrence identity, publication alias bijection and
+finite source evidence. This advances static/PIC Cc provider production and
+retention. Nonempty HeaderInfo, dynamic solib/LTO operations, Cc toolchains,
+remaining Rustc callbacks and resolved Spawn/input execution still block M7A.

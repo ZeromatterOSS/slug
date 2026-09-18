@@ -34,6 +34,7 @@ use starlark_derive::starlark_value;
 use starlark_syntax::slice_vec_ext::SliceExt;
 use starlark_syntax::slice_vec_ext::VecExt;
 
+use super::immutable::ImmutableListData;
 use crate as starlark;
 use crate::any::ProvidesStaticType;
 use crate::coerce::coerce;
@@ -117,7 +118,7 @@ impl<'v> ListData<'v> {
         #[cold]
         #[inline(never)]
         fn error<'v>(x: Value<'v>) -> anyhow::Error {
-            if x.downcast_ref::<ListGen<FrozenListData>>().is_some() {
+            if ListRef::is_immutable(x) {
                 ValueError::CannotMutateImmutableValue.into()
             } else {
                 NotListError(x.get_type()).into()
@@ -141,7 +142,10 @@ impl<'v> ListData<'v> {
     }
 
     pub(crate) fn is_list_type(x: TypeId) -> bool {
-        x == TypeId::of::<ListGen<ListData>>() || x == TypeId::of::<ListGen<FrozenListData>>()
+        x == TypeId::of::<ListGen<ListData>>()
+            || x == TypeId::of::<ListGen<FrozenListData>>()
+            || x == TypeId::of::<ListGen<ImmutableListData<Value>>>()
+            || x == TypeId::of::<ListGen<ImmutableListData<FrozenValue>>>()
     }
 
     /// Return an error if there's at least one iterator over the list.
@@ -343,6 +347,7 @@ impl Display for FrozenListData {
 
 // This trait need to be `pub(crate)` because `ListGen<T>` is.
 pub(crate) trait ListLike<'v>: Debug + Allocative {
+    const SPECIAL: bool = false;
     fn content(&self) -> &[Value<'v>];
     fn set_at(&self, i: usize, v: Value<'v>) -> crate::Result<()>;
 
@@ -355,6 +360,7 @@ pub(crate) trait ListLike<'v>: Debug + Allocative {
 }
 
 impl<'v> ListLike<'v> for ListData<'v> {
+    const SPECIAL: bool = true;
     fn content(&self) -> &[Value<'v>] {
         self.content.get().as_ref().content()
     }
@@ -384,6 +390,7 @@ impl<'v> ListLike<'v> for ListData<'v> {
 }
 
 impl<'v> ListLike<'v> for FrozenListData {
+    const SPECIAL: bool = true;
     fn content(&self) -> &[Value<'v>] {
         coerce(self.content())
     }
@@ -437,7 +444,7 @@ where
     where
         Self: Sized,
     {
-        true
+        T::SPECIAL
     }
 
     fn get_methods() -> Option<&'static Methods> {

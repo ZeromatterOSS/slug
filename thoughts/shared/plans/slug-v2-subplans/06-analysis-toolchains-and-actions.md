@@ -63,7 +63,8 @@ shared filename/provenance table into `AnalysisEvaluationContext`. Rule equality
 includes the table; the pinned Args classifier compares manifest, evaluated
 caller and pinned digests. This prepares authentication of imported native-link
 helpers without retaining evaluator objects or reading source files in analysis.
-Cc constructors and native Cc value lowering remain unadmitted.
+The static/PIC Cc provider slice below supplies constructor and lowering support;
+nonempty native Cc internals and toolchain discovery remain open.
 
 WP-7-25 admits the pinned native-library directory and default direct/indirect
 link flag callbacks plus ambiguous-library directory mapping. Loading checks the
@@ -78,6 +79,19 @@ input/toolchain structs and the Rust linker fallback, with direct/indirect and
 include-flags branches, parameter bytes, imported-source A/B/A and unused-callable
 rejection. This is argument mapping, not native Cc providers/toolchains or execution;
 Windows/Darwin and C++ runtime-library callbacks remain unsupported.
+
+WP-7-26 supplies shallow immutable list/dict copies to `cc_internal.freeze`.
+Read-only variants reuse the retained evaluator's collection algorithms, keep
+nested aliases, reject mutation and direct hashing, and survive module freeze
+and GC without changing mutable collection layout. Structural provider hashing
+rejects mutable nested inputs. The unchanged rules_cc public static/PIC library,
+linker-input/linking-context and CcInfo constructors now feed real provider rows
+to Rustc. Full CcInfo publication retains its native empty HeaderInfo occurrence:
+an Arc token owns native equality/hash; the shared publication equality state
+preserves its alias partition; materialization reconstructs the native type.
+The empty-only producer rejects nonempty HeaderInfo arguments. No global counter
+or evaluator heap crosses DICE. Dynamic solib/LTO/toolchain operations, nonempty
+HeaderInfo and full Cc compilation remain required separate capabilities.
 
 ### Analysis surface
 

@@ -8,6 +8,13 @@ oracle_notes = "Focused source regression, not full rust_library or CLI equivale
 bazel_release = "9.2.0"
 bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
 source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/rules/cpp/CcStarlarkInternal.java#freeze",
+  "src/main/java/com/google/devtools/build/lib/rules/cpp/CcCompilationContext.java#HeaderInfo",
+  "src/main/java/net/starlark/java/eval/StarlarkList.java#immutableCopyOf",
+  "src/main/java/net/starlark/java/eval/Dict.java#immutableCopyOf",
+  "rules_cc 0.2.17 cc/private/link/create_library_to_link.bzl#create_library_to_link",
+  "rules_cc 0.2.17 cc/private/link/create_linker_input.bzl#create_linker_input",
+  "rules_cc 0.2.17 cc/private/cc_info.bzl#CcInfo",
   "rules_rust 0.73.0 rust/private/rustc.bzl#_libraries_dirnames",
   "rules_rust 0.73.0 rust/private/rustc.bzl#_make_link_flags_default",
   "rules_rust 0.73.0 rust/private/rustc.bzl#portable_link_flags",
@@ -33,6 +40,6 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/vfs/PathFragment.java#getSafePathString",
   "rules_cc 0.2.17 cc/extensions.bzl#_compatibility_proxy_repo_impl",
 ]
-translation_notes = "sources.json pins the complete top-level load closure of rustc.bzl. The tests supply regular source/generated Files, optional native-link input structs and standard-library/sysroot Files and native Spawn registration; forced multiline parameter-file replacement argv and bytes are asserted without compiler or toolchain discovery execution. The generated proxy matches the >=9 branch of the separately hashed upstream writer."
+translation_notes = "sources.json pins the complete top-level load closure of rustc.bzl. The tests supply regular source/generated Files, optional native-link input structs or public rules_cc static/PIC CcInfo providers and standard-library/sysroot Files and native Spawn registration; forced multiline parameter-file replacement argv and bytes are asserted without compiler or toolchain discovery execution. The generated proxy matches the >=9 branch of the separately hashed upstream writer."
 generation_command = "Copy the sources.json load closure verbatim from the pinned Bazel repositories, retaining Apache notices and licenses; generate the compatibility proxy using the recorded upstream writer branch."
-verification_command = "Run exact Rust selectors rustc_map_each::pinned_rustc_arguments_publish_and_restore_after_source_edit, rustc_map_each::pinned_rustc_file_dirnames_preserve_order_and_generated_root, and rustc_map_each::pinned_rustc_dependencies_select_aliases_metadata_and_restore plus rustc_map_each::pinned_rustc_native_link_flags_authenticate_imports_and_restore after compile-only preparation and v2_test_preflight.py."
+verification_command = "Run exact Rust selectors rustc_map_each::pinned_rustc_arguments_publish_and_restore_after_source_edit, rustc_map_each::pinned_rustc_file_dirnames_preserve_order_and_generated_root, and rustc_map_each::pinned_rustc_dependencies_select_aliases_metadata_and_restore plus rustc_map_each::pinned_rustc_native_link_flags_authenticate_imports_and_restore and rustc_map_each::pinned_cc_providers_feed_rustc_and_restore after compile-only preparation and v2_test_preflight.py."

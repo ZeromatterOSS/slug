@@ -33,6 +33,7 @@ use serde::Serialize;
 use starlark_derive::starlark_value;
 use starlark_map::Equivalent;
 
+use super::immutable::ImmutableDictData;
 use crate as starlark;
 use crate::any::ProvidesStaticType;
 use crate::cast::transmute;
@@ -158,7 +159,8 @@ impl AllocFrozenValue for FrozenDictData {
 
 impl<'v> Dict<'v> {
     pub(crate) fn is_dict_type(x: TypeId) -> bool {
-        x == TypeId::of::<DictGen<FrozenDictData>>()
+        x == TypeId::of::<DictGen<ImmutableDictData>>()
+            || x == TypeId::of::<DictGen<FrozenDictData>>()
             || x == TypeId::of::<DictGen<FrozenHashableDictData>>()
             || x == TypeId::of::<DictGen<HashableDictData<'static>>>()
             || x == TypeId::of::<DictGen<RefCell<Dict<'static>>>>()
@@ -359,7 +361,7 @@ fn write_hashable_dict_hash<'v>(
     Ok(())
 }
 
-trait DictLike<'v>: Debug + Allocative {
+pub(crate) trait DictLike<'v>: Debug + Allocative {
     type ContentRef<'a>: Deref<Target = SmallMap<Value<'v>, Value<'v>>>
     where
         Self: 'a,

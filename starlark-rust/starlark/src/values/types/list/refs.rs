@@ -25,6 +25,7 @@ use std::slice;
 use ref_cast::RefCastCustom;
 use ref_cast::ref_cast_custom;
 
+use super::immutable::ImmutableListData;
 use crate::coerce::coerce;
 use crate::typing::Ty;
 use crate::values::FrozenValue;
@@ -76,11 +77,20 @@ impl<'v> ListRef<'v> {
         self.content.iter().copied()
     }
 
-    /// Downcast the value to the list or frozen list (both are represented by `ListRef`).
+    /// Whether the outer list is immutable (nested values may still be mutable).
+    pub fn is_immutable(x: Value<'v>) -> bool {
+        Self::from_value(x).is_some()
+            && (x.unpack_frozen().is_some()
+                || x.downcast_ref::<ListGen<ImmutableListData<Value<'v>>>>()
+                    .is_some())
+    }
+
+    /// Downcast any ordinary or shallow immutable list.
     pub fn from_value(x: Value<'v>) -> Option<&'v ListRef<'v>> {
-        if x.unpack_frozen().is_some() {
-            x.downcast_ref::<ListGen<FrozenListData>>()
-                .map(|x| ListRef::new(coerce(x.0.content())))
+        if let Some(frozen) = x.unpack_frozen() {
+            Self::from_frozen_value(frozen)
+        } else if let Some(ptr) = x.downcast_ref::<ListGen<ImmutableListData<Value<'v>>>>() {
+            Some(ListRef::new(&ptr.0.0))
         } else {
             let ptr = x.downcast_ref::<ListGen<ListData>>()?;
             Some(ListRef::new(ptr.0.content()))
@@ -89,8 +99,7 @@ impl<'v> ListRef<'v> {
 
     /// Downcast the list.
     pub fn from_frozen_value<'f>(x: FrozenValue) -> Option<&'f ListRef<'f>> {
-        x.downcast_ref::<ListGen<FrozenListData>>()
-            .map(|x| ListRef::new(coerce(x.0.content())))
+        FrozenListRef::from_frozen_value(x).map(|list| ListRef::new(coerce(&list.content)))
     }
 }
 
@@ -115,6 +124,10 @@ impl FrozenListRef {
     pub fn from_frozen_value(x: FrozenValue) -> Option<&'static FrozenListRef> {
         x.downcast_ref::<ListGen<FrozenListData>>()
             .map(|x| FrozenListRef::new(x.0.content()))
+            .or_else(|| {
+                x.downcast_ref::<ListGen<ImmutableListData<FrozenValue>>>()
+                    .map(|x| FrozenListRef::new(&x.0.0))
+            })
     }
 }
 

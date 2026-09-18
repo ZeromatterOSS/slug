@@ -19,8 +19,10 @@
 
 pub(crate) mod alloc;
 pub(crate) mod globals;
+pub(crate) mod immutable;
 mod list_type;
 pub(crate) mod methods;
+pub use immutable::AllocImmutableList;
 mod refs;
 pub(crate) mod unpack;
 pub(crate) mod value;

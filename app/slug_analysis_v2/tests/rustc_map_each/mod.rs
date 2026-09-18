@@ -604,3 +604,112 @@ async fn pinned_rustc_native_link_flags_authenticate_imports_and_restore() {
     assert!(error.contains("function"), "{error}");
     fs::remove_dir_all(workspace).unwrap();
 }
+
+#[tokio::test]
+async fn pinned_cc_providers_feed_rustc_and_restore() {
+    let workspace = workspace();
+    let files = [
+        "native/libplain.a",
+        "pic/libplain.pic.a",
+        "native/libalways.a",
+        "unused.so",
+        "alias/librenamed.a",
+        "unused.a",
+        "unused.ifso",
+        "tools/ld",
+    ];
+    for name in files.into_iter().chain(["extra-a", "extra-b"]) {
+        let path = workspace.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, "cc provider fixture\n").unwrap();
+    }
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        format!("exports_files(['lib.rs', 'extra-a', 'extra-b'] + {files:?})\n"),
+    )
+    .unwrap();
+    let labels = files.map(|name| format!("@@//:{name}"));
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut first = None;
+    let mut first_argv = None;
+    for extra in ["extra-a", "extra-b", "extra-a"] {
+        fs::write(workspace.join("rules_rust/BUILD.bazel"), format!(
+            "load(':proof.bzl', 'subject')\nsubject(name = 'subject', src = '@@//:lib.rs', native_files = {labels:?}, real_cc = True, native_unused_input = '@@//:{extra}')\n"
+        )).unwrap();
+        let result = request(&dice, &workspace).await.unwrap();
+        let spawn = result.actions()[0].spawn_spec().unwrap();
+        let argv = spawn.render_argv();
+        let native = argv
+            .iter()
+            .filter(|arg| {
+                arg.starts_with("-Lnative=")
+                    || arg.starts_with("-lstatic=")
+                    || arg.starts_with("-Clink-arg=")
+                    || arg.starts_with("--codegen=link-arg=")
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        let expected = [
+            "-Lnative=pic",
+            "-Lnative=native",
+            "-Lnative=alias",
+            "-lstatic=renamed",
+            "-Clink-arg=-lrenamed",
+            "-Clink-arg=-Wl,--whole-archive",
+            "-Clink-arg=native/libalways.a",
+            "-Clink-arg=-Wl,--no-whole-archive",
+            "--codegen=link-arg=-z,now",
+            "--codegen=link-arg=-pthread",
+            "-lstatic=renamed",
+            "-Clink-arg=-lrenamed",
+        ]
+        .map(str::to_owned);
+        assert_eq!(native, expected);
+        let expanded = spawn.expand_forced_param_files().unwrap();
+        assert!(
+            String::from_utf8_lossy(expanded.param_files()[0].bytes())
+                .contains(&format!("{}\n", expected.join("\n")))
+        );
+        if let Some(previous) = &first {
+            assert_eq!(&argv, first_argv.as_ref().unwrap());
+            if extra == "extra-b" {
+                assert_ne!(previous, &result);
+            } else {
+                assert_eq!(previous, &result);
+            }
+        } else {
+            first_argv = Some(argv);
+            first = Some(result);
+        }
+    }
+    // Reload the defining Cc module to create a fresh HeaderInfo occurrence.
+    // Equal configured publication must survive the new token's alias partition.
+    let cc_path = workspace.join("rules_cc/cc/private/cc_info.bzl");
+    let cc_source = fs::read_to_string(&cc_path).unwrap();
+    fs::write(&cc_path, format!("{cc_source}\n")).unwrap();
+    assert_eq!(
+        first.as_ref().unwrap(),
+        &request(&dice, &workspace).await.unwrap()
+    );
+    fs::write(&cc_path, cc_source).unwrap();
+    assert_eq!(
+        first.as_ref().unwrap(),
+        &request(&dice, &workspace).await.unwrap()
+    );
+    // Public constructor validation still runs in unchanged upstream Starlark.
+    let proof_path = workspace.join("rules_rust/proof.bzl");
+    let proof = fs::read_to_string(&proof_path).unwrap();
+    fs::write(
+        &proof_path,
+        proof.replace(
+            "static_library = files[0], pic_static_library = files[1]",
+            "static_library = files[3], pic_static_library = files[1]",
+        ),
+    )
+    .unwrap();
+    let error = request(&dice, &workspace).await.unwrap_err();
+    assert!(error.contains("allowed extensions"), "{error}");
+    fs::write(&proof_path, proof).unwrap();
+    assert_eq!(first.unwrap(), request(&dice, &workspace).await.unwrap());
+    fs::remove_dir_all(workspace).unwrap();
+}

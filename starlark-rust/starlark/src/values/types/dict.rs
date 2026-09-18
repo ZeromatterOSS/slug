@@ -18,6 +18,8 @@
 //! The dictionary type, a mutable associative-map, which iterates in insertion order.
 
 mod alloc;
+pub(crate) mod immutable;
+pub use immutable::AllocImmutableDict;
 
 mod dict_type;
 pub(crate) mod globals;

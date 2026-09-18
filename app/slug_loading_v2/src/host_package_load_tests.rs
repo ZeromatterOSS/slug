@@ -34784,10 +34784,6 @@ EXTRA_EMPTY = POSITIONAL == [] and NAMED == [] and FROM_FROZEN == []
     }
 
     for failure in [
-        "X = cc_common.internal_DO_NOT_USE().freeze([1])",
-        "X = cc_common.internal_DO_NOT_USE().freeze(())",
-        "X = cc_common.internal_DO_NOT_USE().freeze({})",
-        "X = cc_common.internal_DO_NOT_USE().freeze(1)",
         "X = cc_common.internal_DO_NOT_USE().freeze()",
         "X = cc_common.internal_DO_NOT_USE().freeze([], [])",
         "cc_common.internal_DO_NOT_USE().freeze([]).append(1)",
@@ -39025,3 +39021,6 @@ async fn observed_external_bzl_source_provenance_tracks_helper_revision() {
         }
     }
 }
+
+#[path = "cc_freeze_tests.rs"]
+mod cc_freeze_tests;

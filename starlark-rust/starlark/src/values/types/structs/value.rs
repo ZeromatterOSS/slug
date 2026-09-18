@@ -55,7 +55,7 @@ use crate::values::ValueLike;
 use crate::values::comparison::compare_small_map;
 use crate::values::comparison::equals_small_map;
 use crate::values::dict::DictRef;
-use crate::values::list::FrozenListRef;
+use crate::values::list::ListRef;
 use crate::values::structs::unordered_hasher::UnorderedHasher;
 use crate::values::tuple::TupleRef;
 
@@ -76,13 +76,22 @@ pub fn starlark_structural_is_immutable(value: Value<'_>) -> bool {
     if let Some(value) = value.request_value::<&dyn StarlarkStructuralValue>() {
         return value.is_structurally_immutable();
     }
-    if FrozenListRef::from_value(value).is_some()
-        || value
-            .unpack_frozen()
-            .and_then(crate::values::dict::FrozenDictRef::from_frozen_value)
-            .is_some()
+    // Fully frozen collections retain their existing immutable-container barrier.
+    if value.unpack_frozen().is_some()
+        && (ListRef::from_value(value).is_some() || DictRef::from_value(value).is_some())
     {
         return true;
+    }
+    if ListRef::is_immutable(value) {
+        return ListRef::from_value(value)
+            .unwrap()
+            .iter()
+            .all(starlark_structural_is_immutable);
+    }
+    if DictRef::is_immutable(value) {
+        return DictRef::from_value(value).unwrap().iter().all(|(k, v)| {
+            starlark_structural_is_immutable(k) && starlark_structural_is_immutable(v)
+        });
     }
     if let Some(tuple) = TupleRef::from_value(value) {
         return tuple.iter().all(starlark_structural_is_immutable);
@@ -99,7 +108,8 @@ pub fn write_starlark_structural_hash(
     if let Some(value) = value.request_value::<&dyn StarlarkStructuralValue>() {
         return value.write_structural_hash(hasher);
     }
-    if let Some(list) = FrozenListRef::from_value(value) {
+    if ListRef::is_immutable(value) {
+        let list = ListRef::from_value(value).unwrap();
         "list".hash(hasher);
         list.len().hash(hasher);
         for value in list.iter() {
@@ -107,7 +117,7 @@ pub fn write_starlark_structural_hash(
         }
         return Ok(());
     }
-    if value.unpack_frozen().is_some() {
+    if DictRef::is_immutable(value) {
         if let Some(dict) = DictRef::from_value(value) {
             "dict".hash(hasher);
             dict.len().hash(hasher);

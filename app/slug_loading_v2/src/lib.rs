@@ -137,6 +137,8 @@ pub use canonical_repository_route::HostCanonicalRepositoryRouteObservationKey;
 pub use canonical_repository_route::HostCanonicalRepositoryRouteOutcome;
 #[doc(hidden)]
 pub use canonical_repository_route::ObservedHostCanonicalRepositoryRoute;
+pub use cc_common::alloc_frozen_empty_cc_header_info;
+pub use cc_common::empty_cc_header_info_occurrence;
 pub use cycle_detector::bzl_load_cycle_detector;
 #[doc(hidden)]
 pub use external_subtree_package_set::ExternalSubtreePackageSet;

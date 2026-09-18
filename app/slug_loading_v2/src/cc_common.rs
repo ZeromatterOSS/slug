@@ -9,17 +9,22 @@
  */
 
 use std::fmt;
+use std::hash::Hash;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use slug_build_api_v2::CcHeaderInfoOccurrence;
 use starlark::any::ProvidesStaticType;
+use starlark::collections::StarlarkHasher;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
+use starlark::values::Demand;
 use starlark::values::Freeze;
+use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
@@ -27,10 +32,14 @@ use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::ValueLike;
+use starlark::values::dict::AllocImmutableDict;
+use starlark::values::dict::DictRef;
+use starlark::values::list::AllocImmutableList;
 use starlark::values::list::AllocList;
 use starlark::values::list::ListRef;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
+use starlark::values::structs::StarlarkStructuralValue;
 use starlark::values::tuple::TupleRef;
 
 use crate::builtin_restriction::CustomAllowlistEntry;
@@ -81,6 +90,9 @@ impl<'v> StarlarkValue<'v> for CcInternalModule {
 
 #[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
 struct EmptyCcHeaderInfoGen<V> {
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    occurrence: CcHeaderInfoOccurrence,
     empty_headers: V,
 }
 
@@ -100,6 +112,17 @@ where
     Self: ProvidesStaticType<'v>,
 {
     type Canonical = FrozenEmptyCcHeaderInfo;
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(empty_cc_header_info_occurrence(other).is_some_and(|other| self.occurrence == other))
+    }
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.occurrence.hash(hasher);
+        Ok(())
+    }
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn StarlarkStructuralValue>(self);
+    }
 
     fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
@@ -129,6 +152,33 @@ where
         .map(str::to_owned)
         .collect()
     }
+}
+
+impl<V> StarlarkStructuralValue for EmptyCcHeaderInfoGen<V> {
+    fn is_structurally_immutable(&self) -> bool {
+        true
+    }
+    fn write_structural_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.occurrence.hash(hasher);
+        Ok(())
+    }
+}
+
+pub fn empty_cc_header_info_occurrence(value: Value<'_>) -> Option<CcHeaderInfoOccurrence> {
+    match EmptyCcHeaderInfo::from_value(value)? {
+        starlark::__macro_refs::Either::Left(value) => Some(value.occurrence.clone()),
+        starlark::__macro_refs::Either::Right(value) => Some(value.occurrence.clone()),
+    }
+}
+
+pub fn alloc_frozen_empty_cc_header_info(
+    heap: &FrozenHeap,
+    occurrence: CcHeaderInfoOccurrence,
+) -> FrozenValue {
+    heap.alloc(FrozenEmptyCcHeaderInfo {
+        occurrence,
+        empty_headers: heap.alloc(AllocList::EMPTY),
+    })
 }
 
 #[starlark_module]
@@ -169,13 +219,26 @@ fn cc_internal_methods(builder: &mut MethodsBuilder) {
         value: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
-        let Some(list) = ListRef::from_value(value) else {
-            anyhow::bail!("cc_internal.freeze currently supports only empty lists");
-        };
-        if !list.is_empty() {
-            anyhow::bail!("cc_internal.freeze currently supports only empty lists");
+        if let Some(dict) = DictRef::from_value(value) {
+            return Ok(eval.heap().alloc(AllocImmutableDict(dict.iter())));
         }
-        Ok(eval.frozen_heap().alloc(AllocList::EMPTY).to_value())
+        if let Some(list) = ListRef::from_value(value) {
+            return Ok(eval.heap().alloc(AllocImmutableList(list.iter())));
+        }
+        if let Some(tuple) = TupleRef::from_value(value) {
+            return Ok(eval.heap().alloc(AllocImmutableList(tuple.iter())));
+        }
+        // Pinned CcStarlarkInternal.freeze leaves non-iterable values untouched.
+        if value.unpack_str().is_some() || value.unpack_bool().is_some() {
+            anyhow::bail!("cc_internal.freeze requires a Starlark value, not string or bool");
+        }
+        if matches!(value.get_type(), "range" | "set") {
+            anyhow::bail!(
+                "cc_internal.freeze {} conversion is not supported",
+                value.get_type()
+            );
+        }
+        Ok(value)
     }
 
     fn create_header_info<'v>(
@@ -183,9 +246,10 @@ fn cc_internal_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
         let empty_headers = eval.frozen_heap().alloc(AllocList::EMPTY).to_value();
-        Ok(eval
-            .heap()
-            .alloc_complex(EmptyCcHeaderInfoGen { empty_headers }))
+        Ok(eval.heap().alloc_complex(EmptyCcHeaderInfoGen {
+            occurrence: CcHeaderInfoOccurrence::new(),
+            empty_headers,
+        }))
     }
 }
 

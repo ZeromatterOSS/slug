@@ -29,14 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-25-m7a-rustc-native-link-args-r1
+Packet: WP-7-26-m7a-cc-immutable-collections-r1
 Status: accepted; independent final ACCEPT; ready to integrate
 
-The accepted checkpoint retains pinned native-library search/link arguments
-from the authentic Rustc builder, authenticating imported utility source via
-WP-7-24's observed provenance (`3a72e4d7a`). Full Cc providers/toolchains and
-Spawn execution remain open. Nine focused tests and direct query/REAPI checks
-pass. The manifest owns the finite mapping contract and acceptance receipt.
+The accepted checkpoint runs public rules_cc static/PIC constructors into the
+real Rustc builder, retains full CcInfo and native empty HeaderInfo occurrence
+identity, and supplies shallow immutable collection copies. Thirteen focused
+tests and direct query/REAPI checks pass. Toolchains and resolved Spawn execution
+remain required; the manifest owns the finite contract and acceptance receipt.
 
 ### Earlier generated-input receipt
 

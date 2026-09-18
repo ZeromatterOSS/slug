@@ -117,3 +117,6 @@ pub use runfiles::RunfilesError;
 pub use runfiles_packages::RunfilesPackageDepset;
 pub use runfiles_packages::RunfilesPackageMetadata;
 pub use runfiles_packages::RunfilesRepositoryMapping;
+
+mod cc_header_info;
+pub use cc_header_info::CcHeaderInfoOccurrence;

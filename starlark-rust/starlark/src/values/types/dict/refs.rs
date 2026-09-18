@@ -24,6 +24,7 @@ use std::ops::Deref;
 use dupe::Dupe;
 use either::Either;
 
+use super::immutable::ImmutableDictData;
 use crate::coerce::coerce;
 use crate::typing::Ty;
 use crate::values::FrozenValue;
@@ -71,6 +72,14 @@ pub struct FrozenDictRef {
 }
 
 impl<'v> DictRef<'v> {
+    /// Whether the outer dictionary is immutable, independently of nested values.
+    pub fn is_immutable(x: Value<'v>) -> bool {
+        Self::from_value(x).is_some()
+            && (x.unpack_frozen().is_some()
+                || x.downcast_ref::<DictGen<ImmutableDictData<'v>>>().is_some()
+                || x.downcast_ref::<DictGen<HashableDictData<'v>>>().is_some())
+    }
+
     /// Downcast the value to a dict.
     pub fn from_value(x: Value<'v>) -> Option<DictRef<'v>> {
         if x.unpack_frozen().is_some() {
@@ -84,6 +93,10 @@ impl<'v> DictRef<'v> {
                             aref: Either::Right(coerce(&x.0)),
                         })
                 })
+        } else if let Some(ptr) = x.downcast_ref::<DictGen<ImmutableDictData<'v>>>() {
+            Some(DictRef {
+                aref: Either::Right(&ptr.0.0),
+            })
         } else if let Some(ptr) = x.downcast_ref::<DictGen<HashableDictData<'v>>>() {
             Some(DictRef {
                 aref: Either::Right(&ptr.0.0),
@@ -108,7 +121,8 @@ impl<'v> DictMut<'v> {
         #[cold]
         #[inline(never)]
         fn error<'v>(x: Value<'v>) -> anyhow::Error {
-            if x.downcast_ref::<DictGen<FrozenDictData>>().is_some()
+            if x.downcast_ref::<DictGen<ImmutableDictData>>().is_some()
+                || x.downcast_ref::<DictGen<FrozenDictData>>().is_some()
                 || x.downcast_ref::<DictGen<FrozenHashableDictData>>()
                     .is_some()
                 || x.downcast_ref::<DictGen<HashableDictData<'v>>>().is_some()

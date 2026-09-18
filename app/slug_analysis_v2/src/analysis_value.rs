@@ -748,6 +748,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
 
     pub(crate) fn value(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
         Ok(match value.kind() {
+            AnalysisValueKind::EmptyCcHeaderInfo(occurrence) => {
+                slug_loading_v2::alloc_frozen_empty_cc_header_info(self.heap, occurrence.clone())
+            }
             AnalysisValueKind::None => FrozenValue::new_none(),
             AnalysisValueKind::Boolean(value) => FrozenValue::new_bool(value),
             AnalysisValueKind::Number(AnalysisNumber::Integer(value)) => {
@@ -1039,6 +1042,9 @@ impl<'v> AnalysisValueLowerer<'v> {
     }
 
     fn lower_recursive(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
+        if let Some(occurrence) = slug_loading_v2::empty_cc_header_info_occurrence(value) {
+            return Ok(AnalysisValue::empty_cc_header_info(occurrence));
+        }
         if StarlarkDepset::parts_from_value(value).is_some() {
             return self.lower_depset(value, path);
         }
@@ -1667,5 +1673,60 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["child-a", "child-b", "parent"]
         );
+    }
+    #[test]
+    fn empty_header_info_round_trip_preserves_native_type_and_alias_identity() {
+        use slug_build_api_v2::CcHeaderInfoOccurrence;
+        let heap = FrozenHeap::new();
+        let token = CcHeaderInfoOccurrence::new();
+        let a = slug_loading_v2::alloc_frozen_empty_cc_header_info(&heap, token.clone());
+        let alias = slug_loading_v2::alloc_frozen_empty_cc_header_info(&heap, token);
+        let b = slug_loading_v2::alloc_frozen_empty_cc_header_info(
+            &heap,
+            CcHeaderInfoOccurrence::new(),
+        );
+        let source = heap.alloc(AllocTuple([a, alias, b]));
+        let retained = AnalysisValueLowerer::default()
+            .lower(source.to_value(), "header")
+            .unwrap();
+        let target_heap = FrozenHeap::new();
+        let restored = AnalysisValueMaterializer::new(&target_heap)
+            .value(&retained)
+            .unwrap();
+        let values = TupleRef::from_value(restored.to_value())
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>();
+        assert_eq!(values[0].get_type(), "HeaderInfo");
+        assert!(values[0].equals(values[1]).unwrap());
+        assert!(!values[0].equals(values[2]).unwrap());
+        assert_eq!(
+            values[0].get_hashed().unwrap().hash(),
+            values[1].get_hashed().unwrap().hash()
+        );
+        let module = starlark::environment::Module::new();
+        assert!(
+            values[0]
+                .get_attr("header_module", module.heap())
+                .unwrap()
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            ListRef::from_value(
+                values[0]
+                    .get_attr("modular_public_headers", module.heap())
+                    .unwrap()
+                    .unwrap()
+            )
+            .unwrap()
+            .len(),
+            0
+        );
+        let twice = AnalysisValueLowerer::default()
+            .lower(restored.to_value(), "restored")
+            .unwrap();
+        assert_eq!(retained, twice);
+        assert!(retained.publication_eq(&twice));
     }
 }

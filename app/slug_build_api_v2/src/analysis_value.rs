@@ -39,6 +39,7 @@ use crate::providers::ProviderId;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub enum AnalysisValueType {
+    EmptyCcHeaderInfo,
     Empty,
     None,
     Boolean,
@@ -59,6 +60,7 @@ pub enum AnalysisValueType {
 impl AnalysisValueType {
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::EmptyCcHeaderInfo => "HeaderInfo",
             Self::Empty => "empty",
             Self::None => "NoneType",
             Self::Boolean => "bool",
@@ -1071,6 +1073,7 @@ pub struct AnalysisValue(Arc<AnalysisValueData>);
 
 #[derive(Debug, Allocative)]
 enum AnalysisValueData {
+    EmptyCcHeaderInfo(crate::CcHeaderInfoOccurrence),
     None,
     Boolean(bool),
     Number(AnalysisNumber),
@@ -1088,6 +1091,7 @@ enum AnalysisValueData {
 
 #[derive(Debug, Clone, Copy)]
 pub enum AnalysisValueKind<'a> {
+    EmptyCcHeaderInfo(&'a crate::CcHeaderInfoOccurrence),
     None,
     Boolean(bool),
     Number(&'a AnalysisNumber),
@@ -1106,6 +1110,10 @@ pub enum AnalysisValueKind<'a> {
 impl AnalysisValue {
     fn new(value: AnalysisValueData) -> Self {
         Self(Arc::new(value))
+    }
+
+    pub fn empty_cc_header_info(occurrence: crate::CcHeaderInfoOccurrence) -> Self {
+        Self::new(AnalysisValueData::EmptyCcHeaderInfo(occurrence))
     }
 
     pub fn none() -> Self {
@@ -1194,6 +1202,9 @@ impl AnalysisValue {
 
     pub fn kind(&self) -> AnalysisValueKind<'_> {
         match self.0.as_ref() {
+            AnalysisValueData::EmptyCcHeaderInfo(value) => {
+                AnalysisValueKind::EmptyCcHeaderInfo(value)
+            }
             AnalysisValueData::None => AnalysisValueKind::None,
             AnalysisValueData::Boolean(value) => AnalysisValueKind::Boolean(*value),
             AnalysisValueData::Number(value) => AnalysisValueKind::Number(value),
@@ -1214,6 +1225,7 @@ impl AnalysisValue {
 
     pub fn value_type(&self) -> AnalysisValueType {
         match self.0.as_ref() {
+            AnalysisValueData::EmptyCcHeaderInfo(_) => AnalysisValueType::EmptyCcHeaderInfo,
             AnalysisValueData::None => AnalysisValueType::None,
             AnalysisValueData::Boolean(_) => AnalysisValueType::Boolean,
             AnalysisValueData::Number(AnalysisNumber::Integer(_)) => AnalysisValueType::Integer,
@@ -1286,6 +1298,10 @@ impl AnalysisValue {
 
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         match (self.0.as_ref(), other.0.as_ref()) {
+            (
+                AnalysisValueData::EmptyCcHeaderInfo(left),
+                AnalysisValueData::EmptyCcHeaderInfo(right),
+            ) => state.enter_header_info_pair(left.pointer(), right.pointer()),
             (AnalysisValueData::None, AnalysisValueData::None) => true,
             (AnalysisValueData::Boolean(left), AnalysisValueData::Boolean(right)) => left == right,
             (AnalysisValueData::Number(left), AnalysisValueData::Number(right)) => {
@@ -1358,6 +1374,10 @@ fn publication_fields_eq(
 impl PartialEq for AnalysisValue {
     fn eq(&self, other: &Self) -> bool {
         match (self.0.as_ref(), other.0.as_ref()) {
+            (
+                AnalysisValueData::EmptyCcHeaderInfo(left),
+                AnalysisValueData::EmptyCcHeaderInfo(right),
+            ) => left == right,
             (AnalysisValueData::None, AnalysisValueData::None) => true,
             (AnalysisValueData::Boolean(left), AnalysisValueData::Boolean(right)) => left == right,
             (AnalysisValueData::Number(left), AnalysisValueData::Number(right)) => left == right,
@@ -1396,6 +1416,10 @@ impl Eq for AnalysisValue {}
 impl Hash for AnalysisValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self.0.as_ref() {
+            AnalysisValueData::EmptyCcHeaderInfo(value) => {
+                13u8.hash(state);
+                value.hash(state);
+            }
             AnalysisValueData::None => 0u8.hash(state),
             AnalysisValueData::Boolean(value) => {
                 1u8.hash(state);
@@ -1469,6 +1493,8 @@ fn hash_unordered_entries<H: Hasher>(entries: &[(AnalysisValue, AnalysisValue)],
 
 #[derive(Default)]
 pub(crate) struct PublicationEqState {
+    left_header_infos: FxHashMap<usize, usize>,
+    right_header_infos: FxHashMap<usize, usize>,
     left_depsets: FxHashMap<(usize, u32), (usize, u32)>,
     right_depsets: FxHashMap<(usize, u32), (usize, u32)>,
     left_runfiles_depsets: FxHashMap<(usize, u32), (usize, u32)>,
@@ -1476,6 +1502,18 @@ pub(crate) struct PublicationEqState {
 }
 
 impl PublicationEqState {
+    fn enter_header_info_pair(&mut self, left: usize, right: usize) -> bool {
+        if let Some(previous) = self.left_header_infos.get(&left) {
+            return *previous == right;
+        }
+        if self.right_header_infos.contains_key(&right) {
+            return false;
+        }
+        self.left_header_infos.insert(left, right);
+        self.right_header_infos.insert(right, left);
+        true
+    }
+
     pub(crate) fn enter_runfiles_depset_pair(
         &mut self,
         left: (usize, u32),

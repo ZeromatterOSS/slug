@@ -606,3 +606,55 @@ fn depset_publication_equality_is_stack_safe_at_supported_depth() {
     let right = AnalysisValue::depset(deep());
     assert!(left.publication_eq(&right));
 }
+
+#[test]
+fn empty_cc_header_info_retains_occurrences_and_publication_aliases() {
+    use slug_build_api_v2::CcHeaderInfoOccurrence;
+    let a = AnalysisValue::empty_cc_header_info(CcHeaderInfoOccurrence::new());
+    let b = AnalysisValue::empty_cc_header_info(CcHeaderInfoOccurrence::new());
+    assert_ne!(a, b);
+    assert_eq!(a, a.clone());
+    assert!(a.is_starlark_hashable());
+    assert_eq!(
+        a.starlark_hash().unwrap(),
+        a.clone().starlark_hash().unwrap()
+    );
+    assert_ne!(a, AnalysisValue::none());
+    assert_ne!(a, AnalysisValue::strukt([] as [(&str, AnalysisValue); 0]));
+    let shared = AnalysisValue::tuple(vec![a.clone(), a.clone()]);
+    let fresh_shared = AnalysisValue::tuple(vec![b.clone(), b.clone()]);
+    let split = AnalysisValue::tuple(vec![a, b]);
+    assert!(shared.publication_eq(&fresh_shared));
+    assert!(!shared.publication_eq(&split));
+    assert!(!split.publication_eq(&shared));
+    let make = |value| {
+        slug_build_api_v2::ProviderOccurrence::new(
+            slug_build_api_v2::ProviderIdentity::builtin("HeaderProbe"),
+            [("header", value)],
+        )
+    };
+    let left = make(AnalysisValue::empty_cc_header_info(
+        CcHeaderInfoOccurrence::new(),
+    ));
+    let right = make(AnalysisValue::empty_cc_header_info(
+        CcHeaderInfoOccurrence::new(),
+    ));
+    let other = make(AnalysisValue::empty_cc_header_info(
+        CcHeaderInfoOccurrence::new(),
+    ));
+    assert!(slug_build_api_v2::ProviderOccurrence::publication_eq_pairs(
+        [(&left, &right), (&left, &right)]
+    ));
+    assert!(
+        !slug_build_api_v2::ProviderOccurrence::publication_eq_pairs([
+            (&left, &right),
+            (&left, &other)
+        ])
+    );
+    assert!(
+        !slug_build_api_v2::ProviderOccurrence::publication_eq_pairs([
+            (&right, &left),
+            (&other, &left)
+        ])
+    );
+}
