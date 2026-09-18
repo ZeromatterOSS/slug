@@ -241,7 +241,6 @@ async fn execute_prepared(
         .as_deref()
         .ok_or(RemoteExecutionError::MissingExecutor)?;
     let endpoint = tonic_endpoint(executor)?;
-    let platform_properties = command.platform_properties.clone();
     let owned_blobs = owned_blobs(&command, &identity, &input_tree);
 
     let channel = tonic::transport::Endpoint::from_shared(endpoint.clone())
@@ -289,6 +288,36 @@ async fn execute_prepared(
             .map_err(cache_error)?;
     }
 
+    let mut result = execute_staged(
+        config,
+        &command,
+        &identity,
+        &cache,
+        channel,
+        inline_output_files,
+        uploads.iter().map(|blob| blob.digest().clone()).collect(),
+    )
+    .await?;
+    // Preserve the existing FileWrite evidence convention. The source operation
+    // returns bytes only and must not claim local materialization.
+    for output in result.result.output_files() {
+        result.evidence = result
+            .evidence
+            .record_materialized_output(output.digest().clone());
+    }
+    Ok(result)
+}
+
+/// Shared post-staging AC/Execute and verified regular-output path.
+pub(crate) async fn execute_staged(
+    config: &RemoteConfig,
+    command: &ReapiCommand,
+    identity: &ReapiActionIdentity,
+    cache: &CacheClient,
+    channel: tonic::transport::Channel,
+    inline_output_files: Vec<String>,
+    uploads: Vec<ReapiDigest>,
+) -> Result<RemoteExecutionResult, RemoteExecutionError> {
     let mut execution = proto::execution_client::ExecutionClient::new(channel);
     let ac_result = cache
         .get_action_result(&identity.action_digest, inline_output_files.clone())
@@ -342,16 +371,13 @@ async fn execute_prepared(
         evidence.record_ac_miss()
     };
     for blob in uploads {
-        evidence = evidence.record_upload(blob.digest().clone());
-    }
-    for output in action_result.output_files() {
-        evidence = evidence.record_materialized_output(output.digest().clone());
+        evidence = evidence.record_upload(blob);
     }
     Ok(RemoteExecutionResult {
-        action_digest: identity.action_digest,
+        action_digest: identity.action_digest.clone(),
         result: action_result,
         output_blobs,
-        platform_properties,
+        platform_properties: command.platform_properties.clone(),
         evidence,
     })
 }
@@ -515,7 +541,7 @@ pub fn verify_materialized_run_executable(
     Ok(path)
 }
 
-fn tonic_endpoint(value: &str) -> Result<String, RemoteExecutionError> {
+pub(crate) fn tonic_endpoint(value: &str) -> Result<String, RemoteExecutionError> {
     let endpoint = value
         .strip_prefix("grpc://")
         .map(|rest| format!("http://{rest}"))
@@ -542,7 +568,10 @@ fn owned_blobs(
     blobs
 }
 
-fn required_digests(input_tree: &ReapiInputTree, owned: &[ReapiBlob]) -> BTreeSet<ReapiDigest> {
+pub(crate) fn required_digests(
+    input_tree: &ReapiInputTree,
+    owned: &[ReapiBlob],
+) -> BTreeSet<ReapiDigest> {
     let mut digests = owned
         .iter()
         .map(|blob| blob.digest().clone())
@@ -580,7 +609,7 @@ fn decode_execute_response(
     }
 }
 
-fn cache_error(error: CacheError) -> RemoteExecutionError {
+pub(crate) fn cache_error(error: CacheError) -> RemoteExecutionError {
     match error {
         CacheError::Transport(status) => RemoteExecutionError::Transport(status.to_string()),
         other => RemoteExecutionError::Protocol(other.to_string()),

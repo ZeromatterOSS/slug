@@ -129,6 +129,23 @@ digest parity is claimed. Timeout/cache policy requires separate admission.
 Execution still needs representative selection, completed verified staging and
 renewed full-frontier validation before any successful publication.
 
+WP-7-34 adds an opt-in native operation for one closure-selected source-only Spawn.
+A trusted generic transport stages immutable prepared inputs outside DICE; Core
+checks the exact execution representative and reobserves the complete certificate
+under its existing revision owner before Execute. The owner lock is released before
+transport. The original native finalization revalidates after Execute; changed
+inputs discard operation-owned results and use the bounded retry. Errors and unwind
+restore prior accepted state. A single AcceptedCommand owns result and selected
+events. No local output is written and no CLI/daemon build is activated.
+
+The request-local REAPI adapter uploads sources, virtual files, directories, Command
+and Action and verifies every required CAS digest through bounded reads, including
+hits, before AC/Execute. This rejects NativeLink's advertised in-flight inputs.
+It shares the existing regular-output shape and digest checks. Unsupported headers,
+explicit retries/timeouts and a different cache endpoint fail closed. Returned
+output bytes are operation-owned in memory; large-output readiness, generated/tree
+inputs, closure scheduling and accepted output materialization remain open.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

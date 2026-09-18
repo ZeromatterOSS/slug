@@ -15,7 +15,7 @@ use crate::runtime::SourceArtifactInput;
 use crate::runtime::SourceArtifactInputObservationKey;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct SourceStagingKey {
+pub(super) struct SourceStagingKey {
     build: BuildCommandRootKey,
     owner: ConfiguredTargetKey,
     action: usize,
@@ -35,6 +35,14 @@ pub struct PreparedSourceActionInputs {
 }
 
 impl PreparedSourceActionInputs {
+    pub(super) fn check_execution_representative(&self) -> Result<(), NativeDemandSessionError> {
+        require_execution_representative(
+            self.evaluation.as_ref().as_ref().unwrap(),
+            self.owner,
+            self.action,
+        )
+    }
+
     /// Borrow the producer-selected action and its retained execution context.
     /// This conveys the staging selection, not authority to execute or publish.
     pub fn configured_action(&self) -> &slug_analysis_v2::ConfiguredAction {
@@ -91,6 +99,22 @@ impl PreparedSourceActionInputs {
         }
         Ok(file)
     }
+}
+
+pub(super) fn require_execution_representative(
+    evaluation: &BuildCommandEvaluation,
+    owner: usize,
+    action: usize,
+) -> Result<(), NativeDemandSessionError> {
+    if !evaluation
+        .action_closure
+        .execution_representative(owner, action)
+    {
+        return Err(NativeDemandSessionError::Computation(anyhow::anyhow!(
+            "selected source action is not an execution representative"
+        )));
+    }
+    Ok(())
 }
 
 fn error(value: impl fmt::Display) -> Arc<str> {
@@ -185,6 +209,18 @@ fn checked_build_frontier(
 }
 
 impl SourceStagingKey {
+    pub(super) fn new(
+        build: BuildCommandRootKey,
+        owner: ConfiguredTargetKey,
+        action: usize,
+    ) -> Self {
+        Self {
+            build,
+            owner,
+            action,
+        }
+    }
+
     async fn prepare(
         &self,
         ctx: &mut DiceComputations<'_>,

@@ -29,14 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-33-m7a-source-spawn-reapi-plan-r1
+Packet: WP-7-34-m7a-source-spawn-execution-r1
 Status: final ACCEPT; checkpoint ready to commit
 
-Closure-owned typed Spawn Command/Action projection now consumes the accepted
-source/parameter tree and configured execution context. Nine focused gates pass,
-all test batches under one second; independent final review ACCEPT. WP-7-32 verifying local
-CAS is accepted and pushed at bf0ac3f8e. Completed staging, final source validation,
-typed execution and generated/tree inputs remain open; M7A stays partial.
+One source-only Spawn now runs through request-owned staging, pre-Execute validation,
+NativeLink execution and final native acceptance. Focused lifecycle and actual CAS
+failure proofs pass; independent final review ACCEPT. Generated/tree inputs,
+production scheduling, output materialization and CLI/daemon activation remain
+open; M7A stays partial.
 
 ### Earlier generated-input receipt
 

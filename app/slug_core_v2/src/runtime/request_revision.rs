@@ -256,6 +256,7 @@ pub(super) enum RequestRevisionError {
     Computation(String),
     RevisionExhausted,
     RetryNonProgress,
+    StaleBeforeExecution,
 }
 
 impl fmt::Display for RequestRevisionError {
@@ -268,6 +269,9 @@ impl fmt::Display for RequestRevisionError {
             Self::Publication(error) => write!(f, "publishing path epoch: {error}"),
             Self::Injection(error) => write!(f, "injecting path epoch: {error}"),
             Self::Computation(error) => write!(f, "computing request root: {error}"),
+            Self::StaleBeforeExecution => {
+                f.write_str("source or revision changed before execution")
+            }
             Self::RevisionExhausted => f.write_str("request revision allocator exhausted"),
             Self::RetryNonProgress => f.write_str("request revision made no bounded progress"),
         }
@@ -411,6 +415,45 @@ impl RequestRevisionRuntime {
             drop(owner);
             Ok(transaction)
         }
+    }
+
+    /// Read-only gate after staging. This lock never spans a transport await or
+    /// DICE computation, and this check cannot publish an accepted revision.
+    pub(super) async fn precheck_native<F>(
+        &self,
+        terminal: &DiceTransaction,
+        certificate: &SourceCertificate,
+        full_epoch: &PathObservationEpoch,
+        observe: F,
+    ) -> Result<(), RequestRevisionError>
+    where
+        F: FnOnce(Vec<PathObservationDemand>) -> Result<PathObservationEpoch, RequestRevisionError>,
+    {
+        let _owner = self.owner.lock().await;
+        let current = self.dice.updater().existing_state().await;
+        if !current.equivalent(terminal) {
+            return Err(RequestRevisionError::StaleBeforeExecution);
+        }
+        drop(current);
+        validate_certificate_association(full_epoch, certificate)?;
+        let observed = observe(
+            certificate
+                .observations()
+                .observations()
+                .keys()
+                .cloned()
+                .collect(),
+        )?;
+        validate_reobserved_certificate(certificate, &observed)?;
+        if !certificate
+            .observations()
+            .observations()
+            .iter()
+            .all(|(demand, result)| observed.get(demand).is_some_and(|new| new == result))
+        {
+            return Err(RequestRevisionError::StaleBeforeExecution);
+        }
+        Ok(())
     }
 
     /// Validate a provisional native terminal and atomically publish either its
@@ -1743,5 +1786,47 @@ mod tests {
             NativeFinalization::Accepted { .. }
         ));
         assert_eq!(audit(&runtime).commits, commits_before_retry + 1);
+    }
+
+    #[tokio::test]
+    async fn native_precheck_is_read_only_and_rejects_detached_or_advanced_state() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("defs.bzl"), b"V1").unwrap();
+        let runtime = runtime(&directory);
+        let first = read(&runtime, "defs.bzl", "version", "version")
+            .await
+            .unwrap();
+        let mut terminal = runtime.updater().existing_state().await;
+        let epoch = terminal.compute(&PathObservationEpochKey).await.unwrap();
+        let commits = audit(&runtime).commits;
+        runtime
+            .precheck_native(&terminal, first.certificate(), &epoch, observe_certificate)
+            .await
+            .unwrap();
+        assert_eq!(audit(&runtime).commits, commits);
+        let empty = PathObservationEpoch::new([]).unwrap();
+        assert!(
+            runtime
+                .precheck_native(&terminal, first.certificate(), &empty, |_| {
+                    panic!("detached certificate must reject before observing")
+                })
+                .await
+                .is_err()
+        );
+        let mut advance = runtime.updater();
+        advance
+            .changed_to(vec![(PathObservationEpochKey, empty)])
+            .unwrap();
+        drop(runtime.commit(advance).await);
+        let commits = audit(&runtime).commits;
+        assert!(matches!(
+            runtime
+                .precheck_native(&terminal, first.certificate(), &epoch, |_| {
+                    panic!("advanced revision must reject before observing")
+                })
+                .await,
+            Err(RequestRevisionError::StaleBeforeExecution)
+        ));
+        assert_eq!(audit(&runtime).commits, commits);
     }
 }

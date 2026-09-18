@@ -1,163 +1,168 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-33-m7a-source-spawn-reapi-plan-r1
+Packet: WP-7-34-m7a-source-spawn-execution-r1
 Status: final ACCEPT; checkpoint ready to commit
 
 ## Outcome and demand
 
-Construct an opaque, closure-owned typed Spawn REAPI plan containing canonical
-Command/Action bytes and the already-owned source/parameter Merkle tree. This is
-the missing serialization prerequisite for the compiler/build-script Spawn row in
-bootstrap-readiness.md; WP-7-31 already supplies complete declared source staging.
-The plan must preserve one configured action's arguments, fixed environment,
-selected execution context, declared regular outputs and input digests together.
-No Execute, AC request, build publication or CLI activation in this packet:
-execution-representative selection, completed verified staging and full-frontier
-revalidation remain required before execution.
+Execute one closure-selected source-only typed Spawn through a public native
+request operation, returning a single accepted result only after source validation.
+Use the accepted WP-7-33 Command/Action projection and graph-independent cache
+leaf. This advances the compiler/build-script Spawn execution prerequisite in
+bootstrap-readiness; generated/tree inputs, scheduling the production closure,
+CLI/daemon activation and bootstrap remain open. No broader build-success claim.
 
-Pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-remote/RemoteExecutionService.java buildCommand/buildRemoteAction; remote/util/Utils.java
-buildAction; analysis/platform/PlatformUtils.java getPlatformProto. Reuse WP-7-23
-CommandLines.expand and WP-7-31 Merkle/path/content evidence. Exact UTF-8 argv,
-fixed environment, sorted normal output paths, selected/default property semantics
-and SHA-256 of canonical protocol bytes for Slug's actual graph. Slug-native output
-identity and existing REAPI encoding profile (both legacy file outputs and modern
-output_paths, present empty platform, empty salt); no Bazel Action digest/ActionKey
-identity claim. No Java execution, donor implementation or new oracle workspace.
+Inherit pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a
+RemoteExecutionService buildRemoteAction/execute, PlatformUtils, CommandLines and
+REAPI remote_execution.proto; WP-7-33's exact content/protocol SHA-256 and named
+Slug-native identity/wire-profile distinctions remain unchanged. Native request
+ownership follows docs/developers/dice.md and the existing RequestRevisionRuntime
+and NativeDemandAbortGuard invariants. No Java delegation or new semantic model.
 
-## Owners and invariants
+## Core lifecycle and ownership
 
-Core PreparedSourceActionInputs exposes a borrow of the exact ConfiguredAction
-already selected from its retained ValidatedActionClosure. Its constructor, DICE
-key/dependencies, full epoch, certificate, equality and rejection remain unchanged.
-Do not generalize the FileWrite-only ConfiguredActionView or accept a raw Spawn as
-public plan input. Core owns selection; configured action context owns execution
-platform and combined target/group properties. No reconstructed owner/platform.
+Add a private NativeCommandRoot completion hook at drive_command's selected,
+associated, prepared-acceptance point before finalize_native. Ordinary roots use
+a no-op default. Network work stays outside DICE keys/computations and no lock
+spans a transport await. The live transaction, repository session, selected updater,
+full epoch, effect selection and abort guard stay with this single native attempt.
 
-REAPI SourceSpawnReapiPlan is operation-owned serialization scratch: existing
-SourceInputReapiPlan plus Command and Action identity. SourceInputReapiPlan retains
-replacement argv from its one ExpandedSpawnCommandLine and moves it into Command;
-the tree owns virtual bytes from that same expansion. Drop expansion scratch after
-tree construction so parameter-file bytes are not retained twice. No second semantic action, cache, interner, lock or retained DICE
-field. Arc retains the producer until the plan drops; ordinary Vec/BTreeMap wire
-scratch is appropriate, without a performance claim.
+A new Core source-action operation wraps the existing SourceStagingKey, retaining
+the same prepared inputs and an operation-owned optional result (never a DICE
+value). Check ValidatedActionClosure.execution_representative for the exact owner/
+action coordinate before staging. A generic caller-supplied SourceActionTransport
+stages inputs, then executes its staged value; Core never depends on REAPI. Callbacks
+receive immutable prepared inputs, never a DiceComputations or selected updater.
 
-Require a selected execution platform and its raw and effective platform facts.
-When raw platform properties are empty, apply request-local remote defaults then
-overlay effective configured target/group properties. When raw properties exist,
-nonempty effective configured properties are authoritative and defaults are
-excluded. If the effective map is empty, fall back to raw properties (which can
-contain only other-group keys filtered by the effective owner); use defaults if
-both maps are empty, per PlatformUtils. Defaults affect REAPI identity only, not configured DICE identity.
-Read fixed environment from retained Spawn; inherited names fail closed pending
-immutable client-environment resolution. Nonempty execution requirements fail
-closed pending explicit timeout/cache/remote-policy ownership. Reject wrapper-level
-legacy exec_properties, tree/symlink outputs, empty outputs and any source/virtual
-input-output equality or prefix collision. Source staging's existing derived/tree,
-runfiles, undeclared executable and conditional-param boundaries remain intact.
-Arguments stay ordered and parameter replacement is never flattened back to inline
-arguments. Output files are sorted; environment/properties are sorted by existing
-wire owners. Action timeout absent, do_not_cache=false and empty salt are admitted
-only with empty requirements. Remote transport timeout/endpoints never enter this
-plan API or action digest. Mnemonic/progress text remains diagnostic, outside bytes.
+After staging, Core performs a read-only pre-Execute check under the existing
+request revision owner: current transaction version, full certificate association,
+and repository-session reobservation of every certified demand. Drop the owner
+lock before Execute. A precheck mismatch/error aborts without Execute or accepted
+publication. After transport result, the existing finalize_native is authoritative:
+source/version changes discard the result and retry through the existing bounded
+revision loop. Never reuse a staged/result value across a changed attempt. Only
+final acceptance exposes the result through AcceptedCommand and its selected events.
+Failures/unwind/cancellation preserve abort cleanup and prior accepted snapshot;
+remote CAS garbage or a completed content-addressed action may remain remotely.
+No local output materialization occurs inside stage/execute or before acceptance.
+
+Public SourceActionResult retains the prepared owner and transport result by Arc;
+projection may inspect them only after Core acceptance. Transport state, futures,
+channels, wire maps and output buffers are operation-owned and drop on failure,
+retry or caller drop. No global cache/interner, new semantic key, lock across
+compute, retained file handle or graph-injected command result.
+
+## REAPI adapter and integrity
+
+A request-local adapter owns immutable remote configuration. Stage constructs
+SourceSpawnReapiPlan, uses existing verified source uploads and uploads Command/
+Action bytes. Verify every required source, virtual file, Directory, Command and
+Action digest with bounded read_blob_verified into a discard sink before returning
+a staged value. FindMissingBlobs is only an upload optimization: it cannot certify
+completed bytes, including NativeLink's in-flight writes. No retry of corrupt data
+or source mutation; failure prevents Execute. Channel and instance remain bound to
+the same staged plan and are reused for AC/Execute/output reads.
+
+After Core precheck, reuse the existing AC lookup/Execute/result-shape/verified
+output-reading implementation through a private shared helper. Preserve FileWrite
+bytes, cache behavior and result shape. Accept only WP-7-33's empty requirements,
+fixed environment and regular outputs. Unsupported transport policy must fail
+closed rather than silently ignore supplied headers/retry/backend options. The
+accepted operation returns verified output bytes; it does not invoke the existing
+materializer or activate a CLI build. Future output materialization must preserve
+declared types/modes and occur after acceptance.
 
 ## Scope and proof
 
-Allowlist: Core runtime/source_staging.rs borrow accessor; REAPI source_staging.rs
-expansion ownership; new source_spawn.rs/tests.rs and lib.rs reexport; existing
-command.rs only if a bounded shared helper is necessary. Existing executor behavior
-and public raw typed-action rejection remain unchanged. Plans: canonical, manifest,
-Stage 7. No deps, copied fixtures, generated outputs, scheduler or materializer.
-Expected growth roughly200 production/300 focused-test lines; review responsibility
-boundaries if significantly exceeded.
+Allowlist: Core runtime/dice.rs private hook/context and source module exports;
+request_revision.rs read-only precheck; source_staging.rs internal selected-key and
+representative access; new runtime/source_execution.rs/tests; runtime/mod.rs public
+operation types. REAPI new source_execution.rs/tests and lib.rs; bounded helpers
+in executor.rs and source_staging.rs/source_spawn.rs only where required for shared
+transport and immutable prepared ownership. Minimal Cargo/BUILD dependencies only
+if no existing Rust future support suffices. Canonical/manifest and Stage 7.
+No CLI/server change, scheduler, generated/tree input support or materializer edit.
 
-Reuse the tiny authored Core source-staging workspace via its existing shared
-fixture. Public native preparation -> new plan proof inspects encoded Command and
-Action, exact environment, ordered replacement argv/param bytes, source-root digest,
-sorted multiple outputs and selected/raw/combined platform semantics. Same-runtime
-source/content/argument/environment/platform A/B/A changes discriminate Action
-identity while diagnostic-only changes preserve it. Reject inherited environment,
-nonempty requirements and source/output collisions through native preparation.
-The Starlark producer lacks declare_directory, so tree/symlink/empty/malformed
-output guards use the same private output projection directly. Test default
-properties merging with target properties on an empty raw platform and exclusion
-on a nonempty raw platform; also prove the raw-nonempty/effective-empty fallback
-and the both-empty default case. Preserve ordinary FileWrite canonical bytes and raw
-typed-action rejection selectors. No backend needed for pure serialization.
+Core focused fake transport proves unchanged acceptance and one selected event
+stream; source or build-only observation mutation after stage => zero Execute;
+mutation during Execute => old result dropped and bounded retry accepts current
+inputs; stage/execute errors and unwind restore prior accepted state; no callback
+receives graph authority. Exercise representative rejection through the Core-owned
+check without fabricating a public prepared set. Reuse prior source closure/conflict,
+namespace, full-frontier and cancellation proofs where unaffected.
 
-Independent design/final review. Read DICE ownership and utility guidance; no new
-retained representation or extraction. Pinned nightly compile-only --no-run JSON
-preparations capped60s; public Core/REAPI direct consumers compiled by CLI check.
-Exact executable preflight; focused runtime tests expected under a few seconds.
-Any >~30s test requires strict necessity; none planned. Rust format, diff, archive
-and plan checks. Receipts target/wp733. Reuse unaffected earlier wire proofs.
+One tiny authored source script uses public Core operation + actual NativeLink to
+prove cold Execute, AC replay, exact output bytes/digest and source change. A raw
+bad/in-flight required CAS value must not pass the completion verifier or issue
+Execute. Reuse the local verifying backend from WP-7-32 and protect the existing
+FileWrite cold Execute/AC wire selector. No compiler action or broad fixture/suite.
+No local output may appear on precheck/transport/final-validation failure.
 
-REPLAN if the context is not producer-complete, command projection needs an
-unmodeled result-affecting field, or acceptance requires executing outside the
-validated closure. Resolve actual requirements before widening their admission.
-Generated/tree inputs, inherited environment and execution policy are still needed
-for the production closure; this checkpoint cannot close M7A or M8.
+Independent design and final review for the lifecycle/public boundary. Pinned
+nightly preparation separately, --no-run JSON <=60s per operation, exact selector
+preflight. Core tests and tiny wire tests expected under a few seconds; tests over
+~30s require strict necessity and none are planned. Retain passing unaffected
+checks. CLI direct compile coverage, changed Rust format, plan/archive/diff checks.
+Raw receipts target/wp734; preserve unfinished work on the review branch.
 
-Predecessor WP-7-32 accepted/pushed bf0ac3f8e: local CAS write verification,
-strict mismatch absence/recovery and protected FileWrite execution/AC hit. Four
-focused gates; longest test2.180s. In-flight presence still cannot authorize Execute.
+REPLAN if callback integration changes DICE semantic ownership, loses events,
+commits before the final source check, needs unmodeled execution policy, or cannot
+prove completed CAS content before Execute. Do not detach request finalization or
+replace it with independent ad hoc filesystem reads. M7A partial; M8 unproved.
 
+Predecessor WP-7-33 accepted/pushed 916b1dd2a: closure-owned source Spawn wire plan,
+nine focused gates and all test batches under one second. Actual execution and
+request-integrated post-transfer acceptance remained closed.
 
-## Acceptance evidence
+## Candidate evidence
 
-Baseline bf0ac3f8ecfb9a746c82add2f47209d74923cffe;
-review/wp733-source-spawn-plan. Independent design ACCEPT, including the later
-source-backed raw-platform fallback correction. Independent final review ACCEPT. No public
-raw-action execution was enabled and no DICE state or dependency changed.
+Independent design ACCEPT; root implementation stays on review/wp734-source-spawn-execution
+from 916b1dd2a. New lifecycle/protocol logic is split into source_execution modules;
+the large dice.rs driver retains only the private completion seam and borrowed context.
+The completion future is statically dispatched, with no allocation for ordinary
+roots and no new Send bounds on their terminals. Transport is a trusted extension
+point; only Core can construct an accepted SourceActionResult. There is no public
+async command-cancellation API in this slice; dropped transport work returns an
+error through the existing guard, with panic/unwind and existing cancellation proof.
 
-Nine focused gates pass. Pinned direct nightly-2025-09-14 toolchain, no-run Cargo
-JSON exact executable selection and preflight before ordinary tests. Raw receipts
-are under target/wp733. No backend, Slug daemon, Bazel run or build action required.
+The supplied adapter rejects headers, explicit retries/timeouts and different CAS/
+executor endpoints before connecting. Its staged state binds immutable policy,
+channel, plan and completed verified CAS content. Source execution returns verified
+bytes with no materialized-output evidence; FileWrite retains its old evidence.
+Scalar FileWrite closure sharing tests the Core coordinate rejection, because Spawn
+sharing is already rejected before preparation. Incremental events deliberately
+suppress unchanged prior prints; a newly changed analysis print is published once
+across the source-execution revision retry.
 
-- REAPI library final selected5/pass5, exit0, elapsed0.545s:
-  source_spawn::tests::{native_spawn_plan_preserves_fields_and_content_identity,
-  native_spawn_plan_rejects_unmodeled_policy_and_output_collisions,
-  output_projection_rejects_non_file_and_malformed_paths};
-  source_staging::tests::source_merkle_nodes_are_executable_and_paths_are_structural;
-  executor::tests::file_write_plan_owns_canonical_nul_safe_reapi_objects.
-- Native public preparation proves the retained configured owner, fixed environment,
-  literal/forced-param/literal argv ordering and exact virtual bytes, sorted two-file
-  outputs, canonical decoded Command/Action, SHA-256 domains, absent semantic
-  timeout and all four raw/effective/default platform cases. Same-runtime source,
-  virtual argument, literal argument, environment, output and target-property A/B/A
-  change and restore Action identity. Source-only edits preserve Command identity;
-  mnemonic/progress changes preserve all wire identity. Defaults affect the digest
-  when admitted and are ignored with a nonempty raw+effective platform.
-- Native negatives reject inherited environment, nonempty requirements, source/output
-  equality and both prefix directions, plus virtual-param/output collision. The
-  private output helper rejects directory, symlink, runfiles-tree, empty and malformed
-  output declarations. Public declare_directory is not implemented in the Starlark
-  producer, so no native tree declaration admission or proof is claimed.
-- REAPI integration exact selected4/pass4, exit0, elapsed0.002s:
-  typed_actions_reject_command_input_tree_and_execution_projection,
-  typed_action_execution_rejects_before_transport,
-  forced_param_files_merge_exact_bytes_and_merkle_topology,
-  forced_param_files_reject_input_collisions_atomically. Their implementation and
-  invariants were unaffected by the later private platform/argv-ownership refinements;
-  retained passing evidence. Previous accepted NativeLink transport proofs unchanged.
-- Nine separate preparations total46.313s, longest7.782s: six library no-run
-  operations (initial import correction exit101, then all exit0), one integration
-  no-run exit0 and two CLI checks exit0. Final library preparation3.068s; final
-  cargo check -p slug_cli_v2 7.122s covers the public Core/REAPI changes.
-- First test batch failed only because the negative fixture called unavailable
-  Starlark declare_directory; three other gates passed. Output-kind/path validation
-  was factored into the private helper used by the public plan and directly tested,
-  leaving declaration breadth unchanged. The platform fallback was corrected from
-  pinned source before final review and has a native discriminator. Later literal
-  argv and ownership refinements reran affected native proof. Longest test batch
-  (including failures)0.607s; total runtime across all batches2.685s.
-- Changed Rust formatting, diff, archive and plan checks pass. Production growth is
-  the142-line projection plus bounded accessors; the415-line test module comprises
-  native fixture setup and three related projection proofs, reusing the existing
-  authored workspace with no copied ruleset or new dependency. Continuous packet
-  and review elapsed time not recorded; no throughput or benchmark claim.
+Raw receipts target/wp734: corrected real NativeLink source operation 1/1 in .918s
+(cold Execute, AC hit, source edit, advertised in-flight required CAS => actual
+adapter error after writer abort/cleanup, zero Execute callback). The first .891s
+wire run proved only bounded non-completion; final review required an actual error,
+so a timeout now fails the test. Protected FileWrite wire 1/1 in .303s; fresh
+backends stopped (143) and removed. Unsupported-policy test 1/1 in .003s.
 
-Gate advanced: closure-selected typed Spawn -> paired source/parameter tree and
-Command/Action serialization using its own configured context. Execution policy,
-inherited environment, generated/tree inputs, representative admission, completed
-staging and full-frontier validation remain required. M7A partial; M8 unproved.
+Eight Core selectors pass: four new operation gates (acceptance/retry/events,
+source/build mutation, stage/execute error/unwind, closure representative), read-only
+precheck association/version gate, existing synthetic cancellation, existing native
+source closure/conflict/staging, and existing synthetic driver progress/events.
+Final mixed batch passed five relevant selectors in 1.438s; two extra legacy build
+controls failed before root computation on BCR rules_license Connect. Existing
+hermetic source/driver controls replace those network-dependent controls (2/2 in
+.523s). Representative and corrected event/retry proof passed 2/2 in .682s. A first
+event test incorrectly expected an unchanged warm print; corrected to introduce a
+new event against the existing incremental publication contract.
+
+Pinned no-run/check preparations exit 0 (Core final 15.563s, REAPI final 12.638s,
+CLI/direct Core/REAPI/server coverage 9.911s). Longest prep 30.499s; all individually
+capped at 60s. Rustup snap launcher exited 46, so used installed pinned binaries.
+Two early preparation corrections were test module path and PublishedCommand API.
+Formatting, plan status, archive and diff checks pass. Longest test batch 1.438s;
+none requires the user's >~30s exception. Independent final review ACCEPT after actual-error wire correction.
+
+Independent final review confirms the lifecycle/CAS invariants against the actual
+diff and the corrected receipts. Observable gate advanced: a public Core operation
+executes one source-only typed Spawn through NativeLink and accepts its verified
+result only after post-transport source validation. M7A remains partial; M8 unproved.
+Recorded preparation time totals 147.218s across ten separate operations, including
+two corrected invocations; none exceeded 60s. Packet wall/review time was not
+measured across the pause/resume boundary; focused runtime times are above.

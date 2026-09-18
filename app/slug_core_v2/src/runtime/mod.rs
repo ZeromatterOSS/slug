@@ -48,6 +48,8 @@ pub use dice::CqueryCommandEvaluation;
 pub use dice::PreparedSourceActionInputs;
 pub use dice::ResolvedFileWriteSemanticView;
 pub use dice::ResolvedRunSemanticView;
+pub use dice::SourceActionResult;
+pub use dice::SourceActionTransport;
 pub use dice::WorkspaceBuildEvaluation;
 pub use dice::WorkspaceDirectoryObservation;
 pub use dice::WorkspaceEvaluation;

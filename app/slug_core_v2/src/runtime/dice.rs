@@ -1084,9 +1084,50 @@ enum TerminalDemandAssociation {
     TransientTerminalLocal,
 }
 
+/// Borrowed only during one selected native attempt; never exposed to transport.
+struct NativeCommandCompletionContext<'a, 'runtime> {
+    command: &'a NativeDemandCommand<'runtime>,
+    transaction: &'a dice::DiceTransaction,
+}
+
+impl NativeCommandCompletionContext<'_, '_> {
+    async fn validate_sources(
+        &self,
+        certificate: &SourceCertificate,
+    ) -> Result<(), NativeDemandSessionError> {
+        self.command
+            .runtime
+            .request_revision
+            .precheck_native(
+                self.transaction,
+                certificate,
+                &self.command.path_observations,
+                |demands| {
+                    self.command
+                        .runtime
+                        .repository_materializer
+                        .observe_native(self.command.repository_session, demands)
+                        .map_err(|error| RequestRevisionError::Observation(format!("{error:?}")))
+                },
+            )
+            .await
+            .map_err(NativeDemandSessionError::Revision)
+    }
+}
+
 #[async_trait]
 trait NativeCommandRoot: Clone {
     type Terminal: Clone;
+
+    // Local driver future: adding completion does not impose new Send bounds on
+    // ordinary roots. Only this private owner receives graph/session authority.
+    fn complete<'a>(
+        &'a self,
+        _terminal: &'a mut Self::Terminal,
+        _context: NativeCommandCompletionContext<'a, '_>,
+    ) -> impl std::future::Future<Output = Result<(), NativeDemandSessionError>> + 'a {
+        async { Ok(()) }
+    }
 
     fn initializes_request_revision(&self) -> bool {
         false
@@ -2942,6 +2983,10 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
 #[path = "source_staging.rs"]
 mod source_staging;
 pub use source_staging::PreparedSourceActionInputs;
+#[path = "source_execution.rs"]
+mod source_execution;
+pub use source_execution::SourceActionResult;
+pub use source_execution::SourceActionTransport;
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum CqueryCommandError {
@@ -6156,7 +6201,7 @@ impl WorkspaceRuntime {
                         Ok(CommandAttemptResult::Retry(needs))
                     }
                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(terminal) => {
-                        let terminal = terminal.clone();
+                        let mut terminal = terminal.clone();
                         let source_certificate =
                             attempt_root.source_certificate(&terminal).cloned();
                         let terminal_demands = matches!(
@@ -6218,6 +6263,15 @@ impl WorkspaceRuntime {
                                 attempt_root.observed_selection_association(),
                             )?;
                         }
+                        attempt_root
+                            .complete(
+                                &mut terminal,
+                                NativeCommandCompletionContext {
+                                    command: guard.command(),
+                                    transaction: &transaction,
+                                },
+                            )
+                            .await?;
                         begin_probe_phase!(revision_phase, self, RevisionFinalization);
                         let revision_retry = if let Some(source_certificate) = source_certificate {
                             let selected_updater = prepared
