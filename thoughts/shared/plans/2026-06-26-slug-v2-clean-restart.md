@@ -29,14 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-29-m7a-streamed-cas-upload-r1
+Packet: WP-7-30-m7a-source-input-digests-r1
 Status: final ACCEPT; checkpoint ready to commit
 
-The shared CAS leaf now supports bounded, digest-verified reader uploads for
-ordinary compiler/toolchain inputs. Seven focused cache gates and the existing
-NativeLink public wire gate pass; independent final review accepted the change. WP-7-28 source routing/path projection is
-accepted and pushed at 9ff7b172c. Artifact digest staging, generated/tree inputs,
-toolchains and resolved Spawn execution remain required; M7A stays partial.
+Core now binds canonical source labels, repository-resolved paths and streamed
+digest facts with complete observation provenance. Nine focused gates and the
+direct dependent compile pass; independent final review ACCEPT. Configured
+analysis remains independent of source content.
+WP-7-29 verified reader uploads are pushed at 4948d95f8. Generated/tree inputs,
+closure staging, toolchains and Spawn execution remain required; M7A stays partial.
 
 ### Earlier generated-input receipt
 

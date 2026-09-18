@@ -36,6 +36,7 @@ mod root_apparent_repository_source_input;
 mod root_apparent_repository_source_observation;
 mod root_apparent_repository_source_path_input;
 mod root_bootstrap;
+mod source_input;
 pub mod starlark;
 
 pub use configured_output::configured_output_root;
@@ -73,6 +74,16 @@ pub use slug_bzlmod_v2::LockfileMode;
 pub use slug_identity_v2::TargetPattern;
 pub use slug_query_v2::QueryError;
 pub use slug_query_v2::QueryOutputCompletion;
+#[doc(hidden)]
+pub use source_input::ObservedSourceArtifactInput;
+#[doc(hidden)]
+pub use source_input::SourceArtifactInput;
+#[doc(hidden)]
+pub use source_input::SourceArtifactInputError;
+#[doc(hidden)]
+pub use source_input::SourceArtifactInputObservationKey;
+#[doc(hidden)]
+pub use source_input::SourceArtifactInputOutcome;
 
 #[cfg(all(test, feature = "native-probe-observer"))]
 static PANIC_AFTER_OBSERVER_ATTACH: std::sync::atomic::AtomicBool =

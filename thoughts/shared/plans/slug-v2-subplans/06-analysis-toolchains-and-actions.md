@@ -58,6 +58,12 @@ File/Args/Spawn, and native-library ambiguity lookup uses short_path. Exact path
 shape uses existing Slug-native canonical names. Built-in catalog source-file
 admission, sibling layout and derived-root short-path parity remain deferred.
 
+WP-7-30 exposes the same observed source-path resolver to Core with its existing
+route/path observation frontier. Configured source analysis still projects only
+path semantics and does not read or depend on source content. The function checks
+neither declaration visibility nor action closure admission; its execution caller
+must supply retained artifacts from the validated closure.
+
 WP-7-23 adds `SpawnSpec::expand_forced_param_files`: one immutable action-local
 aggregate owns replacement argv and virtual file bytes derived from the retained
 recipe and first declared output. Forced shell/multiline/flag-per-line formats

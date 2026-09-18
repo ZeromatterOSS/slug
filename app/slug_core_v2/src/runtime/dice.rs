@@ -12804,6 +12804,10 @@ root(name = "root", deps = [":parent_a", ":parent_b"])
         include!("tests/build_command_tests.rs");
     }
 
+    mod source_input_tests {
+        include!("tests/source_input_tests.rs");
+    }
+
     mod configured_action_conflicts_tests {
         include!("tests/configured_action_conflicts_tests.rs");
     }

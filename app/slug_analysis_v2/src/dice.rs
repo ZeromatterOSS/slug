@@ -120,6 +120,8 @@ use crate::subrule::configured_dependency_rows;
 use crate::subrule::validate_configured_dependency;
 
 mod source_file;
+pub use source_file::ObservedSourcePath;
+pub use source_file::resolve_source_input_observed;
 
 mod registration_error;
 pub use registration_error::RegistrationAnalysisError;

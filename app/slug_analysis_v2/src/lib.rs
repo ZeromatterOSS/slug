@@ -52,10 +52,14 @@ pub use dice::ConfiguredToolchainResolutionKey;
 pub use dice::ConfiguredToolchainResolutionObservationKey;
 #[doc(hidden)]
 pub use dice::ObservedConfiguredNodeAnalysisPreparationOutcome;
+#[doc(hidden)]
+pub use dice::ObservedSourcePath;
 pub use dice::RegistrationAnalysisError;
 pub use dice::prepare_configured_node_analysis;
 #[doc(hidden)]
 pub use dice::prepare_configured_node_analysis_observed;
+#[doc(hidden)]
+pub use dice::resolve_source_input_observed;
 pub use exec_group::ConfiguredExecGroup;
 pub use execution_groups::ConfiguredExecGroupCollection;
 pub use execution_groups::ConfiguredExecGroupRow;

@@ -74,6 +74,15 @@ coupled without a spawned reader; early remote responses fail closed. Core still
 owns observed source opening, request-certificate validation and selecting missing
 CAS content. This transfer API alone does not authorize Spawn execution.
 
+Core's WP-7-30 `SourceArtifactInputObservationKey` binds a retained Source artifact
+to namespace, requested/physical paths and FileContentDigest through the shared
+analysis resolver and Workspace digest observation owner. It preserves the full
+route/path/digest frontier for final request validation, rejects Derived artifacts,
+and never retains source bytes. Digest/path restoration is distinct from full
+observed equality. The key is a staging fact; closure admission, opening a source,
+verified transfer, generated/tree inputs and Spawn execution remain consumers to
+implement. Built-in catalog sources still need their immutable-source adapter.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or
