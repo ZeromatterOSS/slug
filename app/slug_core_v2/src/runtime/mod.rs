@@ -44,6 +44,8 @@ pub use dice::BuildCommandError;
 pub use dice::BuildCommandEvaluation;
 pub use dice::CqueryCommandError;
 pub use dice::CqueryCommandEvaluation;
+#[doc(hidden)]
+pub use dice::PreparedSourceActionInputs;
 pub use dice::ResolvedFileWriteSemanticView;
 pub use dice::ResolvedRunSemanticView;
 pub use dice::WorkspaceBuildEvaluation;

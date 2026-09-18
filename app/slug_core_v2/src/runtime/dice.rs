@@ -2939,6 +2939,10 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
     }
 }
 
+#[path = "source_staging.rs"]
+mod source_staging;
+pub use source_staging::PreparedSourceActionInputs;
+
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum CqueryCommandError {
     MissingTarget {
@@ -3264,6 +3268,16 @@ impl BuildCommandRootObservationKey {
             || key.singleton_external_single().is_some()
             || key.observed_multi_root())
         .then_some(Self(key))
+    }
+
+    // Staging needs a complete observed frontier even for a single rule. Keep
+    // the ordinary build entrypoint's accepted dispatch unchanged.
+    fn for_source_staging(key: BuildCommandRootKey) -> Option<Self> {
+        if key.initializes_request_revision() {
+            Some(Self(key))
+        } else {
+            Self::new(key)
+        }
     }
 }
 
@@ -5694,7 +5708,7 @@ impl Key for BuildCommandRootObservationKey {
         };
         let outcome = if let Some(label) = self.0.singleton_external_single() {
             compute_external_single_observed(&self.0, &label, ctx).await
-        } else if self.0.observed_multi_root() {
+        } else if self.0.observed_multi_root() || self.0.initializes_request_revision() {
             compute_observed_multi_build_root(&self.0, &configuration, ctx).await
         } else {
             compute_singleton_package_all(&self.0, ctx, BuildAnalysisMode::Observed)
@@ -6394,7 +6408,8 @@ impl WorkspaceRuntime {
         )
     }
 
-    pub fn build_command_with_repository_environment(
+    #[allow(clippy::too_many_arguments)]
+    fn prepare_build_request(
         &self,
         targets: &[TargetPattern],
         command_policy: BzlmodCommandPolicyKey,
@@ -6403,11 +6418,7 @@ impl WorkspaceRuntime {
         registry_urls: &[String],
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
         configuration_overlay: CommandConfigurationOverlay,
-    ) -> Result<
-        AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
-        BuildCommandError,
-    > {
-        begin_probe_phase!(request_phase, self, RequestConfiguration);
+    ) -> Result<(BuildCommandRootKey, NativeDemandRequestInputBundle), BuildCommandError> {
         let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
             .map_err(BuildCommandError::infrastructure)?;
         let host = self
@@ -6431,6 +6442,32 @@ impl WorkspaceRuntime {
             registry_urls,
             repository_environment,
         };
+        Ok((root, request))
+    }
+
+    pub fn build_command_with_repository_environment(
+        &self,
+        targets: &[TargetPattern],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+    ) -> Result<
+        AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+        BuildCommandError,
+    > {
+        begin_probe_phase!(request_phase, self, RequestConfiguration);
+        let (root, request) = self.prepare_build_request(
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+        )?;
         finish_probe_phase!(request_phase);
         let accepted = if let Some(observed) = BuildCommandRootObservationKey::new(root.clone()) {
             self.drive_command(request, observed)

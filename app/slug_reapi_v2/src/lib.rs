@@ -45,3 +45,6 @@ pub use input_tree::InputTreeError;
 pub use input_tree::ReapiBlob;
 pub use input_tree::ReapiInputTree;
 pub use input_tree::ReapiInputTreeEntry;
+
+pub mod source_staging;
+pub use source_staging::SourceInputReapiPlan;

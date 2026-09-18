@@ -29,15 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-30-m7a-source-input-digests-r1
+Packet: WP-7-31-m7a-source-action-staging-r1
 Status: final ACCEPT; checkpoint ready to commit
 
-Core now binds canonical source labels, repository-resolved paths and streamed
-digest facts with complete observation provenance. Nine focused gates and the
-direct dependent compile pass; independent final review ACCEPT. Configured
-analysis remains independent of source content.
-WP-7-29 verified reader uploads are pushed at 4948d95f8. Generated/tree inputs,
-closure staging, toolchains and Spawn execution remain required; M7A stays partial.
+Source-only Spawn staging now selects from the validated requested closure,
+resolves source facts in the native request and stages the Merkle tree/missing
+verified content to CAS. Ten focused gates pass, including the public NativeLink
+round trip; independent final review ACCEPT. WP-7-30 is accepted and pushed at a8041e6f9. Typed execution,
+generated/tree inputs and broader bootstrap remain open; M7A stays partial.
 
 ### Earlier generated-input receipt
 

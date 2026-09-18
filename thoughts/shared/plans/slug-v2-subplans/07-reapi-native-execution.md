@@ -83,6 +83,20 @@ observed equality. The key is a staging fact; closure admission, opening a sourc
 verified transfer, generated/tree inputs and Spawn execution remain consumers to
 implement. Built-in catalog sources still need their immutable-source adapter.
 
+WP-7-31 adds opt-in source-only Spawn staging selected by configured owner/action
+from the validated requested closure. Its Core root consumes the full observed
+build epoch, including singleton rule staging through the existing observed
+branch owner, and every selected source fact. It rejects derived/tree artifacts,
+runfiles support and undeclared executables. The opaque prepared set lowers to
+source FileNodes (executable=true) plus forced virtual parameter files, then
+FindMissingBlobs and bounded verified uploads. CAS hits skip source opening;
+a fresh request still observes source deletion. A source handle is opened and
+checked by Core, never by the graph-independent cache library. Staging issues no
+Action/AC/Execute and cannot publish build success; later execution must validate
+the complete frontier again after transfer. The wire negative exposed that the
+local NativeLink configuration can advertise interrupted bytes; execution admission
+must establish CAS integrity rather than treating presence alone as verification.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

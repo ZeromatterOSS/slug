@@ -27,6 +27,8 @@ use crate::proto;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum InputTreeEntryKind {
     FileWriteContent,
+    /// Ordinary source inputs follow Bazel's executable FileNode policy.
+    Source,
     Input,
     Tool,
     ParamFile,
@@ -162,6 +164,23 @@ impl ReapiInputTree {
         })
     }
 
+    pub(crate) fn from_source_entries(
+        sources: impl IntoIterator<Item = ReapiInputTreeEntry>,
+    ) -> Result<Self, InputTreeError> {
+        let mut entries = BTreeMap::new();
+        for entry in sources {
+            insert_entry(&mut entries, entry)?;
+        }
+        let entries = entries.into_values().collect::<Vec<_>>();
+        let (root_digest, directory_blobs) = merkle_directories(&entries)?;
+        Ok(Self {
+            entries,
+            root_digest,
+            directory_blobs,
+            inline_blobs: Vec::new(),
+        })
+    }
+
     pub fn entries(&self) -> &[ReapiInputTreeEntry] {
         &self.entries
     }
@@ -256,7 +275,7 @@ fn insert_entry(
 
 #[derive(Default)]
 struct DirectoryBuilder {
-    files: BTreeMap<String, ReapiDigest>,
+    files: BTreeMap<String, (ReapiDigest, bool)>,
     directories: BTreeMap<String, DirectoryBuilder>,
 }
 
@@ -272,7 +291,13 @@ fn merkle_directories(
                 if directory.directories.contains_key(segment)
                     || directory
                         .files
-                        .insert(segment.to_owned(), entry.digest().clone())
+                        .insert(
+                            segment.to_owned(),
+                            (
+                                entry.digest().clone(),
+                                entry.kind() == InputTreeEntryKind::Source,
+                            ),
+                        )
                         .is_some()
                 {
                     return Err(InputTreeError::ConflictingPath {
@@ -308,10 +333,10 @@ fn serialize_directory(directory: &DirectoryBuilder, blobs: &mut Vec<ReapiBlob>)
     let files = directory
         .files
         .iter()
-        .map(|(name, digest)| proto::FileNode {
+        .map(|(name, (digest, executable))| proto::FileNode {
             name: name.clone(),
             digest: Some(digest_to_proto(digest)),
-            is_executable: false,
+            is_executable: *executable,
             ..Default::default()
         })
         .collect();
