@@ -29,15 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-32-m7a-verified-local-cas-r1
+Packet: WP-7-33-m7a-source-spawn-reapi-plan-r1
 Status: final ACCEPT; checkpoint ready to commit
 
-Local CAS writes now verify hash and size. Focused wire tests prove invalid
-content rejection, cleanup and recovery, plus the existing worker/Action Cache
-path. Four focused gates pass; longest test2.180s. Independent final review ACCEPT. WP-7-31 source
-staging is accepted and pushed at 055cf7406. In-flight presence is not completed
-verified staging; typed execution, generated/tree inputs and bootstrap remain
-open. M7A stays partial.
+Closure-owned typed Spawn Command/Action projection now consumes the accepted
+source/parameter tree and configured execution context. Nine focused gates pass,
+all test batches under one second; independent final review ACCEPT. WP-7-32 verifying local
+CAS is accepted and pushed at bf0ac3f8e. Completed staging, final source validation,
+typed execution and generated/tree inputs remain open; M7A stays partial.
 
 ### Earlier generated-input receipt
 

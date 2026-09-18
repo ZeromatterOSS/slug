@@ -18,6 +18,7 @@ pub struct SourceInputReapiPlan {
     prepared: Arc<PreparedSourceActionInputs>,
     tree: ReapiInputTree,
     source_digests: Vec<ReapiDigest>,
+    expanded_argv: Vec<String>,
 }
 
 impl SourceInputReapiPlan {
@@ -60,11 +61,17 @@ impl SourceInputReapiPlan {
             prepared,
             tree,
             source_digests,
+            expanded_argv: command.argv().to_vec(),
         })
     }
 
     pub fn input_tree(&self) -> &ReapiInputTree {
         &self.tree
+    }
+
+    /// Move argv from the same expansion that supplied this tree's virtual bytes.
+    pub(crate) fn take_expanded_argv(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.expanded_argv)
     }
 
     /// Stage missing content once per digest. CAS hits never open source paths.

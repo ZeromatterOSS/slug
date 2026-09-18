@@ -111,6 +111,24 @@ open gates before typed Spawn execution. The local test harness uses fresh
 storage, one-second disconnected-stream retention and a two-second bounded
 cleanup check; no persistent-store repair is claimed.
 
+WP-7-33 adds `SourceSpawnReapiPlan` as an operation-owned projection of that same
+prepared closure action. Core lends its retained ConfiguredAction/context; REAPI
+uses one forced parameter expansion for both replacement argv and virtual bytes,
+fixed environment, sorted regular outputs and the source Merkle root. It rejects
+inherited environment, nonempty execution requirements, legacy wrapper properties,
+non-file outputs and input/output equality or prefix collisions. Raw typed action
+execution remains rejected. No new DICE state or execution authority is created.
+
+Selected raw and effective platform facts remain distinct. With a nonempty
+effective map, remote defaults merge only when the raw platform map is empty;
+effective properties win. An empty effective map falls back to the raw map, then
+defaults if both are empty, following pinned Bazel PlatformUtils. The existing
+Slug-native wire profile (both output field sets, present empty platform and empty
+salt) remains separate from exact SHA-256 of Slug's protocol bytes; no Bazel Action
+digest parity is claimed. Timeout/cache policy requires separate admission.
+Execution still needs representative selection, completed verified staging and
+renewed full-frontier validation before any successful publication.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

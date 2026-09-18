@@ -48,3 +48,6 @@ pub use input_tree::ReapiInputTreeEntry;
 
 pub mod source_staging;
 pub use source_staging::SourceInputReapiPlan;
+
+pub mod source_spawn;
+pub use source_spawn::SourceSpawnReapiPlan;

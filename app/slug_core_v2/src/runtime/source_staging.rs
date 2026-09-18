@@ -35,16 +35,21 @@ pub struct PreparedSourceActionInputs {
 }
 
 impl PreparedSourceActionInputs {
-    pub fn spawn(&self) -> &SpawnSpec {
-        self.evaluation
+    /// Borrow the producer-selected action and its retained execution context.
+    /// This conveys the staging selection, not authority to execute or publish.
+    pub fn configured_action(&self) -> &slug_analysis_v2::ConfiguredAction {
+        &self
+            .evaluation
             .as_ref()
             .as_ref()
             .unwrap()
             .action_closure
             .owners()[self.owner]
             .actions()[self.action]
-            .spawn_spec()
-            .unwrap()
+    }
+
+    pub fn spawn(&self) -> &SpawnSpec {
+        self.configured_action().spawn_spec().unwrap()
     }
 
     pub fn sources(&self) -> impl ExactSizeIterator<Item = &SourceArtifactInput> {
