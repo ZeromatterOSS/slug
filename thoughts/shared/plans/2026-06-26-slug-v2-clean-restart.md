@@ -29,14 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-31-m7a-source-action-staging-r1
+Packet: WP-7-32-m7a-verified-local-cas-r1
 Status: final ACCEPT; checkpoint ready to commit
 
-Source-only Spawn staging now selects from the validated requested closure,
-resolves source facts in the native request and stages the Merkle tree/missing
-verified content to CAS. Ten focused gates pass, including the public NativeLink
-round trip; independent final review ACCEPT. WP-7-30 is accepted and pushed at a8041e6f9. Typed execution,
-generated/tree inputs and broader bootstrap remain open; M7A stays partial.
+Local CAS writes now verify hash and size. Focused wire tests prove invalid
+content rejection, cleanup and recovery, plus the existing worker/Action Cache
+path. Four focused gates pass; longest test2.180s. Independent final review ACCEPT. WP-7-31 source
+staging is accepted and pushed at 055cf7406. In-flight presence is not completed
+verified staging; typed execution, generated/tree inputs and bootstrap remain
+open. M7A stays partial.
 
 ### Earlier generated-input receipt
 

@@ -93,9 +93,23 @@ FindMissingBlobs and bounded verified uploads. CAS hits skip source opening;
 a fresh request still observes source deletion. A source handle is opened and
 checked by Core, never by the graph-independent cache library. Staging issues no
 Action/AC/Execute and cannot publish build success; later execution must validate
-the complete frontier again after transfer. The wire negative exposed that the
-local NativeLink configuration can advertise interrupted bytes; execution admission
-must establish CAS integrity rather than treating presence alone as verification.
+the complete frontier again after transfer.
+
+WP-7-32 routes the local oracle's public CAS/ByteStream writes through NativeLink
+VerifyStore with hash and size verification, referencing a shared CAS_RAW
+FastSlowStore. The local worker requires that raw interface; AC keys remain action
+digests and are not content-verified. This validates new client-facing content,
+not existing storage or the worker's own writes. Public wire negatives require
+wrong-hash/size rejection, absence after cleanup and verified valid recovery;
+the existing cold FileWrite/AC-hit proof protects worker/public-store sharing.
+
+NativeLink can advertise in-flight writes and retain disconnected streams for
+resumption. A VerifyStore does not change that presence behavior. Execution
+admission must establish completed verified staging and revalidate the full
+source/build frontier; FindMissingBlobs alone proves neither. These are still
+open gates before typed Spawn execution. The local test harness uses fresh
+storage, one-second disconnected-stream retention and a two-second bounded
+cleanup check; no persistent-store repair is claimed.
 
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies

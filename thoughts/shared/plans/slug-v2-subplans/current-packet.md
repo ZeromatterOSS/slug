@@ -1,181 +1,140 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-31-m7a-source-action-staging-r1
+Packet: WP-7-32-m7a-verified-local-cas-r1
 Status: final ACCEPT; checkpoint ready to commit
 
 ## Outcome and authority
 
-Stage all declared ordinary source inputs of one retained typed Spawn selected by
-configured owner and action ordinal from the requested roots' ValidatedActionClosure. Compute
-WP-7-30 facts in the same native request, project exact REAPI Directory topology,
-and transfer missing content using WP-7-29 bounded verified readers. This advances
-the ordinary source/compiler/tool transfer row in bootstrap-readiness for the
-production CLI closure. It does not admit typed Execute, Action/AC publication,
-generated/tree inputs, built-in catalog adaptation or a successful build result.
+Make the local NativeLink oracle CAS reject invalid new content before persistent
+publication. This closes the concrete backend configuration gap exposed by source
+staging WP-7-31, without claiming concurrent Execute admission. Slug-native harness
+configuration; exact SHA-256/size CAS integrity for Slug's actual bytes. No new Bazel
+parity surface, semantic identity, DICE state, cache API or production executor.
+Inherited source staging/verified reader contracts are in Stage 7 and accepted
+WP-7-31 at 055cf7406e2c306baea8dd5ebc98b85560eb94c9.
 
-Pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-MerkleTreeComputer.java FileNode builder always sets executable=true; existing
-WP-7-28 canonical source execution paths and WP-7-27 exact SHA-256/size evidence
-apply. SpawnAction input/tool ownership and CommandLines parameter expansion are
-inherited from retained Stage 6 Spawn and WP-7-23. Exact content/protobuf/path
-projection for admitted sources; Slug-native canonical/configuration identity;
-unsupported action/input shapes fail closed, never silently omitted.
+Primary source: local NativeLink checkout 2c5496173036773d205c5a39e75d0b7fc1a08c8a,
+nativelink-config/src/stores.rs Verify/RefStore; nativelink-store/src/verify_store.rs
+withholds backend EOF until hash/size validation; filesystem_store.rs commits at
+EOF. local_worker.rs requires a concrete FastSlowStore. fast_slow_store.rs
+has_with_results reports in-flight writes as present; VerifyStore delegates that
+lookup. ByteStream retains disconnected streams for a source-default minute; its
+config documentation still says ten seconds. This is configuration reuse and
+source evidence, not copied donor code.
+The installed backend binary is also tested directly; its build revision is not
+asserted from the source checkout revision.
 
-## Owners and invariants
+## Owner and invariants
 
-Core adds an opt-in native staging root depending on the existing observed build
-root. A staging-only constructor admits a main singleton rule through the existing
-observed multi-branch implementation with one target; ordinary build dispatch and
-its constructor stay unchanged. The previous neutral singleton terminal can lack
-an epoch for rules and cannot be used for staging. The staging root then selects
-a configured owner/action from its validated closure before computing source facts. The staging key Eq/Hash
-includes the underlying build root, configured owner key and action ordinal. It
-does not analyze a detached action or accept raw path/digest rows. Traverse SpawnSpec inputs/tools, including retained depsets and
-FilesToRun files and executable. Explicitly inspect invocation and provider support:
-reject path/string/shell executables, runfiles support, unused-input pruning and
-Derived file/tree inputs until their required owners are implemented. No omission
-may be interpreted as a complete tree. Canonical source labels dedupe using
-existing compact structural sets; all selected source facts are WP-7-30 keys.
-Configured analysis remains content-independent. Need propagates; errors are
-invalid and abort staging before acceptance. No production driver change.
+The shared tools/v2_oracle_lib/nativelink.py configuration owns local backend
+wiring. Retain one named CAS_RAW FastSlowStore with the existing filesystem roots.
+Public CAS is a VerifyStore referencing CAS_RAW with both verify_size and
+verify_hash enabled. CAS, ByteStream and execution frontend services use CAS;
+the local worker alone uses CAS_RAW for its required FastSlow interface. AC stays
+unverified because its keys are action digests, not content digests. The local
+ByteStream service retains disconnected streams for one second, with
+a half-second sweep interval, to bound real cleanup checks. No unsafe configuration
+switch or alternate upload implementation.
 
-The immutable prepared set retains the producer's validated evaluation, selected
-configured owner/action, Arc source facts and unioned full route/path/digest epoch.
-The epoch unions the full predecessor build-root observed epoch (including its
-staging-only main singleton dispatch) with every WP-7-30 source fact epoch, retaining
-equal-result Arcs through from_shared. Any existing build source certificate
-must be an associated subset; a missing or conflicting association fails closed.
-The new certificate covers that complete union, never merely the narrower build
-source certificate or digests. Equality is structural; no rendered
-path identity, new interner/cache, lock across compute or command-injected semantic
-facts. DICE owns retained state; transfer/request scratch drops with its operation.
-This prepared set authorizes this staging operation only, not Execute or final
-build publication. Later execution must revalidate the full frontier after transfer.
+Preserve bounded client reader verification, cancellation and no-finish-on-mismatch.
+A local upload failure can precede backend cancellation cleanup: the wire test
+boundedly waits for missing state instead of requiring an immediate miss. A verified
+wrapper does not cleanse pre-existing corrupt content and does not eliminate
+NativeLink's in-flight presence advertisement. Tests use fresh roots. Future Execute
+must establish completed verified staging, validate the complete source/build
+frontier, and cannot infer either fact solely from FindMissingBlobs.
 
-Core opens the observed physical source path as a regular handle, nonblocking on
-Unix to reject a replacement FIFO without waiting. REAPI transport remains
-path-agnostic. Source handles are transfer-owned and never retained in DICE.
-Upload verifies actual bytes/EOF against the observed digest; a stale or mutated
-source fails without finishing a write. No retry against a different source.
+## Scope and discriminating proof
 
-REAPI accepts only the opaque prepared set. Build a complete source-only input
-tree using artifact execution paths, exact digest/size and executable=true for the
-new ordinary source entry kind; preserve accepted inline FileWrite/param-file wire
-bytes. Compose forced virtual param files through the existing owner. Reject
-same-path conflicting content, source/param collisions and file/directory prefix
-conflicts before any network call. Deduplicate equal source labels/digests.
-FindMissingBlobs covers source, directory and inline digests once. Upload only
-missing values, each digest once; missing source content uses the verified reader,
-metadata/virtual bytes use the shared cache leaf. CAS presence avoids source open.
-No Action identity, AC request, Execute or output materialization is issued.
+Allowlist: tools/v2_oracle_lib/nativelink.py; app/slug_reapi_v2/src/source_staging/tests.rs;
+canonical plan, current manifest and 07-reapi-native-execution.md. Existing tiny
+Core fixture and public wire selectors are reused; no new copied fixtures or deps.
+No graph/cache production Rust changes. Backend process and temporary storage
+remain operation-owned and always reaped/deleted by the supervised harness.
 
-## Scope and proof
+Strengthen the existing source staging wire negative: after local digest mismatch,
+require CAS absence after bounded server cleanup, then restore the correct source
+and prove upload/download succeeds for that same digest. Also send direct public
+requests bypassing client validation: a wrong-hash BatchUpdateBlobs must return
+a per-blob error with the verifier hash diagnostic; a correct-hash, wrong-size
+ByteStream Write with finish_write=true must return the verifier size diagnostic.
+Both require absence and exact verified recovery reads. NativeLink can merge a
+verifier error with backend cancellation errors into INTERNAL, so exact status-code
+parity is not claimed. BatchUpdate size validation happens before the store, which
+is why the independent size discriminator uses ByteStream. Wrong-hash recovery uses the same digest. The wrong-size case uses a correct
+hash with an incorrect size (an unrealizable key), then uploads under the corrected
+size and confirms the malformed key stays absent. Protect existing FileWrite cold
+Execute, AC hit and modes
+to prove shared worker/public storage and unchanged AC semantics. Keep existing
+source Merkle and inline plan ordinary checks.
 
-Allowlist: new Core runtime/source_staging.rs, source_staging/tests.rs and shared
-test_workspace.rs; bounded module/reexports and staging request method in
-runtime/dice.rs and mod.rs. Core staging owns source handle opening. REAPI
-input_tree.rs plus new source_staging.rs/tests and lib reexport; existing executor
-wire gates remain protected. A new source_staging/tests.rs NativeLink selector
-supplies the public staging wire proof. Minimal Cargo/BUILD dev dependency additions
-if required for the real Core fixture. Canonical/manifest, Stage 7 and Stage 9.
+Independent design/final review. Compile separately with pinned nightly --no-run
+JSON, <=60s each preparation; select exact executable. Ordinary exact preflight and
+explicit ignored-selector listing before supervised wire tests. Wire tests
+expected under a few seconds, including a two-second monotonic cleanup deadline;
+fresh local backend, 8s per-selector operation cap and 15s overall diagnostic cap. User guidance is few-second checks for frequent
+use and strict justification above ~30s; these narrower operation caps are local
+estimates, not user requirements. No broad suites or compiler action. Format,
+diff, archive and plan checks. Raw receipts target/wp732.
 
-Native tiny configured rule proves validated action selection, retained source
-inputs/tools/executable, same-runtime warm/content A/B/A, rejected derived and
-unsupported invocation/support, conflicting requested roots and missing input.
-Accepted state remains unchanged on failed preparation. Existing source fact
-namespace/symlink/final-validation proofs are reused; new set frontier is checked
-against native acceptance, including a build-only observation absent from the
-predecessor source certificate. Focused Merkle tests inspect exact source FileNode mode,
-paths, topology and virtual-file conflicts. Public NativeLink staging proof uses
-real prepared Core sources, three-byte upload chunks and downloaded bytes/Directory
-inspection; reuse of an already prepared set after removing a source proves CAS
-hits avoid reopening without authorizing Execute or publication. A fresh native
-preparation must reject that missing source; a stale-byte source miss fails
-transfer verification. No compiler action or broad suite.
+REPLAN if the verifying boundary cannot reject invalid persistent content while
+preserving the existing worker/AC path; do not weaken the absence proof or admit
+Execute based on transient presence. Invalid invocation and test corrections stay
+within this packet. M7A partial and M8 unproved throughout.
 
-Independent design/final review. Compile pinned nightly separately, --no-run JSON,
-<=60 seconds each operation. Exact preflight, focused tests expected subsecond or
-few seconds; >few-second tests infrequent and >~30s require strict necessity.
-Reuse unaffected passing evidence. Named Core/REAPI and CLI direct compile
-coverage; changed Rust formatting, archive, plan and diff checks. A new owner or
-unsupported production prerequisite outside this slice requires an explicit design
-revision, not a fallback or an assertion waiver.
-
-Predecessor WP-7-30 accepted/pushed a8041e6f9: nine focused gates, independent
-final ACCEPT; source facts preserve full observation provenance. M7A partial,
-M8 unproved. Raw local WP-7-31 receipts will live under target/wp731.
+Predecessor WP-7-31 accepted/pushed 055cf7406: closure-owned source staging, ten
+focused gates, all test batches under one second. Its backend negative proved local
+verification failure but exposed the missing server-integrity gate addressed here.
 
 
-## Acceptance receipt
+## Acceptance evidence
 
-Independent corrected design and final review ACCEPT. Gate advanced: validated
-requested closure → complete declared source input set → native observed facts →
-REAPI Merkle tree and verified missing-content transfer. Typed Action/Execute and
-build publication remain closed; this is not bootstrap execution acceptance.
+Baseline 055cf7406e2c306baea8dd5ebc98b85560eb94c9;
+review/wp732-verified-local-cas. Independent design review accepted the verifying
+store wiring and the evidence-driven timeout/status corrections. Independent
+final review ACCEPT. Production Rust and client streaming behavior are unchanged.
 
-Baseline a8041e6f9; review/wp731-source-action-staging. Pinned direct
-nightly-2025-09-14 Cargo/rustc/rustdoc; compile-only JSON and exact executable
-selection. Raw receipts target/wp731, not committed. No Cargo/BUILD dependency
-or upstream copied fixture changes; the tiny authored rule/workspace is shared by
-Core and REAPI tests and uses existing direct-File allow_single_file behavior.
+- Pinned nightly-2025-09-14 direct toolchain; the rustup snap launcher failed
+  before preparation (exit46), so the already-installed pinned binaries were used.
+  Three separate cargo test -p slug_reapi_v2 --lib --no-run --message-format=json
+  preparations exited0 in 7.965s, 6.578s and 6.488s; longest under8s. Exact executable
+  target/debug/deps/slug_reapi_v2-83de72d5efb378db selected from Cargo JSON.
+- Ordinary exact preflight selected2; final batch exit0, pass2, elapsed0.003s:
+  source_staging::tests::source_merkle_nodes_are_executable_and_paths_are_structural
+  and executor::tests::file_write_plan_owns_canonical_nul_safe_reapi_objects.
+- Ignored source_staging::tests::nativelink_closure_sources_merkle_and_verified_upload:
+  exact ignored listing1, final pass1/1, exit0, runtime2.180s; fresh backend setup,
+  test and cleanup2.258s. Retains source/tree/parameter roundtrip and deletion-hit
+  proofs; now proves stale-source absence after disconnect cleanup and same-digest
+  recovery. Raw wrong-hash BatchUpdate has a matching per-blob non-OK status with
+  hash-verifier diagnostic. Raw wrong-size ByteStream finish has a size-verifier
+  diagnostic. Both remain absent after cleanup; valid bytes upload/read exactly,
+  and the unrealizable oversized key remains absent after corrected-size upload.
+- Protected ignored executor::tests::
+  nativelink_file_write_bytes_digest_and_materialized_mode_match_oracle:
+  exact listing1, pass1/1, exit0, runtime0.346s; complete lifecycle0.424s. Cold
+  Execute, AC hit, bytes/digest/mode and streamed/reader uploads pass through the
+  shared verifying public store and raw worker store. This ran before the isolated
+  disconnect-retention correction; it has no interrupted upload, so the passing
+  evidence is retained. Both backends exited143 and their temporary roots were
+  removed; loopback use received the normal reviewed sandbox exception.
+- The first source wire run failed the1s absence deadline (1.578s); source evidence
+  identified retained resumable uploads with a default minute, so the local
+  harness explicitly sets1s retention and the test allows2s including sweeping.
+  The next run proved cleanup/recovery but failed an over-specific status-code
+  assertion (2.026s): NativeLink merges hash rejection with backend cancellation
+  into INTERNAL. The corrected discriminator requires the verifier diagnostic
+  and strict rejection/absence/recovery; it does not accept arbitrary RPC failure.
+  Source inspection moved wrong-size proof from BatchUpdate's frontend check to
+  ByteStream's store verification before another run. No integrity gate was waived.
+- Changed Rust format, diff, plan and archive checks pass. No new dependency,
+  copied fixture, Slug daemon, compiler action or broad suite. Longest test2.180s;
+  compile time21.031s across three preparations. Continuous packet/review elapsed
+  time was not recorded; no performance improvement claim. Raw local receipts:
+  target/wp732.
 
-- Core library preparations: ten bounded operations, one compiler failure for
-  test imports/API spelling/shadowing; remaining preparations exit 0. Initial
-  preparation 22.245s; final preparation 12.225s. No operation reached 60s.
-- Core exact selectors runtime::dice::source_staging::tests::{
-  build_only_observations_survive_the_narrow_source_certificate,
-  native_source_staging_tracks_sources_and_rejects_conflicting_roots} both pass.
-  The synthetic frontier proof passed in the initial two-test batch; unchanged
-  passing evidence retained. Final native selector preflight 1, pass 1 in 0.515s.
-  It proves real singleton selection, complete build-only MODULE provenance and
-  accepted Arc association, same-runtime source A/B/A, deduplication, rejected
-  Derived file/tree, shell, unused-input pruning and FilesToRun support shapes,
-  invalid action ordinal, warm individual roots followed by combined output
-  equivalence rejection, missing input and directory/FIFO handle rejection.
-  Combined-root and missing-source failures preserve accepted semantic state.
-- Native fixture corrections supplied the unrelated local built-in MODULE
-  closure and used the existing direct-File attr projection. The first real
-  staging attempt exposed a missing epoch in the neutral singleton terminal.
-  Independent design review accepted a staging-only observed-key constructor
-  and reuse of the observed multi-branch owner for one target; ordinary build
-  dispatch is unchanged. One later assertion was corrected to the existing
-  shared-output UnsupportedEquivalence error family. No negative was waived.
-- REAPI library/test preparations exit 0 in 21.052s, 4.709s, 9.254s and 2.647s.
-  Seven exact ordinary selectors pass: source_staging::tests::
-  source_merkle_nodes_are_executable_and_paths_are_structural and executor::tests::
-  file_write_plan_owns_canonical_nul_safe_reapi_objects (2/2, 0.008s);
-  integration forced_param_files_merge_exact_bytes_and_merkle_topology,
-  forced_param_files_reject_input_collisions_atomically and
-  raw_file_write_execution_rejects_before_transport (3/3, 0.004s);
-  typed_actions_reject_command_input_tree_and_execution_projection and
-  typed_action_execution_rejects_before_transport (2/2, 0.003s).
-- Public ignored wire selector source_staging::tests::
-  nativelink_closure_sources_merkle_and_verified_upload: exact ignored listing
-  verified, final 1/1 pass in 0.591s; fresh NativeLink setup/test/cleanup 0.673s,
-  process terminal 143, temporary store removed. Socket use required the normal
-  reviewed sandbox exception. The real Core-prepared sources, Directory and
-  forced parameter bytes upload with three-byte chunks and download verified;
-  source nodes are executable. Source/parameter collision rejects before upload.
-  Reusing an old prepared set after deletion hits CAS without open, while a new
-  request rejects deletion. A newly prepared digest is missing before a file
-  mutation; upload then returns the local digest-mismatch error and a subsequent
-  verified read cannot accept remote bytes. The initial 0.626s wire run failed
-  only an extra assertion that an interrupted digest must remain absent: this
-  NativeLink configuration can advertise interrupted bytes. Independent review
-  accepted the stronger client-verification proof rather than claiming server
-  absence. WP-7-29's no-finish-on-mismatch proof remains unchanged.
-- Direct dependent cargo check -p slug_cli_v2 exit 0 in 10.493s, covering Core,
-  REAPI and public consumers. Changed Rust format, plan status, archive and diff
-  checks pass. No compiler action, Slug daemon or broad suite ran.
-
-Ten unique focused gates proved. All test batches, including failed diagnostic
-runs, took under one second; total test execution was 3.371s. Separate compilation
-operations totaled 131.780s, including the test compiler correction; continuous
-packet/review elapsed time was not recorded. No workflow speedup claim.
-
-Residual: generated/tree inputs, catalog sources, runfiles, non-artifact
-executables, conditional spilling and typed execution remain unsupported here.
-The exposed interrupted-backend-content behavior must be resolved by a trusted
-verifying CAS or equivalent integrity gate before execution admission; CAS presence
-alone cannot establish valid content. Later execution must also revalidate the
-full source/build frontier after transfer. M7A remains partial and M8 unproved.
+Gate advanced: the local conformance backend now verifies new public CAS writes
+and rejects hash/size mismatches with demonstrated cleanup/recovery. This does not
+repair existing stores, validate worker-produced bytes, or make an in-flight CAS
+hit safe for concurrent Execute. Completed verified staging and full-frontier
+validation remain required before typed Spawn execution. M7A partial; M8 unproved.

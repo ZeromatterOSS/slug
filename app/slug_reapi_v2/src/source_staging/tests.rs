@@ -143,21 +143,22 @@ fn nativelink_closure_sources_merkle_and_verified_upload() {
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let endpoint = std::env::var("SLUG_V2_NATIVELINK_ENDPOINT").unwrap();
     let endpoint = endpoint.replace("grpc://", "http://");
-    let cache = runtime.block_on(async {
+    let (cache, channel) = runtime.block_on(async {
         let channel = tonic::transport::Endpoint::from_shared(endpoint)
             .unwrap()
             .connect()
             .await
             .unwrap();
-        CacheClient::new(
-            channel,
+        let cache = CacheClient::new(
+            channel.clone(),
             String::new(),
             TransferPolicy {
                 max_batch_bytes: 1,
                 chunk_bytes: 3,
             },
         )
-        .unwrap()
+        .unwrap();
+        (cache, channel)
     });
     runtime.block_on(async {
         let uploaded = plan.upload_missing(&cache).await.unwrap();
@@ -248,11 +249,115 @@ fn nativelink_closure_sources_merkle_and_verified_upload() {
         assert_eq!(cache.find_missing(&[digest.clone()].into_iter().collect()).await.unwrap(), [digest.clone()].into_iter().collect());
         let error = stale.upload_missing(&cache).await.unwrap_err();
         assert!(matches!(&error, CacheError::Protocol(message) if message.starts_with("upload digest mismatch:")), "{error}");
-        // A backend may expose interrupted bytes. Neither missing nor corrupt
-        // remote data can become a successfully verified source result.
+        // Local cancellation precedes server cleanup, and NativeLink can report
+        // in-flight writes as present. Require absence once cleanup settles.
+        require_missing_after_cleanup(&cache, &digest).await;
         assert!(cache.read_blob_verified(&digest, |_| Ok(())).await.is_err());
-
+        std::fs::write(root.0.join("input"), b"not yet uploaded").unwrap();
+        assert!(stale.upload_missing(&cache).await.unwrap().contains(&digest));
+        require_bytes(&cache, &digest, b"not yet uploaded").await;
+        reject_invalid_cas_writes(&cache, channel).await;
     });
+}
+
+async fn require_missing_after_cleanup(cache: &CacheClient, digest: &ReapiDigest) {
+    let requested = [digest.clone()].into_iter().collect();
+    // The local harness retains disconnected streams for 1s and sweeps every
+    // 0.5s. Leave scheduling margin without waiting for the backend's default.
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            if cache.find_missing(&requested).await.unwrap() == requested {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("invalid upload remained advertised after server cleanup deadline");
+}
+
+async fn require_bytes(cache: &CacheClient, digest: &ReapiDigest, expected: &[u8]) {
+    let mut actual = Vec::new();
+    cache
+        .read_blob_verified(digest, |chunk| {
+            actual.extend_from_slice(chunk);
+            Ok(())
+        })
+        .await
+        .unwrap();
+    assert_eq!(actual, expected);
+}
+
+async fn reject_invalid_cas_writes(cache: &CacheClient, channel: tonic::transport::Channel) {
+    use slug_reapi_cache_v2::ReapiBlob;
+    use slug_reapi_cache_v2::cache_client::to_proto;
+
+    use crate::proto;
+    use crate::proto::google::bytestream;
+
+    let hash_blob = ReapiBlob::from_bytes(b"valid hash case".to_vec());
+    require_missing_after_cleanup(cache, hash_blob.digest()).await;
+    let mut cas = proto::content_addressable_storage_client::ContentAddressableStorageClient::new(
+        channel.clone(),
+    );
+    let response = cas
+        .batch_update_blobs(proto::BatchUpdateBlobsRequest {
+            requests: vec![proto::batch_update_blobs_request::Request {
+                digest: Some(to_proto(hash_blob.digest())),
+                data: b"wrong hash case".to_vec(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(response.responses.len(), 1);
+    let result = &response.responses[0];
+    assert_eq!(result.digest, Some(to_proto(hash_blob.digest())));
+    let status = result.status.as_ref().unwrap();
+    // NativeLink merges the verifier error with backend cancellation errors,
+    // which can promote INVALID_ARGUMENT to INTERNAL. Require its specific cause.
+    assert_ne!(status.code, tonic::Code::Ok as i32, "{result:?}");
+    assert!(status.message.contains("Hashes do not match"), "{result:?}");
+    require_missing_after_cleanup(cache, hash_blob.digest()).await;
+    cache.upload_missing(&[hash_blob.clone()]).await.unwrap();
+    require_bytes(cache, hash_blob.digest(), hash_blob.data()).await;
+
+    let size_blob = ReapiBlob::from_bytes(b"valid size case".to_vec());
+    // Correct hash with incorrect size independently exercises size verification.
+    // BatchUpdate rejects size at its frontend, so use ByteStream's explicit EOF.
+    let wrong_size = ReapiDigest::new(
+        size_blob.digest().hash(),
+        size_blob.digest().size_bytes() + 1,
+    )
+    .unwrap();
+    require_missing_after_cleanup(cache, &wrong_size).await;
+    let mut stream = bytestream::byte_stream_client::ByteStreamClient::new(channel);
+    let error = stream
+        .write(tonic::codegen::tokio_stream::iter([
+            bytestream::WriteRequest {
+                resource_name: format!(
+                    "uploads/wp732-size/blobs/{}/{}",
+                    wrong_size.hash(),
+                    wrong_size.size_bytes()
+                ),
+                write_offset: 0,
+                finish_write: true,
+                data: size_blob.data().to_vec(),
+            },
+        ]))
+        .await
+        .unwrap_err();
+    assert_ne!(error.code(), tonic::Code::Ok);
+    assert!(error.message().contains("Expected size"), "{error}");
+    require_missing_after_cleanup(cache, &wrong_size).await;
+    // This malformed key is unrealizable; recover with its corrected size and
+    // prove the original key remains absent.
+    cache.upload_missing(&[size_blob.clone()]).await.unwrap();
+    require_bytes(cache, size_blob.digest(), size_blob.data()).await;
+    let malformed = [wrong_size].into_iter().collect();
+    assert_eq!(cache.find_missing(&malformed).await.unwrap(), malformed);
 }
 
 fn root_path(plan: &SourceInputReapiPlan, name: &str) -> std::path::PathBuf {

@@ -92,12 +92,15 @@ def write_config(
     scheduler_props = "\n".join(scheduler_props_lines)
     worker_props = "\n".join(worker_props_lines)
 
+    # Client-facing CAS writes must validate bytes before persistent publication.
+    # The local worker requires the raw FastSlowStore; both names share storage.
+    # AC keys are action digests, so content verification does not apply to AC.
     path.write_text(
         f"""
 {{
   stores: [
     {{
-      name: "CAS",
+      name: "CAS_RAW",
       fast_slow: {{
         fast: {{
           filesystem: {{
@@ -113,6 +116,14 @@ def write_config(
             eviction_policy: {{ max_bytes: 1000000000 }},
           }},
         }},
+      }},
+    }},
+    {{
+      name: "CAS",
+      verify: {{
+        backend: {{ ref_store: {{ name: "CAS_RAW" }} }},
+        verify_size: true,
+        verify_hash: true,
       }},
     }},
     {{
@@ -139,7 +150,7 @@ def write_config(
       local: {{
         name: "worker-1",
         worker_api_endpoint: {{ uri: "grpc://127.0.0.1:{worker_port}" }},
-        cas_fast_slow_store: "CAS",
+        cas_fast_slow_store: "CAS_RAW",
         upload_action_result: {{ ac_store: "AC" }},
         work_directory: "{root}/worker/work",
         platform_properties: {{
@@ -156,7 +167,12 @@ def write_config(
         ac: [{{ ac_store: "AC" }}],
         execution: [{{ cas_store: "CAS", scheduler: "SIMPLE" }}],
         bytestream: [
-          {{ instance_name: "", cas_store: "CAS" }},
+          {{
+            instance_name: "",
+            cas_store: "CAS",
+            // Keep interrupted-upload cleanup checks small in the local harness.
+            persist_stream_on_disconnect_timeout: 1,
+          }},
         ],
         capabilities: [{{ remote_execution: {{ scheduler: "SIMPLE" }} }}],
       }},
