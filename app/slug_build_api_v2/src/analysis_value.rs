@@ -345,21 +345,40 @@ impl AnalysisArtifact {
             .to_owned()
     }
 
-    /// Returns the Bazel-path projection used by phase-scratch consumers.
-    ///
-    /// The artifact remains the semantic owner; this projection is never
-    /// retained as a parallel identity.
+    /// Execution path for the admitted nonsibling repository layout.
+    /// This is scratch; the canonical label or configured owner remains identity.
     pub fn path(&self) -> Cow<'_, str> {
         match self {
-            Self::Source(label) => {
-                let package = label.package().package().as_str();
-                if package.is_empty() {
-                    Cow::Borrowed(label.target().as_str())
-                } else {
-                    Cow::Owned(format!("{package}/{}", label.target()))
-                }
-            }
+            Self::Source(label) => Self::source_path(label, "external"),
             Self::Derived { output, .. } => Cow::Borrowed(output.path()),
+        }
+    }
+
+    /// Source runfiles path relative to the main repository. Derived paths keep
+    /// their existing Slug-native projection until output roots are modeled.
+    pub fn short_path(&self) -> Cow<'_, str> {
+        match self {
+            Self::Source(label) => Self::source_path(label, ".."),
+            Self::Derived { output, .. } => Cow::Borrowed(output.path()),
+        }
+    }
+
+    fn source_path<'a>(label: &'a CanonicalLabel, external_prefix: &str) -> Cow<'a, str> {
+        let package = label.package().package().as_str();
+        let target = label.target().as_str();
+        let relative = if package.is_empty() {
+            Cow::Borrowed(target)
+        } else {
+            Cow::Owned(format!("{package}/{target}"))
+        };
+        let repository = label.package().repo();
+        if repository.is_root() {
+            relative
+        } else {
+            Cow::Owned(format!(
+                "{external_prefix}/{}/{relative}",
+                repository.as_str()
+            ))
         }
     }
 }

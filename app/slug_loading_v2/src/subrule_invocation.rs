@@ -738,7 +738,7 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
     fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match name {
             "path" => Some(heap.alloc_str(&self.path()).to_value()),
-            "short_path" => Some(heap.alloc_str(&self.path()).to_value()),
+            "short_path" => Some(heap.alloc_str(&self.artifact.short_path()).to_value()),
             "basename" => Some(heap.alloc_str(&self.basename()).to_value()),
             "dirname" => Some(heap.alloc_str(&self.dirname()).to_value()),
             "is_source" => Some(Value::new_bool(matches!(

@@ -61,8 +61,10 @@ path frontier plus digest; PathFileDigestKey projects content equality. Need is
 transient, size disagreement/read failures are explicit, and request validation
 compares content observations. This is not an upload capability: consumers must
 validate the complete frontier and transfers must verify bytes against the digest.
-Repository/artifact routing, generated/tree inputs, transfer and resolved Spawn
-activation remain required. Pinned Bazel input FileNodes use executable=true;
+WP-7-28 adds configured source-file routing through existing materialized
+repository owners and repository-aware execution/short paths; digest-to-artifact
+staging, generated/tree inputs, transfer and resolved Spawn activation remain
+required. Pinned Bazel input FileNodes use executable=true;
 host permissions are not a substitute for that wire policy.
 
 Consume the retained Stage 6 action and owner context used by aquery. The

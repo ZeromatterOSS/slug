@@ -29,15 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-27-m7a-streamed-input-digests-r1
-Status: accepted; independent final ACCEPT; ready to integrate
+Packet: WP-7-28-m7a-repository-source-paths-r1
+Status: final ACCEPT; checkpoint ready to commit
 
-The accepted checkpoint produces observation-backed, streamed SHA-256/size
-facts for ordinary compiler/toolchain inputs without retaining entire binaries
-in DICE. Thirteen focused checks are proved; independent final ACCEPT confirms
-content equality, complete provenance and request revalidation. Native Windows
-compilation remains unverified because the target is unavailable. Toolchains,
-source/generated input transfer and resolved Spawn execution remain required.
+Materialized external SourceFile analysis now uses existing repository path
+owners; File/Args retain repository execution paths and distinct short paths
+for native-library lookup. Eleven focused gates and direct dependent compilation
+passed with independent final ACCEPT. WP-7-27 streamed digests are pushed at
+994abb76c. Artifact digest staging, input transfer, toolchains and resolved Spawn
+execution remain required; M7A stays partial.
 
 ### Earlier generated-input receipt
 

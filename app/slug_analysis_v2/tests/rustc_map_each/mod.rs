@@ -96,11 +96,19 @@ async fn request(
     dice: &Arc<Dice>,
     workspace: &std::path::Path,
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
+    request_with_epoch(dice, workspace, root_epoch(workspace), false).await
+}
+
+async fn request_with_epoch(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    epoch: PathObservationEpoch,
+    observed: bool,
+) -> Result<Arc<ConfiguredNodeResult>, String> {
     let mut updater = dice.updater_with_data(UserComputationData {
         cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
     });
-    let epoch = root_epoch(workspace);
     updater
         .changed_to(slug_workspace_v2::path_observation_shards(&epoch))
         .unwrap();
@@ -123,6 +131,31 @@ async fn request(
     )
     .unwrap();
     let mut transaction = updater.commit().await;
+    if observed {
+        let key = match slug_analysis_v2::prepare_configured_node_analysis_observed(
+            &mut transaction,
+            NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
+            CanonicalLabel::parse("@@rules_rust+//:subject").unwrap(),
+            typed_action_test_configuration(),
+        )
+        .await
+        {
+            AnalysisPreparationOutcome::Complete(Ok(Ok(key))) => key,
+            other => return Err(format!("observed callback preparation: {other:?}")),
+        };
+        return match transaction
+            .compute(&key)
+            .await
+            .map_err(|error| error.to_string())?
+        {
+            AnalysisPreparationOutcome::Complete(Ok(value)) => value
+                .as_ref()
+                .as_ref()
+                .cloned()
+                .map_err(ToString::to_string),
+            other => Err(format!("observed callback proof needs input: {other:?}")),
+        };
+    }
     let key = match prepare_configured_node_analysis(
         &mut transaction,
         NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
@@ -713,3 +746,5 @@ async fn pinned_cc_providers_feed_rustc_and_restore() {
     assert_eq!(first.unwrap(), request(&dice, &workspace).await.unwrap());
     fs::remove_dir_all(workspace).unwrap();
 }
+
+mod external_sources;

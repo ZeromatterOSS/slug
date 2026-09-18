@@ -1851,3 +1851,5 @@ fn forced_param_files_reject_unowned_limits_invalid_paths_and_output_collisions(
 }
 
 mod native_link_args;
+
+mod source_paths;

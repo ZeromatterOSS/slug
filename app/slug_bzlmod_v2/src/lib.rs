@@ -520,6 +520,12 @@ pub use source_preparation::HostRepositoryLocalPathPolicy;
 #[doc(hidden)]
 pub use source_preparation::HostRepositoryMaterializationDisposition;
 #[doc(hidden)]
+pub use source_preparation::HostRepositoryPathKey;
+#[doc(hidden)]
+pub use source_preparation::HostRepositoryPathObservationKey;
+#[doc(hidden)]
+pub use source_preparation::HostRepositoryPathValue;
+#[doc(hidden)]
 pub use source_preparation::HostRepositoryRelativePath;
 #[doc(hidden)]
 pub use source_preparation::HostRepositoryRelativePathError;
@@ -567,6 +573,8 @@ pub use source_preparation::ModuleSourcePreparationError;
 pub use source_preparation::ModuleSourcePreparationKey;
 #[doc(hidden)]
 pub use source_preparation::ObservedHostRepositoryDirectoryListing;
+#[doc(hidden)]
+pub use source_preparation::ObservedHostRepositoryPath;
 #[doc(hidden)]
 pub use source_preparation::ObservedHostRepositorySourceFile;
 #[doc(hidden)]

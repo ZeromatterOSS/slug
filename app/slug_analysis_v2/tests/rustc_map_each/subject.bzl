@@ -64,13 +64,16 @@ def _impl(ctx):
         fail("File.is_source must distinguish source and generated artifacts")
     if "is_source" not in dir(ctx.attr.src) or "is_source" not in dir(output):
         fail("File.is_source must be discoverable")
-    if ctx.attr.src.label.workspace_root != "" or ctx.label.workspace_root != "external/rules_rust+":
+    source_paths = [ctx.attr.src.path, ctx.attr.src.short_path, ctx.attr.src.dirname, ctx.attr.src.label.workspace_root]
+    if source_paths != ctx.attr.expected_source_paths:
+        fail("source File paths: expected {}, got {}".format(ctx.attr.expected_source_paths, source_paths))
+    if ctx.label.workspace_root != "external/rules_rust+":
         fail("Label.workspace_root must use the canonical repository, without the package")
     if "workspace_root" not in dir(ctx.label):
         fail("Label.workspace_root must be discoverable")
     if _NESTED_ROOT_LABEL.workspace_root != "" or _NESTED_EXTERNAL_LABEL.workspace_root != "external/rules_rust+":
         fail("Label.workspace_root must ignore package and target components")
-    if ctx.attr.src.dirname != "." or output.dirname != "out":
+    if output.dirname != "out":
         fail("File.dirname must distinguish the execution root and nested directories")
     root = ctx.attr.src
     if ctx.attr.generated:
@@ -158,6 +161,7 @@ def _impl(ctx):
 
 subject = rule(implementation = _impl, attrs = {
     "src": attr.label(allow_single_file = True),
+    "expected_source_paths": attr.string_list(default = ["lib.rs", "lib.rs", ".", ""]),
     "stdlib": attr.label_list(allow_files = True),
     "sysroot": attr.label(allow_single_file = True),
     "generated": attr.bool(default = False),

@@ -48,6 +48,16 @@ their existing Slug-native classification. Generic callbacks, directories and
 sibling layout remain unsupported; the native-link slice below is separate. No callable
 or evaluator heap crosses publication, and no new semantic cache/key is added.
 
+WP-7-28 admits regular source files from materialized canonical repositories as
+Null SourceFile nodes. Analysis resolves their existing canonical load route and
+Bzlmod repository path keys, including observed producers; it never reconstructs
+a host root from an execution path or reads source bytes. Source execution paths
+use `external/<canonical repo>/...`, and source short paths use `../<repo>/...`;
+main paths stay repository-relative. AnalysisArtifact owns both projections for
+File/Args/Spawn, and native-library ambiguity lookup uses short_path. Exact path
+shape uses existing Slug-native canonical names. Built-in catalog source-file
+admission, sibling layout and derived-root short-path parity remain deferred.
+
 WP-7-23 adds `SpawnSpec::expand_forced_param_files`: one immutable action-local
 aggregate owns replacement argv and virtual file bytes derived from the retained
 recipe and first declared output. Forced shell/multiline/flag-per-line formats

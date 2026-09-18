@@ -64,10 +64,8 @@ use slug_loading_v2::package::ToolchainTypeRequirement;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathNodeKind;
+#[cfg(test)]
 use slug_workspace_v2::PathObservationNamespace;
-use slug_workspace_v2::PathOutcome;
-use slug_workspace_v2::ResolvedPathKey;
-use slug_workspace_v2::ResolvedPathObservationKey;
 use slug_workspace_v2::ResolvedPathState;
 use starlark::PrintHandler;
 use starlark::PrintLocation;
@@ -120,6 +118,8 @@ use crate::subrule::ConfiguredDependencyValidation;
 use crate::subrule::DeclaredDependencyKey;
 use crate::subrule::configured_dependency_rows;
 use crate::subrule::validate_configured_dependency;
+
+mod source_file;
 
 mod registration_error;
 pub use registration_error::RegistrationAnalysisError;
@@ -2659,72 +2659,6 @@ fn require_root_delegating_reference(
     }
 }
 
-fn source_path(
-    workspace: &NormalizedAbsolutePath,
-    label: &CanonicalLabel,
-) -> NormalizedAbsolutePath {
-    let mut path = workspace.as_path().to_path_buf();
-    let package = label.package().package().as_str();
-    if !package.is_empty() {
-        path.push(package);
-    }
-    path.push(label.target().as_str());
-    NormalizedAbsolutePath::new(path)
-        .expect("validated package and target names remain below the absolute workspace path")
-}
-
-async fn resolve_source_input(
-    ctx: &mut DiceComputations<'_>,
-    mode: ConfiguredAnalysisMode,
-    path: NormalizedAbsolutePath,
-    label: &CanonicalLabel,
-) -> AnalysisSemanticOutcome<slug_workspace_v2::ResolvedPath> {
-    match mode {
-        ConfiguredAnalysisMode::Legacy => {
-            match ctx
-                .compute(&ResolvedPathKey::new(PathObservationNamespace::Host, path))
-                .await
-            {
-                Ok(PathOutcome::Need(need)) => {
-                    LoadingPreparationOutcome::Need(LoadingPreparationNeeds::path(need))
-                }
-                Ok(PathOutcome::Complete(Ok(resolved))) => analysis_semantic_complete(Ok(resolved)),
-                Ok(PathOutcome::Complete(Err(error))) => analysis_semantic_complete(Err(
-                    AnalysisError::new(format!("resolving source file {label}: {error:?}")),
-                )),
-                Err(error) => analysis_semantic_complete(Err(AnalysisError::new(format!(
-                    "resolving source file through DICE: {error}"
-                )))),
-            }
-        }
-        ConfiguredAnalysisMode::Observed => {
-            match ctx
-                .compute(&ResolvedPathObservationKey::new(
-                    PathObservationNamespace::Host,
-                    path,
-                ))
-                .await
-            {
-                Ok(PathOutcome::Need(need)) => {
-                    LoadingPreparationOutcome::Need(LoadingPreparationNeeds::path(need))
-                }
-                Ok(PathOutcome::Complete(Err(error))) => {
-                    LoadingPreparationOutcome::Complete(Err(error))
-                }
-                Ok(PathOutcome::Complete(Ok(observed))) => match observed.result() {
-                    Ok(resolved) => analysis_semantic_complete(Ok(resolved.dupe())),
-                    Err(error) => analysis_semantic_complete(Err(AnalysisError::new(format!(
-                        "resolving source file {label}: {error:?}"
-                    )))),
-                },
-                Err(error) => analysis_semantic_complete(Err(AnalysisError::new(format!(
-                    "resolving source file through DICE: {error}"
-                )))),
-            }
-        }
-    }
-}
-
 async fn compute_configured_child(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
@@ -3027,6 +2961,14 @@ fn require_supported_canonical_configured_target(
             })
         )
     );
+    let supported = supported
+        || matches!(
+            (node, target.map(|target| &target.kind)),
+            (
+                ConfiguredNodeKey::Null(_),
+                Some(PackageTargetKind::ExportedFile) | None
+            )
+        );
     if supported {
         Ok(())
     } else {
@@ -5319,8 +5261,14 @@ impl ConfiguredNodeAnalysisKey {
                 if matches!(source_kind, Some(PackageTargetKind::ExportedFile))
                     || (source_kind.is_none() && package_declares_source_label(package, label)) =>
             {
-                let source_path = source_path(&self.workspace, label);
-                let resolved = match resolve_source_input(ctx, mode, source_path, label).await {
+                let resolved = match source_file::resolve_source_input(
+                    ctx,
+                    mode,
+                    &self.workspace,
+                    label,
+                )
+                .await
+                {
                     LoadingPreparationOutcome::Need(need) => {
                         return LoadingPreparationOutcome::Need(need);
                     }

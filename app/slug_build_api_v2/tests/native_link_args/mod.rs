@@ -384,3 +384,55 @@ fn native_link_rows_preserve_shared_depset_publication_identity() {
     assert_eq!(aliased.render_argv(), split.render_argv());
     assert_ne!(aliased, split);
 }
+
+#[test]
+fn external_libraries_use_short_keys_and_execution_paths() {
+    let external =
+        AnalysisArtifact::Source(CanonicalLabel::parse("@@native+//lib:libsame.a").unwrap());
+    let make = |key: &str, always| {
+        let library = AnalysisValue::strukt([
+            ("static_library", AnalysisValue::artifact(external.clone())),
+            ("pic_static_library", AnalysisValue::none()),
+            ("interface_library", AnalysisValue::none()),
+            ("dynamic_library", AnalysisValue::none()),
+            ("alwayslink", AnalysisValue::boolean(always)),
+        ]);
+        row(
+            vec![library],
+            false,
+            true,
+            &[(key, "alias/librenamed.a")],
+            AnalysisValue::none(),
+        )
+    };
+    let short_key = "../native+/lib/libsame.a";
+    assert_eq!(
+        recipe(vec![make(short_key, false)], Mapper::DefaultDirect).render(),
+        [
+            "-lstatic=renamed",
+            "-Clink-arg=-lrenamed",
+            "--codegen=link-arg=-pthread",
+            "--codegen=link-arg=two words"
+        ]
+    );
+    assert_eq!(
+        recipe(
+            vec![make("external/native+/lib/libsame.a", false)],
+            Mapper::DefaultDirect
+        )
+        .render()[0],
+        "-lstatic=same"
+    );
+    assert_eq!(
+        recipe(vec![make(short_key, true)], Mapper::DefaultDirect).render()[..3],
+        [
+            "-Clink-arg=--whole-archive",
+            "-Clink-arg=external/native+/lib/libsame.a",
+            "-Clink-arg=--no-whole-archive"
+        ]
+    );
+    assert_eq!(
+        recipe(vec![make(short_key, false)], Mapper::Directories).render(),
+        ["-Lnative=external/native+/lib"]
+    );
+}

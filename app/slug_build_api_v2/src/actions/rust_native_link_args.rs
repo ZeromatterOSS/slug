@@ -169,9 +169,10 @@ fn project(
                 format!("-Clink-arg={prefix}--no-whole-archive"),
             ]);
         } else if include {
+            let short_path = preferred.short_path();
             let replacement = ambiguous
                 .iter()
-                .find(|(key, _)| key.as_str() == Some(preferred.path().as_ref()));
+                .find(|(key, _)| key.as_str() == Some(short_path.as_ref()));
             let artifact = match replacement {
                 Some((_, value)) => regular_file(value)?,
                 None => preferred,

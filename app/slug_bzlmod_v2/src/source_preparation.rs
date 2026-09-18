@@ -1425,13 +1425,15 @@ impl ObservedRepositorySourceFileValue {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) struct HostRepositoryPathKey {
+#[doc(hidden)]
+pub struct HostRepositoryPathKey {
     route: HostRepositorySourceRoute,
     repo_relative_path: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-pub(crate) struct HostRepositoryPathObservationKey(pub(crate) HostRepositoryPathKey);
+#[doc(hidden)]
+pub struct HostRepositoryPathObservationKey(pub(crate) HostRepositoryPathKey);
 
 impl HostRepositoryPathKey {
     pub(crate) fn new(route: RootRepositoryRoute, repo_relative_path: PathBuf) -> Self {
@@ -1441,7 +1443,7 @@ impl HostRepositoryPathKey {
         }
     }
 
-    pub(crate) fn from_source_route(
+    pub fn from_source_route(
         route: HostRepositorySourceRoute,
         repo_relative_path: PathBuf,
     ) -> Self {
@@ -1453,7 +1455,7 @@ impl HostRepositoryPathKey {
 }
 
 impl HostRepositoryPathObservationKey {
-    pub(crate) fn from_source_route(
+    pub fn from_source_route(
         route: HostRepositorySourceRoute,
         repo_relative_path: PathBuf,
     ) -> Self {
@@ -1489,18 +1491,30 @@ impl fmt::Display for HostRepositoryPathObservationKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-pub(crate) struct HostRepositoryPathValue(ResolvedPath);
+#[doc(hidden)]
+pub struct HostRepositoryPathValue(ResolvedPath);
 
 impl HostRepositoryPathValue {
-    pub(crate) fn resolved(&self) -> &ResolvedPath {
+    pub fn resolved(&self) -> &ResolvedPath {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-pub(crate) struct ObservedHostRepositoryPath {
+#[doc(hidden)]
+pub struct ObservedHostRepositoryPath {
     pub(crate) result: Arc<Result<HostRepositoryPathValue, RepositorySourceFileError>>,
     pub(crate) observations: PathObservationEpoch,
+}
+
+impl ObservedHostRepositoryPath {
+    pub fn result(&self) -> &Arc<Result<HostRepositoryPathValue, RepositorySourceFileError>> {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
 }
 
 #[doc(hidden)]
