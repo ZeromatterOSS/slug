@@ -259,6 +259,7 @@ pub enum PathObservationOperation {
     Lstat,
     ReadLink,
     FileBytes,
+    FileDigest,
     DirectoryEntries,
     WindowsLongPath,
     WindowsOptionPathLongName,
@@ -651,6 +652,7 @@ pub enum PathObservationResult {
     Lstat(PathOperationResult<PathLstat>),
     ReadLink(PathOperationResult<Arc<PathBuf>>),
     FileBytes(PathOperationResult<Arc<[u8]>>),
+    FileDigest(PathOperationResult<crate::FileContentDigest>),
     DirectoryEntries(PathOperationResult<PathDirectoryEntries>),
     WindowsLongPath(Arc<[u16]>),
     WindowsOptionPathLongName(WindowsOptionPathLongNameOutcome),
@@ -662,6 +664,7 @@ impl PathObservationResult {
             Self::Lstat(_) => PathObservationOperation::Lstat,
             Self::ReadLink(_) => PathObservationOperation::ReadLink,
             Self::FileBytes(_) => PathObservationOperation::FileBytes,
+            Self::FileDigest(_) => PathObservationOperation::FileDigest,
             Self::DirectoryEntries(_) => PathObservationOperation::DirectoryEntries,
             Self::WindowsLongPath(_) => PathObservationOperation::WindowsLongPath,
             Self::WindowsOptionPathLongName(_) => {

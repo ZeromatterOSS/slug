@@ -865,6 +865,7 @@ async fn parse_ignore_file_observed(
                     | PathObservationResult::ReadLink(_)
                     | PathObservationResult::FileBytes(_)
                     | PathObservationResult::DirectoryEntries(_)
+                    | PathObservationResult::FileDigest(_)
                     | PathObservationResult::WindowsOptionPathLongName(_) => {
                         return PathOutcome::Complete(Err(ObservedPathFrontierError::from(
                             PathObservationEpochError::OperationMismatch {

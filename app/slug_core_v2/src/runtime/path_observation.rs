@@ -10,11 +10,14 @@
  * License, Version 2.0 found in the LICENSE-APACHE file in the root directory.
  */
 
+mod file_digest;
+
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use slug_workspace_v2::FileContentDigest;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathDirectoryEntries;
 use slug_workspace_v2::PathDirectoryEntry;
@@ -128,6 +131,11 @@ trait ObservationOperations {
 
     fn file_bytes(&mut self, path: &NormalizedAbsolutePath) -> Result<Arc<[u8]>, PrimaryFailure>;
 
+    fn file_digest(
+        &mut self,
+        path: &NormalizedAbsolutePath,
+    ) -> Result<FileContentDigest, PrimaryFailure>;
+
     fn directory_entries(
         &mut self,
         path: &NormalizedAbsolutePath,
@@ -210,6 +218,15 @@ fn observe_one(
                 }
             })
         }
+        PathObservationOperation::FileDigest => {
+            PathObservationResult::FileDigest(match operations.file_digest(demand.path()) {
+                Ok(digest) => PathOperationResult::Present(digest),
+                Err(PrimaryFailure::Final(error)) => PathOperationResult::Error(error),
+                Err(PrimaryFailure::Refine(error)) => {
+                    refine_file_bytes(error, operations.lstat(demand.path()))
+                }
+            })
+        }
         PathObservationOperation::DirectoryEntries => PathObservationResult::DirectoryEntries(
             match operations.directory_entries(demand.path()) {
                 Ok(entries) => PathOperationResult::Present(entries),
@@ -254,10 +271,10 @@ fn refine_read_link(
     }
 }
 
-fn refine_file_bytes(
+fn refine_file_bytes<T>(
     original: PathObservationError,
     auxiliary: PathOperationResult<PathLstat>,
-) -> PathOperationResult<Arc<[u8]>> {
+) -> PathOperationResult<T> {
     match auxiliary {
         PathOperationResult::Missing => PathOperationResult::Missing,
         PathOperationResult::Present(lstat) if lstat.kind() == PathNodeKind::Directory => {
@@ -339,6 +356,13 @@ impl ObservationOperations for UnixPathObservationAdapter {
                 }
             }
         }
+    }
+
+    fn file_digest(
+        &mut self,
+        path: &NormalizedAbsolutePath,
+    ) -> Result<FileContentDigest, PrimaryFailure> {
+        file_digest::observe(path)
     }
 
     fn directory_entries(
@@ -1830,6 +1854,13 @@ mod windows_native {
             }
         }
 
+        fn file_digest(
+            &mut self,
+            path: &NormalizedAbsolutePath,
+        ) -> Result<FileContentDigest, PrimaryFailure> {
+            file_digest::observe(path)
+        }
+
         fn directory_entries(
             &mut self,
             path: &NormalizedAbsolutePath,
@@ -2920,6 +2951,7 @@ mod tests {
         Lstat(NormalizedAbsolutePath),
         ReadLink(NormalizedAbsolutePath),
         FileBytes(NormalizedAbsolutePath),
+        FileDigest(NormalizedAbsolutePath),
         DirectoryEntries(NormalizedAbsolutePath),
         WindowsLongPath(Arc<[u16]>),
         WindowsOptionPathLongName(Arc<[u16]>),
@@ -2932,6 +2964,7 @@ mod tests {
         lstats: VecDeque<PathOperationResult<PathLstat>>,
         read_links: VecDeque<Result<Arc<PathBuf>, PrimaryFailure>>,
         file_bytes: VecDeque<Result<Arc<[u8]>, PrimaryFailure>>,
+        file_digests: VecDeque<Result<FileContentDigest, PrimaryFailure>>,
         directory_entries: VecDeque<Result<PathDirectoryEntries, PrimaryFailure>>,
         windows_long_paths: VecDeque<Arc<[u16]>>,
         windows_option_path_long_names: VecDeque<WindowsOptionPathLongNameOutcome>,
@@ -2946,6 +2979,7 @@ mod tests {
                 lstats: VecDeque::new(),
                 read_links: VecDeque::new(),
                 file_bytes: VecDeque::new(),
+                file_digests: VecDeque::new(),
                 directory_entries: VecDeque::new(),
                 windows_long_paths: VecDeque::new(),
                 windows_option_path_long_names: VecDeque::new(),
@@ -2991,6 +3025,16 @@ mod tests {
             self.file_bytes
                 .pop_front()
                 .expect("script must supply a file-bytes result")
+        }
+
+        fn file_digest(
+            &mut self,
+            path: &NormalizedAbsolutePath,
+        ) -> Result<FileContentDigest, PrimaryFailure> {
+            self.calls.push(Call::FileDigest(path.clone()));
+            self.file_digests
+                .pop_front()
+                .expect("script must supply a digest observation")
         }
 
         fn directory_entries(
@@ -3499,6 +3543,7 @@ mod tests {
         for operation in [
             PathObservationOperation::ReadLink,
             PathObservationOperation::FileBytes,
+            PathObservationOperation::FileDigest,
             PathObservationOperation::DirectoryEntries,
         ] {
             let demand = demand(
@@ -3514,6 +3559,9 @@ mod tests {
                     .push_back(Err(PrimaryFailure::Final(original))),
                 PathObservationOperation::FileBytes => operations
                     .file_bytes
+                    .push_back(Err(PrimaryFailure::Final(original))),
+                PathObservationOperation::FileDigest => operations
+                    .file_digests
                     .push_back(Err(PrimaryFailure::Final(original))),
                 PathObservationOperation::DirectoryEntries => operations
                     .directory_entries
@@ -3531,6 +3579,7 @@ mod tests {
                 result.as_ref(),
                 PathObservationResult::ReadLink(PathOperationResult::Error(error))
                     | PathObservationResult::FileBytes(PathOperationResult::Error(error))
+                    | PathObservationResult::FileDigest(PathOperationResult::Error(error))
                     | PathObservationResult::DirectoryEntries(PathOperationResult::Error(error))
                     if *error == original
             ));
@@ -3593,7 +3642,7 @@ mod tests {
     fn file_bytes_refinement_exhausts_every_auxiliary_kind_and_race() {
         let original = io(PathIoErrorKind::IsADirectory, Some(21));
         assert_eq!(
-            refine_file_bytes(original, PathOperationResult::Missing),
+            refine_file_bytes::<Arc<[u8]>>(original, PathOperationResult::Missing),
             PathOperationResult::Missing
         );
         for kind in [
@@ -3602,12 +3651,12 @@ mod tests {
             PathNodeKind::Symlink,
         ] {
             assert_eq!(
-                refine_file_bytes(original, PathOperationResult::Present(lstat(kind))),
+                refine_file_bytes::<Arc<[u8]>>(original, PathOperationResult::Present(lstat(kind))),
                 PathOperationResult::Error(original)
             );
         }
         assert_eq!(
-            refine_file_bytes(
+            refine_file_bytes::<Arc<[u8]>>(
                 original,
                 PathOperationResult::Present(lstat(PathNodeKind::Directory))
             ),
@@ -3617,7 +3666,7 @@ mod tests {
             })
         );
         assert_eq!(
-            refine_file_bytes(
+            refine_file_bytes::<Arc<[u8]>>(
                 original,
                 PathOperationResult::Error(io(PathIoErrorKind::PermissionDenied, Some(13)))
             ),

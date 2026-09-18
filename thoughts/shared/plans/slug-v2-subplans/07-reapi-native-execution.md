@@ -54,6 +54,17 @@ Other callback families, native Cc providers/toolchains, conditional spilling
 and resolved Spawn execution staging remain open. These components do not widen the bounded
 FileWrite executor or bypass `ValidatedActionClosure`.
 
+Ordinary source/tool inputs have a fixed-memory content observation prerequisite
+in WP-7-27: Core streams SHA-256 with a 64 KiB buffer, retaining only a 40-byte
+digest/size fact. Workspace's PathFileDigestObservationKey owns the resolved
+path frontier plus digest; PathFileDigestKey projects content equality. Need is
+transient, size disagreement/read failures are explicit, and request validation
+compares content observations. This is not an upload capability: consumers must
+validate the complete frontier and transfers must verify bytes against the digest.
+Repository/artifact routing, generated/tree inputs, transfer and resolved Spawn
+activation remain required. Pinned Bazel input FileNodes use executable=true;
+host permissions are not a substitute for that wire policy.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

@@ -207,6 +207,7 @@ fn operation_name(operation: PathObservationOperation) -> &'static str {
         PathObservationOperation::Lstat => "Lstat",
         PathObservationOperation::ReadLink => "ReadLink",
         PathObservationOperation::FileBytes => "FileBytes",
+        PathObservationOperation::FileDigest => "FileDigest",
         PathObservationOperation::DirectoryEntries => "DirectoryEntries",
         PathObservationOperation::WindowsLongPath => "WindowsLongPath",
         PathObservationOperation::WindowsOptionPathLongName => "WindowsOptionPathLongName",

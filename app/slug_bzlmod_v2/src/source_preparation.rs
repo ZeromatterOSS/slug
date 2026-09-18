@@ -6080,6 +6080,7 @@ async fn drive_host_repository_source_from_resolved(
         | PathObservationResult::ReadLink(_)
         | PathObservationResult::DirectoryEntries(_)
         | PathObservationResult::WindowsLongPath(_)
+        | PathObservationResult::FileDigest(_)
         | PathObservationResult::WindowsOptionPathLongName(_) => {
             unreachable!("FileBytes demand must return a FileBytes observation")
         }
@@ -7319,6 +7320,7 @@ fn finish_module_source_patch_file(
         | PathObservationResult::ReadLink(_)
         | PathObservationResult::DirectoryEntries(_)
         | PathObservationResult::WindowsLongPath(_)
+        | PathObservationResult::FileDigest(_)
         | PathObservationResult::WindowsOptionPathLongName(_) => {
             unreachable!("FileBytes demand must return FileBytes")
         }

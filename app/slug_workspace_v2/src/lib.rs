@@ -21,9 +21,16 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use starlark_map::sorted_map::SortedMap;
 
+mod path_file_digest;
 mod path_observation;
 mod path_resolution;
 
+pub use path_file_digest::FileContentDigest;
+pub use path_file_digest::ObservedPathFileDigest;
+pub use path_file_digest::PathFileDigest;
+pub use path_file_digest::PathFileDigestError;
+pub use path_file_digest::PathFileDigestKey;
+pub use path_file_digest::PathFileDigestObservationKey;
 pub use path_observation::EmptyPathObservationNeed;
 pub use path_observation::InvalidPathDirectoryName;
 pub use path_observation::NeedPathObservations;

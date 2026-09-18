@@ -1,147 +1,127 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-26-m7a-cc-immutable-collections-r1
+Packet: WP-7-27-m7a-streamed-input-digests-r1
 Status: accepted; independent final ACCEPT; ready to integrate
 
-## Outcome and evidence
+## Outcome and compatibility
 
-Run pinned rules_cc public static/PIC library and linker-input constructors into
-retained Rustc native-link Args using their real provider values. Inspection
-found these are Starlark providers already in the authentic fixture closure;
-`cc_internal.freeze` accepting only empty lists is the immediate missing bridge.
-Do not invent native Cc constructors or flatten provider fields into structs.
+Produce observation-backed SHA-256/size facts for ordinary compiler/toolchain
+files without retaining their bytes in DICE. This is the source-input prerequisite
+for the production CLI Rustc/process-wrapper closure recorded in
+bootstrap-readiness.md, ordinary source/generated/tree input transfer row, and Stage 7/11 bounded transfer
+contracts. It does not activate Spawn execution or upload unverified host files.
+Exact SHA-256 of observed bytes; Slug-native observation/request identity and
+error behavior. Generated artifacts, tree expansion, uploads and execution remain
+required future work. No claim of a stable historical filesystem snapshot.
 
-Bazel 9.2 commit 8220c6198837d5c13d53fea211cf3282aa12408a:
-CcStarlarkInternal.freeze copies Dict shallowly to an immutable dictionary,
-copies Iterable shallowly to an immutable list, and returns other values.
-StarlarkList.copyOf/immutableCopyOf and Dict.immutableCopyOf preserve contents;
-both checkHashable methods reject direct hashing even for frozen containers.
-StarlarkInfoWithSchema.isImmutable checks exported provider fields. Existing
-Slug structural provider/depset hashing and AnalysisValueLowerer remain owners.
-Pinned rules_cc 0.2.17 create_library_to_link.bzl, create_linker_input.bzl and
-cc_info.bzl in the existing source-pinned fixture establish constructor behavior.
+Pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
+vfs/DigestUtils.java getDigestWithManualFallback/manuallyComputeDigest owns file
+content digests; remote/merkletree/MerkleTreeComputer.java addFile (1032-1050)
+uses content digest and always executable input nodes. This packet creates no
+REAPI nodes and does not project host executable bits. Source anchors describe
+content identity, not a port of Bazel's process-global digest cache.
 
-Admit list/tuple-to-list and dict-to-dict shallow immutable copies plus
-non-iterable Starlark-value pass-through needed by these constructors. Java
-string/bool values are rejected by the pinned StarlarkValue signature; local
-range/set iterable conversion remains unsupported and rejects explicitly. Preserve order, container
-type, element identity and nested mutability. Direct list/dict hashing remains
-unsupported as in Bazel. Exact admitted collection operations/mutation rejection;
-conservative rejection of structurally mutable nested provider hash inputs and
-unsupported iterable forms is Slug-native. Paths retain existing Slug-native
-identity; no change to exact configuration/output bytes.
+## Ownership and contract
 
-## Ownership and representation
+Add FileDigest to the existing PathObservationOperation/Result family with a
+fixed-size SHA-256 plus actual byte count. Core's OS observer reads through a
+fixed-size buffer and returns the digest; no host I/O occurs inside DICE.
+Unix and Windows use std File/Read with their existing error-classification
+policies. Reads retry Interrupted at the individual operation, count actual
+bytes with checked accumulation and reject sizes above i64::MAX (the REAPI
+signed-size domain). The fixed-size fact constructor enforces that bound.
+Reject non-regular opened files before reading; Unix uses nonblocking open
+to avoid a FIFO replacement hanging the observer. No file-sized allocation. Observation
+completion closes the handle; synchronous scratch is released on return.
 
-Use separate read-only evaluator collection variants under existing ListGen /
-ListLike and DictGen / DictLike abstractions; do not add a flag to every normal
-list/dict or reuse the hashable dictionary variant. Boxed immutable list slices
-and SmallMap dictionary storage have Trace/Freeze/Allocative ownership. ListRef,
-DictRef, collection operations and module freeze must recognize these values.
-No unsafe reinterpretation of live values as FrozenValue. Review optimized VM
-paths: construction-only mutation may use unchecked mutable access; ordinary
-mutation must reject read-only values. Keep generic algorithms at their current
-owners and isolate additional representations in cohesive files where possible.
+Workspace owns PathFileDigestObservationKey over namespace/logical path. It
+uses ResolvedPathObservationKey, demands the resolved physical file digest and
+retains the complete resolution-plus-digest observation frontier. Missing,
+wrong-kind, symlink cycle, read failure, and resolution/read disappearance retain
+existing path error semantics; reuse PathFileBytesError as the shared file-read
+error payload rather than copying its error classification. A typed digest
+error adds size disagreement between resolution metadata and bytes actually read.
+PathFileDigestKey projects the content result from this observed producer; equal
+SHA-256/size cuts off semantic dependents even when resolution metadata changes,
+while the observed producer preserves certificate changes. Need stays invalid
+and never equals itself. Frontier construction errors remain explicit.
 
-Collections live in evaluator/module heaps; configured lowering copies through
-the existing shared AnalysisValueLowerer, preserving all provider fields and
-depset alias identity. No evaluator value enters DICE or action storage, no
-new cache, DICE key, lock or alternative semantic identity. Module freeze and
-GC preserve collection content/alias lifetime. Mutable nested values remain
-mutable through a shallow copy; they cannot silently acquire a stable hash.
+Use existing immutable observation epochs, DICE keys and Allocative/Dupe facts.
+DICE api Key equality/validity and existing path_resolution tests are the DICE
+reference. No new cache, global registry, lock, retained file bytes or evaluator
+borrow. Fixed digest facts are DICE-retained semantic memory; epoch slices share
+existing Arc facts. Request owners must validate the returned frontier before
+publication; later transfers must reverify bytes against the digest. This packet
+cannot itself authorize a mutable path for upload. Existing request validation
+must recognize digest observations and reject changed/error observations. Digest
+observations count as content evidence for the existing metadata revalidation
+policy; kind/size checks remain, same-content node-id/mtime changes are harmless.
 
-Full CcInfo publication exposed its native empty HeaderInfo leaf. The pinned
-CcCompilationContext.HeaderInfo (lines 558, 744-758) owns an identity token,
-equals/hash by that token, and is immutable. Retain a typed Arc-backed
-CcHeaderInfoOccurrence through the existing live empty HeaderInfo, module
-freeze, AnalysisValue lowering and materialization. Starlark/direct retained
-Eq/Hash use token identity; PublicationEqState uses a bidirectional occurrence
-mapping to preserve alias partitions across recomputation. Fresh-versus-shared
-occurrence behavior follows pinned source; token storage/publication identity
-is Slug-native, not Bazel SymbolGenerator bytes. No counter, zero
-marker, provider/struct surrogate or pointer-derived persistent identity.
-Nonempty HeaderInfo construction remains unsupported; no hidden nonempty state
-can enter the empty producer. Prove native equality/hash, distinct/shared
-occurrences and materialization round-trip plus full CcInfo publication.
+## Scope and proof
 
-## Scope and validation
+Allowlist: workspace src/{path_observation,path_resolution,lib}.rs plus new
+path_file_digest.rs and focused tests; Core runtime/path_observation.rs plus
+new path_observation/file_digest.rs and focused tests, repository_io.rs validation
+exhaustiveness; bzlmod host_file.rs, repository_ignore.rs,
+source_preparation.rs and source_preparation/repository_source_observation/
+registration_diagnostic.rs only new exhaustive observation branches; other
+existing exhaustive matches only if required by compilation. Canonical, manifest,
+Stage 7 and Stage 9 owner summaries. Large existing files get dispatch only;
+new cohesive modules own digest algorithm/projection/tests. No upstream fixture
+copy or new oracle fixture; pinned-source regression plus standard SHA-256 vectors.
 
-Allowlist: starlark-rust/starlark/src/values/types/{list,dict,structs} and their
-module export files for read-only allocation/views and structural traversal;
-app/slug_loading_v2/src/cc_common.rs plus focused tests (new module preferred)
-and obsolete empty-only rejection assertions in host_package_load_tests.rs;
-Build API src/{cc_header_info.rs,analysis_value.rs,lib.rs} and tests/analysis_value.rs,
-loading lib.rs exports, analysis src/analysis_value.rs and focused round-trip test;
-analysis tests/rustc_map_each/{mod.rs,subject.bzl} and fixture.toml; canonical,
-manifest, Stage 6/9/bootstrap summaries. The independently reviewed native
-HeaderInfo leaf is the documented lowering gap;
-no other production analysis/action changes.
-No copied upstream body or fixture closure growth. Existing large files receive
-bounded dispatch; independent design and final review required.
+Discriminators: empty/abc/multi-buffer digest+size, bounded reads, interrupted
+and failing reads, real native observer regular/missing/directory/symlink paths;
+same-DICE A/B/A digest changes, symlink retarget with equal content but different
+frontier, missing/delete/recreate, wrong kind/read error/size mismatch, Need
+validity and semantic equality cutoff. Protect an existing file-bytes resolver
+and observer regression. Unix host execution plus compile Windows observer if
+the installed target is available; otherwise platform-independent scripted error
+classification and document unavailable native Windows compilation.
 
-Prove list/dict type, ordering, equality, indexing, slicing, iteration, ordinary
-copy/concat behavior, every mutator category, direct hash rejection, shallow
-alias/mutation, module freeze/GC and provider/depset structural behavior. Real
-public cc_common static/PIC/alwayslink library -> linker_input -> linking_context
--> CcInfo -> Rustc builder proof checks retained providers, exact argv/param
-bytes and same-DICE edit/restoration. Existing struct-backed dynamic/indirect
-proof stays a regression; no claim to dynamic solib/LTO/toolchain execution.
+Compile separately using pinned nightly, each preparation bounded to 60s.
+Preflight exact subsecond selectors. Checks over a few seconds run infrequently;
+>roughly 30s tests need strict necessity, no such tests planned. Direct bzlmod,
+loading, analysis and Core compile coverage catches enum consumers; no full
+suite, daemon, Bazel build, compiler action or live transport. Format/diff/archive/
+plan checks. Independent design and final review required for new DICE boundary.
+Resolve observer/error/certificate contradictions before activation. Overall
+M7A/bootstrap remains open after this prerequisite.
 
-Compile owner/dependents separately with pinned nightly under 60s preparation
-caps. Preflight exact selectors, run focused expected-subsecond tests; tests
-over a few seconds are infrequent and over roughly 30s require strict necessity.
-Check direct analysis/query/REAPI consumers, rustfmt, diff/archive/plan. Do not run
-full-suite, daemon, compiler action, live transport or Bazel build.
-
-Resolve any immutable representation/VM safety contradiction before activation.
-A constructor reaching toolchain/solib/LTO behavior cannot be faked or bypassed;
-retain it as an explicit required future dependency. Full M7A requires remaining
-Rustc callbacks, Cc toolchain support and resolved Spawn/input execution.
-
-Predecessor WP-7-25 at 1dbb0ad07 is pushed: native-link Args with imported-source
-authentication and full tuple/publication identity; nine focused tests and
-independent final ACCEPT. The overall bootstrap goal remains open.
+Predecessor WP-7-26 accepted and pushed at 8af36b3d8: public rules_cc static/PIC
+providers, shallow immutable collections and full CcInfo/HeaderInfo retention;
+focused tests and independent final ACCEPT. Receipt is in that commit's manifest.
 
 ## Acceptance receipt
 
-The unchanged public rules_cc static/PIC and alwayslink library constructors,
-linker-input and linking-context constructors, and CcInfo initializer now feed
-real providers to the unchanged Rustc builder. Full CcInfo publication retains
-its empty native HeaderInfo. The proof changes an otherwise unused linker input
-(same argv, different retained result), restores it, reloads/restores cc_info.bzl
-(new HeaderInfo token, equal publication), and rejects invalid library extensions.
-Exact native argv and forced multiline parameter bytes are asserted.
+Core test compilation covers production bzlmod/loading/analysis/query consumers
+of the extended enums. Initial workspace preparation caught test-only misuse
+of PathOutcome (it intentionally has no PartialEq); assertions now use complete_eq.
+Initial Core preparation caught a test module path and a scripted enum match;
+only those tests were corrected and the digest final-error branch was added to
+the existing dispatch proof. Largest preparation 54.41s, below the skill's 60s
+cap; final workspace preparation 3.40s and Core preparation 22.75s. The installed
+pinned nightly binaries were used because rustup's snap launcher cannot run here.
 
-Separate pinned-nightly preparation operations stayed within 60s: the largest
-observed test preparation was 47.35s; final API, loading and analysis preparation
-finished in 2.30s, 6.12s and 11.15s respectively. The unavailable rustup snap
-launcher used the previously verified direct pinned binaries. Initial focused
-checks caught and corrected the special-list allocation flag and test-harness
-source-path/scope/GC/TupleRef mistakes. Only affected gates were repeated.
-Exact-selector preflight and final execution passed:
+Exact preflight and execution: workspace 4/4 in 0.064s including semantic
+cutoff, full frontier, A/B/A, delete/recreate, errors and the existing byte read
+projection. Core 8/9 passed in 0.008s; the existing native byte regression failed
+at UnixListener::bind with EPERM in the sandbox. The sole affected selector
+passed 1/1 in 0.01s after approved sandbox escalation. All nine Core gates are
+now proved, including standard SHA-256 vectors, bounded/short/interrupted reads,
+partial-read failure, native file/link/missing/directory/FIFO dispatch, digest
+revalidation, existing byte error/dispatch and Windows error-classification.
+Only Linux's Rust target is installed. Native Windows compilation was unavailable;
+the shared streaming algorithm and portable Windows classifier tests pass, with
+native Windows execution remaining unverified. No broad suite, daemon, build,
+compiler action, live service or upstream fixture growth. Receipts: target/wp727/.
 
-- Loading 7/7 in 0.01s: reads, all mutator categories, shallow aliases, direct
-  hash rejection, GC (automatic/disabled/forced), module freeze/cycle,
-  provider/depset hash, native HeaderInfo identities and iterable/scalar negatives.
-- Build API 3/3 in 0.00s: HeaderInfo occurrence/publication aliases (including
-  cross-provider pairs), prior provider alias and frozen-container barriers.
-- Analysis unit 1/1 in 0.00s: native type, fields, hash/alias preservation and
-  lower/materialize/lower round-trip.
-- Authentic analysis 2/2 in 0.55s: public CcInfo/Rustc proof and prior native-link
-  callback/source restoration regression.
+Format, diff, archive and plan checks pass. Packet/review wall time was not
+separately measured. This advances fixed-memory ordinary input observation, not
+source artifact routing, input transfer or Spawn execution. Overall goal open.
 
-`cargo check -p slug_query_v2 -p slug_reapi_v2` exited 0 in 18.63s with existing
-warnings. Rustfmt, diff, archive and plan checks pass. Receipts: `target/wp726/`.
-Packet/review wall time was not separately measured. No broad suite, daemon,
-compiler action, live transport or Bazel build ran.
-
-Fixture hygiene review reused the same 54 pinned source files plus the recorded
-reused source/generated proxy; all 54 source digests/lengths match, no copied
-implementation or load-closure file was added. Added proofs reuse the existing
-workspace constructor, provider lowerer and argument builder.
-
-Independent final review ACCEPT confirmed shallow collection semantics,
-Freeze/GC ownership, native occurrence identity, publication alias bijection and
-finite source evidence. This advances static/PIC Cc provider production and
-retention. Nonempty HeaderInfo, dynamic solib/LTO operations, Cc toolchains,
-remaining Rustc callbacks and resolved Spawn/input execution still block M7A.
+Independent final ACCEPT confirmed the actual bounded observer, signed-size
+constructor, complete observed frontier, content-only equality cutoff, error
+retention and existing validation policy. No material blocker; the reviewer
+reused recorded evidence and did not rerun tests. Windows native validation is
+the explicit platform limitation, and this checkpoint makes no execution claim.

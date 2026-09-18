@@ -1094,7 +1094,7 @@ fn normalize_retained_roots(
 }
 
 #[allow(dead_code)]
-fn validation_epoch_is_dirty(
+pub(super) fn validation_epoch_is_dirty(
     previous: &[(PathObservationDemand, PathObservationResult)],
     observed: &PathObservationEpoch,
 ) -> bool {
@@ -1104,7 +1104,7 @@ fn validation_epoch_is_dirty(
                 demand,
                 prior_result,
                 observed,
-                previous_has_file_bytes(previous, demand),
+                previous_has_file_content(previous, demand),
             )
         })
     })
@@ -1138,20 +1138,23 @@ fn validation_is_dirty(
                 demand,
                 prior_result,
                 observed,
-                previous_has_file_bytes(previous, demand),
+                previous_has_file_content(previous, demand),
             )
         })
 }
 
 #[allow(dead_code)]
-fn previous_has_file_bytes(
+fn previous_has_file_content(
     previous: &[(PathObservationDemand, PathObservationResult)],
     demand: &PathObservationDemand,
 ) -> bool {
     previous.iter().any(|(candidate, _)| {
         candidate.namespace() == demand.namespace()
             && candidate.path() == demand.path()
-            && candidate.operation() == PathObservationOperation::FileBytes
+            && matches!(
+                candidate.operation(),
+                PathObservationOperation::FileBytes | PathObservationOperation::FileDigest
+            )
     })
 }
 
@@ -1160,18 +1163,22 @@ fn observation_is_dirty(
     demand: &PathObservationDemand,
     previous: &PathObservationResult,
     observed: &PathObservationResult,
-    has_file_bytes: bool,
+    has_file_content: bool,
 ) -> bool {
     if observed.operation() != demand.operation() || observation_has_error(observed) {
         return true;
     }
     match (previous, observed) {
         (PathObservationResult::Lstat(previous), PathObservationResult::Lstat(observed)) => {
-            lstat_is_dirty(previous, observed, has_file_bytes)
+            lstat_is_dirty(previous, observed, has_file_content)
         }
         (
             PathObservationResult::FileBytes(previous),
             PathObservationResult::FileBytes(observed),
+        ) => previous != observed,
+        (
+            PathObservationResult::FileDigest(previous),
+            PathObservationResult::FileDigest(observed),
         ) => previous != observed,
         (PathObservationResult::ReadLink(previous), PathObservationResult::ReadLink(observed)) => {
             previous != observed
@@ -1204,6 +1211,9 @@ fn observation_has_error(result: &PathObservationResult) -> bool {
         PathObservationResult::FileBytes(result) => {
             matches!(result, PathOperationResult::Error(_))
         }
+        PathObservationResult::FileDigest(result) => {
+            matches!(result, PathOperationResult::Error(_))
+        }
         PathObservationResult::DirectoryEntries(result) => {
             matches!(result, PathOperationResult::Error(_))
         }
@@ -1216,7 +1226,7 @@ fn observation_has_error(result: &PathObservationResult) -> bool {
 fn lstat_is_dirty(
     previous: &PathOperationResult<PathLstat>,
     observed: &PathOperationResult<PathLstat>,
-    has_file_bytes: bool,
+    has_file_content: bool,
 ) -> bool {
     match (previous, observed) {
         (PathOperationResult::Missing, PathOperationResult::Missing) => false,
@@ -1227,7 +1237,7 @@ fn lstat_is_dirty(
             match previous.kind() {
                 PathNodeKind::RegularFile | PathNodeKind::SpecialFile => {
                     previous.size() != observed.size()
-                        || (!has_file_bytes
+                        || (!has_file_content
                             && (previous.node_id() != observed.node_id()
                                 || previous.mtime_millis() != observed.mtime_millis()))
                 }

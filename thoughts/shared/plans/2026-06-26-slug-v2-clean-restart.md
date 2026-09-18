@@ -29,14 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-26-m7a-cc-immutable-collections-r1
+Packet: WP-7-27-m7a-streamed-input-digests-r1
 Status: accepted; independent final ACCEPT; ready to integrate
 
-The accepted checkpoint runs public rules_cc static/PIC constructors into the
-real Rustc builder, retains full CcInfo and native empty HeaderInfo occurrence
-identity, and supplies shallow immutable collection copies. Thirteen focused
-tests and direct query/REAPI checks pass. Toolchains and resolved Spawn execution
-remain required; the manifest owns the finite contract and acceptance receipt.
+The accepted checkpoint produces observation-backed, streamed SHA-256/size
+facts for ordinary compiler/toolchain inputs without retaining entire binaries
+in DICE. Thirteen focused checks are proved; independent final ACCEPT confirms
+content equality, complete provenance and request revalidation. Native Windows
+compilation remains unverified because the target is unavailable. Toolchains,
+source/generated input transfer and resolved Spawn execution remain required.
 
 ### Earlier generated-input receipt
 

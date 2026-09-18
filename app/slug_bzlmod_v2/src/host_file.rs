@@ -204,6 +204,7 @@ impl Key for HostFileBytesKey {
                 | PathObservationResult::ReadLink(_)
                 | PathObservationResult::DirectoryEntries(_)
                 | PathObservationResult::WindowsLongPath(_)
+                | PathObservationResult::FileDigest(_)
                 | PathObservationResult::WindowsOptionPathLongName(_) => {
                     unreachable!("FileBytes demand must return a FileBytes observation")
                 }

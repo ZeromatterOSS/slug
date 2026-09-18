@@ -863,7 +863,8 @@ impl Key for ResolvedPathObservationKey {
         value.is_complete()
     }
 }
-/// A byte-projection failure containing only semantic identity.
+/// A file-content projection failure containing only semantic identity.
+/// Shared by byte and digest reads.
 #[derive(Debug, Clone, Allocative, Dupe)]
 pub enum PathFileBytesError {
     Observation {
@@ -981,7 +982,10 @@ impl PathFileBytesError {
         }
     }
 
-    fn from_resolution(logical_path: NormalizedAbsolutePath, error: PathResolutionError) -> Self {
+    pub(crate) fn from_resolution(
+        logical_path: NormalizedAbsolutePath,
+        error: PathResolutionError,
+    ) -> Self {
         match error {
             PathResolutionError::Observation { demand, error, .. } => Self::Observation {
                 logical_path,
@@ -1121,6 +1125,7 @@ impl Key for PathFileBytesKey {
                 | PathObservationResult::ReadLink(_)
                 | PathObservationResult::DirectoryEntries(_)
                 | PathObservationResult::WindowsLongPath(_)
+                | PathObservationResult::FileDigest(_)
                 | PathObservationResult::WindowsOptionPathLongName(_) => {
                     unreachable!("FileBytes demand must return a FileBytes observation")
                 }
@@ -1476,6 +1481,7 @@ async fn compute_directory_listing(
         | PathObservationResult::ReadLink(_)
         | PathObservationResult::FileBytes(_)
         | PathObservationResult::WindowsLongPath(_)
+        | PathObservationResult::FileDigest(_)
         | PathObservationResult::WindowsOptionPathLongName(_) => {
             unreachable!("DirectoryEntries demand must return a DirectoryEntries observation")
         }
