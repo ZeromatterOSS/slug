@@ -1019,6 +1019,22 @@ mod tests {
             .unwrap();
         assert_eq!(streamed_read, streamed.data());
 
+        let reader_bytes = b"verified reader CAS proof";
+        let reader_digest = ReapiDigest::of_bytes(reader_bytes);
+        cache
+            .upload_reader_verified(&reader_digest, reader_bytes.as_slice())
+            .await
+            .unwrap();
+        let mut reader_download = Vec::new();
+        cache
+            .read_blob_verified(&reader_digest, |chunk| {
+                reader_download.extend_from_slice(chunk);
+                Ok(())
+            })
+            .await
+            .unwrap();
+        assert_eq!(reader_download, reader_bytes);
+
         assert_eq!(execution.output_blobs["pkg/write_file.txt"], content);
         let expected_digest = ReapiDigest::of_bytes(content);
         assert_eq!(

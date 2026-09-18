@@ -67,6 +67,13 @@ staging, generated/tree inputs, transfer and resolved Spawn activation remain
 required. Pinned Bazel input FileNodes use executable=true;
 host permissions are not a substitute for that wire policy.
 
+WP-7-29 adds the cache leaf's `upload_reader_verified` for ordinary file content:
+bounded AsyncRead chunks, local EOF/size/SHA-256 verification before finish_write,
+and exact remote committed-size checking. Producer and RPC cancellation are
+coupled without a spawned reader; early remote responses fail closed. Core still
+owns observed source opening, request-certificate validation and selecting missing
+CAS content. This transfer API alone does not authorize Spawn execution.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

@@ -79,6 +79,13 @@ digest, malformed CAS response, interrupted Write-status and cross-domain
 ActionKey proof corrections. General cache-only writes and standalone release
 remain the later slices below.
 
+WP-7-29 adds verified AsyncRead uploads without retaining a complete ReapiBlob.
+The caller retains source/provenance and missing-blob policy; the leaf owns a
+bounded channel, SHA-256 verification and ByteStream completion. It drops the
+reader on cancellation or early RPC completion and publishes success only after
+local verification and exact committed size. Resumption and compression remain
+unadmitted; interrupted RPC status is diagnostic only.
+
 ## Implementation slices
 
 ### 11.1 Bootstrap cache core — M7A/M8

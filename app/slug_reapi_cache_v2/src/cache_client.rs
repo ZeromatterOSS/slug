@@ -21,6 +21,8 @@ use crate::ReapiDigest;
 use crate::proto;
 use crate::proto::google::bytestream;
 
+mod reader_upload;
+
 #[derive(Debug, Clone, Copy)]
 pub struct TransferPolicy {
     pub max_batch_bytes: usize,
@@ -41,13 +43,14 @@ pub enum CacheError {
     Transport(tonic::Status),
     Protocol(String),
     Sink(String),
+    Source(String),
 }
 
 impl std::fmt::Display for CacheError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Transport(error) => write!(f, "{error}"),
-            Self::Protocol(error) | Self::Sink(error) => f.write_str(error),
+            Self::Protocol(error) | Self::Sink(error) | Self::Source(error) => f.write_str(error),
         }
     }
 }
@@ -149,6 +152,51 @@ impl CacheClient {
             }
         }
         Ok(())
+    }
+
+    /// Upload a caller-owned reader with bounded buffers. EOF, size and SHA-256
+    /// must match before finalizing the write. The caller owns source provenance
+    /// and missing-blob policy; this method neither opens paths nor retries them.
+    /// Cancellation drops the reader. An early server response fails closed.
+    pub async fn upload_reader_verified<R>(
+        &self,
+        digest: &ReapiDigest,
+        reader: R,
+    ) -> Result<(), CacheError>
+    where
+        R: tokio::io::AsyncRead + Unpin + Send,
+    {
+        let resource = self.resource_name(digest, true);
+        let mut client =
+            bytestream::byte_stream_client::ByteStreamClient::new(self.channel.clone());
+        let result = reader_upload::upload(
+            reader,
+            digest,
+            resource.clone(),
+            self.policy.chunk_bytes,
+            |requests| async {
+                let requests = stream::unfold(requests, |mut requests| async {
+                    requests.recv().await.map(|request| (request, requests))
+                });
+                client
+                    .write(requests)
+                    .await
+                    .map(tonic::Response::into_inner)
+                    .map_err(CacheError::Transport)
+            },
+        )
+        .await;
+        // The coordination future has already dropped its producer and reader.
+        // Status is diagnostic only, never a substitute for a verified upload.
+        match result {
+            Err(CacheError::Transport(error)) => Err(interrupted_write_error(error, || {
+                client.query_write_status(bytestream::QueryWriteStatusRequest {
+                    resource_name: resource,
+                })
+            })
+            .await),
+            other => other,
+        }
     }
 
     async fn batch_upload(&self, blob: &ReapiBlob) -> Result<(), CacheError> {

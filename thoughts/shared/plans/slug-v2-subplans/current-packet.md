@@ -1,171 +1,141 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-28-m7a-repository-source-paths-r1
+Packet: WP-7-29-m7a-streamed-cas-upload-r1
 Status: final ACCEPT; checkpoint ready to commit
 
 ## Outcome and evidence
 
-Ordinary source-input staging exposed a prerequisite: AnalysisArtifact::Source
-currently renders package/target for every repository. External compiler roots,
-rlibs, native libraries and tools therefore lose their repository prefix. Fix the
-shared artifact path owner so File/Args/Spawn consumers all render repository-aware
-paths. Independent review found that analysis also rejects external SourceFile
-nodes and assumes main-workspace paths. Admit materialized external source files
-through the existing canonical repository/materialization path owner in this
-cohesive checkpoint; preserve the authentic external-root acceptance gate. Preserve distinct execution and short paths, including rules_rust's
-ambiguous-library lookup which currently conflates them.
+Add CacheClient::upload_reader_verified(expected_digest, reader), a bounded-memory
+ByteStream upload for ordinary compiler/toolchain inputs. Existing upload_missing
+requires a complete ReapiBlob, so streamed digest observations alone cannot avoid
+file-sized transfer ownership. Demanded by bootstrap-readiness ordinary source/
+generated input transfer and shared cache core rows for //app/slug_cli_v2:slug.
+This is the next transfer prerequisite after WP-7-27 digest observations and
+WP-7-28 repository-aware source admission. Artifact digest staging, generated/tree
+inputs and validated-closure Spawn activation remain required; do not admit a
+family or claim bootstrap from this leaf boundary.
 
-Demanded by the production external crate/toolchain closure in bootstrap-readiness
-(rows rules_rust evaluation, Spawn and ordinary input transfer). Pinned Bazel 9.2
-8220c6198837d5c13d53fea211cf3282aa12408a: RepositoryName.java getExecPath(false)
-and getRunfilesPath; Artifact.java getDirname (384-395), getExecPathString
-(526-528), getRunfilesPath (636-666). Existing pinned rules_rust 0.73.0
-rust/private/rustc.bzl portable_link_flags (2654-2657) looks up ambiguous libraries
-by artifact.short_path; alwayslink arguments use execution path.
-ConfiguredTargetFactory.java InputFile branch (316-335) supplies the input file
-execution path and owning package source root to the source artifact factory.
+Pinned protocol: slug_reapi_cache_v2/PROVENANCE.md, google/bytestream/bytestream.proto
+Write/WriteRequest/WriteResponse (54-74, 120-161); resource name, monotonically
+contiguous offsets, finish_write exactly once, committed size. Bazel 9.2 commit
+8220c6198837d5c13d53fea211cf3282aa12408a ByteStreamUploader.java
+startAsyncUpload and checkCommittedSize, Chunker.java file/input stream chunking.
+Exact uncompressed SHA-256 bytes/offsets and full committed size are admitted;
+Slug-native source verification/cancellation policy requires local EOF, digest
+and size verification plus RPC success. Resumption, compression and early-server
+success without completed local verification remain deferred/fail closed.
 
-Admit default nonsibling source layout: main source path/short_path is
-package/target; external execution path is external/<canonical repo>/package/target
-and short_path is ../<canonical repo>/package/target. Empty package handling and
-dirname are exact for supplied canonical repository identities. Canonical repo
-naming remains the existing Slug-native owner. Generated artifact output paths
-and existing short-path projection remain Slug-native, not exact root extraction.
-Sibling layout, path mapping and derived-root short-path parity remain deferred.
-Do not infer a source's host repository root from its rendered execution path.
+## Owner, integrity and lifetime
 
-## Ownership and invariants
+The graph-independent cache leaf owns protocol and verified transfer. Caller
+supplies an AsyncRead and validated expected ReapiDigest; no path, artifact, DICE,
+configuration or source-certificate type enters the leaf. Core will own opening
+observed source files and validating request provenance before publication. A
+matching CAS digest does not validate the source route or requested revision.
 
-AnalysisArtifact's existing canonical Source label remains identity; paths are
-scratch projections, never new retained identity/cache/DICE state. Implement
-execution and short-path projection there, reuse from AnalysisArtifactValue and
-native-link recipe. Preserve main and derived behavior and File hashing/equality,
-retained input identity, argument ordering/deduplication, forced parameter bytes.
-Do not weaken provider identity or imported-callback authentication. Native-link
-lookup uses short_path, but directories and alwayslink flags use execution paths.
-No new root registry, string parsing of host roots, dependency, lock or storage.
-Keep scratch String/Cow allocation and existing Arc/Allocative carriers.
+Use a private reader_upload module, a bounded one-slot channel, and an explicit
+producer/RPC select state machine in the calling task; no spawned producer or
+detached reader. Poll the producer first when both futures are ready. Producer
+error cancels the RPC; RPC error cancels/drops the producer before running the
+existing QueryWriteStatus diagnostic. RPC success before producer EOF/hash/size
+verification and final send cancels/drops the reader and fails closed. Only
+verified producer completion followed by matching committed-size RPC success
+returns Ok; never join a stalled producer after an early RPC response. Reserve channel capacity before reading. One bounded data chunk plus
+one queued chunk (and bounded transport buffering) replace file-sized retention;
+SHA-256 state, offsets and resource strings are transfer-local scratch. No new
+cache/interner/retained graph, dependency or lock. Vec owns each protobuf payload;
+existing Tokio/futures/SHA-256 utilities suffice. No donor code or perf claim.
+Reader is owned by the operation; cancellation/error drops producer and reader,
+and cancels the request future. Channel/RPC state cannot outlive its transport
+cancellation beyond existing library internals.
 
-## External source routing owner
+Emit data chunks without finish_write. At EOF require exact length and SHA-256;
+only then emit one empty final request with finish_write=true at the full offset.
+Empty input emits a single resource-bearing final request. Bound reads to the
+remaining expected length plus one byte so growth fails promptly. Interrupted
+reads retry; short reads accumulate; source errors/truncation/growth/corruption
+must return errors and never send finish_write. Server committed size mismatch or
+RPC failure never succeeds. Preserve existing interrupted-write QueryWriteStatus
+diagnostic, without resuming or treating status as success. Existing inline
+ReapiBlob upload remains unchanged. Caller decides FindMissingBlobs/AC policy.
 
-Expose the existing Bzlmod HostRepositoryPathKey/ObservationKey and read-only
-result accessors for configured analysis. Their existing driver owns validated
-repository-relative paths, materialization request/Need, local Host versus
-immutable Materialization namespace, resolution and complete observation frontier.
-Do not add another path or materialization key. Analysis's new cohesive
-source_file module obtains HostCanonicalRepositoryLoadRouteKey/ObservationKey
-from workspace plus canonical repository and passes its retained source input
-to the existing path owner. Main sources reuse their existing resolver.
+## Scope and proof
 
-Widen external configured-target admission only to Null ExportedFile and the
-Null absent-target case that is still guarded by package_declares_source_label.
-Unrelated external target shapes stay closed. Only regular files become source
-nodes; missing/nonregular files keep existing diagnostics. Built-in catalog
-source files have no materialized host path and remain explicitly unsupported
-by this path owner, pending their immutable-source adapter; no fabricated root.
-This covers materialized local/registry/generated repositories supported by the
-existing route owner, without claiming generated action outputs are source files.
+Allowlist: cache_client.rs for bounded dispatch/error integration; new
+cache_client/reader_upload.rs and reader_upload/tests.rs; existing REAPI executor.rs
+NativeLink test only for an additional streamed-reader CAS round trip; canonical,
+manifest, Stage 7/11 architecture and Stage 9 compact utility disposition. No proto,
+Cargo/BUILD dependency, action semantic, CLI, daemon or backend implementation edit.
 
-Observed analysis must compute observed route/path producers and preserve Need.
-Match compute_configured_package_input: canonical-load-route outer errors become
-diagnostic AnalysisError (invalid analysis); the path producer outer
-ObservedPathFrontierError stays outer. Neither error becomes success. Analysis
-returns source semantics only, so both observed producers remain DICE dependencies
-for transitive capture; no combined observed result is exposed or invented. Core's existing
-transitive DICE observation capture/certificate mechanism remains the request
-owner; no detached reads or historical-host snapshot assumptions. Reuse existing
-path/materialization DICE tests and docs/developers/dice.md. Public visibility
-changes add no new retained graph representation, lock or lifecycle. Canonical
-route/materialization changes remain tracked dependencies even when the source
-artifact's rendered path is unchanged. Final request validation remains required.
+Focused deterministic tests drive the same producer/RPC coordination helper used
+by the public method: tiny chunks, empty input, short/interrupted reads, exact
+resource/offset/finish bytes; corruption/short/extra/read error never finish;
+wrong committed size, transport failure and early RPC success; blocked source cancellation and
+reader drop; stalled RPC backpressure bounds reader demand. No sleeps needed.
+Preserve existing inline ByteStream/error tests. Extend the existing ignored
+NativeLink FileWrite test with a real public-reader upload/download using 3-byte
+chunks, preserving its cold execution/AC-hit proof. This is an existing selected
+subsecond harness, not a full suite. Exact ignored selector checked separately,
+backend supervised and cleaned; ordinary selectors use v2_test_preflight.py.
 
-## Scope and validation
+Independent design and final review for public async transfer/lifecycle boundary.
+Compile pinned nightly separately --no-run JSON, <=60s preparation operations.
+Focused tests expected subsecond; >few-second tests infrequent, >~30s need strict
+necessity. NativeLink startup/test supervisor <=15s operational cap, not a user
+cutoff. Direct REAPI and Core compile coverage. Format/archive/plan/diff checks.
+If backend preparation or runtime exceeds its cap, preserve evidence and diagnose;
+do not substitute pure unit checks for the declared public wire gate.
 
-Allowlist: Bzlmod source_preparation.rs/lib.rs for existing path-key visibility
-and read-only accessors only; analysis dice.rs (source dispatch/guard) and new
-dice/source_file.rs, existing root/source lifecycle tests and Bzlmod source_preparation_observation_tests.rs
-only for a public-wrapper discriminator if needed, plus fixture request
-helper for observed mode/missing-path injection; Build API analysis_value.rs,
-actions/rust_native_link_args.rs; loading
-subrule_invocation.rs File dispatch; focused API source-path tests (new module
-under existing actions tests and native_link_args test module); analysis
-rustc_map_each/{mod.rs,subject.bzl,external_sources.rs} and existing fixture.toml; canonical/manifest
-and Stage 6/7 summaries. Large source files receive bounded methods/dispatch;
-new proof is a cohesive test module where practical. No copied implementation
-or expanded top-level load closure. Same 54 pinned source files.
-
-Exact source path/short_path/dirname/basename cases for main/two external repos,
-empty/nested packages and slash-containing targets. Retained Args/Spawn executable
-and forced param bytes distinguish identical basenames across repositories.
-Native-library ambiguity keys prove short-path selection and reject execution-path
-aliasing; alwayslink/search directories retain execution paths. Authentic unchanged
-Rustc builder runs with external root File, checks File properties and rendered
-root argument, then source repo A/B/A restores the configured result in one DICE.
-Exercise observed and legacy analysis, external deletion/recreation despite a
-same-named main source, wrong-kind rejection and restored equality. Reuse owner
-tests for materialization namespace and source-path frontiers; add a direct
-public-wrapper gate if existing coverage does not prove the exposed boundary.
-Preserve existing root/dirname and native-link authentic proofs. A source label
-change must remain a semantic input even if contents/basenames agree.
-
-Independent design and final review required for shared public path behavior.
-Use pinned-nightly compile-only preparation <=60s each, exact-selector preflight,
-subsecond focused tests. Tests >few seconds infrequent and >roughly30s require
-strict necessity; no such test planned. Direct API/loading/analysis plus Core/
-query/REAPI compile coverage as required by this shared projection. No full suite,
-Bazel build, compiler action, daemon or live transport. Format/archive/plan/diff.
-Resolve any caller relying on package-relative artifact.path before activation;
-repository routing/input upload and resolved Spawn execution remain required.
-
-Predecessor WP-7-27 accepted/pushed at 994abb76c: streamed digest/size observation,
-complete provenance and semantic equality cutoff; 13 focused gates and independent
-final ACCEPT. Its Windows native validation remains explicitly unverified.
+Predecessor WP-7-28 accepted/pushed at 9ff7b172c: repository-aware source paths and
+materialized external SourceFile routing; 11 focused gates, direct dependents and
+independent final ACCEPT. M7A partial and M8 unproved.
 
 ## Acceptance receipt
 
-Independent revised design and final review ACCEPT. Baseline 994abb76c; candidate
-on review/wp728-repository-source-paths. Gate advanced: configured materialized
-external SourceFile admission and repository-aware File/Args/Spawn source path
-projection, including authentic pinned Rustc root rendering and observed routing.
-No retained representation, path/materialization key or imported source was added.
+Independent corrected design and final review ACCEPT. Gate advanced: public
+bounded, digest-verified reader-to-ByteStream upload with cancellation ownership
+and a real CAS round trip. Existing inline and FileWrite gates remain accepted.
 
-Validation used direct nightly-2025-09-14 binaries because the rustup snap launcher
-cannot run for this user. Cargo test preparation used --no-run --message-format=json
-and a 60-second operation cap; selected executables were preflighted exactly.
-Commands and local raw receipts are in target/wp728 (not committed):
+Baseline 9ff7b172c; review/wp729-streamed-cas-upload. Direct pinned
+nightly-2025-09-14 Cargo/rustc/rustdoc; JSON compile-only preparation under
+60-second operation caps. Local raw receipts: target/wp729 (not committed).
 
-- cargo test -p slug_build_api_v2 --test actions --no-run: 4.096s, then 1.246s
-  for a corrected expected user-link flag spelling. Two source_paths selectors,
-  external_libraries_use_short_keys_and_execution_paths, existing
-  file_dirname_recipes_preserve_identity_and_map_before_uniquify and
-  preferred_library_flags_and_directory_order_follow_pinned_source: 5/5 proved
-  across the initial four passing selectors and corrected single selector.
-  Runtime batches 0.004s and 0.001s.
-- cargo test -p slug_analysis_v2 --test starlark_rule --no-run: 51.334s, then
-  7.485s after supplying the empty-directory Lstat omitted by the fixture's
-  snapshot helper. Existing pinned_rustc_file_dirnames_preserve_order_and_generated_root
-  and pinned_rustc_native_link_flags_authenticate_imports_and_restore passed in
-  the initial 0.515s batch. Corrected
-  rustc_map_each::external_sources::external_source_roots_route_render_and_restore
-  passed in 0.590s. Together 3/3 proved, including legacy/observed A/B/A,
-  missing external despite main shadow, nonregular rejection and restoration.
-- cargo test -p slug_bzlmod_v2 --lib --no-run: 52.520s. Existing
-  source_preparation::tests::observation_tests selectors
-  observed_host_source_preserves_exact_symlink_epoch_and_isolates_families,
-  observed_host_source_preserves_immutable_and_file_error_prefixes and
-  observed_host_source_covers_path_need_route_error_and_reverse_isolation:
-  3/3 passed in 0.011s; public analysis use is also proved by the authentic gate.
-- cargo check -p slug_core_v2 -p slug_query_v2 -p slug_reapi_v2: exit 0 in
-  25.156s, including API/loading/analysis dependency compilation.
+- cargo test -p slug_reapi_cache_v2 --lib --no-run: first exit 101 in 1.055s
+  for a temporary test digest borrowed past its statement; corrected binding
+  preparation exit 0 in 1.429s. Seven exact ordinary selectors preflighted.
+  Initial batch had six passes and one mock-lifetime failure in 0.003s: the
+  early-RPC fixture dropped its receiver before polling the RPC. Keep the
+  receiver in that future; corrected preparation exit 0 in 1.415s and sole
+  affected selector re-preflighted/passed in 0.003s. No production correction.
+- Seven proved selectors: reader_upload::tests::{
+  verified_reader_offsets_eof_and_empty_finish_match_wire_contract,
+  source_corruption_truncation_growth_and_read_failure_never_finish,
+  wrong_committed_size_and_early_rpc_response_fail_closed,
+  stalled_rpc_backpressures_reads_and_cancellation_drops_reader,
+  source_failure_cancels_stalled_rpc}; existing cache_client::tests::{
+  tiny_chunks_keep_offsets_and_finish_once,
+  interrupted_write_queries_status_before_failing_closed}.
+- cargo test -p slug_reapi_v2 --lib --no-run: first preparation exited 124
+  at its 60s cap after successful cache/API/loading/analysis/query/Core library
+  artifacts. Verified terminal process/no surviving compiler. Retained those
+  artifacts; second preparation completed the REAPI executable, exit 0 in
+  1.646s. This supplies direct REAPI/Core compile coverage.
+- Exact ignored selector
+  executor::tests::nativelink_file_write_bytes_digest_and_materialized_mode_match_oracle
+  checked with --list --ignored --exact, then 1/1 passed in 0.340s. Existing
+  NativeLink backend binary, fresh temporary store, 15s backend/test supervisor;
+  setup/test/cleanup 0.419s, backend terminal 143 after stop, directory removed.
+  Socket creation was denied EPERM in sandbox, so this gate used the normal
+  reviewed execution exception. The public reader API uploads three-byte chunks
+  and verified download matches; prior FileWrite cold/AC-hit/mode and inline
+  ByteStream roundtrip assertions remain. No Slug daemon or CLI/Bazel build ran.
 - Changed Rust rustfmt --check, git diff --check, v2_plan_status.py and
-  v2_archive_status.sh passed. All 54 pinned source sizes/SHA-256 hashes match;
-  no copied fixture growth or load-closure change.
+  v2_archive_status.sh pass. No dependency/proto or copied fixture change.
 
-Compilation totaled 141.837s across six separate preparations/checks, each below
-60s. Test batches totaled about 1.12s including the two corrected fixture
-assertions; no long-running test, daemon, compiler action, Bazel or transport ran.
-Packet/review wall time was not continuously measured across the user pause.
-The initial path-only design was expanded after review found external SourceFile
-admission missing; the authentic external-root requirement was preserved.
-Builtin catalog source files, generated-root short-path parity, input digest
-staging/upload, toolchain discovery and resolved Spawn execution remain open.
+Compilation operations totaled 65.558s including the capped operation and
+compiler correction. Test batches totaled about 0.35s including the corrected
+fixture failure. Continuous packet/review wall time was not recorded. Design
+review required explicit early-response cancellation instead of a plain join;
+the implementation and blocked-reader tests preserve that accepted correction.
+Source routing/certificate integration, artifact digest staging, generated/tree
+transfer, Spawn execution and broader bootstrap remain open.
