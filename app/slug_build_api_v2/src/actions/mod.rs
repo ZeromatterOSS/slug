@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+mod cargo_runfiles_args;
 pub mod ctx_actions;
 pub mod reapi_projection;
 pub mod registry;
@@ -17,6 +18,8 @@ mod rust_native_link_args;
 mod spawn_command_line;
 pub mod spec;
 
+pub use cargo_runfiles_args::CargoRunfilesArgsError;
+pub use cargo_runfiles_args::RetainedCargoRunfilesArgs;
 pub use ctx_actions::CtxActions;
 pub use reapi_projection::ReapiCommandProjection;
 pub use registry::ActionError;

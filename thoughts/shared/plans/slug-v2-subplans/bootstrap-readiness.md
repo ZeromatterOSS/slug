@@ -322,7 +322,10 @@ WP-7-52 admits the demanded regular-File artifact-target alias family: nested al
 source/CAS/local provenance and executable checks, remote consumers get verified target
 bytes, and requested physical links retain complete durable backing after CLI exit.
 The two saved SolibSymlink actions remain a separate native family; Cargo's _runfiles_map
-callback remains open. Virtual Args paramfiles do not prove standalone ArgsWrite demand.
+callback is admitted by WP-7-53 as an authenticated structural recipe with retained captures
+and forced parameter bytes, including the required unexpanded Directory argument. Full
+Cargo rule/toolchain execution remains open. Virtual Args paramfiles do not prove standalone
+ArgsWrite demand.
 Run remains deferred and F3 remains closed.
 
 ## Family admission and completion procedure

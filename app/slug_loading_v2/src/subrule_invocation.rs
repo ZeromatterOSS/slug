@@ -175,9 +175,20 @@ pub struct EvaluatorVectorArgGen<V> {
     pub source: EvaluatorVectorSourceGen<V>,
     #[trace(unsafe_ignore)]
     pub options: RetainedVectorOptions,
-    #[trace(unsafe_ignore)]
-    pub map_each: Option<PinnedVectorMapEach>,
+    pub map_each: Option<EvaluatorVectorMapEachGen<V>>,
 }
+
+#[derive(Debug, Clone, Allocative, Trace)]
+pub enum EvaluatorVectorMapEachGen<V> {
+    Pinned(#[trace(unsafe_ignore)] PinnedVectorMapEach),
+    CargoRunfiles {
+        fake_exe: V,
+        #[trace(unsafe_ignore)]
+        workspace_name: CompactString,
+    },
+}
+
+mod cargo_runfiles;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]
 pub enum PinnedVectorMapEach {
@@ -475,16 +486,16 @@ fn reject_callback_options(
     Ok(())
 }
 
-fn classify_add_all_callback(
-    map_each: Option<Value<'_>>,
+fn classify_add_all_callback<'v>(
+    map_each: Option<Value<'v>>,
     allow_closure: bool,
-    eval: &Evaluator<'_, '_, '_>,
-) -> anyhow::Result<Option<PinnedVectorMapEach>> {
+    eval: &Evaluator<'v, '_, '_>,
+) -> anyhow::Result<Option<EvaluatorVectorMapEachGen<Value<'v>>>> {
     let Some(map_each) = map_each.filter(|value| !value.is_none()) else {
         reject_callback_options(None, allow_closure, "add_all")?;
         return Ok(None);
     };
-    if allow_closure || map_each.get_type() != "function" {
+    if map_each.get_type() != "function" {
         anyhow::bail!("Args.add_all callback forms are not supported");
     }
     let span = eval
@@ -502,62 +513,78 @@ fn classify_add_all_callback(
     }
     let loaded_digest: [u8; 32] = Sha256::digest(span.file.source().as_bytes()).into();
     let callsite = span.resolve_span();
+    if source.identity.label.to_string() == cargo_runfiles::SOURCE_LABEL {
+        return cargo_runfiles::capture(
+            source,
+            loaded_digest,
+            &span,
+            map_each,
+            allow_closure,
+            eval,
+        )
+        .map(Some);
+    }
+    if allow_closure {
+        anyhow::bail!("Args.add_all callback forms are not supported");
+    }
     if !is_pinned_rustc_source(source, loaded_digest) {
         anyhow::bail!("Args.add_all callback forms are not supported");
     }
-    match (callsite.begin.line, callsite.end.line) {
-        (1168, 1168) => Ok(Some(PinnedVectorMapEach::RulesRustCrateRoot)),
-        (1098, 1098) | (1227, 1227) | (1274, 1274) | (1424, 1424) | (2889, 2889) => {
-            Ok(Some(PinnedVectorMapEach::RegularFileDirnames))
-        }
-        (2572, 2572) => {
-            // Only these two immutable module bindings can reach this pinned
-            // expression. Repr distinguishes the branch after authentication.
-            let repr = map_each.to_repr();
-            let mapper =
-                if repr == format!("<function _crate_to_link_flag from {}>", span.filename()) {
-                    RustCrateArgMapper::Extern
-                } else if repr
+    let pinned: anyhow::Result<Option<PinnedVectorMapEach>> =
+        match (callsite.begin.line, callsite.end.line) {
+            (1168, 1168) => Ok(Some(PinnedVectorMapEach::RulesRustCrateRoot)),
+            (1098, 1098) | (1227, 1227) | (1274, 1274) | (1424, 1424) | (2889, 2889) => {
+                Ok(Some(PinnedVectorMapEach::RegularFileDirnames))
+            }
+            (2572, 2572) => {
+                // Only these two immutable module bindings can reach this pinned
+                // expression. Repr distinguishes the branch after authentication.
+                let repr = map_each.to_repr();
+                let mapper =
+                    if repr == format!("<function _crate_to_link_flag from {}>", span.filename()) {
+                        RustCrateArgMapper::Extern
+                    } else if repr
+                        == format!(
+                            "<function _crate_to_link_flag_metadata from {}>",
+                            span.filename()
+                        )
+                    {
+                        RustCrateArgMapper::ExternMetadata
+                    } else {
+                        anyhow::bail!("Args.add_all callback forms are not supported");
+                    };
+                Ok(Some(PinnedVectorMapEach::RulesRustCrates(mapper)))
+            }
+            (2574, 2574) => Ok(Some(PinnedVectorMapEach::RulesRustCrates(
+                RustCrateArgMapper::DependencyDir,
+            ))),
+            (2880, 2880) | (2895, 2895) => {
+                require_pinned_rust_utils(&identities)?;
+                use slug_build_api_v2::RustNativeLinkArgMapper as Mapper;
+                let mapper = if callsite.begin.line == 2880 {
+                    Mapper::Directories
+                } else if map_each.to_repr()
                     == format!(
-                        "<function _crate_to_link_flag_metadata from {}>",
+                        "<function _make_link_flags_default_direct from {}>",
                         span.filename()
                     )
                 {
-                    RustCrateArgMapper::ExternMetadata
+                    Mapper::DefaultDirect
+                } else if map_each.to_repr()
+                    == format!(
+                        "<function _make_link_flags_default_indirect from {}>",
+                        span.filename()
+                    )
+                {
+                    Mapper::DefaultIndirect
                 } else {
                     anyhow::bail!("Args.add_all callback forms are not supported");
                 };
-            Ok(Some(PinnedVectorMapEach::RulesRustCrates(mapper)))
-        }
-        (2574, 2574) => Ok(Some(PinnedVectorMapEach::RulesRustCrates(
-            RustCrateArgMapper::DependencyDir,
-        ))),
-        (2880, 2880) | (2895, 2895) => {
-            require_pinned_rust_utils(&identities)?;
-            use slug_build_api_v2::RustNativeLinkArgMapper as Mapper;
-            let mapper = if callsite.begin.line == 2880 {
-                Mapper::Directories
-            } else if map_each.to_repr()
-                == format!(
-                    "<function _make_link_flags_default_direct from {}>",
-                    span.filename()
-                )
-            {
-                Mapper::DefaultDirect
-            } else if map_each.to_repr()
-                == format!(
-                    "<function _make_link_flags_default_indirect from {}>",
-                    span.filename()
-                )
-            {
-                Mapper::DefaultIndirect
-            } else {
-                anyhow::bail!("Args.add_all callback forms are not supported");
-            };
-            Ok(Some(PinnedVectorMapEach::RulesRustNativeLinks(mapper)))
-        }
-        _ => anyhow::bail!("Args.add_all callback forms are not supported"),
-    }
+                Ok(Some(PinnedVectorMapEach::RulesRustNativeLinks(mapper)))
+            }
+            _ => anyhow::bail!("Args.add_all callback forms are not supported"),
+        };
+    Ok(pinned?.map(EvaluatorVectorMapEachGen::Pinned))
 }
 
 fn require_pinned_rust_utils(

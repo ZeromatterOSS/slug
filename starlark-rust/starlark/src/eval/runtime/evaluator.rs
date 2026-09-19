@@ -513,26 +513,8 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
         };
         let call_location = self.call_stack.nth_location(1)?;
 
-        let local_value = def_info
-            .used
-            .iter()
-            .position(|name| name.as_str() == local_name)
-            .and_then(|slot| {
-                if !self.current_frame.is_inititalized() {
-                    return None;
-                }
-                self.current_frame
-                    .get_slot(LocalSlotId(slot as u32).to_captured_or_not())
-            })
-            .and_then(|value| {
-                if value.downcast_ref::<ValueCaptured>().is_some()
-                    || value.downcast_ref::<FrozenValueCaptured>().is_some()
-                {
-                    value_captured_get(value)
-                } else {
-                    Some(value)
-                }
-            })
+        let local_value = self
+            .native_call_local_value(local_name)
             .and_then(|value| value.unpack_str().map(ToOwned::to_owned));
 
         Some(NativeCallContext {
@@ -540,6 +522,39 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
             call_location,
             local_value,
         })
+    }
+
+    /// Read one local of the Starlark `def` directly calling a native function.
+    ///
+    /// The value is evaluator-local: callers must trace it while retaining it and
+    /// lower it into owned semantic data before releasing the evaluator. This
+    /// does not search outer frames or module bindings, or authenticate a caller.
+    pub fn native_call_local_value(&self, local_name: &str) -> Option<Value<'v>> {
+        let caller = self.call_stack.top_nth_function_opt(1)?;
+        let def_info = if let Some(caller) = caller.downcast_ref::<Def>() {
+            caller.def_info
+        } else if let Some(caller) = caller.downcast_ref::<FrozenDef>() {
+            caller.def_info
+        } else {
+            return None;
+        };
+        let slot = def_info
+            .used
+            .iter()
+            .position(|name| name.as_str() == local_name)?;
+        if !self.current_frame.is_inititalized() {
+            return None;
+        }
+        let value = self
+            .current_frame
+            .get_slot(LocalSlotId(slot as u32).to_captured_or_not())?;
+        if value.downcast_ref::<ValueCaptured>().is_some()
+            || value.downcast_ref::<FrozenValueCaptured>().is_some()
+        {
+            value_captured_get(value)
+        } else {
+            Some(value)
+        }
     }
 
     /// Return the source filename of the innermost executing Starlark `def`.
@@ -1254,3 +1269,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "native_local_tests.rs"]
+mod native_local_tests;

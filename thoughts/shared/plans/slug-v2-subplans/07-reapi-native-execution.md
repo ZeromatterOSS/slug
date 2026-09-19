@@ -50,6 +50,8 @@ prefix conflicts, then publish exact CAS bytes and deterministic Merkle topology
 The authentic Rustc proof asserts replacement argv and multiline bytes.
 WP-7-25 adds native-library search and default direct/indirect link recipes,
 including their forced parameter bytes through the real Linux argument builder.
+WP753 adds the pinned Cargo runfiles mapping closure with structural captures and forced
+parameter bytes; it does not activate the full Cargo action/toolchain path.
 Other callback families, native Cc providers/toolchains, conditional spilling
 and resolved Spawn execution staging remain open. These components do not widen the bounded
 FileWrite executor or bypass `ValidatedActionClosure`.

@@ -1,0 +1,16 @@
+[fixture]
+name = "cargo-runfiles-args-source-proof"
+description = "Unchanged private Cargo helper to retained Args and configured Spawn publication."
+comparison = "structured_semantic"
+oracle_notes = "Source-derived helper proof, not full Cargo module loading, toolchain analysis, production action registration, or execution. Authored inert import/global scaffolding evaluates unrelated top-level declarations. The invoked helper and local _rlocationpath are unchanged; ctx/actions/Args, artifact/depset/DefaultInfo values, snapshot lowering and configured publication use production types. The declaration-only sink is test scaffolding."
+
+[provenance]
+rules_rust_release = "0.73.0"
+source = "cargo/private/cargo_build_script.bzl"
+sha256 = "6147df938723ec58cef646169814c85a72fa0f74080471756e3c1891d02f4630"
+source_anchors = ["cargo/private/cargo_build_script.bzl#_create_runfiles_dir", "cargo/private/cargo_build_script.bzl#_rlocationpath"]
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+bazel_source_anchors = ["src/main/java/com/google/devtools/build/lib/analysis/starlark/Args.java:270-290,366-388", "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkCustomCommandLine.java:328-348", "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkCustomCommandLine.java:427-439", "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkCustomCommandLine.java:1125-1180", "src/main/java/com/google/devtools/build/lib/actions/ParameterFile.java:82-98", "src/main/java/com/google/devtools/build/lib/util/ShellEscaper.java:58-65,98-110"]
+generation_command = "Copy the complete unchanged cargo/private/cargo_build_script.bzl from the pinned rules_rust+ repository, retaining its Apache license."
+verification_command = "Compile slug_analysis_v2 lib tests, exact-preflight and run starlark_rule::cargo_runfiles_tests::{unchanged_cargo_helper_retains_captures_after_caller_exit_and_gc,cargo_helper_capture_mutations_restore_configured_publication,cargo_helper_rejects_unauthenticated_source_and_directory_inputs}."
+translation_notes = "Main/external source and generated regular files retain typed identity. Shared depset inputs retain the fake executable while argv excludes only its exact artifact identity. A/B/A fake-artifact and workspace capture mutation checks configured publication; workspace mutation is a snapshot retainer test, not a production configuration setting. A module statement GC safe point after allocation checks collection of the Args/caller graph; the frozen fake capture is covered separately by the Loading mutable-value trace discriminator."

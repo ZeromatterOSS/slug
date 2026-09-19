@@ -1,191 +1,163 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-52-m7a-artifact-file-symlinks-r1
+Packet: WP-7-53-m7a-cargo-runfiles-args-r1
 Status: accepted
 
 ## Outcome and source basis
 
-Ordinary requested Build executes and publishes regular-File artifact-target Symlink and
-ExecutableSymlink actions. Remote consumers (including FilesToRun) receive target bytes;
-requested aliases are physical links with complete durable backing. Nested aliases retain
-terminal provenance and executable checks. Predecessor WP751 is accepted at 576818e94;
-its contract/evidence remain in that commit's current-packet.md. Preserve WP750/751 behavior.
+Admit the production-demanded Cargo `_runfiles_map` Args callback as a structural retained
+recipe, including its captured fake executable and workspace name. The unchanged pinned
+helper must produce correct filtering, ordered mapping strings and forced parameter bytes;
+source/capture changes must invalidate and restore the retained result. WP752 is accepted
+at 74770f888; its alias execution/publication contract remains there in current-packet.md.
 
-Demanded by authenticated target/wp714/actions.json SHA256
-ffc50a44648f85b464988eb5dd6c6dd152269f342121a006839d3e8c7b4c0be8:
-562 Symlink (412 generated Rustc rlib aliases, 94 external sysroot files, 54 external stdlib
-rlib aliases, two redacted-header templates) and 17 ExecutableSymlink (16 configured sysroot
-executables and one bootstrap wrapper). Each has one non-tree input/output. Pinned rules_rust
-0.73 rust/private/toolchain.bzl:128-187, rust/private/utils.bzl:479-518,
-rust/private/rustc.bzl:2334 and util/process_wrapper/private/bootstrap_process_wrapper.bzl:22-25
-use target_file, including intermediate aliases across package boundaries. Two SolibSymlink
-CppLink consumers are a separate native family; no Directory or unresolved-path demand is
-established. Saved declarations do not prove full live-root execution. F3 stays closed.
+Saved target/wp714/actions.json SHA256
+ffc50a44648f85b464988eb5dd6c6dd152269f342121a006839d3e8c7b4c0be8 contains 66
+CargoBuildScriptRun actions with 4865 mapping arguments: 4783 external sources, 16 main
+sources, 61 external generated files and five main generated files. Each mapping input
+resolves to a non-tree artifact; no Directory callback demand is established. The two
+SolibSymlink actions require separate C++ native construction and remain deferred.
 
-Pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-analysis/starlark/StarlarkActionFactory.java:294-325 validates artifact kinds;
-analysis/actions/SymlinkAction.java:56-58,137-142,218-276 creates an artifact-backed link
-without a spawned process, :295-339 checks regular-file owner-execute permission, :392-413
-forwards target metadata. SymlinkActionTest.java:130-173 checks physical link behavior.
-remote/RemoteActionFileSystem.java:509-516,596-605 resolves links before executable checks;
-remote-only files count executable, whereas aliases to sources preserve source permissions.
-remote/merkletree/MerkleTreeComputer.java:610-669,1032-1047 projects ordinary artifact aliases
-as digest-backed executable FileNodes, not REAPI SymlinkNodes. UnresolvedSymlinkAction is a
-different family; retained AbsolutePath is deprecated nonhermetic SymlinkAction behavior.
-ActionOutputMetadataStore.java:219-225,590-600 establishes generated output permissions.
-Reuse existing observed mode rows, native certificates/generation leases, typed local results,
-source backing and confined publication. Read docs/developers/dice.md and Stage 9 retained
-artifact/runfiles/observed-source utility dispositions; no donor semantic owner is imported.
+Pinned rules_rust 0.73 cargo/private/cargo_build_script.bzl SHA256
+6147df938723ec58cef646169814c85a72fa0f74080471756e3c1891d02f4630, lines 307–311
+`_rlocationpath`, 343–346 `_runfiles_map`, and 351–357 Args construction establish semantics:
+filter exact fake_exe artifact; map path + '=' + rlocation, stripping one leading '../'
+from short_path for external sources or prefixing workspace_name otherwise. Preserve the
+merged depset traversal and forced `--cargo_manifest_args=@%s` parameter-file policy.
+Pinned Bazel9.2 8220c6198837d5c13d53fea211cf3282aa12408a Args.java:366–388 permits
+explicit allow_closure; StarlarkCustomCommandLine.java:1125–1180 maps in input order and
+omits None. Reuse accepted WP720–725 vector options/parameter-file and source-provenance
+contracts. This is not general callback or closure admission.
 
-## Contract
+## Contract and owners
 
-Exact named behavior: artifact input edge, file digest forwarding, executable validation,
-remote regular-file projection and physical local alias behavior. Structural artifact/config
-identity, native execution routing and durable backing/path spellings remain Slug-native.
-Only SymlinkTarget::Artifact with File output and source File or generated File target is
-admitted. Reject AbsolutePath, use_exec_root_for_source=true, Directory/RunfilesTree targets,
-unresolved Symlink output kinds, SolibSymlink and unsupported platforms before effects.
-Run, exact ActionKeys, broader aquery, source directories and Windows remain deferred.
+Exact named behavior: pinned callback filter, ordering and string algorithm over the
+admitted File projections; retention/equality of all captures; existing vector formatting
+and forced parameter encoding. Source path/short_path use accepted nonsibling repository
+semantics. Derived path/short_path and structural configuration/output identities retain
+the existing explicit Slug-native projection, including external generated files. Do not
+claim exact Bazel output-root/runfiles bytes or repair artifact paths inside this callback.
+Noncallback Directory vectors with expand_directories=False render the literal typed
+artifact path; default/true expansion and Directory callback inputs remain unsupported.
+Directory expansion, arbitrary closures, add_joined callbacks, full Cargo rule/toolchain
+execution, native C++ construction, broad aquery, exact ActionKeys and Run remain deferred.
 
-Core adds one exact artifact edge to the existing validated forest. Preserve owner/config
-lookup, canonical shared FileWrite representatives, cycle detection and unsupported-family
-preflight. In requested mode, every reachable public-MANIFEST SymlinkTree also schedules its exact virtual tree
-as a deferred completion root, including through alias chains; preserve declared edges and
-avoid the tree-to-MANIFEST cycle. Complete these deferred roots before returning the forest,
-keeping original selected-artifact producer ordinals. The legacy single-selected-action API
-rejects a newly admitted topology if deferred completion requires actions after its selected
-step; it must not misidentify the selected action or reorder true prerequisites. Legacy
-ordinary Spawn roots retain their previous MANIFEST-file consumption behavior without these
-additional publication completion roots; no alias output is selected for publication there. Ordinary
-requested Build owns that topology. Source staging remains source-only. ActionChainStagingKey observes alias targets
-through the same source owner and full epoch/certificate. A focused pure prepared-symlink
-projection may expose output, exact target, require-executable and direct-source executable
-status from the already-certified real-path Lstat row. Missing permissions fail closed;
-no direct filesystem stat or new DICE key/semantic cache. This metadata confers no authority.
+Authenticate the unique loaded canonical Cargo source row, its observed digest, evaluated
+full-source digest, exact add_all callsite, immediate `_create_runfiles_dir` caller and
+`_runfiles_map` function before reading captures. The pinned call uses allow_closure=True;
+all other callback admission rules remain unchanged. Source edits/relabels/missing or
+ambiguous provenance fail closed. An empty source does not bypass authentication.
 
-REAPI retains a typed local alias result at its plan ordinal: exact output, target content
-digest, effective executable status and terminal backing provenance (certified source index,
-verified remote CAS, or completed local bytes). Alias chains preserve that terminal provenance;
-a Derived alias to a nonexecutable source does not become executable merely by being derived.
-Use owner execute bit for source targets, remote-only generated files count executable even
-when REAPI output mode is false, and local generated manifest files follow existing 0555
-publication policy. Required executable validation occurs before completing the alias and
-before its downstream consumers/publication. Generated target content must still exist and
-verify in CAS at alias completion. Source/local equal bytes cannot repair missing generated
-CAS, including through alias chains. No fabricated Execute/ActionResult/AC hit is introduced;
-all-local source-alias plans need no backend connection.
+The real token-checked Analysis context exposes workspace_name as the Bzlmod-only '_main'
+runfiles prefix, matching existing RetainedRunfiles. Pinned BazelRuleClassProvider.java:232,
+PackageFactory.java:231/299, RuleContext.java:383–384 and StarlarkRuleContext.java:714–716
+establish the package-owned fixed prefix. No command option or ambient state participates.
 
-Regular Spawn/executable/runfiles bindings consume alias digests and terminal provenance
-through the same source/local/generated upload rules. Never create a REAPI SymlinkNode for
-this resolved artifact family. Keep exact session identity/ordinal checks, native per-step
-and final source validation, complete result reconciliation and honest requested-build digest
-accounting. New result variants require direct CLI/server compilation and wrapper proof.
-All new maps/results are request/session scratch; existing Arc/compact owners are reused.
-No retained depset flattening, unbounded global state, async lock or execution outside Core.
+A narrow lifetime-bound evaluator accessor may expose one immediate Starlark caller local,
+reusing the existing Def/FrozenDef slot lookup and captured-cell unwrapping behind
+native_call_context. No module-scope or unrelated-frame fallback. Keep this accessor
+source-agnostic; the Loading owner authenticates the caller. Copy workspace_name and keep
+fake_exe in a traced evaluator-local Args snapshot before the caller exits. A Value must
+never enter the existing unsafe-ignore/Copy mapper enum. No closure, evaluator, local-frame
+reference, arbitrary user callable or heap owner survives action publication.
 
-Core owns physical alias effects. Selected aliases and aliases included in selected runfiles
-trees expand publication to all transitive alias/backing prerequisites, even when not in
-DefaultInfo. Use an iterative finite worklist so aliases to generated support manifests and
-runfiles containing aliases reach a complete backing closure without repeated full replanning.
-Preserve existing tree/MANIFEST coupling. Tool-only aliases require no local publication.
-Host targets use observed requested paths; materialized sources use the existing verified
-persistent source-backing store, not temporary repository paths. Derived links point at exact
-configured output paths. Source-generation leases cover alias preparation/copying/execution
-where needed, and immutable backing survives result/runtime/process exit.
+Analysis lowers captured fake_exe to exact AnalysisArtifact and workspace_name to compact
+owned string, and lowers the input depset with the existing shared AnalysisValueLowerer.
+Build API owns a focused validated Cargo runfiles recipe retaining ArtifactInputs/depset
+DAG and those two captures, with Allocative and structural publication equality. Filter by
+artifact identity, never rendered path; same-path different owner/config remains distinct.
+Reject nonregular inputs/captured fake exe and FilesToRun in this recipe. Rendered strings
+are action-expansion scratch, never retained flattened depset/cache state. Options apply
+after mapping/filtering through existing RetainedVectorArg machinery.
+Filter only rendered arguments; preserve all_runfiles_files as the action input depset.
 
-Introduce an internal typed alias stage (no public arbitrary symlink writer). Use descriptor-
-confined no-follow parents, exact link-text seal checks, stale destination detection and
-same-parent replacement. Symlink leaves may be replaced/unlinked without following targets;
-symlink ancestors and special files remain rejected. Preserve safe replacement between regular
-File outputs and alias leaves while continuing to reject symlink nodes from remote outputs.
-Never chmod, read through or recursively clean a link target. Stage/seal all backing, links
-and outputs, preflight the full batch, install durable backing then ordinary generated backing
-then aliases in prerequisite order then runfiles trees under existing final revision validation.
-Individual output swaps do not provide batch atomicity: an alias to a public MANIFEST may
-briefly precede its tree replacement, but all terminal bytes are already installed and success
-requires the complete batch. Preserve explicit partial-publication failure if a later swap
-fails; never report such a batch as complete. Release retired owners outside the lock.
-No new GC or power-loss durability guarantee.
+Existing configured-analysis DICE values own retained actions and source dependencies;
+publication equality includes workspace, fake artifact, input DAG/alias topology and options.
+No new DICE key, cache, interner, lock, filesystem read or observation bypass. Existing
+need/error and source-revision machinery remains authoritative. Read docs/developers/dice.md
+and Stage9 rows for retained Args/depset/CompactString/Allocative and source provenance.
+Use the utility-reuse skill; no donor implementation or performance claim is needed.
 
 ## Scope and proof
 
-Core: action_prerequisites.rs and focused alias helper/tests; action_chain_staging.rs and
-focused symlink projection/reused observed-mode helper; action_chain_execution.rs lease gate;
-action_output_staging.rs, plan.rs/focused backing-closure child, Linux staging/alias child,
-configured_output.rs and runtime exports. REAPI: action_chain.rs, result.rs, binding.rs,
-focused alias child, output_staging.rs, requested_build.rs and directly affected tests.
-CLI: focused wrapper proof reusing an authored fixture, no new command API. Root owns this
-manifest, canonical and Stage7/bootstrap notes. No analysis action expansion is required.
-Expected 600-1000 production and 600-1100 proof lines; keep new behavior in focused children,
-review responsibility boundaries if exceeded. No new fixture corpus or fresh Bazel process.
+Allowed: starlark-rust/starlark/src/eval/runtime/evaluator.rs and focused test child;
+Loading subrule_invocation.rs plus focused Cargo capture/provenance helper/tests;
+Build API actions focused cargo_runfiles_args child, spec.rs/mod.rs/lib.rs exports and tests;
+Analysis starlark_rule.rs routing plus focused lowering/test child and the focused public
+workspace_name integration child/registration; a focused authored
+source-proof fixture and its provenance, reusing existing rustc-map-each imports when useful.
+Root owns manifest/canonical and Stage6/7/bootstrap/Stage9 contract notes.
 
-Discriminators: Host/materialized source and generated regular File aliases; source symlink
-requested-path preservation; two-link chains/shared producers and exact configuration/owner
-rejection; source owner-x versus group/other-x, chmod-only failure/restoration; generated
-remote modefalse acceptance; local manifest aliases including an alias-only request for a
-public MANIFEST that schedules/publishes its coupled tree; missing/corrupt generated CAS with equal
-source/local bytes; consumer-only FilesToRun execution with no incidental tool publication;
-requested physical aliases + hidden backing and source durability after CLI/runtime exit;
-A/warm-A/B/A content and mode changes, regular-file/alias replacement, malicious leaf/ancestor
-links, seal/stale destination failure and cleanup that never touches link targets. Preserve
-WP750/751 publication and source-only controls. Reuse existing retry/final-validation and
-partial-publication proof where unchanged. Full production closure, M7A/M8 remain unproved.
+Prefer focused children. starlark_rule.rs exceeds 2000 lines: add only dispatch there and
+keep new recipe/lowering logic in its child. Existing evaluator and Loading owner remain
+cohesive for narrow capture access/dispatch. Estimate 250–450 production and 300–650 proof
+lines plus only indispensable verbatim source fixture growth; review scope if exceeded.
+Do not append test exports to authenticated Cargo source. Use a test-only private symbol
+lookup from its unchanged loaded module and real Args snapshot/lowering; classify authored
+context scaffolding honestly. Imported helpers keep full source/provenance authentication.
+Fixture manifest records source SHA, pinned Bazel anchors and exact/structured comparison.
+Inspect load closure and avoid copying unrelated files or another full corpus.
 
-Independent design and final review. Pinned nightly-2025-09-14 offline no-run/compile separately
-from exact-selector tests; 60s preparation cap per operation. Runtime tests expected a few
-seconds; longer tests infrequent and >30s needs strict necessity. Shared-target Cargo and native
-ancestor-observing tests serial. Root coordinates all compilation/execution; workers author
-focused tests. Rebuild CLI before public wrapper smoke. Supervised local backend only for
-named real-transfer proofs with cleanup receipts; no broad suite. Format/diff/plan/archive
-checks and target/wp752 receipts, then commit and authorized main push after acceptance.
-REPLAN only for a new ownership/compatibility prerequisite that cannot satisfy this contract;
-routine corrections remain within the packet. WP746 baseline diagnostic defect stays open.
+Discriminators: main/external source and generated files, exact fake artifact filtering,
+same-path/different-owner retention, depset order/dedup/shared-node identity, workspace/fake
+capture changes and A/B/A publication, retained snapshot after caller exit/GC, invalid
+captures and Directory rejection, spoofed/mutated source and generic closure rejection.
+Prove actual unchanged helper invocation, lowered owned recipe and forced paramfile bytes.
+Protect existing native_call_context, Rustc pinned callbacks and ordinary noncallback Args.
+Compile direct consumers CLI/server after the public recipe/snapshot shape change. Reuse
+existing REAPI paramfile evidence since transfer/expansion code is unchanged.
 
-Independent design review: ACCEPT. Regular-File target scope, terminal provenance,
-source permission authority, deferred MANIFEST/tree completion roots and publication
-limits are frozen for implementation.
+Independent design then final review. Pinned nightly-2025-09-14 offline compilation separate
+from exact-selector tests; serial shared-target Cargo and ancestor-observing tests. Root
+coordinates execution. Tests should take a few seconds; longer tests run only if needed,
+and >30s needs strict necessity. Preparation cap60s per operation. No Bazel/F3 replay or full
+production build. Format/diff/plan/archive checks and target/wp753 receipts; commit and push
+at acceptance. REPLAN only if bounded capture ownership/source proof cannot satisfy this
+contract, not for routine invocation/compiler corrections. M7A/M8 remain incomplete.
+
+Independent design review ACCEPT: traced captures, source authentication and retained
+identity are bounded. The source proof may use documented inert import scaffolding with
+the unchanged full Cargo file, real executed typed dependencies and private test lookup;
+it does not claim full module loading. The fixed workspace_name getter amendment is independently accepted.
+
+Independent amendment ACCEPT: the unchanged helper first requires
+args.add_all([runfiles_dir], expand_directories=False), which failed against the existing
+unconditional Directory rejection. Admit literal Directory paths for noncallback sequence
+and depset vectors with expansion disabled, retaining artifacts and option equality. Pinned
+StarlarkCustomCommandLine.java:328–348,427–439 gates expansion before path rendering. Add
+focused public sequence/depset false positives and default/true negatives; keep Directory
+callback rejection. Root owns tests/directory_args.rs and its registration. This prerequisite
+is necessary to execute the unchanged helper, not broader Directory expansion.
 
 ## Acceptance receipt
 
-Implemented Core-owned exact alias edges, certified source-mode projection, generation
-leases, deferred MANIFEST/tree completion and finite publication backing expansion. REAPI
-keeps typed terminal provenance, verifies generated CAS before alias completion and exposes
-resolved aliases as regular consumer inputs. Confined physical links and durable backing
-survive runtime/CLI exit. No new retained state, DICE key or dependency was added.
+The unchanged pinned helper now publishes the retained Cargo mapping recipe, preserves
+the original action input depset, filters only the exact fake artifact, and emits forced
+shell-quoted parameter bytes. The helper leaves Bazel's default SHELL_QUOTED format intact:
+Args.java:270–290, ParameterFile.java:82–98 and ShellEscaper.java:58–65,98–110 at the pinned
+commit establish single quotes around the '=' mappings. Correcting the initial unquoted
+test expectation changed no production behavior.
 
-Independent final source review ACCEPT, including two corrections: private alias creation
-claims cleanup only after checking symlink identity/text (a substituted directory survives),
-and stable publication sorting preserves ordinary selected-group order while sorting aliases
-by prerequisite ordinal. The inherited strict-subset control first reproduced [1,2,3] versus
-required [2,3,1], then passed after correction. Approximately 732 added production and 1282
-proof lines; the proof estimate overrun was reviewed as distinct planner/filesystem,
-provenance/CAS/backend and shared-fixture CLI responsibilities, without expanding scope.
+Twenty exact-selected tests pass (target/wp753 receipts): evaluator-locals-r1 2/2 in
+0.007s; cargo-recipe-r2 4/4 in 0.002s; loading-capture-r4 3/3 in 0.011s;
+cargo-helper-r3 3/3 in 0.054s; analysis-integration-r2 8/8 in 1.803s. These cover the
+immediate-frame accessor, actual GC tracing, structural captures/shared depsets, unchanged
+source helper and its authentication/invalid captures, public workspace name and Directory
+literal/default/true behavior, source-change restoration and existing Rustc/generic Args.
+Pinned offline CLI/server compilation passes in 44.628s (cli-server-build-r1); this is
+separate preparation, not test runtime. Final helper preparation passes in 3.522s. Initial
+Directory prerequisite and shell-byte assertion failures are preserved with their corrected
+receipts. No broad suite, backend test, Bazel replay or full production build was run.
 
-Pinned nightly-2025-09-14 offline validation, all exit 0 unless explicitly recorded as the
-pre-correction discriminator; receipts under target/wp752:
+Independent final source review accepts ownership, compatibility and proof growth:
+approximately 361 production additions remain within the 250–450 estimate; 1,113 authored
+proof lines exceed the 300–650 estimate because evaluator/GC, retained identity, unchanged
+source/authentication and public amended surfaces require distinct tests. The only copied
+fixture is the indispensable 919-line unchanged Cargo module plus its 202-line license;
+inert scaffolding and snapshot workspace mutation are explicitly labeled in fixture.toml.
+Full Cargo loading/toolchain/execution and exact Bazel derived paths remain unproved.
 
-- Core no-run 24.952s, correction rebuild 5.844s; REAPI no-run 22.016s and final 2.433s;
-  CLI/server build 13.627s; requested_build integration no-run 8.263s. Preparation was serial.
-- 18 exact Core tests: core-focused-r2 15/15 in 1.010s and core-protected-r1 3/3 in 0.441s.
-  New alias planner/filesystem cases plus exact producers, selected subsets/order, shared
-  FileWrite owners, runfiles, source-only boundaries, batch preflight and cache confinement.
-- 10 exact REAPI portable tests, reapi-portable-r2 10/10 in 1.795s: terminal provenance,
-  source owner-x changes, generated modefalse, exact results, all-local completion and
-  protected FilesToRun/local-manifest bindings.
-- Six supervised backend proofs, one exact ignored selector each: new alias consumers
-  3.224s; missing/corrupt alias CAS 1.188s; final physical alias/manifest publication 1.180s;
-  rebuilt CLI process-exit 0.657s; inherited binary runfiles publication 1.527s; inherited
-  FilesToRun consumers 7.931s. The last is an infrequent checkpoint regression. All backend
-  processes terminated/reaped and temporary roots removed. Consumer/CAS evidence predates
-  only the publication-order correction, which cannot affect execution-only behavior.
-- Rustfmt, diff, plan status and archive checks pass. Source hashes cover 33 changed Rust
-  files; target/wp752/source-hashes.json SHA256
-  dc27cf9aebd6aeab9b27fc68f3eede43d1522f14e3e09f00cba53ee34fa1888d.
-  artifact-hashes.json also identifies the validated binaries. Packet wall time spans a
-  user pause and was not measured reliably; individual compile/test durations are above.
-
-Observable gate advanced: ordinary requested Build now executes the saved production
-regular-File alias family and publishes complete durable physical backing. Authentic full
-production execution, M7A/M8, SolibSymlink and Cargo's _runfiles_map remain open. WP746's
-baseline diagnostic defect remains recorded; F3 stays closed. Commit/push this checkpoint,
-then select the next production-demanded prerequisite from the retained inventory.
+Final formatting, diff, plan and archive checks pass. Source and validation hashes are
+recorded under target/wp753. The next work is the demanded native C++/Solib construction
+prerequisite inventory; WP752 execution support alone cannot register those native actions.
+WP746's baseline diagnostic defect remains open; M7A is partial and M8 remains unproved.

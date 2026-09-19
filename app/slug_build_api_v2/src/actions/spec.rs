@@ -23,6 +23,7 @@ use slug_configuration_v2::NormalizedAbsoluteBazelPath;
 use slug_configuration_v2::NormalizedBazelPath;
 use slug_configuration_v2::RetainedActionEnvironment;
 
+use crate::actions::cargo_runfiles_args::RetainedCargoRunfilesArgs;
 use crate::actions::runfiles_support::RunfilesSupportActionSpec;
 use crate::actions::rust_crate_args::RetainedRustCrateArgs;
 use crate::actions::rust_native_link_args::RetainedRustNativeLinkArgs;
@@ -225,11 +226,26 @@ impl Error for RetainedArgsDepsetError {}
 
 impl RetainedArgsDepset {
     pub fn new(depset: AnalysisDepset) -> Result<Self, RetainedArgsDepsetError> {
+        Self::validate(depset, true)
+    }
+
+    /// Retain literal Directory paths for a vector with directory expansion disabled.
+    pub fn new_unexpanded(depset: AnalysisDepset) -> Result<Self, RetainedArgsDepsetError> {
+        Self::validate(depset, false)
+    }
+
+    fn validate(
+        depset: AnalysisDepset,
+        expand_directories: bool,
+    ) -> Result<Self, RetainedArgsDepsetError> {
         match depset.element_type() {
             AnalysisValueType::Empty | AnalysisValueType::String | AnalysisValueType::Integer => {
                 Ok(Self(depset))
             }
             AnalysisValueType::Artifact => {
+                if !expand_directories {
+                    return Ok(Self(depset));
+                }
                 let mut directory = false;
                 depset
                     .visit(|value| {
@@ -283,6 +299,7 @@ pub enum RetainedVectorSource {
     /// Validated by `regular_file_dirnames`; retains artifact/depset identity.
     RegularFileDirnames(ArtifactInputs),
     RulesRustCrates(RetainedRustCrateArgs),
+    CargoRunfiles(RetainedCargoRunfilesArgs),
     RulesRustNativeLinks(RetainedRustNativeLinkArgs),
     /// Pinned rules_rust `_get_crate_root_path` for a regular crate-root File.
     RulesRustRegularCrateRoot {
@@ -317,6 +334,7 @@ impl RetainedVectorSource {
             Self::Sequence(values) => values.iter().map(RetainedScalarValue::render).collect(),
             Self::Depset(values) => values.render(),
             Self::RulesRustCrates(values) => values.render(),
+            Self::CargoRunfiles(values) => values.render(),
             Self::RulesRustNativeLinks(values) => values.render(),
             Self::RegularFileDirnames(inputs) => {
                 let mut values = Vec::new();
@@ -334,6 +352,9 @@ impl RetainedVectorSource {
             (Self::Sequence(left), Self::Sequence(right)) => left == right,
             (Self::Depset(left), Self::Depset(right)) => left.publication_eq_with(right, state),
             (Self::RulesRustNativeLinks(left), Self::RulesRustNativeLinks(right)) => {
+                left.publication_eq_with(right, state)
+            }
+            (Self::CargoRunfiles(left), Self::CargoRunfiles(right)) => {
                 left.publication_eq_with(right, state)
             }
             (Self::RulesRustCrates(left), Self::RulesRustCrates(right)) => {
@@ -817,7 +838,7 @@ impl ArtifactInputs {
         Ok(())
     }
 
-    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+    pub(super) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         self.0.len() == other.0.len()
             && self
                 .0

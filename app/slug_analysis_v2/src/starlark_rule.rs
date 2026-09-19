@@ -84,6 +84,7 @@ use slug_loading_v2::subrule_invocation::AnalysisToolchainRequest;
 use slug_loading_v2::subrule_invocation::EvaluatorArgCallGen;
 use slug_loading_v2::subrule_invocation::EvaluatorArgsSnapshot;
 use slug_loading_v2::subrule_invocation::EvaluatorVectorArgGen;
+use slug_loading_v2::subrule_invocation::EvaluatorVectorMapEachGen;
 use slug_loading_v2::subrule_invocation::EvaluatorVectorSourceGen;
 use slug_loading_v2::subrule_invocation::PinnedVectorMapEach;
 use slug_loading_v2::subrule_invocation::PreparedSubruleInvocation;
@@ -231,6 +232,7 @@ where
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         self.token.require_active(attribute, "rule context").ok()?;
         match attribute {
+            "workspace_name" => Some(heap.alloc_str("_main").to_value()),
             "label" => Some(slug_loading_v2::provider::alloc_starlark_label(
                 heap,
                 self.target_label.clone(),
@@ -1589,11 +1591,24 @@ fn lower_vector_arg<'v>(
     value: EvaluatorVectorArgGen<Value<'v>>,
     lowerer: &mut AnalysisValueLowerer<'v>,
 ) -> anyhow::Result<RetainedVectorArg> {
-    let source = if value.map_each == Some(PinnedVectorMapEach::RulesRustCrateRoot) {
+    let map_each = match value.map_each {
+        None => None,
+        Some(EvaluatorVectorMapEachGen::Pinned(mapper)) => Some(mapper),
+        Some(EvaluatorVectorMapEachGen::CargoRunfiles {
+            fake_exe,
+            workspace_name,
+        }) => {
+            return Ok(RetainedVectorArg::new(
+                cargo_runfiles::lower(value.source, fake_exe, workspace_name, lowerer)?,
+                value.options,
+            ));
+        }
+    };
+    let source = if map_each == Some(PinnedVectorMapEach::RulesRustCrateRoot) {
         lower_rules_rust_crate_root(value.source)?
-    } else if value.map_each == Some(PinnedVectorMapEach::RegularFileDirnames) {
+    } else if map_each == Some(PinnedVectorMapEach::RegularFileDirnames) {
         lower_regular_file_dirnames(value.source, lowerer)?
-    } else if let Some(PinnedVectorMapEach::RulesRustNativeLinks(mapper)) = value.map_each {
+    } else if let Some(PinnedVectorMapEach::RulesRustNativeLinks(mapper)) = map_each {
         let EvaluatorVectorSourceGen::Sequence(rows) = value.source else {
             anyhow::bail!("rules_rust native link Args requires tuple sequence");
         };
@@ -1608,7 +1623,7 @@ fn lower_vector_arg<'v>(
         RetainedVectorSource::RulesRustNativeLinks(
             slug_build_api_v2::RetainedRustNativeLinkArgs::new(rows, mapper)?,
         )
-    } else if let Some(PinnedVectorMapEach::RulesRustCrates(mapper)) = value.map_each {
+    } else if let Some(PinnedVectorMapEach::RulesRustCrates(mapper)) = map_each {
         let EvaluatorVectorSourceGen::Depset(source) = value.source else {
             anyhow::bail!("rules_rust crate Args requires a depset");
         };
@@ -1627,20 +1642,24 @@ fn lower_vector_arg<'v>(
             EvaluatorVectorSourceGen::Sequence(values) => RetainedVectorSource::Sequence(
                 values
                     .into_iter()
-                    .map(vector_scalar_value)
+                    .map(|item| vector_scalar_value(item, value.options.expand_directories))
                     .collect::<anyhow::Result<Vec<_>>>()?
                     .into(),
             ),
-            EvaluatorVectorSourceGen::Depset(value) => {
+            EvaluatorVectorSourceGen::Depset(depset_value) => {
                 let lowered = lowerer
-                    .lower(value, "Args vector depset")
+                    .lower(depset_value, "Args vector depset")
                     .map_err(anyhow::Error::msg)?;
                 let AnalysisValueKind::Depset(depset) = lowered.kind() else {
                     anyhow::bail!("Args vector values must be a sequence or depset")
                 };
-                RetainedVectorSource::Depset(
+                let retained = if value.options.expand_directories {
                     RetainedArgsDepset::new(depset.clone())
-                        .map_err(|error| anyhow::anyhow!(error.to_string()))?,
+                } else {
+                    RetainedArgsDepset::new_unexpanded(depset.clone())
+                };
+                RetainedVectorSource::Depset(
+                    retained.map_err(|error| anyhow::anyhow!(error.to_string()))?,
                 )
             }
         }
@@ -1711,7 +1730,10 @@ fn lower_rules_rust_crate_root(
     })
 }
 
-fn vector_scalar_value(value: Value<'_>) -> anyhow::Result<slug_build_api_v2::RetainedScalarValue> {
+fn vector_scalar_value(
+    value: Value<'_>,
+    expand_directories: bool,
+) -> anyhow::Result<slug_build_api_v2::RetainedScalarValue> {
     if let Some(value) = value.unpack_str() {
         return Ok(slug_build_api_v2::RetainedScalarValue::String(value.into()));
     }
@@ -1721,7 +1743,9 @@ fn vector_scalar_value(value: Value<'_>) -> anyhow::Result<slug_build_api_v2::Re
         ));
     }
     if let Some(file) = AnalysisArtifactValue::from_starlark(value) {
-        reject_directory_file(file, "Args vector value")?;
+        if expand_directories {
+            reject_directory_file(file, "Args vector value")?;
+        }
         return Ok(slug_build_api_v2::RetainedScalarValue::Artifact(
             file.artifact().clone(),
         ));
@@ -2498,3 +2522,8 @@ mod integer_list_projection_tests {
         assert_eq!(value.to_repr(), "[1, -2, 3]");
     }
 }
+
+mod cargo_runfiles;
+
+#[cfg(test)]
+mod cargo_runfiles_tests;

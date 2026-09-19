@@ -155,10 +155,12 @@ use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::path_observation_shards;
 use starlark_map::small_map::SmallMap;
 
+mod directory_args;
 mod effective_output_groups;
 mod file_output_providers;
 mod output_group_info;
 mod rustc_map_each;
+mod workspace_name;
 
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
 enum EventKind {

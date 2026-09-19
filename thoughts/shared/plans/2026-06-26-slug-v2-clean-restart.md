@@ -29,14 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-52-m7a-artifact-file-symlinks-r1
+Packet: WP-7-53-m7a-cargo-runfiles-args-r1
 Status: accepted
 
-WP752 accepts production-demanded regular File artifact-target Symlink/ExecutableSymlink:
-verified remote alias bytes and physical local links with complete durable backing. Independent
-review, 28 focused portable checks and six supervised backend/CLI proofs passed. WP751
-FilesToRun input transfer remains accepted at 576818e94. M7A remains partial and M8 unproved;
-SolibSymlink, Cargo's runfiles callback and WP746's baseline diagnostic defect remain open.
+WP753 accepts the production-demanded Cargo runfiles Args callback: authenticated captures,
+structural retained mapping and forced shell-quoted parameter bytes, with public workspace
+name and literal unexpanded Directory prerequisites. Twenty focused tests and CLI/server
+compilation pass. Next: inventory demanded native C++/SolibSymlink construction prerequisites.
+WP752 alias execution/publication is accepted at 74770f888. Full Cargo loading/execution,
+WP746's baseline diagnostic defect and broader M7A remain open; M8 is unproved.
 
 ### Earlier generated-input receipt
 

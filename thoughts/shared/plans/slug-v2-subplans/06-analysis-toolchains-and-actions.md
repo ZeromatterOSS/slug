@@ -142,6 +142,20 @@ include-flags branches, parameter bytes, imported-source A/B/A and unused-callab
 rejection. This is argument mapping, not native Cc providers/toolchains or execution;
 Windows/Darwin and C++ runtime-library callbacks remain unsupported.
 
+WP753 adds the pinned Cargo `_runfiles_map` closure as a typed recipe. The unique loaded
+Cargo source row, observed/evaluated SHA, exact callsite and immediate helper authenticate
+capture extraction. Args traces the evaluator-local fake executable and copies workspace
+name; Analysis lowers those captures and the shared File depset into owned structural state.
+Exact artifact equality filters only emitted arguments, preserving the action input depset.
+Rendering uses file.path and the existing short_path projection before ordinary vector
+options/parameter encoding. Noncallback Directory vectors render literal paths only with
+expand_directories=False; their default/true expansion remains rejected. The Bzlmod-only
+ctx.workspace_name getter exposes `_main` under
+the active-context check. Derived paths remain explicitly Slug-native; arbitrary callbacks,
+Directory expansion and complete Cargo toolchain/rule execution remain deferred. The focused
+proof invokes the unchanged private helper with real typed values and documented inert
+imports; it is not a full Cargo module-loading proof.
+
 WP-7-26 supplies shallow immutable list/dict copies to `cc_internal.freeze`.
 Read-only variants reuse the retained evaluator's collection algorithms, keep
 nested aliases, reject mutation and direct hashing, and survive module freeze
