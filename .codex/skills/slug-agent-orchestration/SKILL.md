@@ -35,14 +35,14 @@ packet touches one of its listed surfaces.
 ## Route
 
 Favor useful parallel work to shorten elapsed time. When independent tasks are
-available, proactively run two or three subagents alongside the root, within the
-session's available slots. The user favors faster project progress over modest
-token savings; use the third worker for useful independent work without requiring
-an exceptional critical-path justification. Treat this as an allowance, not a
-quota; small or sequential tasks may need fewer agents.
-While token capacity is comfortable, favor elapsed-time savings when deciding
-whether another useful worker is worth its token cost. As workers finish, reuse
-them for ready independent tasks while the root continues integration; do not
+available, prefer three subagents alongside the root, within the session's
+available slots. Use fewer for small or sequential tasks. The user favors faster
+project progress over modest token savings while weekly usage has headroom;
+do not leave a useful third worker idle solely to conserve tokens. This is a
+staffing preference, not a quota or an instruction to spend the remaining budget.
+Use the user's latest usage guidance when weighing token cost against elapsed
+time; do not treat an old usage percentage or reset date as current. As workers
+finish, reuse them for ready independent tasks while the root continues integration; do not
 wait for the whole group unless the next work depends on all their results.
 Examples include disjoint implementation, pinned-source research, focused
 validation on an already-built executable, and independent review. Keep each

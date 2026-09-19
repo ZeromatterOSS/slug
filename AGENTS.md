@@ -59,11 +59,11 @@ Start from the live checkout, not from memory.
 - Check `git status --short` and inspect dirty diffs before making changes.
   Treat dirty files as active user/agent state unless the user says otherwise.
 - Proactively use parallel subagents for independent work that advances the
-  current packet. Prefer two or three alongside the root when useful independent
-  tasks are available, within the session's available slots. The user favors
-  faster progress over modest token savings; a third worker needs no exceptional
-  justification. Use available capacity when it shortens elapsed time, and reuse
-  finishing workers for the next ready independent task. Keep concurrent edits
+  current packet. Prefer three alongside the root when useful independent tasks
+  are available, within the session's available slots; use fewer for smaller or
+  sequential work. The user favors faster progress over modest token savings
+  while weekly usage has headroom. Use available capacity when it shortens elapsed
+  time, and reuse finishing workers for the next ready independent task. Keep concurrent edits
   disjoint and follow the orchestration skill's routing and validation requirements.
 - Do not run multiple `cargo build` or `cargo test` commands in parallel when
   they share the same target directory; Cargo lock contention obscures signal.
