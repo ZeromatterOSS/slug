@@ -3443,6 +3443,7 @@ name = "slug_cli_v2"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "serde_json",
  "slug_commands_v2",
  "slug_core_v2",
  "slug_reapi_v2",

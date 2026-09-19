@@ -43,6 +43,20 @@ impl RemoteConfig {
         };
 
         for arg in args {
+            if matches!(
+                *arg,
+                "--remote_executor"
+                    | "--remote_cache"
+                    | "--remote_instance_name"
+                    | "--remote_header"
+                    | "--remote_timeout"
+                    | "--remote_retries"
+                    | "--remote_default_exec_properties"
+            ) {
+                return Err(RemoteConfigError::EmptyValue {
+                    flag: (*arg).to_owned(),
+                });
+            }
             if let Some(value) = arg.strip_prefix("--remote_executor=") {
                 config.executor = Some(non_empty("--remote_executor", value)?);
             } else if let Some(value) = arg.strip_prefix("--remote_cache=") {
@@ -115,13 +129,22 @@ fn parse_key_value(flag: &str, value: &str) -> Result<(String, String), RemoteCo
     let Some((key, value)) = value.split_once('=') else {
         return Err(RemoteConfigError::InvalidKeyValue {
             flag: flag.to_owned(),
-            value: value.to_owned(),
+            value: if flag == "--remote_header" {
+                "<redacted>"
+            } else {
+                value
+            }
+            .to_owned(),
         });
     };
     if key.is_empty() || value.is_empty() {
         return Err(RemoteConfigError::InvalidKeyValue {
             flag: flag.to_owned(),
-            value: format!("{key}={value}"),
+            value: if flag == "--remote_header" {
+                "<redacted>".to_owned()
+            } else {
+                format!("{key}={value}")
+            },
         });
     }
     Ok((key.to_owned(), value.to_owned()))

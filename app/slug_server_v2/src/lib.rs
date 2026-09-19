@@ -36,8 +36,6 @@ use slug_query_v2::QueryPolicy;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 
-use crate::reapi::run_reapi_build;
-
 /// The retained daemon state: one workspace runtime and a non-semantic
 /// observation adapter. The adapter's previous values are used only to report
 /// the compatibility metric.
@@ -229,6 +227,83 @@ impl Daemon {
         #[cfg(test)]
         self.forwarded_repository_environments
             .push(repository_environment.clone());
+        if !run && remote.mode() == RemoteMode::Execute {
+            let transport = match slug_reapi_v2::ActionChainReapiTransport::new(remote.clone()) {
+                Ok(transport) => transport,
+                Err(error) => {
+                    return (
+                        BuildResult::error_with_invalidated(
+                            "build_runtime_error",
+                            &error.to_string(),
+                            invalidated,
+                        ),
+                        None,
+                    );
+                }
+            };
+            let accepted = match self
+                .runtime
+                .execute_and_publish_requested_actions_with_repository_environment(
+                    targets,
+                    command_policy,
+                    environment_policy,
+                    lockfile_mode,
+                    &registry_urls,
+                    repository_environment,
+                    configuration_overlay,
+                    &transport,
+                ) {
+                Ok(accepted) => accepted,
+                Err(error) => {
+                    return (
+                        BuildResult::error_with_invalidated(
+                            "build_runtime_error",
+                            &error.to_string(),
+                            invalidated,
+                        ),
+                        None,
+                    );
+                }
+            };
+            let published = accepted
+                .project(|terminal| match terminal {
+                    Err(error) => {
+                        let (kind, code) = error.terminal_error();
+                        TerminalOutput::new(
+                            code,
+                            String::new(),
+                            build_error_json(kind, &error.to_string(), invalidated),
+                        )
+                    }
+                    Ok(result) => match slug_reapi_v2::requested_build_success_json(
+                        result,
+                        "daemon",
+                        Some(invalidated),
+                    ) {
+                        Ok(json) => TerminalOutput::new(0, String::new(), json),
+                        Err(error) => TerminalOutput::new(
+                            2,
+                            String::new(),
+                            build_error_json(
+                                "build_runtime_error",
+                                &error.to_string(),
+                                invalidated,
+                            ),
+                        ),
+                    },
+                })
+                .publish();
+            let (_, exit_code, stdout, stderr) = published.into_parts();
+            return (
+                BuildResult {
+                    exit_code,
+                    stdout,
+                    stderr,
+                    invalidated_files: invalidated,
+                },
+                None,
+            );
+        }
         let accepted = match self.runtime.build_command_with_repository_environment(
             targets,
             command_policy,
@@ -274,33 +349,20 @@ impl Daemon {
                     let analyzed_target_count = evaluation.analyzed_target_count();
                     let declared_action_count = evaluation.declared_action_count();
                     if remote.mode() == RemoteMode::Execute {
-                        let outcome = if run {
-                            let (outcome, path) = crate::reapi::run_reapi_executable(
-                                &self.workspace,
-                                evaluation,
-                                remote,
-                                "daemon",
-                                invalidated,
-                            );
-                            launch_path.replace(path);
-                            outcome
-                        } else {
-                            run_reapi_build(
-                                &self.workspace,
-                                evaluation,
-                                analyzed_target_count,
-                                declared_action_count,
-                                remote,
-                                "daemon",
-                                invalidated,
-                            )
-                        };
+                        let (outcome, path) = crate::reapi::run_reapi_executable(
+                            &self.workspace,
+                            evaluation,
+                            remote,
+                            "daemon",
+                            invalidated,
+                        );
+                        launch_path.replace(path);
                         TerminalOutput::new(outcome.exit_code, String::new(), outcome.stderr)
                     } else {
                         let argv_json = argv
                             .iter()
                             .map(|arg| {
-                                let arg = redact_repository_environment_arg(arg);
+                                let arg = redact_build_arg(arg);
                                 format!("\"{}\"", json_escape(arg))
                             })
                             .collect::<Vec<_>>()
@@ -722,9 +784,11 @@ impl Daemon {
     }
 }
 
-fn redact_repository_environment_arg(arg: &str) -> &str {
+fn redact_build_arg(arg: &str) -> &str {
     if arg.starts_with("--repo_env=") {
         "--repo_env=<redacted>"
+    } else if arg.starts_with("--remote_header=") {
+        "--remote_header=<redacted>"
     } else {
         arg
     }
@@ -911,6 +975,7 @@ pub use server::DaemonRequest;
 pub use server::DaemonResponse;
 pub use server::QueryRequest;
 pub use server::RUN_ENVIRONMENT_TO_CLEAR;
+pub use server::RemoteRequest;
 pub use server::RepositoryEnvironmentRequestInputs;
 pub use server::RepositoryEnvironmentWireEntry;
 pub use server::RunLaunchPlan;

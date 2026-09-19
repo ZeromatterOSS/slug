@@ -29,14 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-45-m7a-requested-command-terminals-r2
+Packet: WP-7-46-m7a-requested-build-activation-r1
 Status: accepted
 
-WP745 accepts typed requested build failures and diagnostic events, including
-DICE-attested transient roots for recurrent analysis failures, with 21 focused checks
-and direct dependent compilation. WP744 publication remains accepted at 65fc9bf7c.
-Next: WP746 adapter activation, including explicit
-malformed-target and remote-policy handling. M7A partial, M8 unproved.
+WP746 accepts Execute-mode Build through requested native execution/publication in
+CLI and daemon, with complete remote policy, typed diagnostics and selected-output evidence.
+Its 28 focused checks include separate fresh-backend one-shot and same-PID daemon A/A/B/A
+proofs. Run remains on its existing path. A Disabled-mode external-module-cycle diagnostic
+failure is reproduced at exact base 643578e1a and remains open. The next demanded execution
+family is default binary runfiles support; see bootstrap-readiness. M7A partial, M8 unproved.
 
 ### Earlier generated-input receipt
 

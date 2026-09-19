@@ -1,195 +1,159 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-45-m7a-requested-command-terminals-r2
+Packet: WP-7-46-m7a-requested-build-activation-r1
 Status: accepted
 
 ## Outcome and basis
 
-Preserve typed build-error terminals and selected diagnostic events through requested
-execution's existing native acceptance owner, without starting transport or publishing
-outputs on build errors. This is a prerequisite discovered while auditing CLI/server
-activation: both adapters currently project accepted Result<BuildCommandEvaluation,
-BuildCommandError>, whereas action-chain staging stringifies build errors and aborts.
-Activating that API directly would lose error categories and diagnostic events.
-WP744 (65fc9bf7c) accepted selected-subset publication with 21 focused checks including
-real REAPI proof; preserve its successful execution/publication and zero-action behavior.
+Activate Execute-mode Build in both one-shot CLI and retained daemon through the shared
+requested-artifact forest and native selected-output publication. A mixed FileWrite→Spawn
+File/Tree request executes exactly its reachable prerequisites and publishes only selected
+artifacts, with typed diagnostics and accepted source freshness. WP745 (643578e1a) supplies
+typed native errors and retained-runtime recovery; WP742-744 supply selection, producer
+binding, verified transfer and Linux GNU publication. Reuse their pinned Bazel 9.2
+8220c6198837d5c13d53fea211cf3282aa12408a CompletionFunction.java:160-164,364-375 artifact
+selection contract. Artifact/content identity and named error categories remain exact;
+command acceptance, structural configuration and JSON execution evidence are Slug-native.
+M7A remains partial and M8 unproved. No new action family, Run/runfiles or backend policy.
 
-Bazel 9.2 pin 8220c6198837d5c13d53fea211cf3282aa12408a,
-CompletionFunction.java:160-164,364-375 owns requested Artifact dependencies. Reuse
-WP742-744 producer/selection/content proof and existing native build error/event
-ownership in runtime/dice.rs (ObservedBuildCommandRoot and NativeCommandRoot hooks),
-runtime/events.rs and docs/developers/dice.md. Named error categories, source identity
-and selected evaluation diagnostics stay exact to their accepted owners. Request
-acceptance, structural configuration and event reconciliation remain Slug-native.
-This packet does not activate CLI/server execution or broaden action families.
+## Decisions and ownership
 
-## Decision and ownership
+Branch Execute-mode Build BEFORE each adapter's ordinary build acceptance. Construct one
+ActionChainReapiTransport from immutable command options, invoke
+execute_and_publish_requested_actions_with_repository_environment once, and project/publish
+its accepted Result once. Borrow the accepted inputs.evaluation for counts; no second
+build, adapter action loop, direct materialization or execution inside a terminal projector.
+Typed terminal errors use their original category/exit code. Outer operation failures keep
+build_runtime_error. Preserve Disabled/CacheOnly behavior, exported-source handling in
+those modes, CLI missing-target rejection, command configuration, Bzlmod/registry/env inputs.
 
-PreparedActionChainInputs already retains Arc<Result<BuildCommandEvaluation,
-BuildCommandError>>. Reuse it as the sole build outcome owner; add no secondary error
-field, side cache, graph rebuild, error reconstruction or filesystem discovery.
-For Requested selection only, retain a failed observed build evaluation after
-checked_build_frontier and successful SourceCertificate::from_epoch. It carries the
-original typed error, the complete observed build frontier/certificate and no action
-sources. Do not turn Need, outer observed-root errors, invalid/empty certificates,
-plan/producer/source-input errors or transport failures into accepted build errors.
-Selected-action staging keeps its existing failure behavior.
+Source-only and authored analyzed-empty Execute requests succeed without connecting to the
+executor. Loading-only native filegroups remain unsupported by requested selection. The
+server metric observation adapter stays nonsemantic; preserve its invalidation count and
+input-forwarding test hooks before the branch. Keep the existing legacy server executor as
+Run-only because both Run adapters still depend on it; its current admission stays intact.
+Remove the CLI Build loop and its obsolete alias/generated-root rejection test. Do not
+remove Run's corresponding guard or claim Run activation.
 
-Add public PreparedActionChainInputs::evaluation() returning
-Result<&BuildCommandEvaluation, &BuildCommandError>. plan() must propagate the retained
-error as its existing Arc<str> interface instead of unwrapping. Document that requested
-preparation may accept failed evaluation metadata and callers must inspect evaluation().
-Successful metadata/count projection borrows this same accepted evaluation.
+A shared PURE projection in slug_reapi_v2 accepts only RequestedActionResult with accepted
+ActionChainRemoteResult metadata. Preserve reapi_native_execution and existing JSON counter,
+digest, platform, runtime-mode and daemon invalidation fields. Aggregate execution/cache
+counters, action digests, uploads and platform properties from every completed prerequisite.
+Derive materialized_outputs ONLY from accepted publication groups: producer ordinal indexes
+the remote result table, selected File maps to its verified file digest, selected Directory
+to its verified manifest file digests (empty directories add no file digest). Never report
+unselected cooutputs or generated intermediates as materialized. Zero-action output has
+zero counters and empty digests. Projection performs no I/O, DICE computation or mutation.
+No new semantic owner or serde dependency for formatting; output strings are request scratch.
 
-Staging Key validity accepts completed retained evaluations, including typed failures,
-matching the observed-build owner so configured-conflict diagnostic closures remain
-readable. Equality requires successful evaluations on both sides; failed evaluations
-never cut off by equality. Dependency transience still propagates from DICE. Existing
-observation/Need dependencies and allocation ownership remain unchanged. No DICE lock or key-identity change. For retained
-requested analysis errors, reuse recursive BuildCommandError::is_analysis_error to allow
-unavailable terminal roots and TransientTerminalLocal demand association, exactly as the
-observed-build native owner does. Forward BOTH hooks from ActionChainExecutionRoot to
-staging. Keep SourceCertifiedCurrentClosure reconciliation and full selected-dependency
-association; native finalization revalidates the retained complete frontier.
-
-Execution complete checks the retained evaluation error before requesting a plan or
-calling any transport/publication callback. Both requested execute APIs now return
-Result<AcceptedCommand<Result<RequestedActionResult<T>, BuildCommandError>>,
-BuildCommandError>. Clone the original typed build error into the accepted terminal
-only after native acceptance; successful results keep the current result/output and
-producer-associated publication fields. Outer failure remains distinct. No compatibility
-shim: update all existing internal tests/callers to inspect the explicit result.
-Selected action APIs remain nonempty and retain existing error semantics.
-
-All new memory is borrowed metadata or the existing immutable Arc/error clone at terminal
-projection. Preserve Stage9 Arc/Allocative conventions; no donor/dependency/interner or
-retained hot-path representation change. The existing oversized runtime/dice.rs changes only to forward the completion
-callback through its test audit tracker; no native-driver redesign.
+Daemon IPC must preserve supported immutable remote options and must not silently discard
+unsupported ones. Carry cache endpoint, instance name, headers, timeout and retries alongside
+existing executor/properties in one primitive RemoteRequest with lossless conversion.
+Redact header values from its Debug and use a generic malformed-IPC parse error so serde
+errors cannot echo malformed header payloads. Execute validates
+existing chain policy on both CLI and server: headers/timeouts/retries/distinct CAS endpoints
+remain unsupported, without header values in diagnostics. CLI rejects invalid Execute policy
+before dispatch; server validates independently for raw requests. Keep Run's existing policy.
+Empty or malformed Build targets must fail the entire request, before runtime effects, instead
+of filter_map dropping them into a potentially successful empty request. Use the same parser
+and explicit error response; no permissive fallback.
 
 ## Scope and proof
 
-Production: runtime/action_chain_staging.rs and action_chain_execution.rs; optional
-minimal dice.rs test-tracker forwarding only. Core tests: existing action_chain_staging/tests.rs,
-action_chain_execution/tests.rs, requested_tests.rs, requested_publication_tests.rs,
-and one new requested_error_tests.rs child. REAPI: minimal typed-result adaptation in
-action_chain/requested_tests.rs and output_staging/requested_publication_tests.rs only.
-Additional prerequisite scope: dice/dice/src/api/activation_tracker.rs,
-dice/dice/src/impls/ctx.rs and impls/tests/activation_tracker.rs;
-runtime/events.rs, runtime/demands.rs and a focused events/transient_root_tests.rs
-child. Docs: current/canonical, Stage7 and bootstrap-readiness. No CLI/server edits this packet.
-Expected production growth 40-100 lines and proof/adaptation 150-300 lines, review
-triggers rather than caps. Worker1 owns production; worker2 owns Core tests; root owns
-REAPI adaptations, source/contract review and coordinated validation.
+Production allowlist: slug_cli_v2/src/commands/{build,run}.rs (Run IPC adaptation only),
+slug_server_v2/src/{lib,server,reapi}.rs, slug_reapi_v2/src/lib.rs and a new
+requested_build.rs pure projection child; config.rs for header-safe parse diagnostics and rejection of bare value-taking remote
+flags; explicit options may never silently disappear. Build argv diagnostics also redact
+remote headers in one-shot and server analysis-only paths; early parser failures must
+not expose valid header arguments.
+Focused tests in adjacent new requested_build child modules, CLI tests/cli.rs loading-only
+expectation migration and existing server/tests.rs
+protocol literals/controls; two focused ignored CLI integration selectors supervised against separate fresh backends, using existing
+source-staging workspace and WP744 real backend scaffolding. Root owns REAPI projection,
+plan/docs and coordinated validation; workers own disjoint CLI and server adapters/proof.
+No Core/DICE/transport/publication semantic change. Expected net production growth 0-200
+lines after deleting CLI duplicate execution, plus 300-700 focused proof/harness lines;
+estimates trigger review, not hard caps. Large existing adapter files receive only branch,
+protocol and helper changes; new proof goes in children rather than expanding monoliths.
+CLI Cargo.toml may reuse existing workspace serde_json as a dev-dependency for
+structured integration assertions; no new external package or production dependency.
+No retained representation, interner or lock change. Keep existing Arc/ownership.
 
-Prove a real semantic error→repair→error sequence in one retained runtime, exact typed
-error category/message and selected diagnostics through project/publish, zero transport
-and publication callbacks on error, native accepted snapshot consistency, and successful
-recovery. Cover a non-analysis build error and an analysis failure requiring unavailable
-terminal-root/demand handling. Compare appropriate baseline build-command evidence or
-explicit expected diagnostics; no weakened event assertions. Requested preparation must
-expose the typed error and plan() must fail without panic. Protect Selected-mode errors,
-requested success/source-only completion and requested publication/retry.
+Prove public one-shot and retained-daemon mixed FileWrite→Spawn selected File/Tree publication
+with real REAPI: cold/warm/source A→B→A, exact bytes, selected materialized evidence, complete
+execution/cache counters, unchanged diagnostics not replayed, unrelated actions/cooutputs
+absent, configured output location and source recovery. Reuse a tiny existing backend fixture;
+no broad workspace build. Add offline adapter controls for source/authored-empty bad endpoint,
+analysis/conflict typed failures/recovery, malformed targets and policy preservation/rejection
+(including instance/default properties and no header-value exposure). Protect Disabled/CacheOnly
+and Run admission plus named existing daemon event/input controls. Pure summary proof covers
+selected-vs-unselected producer outputs, empty trees and zero-action evidence. New tests must
+exercise the production adapters, not a separate test-only executor or projector.
 
-Compile default Core/REAPI library tests --no-run with pinned nightly-2025-09-14 and
-Cargo JSON; compile CLI direct dependent for public API change. Preparations separate,
-cap60s. Preflight exact focused selectors. Run native fixture suites serially. Prefer
-runtime below a few seconds; >30s needs strict necessity, 12s is guidance. Reuse accepted
-WP744 wire/CAS proof because transport/publication algorithms do not change. Format,
-diff/plan/archive checks and independent design/final ACCEPT before commit/main
-fast-forward and authorized push. Receipts target/wp745. Record elapsed/compile/test time.
-REPLAN only for a contradicted native error/certificate owner or a newly required
-semantic boundary; routine invocation or implementation corrections stay in packet.
+Compile separately with pinned nightly-2025-09-14 and Cargo JSON, preparation cap60s. Build
+slug_cli_v2 before any SLUG_V2_BIN-based proof. Preflight exact unit selectors; run native
+fixtures serially where observed ancestor paths overlap. Supervise fresh backend/daemon and
+reap owned processes; Unix-socket execution uses existing authorized sandbox escalation.
+Prefer runtime below a few seconds; >30s requires strict necessity, 12s is guidance. Name
+focused gates and preserve passing evidence; no broad suites absent a gap. Format changed
+Rust, diff/plan/archive checks, independent design and final review before checkpoint commit,
+main fast-forward and authorized push. Receipts target/wp746. REPLAN only if shared acceptance,
+output evidence, remote policy or Run ownership cannot implement this contract; routine
+invocation/fixture/compiler corrections stay in this packet.
 
-## Reviewed prerequisite correction
-
-R1 exposed two distinct failures in target/wp745/core-corrected-r2.receipt (two tests,
-1.196s). Blanket invalid staging wrappers hide configured-conflict diagnostics; the
-validity correction above retains their tracked closure. A separate ordinary-only
-error→repair→error diagnostic (ordinary-diagnostic-r1.receipt, 1.034s) proves analysis
-iteration2 already fails in the ordinary native owner: transient recomputation leaves
-its prior persistent root Dirty. Conflict succeeds all three ordinary phases; unchanged
-selected evaluation events correctly do not replay after the initial phase.
-
-R2 resolves this prerequisite within the same typed-error acceptance outcome. DICE owns
-current computed-value validity, including dependency transience. Extend its activation
-tracker with a default root-completion callback using the same reserved root node,
-version and ordinal, emitted only after successful compute/projection completion.
-Preserve existing root-start ordering and cancellation behavior; cached/transient values
-must report their actual validity. No persistent graph transition is fabricated. Callback state uses the existing erased
-rich-activation future branch only for tracked parentless requests; ordinary nested
-computes keep the unboxed path and original 88-byte compile-time size guard. The first
-capture-based candidate failed that guard at 144 bytes and is rejected. Extra boxing is
-request scratch released on completion/cancellation, not per dependency computation.
-Independent representation review ACCEPT; no runtime speedup claim.
-The command event owner records this attestation on the matching current-attempt root.
-Only the existing analysis-error unavailable-root policy may omit that exact completed
-transient root after activation_closure rejects it as Dirty at the sealed version.
-Always query the original roots first, preserving foreign-engine and live-version
-validation. Retry only after removing a matching current root; a dirty descendant or
-NotVerified error still rejects. Existing unavailable-root handling remains. Never blanket-ignore
-Dirty, skip dirty descendants, accept stale-version completions or infer transience
-from an error string. Preserve version/root/ordinal validation and source-certified
-terminal-local demand association. No extra dependency graph, cache, replay owner,
-filesystem read or locking across a DICE computation.
-
-DICE prior-art basis: local impls/tests/transients.rs and activation_tracker.rs and
-MaybeValidDiceValue dependency validity propagation. These are Slug-native provenance
-semantics, not a new Bazel parity claim. New memory is a completion flag per command
-root, a sealed transient-root ID vector and callback scratch, released with its attempt; no retained semantic value grows.
-The existing events owner remains cohesive: the change extends its root selection,
-with focused new tests in a child rather than expanding its large colocated test block.
-Expected additional production growth 60-130 lines plus focused proof; estimates only.
-
-Prove valid→transient→valid completion metadata, repeated/transient cached requests,
-root ordering and projection behavior, and cancellation with no completion. Event tests
-must accept an attested transient after prior success only under the allowed policy,
-retain strict rejection, and protect dirty/uncomputed roots, dirty descendants, foreign
-transactions and version mismatches, including when every root is transient. Run the retained ordinary/requested error→repair→error proof and
-exact conflict event suppression. Compile DICE tests and Core/REAPI, check CLI dependent,
-then run focused selectors serially. Reuse unaffected earlier proof; no broader suite.
-Independent prerequisite design ACCEPT: preserve root-start identity/ordering; use
-rejection-driven retry so original engine/liveness checks execute before any omission.
-Final review requires the named transient, cancellation, projection and wrong-transaction
-negatives plus ordinary/requested warm recovery.
-
-## Activation successor
-
-WP746 migrates Execute-mode Build before each adapter's old build acceptance, using one
-requested execute/publish operation and pure accepted-result rendering. Preserve analysis-
-only/CacheOnly behavior and CLI missing-target rejection. Loading-only native filegroups
-remain unsupported selection; authored empty/source roots succeed without connection.
-Project materialized digest evidence from accepted selected publication groups, never all
-remote cooutputs, and aggregate execution counters from the complete accepted result table.
-
-Server BuildRequest parsing currently filter_maps malformed target strings; fail explicitly.
-Its IPC drops cache, instance_name, headers, timeout and retry policy; carry supported
-immutable options or reject unsupported options before dispatch, never silently discard.
-Keep header values out of diagnostics. Existing chain policy rejects custom headers,
-timeouts/retries and separate CAS endpoints. Do not broaden that policy in activation.
-Run still calls the old server run_reapi_build helper via run_reapi_executable; preserve
-it as Run-only with existing admission rather than deleting it with ordinary Build loops.
-Require real one-shot and retained-daemon requested File/Tree subset proof, cold/warm/
-source A/B/A, diagnostics and failure controls. M7A partial; M8 remains unproved.
-
-Independent design review ACCEPT: preserve typed/frontier/native owners, both error
-policy hooks and explicit result projection; final error/recovery/effect proof required.
+Independent design review ACCEPT: single native Build operation, pure selected evidence,
+complete immutable remote policy and separate Run. Final proof includes header redaction
+through parse and argv error paths, both real adapters and retained recovery.
 
 ## Acceptance receipt
 
-Baseline 65fc9bf7c, pinned nightly-2025-09-14, default host library tests. Independent
-final review ACCEPT. Final exact-selector checks: Core 15/15 (4.287s), DICE 5/5
-(0.009s), REAPI source-only 1/1 (0.288s), all serial where native fixtures overlap.
-Core includes both retained ordinary and requested analysis/conflict error→repair→error
-with exact typed errors/events, failed-operation zero effects, current source frontier,
-Selected failure behavior, successful publication/retry, and transient-root negatives.
-DICE proves completion validity/identity, cached projections, cancellation and version
-ordering; its original 88-byte compute-future assertion remains unchanged.
+WP746 activates only the bounded requested Build contract above. The public one-shot and
+same-PID daemon proofs each use a fresh NativeLink backend and A/A/B/A requests; three
+reachable actions execute out of four declared, with accepted-attempt (hit,miss) counts
+(0,3)/(3,0)/(1,2)/(3,0), exact selected File/Tree bytes and 0555 modes, replacement removing
+stale children, preserved unrelated outputs, no intermediate/cooutput publication and
+expected diagnostic replay. Run remains on its existing execution path.
 
-Final combined DICE/Core/REAPI --no-run preparation passed in 26.323s; CLI dependent
-check (including server) passed in 20.174s. Formatting, diff, plan and archive checks pass.
-Receipts: target/wp745/{core-final-r3,dice-focused-r1,reapi-source-control-r2,
-dice-core-reapi-no-run-r7,cli-check-r2,structural}.receipt. Recorded preparation time
-across attempts: 158.492s; runtime including diagnostic/failing attempts: 11.253s;
-accepted 21-check runtime: 4.584s. No >30s runtime test was required. WP744 wire/CAS
-proof is reused; no transport/publication algorithm changed. The prerequisite advances
-typed native acceptance only; CLI/server activation is WP746, M7A partial, M8 unproved.
+Pinned preparation passed: current REAPI/server libraries 4.287s, explicit CLI build 1.724s,
+CLI integration compilation 6.781s, CLI library tests 2.277s and wire-fixture recompile 1.818s.
+An earlier CLI preparation reached its 60s cap; the completed dependency work was reused.
+Focused validation passed 28 selectors in 18.577s total runtime: 12 server (2.828s), four
+pure REAPI/config (0.004s), four CLI offline (3.361s), two existing CLI adapter controls
+(5.411s), three Run parsing/launch controls (0.006s), the preserved legacy Run root guard (0.317s),
+one-shot wire (3.716s), and daemon wire
+(2.934s). Exact-selector preflights and ignored-selector checks passed. Native fixtures ran
+serially; fresh backends terminated and owned daemon descendants were reaped. Receipts are
+under target/wp746; committed selectors retain reproducible proof, while backend supervision
+reuses tools/v2_oracle_lib/nativelink.py and the existing Linux NativeLink binary.
+
+Corrections preserved assertions: absent output directories are valid after no publication;
+four older server fixtures now use local built-in module dependencies; loading-only native
+filegroup expectations match requested-selection rejection. The wire fixture precreates an
+empty bazel-out before either adapter starts, stabilizing the observed directory namespace
+without warming DICE or CAS. First-ever directory creation can otherwise cause a discarded
+execution attempt and an accepted cache-hit retry; counters describe accepted results, not
+all RPCs across discarded attempts. This existing retry behavior is not changed here.
+
+One protected failure is proven pre-existing: retained_daemon_external_module_cycle_recovers_without_stale_events
+fails Disabled-mode Build with build_runtime_error/exit2 instead of unsupported_feature/exit7
+at both candidate and exact base 643578e1a. Baseline server/REAPI sources were verified against
+32 Git blobs; unchanged dependency sources and package versions were retained. Separate
+baseline preparation passed in 19.332s after a 60s preparation cap; the exact failing selector
+took 0.073s. Its assertion is unchanged and the diagnostic defect remains open.
+An optional older Run conflict fixture exceeded a 12s group estimate before its first case
+completed; it supplies no passing evidence and was not repeated. The changed Run IPC is
+covered by the passing server wire, CLI registry and parsing/launch controls. An initial
+Run-unit selection targeted the main wrapper with zero tests; the library target supplied
+all three verified selectors. No broad suite or new Bazel execution was needed.
+
+The three new focused proof modules total 1,034 lines, exceeding the original 300–700
+estimate because both product adapters need invocation/lifecycle coverage, raw IPC
+needs separate malformed-policy/target and redaction checks, and the pure summary needs
+producer-subset negatives. New tests live in three focused children; the wire variants share
+one fixture/driver, and offline modules reuse the existing built-in workspace writer.
+
+The next demanded family is default binary runfiles support, documented in bootstrap-readiness.
+M7A remains partial and M8 unproved. Preserve this accepted checkpoint before selecting that
+bounded implementation contract. Independent final review: ACCEPT, confirming native ownership,
+selected publication, typed errors, immutable remote policy, both backend proofs and baseline
+failure attribution. Rust formatting, diff, plan consistency and archive checks pass.

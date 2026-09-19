@@ -79,8 +79,7 @@ fn repository_environment_wire_is_canonical_redacted_and_never_falls_back() {
         DaemonRequest::Build(BuildRequest {
             targets: vec!["//:probe".to_owned()],
             configuration_overlay: Default::default(),
-            executor: None,
-            default_exec_properties: Vec::new(),
+            remote: Default::default(),
             bzlmod: Default::default(),
             repository_environment: RepositoryEnvironmentRequestInputs { entries },
         })
@@ -99,8 +98,7 @@ fn repository_environment_wire_is_canonical_redacted_and_never_falls_back() {
     let build = BuildRequest {
         targets: vec!["//:probe".to_owned()],
         configuration_overlay: Default::default(),
-        executor: None,
-        default_exec_properties: Vec::new(),
+        remote: Default::default(),
         bzlmod: Default::default(),
         repository_environment: RepositoryEnvironmentRequestInputs {
             entries: entries.clone(),
@@ -849,7 +847,7 @@ fn third_build_after_no_edit_invalidates_zero() {
 fn retained_daemon_build_publishes_cold_and_changed_events_without_warm_replay() {
     let workspace = scratch("build-selected-events");
     let package = workspace.join("pkg");
-    write_configured_module(
+    requested_build_tests::write_hermetic_module(
         &workspace,
         "print(\"MODULE_EVENT\")\nmodule(name = \"demo\")\n",
     );
@@ -910,7 +908,7 @@ fn retained_daemon_build_publishes_cold_and_changed_events_without_warm_replay()
 fn missing_loaded_bzl_is_absent_then_create_is_observed_without_a_key_panic() {
     let workspace = scratch("missing-then-create-bzl");
     let package = workspace.join("pkg");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    requested_build_tests::write_hermetic_module(&workspace, "module(name = \"demo\")\n");
     write(&workspace.join("BUILD.bazel"), "");
     write(
         &package.join("BUILD.bazel"),
@@ -943,7 +941,7 @@ fn missing_loaded_bzl_is_absent_then_create_is_observed_without_a_key_panic() {
 fn transitive_missing_bzl_reports_the_deepest_label_and_recovers() {
     let workspace = scratch("transitive-missing-then-create-bzl");
     let package = workspace.join("pkg");
-    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    requested_build_tests::write_hermetic_module(&workspace, "module(name = \"demo\")\n");
     write(
         &package.join("BUILD.bazel"),
         "load(\":defs.bzl\", \"declare\")\ndeclare()\n",
@@ -1285,11 +1283,15 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
     let request = DaemonRequest::Build(BuildRequest {
         targets: vec!["//pkg:one".to_owned(), "//pkg:two".to_owned()],
         configuration_overlay: root_setting_overlay(Some("Gr\u{00fc}\u{00df}e")),
-        executor: Some("grpc://executor".to_owned()),
-        default_exec_properties: vec![
-            ("cpu".to_owned(), "x86_64".to_owned()),
-            ("os".to_owned(), "linux".to_owned()),
-        ],
+        remote: crate::RemoteRequest {
+            executor: Some("grpc://executor".to_owned()),
+            default_exec_properties: [
+                ("cpu".to_owned(), "x86_64".to_owned()),
+                ("os".to_owned(), "linux".to_owned()),
+            ]
+            .into(),
+            ..Default::default()
+        },
         bzlmod: BzlmodRequestInputs::default(),
         repository_environment: Default::default(),
     });
@@ -1303,9 +1305,13 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
         build.configuration_overlay,
         root_setting_overlay(Some("Gr\u{00fc}\u{00df}e"))
     );
-    assert_eq!(build.executor.as_deref(), Some("grpc://executor"));
+    assert_eq!(build.remote.executor.as_deref(), Some("grpc://executor"));
     assert_eq!(
-        build.default_exec_properties,
+        build
+            .remote
+            .default_exec_properties
+            .into_iter()
+            .collect::<Vec<_>>(),
         [
             ("cpu".to_owned(), "x86_64".to_owned()),
             ("os".to_owned(), "linux".to_owned())
@@ -1336,8 +1342,11 @@ fn run_wire_carries_only_build_inputs_and_bounded_launch_authorization() {
     let request = DaemonRequest::Run(BuildRequest {
         targets: vec!["//pkg:hello".to_owned()],
         configuration_overlay: CommandConfigurationOverlay::default(),
-        executor: Some("grpc://executor".to_owned()),
-        default_exec_properties: vec![("cpu".to_owned(), "x86_64".to_owned())],
+        remote: crate::RemoteRequest {
+            executor: Some("grpc://executor".to_owned()),
+            default_exec_properties: [("cpu".to_owned(), "x86_64".to_owned())].into(),
+            ..Default::default()
+        },
         bzlmod: BzlmodRequestInputs {
             registry_urls: registry_urls.clone(),
             ..BzlmodRequestInputs::default()
@@ -1353,10 +1362,9 @@ fn run_wire_carries_only_build_inputs_and_bounded_launch_authorization() {
     };
     assert_eq!(decoded.targets, ["//pkg:hello"]);
     assert_eq!(decoded.bzlmod.registry_urls, registry_urls);
-    let omitted: DaemonRequest = serde_json::from_str(
-        r#"{"kind":"run","request":{"targets":["//pkg:hello"],"executor":null,"default_exec_properties":[]}}"#,
-    )
-    .unwrap();
+    let omitted: DaemonRequest =
+        serde_json::from_str(r#"{"kind":"run","request":{"targets":["//pkg:hello"],"remote":{}}}"#)
+            .unwrap();
     let DaemonRequest::Run(omitted) = omitted else {
         panic!("expected run request")
     };
@@ -2546,7 +2554,7 @@ fn bzlmod_protocol_is_primitive_canonical_and_backward_compatible() {
     assert_eq!(override_inputs.lockfile_mode, "error");
 
     let old: DaemonRequest = serde_json::from_str(
-        r#"{"kind":"build","request":{"targets":["//pkg:probe"],"executor":null,"default_exec_properties":[]}}"#,
+        r#"{"kind":"build","request":{"targets":["//pkg:probe"],"remote":{}}}"#,
     )
     .unwrap();
     let DaemonRequest::Build(old) = old else {
@@ -2769,7 +2777,7 @@ fn retained_daemon_direct_external_query_replays_only_changed_external_build() {
 #[test]
 fn retained_daemon_build_observes_direct_external_exported_sources() {
     let workspace = scratch("external-build-source");
-    write_configured_module(
+    requested_build_tests::write_hermetic_module(
         &workspace,
         "print(\"ROOT_EVENT\")\nmodule(name = \"demo\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
     );
@@ -2873,8 +2881,11 @@ fn retained_daemon_build_observes_direct_external_exported_sources() {
     remote_execute.executor = Some("grpc://must-not-run".to_owned());
     let remote_source = daemon.build(&[target("@dep//:target.txt")], &remote_execute, &[]);
     assert_eq!(remote_source.exit_code, 0, "{remote_source:?}");
-    assert_eq!(remote_source.stderr, terminal(0));
-    assert!(!remote_source.stderr.contains("reapi"), "{remote_source:?}");
+    let evidence: serde_json::Value = serde_json::from_str(&remote_source.stderr).unwrap();
+    assert_eq!(evidence["completed_boundary"], "reapi_native_execution");
+    assert_eq!(evidence["reapi_actions"], 0);
+    assert_eq!(evidence["materialized_outputs"], serde_json::json!([]));
+    assert_eq!(evidence["invalidated_files"], 0);
 }
 
 #[test]
@@ -3395,8 +3406,8 @@ fn retained_daemon_buildfiles_tracks_loaded_companion_priority_only() {
 #[test]
 fn every_active_daemon_decoder_carries_command_module_overrides() {
     let requests = [
-        r#"{"kind":"build","request":{"targets":["//pkg:probe"],"executor":null,"default_exec_properties":[],"bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
-        r#"{"kind":"run","request":{"targets":["//pkg:probe"],"executor":null,"default_exec_properties":[],"bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
+        r#"{"kind":"build","request":{"targets":["//pkg:probe"],"remote":{},"bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
+        r#"{"kind":"run","request":{"targets":["//pkg:probe"],"remote":{},"bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
         r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
         r#"{"kind":"aquery","request":{"expression":"//pkg:probe","bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
         r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"label","bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
@@ -3415,3 +3426,6 @@ fn every_active_daemon_decoder_carries_command_module_overrides() {
         );
     }
 }
+
+#[path = "requested_build_tests.rs"]
+mod requested_build_tests;

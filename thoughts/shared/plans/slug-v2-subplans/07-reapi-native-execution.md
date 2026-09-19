@@ -224,7 +224,8 @@ lock; cleanup follows saved retired identities, never the new published handles.
 The current publisher requires Linux GNU and one coordinated publisher per workspace.
 Concurrent external/legacy namespace mutation, crash recovery, symlink artifacts,
 writable-output policy and whole-generation watch publication remain unsupported.
-General build scheduling and CLI activation remain open.
+Requested Build scheduling and CLI/daemon activation use the bounded forest below;
+broader action-family admission remains open.
 
 Core's `BuildCommandEvaluation::requested_artifacts()` is the ordinary requested
 output metadata boundary. It selects sorted hidden, validation, default and temporary
@@ -283,12 +284,13 @@ ordinary native builds to recover and fail again in one retained runtime.
 Both requested execution
 operations return an accepted Result: build errors invoke no transport or publication,
 while outer observation, plan/source-input and transport errors remain operation failures.
-This terminal boundary is required before command adapters can activate the path.
+Both Build adapters consume this terminal boundary before formatting command output.
 
-The legacy CLI/server all-action executors reject newly activated Alias/GeneratedFile
-requested roots before effects. This temporary gate is removed when the shared selected
-artifact forest replaces both helpers and reaches native validated publication. Closure
-inspection APIs retain their existing meaning. WP744 extends the existing output
+Execute-mode Build in CLI and daemon now invokes one requested native execution and
+publication operation before ordinary build acceptance. The CLI all-action helper is
+removed; the server legacy executor and its Alias/GeneratedFile admission guard remain
+Run-only. Disabled/CacheOnly and closure inspection APIs retain their existing meaning.
+WP744 extends the existing output
 transport callback to one complete batch of selected producer subsets. Core groups
 selected Derived artifacts by exact producer, deduplicates equivalent shared FileWrite
 destinations, and retains producer ordinals in accepted publication metadata. Sources
@@ -302,8 +304,16 @@ Every selected group is transferred and sealed before native finalization. Core 
 preflights every destination before the first rename, retaining all stages until after
 the revision owner is released. The existing per-artifact partial-publication and abort
 error guarantees apply across groups. Zero-action requested publication invokes no
-transport or staging and returns empty published metadata. Runfiles families and
-ordinary CLI activation remain open; library publication does not prove product gates.
+transport or staging and returns empty published metadata.
+
+WP746 connects both product Build adapters to this operation. A pure shared projection
+counts all accepted prerequisite results but reports materialized digests only from
+accepted selected producer subsets. Source-only and authored analyzed-empty builds need
+no backend connection; loading-only native filegroups remain unsupported. IPC preserves
+all immutable remote options, rejects malformed target lists and obsolete unknown fields,
+and redacts header values. Existing transport policy rejects unsupported headers, timeouts,
+retries and distinct CAS endpoints before execution; bare value-taking flags cannot vanish.
+Runfiles families, symlink publication and production Rustc execution remain open.
 
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies

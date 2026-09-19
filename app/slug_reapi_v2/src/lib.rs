@@ -64,3 +64,6 @@ pub use action_chain::ActionChainReapiSession;
 pub use action_chain::ActionChainReapiTransport;
 pub use action_chain::ActionChainRemoteResult;
 pub use action_chain::StagedChainAction;
+
+mod requested_build;
+pub use requested_build::requested_build_success_json;

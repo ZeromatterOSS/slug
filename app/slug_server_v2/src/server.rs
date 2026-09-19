@@ -36,16 +36,72 @@ use crate::Daemon;
 
 /// A build request sent by the CLI client over the socket.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BuildRequest {
     pub targets: Vec<String>,
     #[serde(default)]
     pub configuration_overlay: CommandConfigurationOverlay,
-    pub executor: Option<String>,
-    pub default_exec_properties: Vec<(String, String)>,
+    #[serde(default)]
+    pub remote: RemoteRequest,
     #[serde(default)]
     pub bzlmod: BzlmodRequestInputs,
     #[serde(default)]
     pub repository_environment: RepositoryEnvironmentRequestInputs,
+}
+
+/// Lossless remote policy on the local command protocol.
+#[derive(Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct RemoteRequest {
+    pub executor: Option<String>,
+    pub cache: Option<String>,
+    pub instance_name: Option<String>,
+    pub headers: std::collections::BTreeMap<String, String>,
+    pub timeout_seconds: Option<u64>,
+    pub retry_attempts: Option<u32>,
+    pub default_exec_properties: std::collections::BTreeMap<String, String>,
+}
+
+impl std::fmt::Debug for RemoteRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RemoteRequest")
+            .field("executor", &self.executor)
+            .field("cache", &self.cache)
+            .field("instance_name", &self.instance_name)
+            .field("headers", &"<redacted>")
+            .field("timeout_seconds", &self.timeout_seconds)
+            .field("retry_attempts", &self.retry_attempts)
+            .field("default_exec_properties", &self.default_exec_properties)
+            .finish()
+    }
+}
+
+impl From<&RemoteConfig> for RemoteRequest {
+    fn from(config: &RemoteConfig) -> Self {
+        Self {
+            executor: config.executor.clone(),
+            cache: config.cache.clone(),
+            instance_name: config.instance_name.clone(),
+            headers: config.headers.clone(),
+            timeout_seconds: config.timeout_seconds,
+            retry_attempts: config.retry_attempts,
+            default_exec_properties: config.default_exec_properties.clone(),
+        }
+    }
+}
+
+impl RemoteRequest {
+    pub fn to_config(&self) -> RemoteConfig {
+        RemoteConfig {
+            executor: self.executor.clone(),
+            cache: self.cache.clone(),
+            instance_name: self.instance_name.clone(),
+            headers: self.headers.clone(),
+            timeout_seconds: self.timeout_seconds,
+            retry_attempts: self.retry_attempts,
+            default_exec_properties: self.default_exec_properties.clone(),
+        }
+    }
 }
 
 /// A loading query request sent over the same daemon protocol.
@@ -358,14 +414,13 @@ pub fn serve(socket_path: impl AsRef<Path>, workspace: impl AsRef<Path>) -> anyh
 pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
     let request: DaemonRequest = match serde_json::from_str(request_json) {
         Ok(req) => req,
-        Err(error) => {
+        Err(_) => {
             return DaemonResponse {
                 exit_code: 2,
                 stdout: String::new(),
-                stderr: format!(
-                    "{{\"error\":\"daemon_parse_error\",\"message\":\"{}\"}}",
-                    error
-                ),
+                stderr:
+                    "{\"error\":\"daemon_parse_error\",\"message\":\"malformed daemon request\"}\n"
+                        .to_owned(),
                 invalidated_files: 0,
                 run_launch_plan: None,
             };
@@ -373,6 +428,18 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
     };
     match request {
         DaemonRequest::Build(request) => {
+            if request.targets.is_empty() {
+                return build_request_error("build requires at least one target");
+            }
+            let targets = match request
+                .targets
+                .iter()
+                .map(|target| TargetPattern::parse(target))
+                .collect::<Result<Vec<_>, _>>()
+            {
+                Ok(targets) => targets,
+                Err(error) => return build_request_error(&error.to_string()),
+            };
             let (command_policy, environment_policy, lockfile_mode, registry_urls) =
                 match request.bzlmod.normalize() {
                     Ok(inputs) => inputs,
@@ -382,11 +449,6 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 Ok(inputs) => inputs,
                 Err(error) => return malformed_repository_environment_response(error),
             };
-            let targets: Vec<TargetPattern> = request
-                .targets
-                .iter()
-                .filter_map(|t| TargetPattern::parse(t).ok())
-                .collect();
             let remote = build_remote_config(&request);
             let result = daemon.build_with_repository_environment(
                 &targets,
@@ -653,6 +715,16 @@ fn run_request_error(message: &str) -> DaemonResponse {
     }
 }
 
+fn build_request_error(message: &str) -> DaemonResponse {
+    DaemonResponse {
+        exit_code: 2,
+        stdout: String::new(),
+        stderr: super::build_error_json("build_request_error", message, 0),
+        invalidated_files: 0,
+        run_launch_plan: None,
+    }
+}
+
 fn malformed_bzlmod_response(error: String) -> DaemonResponse {
     DaemonResponse {
         exit_code: 2,
@@ -680,24 +752,7 @@ fn malformed_repository_environment_response(error: String) -> DaemonResponse {
 }
 
 fn build_remote_config(request: &BuildRequest) -> RemoteConfig {
-    let mut config = RemoteConfig {
-        executor: None,
-        cache: None,
-        instance_name: None,
-        headers: std::collections::BTreeMap::new(),
-        timeout_seconds: None,
-        retry_attempts: None,
-        default_exec_properties: std::collections::BTreeMap::new(),
-    };
-    if let Some(executor) = &request.executor {
-        config.executor = Some(executor.clone());
-    }
-    for (key, value) in &request.default_exec_properties {
-        config
-            .default_exec_properties
-            .insert(key.clone(), value.clone());
-    }
-    config
+    request.remote.to_config()
 }
 
 fn read_line(stream: &mut UnixStream) -> anyhow::Result<String> {

@@ -883,7 +883,7 @@ fn typed_build_activation_publishes_cold_events_without_warm_daemon_replay() {
 }
 
 #[test]
-fn typed_build_activation_preserves_native_reapi_projector_for_no_action_terminal() {
+fn requested_build_rejects_loading_only_native_filegroups() {
     let workspace = scratch("typed-build-reapi-projector");
     write(
         workspace.join("MODULE.bazel"),
@@ -915,7 +915,9 @@ fn typed_build_activation_preserves_native_reapi_projector_for_no_action_termina
         assert!(output.stdout.is_empty());
         let stderr = String::from_utf8(output.stderr).unwrap();
         assert!(
-            stderr.contains("\"message\":\"no executable actions were declared\""),
+            stderr.contains(
+                "requested artifact selection is unsupported for unactivated target //pkg:probe"
+            ),
             "{stderr:?}"
         );
         assert!(stderr.ends_with('\n'));

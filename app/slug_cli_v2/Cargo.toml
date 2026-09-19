@@ -18,6 +18,9 @@ slug_server_v2 = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
 
+[dev-dependencies]
+serde_json = { workspace = true }
+
 [[bin]]
 name = "slug"
 path = "src/main.rs"

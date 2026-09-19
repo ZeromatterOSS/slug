@@ -8,15 +8,15 @@
  * above-listed licenses.
  */
 
-use slug_commands_v2::CommandKind;
 use slug_commands_v2::CommandParseError;
 use slug_commands_v2::build::BuildRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
-use slug_core_v2::runtime::BuildCommandEvaluation;
-use slug_core_v2::runtime::ConfiguredNodeKind;
+use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
+use slug_core_v2::runtime::WorkspaceRuntime;
 use slug_core_v2::runtime::evaluate_workspace_build_command_with_repository_environment;
+use slug_reapi_v2::ActionChainReapiTransport;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 
@@ -33,28 +33,61 @@ pub fn run(argv: Vec<String>) -> i32 {
     };
     let request = match BuildRequest::parse_at_workspace(&argv, &workspace) {
         Ok(request) => request,
-        Err(error) => return super::emit_result(CommandKind::Build, argv, Err(error)),
+        Err(error) => return emit_parse_error(&argv, error),
     };
     let repository_environment = match super::repository_environment::capture_repository_environment(
         &workspace,
         &request.repository_environment_overrides,
     ) {
         Ok(snapshot) => snapshot,
-        Err(error) => return super::emit_result(CommandKind::Build, argv, Err(error)),
+        Err(error) => return emit_parse_error(&argv, error),
     };
     let environment_value = match capture_bzlmod_allow_yanked_versions() {
         Ok(value) => value,
-        Err(error) => return super::emit_result(CommandKind::Build, argv, Err(error)),
+        Err(error) => return emit_parse_error(&argv, error),
     };
     let environment_policy = match normalize_bzlmod_environment_value(environment_value.as_deref())
     {
         Ok(policy) => policy,
-        Err(error) => return super::emit_result(CommandKind::Build, argv, Err(error)),
+        Err(error) => return emit_parse_error(&argv, error),
+    };
+
+    let output_base = extract_output_base(&argv);
+    let runtime_mode = if output_base.is_some() {
+        "daemon"
+    } else {
+        "one-shot"
+    };
+    let remote = match RemoteConfig::from_args(&argv.iter().map(String::as_str).collect::<Vec<_>>())
+    {
+        Ok(remote) => remote,
+        Err(error) => {
+            eprint!(
+                "{}",
+                build_error_json("build_runtime_error", &error.to_string(), runtime_mode)
+            );
+            return 2;
+        }
+    };
+    // Validate the entire immutable Execute policy before daemon startup or dispatch.
+    let transport = if remote.mode() == RemoteMode::Execute {
+        match ActionChainReapiTransport::new(remote.clone()) {
+            Ok(transport) => Some(transport),
+            Err(error) => {
+                eprint!(
+                    "{}",
+                    build_error_json("build_runtime_error", &error.to_string(), runtime_mode)
+                );
+                return 2;
+            }
+        }
+    } else {
+        None
     };
 
     // Daemon mode: when --output_base is set, route through the persistent
     // daemon so DICE state survives across builds (gate clause 5).
-    if let Some(output_base) = extract_output_base(&argv) {
+    if let Some(output_base) = output_base {
         let bzlmod = slug_server_v2::BzlmodRequestInputs::from_normalized_with_registry_urls(
             &request.bzlmod_policy,
             &environment_policy,
@@ -65,7 +98,66 @@ pub fn run(argv: Vec<String>) -> i32 {
             slug_server_v2::RepositoryEnvironmentRequestInputs::from_normalized(
                 &repository_environment,
             );
-        return run_daemon_build(&argv, &output_base, request, bzlmod, repository_environment);
+        return run_daemon_build(
+            &output_base,
+            request,
+            bzlmod,
+            repository_environment,
+            &remote,
+        );
+    }
+
+    if let Some(transport) = transport {
+        let accepted = WorkspaceRuntime::new(&workspace, ProcessHostOwner::native())
+            .map_err(|error| error.to_string())
+            .and_then(|runtime| {
+                runtime
+                    .execute_and_publish_requested_actions_with_repository_environment(
+                        &request.targets,
+                        request.bzlmod_policy,
+                        environment_policy,
+                        request.lockfile_mode,
+                        &request.registry_urls,
+                        repository_environment,
+                        request.configuration_overlay,
+                        &transport,
+                    )
+                    .map_err(|error| error.to_string())
+            });
+        let accepted = match accepted {
+            Ok(accepted) => accepted,
+            Err(error) => {
+                eprint!(
+                    "{}",
+                    build_error_json("build_runtime_error", &error, "one-shot")
+                );
+                return 2;
+            }
+        };
+        let published = accepted
+            .project(|result| match result {
+                Err(error) => {
+                    let (kind, code) = error.terminal_error();
+                    TerminalOutput::new(
+                        code,
+                        String::new(),
+                        build_error_json(kind, &error.to_string(), "one-shot"),
+                    )
+                }
+                Ok(result) => {
+                    match slug_reapi_v2::requested_build_success_json(result, "one-shot", None) {
+                        Ok(json) => TerminalOutput::new(0, String::new(), json),
+                        Err(error) => TerminalOutput::new(
+                            2,
+                            String::new(),
+                            build_error_json("build_runtime_error", &error.to_string(), "one-shot"),
+                        ),
+                    }
+                }
+            })
+            .publish();
+        let (_, code, stdout, stderr) = published.into_parts();
+        return emit_output(code, stdout, stderr);
     }
 
     let accepted = match evaluate_workspace_build_command_with_repository_environment(
@@ -105,9 +197,9 @@ pub fn run(argv: Vec<String>) -> i32 {
                     "{\"success\":true,\"command\":\"build\",\"target_count\":1,\"loaded_package_count\":1,\"analyzed_target_count\":0,\"declared_action_count\":0,\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"dice_exported_source_file\"}\n".to_owned(),
                 );
             }
-            let argv_json = super::repository_environment::redacted_repository_environment_argv(&argv)
+            let argv_json = redacted_build_argv(&argv)
                 .into_iter()
-                .map(|arg| format!("\"{}\"", json_escape(arg)))
+                .map(|arg| format!("\"{}\"", json_escape(&arg)))
                 .collect::<Vec<_>>()
                 .join(",");
             let analyzed_target_count = evaluation.analyzed_target_count();
@@ -117,26 +209,6 @@ pub fn run(argv: Vec<String>) -> i32 {
             } else {
                 "dice_starlark_rule_analysis"
             };
-            let remote_args = argv.iter().map(String::as_str).collect::<Vec<_>>();
-            let remote = match RemoteConfig::from_args(&remote_args) {
-                Ok(remote) => remote,
-                Err(error) => {
-                    return TerminalOutput::new(
-                        2,
-                        String::new(),
-                        build_error_json("build_runtime_error", &error.to_string(), "one-shot"),
-                    );
-                }
-            };
-            if remote.mode() == RemoteMode::Execute {
-                run_reapi_build(
-                    &workspace,
-                    evaluation,
-                    analyzed_target_count,
-                    declared_action_count,
-                    &remote,
-                )
-            } else {
                 TerminalOutput::new(
                     2,
                     String::new(),
@@ -151,17 +223,71 @@ pub fn run(argv: Vec<String>) -> i32 {
                     ),
                 )
             }
-            }
         })
         .publish();
-    let (_terminal, exit_code, stdout, stderr) = published.into_parts();
+    let (_, exit_code, stdout, stderr) = published.into_parts();
+    emit_output(exit_code, stdout, stderr)
+}
+
+fn emit_output(code: i32, stdout: String, stderr: String) -> i32 {
     if !stdout.is_empty() {
         print!("{stdout}");
     }
     if !stderr.is_empty() {
         eprint!("{stderr}");
     }
-    exit_code
+    code
+}
+
+fn redacted_build_argv(argv: &[String]) -> Vec<String> {
+    let mut value = false;
+    super::repository_environment::redacted_repository_environment_argv(argv)
+        .into_iter()
+        .map(|arg| {
+            if value {
+                value = false;
+                "<redacted>".to_owned()
+            } else if arg == "--remote_header" {
+                value = true;
+                arg.to_owned()
+            } else if arg.starts_with("--remote_header=") {
+                "--remote_header=<redacted>".to_owned()
+            } else {
+                arg.to_owned()
+            }
+        })
+        .collect()
+}
+
+fn emit_parse_error(argv: &[String], error: CommandParseError) -> i32 {
+    let mut message = error.to_string();
+    let mut value = false;
+    for arg in argv {
+        let header = if value {
+            value = false;
+            Some(arg.as_str())
+        } else if arg == "--remote_header" {
+            value = true;
+            None
+        } else {
+            arg.strip_prefix("--remote_header=")
+        };
+        if let Some(header) = header {
+            for sensitive in [
+                header,
+                header.split_once('=').map_or(header, |(_, value)| value),
+            ] {
+                if !sensitive.is_empty() && message.contains(sensitive) {
+                    message = "invalid build arguments (remote header redacted)".into();
+                }
+            }
+        }
+    }
+    eprint!(
+        "{}",
+        build_error_json("command_parse_error", &message, "one-shot")
+    );
+    2
 }
 
 fn build_error_json(kind: &str, message: &str, runtime_mode: &str) -> String {
@@ -171,211 +297,6 @@ fn build_error_json(kind: &str, message: &str, runtime_mode: &str) -> String {
         json_escape(message),
         runtime_mode,
     )
-}
-
-fn run_reapi_build(
-    workspace: &std::path::Path,
-    evaluation: &BuildCommandEvaluation,
-    analyzed_target_count: usize,
-    declared_action_count: usize,
-    remote: &RemoteConfig,
-) -> TerminalOutput {
-    if evaluation.requested_target_kinds().any(|kind| {
-        matches!(
-            kind,
-            ConfiguredNodeKind::Alias | ConfiguredNodeKind::GeneratedFile
-        )
-    }) {
-        return TerminalOutput::new(
-            2,
-            String::new(),
-            build_error_json(
-                "build_runtime_error",
-                "REAPI execution for requested aliases and generated files is unsupported",
-                "one-shot",
-            ),
-        );
-    }
-    let runtime = match tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            return TerminalOutput::new(
-                2,
-                String::new(),
-                build_error_json("build_runtime_error", &error.to_string(), "one-shot"),
-            );
-        }
-    };
-    let execution = runtime.block_on(async {
-        let mut reapi_actions = 0_u64;
-        let mut direct_local_actions = 0_u64;
-        let mut ac_hits = 0_u64;
-        let mut ac_misses = 0_u64;
-        let mut action_digests: Vec<String> = Vec::new();
-        let mut uploaded_digests: Vec<String> = Vec::new();
-        let mut materialized_outputs: Vec<String> = Vec::new();
-        let mut platform_properties = std::collections::BTreeMap::new();
-        let mut record = |output_root: &std::path::Path,
-                          result: slug_reapi_v2::RemoteExecutionResult|
-         -> Result<(), String> {
-            slug_reapi_v2::materialize_outputs(output_root, &result)
-                .map_err(|error| error.to_string())?;
-            reapi_actions += result.evidence.reapi_actions;
-            direct_local_actions += result.evidence.direct_local_actions;
-            ac_hits += result.evidence.ac_hits;
-            ac_misses += result.evidence.ac_misses;
-            action_digests.push(result.action_digest.to_string());
-            uploaded_digests.extend(
-                result
-                    .evidence
-                    .uploaded_digests
-                    .iter()
-                    .map(|digest| digest.to_string()),
-            );
-            materialized_outputs.extend(
-                result
-                    .evidence
-                    .materialized_outputs
-                    .iter()
-                    .map(|digest| digest.to_string()),
-            );
-            platform_properties.extend(result.platform_properties);
-            Ok(())
-        };
-
-        let mut file_write_actions = 0_usize;
-        let mut other_actions = 0_usize;
-        for action in evaluation
-            .analyses()
-            .flat_map(|analysis| analysis.actions())
-        {
-            if slug_reapi_v2::is_file_write_action(action) {
-                file_write_actions += 1;
-            } else {
-                other_actions += 1;
-            }
-        }
-        if file_write_actions > 0 && other_actions > 0 {
-            return Err(
-                "mixed FileWrite and non-FileWrite REAPI closures are unsupported".to_owned(),
-            );
-        }
-
-        if file_write_actions > 0 {
-            let views = evaluation
-                .resolved_file_write_execution_views_in_closure()
-                .map_err(str::to_owned)?;
-            for view in views {
-                let configuration = view
-                    .action()
-                    .owner()
-                    .configuration()
-                    .slug_configuration()
-                    .ok_or_else(|| {
-                        "production FileWrite owner has an opaque configuration".to_owned()
-                    })?;
-                let output_root =
-                    slug_core_v2::runtime::configured_output_root(workspace, configuration);
-                let result = slug_reapi_v2::execute_file_write(remote, &view)
-                    .await
-                    .map_err(|error| error.to_string())?;
-                record(&output_root, result)?;
-            }
-        } else {
-            for analysis in evaluation.analyses() {
-                let configuration = analysis
-                    .configured_target_key()
-                    .ok_or_else(|| "production rule analysis returned a null node".to_owned())?
-                    .configuration()
-                    .slug_configuration()
-                    .ok_or_else(|| {
-                        "production analysis returned an opaque configuration".to_owned()
-                    })?;
-                let output_root =
-                    slug_core_v2::runtime::configured_output_root(workspace, configuration);
-                for action in analysis.actions() {
-                    let result = slug_reapi_v2::execute_action(remote, action)
-                        .await
-                        .map_err(|error| error.to_string())?;
-                    record(&output_root, result)?;
-                }
-            }
-        }
-        Ok::<_, String>((
-            reapi_actions,
-            direct_local_actions,
-            ac_hits,
-            ac_misses,
-            action_digests,
-            uploaded_digests,
-            materialized_outputs,
-            platform_properties,
-        ))
-    });
-    match execution {
-        Ok((
-            reapi_actions,
-            direct_local_actions,
-            ac_hits,
-            ac_misses,
-            action_digests,
-            uploaded_digests,
-            materialized_outputs,
-            platform_properties,
-        )) if reapi_actions > 0 => {
-            let action_digests_json = action_digests
-                .iter()
-                .map(|digest| format!("\"{}\"", json_escape(digest)))
-                .collect::<Vec<_>>()
-                .join(",");
-            let uploaded_digests_json = uploaded_digests
-                .iter()
-                .map(|digest| format!("\"{}\"", json_escape(digest)))
-                .collect::<Vec<_>>()
-                .join(",");
-            let materialized_outputs_json = materialized_outputs
-                .iter()
-                .map(|digest| format!("\"{}\"", json_escape(digest)))
-                .collect::<Vec<_>>()
-                .join(",");
-            let platform_properties_json = platform_properties
-                .iter()
-                .map(|(key, value)| format!("\"{}\":\"{}\"", json_escape(key), json_escape(value)))
-                .collect::<Vec<_>>()
-                .join(",");
-            TerminalOutput::new(
-                0,
-                String::new(),
-                format!(
-                    "{{\"success\":true,\"command\":\"build\",\"analyzed_target_count\":{},\"declared_action_count\":{},\"reapi_actions\":{},\"direct_local_actions\":{},\"ac_hits\":{},\"ac_misses\":{},\"action_digests\":[{}],\"uploaded_digests\":[{}],\"materialized_outputs\":[{}],\"platform_properties\":{{{}}},\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"reapi_native_execution\"}}\n",
-                    analyzed_target_count,
-                    declared_action_count,
-                    reapi_actions,
-                    direct_local_actions,
-                    ac_hits,
-                    ac_misses,
-                    action_digests_json,
-                    uploaded_digests_json,
-                    materialized_outputs_json,
-                    platform_properties_json,
-                ),
-            )
-        }
-        Ok(_) => TerminalOutput::new(
-            2,
-            String::new(),
-            "{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"message\":\"no executable actions were declared\",\"runtime_mode\":\"one-shot\"}\n"
-                .to_owned(),
-        ),
-        Err(error) => TerminalOutput::new(
-            2,
-            String::new(),
-            build_error_json("build_runtime_error", &error, "one-shot"),
-        ),
-    }
 }
 
 /// Extract `--output_base=PATH` or `--output_base PATH` from the argv.
@@ -398,11 +319,11 @@ pub(super) fn extract_output_base(argv: &[String]) -> Option<String> {
 /// start it as a background process first. The daemon holds DICE state across
 /// builds so `.bzl` edits are invalidated and replayed in the same process.
 fn run_daemon_build(
-    argv: &[String],
     output_base: &str,
     request: BuildRequest,
     bzlmod: slug_server_v2::BzlmodRequestInputs,
     repository_environment: slug_server_v2::RepositoryEnvironmentRequestInputs,
+    remote: &RemoteConfig,
 ) -> i32 {
     let output_base_path = std::path::Path::new(output_base);
     let _ = std::fs::create_dir_all(output_base_path);
@@ -419,27 +340,10 @@ fn run_daemon_build(
         }
     }
 
-    let remote_args: Vec<&str> = argv.iter().map(String::as_str).collect();
-    let remote = match RemoteConfig::from_args(&remote_args) {
-        Ok(remote) => remote,
-        Err(error) => {
-            eprintln!(
-                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\"}}",
-                json_escape(&error.to_string())
-            );
-            return 2;
-        }
-    };
-
     let daemon_request = slug_server_v2::BuildRequest {
         targets: request.targets.iter().map(|t| t.to_string()).collect(),
         configuration_overlay: request.configuration_overlay,
-        executor: remote.executor.clone(),
-        default_exec_properties: remote
-            .default_exec_properties
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect(),
+        remote: remote.into(),
         bzlmod,
         repository_environment,
     };
@@ -650,158 +554,6 @@ mod daemon_readiness_tests {
             let error = daemon_cleanup_error(primary.into(), kill_result, wait_result);
             assert_eq!(error.to_string(), format!("startup failed{suffix}"));
             assert_eq!(error.root_cause().to_string(), "startup failed");
-        }
-    }
-}
-
-#[cfg(test)]
-#[path = "../../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
-mod requested_root_guard_fixture;
-
-#[cfg(test)]
-mod requested_root_guard_tests {
-    use slug_core_v2::runtime::BzlmodCommandPolicyKey;
-    use slug_core_v2::runtime::BzlmodEnvironmentPolicyKey;
-    use slug_core_v2::runtime::LockfileMode;
-    use slug_core_v2::runtime::ProcessHostOwner;
-    use slug_core_v2::runtime::TargetPattern;
-    use slug_core_v2::runtime::WorkspaceRuntime;
-
-    use super::requested_root_guard_fixture as fixture;
-    use super::*;
-
-    struct Scratch(std::path::PathBuf);
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            std::fs::remove_dir_all(&self.0).unwrap();
-        }
-    }
-
-    #[test]
-    fn requested_alias_and_generated_roots_reject_before_execution_setup() {
-        let parent =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/wp741/guards");
-        std::fs::create_dir_all(&parent).unwrap();
-        let root = Scratch(parent.canonicalize().unwrap().join(format!(
-            "cli-{}-{}", std::process::id(),
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
-        )));
-        std::fs::create_dir(&root.0).unwrap();
-        fixture::write(&root.0);
-        std::fs::write(
-            root.0.join("defs.bzl"),
-            r#"
-def _generate(ctx):
-    ctx.actions.write(ctx.outputs.out, "bytes")
-    ctx.actions.write(ctx.actions.declare_file("unrelated.out"), "unselected")
-    return [DefaultInfo(files = depset([ctx.outputs.out]))]
-generate = rule(implementation = _generate, attrs = {"out": attr.output(mandatory = True)})
-def _empty(ctx): return []
-empty = rule(implementation = _empty)
-"#,
-        )
-        .unwrap();
-        std::fs::write(
-            root.0.join("BUILD.bazel"),
-            r#"
-load(":defs.bzl", "generate", "empty")
-platform(name = "platform")
-exports_files(["input"])
-generate(name = "producer", out = "generated.out")
-alias(name = "rule_alias", actual = ":producer")
-alias(name = "generated_alias", actual = ":generated.out")
-empty(name = "empty")
-"#,
-        )
-        .unwrap();
-        let workspace = WorkspaceRuntime::new(&root.0, ProcessHostOwner::native()).unwrap();
-        let remote = RemoteConfig::from_args(&["--remote_executor=http://[invalid"]).unwrap();
-        for (targets, rejected) in [
-            (vec!["//:rule_alias"], true),
-            (vec!["//:generated_alias"], true),
-            (vec!["//:generated.out"], true),
-            (vec!["//:input", "//:empty"], false),
-        ] {
-            let accepted = workspace
-                .build_command_with_repository_environment(
-                    &targets
-                        .iter()
-                        .map(|target| TargetPattern::parse(target).unwrap())
-                        .collect::<Vec<_>>(),
-                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
-                    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-                    LockfileMode::Update,
-                    &[format!("file://{}/empty-registry", root.0.display())],
-                    Default::default(),
-                    Default::default(),
-                )
-                .unwrap();
-            let published = accepted
-                .project(|terminal| {
-                    let evaluation = terminal.as_ref().as_ref().unwrap();
-                    assert_eq!(
-                        evaluation.requested_target_kinds().any(|kind| matches!(
-                            kind,
-                            ConfiguredNodeKind::Alias | ConfiguredNodeKind::GeneratedFile
-                        )),
-                        rejected
-                    );
-                    let mut output_paths = Vec::new();
-                    for analysis in evaluation.analyses() {
-                        let configuration = analysis
-                            .configured_target_key()
-                            .unwrap()
-                            .configuration()
-                            .slug_configuration()
-                            .unwrap();
-                        let output_root =
-                            slug_core_v2::runtime::configured_output_root(&root.0, configuration);
-                        for action in analysis.actions() {
-                            for output in action.outputs() {
-                                output_paths.push(output_root.join(output.path()));
-                            }
-                        }
-                    }
-                    assert_eq!(output_paths.len(), if rejected { 2 } else { 0 });
-                    assert!(output_paths.iter().all(|path| !path.exists()));
-                    let execute = || {
-                        run_reapi_build(
-                            &root.0,
-                            evaluation,
-                            evaluation.analyzed_target_count(),
-                            evaluation.declared_action_count(),
-                            &remote,
-                        )
-                    };
-                    let output = if rejected {
-                        // An unguarded path panics if it reaches nested block_on.
-                        tokio::runtime::Builder::new_current_thread()
-                            .build()
-                            .unwrap()
-                            .block_on(async { execute() })
-                    } else {
-                        execute()
-                    };
-                    assert!(output_paths.iter().all(|path| !path.exists()));
-                    output
-                })
-                .publish();
-            let (_, code, _, stderr) = published.into_parts();
-            assert_eq!(code, 2);
-            if rejected {
-                assert!(
-                    stderr.contains(
-                        "REAPI execution for requested aliases and generated files is unsupported"
-                    ),
-                    "{stderr}"
-                );
-            } else {
-                assert!(
-                    stderr.contains("no executable actions were declared"),
-                    "{stderr}"
-                );
-            }
-            assert!(!root.0.join("generated.out").exists());
         }
     }
 }

@@ -7,7 +7,7 @@
  * select, at your option, one of the above-listed licenses.
  */
 
-//! REAPI build execution for the daemon. Mirrors the one-shot CLI path but
+//! Legacy Run execution shared by the daemon and one-shot CLI. It
 //! embeds `runtime_mode = "daemon"` and the invalidated-file count.
 
 use std::path::Path;
@@ -17,9 +17,9 @@ use slug_core_v2::runtime::BuildCommandEvaluation;
 use slug_core_v2::runtime::ConfiguredNodeKind;
 use slug_reapi_v2::RemoteConfig;
 
-/// Execute all declared actions in the evaluation through REAPI and return the
+/// Execute the existing Run action closure through REAPI and return the
 /// JSON evidence line plus the exit code.
-pub fn run_reapi_build(
+fn run_reapi_run_build(
     workspace: &Path,
     evaluation: &BuildCommandEvaluation,
     analyzed_target_count: usize,
@@ -233,7 +233,7 @@ pub fn run_reapi_executable(
             );
         }
     };
-    let outcome = run_reapi_build(
+    let outcome = run_reapi_run_build(
         workspace,
         evaluation,
         evaluation.analyzed_target_count(),
@@ -385,7 +385,7 @@ empty(name = "empty")
                     assert_eq!(output_paths.len(), if rejected { 2 } else { 0 });
                     assert!(output_paths.iter().all(|path| !path.exists()));
                     let execute = || {
-                        let outcome = run_reapi_build(
+                        let outcome = run_reapi_run_build(
                             &root.0,
                             evaluation,
                             evaluation.analyzed_target_count(),
