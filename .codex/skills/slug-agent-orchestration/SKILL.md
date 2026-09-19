@@ -34,11 +34,17 @@ packet touches one of its listed surfaces.
 
 ## Route
 
-The root may complete a cohesive packet directly. Delegate only a concrete
-independent implementation or review task; give concurrent writers disjoint
-files/worktrees. Use the user's selected model and delegation preferences;
-there is no mandatory model-name or effort downgrade. Under token pressure,
-default to root-only work and reuse accepted evidence.
+Favor useful parallel work to shorten elapsed time. When independent tasks are
+available, proactively run up to two subagents alongside the root; a third is
+appropriate when it clearly advances the critical path within available slots.
+Examples include disjoint implementation, pinned-source research, focused
+validation on an already-built executable, and independent review. Keep each
+assignment concrete and bounded, give concurrent writers disjoint files/worktrees,
+and continue useful root work while they run. Reuse agents and accepted evidence;
+avoid duplicate investigations or delegation overhead for small sequential edits.
+The root still owns integration and may complete a cohesive packet directly.
+Use the user's selected model; there is no mandatory model or effort downgrade.
+Reduce concurrency if actual resource pressure or conflicts appear.
 
 Obtain independent review for a new shared public boundary, semantic
 identity/ownership or DICE locking change, lifecycle risk, and milestone close.

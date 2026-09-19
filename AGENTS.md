@@ -58,6 +58,10 @@ Start from the live checkout, not from memory.
   `.codex/skills/slug-buck2-utility-reuse/SKILL.md` before editing.
 - Check `git status --short` and inspect dirty diffs before making changes.
   Treat dirty files as active user/agent state unless the user says otherwise.
+- Proactively use parallel subagents for independent work that advances the
+  current packet. Prefer up to two alongside the root; use a third when its
+  bounded task clearly shortens the critical path. Keep concurrent edits disjoint
+  and follow the orchestration skill's routing and validation requirements.
 - Do not run multiple `cargo build` or `cargo test` commands in parallel when
   they share the same target directory; Cargo lock contention obscures signal.
 - If a Rust change affects the V2 `slug` binary path used by oracle tests,
