@@ -59,6 +59,7 @@ pub use dice::CqueryCommandError;
 pub use dice::CqueryCommandEvaluation;
 pub use dice::PreparedActionChainInputs;
 pub use dice::PreparedActionPlan;
+pub use dice::PreparedArtifactSymlink;
 pub use dice::PreparedRunfilesAction;
 pub use dice::PreparedRunfilesManifests;
 #[doc(hidden)]

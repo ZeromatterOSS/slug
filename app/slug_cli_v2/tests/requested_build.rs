@@ -577,3 +577,7 @@ fn one_shot_requested_file_tree_cold_warm_change_restore() {
 fn daemon_requested_file_tree_cold_warm_change_restore() {
     wire(true);
 }
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[path = "requested_build/artifact_symlinks.rs"]
+mod artifact_symlinks;

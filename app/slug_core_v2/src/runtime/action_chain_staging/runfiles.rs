@@ -64,7 +64,7 @@ impl PreparedActionChainInputs {
         }
     }
 
-    fn target_path(
+    pub(super) fn target_path(
         &self,
         artifact: &AnalysisArtifact,
         declared: &paths::DeclaredOutputs<'_>,

@@ -393,6 +393,26 @@ unresolved Symlink outputs, Run activation, exact support ActionKeys and Windows
 continue to reject directly selecting support families; ordinary requested Build owns their
 coupled publication.
 
+WP752 admits regular-File artifact-target Symlink/ExecutableSymlink actions on Linux GNU.
+Each alias retains its exact prerequisite and forwards its digest, effective execute status
+and terminal source/CAS/local-byte provenance without a fabricated remote action. Source
+owner-execute permission comes from certified observations; remote-only generated files
+count executable. Generated CAS content must verify before alias completion, including
+nested aliases and equal-source/local-byte collisions. Consumers project resolved aliases
+as regular executable FileNodes, including through FilesToRun.
+
+Requested publication follows the transitive alias and runfiles backing closure. Host links
+preserve observed requested paths; materialized sources use persistent verified backing.
+Core owns confined physical links and safe regular-file/alias replacement. Ordinary groups
+retain their selected order, followed by aliases in prerequisite order and coupled trees.
+Reachable public MANIFEST producers schedule deferred tree completion roots without adding
+dependency cycles. Legacy selected aliases reject a topology needing later completion;
+legacy ordinary Spawn MANIFEST consumption is preserved. Publication remains per-artifact,
+with explicit partial failure rather than batch atomicity. AbsolutePath, exec-root source
+policy, Directory targets, unresolved Symlink outputs and SolibSymlink remain deferred.
+The focused proofs cover source chmod/content restoration, generated modefalse, missing or
+corrupt CAS, physical replacement, cleanup confinement and post-CLI-exit MANIFEST backing.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

@@ -196,7 +196,7 @@ fn staging_rejects_escape_type_conflicts_missing_outputs_and_cleans_sealed_trees
 }
 
 #[test]
-fn namespace_symlinks_are_rejected_without_touching_outside() {
+fn namespace_ancestor_symlinks_are_rejected_without_touching_outside() {
     let (config, _) = configurations();
     for boundary in [
         "workspace",
@@ -206,7 +206,6 @@ fn namespace_symlinks_are_rejected_without_touching_outside() {
         "configuration",
         "bin",
         "parent",
-        "leaf",
     ] {
         let workspace = Workspace::new();
         let outside = Workspace::new();
@@ -226,7 +225,6 @@ fn namespace_symlinks_are_rejected_without_touching_outside() {
             "configuration" => output_root.parent().unwrap().to_path_buf(),
             "bin" => output_root.clone(),
             "parent" => output_root.join("pkg"),
-            "leaf" => output_root.join("pkg/file"),
             _ => unreachable!(),
         };
         fs::create_dir_all(link.parent().unwrap()).unwrap();

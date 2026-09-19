@@ -20,6 +20,10 @@ use crate::executor::tonic_endpoint;
 use crate::source_spawn::spawn_command;
 use crate::*;
 
+mod artifact_symlink;
+pub use artifact_symlink::ArtifactSymlinkResult;
+use artifact_symlink::ArtifactSymlinkTemplate;
+
 mod binding;
 use binding::Binding;
 use binding::BoundInputs;
@@ -72,10 +76,11 @@ enum StagedPayload {
         identity: ReapiActionIdentity,
         uploaded: Vec<ReapiDigest>,
     },
-    Runfiles(ActionChainStepResult),
+    Local(ActionChainStepResult),
 }
 
 enum Template {
+    ArtifactSymlink(ArtifactSymlinkTemplate),
     Runfiles(ActionChainStepResult),
     Write(FileWriteReapiPlan),
     Spawn {
@@ -144,6 +149,28 @@ impl Template {
                         runfiles,
                     )));
                 }
+                if let Some(alias) = inputs
+                    .prepare_artifact_symlink(action)
+                    .map_err(command_error)?
+                {
+                    let [target] = step.inputs() else {
+                        return Err(protocol(
+                            "artifact symlink requires exactly one planned input",
+                        ));
+                    };
+                    if target.artifact() != alias.input() {
+                        return Err(protocol("artifact symlink differs from its planned target"));
+                    }
+                    let binding = Binding::prepare(target, &sources, &plan)?;
+                    let mut entries = Vec::new();
+                    let mut directories = Vec::new();
+                    binding.preflight(&mut entries, &mut directories);
+                    ReapiInputTree::from_entries_and_directories(entries, directories)
+                        .map_err(command_error)?;
+                    return Ok(Self::ArtifactSymlink(ArtifactSymlinkTemplate::new(
+                        alias, binding,
+                    )));
+                }
                 let Some(spawn) = action.spawn_spec() else {
                     return FileWriteReapiPlan::from_chain_action(action, defaults)
                         .map(Self::Write)
@@ -184,7 +211,7 @@ impl Template {
         } = self
         else {
             let Self::Write(plan) = self else {
-                return Err(protocol("runfiles step has no remote input tree"));
+                return Err(protocol("local metadata step has no remote input tree"));
             };
             return Ok(BoundAction {
                 command: plan.command().clone(),
@@ -253,9 +280,12 @@ impl ActionChainTransport for ActionChainReapiTransport {
             tonic_endpoint(self.config.executor.as_deref().expect("validated executor"))?;
         let endpoint = tonic::transport::Endpoint::from_shared(endpoint)
             .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
-        let remote = templates
-            .iter()
-            .any(|template| !matches!(template, Template::Runfiles(_)));
+        let remote = templates.iter().any(|template| {
+            !matches!(
+                template,
+                Template::Runfiles(_) | Template::ArtifactSymlink(_)
+            )
+        });
         let channel = if remote {
             endpoint
                 .connect()
@@ -303,7 +333,14 @@ impl ActionChainTransport for ActionChainReapiTransport {
             return Ok(StagedChainAction {
                 session: session.identity.clone(),
                 index,
-                payload: StagedPayload::Runfiles(result.clone()),
+                payload: StagedPayload::Local(result.clone()),
+            });
+        }
+        if let Template::ArtifactSymlink(alias) = template {
+            return Ok(StagedChainAction {
+                session: session.identity.clone(),
+                index,
+                payload: StagedPayload::Local(artifact_symlink::stage(alias, session).await?),
             });
         }
         let bound = template.bind(&session.results)?;
@@ -403,7 +440,7 @@ impl ActionChainTransport for ActionChainReapiTransport {
             ));
         }
         let result = match staged.payload {
-            StagedPayload::Runfiles(result) => result,
+            StagedPayload::Local(result) => result,
             StagedPayload::Remote {
                 command,
                 identity,
@@ -454,3 +491,6 @@ mod runfiles_tests;
 
 #[cfg(all(test, target_os = "linux", target_env = "gnu"))]
 mod files_to_run_tests;
+
+#[cfg(all(test, target_os = "linux", target_env = "gnu"))]
+mod artifact_symlink_tests;

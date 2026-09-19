@@ -29,15 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-51-m7a-files-to-run-inputs-r1
+Packet: WP-7-52-m7a-artifact-file-symlinks-r1
 Status: accepted
 
-WP751 accepts FilesToRun tool-input transfer through exact native producer bindings and
-logical remote runfiles expansion, including generated Directory artifacts. Twenty-four
-portable checks, three real-backend proofs and direct CLI/server compilation pass; independent
-final review accepted. WP750 binary publication remains protected. M7A remains partial and
-M8 unproved; bootstrap symlink families, Cargo's runfiles callback and WP746's baseline
-diagnostic defect remain open.
+WP752 accepts production-demanded regular File artifact-target Symlink/ExecutableSymlink:
+verified remote alias bytes and physical local links with complete durable backing. Independent
+review, 28 focused portable checks and six supervised backend/CLI proofs passed. WP751
+FilesToRun input transfer remains accepted at 576818e94. M7A remains partial and M8 unproved;
+SolibSymlink, Cargo's runfiles callback and WP746's baseline diagnostic defect remain open.
 
 ### Earlier generated-input receipt
 

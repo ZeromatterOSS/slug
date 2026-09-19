@@ -31,6 +31,7 @@ use slug_build_api_v2::ActionOutputKind;
 use slug_configuration_v2::SlugConfiguration;
 use tempfile::NamedTempFile;
 
+mod alias;
 mod runfiles;
 mod source_backing;
 pub(super) use runfiles::validate_runfiles;
@@ -51,10 +52,8 @@ fn entry(parent: &File, name: &str) -> io::Result<Option<Entry>> {
     match fstatat(parent, name, AtFlags::AT_SYMLINK_NOFOLLOW) {
         Ok(stat) => {
             let kind = SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT;
-            if kind != SFlag::S_IFREG && kind != SFlag::S_IFDIR {
-                return Err(io::Error::other(
-                    "output namespace contains symlink or special file",
-                ));
+            if kind != SFlag::S_IFREG && kind != SFlag::S_IFDIR && kind != SFlag::S_IFLNK {
+                return Err(io::Error::other("output namespace contains special file"));
             }
             Ok(Some(Entry {
                 identity: Identity(stat.st_dev, stat.st_ino),
@@ -249,6 +248,7 @@ pub(super) struct Staging {
     sealed: bool,
     attempted: bool,
     runfiles: Option<runfiles::RunfilesTopology>,
+    alias: Option<String>,
 }
 impl Staging {
     pub(super) fn new(
@@ -292,6 +292,7 @@ impl Staging {
             sealed: false,
             attempted: false,
             runfiles: None,
+            alias: None,
         })
     }
     fn destination(
@@ -301,8 +302,10 @@ impl Staging {
         relative: &str,
         is_dir: bool,
     ) -> io::Result<&Destination> {
-        if self.sealed || self.attempted {
-            return Err(io::Error::other("output staging is sealed"));
+        if self.sealed || self.attempted || self.alias.is_some() {
+            return Err(io::Error::other(
+                "output staging is sealed or Core-owned alias",
+            ));
         }
         let output = outputs
             .get(index)
@@ -377,7 +380,9 @@ impl Staging {
             if entry(&destination.parent, &destination.name)? != destination.cleanup {
                 return Err(io::Error::other("staged output changed during transfer"));
             }
-            if let Some(topology) = &self.runfiles {
+            if self.alias.is_some() {
+                self.check_alias()?;
+            } else if let Some(topology) = &self.runfiles {
                 topology.seal(&destination.staged)?;
             } else {
                 seal_entry(&destination.parent, &destination.name)?;
@@ -418,6 +423,7 @@ impl Staging {
                 "output publication requires one sealed stage",
             ));
         }
+        self.check_alias()?;
         self.preflight(outputs)
     }
     pub(super) fn publish(&mut self, outputs: &[ActionOutput]) -> io::Result<()> {

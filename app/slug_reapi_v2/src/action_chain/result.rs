@@ -32,6 +32,7 @@ impl LocalManifestResult {
 #[derive(Debug, Clone)]
 pub enum ActionChainStepResult {
     Remote(RemoteExecutionResult),
+    ArtifactSymlink(ArtifactSymlinkResult),
     Manifest(LocalManifestResult),
     SymlinkTree(LocalManifestResult),
     RunfilesTree { output: ActionOutput },

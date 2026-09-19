@@ -33,26 +33,45 @@ pub(super) fn expand_groups(
     inputs: Option<&PreparedActionChainInputs>,
     groups: &mut SmallMap<usize, SmallSet<ActionOutput>>,
 ) -> io::Result<Vec<CoupledTree>> {
+    let mut pending = groups.keys().copied().collect::<Vec<_>>();
+    let mut seen = SmallSet::new();
     let mut supports = Vec::new();
-    for (index, _) in groups.iter() {
-        if let Some(
-            spec @ (RunfilesSupportActionSpec::SymlinkTree { .. }
-            | RunfilesSupportActionSpec::RunfilesTree { .. }),
-        ) = plan.actions()[*index].action().runfiles_support_spec()
-        {
-            let inputs = inputs.ok_or_else(|| {
-                io::Error::other("runfiles publication requires prepared source inputs")
-            })?;
-            inputs
-                .runfiles_action(*index)
+    let mut trees = Vec::new();
+    while let Some(index) = pending.pop() {
+        if !seen.insert(index) {
+            continue;
+        }
+        let action = plan.actions()[index].action();
+        if let Some(spec) = action.symlink_spec() {
+            let input = crate::runtime::action_prerequisites::symlink::target(action, spec)
                 .map_err(|error| io::Error::other(error.to_string()))?;
-            if !supports.contains(&spec.support()) {
-                supports.push(spec.support());
+            if let AnalysisArtifact::Derived { output, .. } = input {
+                let producer = producer(plan, input)?;
+                groups
+                    .entry(producer)
+                    .or_insert_with(SmallSet::new)
+                    .insert(output.clone());
+                pending.push(producer);
             }
         }
-    }
-    let mut trees = Vec::new();
-    for support in supports {
+        let Some(
+            spec @ (RunfilesSupportActionSpec::SymlinkTree { .. }
+            | RunfilesSupportActionSpec::RunfilesTree { .. }),
+        ) = action.runfiles_support_spec()
+        else {
+            continue;
+        };
+        let inputs = inputs.ok_or_else(|| {
+            io::Error::other("runfiles publication requires prepared source inputs")
+        })?;
+        inputs
+            .prepare_runfiles_action(action)
+            .map_err(|error| io::Error::other(error.to_string()))?;
+        let support = spec.support();
+        if supports.contains(&support) {
+            continue;
+        }
+        supports.push(support);
         let tree_index = producer(plan, &support.tree)?;
         let manifest = support
             .manifest
@@ -71,18 +90,23 @@ pub(super) fn expand_groups(
                 .entry(index)
                 .or_insert_with(SmallSet::new)
                 .insert(output.clone());
+            pending.push(index);
         }
         let AnalysisArtifact::Derived { output, .. } = manifest else {
             unreachable!()
         };
-        // The public manifest is one link in the tree's single physical replacement.
-        groups.shift_remove(&manifest_index);
         trees.push(CoupledTree {
             index: tree_index,
             manifest_index,
             manifest: output.clone(),
         });
     }
+    // Coupled manifests are links inside the tree's one physical replacement.
+    // Remove them after reaching the fixed point, including aliases to MANIFEST.
+    for tree in &trees {
+        groups.shift_remove(&tree.manifest_index);
+    }
+
     Ok(trees)
 }
 
@@ -93,8 +117,8 @@ pub(super) fn stage_trees(
     trees: Vec<CoupledTree>,
     reserved: &SmallSet<&str>,
     stages: &mut Vec<PlannedActionOutputStaging>,
+    seen_backing: &mut SmallSet<PathBuf>,
 ) -> io::Result<()> {
-    let mut seen_backing = SmallSet::new();
     for tree in trees {
         let inputs = inputs.unwrap();
         let links = inputs

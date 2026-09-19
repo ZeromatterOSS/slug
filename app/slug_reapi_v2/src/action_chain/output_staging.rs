@@ -15,6 +15,7 @@ enum SelectedOutput<'a> {
     Directory(&'a GeneratedDirectory),
     Local(&'a LocalManifestResult),
     RunfilesTree,
+    ArtifactSymlink,
 }
 
 /// Reconcile the entire batch before creating even the first staging file.
@@ -85,6 +86,12 @@ fn reconcile_step_outputs<'a>(
                 return Err(protocol("local manifest has a non-file output"));
             }
             (file.output(), SelectedOutput::Local(file))
+        }
+        ActionChainStepResult::ArtifactSymlink(alias) => {
+            if alias.output().kind() != ActionOutputKind::File {
+                return Err(protocol("artifact symlink result has wrong output kind"));
+            }
+            (alias.output(), SelectedOutput::ArtifactSymlink)
         }
         ActionChainStepResult::RunfilesTree { output } => {
             if output.kind() != ActionOutputKind::RunfilesTree {
@@ -158,7 +165,7 @@ async fn stage_output(
                 .map_err(|error| protocol(format!("writing staged manifest: {error}")))?;
         }
         // Core owns the confined writer and couples the physical MANIFEST link.
-        SelectedOutput::RunfilesTree => {}
+        SelectedOutput::RunfilesTree | SelectedOutput::ArtifactSymlink => {}
         SelectedOutput::File(file) => {
             stage_file(cache, staging, index, "", file.digest()).await?;
         }

@@ -207,6 +207,24 @@ impl BoundInputs {
                 let completed = results
                     .get(*producer)
                     .ok_or_else(|| protocol("producer has not completed in this attempt"))?;
+                if let ActionChainStepResult::ArtifactSymlink(alias) = completed {
+                    if alias.output() != output {
+                        return Err(protocol("artifact alias differs from declared input"));
+                    }
+                    self.files.push(input_entry(path, alias.digest().clone()));
+                    match alias.backing() {
+                        artifact_symlink::FileBacking::Source(index) => {
+                            self.sources.insert(alias.digest().clone(), *index);
+                        }
+                        artifact_symlink::FileBacking::GeneratedCas => {
+                            self.generated.insert(alias.digest().clone());
+                        }
+                        artifact_symlink::FileBacking::Local(bytes) => {
+                            self.local.insert(alias.digest().clone(), bytes.clone());
+                        }
+                    }
+                    return Ok(());
+                }
                 if let Some(file) = completed.local_file() {
                     if file.output() != output {
                         return Err(protocol("local producer differs from declared input"));

@@ -15,6 +15,7 @@ use super::configured_action_closure::scalar_file_write;
 use super::dice::source_staging::declared_artifacts;
 
 mod runfiles;
+pub(in crate::runtime) mod symlink;
 
 type Coordinate = (usize, usize);
 
@@ -76,8 +77,12 @@ impl<'a> ActionPrerequisitePlan<'a> {
         if action.runfiles_support_spec().is_some() {
             return Err("runfiles support requires requested-artifact execution".into());
         }
+        let forest = plan_roots(closure, PlanRoots::Action((selected, selected_action)))?;
+        if forest.producers[0] != forest.actions.len().checked_sub(1) {
+            return Err("coupled runfiles completion requires requested-artifact execution".into());
+        }
         Ok(Self {
-            actions: plan_roots(closure, PlanRoots::Action((selected, selected_action)))?.actions,
+            actions: forest.actions,
         })
     }
 }
@@ -207,33 +212,26 @@ fn plan_roots<'a>(
         }
         canonical(coordinate).map(Some)
     };
+    let complete_trees = match &roots {
+        PlanRoots::Artifacts(_) => true,
+        PlanRoots::Action((owner, action)) => {
+            owners[*owner].actions()[*action].symlink_spec().is_some()
+        }
+    };
     let seeds = match roots {
         PlanRoots::Action(coordinate) => vec![Some(canonical(coordinate)?)],
         PlanRoots::Artifacts(artifacts) => {
             artifacts.iter().map(&producer).collect::<Result<_, _>>()?
         }
     };
-    let selected_count = seeds.len();
-    let mut seeds = seeds;
-    // A requested physical MANIFEST also needs its tree/backing completion root.
-    // This is selection expansion, not a new action input or a dependency cycle.
-    for index in 0..selected_count {
-        if let Some((owner, action)) = seeds[index]
-            && let Some(RunfilesSupportActionSpec::SymlinkTree { support, .. }) =
-                owners[owner].actions()[action].runfiles_support_spec()
-        {
-            seeds.push(producer(&support.tree)?);
-        }
-    }
-    let mut forest = walk_prerequisites(closure, seeds, producer)?;
-    forest.producers.truncate(selected_count);
-    Ok(forest)
+    walk_prerequisites(closure, seeds, producer, complete_trees)
 }
 
 fn walk_prerequisites<'a>(
     closure: &'a ValidatedActionClosure,
     seeds: Vec<Option<Coordinate>>,
     producer: impl Fn(&AnalysisArtifact) -> Result<Option<Coordinate>, Arc<str>>,
+    complete_trees: bool,
 ) -> Result<PlannedForest<'a>, Arc<str>> {
     type Inputs = Vec<(AnalysisArtifact, Option<Coordinate>)>;
     enum Visit {
@@ -249,7 +247,9 @@ fn walk_prerequisites<'a>(
     // None means on the current DFS path; Some is the emitted plan index.
     let mut states: SmallMap<Coordinate, Option<usize>> = SmallMap::new();
     let mut actions = Vec::new();
-    while let Some(visit) = pending.pop() {
+    let mut deferred = Vec::new();
+    let mut coupled = SmallSet::new();
+    while let Some(visit) = pending.pop().or_else(|| deferred.pop().map(Visit::Enter)) {
         match visit {
             Visit::Enter(coordinate) => {
                 match states.get(&coordinate) {
@@ -259,6 +259,18 @@ fn walk_prerequisites<'a>(
                 }
                 states.insert(coordinate, None);
                 let action = &owners[coordinate.0].actions()[coordinate.1];
+                // A reachable public MANIFEST also completes its physical tree. This
+                // is a deferred root, never an input edge (the tree needs MANIFEST).
+                if complete_trees
+                    && let Some(RunfilesSupportActionSpec::SymlinkTree { support, .. }) =
+                        action.runfiles_support_spec()
+                {
+                    let tree = producer(&support.tree)?
+                        .ok_or("runfiles completion tree has no producer")?;
+                    if coupled.insert(tree) {
+                        deferred.push(tree);
+                    }
+                }
                 if action.outputs().iter().any(|output| {
                     !matches!(
                         output.kind(),
@@ -286,6 +298,8 @@ fn walk_prerequisites<'a>(
                         artifacts.insert(artifact.clone());
                     });
                     artifacts
+                } else if let Some(spec) = action.symlink_spec() {
+                    SmallSet::from_iter([symlink::target(action, spec)?.clone()])
                 } else if scalar_file_write(action) {
                     Default::default()
                 } else {

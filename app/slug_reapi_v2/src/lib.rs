@@ -64,6 +64,7 @@ pub use action_chain::ActionChainReapiSession;
 pub use action_chain::ActionChainReapiTransport;
 pub use action_chain::ActionChainRemoteResult;
 pub use action_chain::ActionChainStepResult;
+pub use action_chain::ArtifactSymlinkResult;
 pub use action_chain::LocalManifestResult;
 pub use action_chain::StagedChainAction;
 

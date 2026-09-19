@@ -7,6 +7,7 @@ use super::*;
 use crate::runtime::PreparedActionChainInputs;
 use crate::runtime::PreparedActionPlan;
 
+mod alias;
 mod runfiles;
 use crate::runtime::configured_output::ConfiguredOutputOwner;
 
@@ -160,10 +161,15 @@ impl ConfiguredOutputOwner {
             .flat_map(|outputs| outputs.iter())
             .flat_map(|output| output.path().split('/'))
             .collect();
+        let mut seen_backing = SmallSet::new();
         let mut stages = groups
             .iter()
             .filter(|(index, _)| !trees.iter().any(|tree| tree.index == **index))
             .map(|(index, outputs)| {
+                let action = plan.actions()[*index].action();
+                if action.symlink_spec().is_some() {
+                    return alias::stage(self, plan, *index, inputs, &reserved, &mut seen_backing);
+                }
                 let outputs = outputs.iter().cloned().collect::<Vec<_>>();
                 Ok(PlannedActionOutputStaging {
                     action_index: *index,
@@ -177,7 +183,24 @@ impl ConfiguredOutputOwner {
                 })
             })
             .collect::<io::Result<Vec<_>>>()?;
-        runfiles::stage_trees(self, plan, inputs, trees, &reserved, &mut stages)?;
+        // Preserve ordinary group order before aliases in prerequisite order.
+        // A coupled MANIFEST link arrives with its tree in the final phase.
+        stages.sort_by_key(|stage| {
+            let alias = plan.actions()[stage.action_index]
+                .action()
+                .symlink_spec()
+                .is_some();
+            (alias, if alias { stage.action_index } else { 0 })
+        });
+        runfiles::stage_trees(
+            self,
+            plan,
+            inputs,
+            trees,
+            &reserved,
+            &mut stages,
+            &mut seen_backing,
+        )?;
         Ok(stages)
     }
 }

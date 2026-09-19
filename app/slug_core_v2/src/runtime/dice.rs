@@ -3085,6 +3085,7 @@ pub use runfiles_manifest::PreparedRunfilesManifests;
 mod action_chain_staging;
 pub use action_chain_staging::PreparedActionChainInputs;
 pub use action_chain_staging::PreparedActionPlan;
+pub use action_chain_staging::PreparedArtifactSymlink;
 pub use action_chain_staging::PreparedRunfilesAction;
 #[path = "action_chain_execution.rs"]
 mod action_chain_execution;

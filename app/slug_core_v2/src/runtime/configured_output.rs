@@ -76,6 +76,32 @@ impl ConfiguredOutputOwner {
         )
     }
 
+    pub(super) fn stage_alias(
+        &self,
+        action: &slug_analysis_v2::ConfiguredAction,
+        target: &str,
+        reserved: &starlark_map::small_set::SmallSet<&str>,
+    ) -> std::io::Result<super::action_output_staging::ActionOutputStaging> {
+        let configuration = action
+            .context()
+            .owner()
+            .configuration()
+            .slug_configuration()
+            .ok_or_else(|| std::io::Error::other("alias requires structural configuration"))?;
+        let [output] = action.outputs() else {
+            return Err(std::io::Error::other("artifact alias must have one output"));
+        };
+        self.register(configuration.projection(), configuration)
+            .map_err(std::io::Error::other)?;
+        super::action_output_staging::ActionOutputStaging::new_alias(
+            &self.workspace,
+            configuration,
+            output,
+            target,
+            reserved,
+        )
+    }
+
     pub(super) fn stage_runfiles(
         &self,
         action: &slug_analysis_v2::ConfiguredAction,

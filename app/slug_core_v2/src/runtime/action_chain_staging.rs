@@ -15,6 +15,9 @@ use crate::runtime::SourceArtifactInputObservationKey;
 #[path = "action_chain_staging/runfiles.rs"]
 mod runfiles;
 pub use runfiles::PreparedRunfilesAction;
+#[path = "action_chain_staging/symlink.rs"]
+mod symlink;
+pub use symlink::PreparedArtifactSymlink;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(super) struct ActionChainStagingKey {
@@ -222,6 +225,7 @@ impl ActionChainStagingKey {
         // Pure preflight of all support ownership and physical topology before effects.
         for step in prepared.plan()?.actions() {
             prepared.prepare_runfiles_action(step.action())?;
+            prepared.prepare_artifact_symlink(step.action())?;
         }
         Ok(PreparationOutcome::Complete(Arc::new(prepared)))
     }

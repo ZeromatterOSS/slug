@@ -63,6 +63,15 @@ fn materialized_digests<'a>(
                 digests.push(file.digest());
                 continue;
             }
+            if let ActionChainStepResult::ArtifactSymlink(alias) = completed {
+                if output != alias.output() || output.kind() != ActionOutputKind::File {
+                    return Err(RemoteExecutionError::Protocol(
+                        "published artifact symlink differs from result".into(),
+                    ));
+                }
+                digests.push(alias.digest());
+                continue;
+            }
             if let ActionChainStepResult::RunfilesTree { output: tree } = completed {
                 if output != tree || output.kind() != ActionOutputKind::RunfilesTree {
                     return Err(RemoteExecutionError::Protocol(

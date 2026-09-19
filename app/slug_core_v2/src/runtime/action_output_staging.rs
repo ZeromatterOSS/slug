@@ -132,6 +132,34 @@ impl ActionOutputStaging {
         }
     }
 
+    pub(super) fn new_alias(
+        workspace: &Path,
+        configuration: &SlugConfiguration,
+        output: &ActionOutput,
+        target: &str,
+        reserved: &SmallSet<&str>,
+    ) -> io::Result<Self> {
+        #[cfg(all(target_os = "linux", target_env = "gnu"))]
+        {
+            Ok(Self {
+                outputs: Arc::from([output.clone()]),
+                root: super::configured_output::configured_output_root(workspace, configuration),
+                inner: linux::Staging::new_alias(
+                    workspace,
+                    configuration,
+                    output,
+                    target,
+                    reserved,
+                )?,
+            })
+        }
+        #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+        {
+            let _ = (workspace, configuration, output, target, reserved);
+            Err(unsupported())
+        }
+    }
+
     pub fn outputs(&self) -> &[ActionOutput] {
         &self.outputs
     }

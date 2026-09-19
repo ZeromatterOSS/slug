@@ -262,14 +262,17 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
                 // frontier, without inventing a backend session or result.
                 return Ok(());
             }
-            let has_runfiles = terminal
+            let needs_source_generations = terminal
                 .inputs
                 .plan()
                 .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error}")))?
                 .actions()
                 .iter()
-                .any(|step| step.action().runfiles_support_spec().is_some());
-            let _generations = if has_runfiles {
+                .any(|step| {
+                    step.action().runfiles_support_spec().is_some()
+                        || step.action().symlink_spec().is_some()
+                });
+            let _generations = if needs_source_generations {
                 Some(context.retain_source_generations(terminal.inputs.sources())?)
             } else {
                 None
