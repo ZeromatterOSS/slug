@@ -52,9 +52,11 @@ impl ConfiguredOutputOwner {
         }
     }
 
-    pub(super) fn stage_action_outputs(
+    pub(super) fn stage_output_subset(
         &self,
         action: &slug_analysis_v2::ConfiguredAction,
+        outputs: &[slug_build_api_v2::ActionOutput],
+        reserved: &starlark_map::small_set::SmallSet<&str>,
     ) -> std::io::Result<super::action_output_staging::ActionOutputStaging> {
         let configuration = action
             .context()
@@ -66,10 +68,11 @@ impl ConfiguredOutputOwner {
             })?;
         self.register(configuration.projection(), configuration)
             .map_err(std::io::Error::other)?;
-        super::action_output_staging::ActionOutputStaging::new(
+        super::action_output_staging::ActionOutputStaging::new_reserved(
             &self.workspace,
             configuration,
-            action.outputs(),
+            outputs,
+            reserved,
         )
     }
 

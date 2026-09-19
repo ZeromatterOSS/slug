@@ -1,175 +1,161 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-43-m7a-requested-execution-r1
+Packet: WP-7-44-m7a-requested-publication-r1
 Status: accepted
 
 ## Outcome and basis
 
-Stage all selected and reachable sources, then execute the complete requested-artifact
-forest in one native request and one fresh transport session per attempt. Preserve
-requested/group/artifact producer bindings and expose results only after final source
-validation. Zero-action requested forests finish natively without calling transport.
-WP742 (5ca6f056d) accepted the shared exact producer planner with twelve focused checks;
-its full receipt is in that commit. WP741 owns ordinary artifact selection.
+Publish precisely the selected Derived artifacts of an ordinary requested forest,
+across producers and configurations, after one complete native source validation.
+Retain source-only/empty completion, requested/group/artifact bindings and complete
+per-action result verification. WP743 (244c6641d) accepted native requested execution
+with 22 focused checks; reuse its frontier, retry and zero-callback evidence.
 
-Reuse Stage7's WP737 source-certified chain execution, WP738 opt-in single-action
-publication, and WP742's pinned Bazel 9.2 artifact/generating-action dependencies.
-Pin 8220c6198837d5c13d53fea211cf3282aa12408a: skyframe/CompletionFunction.java:
-160-164,364-375 selects Artifact keys; actions/Artifact.java:161-176 and
-ActionLookupData.java:73-106 retain generating owner/ordinal identity;
-skyframe/ActionExecutionFunction.java:294-315,403-445 waits for declared input keys;
-skyframe/ArtifactFunction.java:135-138,275-294 observes source content separately.
-Existing REAPI generated File/Directory/CAS verification and wire-profile proof is
-reused unchanged. Exact admitted semantic identities/content/bindings stay exact;
-structural configuration tokens, sequential traversal and native request lifecycle are
-Slug-native. No parallel action scheduling, new action family or Bazel byte-identity claim.
+Bazel 9.2 pin 8220c6198837d5c13d53fea211cf3282aa12408a,
+skyframe/CompletionFunction.java:160-164,364-375 selects Artifact dependencies via
+TopLevelArtifactHelper; reuse WP742 exact declared artifact/producer identity proof.
+WP738 (0ec1eb5e7 current-packet manifest) anchors RemoteExecutionService.java:
+1350-1384 (finish transfers before moves),915-922 and OutputPermissions.READONLY
+(0555), FileSystemUtils.java:454-489 (no group-atomic move guarantee), and
+AbstractActionInputPrefetcher.java:365-397,681-728 (tree/file modes). It owns output bytes,
+verified CAS transfer, confined hidden siblings, per-artifact atomic replacement,
+cleanup and native publication/error classification. Exact admitted artifact/content
+and complete result schemas stay exact. Configured path spelling, preserving empty
+tree directories, sequential execution and per-artifact namespace commit are
+Slug-native. No Bazel path-byte, whole-generation atomicity or performance claim.
 
-## Owner and invariants
+## Ownership and interface
 
-Generalize ActionChainStagingKey with an explicit retained/hashable/Allocative selection
-enum: Selected { owner, action } versus Requested. The build request and selection fully
-identify the key. Reuse PreparedActionChainInputs and its existing evaluation/source/
-observation/certificate fields; replace its owner/ordinal fields with that selection.
-Its borrowed plan() returns PreparedActionPlan::{Selected, Requested}; actions() serves
-both, requested() exposes the RequestedActionPrerequisitePlan only for Requested, and
-selected_action() returns an action only for Selected. This view is command scratch.
-No forest plan, remote result, session, file handle or backend state becomes DICE-retained.
+Keep discovery/selection/producer bindings in the existing DICE evaluation and
+PreparedActionPlan. No new DICE key, retained forest, action cache or semantic side
+store. Projection into publication groups is attempt scratch. Derive requested
+Derived output groups from selection.artifacts() zipped with artifact_producers(),
+never from last action or path inference. Group by producer in first-selected order,
+deduplicate identical ActionOutput destinations within each producer (equivalent
+scalar FileWrite owners can share one output), preserve requested metadata intact.
+Exact declared owner/output lookup and same-configuration representative resolution
+remain in the existing planner. Verify subset declarations and structural configuration
+agreement before creating capabilities. Sources are observed but never copied.
 
-Validate the entire plan before observing source content. Requested staging structurally
-unions all Source artifacts from selection.artifacts() with Source inputs of planned
-actions, using existing SourceArtifactInputObservationKey and exact observed epoch union.
-A source returned only by a rule's output group must be certified even if no action uses
-it. Shared sources are observed once; every Need/error retains the existing key/native
-channel. Source-only and empty analyzed roots keep their requested identity and full
-build/source frontier. Permit empty target lists only through the private source-staging
-observed-root constructor and existing observed multi-root driver; do not change ordinary
-wildcard dispatch/admission. The observed root's MODULE anchor supplies a real frontier
-for empty requests. No direct filesystem discovery, inferred source paths or cached bytes.
+Add public PlannedActionOutputStaging with read-only action_index() and staging()
+accessors, private construction/publication. Change existing ActionChainOutputTransport
+stage_outputs to receive one slice of these capabilities for the complete operation.
+Selected-action mode supplies one full-output stage for its final action. Requested
+mode supplies all selected producer subsets. No compatibility shim or second transport.
+ConfiguredOutputOwner remains the sole configuration registration/destination owner;
+its new plan method reuses ActionOutputStaging and confined platform implementation.
 
-Add prepare_requested_action_inputs_with_repository_environment and
-execute_requested_actions_with_repository_environment using the same preparation and
-native completion driver as the selected-action operation. Core must not call a chain
-operation independently per artifact/root. Before every Execute, validate the entire
-forest frontier, including selected standalone sources. A final source/build mutation
-retries the whole request with a fresh session; failures/unwind discard provisional
-results and restore prior accepted state through the existing native abort guard.
-Source-only/empty plans bypass start/stage/execute/finish and still pass native final
-validation. No fabricated backend result or remote connection on that path.
+Reserve the union of selected destination path components across the complete batch
+when choosing private sibling names; preserve WP738 collision exclusion across groups.
+Create all groups before transfer. REAPI validates session completion, producer indexes,
+full producer declaration/result schemas and every selected subset before first transfer.
+Keep executor::validate_result_shape/fetch_outputs and output_tree verification unchanged:
+every executed action's cooutputs, even unselected ones, are verified before recording
+its result. Reconcile the full action.outputs() against that result before projecting
+selected paths/kinds. Then reuse stage_output/read_blob_verified for selected bytes;
+late missing/corrupt CAS rejects the entire private batch, without local fallback.
 
-Expose RequestedActionResult<T> with inputs() and output()->Option<&T>; None explicitly
-means zero action steps. Existing ActionChainResult<T> stays nonempty. Requested bindings
-come from inputs.plan().requested(), aligned to the ordered transport result table.
-Generalize the existing REAPI transport via PreparedActionPlan.actions(), preserving
-whole-plan preflight before connection, exact generated producer bindings, full action
-result validation, same-session/ordinal guards and CAS-only generated provenance.
-ActionChainRemoteResult::selected() becomes Option and is Some only for Selected mode;
-it must not label the last forest action as the requested result. Existing single-action
-call sites assert Some. Results() remains the full ordered table.
+Core seals every group after the single transport callback and retains the complete
+batch through native finalization. Under the existing revision owner, after full-frontier
+validation, preflight EVERY stage before publishing the first. PlannedActionOutputStaging::publish_all owns this
+preflight-all/publish-all loop for the native callback. Reuse stage publish for
+per-artifact renames; do not drain/drop stages under the revision lock. Earlier artifacts
+may change if a later rename fails; preserve existing possible-output-change and abort
+restoration diagnostics and return no AcceptedCommand. Cleanup remains after release,
+following retired identities; preflight/transfer/seal failures keep old artifacts intact.
+No downloads, DICE compute, Starlark or async task join inside publication lock.
 
-Publication remains separately gated: existing single-action publication must obtain
-selected_action(), and REAPI output staging explicitly rejects requested mode rather
-than using last(). Requested execution has no publication API. Its results remain CAS/
-operation-owned. CLI/server legacy guards remain until selected artifacts across owners
-can be privately staged and published after one full-frontier validation. No action/output
-subset may be silently omitted to gain successful execution.
+Add execute_and_publish_requested_actions_with_repository_environment through the same
+private driver/publication policy. RequestedActionResult exposes published_outputs()
+as a slice of PublishedPlannedActionOutputs, each with action_index() and outputs()
+(PublishedActionOutputs) to retain producer association without path reconstruction.
+Execution-only and zero-action results have an empty slice; zero actions still invoke
+no transport callback or filesystem staging and pass native final validation. Existing
+ActionChainResult retains its optional singular PublishedActionOutputs projection.
+No CLI/server activation; existing ordinary-request guards remain until migration.
 
-## Scope, ownership and evidence
+All new group vectors/maps/handles are attempt-owned; accepted publication metadata
+uses Arc slices and paths only, no handles/buffers. Retained terminal clones share the
+pending batch via existing Arc/Mutex; no lock across DICE compute. Reuse Stage9 compact
+SmallMap/SmallSet and Arc conventions, no donor import or dependency changes.
 
-Root: runtime/action_chain_staging.rs, minimal dice.rs observed-empty routing/exports,
-runtime/mod.rs exports, new staging child tests and scheduling/owner docs.
-Execution worker: runtime/action_chain_execution.rs plus its new requested_tests child;
-existing execution tests only for shared fixture/helper wiring and necessary API updates.
-REAPI worker: slug_reapi_v2/src/action_chain.rs, output_staging.rs and their child tests,
-including selected() caller updates. Independent reviewer owns design and final gates.
-No concurrent edits to another owner's files. Source_staging.rs may supply an existing
-helper only if needed; no source-input/closure/equivalence or publication-owner redesign.
-Allow current/canonical, Stage7 and bootstrap-readiness documentation updates, plus
-one reusable validation-routing lesson in the orchestration routing log (rolling its
-oldest row unchanged into the existing monthly archive to preserve the 20-row limit).
+## Files and validation
 
-Retained selection enum reuses existing ConfiguredTargetKey/Arc/Allocative under Stage9;
-source sets reuse SmallSet and Arc observation values. No donor import, cache/interner,
-retained artifact flattening, lock across DICE compute or scheduler framework. Existing
-oversized dice.rs gets only bounded routing/exports; staging/execution remain cohesive
-children. Estimated production growth 200-350 lines plus local refactoring, proof growth
-400-700 lines; review triggers, not caps. New selected mode is actual request identity,
-not a compatibility fallback. No compatibility shim or independent alternate scheduler.
+Root owns runtime/action_output_staging.rs, its linux.rs and new plan.rs/plan_tests.rs (existing tests.rs only shared fixture visibility),
+configured_output.rs and runtime/mod.rs exports plus scheduling/owner docs. Core worker
+owns action_chain_execution.rs, existing tests minimal trait adaptation, requested_tests
+only if needed and new requested_publication_tests.rs child. REAPI worker owns
+action_chain/output_staging.rs and existing tests plus a new requested_publication_tests
+child; minimal visibility in action_chain/requested_tests.rs/tests.rs to reuse fixtures.
+Allow minimal dice.rs export wiring if required. No filesystem redesign or native driver
+semantic change. Existing large dice.rs gets exports only. Expected production growth
+200-350 lines and focused proof 300-600 lines are review triggers, not caps.
 
-Discriminators: requested terminals share a diamond producer once; cooutputs and root/
-group bindings remain intact; unrelated actions do not execute; standalone selected
-source absent from all action inputs is certified and its mutation retries whole forest;
-source-only/rule-returned-source/empty/no-target plans invoke no transport callback;
-late failure and unwind expose no accepted partial result; warm request/group changes
-restore bindings and results; unsupported later action fails before effects/connection;
-REAPI preflight/bind uses all forest steps and results have no singular selected action.
-Reuse protected single-action execution/retry/publication and REAPI generated binding,
-CAS corruption/eviction proof where their semantic inputs are unchanged. A new backend
-smoke is required only if adapter semantics change beyond mode/result projection; any
-unproved broader wire/backend scope must be stated explicitly.
+Discriminators: selected strict subsets including File/Tree from different producers;
+selected cooutput not last action; duplicate aliases/shared FileWrites publish once;
+configuration A/B destinations and requested producer associations; unselected outputs
+stay absent; empty/source-only does no transport; late transfer failure/unwind and
+source mutation retry expose no partial acceptance; global destination preflight rejects
+a later changed group before earlier publication. Preserve existing partial rename and
+post-publication bookkeeping diagnostics. REAPI portable full-result projection negatives
+include missing/extra/wrong-kind UNSELECTED cooutputs and invalid ordinal/subset. A focused
+real REAPI multi-producer publication check is required because transfer routing changes;
+reuse existing backend fixture, do not create a new harness. Reuse unchanged low-level
+confinement, modes, tree replacement, missing/corrupt CAS and native lifecycle proofs.
 
-Compile Core and REAPI tests --no-run under pinned nightly-2025-09-14, separately bounded
-60s preparations. Preflight exact selectors per executable; run focused new staging/
-execution/REAPI checks and affected existing single-action lifecycle/publication controls.
-Prefer checks below a few seconds; >30s requires strict necessity, 12s is guidance.
-No concurrent shared-target Cargo. Format changed Rust, diff check, plan/archive checks;
-final independent ACCEPT, commit/main fast-forward and authorized push. Receipts target/wp743.
-REPLAN only for a contradicted identity/lifecycle owner or newly required semantic boundary.
-M7A partial, M8 unproved; selected-artifact publication and CLI activation follow.
+Compile pinned nightly-2025-09-14 Core/REAPI tests --no-run with Cargo JSON; compile CLI
+direct dependent. Preparation separate, cap60s. Preflight exact focused selectors; run
+native freshness suites serially when observed ancestors overlap. Prefer tests below a
+few seconds; >30s requires strict necessity, 12s is guidance. Format changed Rust, diff,
+plan/archive checks and independent design/final ACCEPT before commit/main fast-forward
+and authorized push. Receipts target/wp744. Packet elapsed and compile/test times recorded
+at acceptance. M7A partial, M8 unproved. REPLAN only if exact destination ownership,
+existing native publication lifecycle or required selected families cannot support this
+contract; routine compiler/invocation/test corrections stay in packet.
 
-Independent design review ACCEPT: explicit staging selection identity, complete source
-frontier, shared driver and attempt-local results preserve native authority. Zero-action
-callback bypass and explicit requested-mode publication rejection require final proof.
+Independent design review ACCEPT, including batch-wide path-component reservation.
 
 ## Validation receipt
 
-Base 5ca6f056d; review/wp743-requested-execution; Linux GNU,
-nightly-2025-09-14. Reused the verified direct pinned tools after the session's snap
-rustup launcher failure. core-reapi-no-run-r1 compiled default Core and REAPI library
-tests together, exit 0 in 29.601s, within the separate 60s preparation cap. Cargo JSON
-selected the Core a0b7415282e22264 and REAPI 83de72d5efb378db executables. This rebuild
-replaced the older Core executable with that hash; it is no longer baseline evidence.
-Exact selectors were preflighted before execution; the four cfg-gated publication
-selectors omitted by the initial test-name scan were separately preflighted and run.
+Base 244c6641d; candidate review/wp744-requested-publication; Linux GNU,
+nightly-2025-09-14. The session's verified direct pinned Cargo/rustc/rustdoc tools
+were reused. Core/REAPI default-feature library no-run preparation passed in
+25.595s. Root then restricted the new native publication test child to Linux GNU,
+matching the existing publisher's platform contract; final no-run preparation
+passed in 3.549s. No production correction or assertion weakening was required.
+Cargo JSON identifies Core a0b7415282e22264 and REAPI 83de72d5efb378db.
 
-Twenty-two distinct focused checks have passing evidence: two new staging checks,
-five new native requested-execution checks, four new portable REAPI/mode checks, eight
-protected single-action execution/publication checks and three protected REAPI checks.
-core-focused-r1 ran 11, with 9 passes/2 freshness failures in 4.119s; reapi-focused-r1
-passed 7/7 in 2.074s. protected-publication-r1 ran 4, with 3 passes/1 failure in 1.776s.
-Those groups were mistakenly treated as independent: Core and REAPI fixtures share
-observed target/wp737 ancestors. Source path resolution captures parent Lstat metadata,
-so sibling fixture creation/removal can trip a freshness gate before an intended failure
-injection. The concurrent old-binary probe had the same interference and contributes no
-baseline attribution or acceptance evidence.
+All 21 focused checks pass. Exact ordinary selectors were preflighted per executable;
+ignored wire selectors were individually listed and executed under supervision.
+core-focused-r1: 16/16 in 4.574s (two new batch/configuration/preflight tests,
+seven new requested publication lifecycle/binding tests, seven protected selected
+publication/confinement/rename controls). reapi-focused-r1: 3/3 in 0.713s (two new
+full-schema/subset projection tests and protected schema validation). Native freshness
+suites ran serially; no fixture interference or runtime retries were needed.
 
-Only the three affected selectors were rerun serially, with no concurrent test or file
-mutation: downstream_staging_checks_producer_sources_and_entire_build_frontier,
-final_source_change_retries_whole_chain_with_fresh_session, and
-output_transfer_failure_and_unwind_preserve_old_outputs_and_cleanup. All pass unchanged
-in serialized-lifecycle-controls, 1.234s. No production correction, assertion weakening,
-freshness-policy relaxation or baseline waiver was used. Other passing results remain
-valid. Native freshness tests sharing observed ancestors must run serially; disjoint
-leaf fixture directories are insufficient isolation.
+A fresh local verifying NativeLink ran the new selected-subset File/Tree test across
+two producer ordinals: 1/1 in 0.977s. It proves complete remote cooutput metadata,
+no retained result blobs, duplicate/source request bindings, only selected local
+outputs, empty tree directories and 0555 modes despite false producer mode bits.
+The protected selected-action replacement/modes wire control passed 1/1 in 1.565s.
+Both backend processes reached terminal state and their temporary roots were removed.
+No new backend harness or retained oracle fixture was introduced. Existing missing/
+corrupt CAS, source certificate, no-follow cleanup and revision-owner proofs remain
+reused where unchanged; this is not a broad remote-execution or platform claim.
 
-New evidence proves selected group-only sources are observed and restored A/B/A;
-Selected/Requested staging modes stay distinct; shared producers execute once with
-complete root/group/cooutput bindings; source mutation before Execute blocks that step,
-after Execute retries with a fresh session and drops old output; empty/source-only
-forests invoke no callbacks; late errors/unwind restore prior accepted state. REAPI
-checks use real preflight/bind/finish code with synthetic verified-result metadata and
-an unreachable-endpoint source-only control. No new nonempty multi-root backend smoke
-was run: wire upload/execution/CAS verification is unchanged and its accepted evidence
-is reused. Both publication layers reject requested mode before output transfer or
-last-result lookup. Existing single-action retry/publication controls pass.
+CLI direct-dependent check (including server/Core/REAPI) passed in 11.368s.
+Changed-Rust formatting, diff, plan-status and archive checks pass (structural.receipt).
+Receipts are under target/wp744. Candidate branch elapsed about 16 minutes through
+validation, including design/implementation review; preliminary feasibility research
+was not separately timed. No workflow speedup claim. Net production growth is about
+273 lines; focused proof growth about 764 lines exceeds the initial estimate because
+it covers real configuration forwarding, equivalent owners, lifecycle failures and
+wire routing while reusing existing fixtures. These tests cover distinct invariants.
 
-Changed Rust formatting, diff, plan-status and archive checks pass (structural.receipt).
-Independent final review ACCEPT confirms staging identity, complete frontier validation,
-attempt-local execution, zero-action completion and publication separation. Packet wall
-time was approximately 21 minutes through final review, including interruptions; compile
-29.601s and runtime groups are recorded above. No workflow speedup is claimed.
-The user-authorized AGENTS/orchestration update permits two or three independent workers;
-skill validation passes. This advances
-native requested-forest execution metadata, not selected-artifact publication or CLI
-activation. M7A remains partial and M8 unproved. Next: stage selected artifact subsets
-across producers/configurations, preserve complete per-action result validation, and
-publish under one full-frontier native validation before replacing CLI/server helpers.
+Independent final review ACCEPT confirms producer/configuration ownership, complete
+result verification, native publication ordering and all 21 focused checks. Linux GNU
+library publication is accepted; a later rename can still leave partial filesystem
+changes without acceptance. Next: replace the CLI/server legacy all-action
+helpers with requested execution/publication, then prove ordinary command behavior.
+M7A remains partial, M8 unproved; runfiles/symlink and other deferred families remain
+explicit boundaries.

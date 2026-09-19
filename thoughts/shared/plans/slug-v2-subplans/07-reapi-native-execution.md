@@ -272,10 +272,22 @@ new multi-root backend smoke claim.
 The legacy CLI/server all-action executors reject newly activated Alias/GeneratedFile
 requested roots before effects. This temporary gate is removed when the shared selected
 artifact forest replaces both helpers and reaches native validated publication. Closure
-inspection APIs retain their existing meaning. Both Core and REAPI explicitly reject
-requested mode in the single-action publication path. Selected-artifact publication
-across owners, runfiles families and ordinary CLI activation remain open; execution
-metadata does not prove those publication and product gates.
+inspection APIs retain their existing meaning. WP744 extends the existing output
+transport callback to one complete batch of selected producer subsets. Core groups
+selected Derived artifacts by exact producer, deduplicates equivalent shared FileWrite
+destinations, and retains producer ordinals in accepted publication metadata. Sources
+stay in the validation frontier and are not copied. Configuration collision ownership
+and confined staging remain unchanged; private sibling names exclude every selected
+path component across the batch.
+
+REAPI reconciles full producer declarations/results before selecting bytes for transfer;
+unselected cooutputs remain covered by execution-time schema and CAS verification.
+Every selected group is transferred and sealed before native finalization. Core then
+preflights every destination before the first rename, retaining all stages until after
+the revision owner is released. The existing per-artifact partial-publication and abort
+error guarantees apply across groups. Zero-action requested publication invokes no
+transport or staging and returns empty published metadata. Runfiles families and
+ordinary CLI activation remain open; library publication does not prove product gates.
 
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies

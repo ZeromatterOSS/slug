@@ -337,9 +337,17 @@ impl ActionChainOutputTransport for Fake {
     async fn stage_outputs(
         &self,
         session: &mut Session,
-        staging: &ActionOutputStaging,
+        groups: &[PlannedActionOutputStaging],
     ) -> Result<(), Self::Error> {
         self.output_stages.fetch_add(1, Ordering::SeqCst);
+        let [group] = groups else {
+            panic!("selected test transport expects one output group")
+        };
+        assert_eq!(
+            group.action_index(),
+            session.inputs.plan().unwrap().actions().len() - 1
+        );
+        let staging = group.staging();
         assert_eq!(staging.outputs().len(), 1);
         let mut file = staging.create_file(0, "")?;
         file.write_all(&session.bytes)?;

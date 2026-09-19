@@ -11,7 +11,9 @@
 mod action_output_staging;
 mod action_prerequisites;
 pub use action_output_staging::ActionOutputStaging;
+pub use action_output_staging::PlannedActionOutputStaging;
 pub use action_output_staging::PublishedActionOutputs;
+pub use action_output_staging::PublishedPlannedActionOutputs;
 pub use action_prerequisites::ActionPrerequisitePlan;
 pub use action_prerequisites::PlannedAction;
 pub use action_prerequisites::PlannedActionInput;

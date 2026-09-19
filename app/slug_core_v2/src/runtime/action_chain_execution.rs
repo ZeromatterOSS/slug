@@ -2,8 +2,9 @@
 
 use super::action_chain_staging::ActionChainStagingKey;
 use super::*;
-use crate::runtime::ActionOutputStaging;
+use crate::runtime::PlannedActionOutputStaging;
 use crate::runtime::PublishedActionOutputs;
+use crate::runtime::PublishedPlannedActionOutputs;
 use crate::runtime::configured_output::ConfiguredOutputOwner;
 
 /// Trusted transport extension point. Core owns selection and freshness; the
@@ -39,13 +40,14 @@ pub trait ActionChainTransport: Sync {
     ) -> impl std::future::Future<Output = Result<Self::Output, Self::Error>> + Send;
 }
 
-/// Transport extension for verified transfer of the selected action's outputs.
-/// The supplied capability permits private staging, never visible publication.
+/// Verified transfer of the complete operation's selected output groups.
+/// Capabilities permit private staging, never visible publication. The transport
+/// must reconcile every full producer result and selected subset before transfer.
 pub trait ActionChainOutputTransport: ActionChainTransport {
     fn stage_outputs(
         &self,
         session: &mut Self::Session,
-        staging: &ActionOutputStaging,
+        staging: &[PlannedActionOutputStaging],
     ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
 }
 
@@ -55,7 +57,9 @@ trait PublicationPolicy<T: ActionChainTransport>: Clone + Sync {
         transport: &T,
         session: &mut T::Session,
         inputs: &PreparedActionChainInputs,
-    ) -> impl std::future::Future<Output = Result<Option<ActionOutputStaging>, NativeDemandSessionError>>;
+    ) -> impl std::future::Future<
+        Output = Result<Option<Vec<PlannedActionOutputStaging>>, NativeDemandSessionError>,
+    >;
 }
 
 #[derive(Clone)]
@@ -66,7 +70,7 @@ impl<T: ActionChainTransport> PublicationPolicy<T> for NoPublication {
         _transport: &T,
         _session: &mut T::Session,
         _inputs: &PreparedActionChainInputs,
-    ) -> Result<Option<ActionOutputStaging>, NativeDemandSessionError> {
+    ) -> Result<Option<Vec<PlannedActionOutputStaging>>, NativeDemandSessionError> {
         Ok(None)
     }
 }
@@ -79,26 +83,23 @@ impl<T: ActionChainOutputTransport> PublicationPolicy<T> for PublishOutputs<'_> 
         transport: &T,
         session: &mut T::Session,
         inputs: &PreparedActionChainInputs,
-    ) -> Result<Option<ActionOutputStaging>, NativeDemandSessionError> {
+    ) -> Result<Option<Vec<PlannedActionOutputStaging>>, NativeDemandSessionError> {
         let plan = inputs
             .plan()
             .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error}")))?;
-        let selected = plan.selected_action().ok_or_else(|| {
-            NativeDemandSessionError::Computation(anyhow::anyhow!(
-                "requested action output publication is unsupported"
-            ))
-        })?;
         let mut staging = self
             .0
-            .stage_action_outputs(selected)
+            .stage_planned_outputs(&plan)
             .map_err(|error| NativeDemandSessionError::Computation(error.into()))?;
         transport
             .stage_outputs(session, &staging)
             .await
             .map_err(|error| NativeDemandSessionError::Computation(anyhow::Error::new(error)))?;
-        staging
-            .seal()
-            .map_err(|error| NativeDemandSessionError::Computation(error.into()))?;
+        for group in &mut staging {
+            group
+                .seal()
+                .map_err(|error| NativeDemandSessionError::Computation(error.into()))?;
+        }
         Ok(Some(staging))
     }
 }
@@ -125,11 +126,13 @@ impl<T> ActionChainResult<T> {
 }
 
 /// A complete requested forest after native final validation. Zero-action
-/// requests have no transport output; no requested outputs are published.
+/// requests have no transport output. Publication metadata retains each producer
+/// index; execution-only and zero-action results have no published outputs.
 #[derive(Debug)]
 pub struct RequestedActionResult<T> {
     inputs: Arc<PreparedActionChainInputs>,
     output: Option<Arc<T>>,
+    published_outputs: Arc<[PublishedPlannedActionOutputs]>,
 }
 
 impl<T> RequestedActionResult<T> {
@@ -139,6 +142,10 @@ impl<T> RequestedActionResult<T> {
 
     pub fn output(&self) -> Option<&T> {
         self.output.as_deref()
+    }
+
+    pub fn published_outputs(&self) -> &[PublishedPlannedActionOutputs] {
+        &self.published_outputs
     }
 }
 
@@ -161,8 +168,8 @@ impl<T, P: Clone> Clone for ActionChainExecutionRoot<'_, T, P> {
 struct ActionChainExecutionTerminal<T> {
     inputs: Arc<PreparedActionChainInputs>,
     output: Option<Arc<T>>,
-    pending_outputs: Option<Arc<Mutex<ActionOutputStaging>>>,
-    published_outputs: Option<PublishedActionOutputs>,
+    pending_outputs: Option<Arc<Mutex<Vec<PlannedActionOutputStaging>>>>,
+    published_outputs: Option<Arc<[PublishedPlannedActionOutputs]>>,
 }
 
 impl<T> Clone for ActionChainExecutionTerminal<T> {
@@ -184,11 +191,11 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
 
     fn publish(&self, terminal: &mut Self::Terminal) -> std::io::Result<()> {
         if let Some(pending) = &terminal.pending_outputs {
-            let published = pending
+            let mut stages = pending
                 .lock()
-                .map_err(|_| std::io::Error::other("action output stage lock poisoned"))?
-                .publish()?;
-            terminal.published_outputs = Some(published);
+                .map_err(|_| std::io::Error::other("action output stage lock poisoned"))?;
+            terminal.published_outputs =
+                Some(PlannedActionOutputStaging::publish_all(&mut stages)?);
         }
         Ok(())
     }
@@ -303,6 +310,62 @@ impl WorkspaceRuntime {
         configuration_overlay: CommandConfigurationOverlay,
         transport: &T,
     ) -> Result<AcceptedCommand<RequestedActionResult<T::Output>>, BuildCommandError> {
+        self.execute_requested_actions_with_policy(
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+            transport,
+            NoPublication,
+        )
+    }
+
+    /// Execute one requested forest and publish precisely its selected Derived
+    /// outputs after full-frontier validation. Later rename/bookkeeping failures
+    /// may leave earlier artifacts changed; no accepted result is then returned.
+    #[allow(clippy::too_many_arguments)]
+    pub fn execute_and_publish_requested_actions_with_repository_environment<
+        T: ActionChainOutputTransport,
+    >(
+        &self,
+        targets: &[TargetPattern],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+        transport: &T,
+    ) -> Result<AcceptedCommand<RequestedActionResult<T::Output>>, BuildCommandError> {
+        self.execute_requested_actions_with_policy(
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+            transport,
+            PublishOutputs(&self.configured_output),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn execute_requested_actions_with_policy<T: ActionChainTransport, P: PublicationPolicy<T>>(
+        &self,
+        targets: &[TargetPattern],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+        transport: &T,
+        publication: P,
+    ) -> Result<AcceptedCommand<RequestedActionResult<T::Output>>, BuildCommandError> {
         let (build, request) = self.prepare_build_request(
             targets,
             command_policy,
@@ -316,12 +379,13 @@ impl WorkspaceRuntime {
             request,
             ActionChainStagingKey::requested(build),
             transport,
-            NoPublication,
+            publication,
         )
         .map(|accepted| {
             accepted.map_terminal(|terminal| RequestedActionResult {
                 inputs: terminal.inputs,
                 output: terminal.output,
+                published_outputs: terminal.published_outputs.unwrap_or_default(),
             })
         })
     }
@@ -428,7 +492,12 @@ impl WorkspaceRuntime {
                 output: terminal
                     .output
                     .expect("accepted action chain completed transport"),
-                published_outputs: terminal.published_outputs,
+                published_outputs: terminal.published_outputs.map(|groups| {
+                    let [group] = groups.as_ref() else {
+                        unreachable!("selected-action publication has exactly one output group")
+                    };
+                    group.outputs().clone()
+                }),
             })
         })
     }

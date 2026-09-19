@@ -17,27 +17,6 @@ use super::super::tests::Workspace;
 use super::*;
 
 #[test]
-fn requested_mode_is_rejected_before_selected_result_lookup() {
-    use super::super::requested_tests;
-    let workspace = requested_tests::workspace();
-    let inputs = requested_tests::prepare(&workspace, &["//:one", "//:two"]);
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-    let _entered = runtime.enter();
-    let session = requested_tests::disconnected_session(inputs);
-    assert!(session.results.is_empty());
-    let error = selected_result(&session).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("requested forests do not support output publication"),
-        "{error}"
-    );
-}
-
-#[test]
 fn selected_output_schema_rejects_missing_extra_duplicate_and_wrong_kind() {
     assert!(
         reconcile_outputs(&[], &ActionResult::new(vec![]))
@@ -71,7 +50,7 @@ fn selected_output_schema_rejects_missing_extra_duplicate_and_wrong_kind() {
     }
 }
 
-struct PublicationWorkspace(Workspace);
+pub(super) struct PublicationWorkspace(Workspace);
 impl std::ops::Deref for PublicationWorkspace {
     type Target = Workspace;
     fn deref(&self) -> &Self::Target {
@@ -79,7 +58,7 @@ impl std::ops::Deref for PublicationWorkspace {
     }
 }
 impl PublicationWorkspace {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let workspace = Workspace::new();
         let tool = TOOL.replace(
             "  /bin/cat file tree/nested/value input > done",
@@ -180,7 +159,7 @@ impl Drop for PublicationWorkspace {
     }
 }
 
-fn transport() -> ActionChainReapiTransport {
+pub(super) fn transport() -> ActionChainReapiTransport {
     let endpoint = std::env::var("SLUG_V2_NATIVELINK_ENDPOINT").unwrap();
     ActionChainReapiTransport::new(
         RemoteConfig::from_args(&[&format!("--remote_executor={endpoint}")]).unwrap(),
@@ -281,11 +260,13 @@ impl ActionChainOutputTransport for InterruptedDownload {
     async fn stage_outputs(
         &self,
         session: &mut Self::Session,
-        staging: &ActionOutputStaging,
+        stages: &[PlannedActionOutputStaging],
     ) -> Result<(), Self::Error> {
         let attempt = self.downloads.fetch_add(1, Ordering::SeqCst);
         assert_outputs(&self.old_root, b"aaa");
-        let selected = selected_outputs(session, staging)?;
+        assert_eq!(stages.len(), 1);
+        let staging = stages[0].staging();
+        let selected = selected_outputs(session, stages)?.pop().unwrap();
         assert!(matches!(selected[0], SelectedOutput::File(_)));
         stage_output(&session.cache, staging, 0, selected[0]).await?;
         // The first selected file is fully staged. No old visible artifact may

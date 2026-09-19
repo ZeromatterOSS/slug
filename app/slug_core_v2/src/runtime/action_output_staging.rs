@@ -8,6 +8,11 @@ use std::sync::Arc;
 
 use slug_build_api_v2::ActionOutput;
 use slug_configuration_v2::SlugConfiguration;
+use starlark_map::small_set::SmallSet;
+
+mod plan;
+pub use plan::PlannedActionOutputStaging;
+pub use plan::PublishedPlannedActionOutputs;
 
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 mod linux;
@@ -37,14 +42,28 @@ pub struct ActionOutputStaging {
     inner: linux::Staging,
 }
 impl ActionOutputStaging {
+    #[cfg(test)]
     pub(super) fn new(
         workspace: &Path,
         configuration: &SlugConfiguration,
         outputs: &[ActionOutput],
     ) -> io::Result<Self> {
+        let reserved = outputs
+            .iter()
+            .flat_map(|output| output.path().split('/'))
+            .collect();
+        Self::new_reserved(workspace, configuration, outputs, &reserved)
+    }
+
+    pub(super) fn new_reserved(
+        workspace: &Path,
+        configuration: &SlugConfiguration,
+        outputs: &[ActionOutput],
+        reserved: &SmallSet<&str>,
+    ) -> io::Result<Self> {
         #[cfg(all(target_os = "linux", target_env = "gnu"))]
         {
-            let inner = linux::Staging::new(workspace, configuration, outputs)?;
+            let inner = linux::Staging::new(workspace, configuration, outputs, reserved)?;
             Ok(Self {
                 outputs: outputs.to_vec().into(),
                 root: super::configured_output::configured_output_root(workspace, configuration),
@@ -53,7 +72,7 @@ impl ActionOutputStaging {
         }
         #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
         {
-            let _ = (workspace, configuration, outputs);
+            let _ = (workspace, configuration, outputs, reserved);
             Err(unsupported())
         }
     }
@@ -89,6 +108,16 @@ impl ActionOutputStaging {
         #[cfg(all(target_os = "linux", target_env = "gnu"))]
         {
             self.inner.seal(&self.outputs)
+        }
+        #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+        {
+            Err(unsupported())
+        }
+    }
+    fn preflight(&self) -> io::Result<()> {
+        #[cfg(all(target_os = "linux", target_env = "gnu"))]
+        {
+            self.inner.preflight_publication(&self.outputs)
         }
         #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
         {

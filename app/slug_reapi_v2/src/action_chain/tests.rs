@@ -20,7 +20,7 @@ use super::*;
 #[path = "../../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
 mod fixture;
 
-const DEFS: &str = r#"def _impl(ctx):
+pub(super) const DEFS: &str = r#"def _impl(ctx):
     seed = ctx.actions.declare_file('seed')
     file = ctx.actions.declare_file('file')
     tree = ctx.actions.declare_directory('tree')

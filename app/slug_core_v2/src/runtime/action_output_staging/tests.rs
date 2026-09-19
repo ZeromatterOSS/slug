@@ -15,12 +15,12 @@ use slug_identity_v2::CanonicalLabel;
 
 use super::*;
 
-struct Workspace(tempfile::TempDir);
+pub(super) struct Workspace(tempfile::TempDir);
 impl Workspace {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self(tempfile::tempdir().unwrap())
     }
-    fn path(&self) -> &Path {
+    pub(super) fn path(&self) -> &Path {
         self.0.path()
     }
 }
@@ -37,7 +37,7 @@ impl Drop for Workspace {
         writable(self.path());
     }
 }
-fn configurations() -> (SlugConfiguration, SlugConfiguration) {
+pub(super) fn configurations() -> (SlugConfiguration, SlugConfiguration) {
     let host = HostConversionInputs::new(
         Some(AutoCpuToken::K8),
         Some(HostPathFlavor::Unix),
@@ -60,7 +60,7 @@ fn outputs() -> Vec<ActionOutput> {
         ActionOutput::new("pkg/tree", ActionOutputKind::Directory),
     ]
 }
-fn root(workspace: &Workspace, config: &SlugConfiguration) -> PathBuf {
+pub(super) fn root(workspace: &Workspace, config: &SlugConfiguration) -> PathBuf {
     super::super::configured_output::configured_output_root(workspace.path(), config)
 }
 fn fill(stage: &ActionOutputStaging, bytes: &[u8]) {
@@ -72,7 +72,7 @@ fn fill(stage: &ActionOutputStaging, bytes: &[u8]) {
         .write_all(bytes)
         .unwrap();
 }
-fn scratch(root: &Path) -> Vec<PathBuf> {
+pub(super) fn scratch(root: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
     let mut pending = vec![root.parent().unwrap().to_path_buf()];
     while let Some(parent) = pending.pop() {

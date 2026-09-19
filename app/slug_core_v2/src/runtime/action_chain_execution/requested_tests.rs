@@ -183,6 +183,7 @@ fn requested_forest_executes_shared_producers_once_and_restores_group_bindings()
     let targets = ["//:one", "//:one_alias", "//:left", "//:one"];
     let accepted = run(&workspace, &targets, &transport).unwrap();
     let result = accepted.terminal_for_test();
+    assert!(result.published_outputs().is_empty());
     let plan = result.inputs().plan().unwrap();
     assert!(plan.selected_action().is_none());
     let requested = plan.requested().unwrap();
@@ -380,28 +381,6 @@ fn requested_late_failures_and_unwind_discard_results_and_restore_accepted_state
     );
 }
 
-#[test]
-fn requested_publication_policy_rejects_before_output_transfer() {
-    let workspace = workspace();
-    let transport = RequestedFake::new(&workspace, RequestedBehavior::Normal);
-    let accepted = run(&workspace, &["//:one"], &transport).unwrap();
-    let inputs = accepted.terminal_for_test().inputs.clone();
-    let publisher = Fake::new(workspace.root.path(), Behavior::Normal);
-    let error = workspace.runtime.runtime.block_on(async {
-        let mut session = publisher.start(inputs.clone()).await.unwrap();
-        PublishOutputs(&workspace.runtime.configured_output)
-            .stage_outputs(&publisher, &mut session, &inputs)
-            .await
-            .err()
-            .expect("requested publication must be rejected")
-    });
-    assert!(
-        error
-            .to_string()
-            .contains("requested action output publication is unsupported"),
-        "{error}"
-    );
-    assert_eq!(publisher.output_stages.load(Ordering::SeqCst), 0);
-    assert_eq!(publisher.session_drops.load(Ordering::SeqCst), 1);
-    assert!(!workspace.output_path().exists());
-}
+#[path = "requested_publication_tests.rs"]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+mod requested_publication_tests;

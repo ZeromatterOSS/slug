@@ -29,14 +29,13 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-43-m7a-requested-execution-r1
+Packet: WP-7-44-m7a-requested-publication-r1
 Status: accepted
 
-WP743 accepted requested-forest execution through one native request, preserving the
-complete source frontier, fresh-session retries and zero-action completion. Twenty-two
-focused checks, compile/structural checks and independent final review pass. WP742 is
-accepted at 5ca6f056d. Next: selected-artifact publication across producers/configurations,
-then CLI activation. M7A partial, M8 unproved.
+WP744 accepts selected-artifact publication across producers/configurations under one
+native full-frontier validation, with 21 focused checks including real multi-producer
+REAPI proof, direct-dependent compile and independent final ACCEPT. WP743 is
+244c6641d. Next: CLI/server requested build activation. M7A partial, M8 unproved.
 
 ### Earlier generated-input receipt
 

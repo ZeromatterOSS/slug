@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fs::File;
 use std::io::Read;
@@ -154,7 +153,7 @@ impl Destination {
         parent: File,
         previous: Option<Entry>,
         kind: ActionOutputKind,
-        reserved: &HashSet<&str>,
+        reserved: &starlark_map::small_set::SmallSet<&str>,
     ) -> io::Result<Self> {
         let mut builder = tempfile::Builder::new();
         builder.prefix(".slug-output-stage-");
@@ -250,6 +249,7 @@ impl Staging {
         workspace: &Path,
         configuration: &SlugConfiguration,
         outputs: &[ActionOutput],
+        reserved: &starlark_map::small_set::SmallSet<&str>,
     ) -> io::Result<Self> {
         for output in outputs {
             component_path(output.path())?;
@@ -269,21 +269,12 @@ impl Staging {
         claim_marker(&bazel, &projection, configuration.canonical_bytes())?;
         let configured = directory(&bazel, &projection, true)?;
         let bin = directory(&configured, "bin", true)?;
-        let reserved: HashSet<_> = outputs
-            .iter()
-            .flat_map(|output| output.path().split('/'))
-            .collect();
         let mut destinations = Vec::with_capacity(outputs.len());
         for output in outputs {
             let parts = component_path(output.path())?;
             let parent = walk(&bin, &parts[..parts.len() - 1], true)?;
             let previous = entry(&parent, parts.last().unwrap())?;
-            destinations.push(Destination::new(
-                parent,
-                previous,
-                output.kind(),
-                &reserved,
-            )?);
+            destinations.push(Destination::new(parent, previous, output.kind(), reserved)?);
         }
         Ok(Self {
             workspace,
@@ -410,14 +401,17 @@ impl Staging {
         }
         Ok(())
     }
-    pub(super) fn publish(&mut self, outputs: &[ActionOutput]) -> io::Result<()> {
+    pub(super) fn preflight_publication(&self, outputs: &[ActionOutput]) -> io::Result<()> {
         if !self.sealed || self.attempted {
             return Err(io::Error::other(
                 "output publication requires one sealed stage",
             ));
         }
+        self.preflight(outputs)
+    }
+    pub(super) fn publish(&mut self, outputs: &[ActionOutput]) -> io::Result<()> {
+        self.preflight_publication(outputs)?;
         self.attempted = true;
-        self.preflight(outputs)?;
         for (output, destination) in outputs.iter().zip(&mut self.destinations) {
             let name = component_path(output.path())?.last().unwrap().to_string();
             let flags = if destination.previous.is_some() {

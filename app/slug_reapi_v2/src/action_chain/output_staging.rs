@@ -4,6 +4,7 @@ use std::io::Write;
 
 use slug_core_v2::runtime::ActionChainOutputTransport;
 use slug_core_v2::runtime::ActionOutputStaging;
+use slug_core_v2::runtime::PlannedActionOutputStaging;
 use slug_reapi_cache_v2::CacheError;
 
 use super::*;
@@ -14,35 +15,59 @@ enum SelectedOutput<'a> {
     Directory(&'a GeneratedDirectory),
 }
 
-/// Reconcile the entire declaration before creating even the first staging file.
+/// Reconcile the entire batch before creating even the first staging file.
 fn selected_outputs<'a>(
     session: &'a ActionChainReapiSession,
-    staging: &ActionOutputStaging,
-) -> Result<Vec<SelectedOutput<'a>>, RemoteExecutionError> {
-    let result = selected_result(session)?;
-    reconcile_outputs(staging.outputs(), &result.result)
+    stages: &[PlannedActionOutputStaging],
+) -> Result<Vec<Vec<SelectedOutput<'a>>>, RemoteExecutionError> {
+    project_outputs(
+        session,
+        stages
+            .iter()
+            .map(|stage| (stage.action_index(), stage.staging().outputs())),
+    )
 }
 
-fn selected_result(
-    session: &ActionChainReapiSession,
-) -> Result<&RemoteExecutionResult, RemoteExecutionError> {
-    if session
-        .inputs
-        .plan()
-        .map_err(command_error)?
-        .selected_action()
-        .is_none()
+fn project_outputs<'a, 's>(
+    session: &'a ActionChainReapiSession,
+    selections: impl IntoIterator<Item = (usize, &'s [ActionOutput])>,
+) -> Result<Vec<Vec<SelectedOutput<'a>>>, RemoteExecutionError> {
+    let plan = session.inputs.plan().map_err(command_error)?;
+    if session.results.len() != session.templates.len()
+        || session.results.len() != plan.actions().len()
+        || session.results.is_empty()
     {
-        return Err(protocol(
-            "requested forests do not support output publication",
-        ));
+        return Err(protocol("output staging requires a completed action plan"));
     }
-    if session.results.len() != session.templates.len() || session.results.is_empty() {
-        return Err(protocol(
-            "output staging requires a completed selected chain",
-        ));
-    }
-    Ok(session.results.last().unwrap())
+    let mut producers = BTreeSet::new();
+    selections
+        .into_iter()
+        .map(|(index, selected)| {
+            let action = plan
+                .actions()
+                .get(index)
+                .ok_or_else(|| protocol("output staging producer index is outside the plan"))?
+                .action();
+            if !producers.insert(index) {
+                return Err(protocol("duplicate output staging producer"));
+            }
+            // An unselected cooutput is still part of the producer's contract.
+            let complete = reconcile_outputs(action.outputs(), &session.results[index].result)?;
+            let mut outputs = action
+                .outputs()
+                .iter()
+                .zip(complete)
+                .collect::<BTreeMap<_, _>>();
+            selected
+                .iter()
+                .map(|output| {
+                    outputs.remove(output).ok_or_else(|| {
+                        protocol("staged output subset differs from producer declaration")
+                    })
+                })
+                .collect()
+        })
+        .collect()
 }
 
 fn reconcile_outputs<'a>(
@@ -136,11 +161,13 @@ impl ActionChainOutputTransport for ActionChainReapiTransport {
     async fn stage_outputs(
         &self,
         session: &mut Self::Session,
-        staging: &ActionOutputStaging,
+        stages: &[PlannedActionOutputStaging],
     ) -> Result<(), Self::Error> {
-        let selected = selected_outputs(session, staging)?;
-        for (index, output) in selected.into_iter().enumerate() {
-            stage_output(&session.cache, staging, index, output).await?;
+        let selected = selected_outputs(session, stages)?;
+        for (stage, selected) in stages.iter().zip(selected) {
+            for (index, output) in selected.into_iter().enumerate() {
+                stage_output(&session.cache, stage.staging(), index, output).await?;
+            }
         }
         Ok(())
     }
@@ -148,3 +175,6 @@ impl ActionChainOutputTransport for ActionChainReapiTransport {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod requested_publication_tests;
