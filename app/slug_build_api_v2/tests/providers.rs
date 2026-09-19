@@ -355,22 +355,69 @@ fn files_to_run_private_carrier_preserves_support_topology_and_hash_law() {
 }
 
 #[test]
-fn runfiles_admit_symlink_artifacts_but_reject_tree_shapes() {
-    let make = |kind| {
-        RetainedRunfiles::from_parts(
-            vec![derived_artifact("pkg/value", kind)],
+fn runfiles_admit_directory_and_symlink_artifacts_but_reject_nested_runfiles_trees() {
+    for kind in [
+        ActionOutputKind::File,
+        ActionOutputKind::Symlink,
+        ActionOutputKind::Directory,
+        ActionOutputKind::RunfilesTree,
+    ] {
+        let artifact = derived_artifact("pkg/value", kind);
+        let files = AnalysisDepset::new(
+            DepsetOrder::Default,
+            vec![AnalysisValue::artifact(artifact.clone())],
             Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            RunfilesConflictPolicy::Warn,
         )
-    };
-    assert!(make(ActionOutputKind::File).is_ok());
-    assert!(make(ActionOutputKind::Symlink).is_ok());
-    for kind in [ActionOutputKind::Directory, ActionOutputKind::RunfilesTree] {
-        assert_eq!(make(kind), Err(RunfilesError::InvalidArtifactKind(kind)));
+        .unwrap();
+        let link = RunfilesSymlink::new("logical", artifact.clone());
+        let links = Depset::from_direct(DepsetOrder::Default, vec![link.clone()]).unwrap();
+        let mut results = vec![RetainedRunfiles::empty().with_artifact(artifact.clone())];
+        for channel in 0..6 {
+            results.push(RetainedRunfiles::from_parts(
+                if channel == 0 {
+                    vec![artifact.clone()]
+                } else {
+                    Vec::new()
+                },
+                if channel == 1 {
+                    vec![files.clone()]
+                } else {
+                    Vec::new()
+                },
+                if channel == 2 {
+                    vec![link.clone()]
+                } else {
+                    Vec::new()
+                },
+                if channel == 3 {
+                    vec![links.clone()]
+                } else {
+                    Vec::new()
+                },
+                if channel == 4 {
+                    vec![link.clone()]
+                } else {
+                    Vec::new()
+                },
+                if channel == 5 {
+                    vec![links.clone()]
+                } else {
+                    Vec::new()
+                },
+                RunfilesConflictPolicy::Warn,
+            ));
+        }
+        for (channel, result) in results.into_iter().enumerate() {
+            if kind == ActionOutputKind::RunfilesTree {
+                assert_eq!(
+                    result,
+                    Err(RunfilesError::InvalidArtifactKind(kind)),
+                    "channel {channel}"
+                );
+            } else {
+                assert!(result.is_ok(), "{kind:?}, channel {channel}: {result:?}");
+            }
+        }
     }
 }
 

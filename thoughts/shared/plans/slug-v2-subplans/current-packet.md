@@ -1,169 +1,167 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-50-m7a-runfiles-build-publication-r1
+Packet: WP-7-51-m7a-files-to-run-inputs-r1
 Status: accepted
 
 ## Outcome and basis
 
-Complete ordinary requested binary Build for the existing four retained runfiles support
-families on Linux GNU, including hidden generated backing and materialized repository
-sources. WP749 (307048562) supplies selected native generation leases, WP748 supplies
-observed manifest encoders, and WP747 supplies the artifact-owned layout. Retain exact
-manifest algorithms and graph identities. Persistent source path projection, storage,
-publication and local execution routing are explicitly Slug-native. Exact ActionKeys,
-Run activation, FilesToRun-as-Spawn-input, arbitrary Symlink outputs, nested runfiles trees,
-Windows and unrelated Args action families remain unsupported/deferred. Legacy single-selected-
-action execution/publication continues to reject selecting a runfiles support family; its
-ordinary remote action behavior is unchanged. Requested public-MANIFEST roots additionally
-seed their exact matching virtual tree as a completion root without changing declared edges.
+Ordinary requested Build executes a generated tool through executable-attribute FilesToRun
+and explicit FilesToRun tools, with source File and generated File/Directory runfiles available in
+the remote sandbox. Transfer uses logical mappings and verified same-attempt producers;
+tool intermediates need not be locally published. Preserve WP750 binary publication.
+Predecessor: 7f9e1a4e8, accepted WP750 contract in that commit's current-packet.md.
 
-Pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a sources:
-RunfilesSupport.java:467-543 (four artifacts); RunfilesTreeAction.java:107-138 (virtual
-metadata completion, not remote Directory); SymlinkTreeHelper.java:87-95,167-237 (absolute
-links, public MANIFEST and writable directory structure); SourceManifestAction.java:249-424
-(manifest bytes and diagnostics); RepoMappingManifestAction.java:186-332 (mapping bytes).
-RemoteOutputChecker.java:165-211 and RemoteImportantOutputHandler.java:135-148 establish
-that runfiles backing must actually be available. Reuse pinned-source regression evidence
-from WP747/748 and native lifetime evidence from WP749. No fresh Bazel process is required
-unless integration exposes an uncovered compatibility question. Read docs/developers/dice.md.
+Demanded by: pinned rules_rust 0.73 rust/private/rustc.bzl:1895-1948 wrapper invocations
+and cargo/private/cargo_build_script.bzl:663-684 executable runner plus explicit script
+FilesToRun. Saved authenticated target/wp714/actions.json contains 510 Rustc, 375
+ExtractCargoTomlEnvVars and 66 CargoBuildScriptRun actions consuming RunfilesTree artifacts.
+This is capability demand, not proof that the full live production root executes.
+Virtual Args paramfiles at rustc.bzl:1167-1168 and cargo_build_script.bzl:353-357 do not
+establish standalone ArgsWrite demand. Bootstrap Symlink/ExecutableSymlink and Cargo's
+_runfiles_map callback remain separate concrete residuals. F3 stays closed.
+
+Pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
+exec/SpawnInputExpander.java:85-130,202-211 expands logical runfiles mappings, null empty
+files and tree children/empty roots, excluding automatic MANIFEST. Its tests
+SpawnInputExpanderTest.java:189-273,356-388 cover regular links, root links/workspace
+sentinel and tree children. remote/merkletree/MerkleTreeComputer.java mapping and file
+node construction establish regular FileNodes with executable=true. Reuse WP747/748
+layout/manifest algorithms, WP749 source-generation lifetime and WP750 typed results.
+No fresh Bazel probe is required. Read docs/developers/dice.md and Stage 9 existing
+runfiles/depset/observed-source utility dispositions; no donor semantics are imported.
 
 ## Contract
 
-Preserve the single exact-owner prerequisite forest and native attempt. Admit the four
-RunfilesSupportActionSpec variants through their retained declared-input edges. Reject
-unsupported artifacts before effects, preserving exact owner/configuration lookup and
-cycle/conflict checks. Observe every raw runfiles source constituent (including obscured
-entries) in the existing action-chain DICE staging key. Retain workspace as a semantic
-input for pure path projection. Share existing manifest/path helpers. No filesystem owner,
-source bytes or execution results enter DICE; new action/layout/result metadata is request
-scratch. Reuse Arc, SmallMap/SmallSet, Allocative and Stage 9 observed-source ownership rows.
+Logical mapping and regular-file/tree expansion are exact for admitted Bazel surfaces.
+Structural artifact/configuration identities, native validation, transport routing and
+execution paths remain Slug-native. Exact ActionKeys, Run, arbitrary Symlink outputs,
+source directories, nested RunfilesTree, unresolved symlinks, Filesets, archived trees, path-mapping modes
+and Windows remain unsupported/deferred. Do not claim M7A completion or M8.
 
-Represent results in plan ordinal order with typed remote, local manifest, physical
-symlink-tree and virtual runfiles-tree outcomes. A virtual result never creates an Execute,
-REAPI ActionResult or Directory output. Remote evidence counts only remote actions. Generated
-file consumers may bind actual local manifest bytes/digests; generic runfiles-tree consumers
-remain rejected. Whole-plan preflight precedes remote work. Existing per-step and final
-full-source certificate validation remain mandatory. Completion retains exact selected native
-generation leases for materialized sources for the duration of copying/execution.
+Core's validated prerequisite forest owns exact artifact-to-producer binding and ordering.
+Expand all FilesToRun occurrences in executable, inputs and tools; deduplicate structurally
+through existing artifact collections. Require provider.support to match the exact retained
+RunfilesTree producer support, never just a matching path. The provider's executable and
+support tree must be represented. Generic source-only staging remains source-only.
+Admit direct retained RunfilesTree inputs only through their exact supported producer.
+Preserve cycle detection, shared scalar FileWrite representative bindings and whole-plan
+unsupported-kind rejection. Existing support edges schedule every raw constituent, including
+obscured sources and derived backing. Existing ActionChainStagingKey observes all sources,
+retains full certificates/events, and performs exact support preflight; no alternate graph,
+filesystem readback, semantic side table or new DICE key is introduced.
 
-Materialized sources used as link targets project to reserved
-bazel-out/.slug-runfiles-sources/v1/<sha256>-<size>-<mode> paths, outside configured roots.
-Use read-only mode 0444 plus the source's observed execute bits (0111); reject unavailable
-permissions. The exact namespaced real-path Lstat row in the source observation epoch owns
-mode. Copy via observed-source authority and verify SHA-256/length before sealing. Existing
-entries are not trusted by name: validate or replace through a confined staged file. The
-same pure projection supplies source manifest bytes and physical link targets. Host sources
-keep their observed requested paths. Durable backing is an output cache, never semantic
-input or freshness authority. Retain installed backing until explicit output cleanup;
-there is no automatic GC in this packet. Harmless immutable orphan blobs after an aborted
-partial publication are allowed. Paths survive result/runtime/process exit. No fsync/power
-loss guarantee beyond existing output publication; no permanent TempDir targets.
+REAPI prepares request-local binding templates from the borrowed native plan. Expand each
+RunfilesTree at its declared exec path using support.layout().entries(), including authored
+MANIFEST and _repo_mapping. Never inject automatic physical MANIFEST or host absolute link
+paths. Empty logical entries become empty inline file bytes. Ordinary targets bind certified
+source digests/readers or exact same-session producer results; generated Directory targets
+project their verified regular file children at logical paths, preserving an empty root but
+not nested empty producer directories. All consumer file modes follow existing executable=true
+projection. Virtual tree metadata remains a typed local result, never an Execute/Directory
+output. Validate its exact completed output before consuming the mapping.
 
-Core owns all local filesystem effects. Reuse descriptor-confined no-follow parents and
-staged sibling swaps. Add an internal typed tree writer, never a public arbitrary symlink
-capability. Create only validated layout links/empty files and the public MANIFEST link;
-validate symlink text without opening or chmodding targets. New tree directories use 0755
-and empty files 0444 (Slug-native mode normalization); create the mandatory main workspace
-subdirectory. Overlay physical MANIFEST after authored entries as the pinned helper does,
-replacing any authored MANIFEST leaf while preserving it in source manifest bytes. Whole-plan
-preflight rejects physical leaf/descendant conflicts preserved by late root/empty overlays,
-including MANIFEST/child; it never follows a leaf symlink or silently drops a child.
-Bind tree and MANIFEST to the
-same exact retained support and publish them as one directory unit. Account for MANIFEST's
-separate producer in accepted publication metadata. Expand selection to complete raw derived
-backing plus input/repository manifests using exact producer bindings, including artifacts
-absent from DefaultInfo. No undeclared files enter the logical runfiles tree.
+Whole-plan preflight reserves runfiles root namespaces against ordinary inputs, paramfiles
+and outputs, and validates known logical entry paths/types/conflicts before any connection.
+Runtime verified directory children undergo existing canonical input-tree validation. Exact
+repeated artifact inputs deduplicate; conflicting paths or leaf-prefix placements reject.
+Retain separate generated-CAS provenance: missing/corrupt generated data cannot be repaired
+from equal-digest source/local/empty bytes. Local manifest bytes may be uploaded only from
+actual completed local results. Keep session identity and ordinal gates, per-step and final
+native source validation, and selected generation leases. No local output publication is
+required for a tool-only tree; requested outputs still use existing staging/publication.
 
-Stage/seal all bytes and links before final source validation; preflight the entire batch,
-install durable/derived backing before visible trees, then publish under existing native
-revision validation. Preserve explicit partial-publication errors and release retired/private
-stages outside the revision lock. Rejection/retry drops provisional stage owners; accepted
-backing has persistent output ownership. Preserve existing output modes outside this explicit
-source-backing policy. No mutex across DICE compute or asynchronous work.
+All new bindings/maps/bytes are action/session scratch, released on failure/cancel/finish.
+Reuse borrowed plan, Arc support/layout identities, compact retained collections and existing
+ordered REAPI scratch maps. Avoid copying depset graphs or replanning the whole forest per
+ordinary input. No new service cache, filesystem owner, public API or lock is required.
 
-## Scope and evidence
+## Scope and validation
 
-Core: action_prerequisites.rs, action_chain_staging.rs with focused runfiles child,
-action_chain_execution.rs, runfiles_manifest paths visibility/reuse, action_output_staging.rs,
-plan.rs and Linux children, configured_output.rs narrow wiring, runtime exports. REAPI:
-action_chain.rs and focused children, output_staging.rs, requested_build.rs, public exports
-and directly affected tests. Add focused test children reusing existing hermetic native
-Workspace and local REAPI backend scaffolding. CLI/daemon only for direct wrapper coverage
-and necessary result API adaptation. Root owns this manifest, canonical and Stage 7/bootstrap
-owner notes. Avoid central-file growth: new source backing/tree/result logic belongs in
-focused children. Expected 900-1500 production and 700-1200 proof lines; review actual
-responsibility boundaries when exceeded, not permission based on a line count.
+Build API: runfiles.rs retained-artifact importer and focused tests admit generated Directory
+in direct/transitive files and link targets, preserving nested RunfilesTree rejection.
+Core: runtime/source_staging.rs, action_prerequisites.rs with focused child helpers/tests,
+action_chain_staging.rs/runfiles.rs only if needed for preflight; focused requested_artifacts
+runfiles tests. REAPI: action_chain.rs and focused binding/runfiles-input/test children.
+CLI: reuse shared fixture for one public wrapper proof if necessary; compile CLI/server direct
+dependents. Root owns canonical, Stage 7/bootstrap notes and this manifest. Expected 300-600
+production and 400-800 test lines; review responsibility boundaries if exceeded. Keep new
+binding expansion out of the central transport module. No fixture corpus growth/new oracle.
 
-Discriminators: mixed local/remote plan ordinals and remote evidence; exact support pairing;
-hidden generated backing and cooutput selection; public MANIFEST coupling including a MANIFEST-only requested root and authored root-name
-overlay and rejected late prefix conflicts; executable and
-non-executable materialized source backing; Host requested symlink spelling; obscured source
-certification; source/generated A/B/A and missing repair; result/runtime shutdown lifetime;
-corrupt/missing backing, pre-publication mutation, stale destination, confined link/cleanup
-without touching outside targets. Reuse existing retry/final-validation/partial-publication
-controls where unchanged. Public requested Build integration must produce a usable binary
-runfiles tree, not merely a metadata preparation result. Keep M7A partial/M8 unproved until
-their full gates pass. WP746 baseline diagnostic defect remains separately open.
+Discriminators: executable attribute and explicit tools support; mixed generated File and
+Directory (including empty), observed Host/materialized sources, empty logical files, mapping
+manifest and authored MANIFEST vs absent automatic MANIFEST; exact support/producer identity,
+shared/deduplicated bindings and namespace/prefix conflict rejection before connection;
+actual remote consumer bytes/modes, zero tool-only publication; cold/warm/A/B/A identity/cache
+behavior with accepted source-generation lifetime; generated CAS missing/corrupt and equal-digest
+local provenance controls. Reuse existing lifecycle/freshness/publication controls where
+unchanged. Existing WP750 binary Build must still work.
 
-Independent design and final review. Pinned nightly-2025-09-14, offline no-run compilation
-separate from execution, preparation cap 60s per operation. Shared-target Cargo and native
-tests observing shared ancestor paths serial. Exact-selector preflight; focused tests expected
-a few seconds, >30s requires strict necessity. Compile named direct dependents, rebuild CLI
-before wrapper smoke; no broad suites without milestone necessity. Format/diff/plan/archive
-checks, receipts target/wp750, commit and authorized main push at acceptance. Preserve
-unfinished coherent work on a review branch if a genuine design prerequisite interrupts
-completion. REPLAN only if the exact support owner, durable lifetime or atomic tree unit
-cannot be implemented without weakening native validation or broadening compatibility.
+Independent design and final review. Pinned nightly-2025-09-14 offline compile/no-run separately
+from exact-selector tests; compilation cap 60s per operation, focused tests expected a few
+seconds, >30s demands strict necessity. Shared-target Cargo and ancestor-observing native tests
+strictly serial. Root coordinates all execution, workers may author tests but must not run
+Cargo concurrently. Rebuild CLI before wrapper smoke. Use supervised fresh NativeLink only
+for named real-transfer proofs, with cleanup receipts; no broad suite. Format/diff/plan/archive
+checks and receipts target/wp751. Commit and authorized main push after acceptance.
+REPLAN only for a new unbounded ownership/compatibility prerequisite; routine corrections
+remain within this contract. Keep WP746 baseline diagnostic defect separately open.
 
-Independent design review: ACCEPT. Typed result ownership, persistent source backing,
-physical MANIFEST coupling and explicit mode/conflict boundaries are frozen for implementation.
+Independent design review: ACCEPT. Exact support/producer ownership, source-file boundary,
+logical mapping, pre-connection conflict rejection and CAS provenance are frozen.
 
-Reviewed design amendment: ActionChainStagingKey stores Warn obscuring diagnostics in its
-existing evaluation EventBatch once per SourceSymlinkManifest, after complete successful
-preparation. Need/errors use empty batches; no warning text enters prepared semantic equality.
-Existing native event selection owns retry, warm suppression and restoration. Message shape
-follows pinned Runfiles.java:289-307 with Slug-native artifact exec-path spelling. Independent
-design review ACCEPT; exact warning A/warm-A/remove/restore is required.
+Implementation discovery: the shared RetainedRunfiles importer still rejected generated
+Directory artifacts despite existing layout/remote tree semantics. Admit that same typed
+artifact through the existing visitor (no new semantic owner); pinned StarlarkRuleContext.java
+1059-1143 adds Artifact lists/depsets and symlink targets without a regular-file restriction, and pinned
+SpawnInputExpander.java104-122 owns their remote expansion. Source directories stay closed.
+
+Independent design amendment review: ACCEPT. Shared Directory importer admission completes
+the existing typed contract; no Analysis API or new observation owner is needed.
 
 ## Acceptance evidence
 
-The implementation now completes ordinary binary Build with a plan-indexed typed result
-table and no fabricated remote outcomes. Native preparation certifies all raw runfiles
-sources and rejects mismatched support objects/outputs and physical topology conflicts.
-Core stages verified persistent materialized sources, exact generated backing subsets and
-one physical tree/MANIFEST unit, with all backing installed before trees after full native
-validation. Shared-source mode/content identities preserve executable and non-executable
-backing independently. Existing arbitrary symlink rejection and legacy selected-family
-admission remain unchanged. Warnings use existing DICE event reconciliation, not transport
-or result-local stderr. Pure projections use the borrowed action on the ordinary path to
-avoid repeated forest planning.
+Implementation completes remote FilesToRun consumers through the existing exact prerequisite
+forest. Core rejects mismatched or incomplete support (including missing manifests before
+retained-input traversal), preserves source-only staging, and retains canonical shared
+producer bindings. REAPI binding is a focused child using exact artifact lookup and plan
+ordinals; no new public API or dependency was introduced. The shared runfiles importer now
+admits generated Directory in all existing file/link input channels. Physical publication
+and remote logical input topology remain distinct.
 
-Fifty distinct portable checks pass: 34 Core (six new confined staging/backing checks,
-three new native binary/overlay/warning checks including forged support/output negatives,
-and existing planner, manifest generation, requested output, retry and partial-publication
-controls), plus 16 REAPI result/binding/schema/evidence/preflight checks. Portable batches
-completed in 0.284-4.661s. New real-backend selectors prove binary A/warm-A/B/restored-A with
-exact two-action remote evidence and hidden backing, durable source modes/targets after
-runtime shutdown (1.519s), and an initially unpublished MANIFEST-only root with complete
-backing (0.626s). The rebuilt production CLI's one-shot Build exits, then its binary still
-runs from the published runfiles tree (0.654s). All three supervised backends terminate and
-remove their temporary roots; no daemon or fresh Bazel process was required. These tests
-prove the admitted family, not full production closure or Run.
+Twenty-four unique portable checks pass: 12 Core covering new provider occurrences/malformed
+support plus preserved ownership/cycles/source-only/native runfiles controls (1.748s total),
+11 REAPI covering logical aliases/empty files/empty directories, typed producer results,
+source/local/generated provenance, namespace preflight and existing requested/local result
+controls (initial batch 2.672s, final namespace 0.476s), and the revised Build API importer
+regression (0.001s). Exact selection receipts are in target/wp751. Initial namespace failure
+revealed the generated-Directory importer prerequisite; the valid-control assertion was
+improved to expose the error and the reviewed importer correction closed it.
 
-Pinned offline Core/REAPI compilation and CLI/server direct-dependent build pass; no-run
-preparation and runtime were separate. The largest preparation was 46.061s, below its 60s
-operation cap. Initial Core compilation found Arc<str>-to-io::Error conversion errors,
-corrected without changing the contract. Three fixture corrections preserved the gates:
-raw-file overlap selects Warn while explicit Starlark symlinks select Error; no-output
-checks must permit pre-existing configured-output infrastructure; and a source executable
-needs the established tools/tool path rather than a bare PATH-searched name. Failed
-receipts remain alongside passing corrections in target/wp750. Formatting, diff, plan and
-archive checks pass; exact selectors and accepted Rust source hashes are recorded there.
-No performance speedup is claimed. Independent final review: ACCEPT, verifying ownership, complete freshness, durable backing,
-coupled publication, honest remote evidence and the full named validation.
+Three unique real-backend checks pass: new implicit/explicit FilesToRun consumers use six
+shared remote producers/consumers with cold/warm/B/restored-A hits 0/6/2/6, correct logical
+bytes/modes, authored versus absent automatic MANIFEST, no tool-only publication, and an
+execution-only fresh-workspace control (final 7.883s); missing/corrupt generated CAS data
+blocks consumer Execute despite equal source bytes (1.955s); and the inherited WP750 binary
+publication/source-backing/shutdown-lifetime proof remains passing (1.405s). Every supervised
+backend exited 143 and its temporary root was removed. The 7.9s consumer proof is an infrequent
+checkpoint test; no test exceeded 30s and no broad suite or new Bazel process ran.
 
-This closes ordinary requested binary runfiles execution/publication. M7A remains partial
-and M8 unproved; continue the finite production closure's demanded Args/FilesToRun/other
-family gates. Exact support ActionKeys, aquery projection, arbitrary Symlink outputs,
-Run/Windows and WP746's baseline diagnostic defect remain open. Durable backing is retained
-until explicit output cleanup; automatic GC and power-loss persistence are not introduced.
+Pinned offline Core/REAPI/provider no-run preparation and the direct CLI/server build pass.
+Compilation was separate from test execution. Two compiler corrections used existing owners:
+public RetainedArtifactInputs replaced an inaccessible depset visitor, and AnalysisArtifact
+source keys replaced a test-only identity-crate import. The latter correction was validated
+by the final CLI build, REAPI compile, native namespace check and full positive wire proof.
+Source-map ordering remains deterministic because the scratch hash map is lookup-only.
+Failed and passing receipts remain under target/wp751; accepted Rust hashes are recorded.
+
+Proof growth exceeds the estimate because isolated tests cover importer channels, exact
+provider occurrences/forgeries, binding provenance and supervised real-transfer faults;
+review found these separate responsibilities cohesive. The transport module shrank while
+new binding logic stayed in its focused child. No performance speedup is claimed. Formatting,
+diff, plan and archive checks pass. Final independent review: ACCEPT, confirming exact support ownership, certified source
+binding, logical expansion, generated CAS integrity and the named validation.
+
+M7A remains partial and M8 unproved. Next production-demanded prerequisites include bootstrap
+Symlink/ExecutableSymlink and Cargo's _runfiles_map callback. Full production closure,
+source directories, nested runfiles trees, Run, broader aquery/ActionKeys and Windows remain
+unproved/deferred. WP746's baseline diagnostic defect remains separately open.

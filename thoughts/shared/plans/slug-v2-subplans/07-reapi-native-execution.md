@@ -373,8 +373,23 @@ WP750 evidence covers exact pairing, overlay/conflict handling, missing/corrupt 
 mode preservation, confined cleanup, typed mixed-result provenance, warning restoration,
 public binary A/warm-A/B/restored-A plus runtime shutdown, MANIFEST-only selection, and an
 actual CLI process-exit binary smoke. Full production closure execution remains unproved.
-FilesToRun-as-Spawn-input, nested runfiles trees, unresolved Symlink outputs, Run activation,
-exact support ActionKeys and Windows remain deferred. Legacy single-selected-action APIs
+FilesToRun consumers use the same prerequisite forest: executable/input/tool providers must
+match their exact retained tree producer, and malformed support fails before traversal.
+Generated Directory artifacts are admitted through the existing runfiles importer; nested
+RunfilesTree remains rejected. REAPI projects logical entries beneath the declared tree path
+using certified source files and verified same-session generated File/Directory results.
+Directory children retain regular-file executable projection and empty roots; nested empty
+producer directories are omitted. Authored MANIFEST and _repo_mapping follow the logical map;
+the automatic physical MANIFEST and host absolute symlink paths never enter remote inputs.
+Empty entries retain local empty bytes without weakening generated CAS provenance. Whole-tree
+namespaces and known logical conflicts reject before connection. Tool-only intermediates and
+source backing need no local publication. Bindings are request/session scratch, not DICE state.
+
+WP751 real-backend proofs cover executable-attribute and explicit FilesToRun tools, shared
+backing, Host/materialized sources, cold/warm/A/B/A cache identity, execution-only completion,
+no tool publication and generated CAS eviction/corruption despite equal source bytes. WP750
+binary publication/lifetime controls remain valid. Source directories, nested runfiles trees,
+unresolved Symlink outputs, Run activation, exact support ActionKeys and Windows remain deferred. Legacy single-selected-action APIs
 continue to reject directly selecting support families; ordinary requested Build owns their
 coupled publication.
 

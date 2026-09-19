@@ -532,3 +532,6 @@ mod requested_tests;
 
 #[path = "engine_tests.rs"]
 mod engine_tests;
+
+#[path = "runfiles_tests.rs"]
+mod runfiles_tests;

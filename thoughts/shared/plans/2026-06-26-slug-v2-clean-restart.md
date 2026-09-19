@@ -29,14 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-50-m7a-runfiles-build-publication-r1
+Packet: WP-7-51-m7a-files-to-run-inputs-r1
 Status: accepted
 
-WP750 accepts ordinary binary Build runfiles on Linux GNU: typed local/remote results,
-complete backing publication and durable materialized sources, verified by 50 portable
-checks plus three real-backend/CLI lifetime proofs. Continue the finite production closure's
-remaining demanded action/tool-input gates. M7A remains partial and M8 unproved; WP746's
-baseline diagnostic defect remains open.
+WP751 accepts FilesToRun tool-input transfer through exact native producer bindings and
+logical remote runfiles expansion, including generated Directory artifacts. Twenty-four
+portable checks, three real-backend proofs and direct CLI/server compilation pass; independent
+final review accepted. WP750 binary publication remains protected. M7A remains partial and
+M8 unproved; bootstrap symlink families, Cargo's runfiles callback and WP746's baseline
+diagnostic defect remain open.
 
 ### Earlier generated-input receipt
 

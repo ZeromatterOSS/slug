@@ -234,7 +234,7 @@ fn ensure_regular_artifact(artifact: &AnalysisArtifact) -> Result<(), RunfilesEr
     if let AnalysisArtifact::Derived { output, .. } = artifact
         && !matches!(
             output.kind(),
-            ActionOutputKind::File | ActionOutputKind::Symlink
+            ActionOutputKind::File | ActionOutputKind::Directory | ActionOutputKind::Symlink
         )
     {
         return Err(RunfilesError::InvalidArtifactKind(output.kind()));

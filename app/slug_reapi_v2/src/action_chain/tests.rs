@@ -260,6 +260,7 @@ fn empty_tree_namespace_rejects_descendants_and_outputs_but_allows_siblings() {
         // An empty tree has a namespace even before producer contents exist.
         let mut inputs = vec![Binding::Generated {
             producer: 0,
+            path: "tree".to_owned(),
             output: ActionOutput::new("tree", ActionOutputKind::Directory),
         }];
         inputs.extend(sources.iter().map(|path| Binding::Source {

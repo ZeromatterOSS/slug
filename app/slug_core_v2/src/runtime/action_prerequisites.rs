@@ -14,6 +14,8 @@ use super::configured_action_closure::ValidatedActionClosure;
 use super::configured_action_closure::scalar_file_write;
 use super::dice::source_staging::declared_artifacts;
 
+mod runfiles;
+
 type Coordinate = (usize, usize);
 
 /// A declared input and, for generated inputs, its producer in `actions()`.
@@ -197,6 +199,12 @@ fn plan_roots<'a>(
                 output.kind()
             ))
         })?;
+        if output.kind() == ActionOutputKind::RunfilesTree {
+            runfiles::require_tree_producer(
+                artifact,
+                &owners[coordinate.0].actions()[coordinate.1],
+            )?;
+        }
         canonical(coordinate).map(Some)
     };
     let seeds = match roots {
@@ -265,10 +273,12 @@ fn walk_prerequisites<'a>(
                 }
                 let artifacts = if let Some(spawn) = action.spawn_spec() {
                     let artifacts = declared_artifacts(spawn)?;
-                    if artifacts.iter().any(|artifact| matches!(artifact,
-                        AnalysisArtifact::Derived { output, .. } if output.kind() == ActionOutputKind::RunfilesTree)) {
-                        return Err("runfiles-tree Spawn inputs remain unsupported".into());
-                    }
+                    runfiles::validate_providers(spawn, |artifact| {
+                        let coordinate = producer(artifact)?.ok_or_else(|| {
+                            Arc::from("FilesToRun tree has no generated producer")
+                        })?;
+                        Ok(&owners[coordinate.0].actions()[coordinate.1])
+                    })?;
                     artifacts
                 } else if let Some(spec) = action.runfiles_support_spec() {
                     let mut artifacts = SmallSet::new();

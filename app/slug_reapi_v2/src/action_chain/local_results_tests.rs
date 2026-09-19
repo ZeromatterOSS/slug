@@ -25,6 +25,7 @@ fn local_manifest_binding_preserves_plan_ordinals_and_remote_cas_provenance() {
     // ordinal one. Equal bytes must retain the remote producer's CAS obligation.
     bindings.push(Binding::Generated {
         producer: 1,
+        path: "remote".to_owned(),
         output: ActionOutput::new("remote", ActionOutputKind::File),
     });
     let remote = ActionChainStepResult::Remote(RemoteExecutionResult {

@@ -128,6 +128,12 @@ fn error(value: impl fmt::Display) -> Arc<str> {
 }
 
 fn declared_sources(spawn: &SpawnSpec) -> Result<SmallSet<AnalysisArtifact>, Arc<str>> {
+    visit_files_to_run(spawn, |provider| {
+        if provider.support.is_some() {
+            return Err(error("runfiles support is not admitted for source staging"));
+        }
+        Ok(())
+    })?;
     let sources = declared_artifacts(spawn)?;
     if sources
         .iter()
@@ -136,6 +142,26 @@ fn declared_sources(spawn: &SpawnSpec) -> Result<SmallSet<AnalysisArtifact>, Arc
         return Err(error("generated file/tree source staging is not admitted"));
     }
     Ok(sources)
+}
+
+/// Visit typed provider occurrences without flattening or copying their depsets.
+pub(in crate::runtime) fn visit_files_to_run(
+    spawn: &SpawnSpec,
+    mut visitor: impl FnMut(&FilesToRunProvider) -> Result<(), Arc<str>>,
+) -> Result<(), Arc<str>> {
+    for inputs in [spawn.inputs(), spawn.tools()] {
+        for input in inputs.sources() {
+            if let ArtifactInputSource::FilesToRun(provider) = input {
+                visitor(provider)?;
+            }
+        }
+    }
+    if let RetainedSpawnInvocation::Executable(SpawnExecutable::FilesToRun(provider)) =
+        spawn.invocation()
+    {
+        visitor(provider)?;
+    }
+    Ok(())
 }
 
 pub(in crate::runtime) fn declared_artifacts(
@@ -151,17 +177,26 @@ pub(in crate::runtime) fn declared_artifacts(
         provider: &FilesToRunProvider,
         sources: &mut SmallSet<AnalysisArtifact>,
     ) -> Result<(), Arc<str>> {
-        if provider.support.is_some() {
-            return Err(error("runfiles support is not admitted for source staging"));
-        }
+        let mut has_executable = provider.executable.is_none();
+        let mut has_tree = provider.support.is_none();
         RetainedArtifactInputs::new(provider.files().clone())
             .map_err(error)?
             .visit(|artifact| {
+                has_executable |= provider.executable.as_ref() == Some(artifact);
+                has_tree |= provider
+                    .support
+                    .as_ref()
+                    .is_some_and(|support| &support.tree == artifact);
                 sources.insert(artifact.clone());
             })
             .map_err(error)?;
-        if let Some(executable) = &provider.executable {
-            sources.insert(executable.clone());
+        if !has_executable || !has_tree {
+            return Err(error(
+                "FilesToRun files omit its executable or runfiles tree",
+            ));
+        }
+        if provider.support.is_some() && provider.executable.is_none() {
+            return Err(error("FilesToRun runfiles support has no executable"));
         }
         Ok(())
     }

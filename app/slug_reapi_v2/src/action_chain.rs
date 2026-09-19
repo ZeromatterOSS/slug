@@ -20,6 +20,11 @@ use crate::executor::tonic_endpoint;
 use crate::source_spawn::spawn_command;
 use crate::*;
 
+mod binding;
+use binding::Binding;
+use binding::BoundInputs;
+use binding::validate_paths;
+
 mod output_staging;
 mod result;
 pub use result::ActionChainStepResult;
@@ -70,17 +75,6 @@ enum StagedPayload {
     Runfiles(ActionChainStepResult),
 }
 
-enum Binding {
-    Source {
-        path: String,
-        digest: ReapiDigest,
-        index: usize,
-    },
-    Generated {
-        producer: usize,
-        output: ActionOutput,
-    },
-}
 enum Template {
     Runfiles(ActionChainStepResult),
     Write(FileWriteReapiPlan),
@@ -130,9 +124,12 @@ impl Template {
                     .collect::<String>();
                 let digest =
                     ReapiDigest::new(hash, source.digest().size_bytes()).map_err(command_error)?;
-                Ok((source.label().clone(), (index, digest)))
+                Ok((
+                    AnalysisArtifact::Source(source.label().clone()),
+                    (index, digest),
+                ))
             })
-            .collect::<Result<BTreeMap<_, _>, RemoteExecutionError>>()?;
+            .collect::<Result<std::collections::HashMap<_, _>, RemoteExecutionError>>()?;
         let plan = inputs.plan().map_err(command_error)?;
         plan.actions()
             .iter()
@@ -158,46 +155,14 @@ impl Template {
                 let bindings = step
                     .inputs()
                     .iter()
-                    .map(|input| {
-                        Ok(match input.artifact() {
-                            AnalysisArtifact::Source(label) => {
-                                let (index, digest) = sources
-                                    .get(label)
-                                    .ok_or_else(|| protocol("unobserved chain source"))?;
-                                Binding::Source {
-                                    path: input.artifact().path().into_owned(),
-                                    digest: digest.clone(),
-                                    index: *index,
-                                }
-                            }
-                            AnalysisArtifact::Derived { output, .. } => Binding::Generated {
-                                producer: input.producer().ok_or_else(|| {
-                                    protocol("generated input has no planned producer")
-                                })?,
-                                output: output.clone(),
-                            },
-                        })
-                    })
+                    .map(|input| Binding::prepare(input, &sources, &plan))
                     .collect::<Result<Vec<_>, RemoteExecutionError>>()?;
                 validate_namespaces(&bindings, &expanded, &command)?;
                 // Validate canonical input/param paths before any upstream action runs.
                 let mut entries = Vec::new();
                 let mut directories = command.output_directories.clone();
                 for binding in &bindings {
-                    match binding {
-                        Binding::Source { path, digest, .. } => {
-                            entries.push(input_entry(path, digest.clone()))
-                        }
-                        Binding::Generated { output, .. }
-                            if output.kind() == ActionOutputKind::Directory =>
-                        {
-                            directories.push(output.path().to_owned())
-                        }
-                        Binding::Generated { output, .. } => entries.push(input_entry(
-                            output.path(),
-                            ReapiBlob::from_bytes(Vec::new()).digest().clone(),
-                        )),
-                    }
+                    binding.preflight(&mut entries, &mut directories);
                 }
                 ReapiInputTree::from_entries_and_directories(entries, directories)
                     .and_then(|tree| tree.with_spawn_param_files_executable(&expanded, true))
@@ -229,84 +194,22 @@ impl Template {
                 local: BTreeMap::new(),
             });
         };
-        let mut entries = Vec::new();
-        let mut directories = command.output_directories.clone();
-        let mut sources = BTreeMap::new();
-        let mut generated = BTreeSet::new();
-        let mut local = BTreeMap::new();
+        let mut bound = BoundInputs {
+            directories: command.output_directories.clone(),
+            ..Default::default()
+        };
         for binding in inputs {
-            match binding {
-                Binding::Source {
-                    path,
-                    digest,
-                    index,
-                } => {
-                    entries.push(input_entry(path, digest.clone()));
-                    sources.insert(digest.clone(), *index);
-                }
-                Binding::Generated { producer, output } => {
-                    let completed = results
-                        .get(*producer)
-                        .ok_or_else(|| protocol("producer has not completed in this attempt"))?;
-                    if let Some(file) = completed.local_file() {
-                        if file.output() != output {
-                            return Err(protocol("local producer differs from declared input"));
-                        }
-                        entries.push(input_entry(output.path(), file.digest().clone()));
-                        local.insert(file.digest().clone(), file.bytes.clone());
-                        continue;
-                    }
-                    let result = &completed
-                        .remote()
-                        .ok_or_else(|| {
-                            protocol("virtual runfiles tree cannot bind a remote input")
-                        })?
-                        .result;
-                    match output.kind() {
-                        ActionOutputKind::File => {
-                            let file = result
-                                .output_files()
-                                .iter()
-                                .find(|file| file.path() == output.path())
-                                .ok_or_else(|| {
-                                    protocol("verified producer is missing its declared file")
-                                })?;
-                            generated.insert(file.digest().clone());
-                            entries.push(input_entry(output.path(), file.digest().clone()));
-                        }
-                        ActionOutputKind::Directory => {
-                            let tree = result
-                                .output_directories()
-                                .iter()
-                                .find(|tree| tree.path() == output.path())
-                                .ok_or_else(|| {
-                                    protocol("verified producer is missing its declared directory")
-                                })?;
-                            // Bazel projects file children; do not graft truthful producer modes
-                            // or nested empty directories into the consumer's input root.
-                            directories.push(output.path().to_owned());
-                            for file in tree.files() {
-                                generated.insert(file.digest().clone());
-                                entries.push(input_entry(
-                                    &format!("{}/{}", output.path(), file.path()),
-                                    file.digest().clone(),
-                                ));
-                            }
-                        }
-                        _ => return Err(protocol("unsupported generated input kind")),
-                    }
-                }
-            }
+            bound.add(binding, results)?;
         }
-        let tree = ReapiInputTree::from_entries_and_directories(entries, directories)
+        let tree = ReapiInputTree::from_entries_and_directories(bound.files, bound.directories)
             .and_then(|tree| tree.with_spawn_param_files_executable(expanded, true))
             .map_err(command_error)?;
         Ok(BoundAction {
             command: command.clone(),
             tree,
-            sources,
-            generated,
-            local,
+            sources: bound.sources,
+            generated: bound.generated,
+            local: bound.local,
         })
     }
 }
@@ -322,10 +225,7 @@ fn validate_namespaces(
 ) -> Result<(), RemoteExecutionError> {
     let paths = inputs
         .iter()
-        .map(|input| match input {
-            Binding::Source { path, .. } => path.as_str(),
-            Binding::Generated { output, .. } => output.path(),
-        })
+        .map(Binding::path)
         .chain(expanded.param_files().iter().map(|file| file.path()))
         .chain(
             command
@@ -334,23 +234,8 @@ fn validate_namespaces(
                 .chain(&command.output_directories)
                 .map(String::as_str),
         );
-    // Check whole-tree namespaces before their children are known.
-    let mut paths = paths.collect::<Vec<_>>();
-    paths.sort_unstable();
-    // A lexical neighbor alone is insufficient when punctuation sorts before '/'.
-    let mut seen = BTreeSet::new();
-    for path in paths {
-        if !seen.insert(path)
-            || path
-                .match_indices('/')
-                .any(|(end, _)| seen.contains(&path[..end]))
-        {
-            return Err(command_error(format!(
-                "chain input/param/output namespace conflict at {path}"
-            )));
-        }
-    }
-    Ok(())
+    // Reserve whole-tree namespaces before generated children are known.
+    validate_paths(paths)
 }
 
 impl ActionChainTransport for ActionChainReapiTransport {
@@ -566,3 +451,6 @@ mod local_results_tests;
 
 #[cfg(all(test, target_os = "linux", target_env = "gnu"))]
 mod runfiles_tests;
+
+#[cfg(all(test, target_os = "linux", target_env = "gnu"))]
+mod files_to_run_tests;
