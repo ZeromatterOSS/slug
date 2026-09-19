@@ -829,6 +829,11 @@ enum NativeDemandSessionError {
     PathInternalNonProgress,
     RevisionInternalNonProgress,
     Revision(RequestRevisionError),
+    AfterOutputPublication(Box<NativeDemandSessionError>),
+    OutputPublicationAbort {
+        publication: Box<NativeDemandSessionError>,
+        abort: Box<NativeDemandSessionError>,
+    },
     MissingSelectedPath(PathObservationDemand),
     PathEpoch(slug_workspace_v2::PathObservationEpochError),
     ObservedTerminal(ObservedTerminalMismatch),
@@ -864,6 +869,14 @@ impl fmt::Display for NativeDemandSessionError {
                 f.write_str("request revision made no bounded progress")
             }
             Self::Revision(error) => write!(f, "request revision failed: {error}"),
+            Self::AfterOutputPublication(error) => write!(
+                f,
+                "native acceptance failed after action outputs were published (outputs may have changed): {error}"
+            ),
+            Self::OutputPublicationAbort { publication, abort } => write!(
+                f,
+                "{publication}; native abort also failed (outputs may have changed): {abort}"
+            ),
             Self::MissingSelectedPath(_) => {
                 f.write_str("a selected path observation was not materialized")
             }
@@ -1127,6 +1140,16 @@ trait NativeCommandRoot: Clone {
         _context: NativeCommandCompletionContext<'a, '_>,
     ) -> impl std::future::Future<Output = Result<(), NativeDemandSessionError>> + 'a {
         async { Ok(()) }
+    }
+
+    // Only roots with a pending capability publish. No DICE compute or async
+    // effects may run here: finalization still owns the source-validation lock.
+    fn publish(&self, _terminal: &mut Self::Terminal) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn publication_completed(&self, _terminal: &Self::Terminal) -> bool {
+        false
     }
 
     fn initializes_request_revision(&self) -> bool {
@@ -2985,6 +3008,7 @@ mod action_chain_staging;
 pub use action_chain_staging::PreparedActionChainInputs;
 #[path = "action_chain_execution.rs"]
 mod action_chain_execution;
+pub use action_chain_execution::ActionChainOutputTransport;
 pub use action_chain_execution::ActionChainResult;
 pub use action_chain_execution::ActionChainTransport;
 
@@ -6300,7 +6324,7 @@ impl WorkspaceRuntime {
                             let repository_session = guard.command().repository_session;
                             match self
                                 .request_revision
-                                .finalize_native(
+                                .finalize_native_with_publication(
                                     &transaction,
                                     &source_certificate,
                                     selected_updater,
@@ -6314,6 +6338,7 @@ impl WorkspaceRuntime {
                                                 ))
                                             })
                                     },
+                                    || attempt_root.publish(&mut terminal),
                                 )
                                 .await
                                 .map_err(NativeDemandSessionError::Revision)?
@@ -6395,7 +6420,16 @@ impl WorkspaceRuntime {
                 }
                 CommandAttemptResult::Terminal(terminal, prepared, terminal_root_count) => {
                     begin_probe_phase!(acceptance_phase, self, FinalAcceptance);
-                    let accepted = guard.accept_prepared(prepared, terminal)?;
+                    let publication_completed = root.publication_completed(&terminal);
+                    // Repository acceptance, snapshot replacement, effect disarm
+                    // and lease close remain fallible after filesystem commit.
+                    let accepted = guard.accept_prepared(prepared, terminal).map_err(|error| {
+                        if publication_completed {
+                            NativeDemandSessionError::AfterOutputPublication(Box::new(error))
+                        } else {
+                            error
+                        }
+                    })?;
                     finish_probe_phase!(acceptance_phase);
                     return Ok(DrivenCommand {
                         accepted,
@@ -7929,19 +7963,33 @@ impl<'a> NativeDemandAbortGuard<'a> {
             .as_mut()
             .expect("restorable native-demand guard owns its command")
             .discard_in_place();
-        match restoration {
+        let replacement = match restoration {
             Err(error) => {
                 self.phase = NativeDemandAbortPhase::FailClosed;
-                Err(error)
+                Some(error)
             }
             Ok(()) => {
                 self.phase = NativeDemandAbortPhase::Closed;
                 self.command = None;
-                match suppression {
-                    Ok(()) => Err(original),
-                    Err(error) => Err(error),
-                }
+                suppression.err()
             }
+        };
+        match replacement {
+            None => Err(original),
+            Some(abort)
+                if matches!(
+                    &original,
+                    NativeDemandSessionError::Revision(RequestRevisionError::OutputPublication(_))
+                        | NativeDemandSessionError::AfterOutputPublication(_)
+                        | NativeDemandSessionError::OutputPublicationAbort { .. }
+                ) =>
+            {
+                Err(NativeDemandSessionError::OutputPublicationAbort {
+                    publication: Box::new(original),
+                    abort: Box::new(abort),
+                })
+            }
+            Some(error) => Err(error),
         }
     }
 

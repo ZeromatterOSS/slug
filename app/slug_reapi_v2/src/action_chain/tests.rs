@@ -38,7 +38,7 @@ const DEFS: &str = r#"def _impl(ctx):
 stage = rule(implementation=_impl, attrs={'input':attr.label(allow_single_file=True), 'tool':attr.label(allow_single_file=True)})
 "#;
 
-const TOOL: &str = r#"#!/bin/sh
+pub(super) const TOOL: &str = r#"#!/bin/sh
 set -eu
 if [ "$1" = produce ]; then
   [ "$(/bin/cat seed)" = seed ]
@@ -56,10 +56,10 @@ else
 fi
 "#;
 
-struct Workspace {
-    root: PathBuf,
-    runtime: WorkspaceRuntime,
-    owner: ConfiguredTargetKey,
+pub(super) struct Workspace {
+    pub(super) root: PathBuf,
+    pub(super) runtime: WorkspaceRuntime,
+    pub(super) owner: ConfiguredTargetKey,
 }
 impl Drop for Workspace {
     fn drop(&mut self) {
@@ -67,7 +67,7 @@ impl Drop for Workspace {
     }
 }
 impl Workspace {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
             "../../target/wp737/wire-{}-{}",

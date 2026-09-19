@@ -19,6 +19,8 @@ use crate::executor::tonic_endpoint;
 use crate::source_spawn::spawn_command;
 use crate::*;
 
+mod output_staging;
+
 /// Immutable remote policy. Each Core attempt creates an independent session.
 pub struct ActionChainReapiTransport {
     config: RemoteConfig,

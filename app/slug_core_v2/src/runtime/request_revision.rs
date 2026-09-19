@@ -253,6 +253,7 @@ pub(super) enum RequestRevisionError {
     Observation(String),
     Injection(String),
     Publication(String),
+    OutputPublication(String),
     Computation(String),
     RevisionExhausted,
     RetryNonProgress,
@@ -267,6 +268,10 @@ impl fmt::Display for RequestRevisionError {
             }
             Self::Observation(error) => write!(f, "observing Host file: {error}"),
             Self::Publication(error) => write!(f, "publishing path epoch: {error}"),
+            Self::OutputPublication(error) => write!(
+                f,
+                "publishing action outputs (earlier outputs may have changed): {error}"
+            ),
             Self::Injection(error) => write!(f, "injecting path epoch: {error}"),
             Self::Computation(error) => write!(f, "computing request root: {error}"),
             Self::StaleBeforeExecution => {
@@ -469,6 +474,33 @@ impl RequestRevisionRuntime {
     where
         F: FnOnce(Vec<PathObservationDemand>) -> Result<PathObservationEpoch, RequestRevisionError>,
     {
+        self.finalize_native_with_publication(
+            terminal,
+            certificate,
+            selected_updater,
+            full_epoch,
+            observe,
+            || Ok(()),
+        )
+        .await
+    }
+
+    /// Perform synchronous filesystem publication only after the selected DICE
+    /// revision commits and while its source-validation owner remains held.
+    /// On publication error the DICE revision has advanced; outputs may be partial.
+    pub(super) async fn finalize_native_with_publication<F, P>(
+        &self,
+        terminal: &DiceTransaction,
+        certificate: &SourceCertificate,
+        selected_updater: dice::DiceTransactionUpdater,
+        full_epoch: &PathObservationEpoch,
+        observe: F,
+        publish: P,
+    ) -> Result<NativeFinalization, RequestRevisionError>
+    where
+        F: FnOnce(Vec<PathObservationDemand>) -> Result<PathObservationEpoch, RequestRevisionError>,
+        P: FnOnce() -> std::io::Result<()>,
+    {
         let mut owner = self.owner.lock().await;
         let current = selected_updater.existing_state().await;
         if !current.equivalent(terminal) {
@@ -515,6 +547,8 @@ impl RequestRevisionRuntime {
             let revision = self
                 .commit_native_revision_under_owner(&mut owner, selected_updater)
                 .await?;
+            publish()
+                .map_err(|error| RequestRevisionError::OutputPublication(error.to_string()))?;
             drop(owner);
             return Ok(NativeFinalization::Accepted {
                 revision: revision.0,
@@ -1517,6 +1551,101 @@ mod tests {
         assert!(runtime.owner.lock().await.initialized);
         assert_eq!(audit(&runtime).commits, 1);
     }
+    #[tokio::test]
+    async fn native_output_publication_runs_under_owner_after_revision_commit() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("defs.bzl"), b"V1").unwrap();
+        let runtime = runtime(&directory);
+        let first = read(&runtime, "defs.bzl", "publication", "publication")
+            .await
+            .unwrap();
+        let mut terminal = runtime.updater().existing_state().await;
+        let epoch = terminal.compute(&PathObservationEpochKey).await.unwrap();
+        let before = audit(&runtime).commits;
+        let mut called = false;
+        let outcome = runtime
+            .finalize_native_with_publication(
+                &terminal,
+                first.certificate(),
+                runtime.updater(),
+                &epoch,
+                observe_certificate,
+                || {
+                    assert!(runtime.owner.try_lock().is_err());
+                    assert_eq!(audit(&runtime).commits, before + 1);
+                    called = true;
+                    Ok(())
+                },
+            )
+            .await
+            .unwrap();
+        assert!(called);
+        assert!(matches!(outcome, NativeFinalization::Accepted { .. }));
+        assert!(runtime.owner.try_lock().is_ok());
+
+        let terminal = runtime.updater().existing_state().await;
+        let before = audit(&runtime).commits;
+        let error = runtime
+            .finalize_native_with_publication(
+                &terminal,
+                first.certificate(),
+                runtime.updater(),
+                &epoch,
+                observe_certificate,
+                || Err(std::io::Error::other("forced final rename failure")),
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(error, RequestRevisionError::OutputPublication(_)));
+        assert!(
+            error
+                .to_string()
+                .contains("earlier outputs may have changed")
+        );
+        assert_eq!(audit(&runtime).commits, before + 1);
+        assert!(runtime.owner.try_lock().is_ok());
+    }
+
+    #[tokio::test]
+    async fn native_source_and_version_retries_never_invoke_output_publication() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("defs.bzl"), b"V1").unwrap();
+        let runtime = runtime(&directory);
+        let first = read(&runtime, "defs.bzl", "publication", "publication")
+            .await
+            .unwrap();
+        let mut terminal = runtime.updater().existing_state().await;
+        let epoch = terminal.compute(&PathObservationEpochKey).await.unwrap();
+        std::fs::write(directory.path().join("defs.bzl"), b"V2").unwrap();
+        let outcome = runtime
+            .finalize_native_with_publication(
+                &terminal,
+                first.certificate(),
+                runtime.updater(),
+                &epoch,
+                observe_certificate,
+                || panic!("changed sources must not publish outputs"),
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            outcome,
+            NativeFinalization::RetrySourceChanged { .. }
+        ));
+        let outcome = runtime
+            .finalize_native_with_publication(
+                &terminal,
+                first.certificate(),
+                runtime.updater(),
+                &epoch,
+                observe_certificate,
+                || panic!("advanced DICE version must not publish outputs"),
+            )
+            .await
+            .unwrap();
+        assert!(matches!(outcome, NativeFinalization::RetryVersionAdvanced));
+    }
+
     #[tokio::test]
     async fn native_finalization_commits_current_and_replaces_only_changed_source() {
         let directory = tempfile::tempdir().unwrap();

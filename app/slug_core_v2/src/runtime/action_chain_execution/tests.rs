@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::Read;
+use std::io::Write;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
@@ -88,6 +89,50 @@ impl Workspace {
                 transport,
             )
     }
+    fn publish(
+        &self,
+        transport: &Fake,
+    ) -> Result<AcceptedCommand<ActionChainResult<Output>>, BuildCommandError> {
+        self.runtime
+            .execute_and_publish_action_chain_with_repository_environment(
+                &[TargetPattern::parse("//:one").unwrap()],
+                self.owner.clone(),
+                4,
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[format!(
+                    "file://{}/empty-registry",
+                    self.root.path().display()
+                )],
+                Default::default(),
+                Default::default(),
+                transport,
+            )
+    }
+    fn output_path(&self) -> PathBuf {
+        crate::runtime::configured_output_root(
+            self.root.path(),
+            self.owner.configuration().slug_configuration().unwrap(),
+        )
+        .join("done")
+    }
+    fn assert_stage_cleanup(&self) {
+        let path = self.output_path();
+        let configuration = path.parent().unwrap().parent().unwrap();
+        assert!(
+            fs::read_dir(configuration)
+                .unwrap()
+                .all(|entry| entry.unwrap().file_name() == "bin")
+        );
+        assert!(fs::read_dir(path.parent().unwrap()).unwrap().all(|entry| {
+            !entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".slug-output-stage-")
+        }));
+    }
     fn snapshot(&self) -> AcceptedNativeDemandSnapshot {
         self.runtime
             .native_demand_sessions
@@ -116,6 +161,10 @@ enum Behavior {
     StageError,
     ExecuteError,
     StagePanic,
+    OutputSource,
+    OutputError,
+    OutputPanic,
+    OutputCommitFailure,
 }
 struct Fake {
     root: PathBuf,
@@ -123,6 +172,7 @@ struct Fake {
     starts: AtomicUsize,
     stages: AtomicUsize,
     executions: AtomicUsize,
+    output_stages: AtomicUsize,
     session_drops: Arc<AtomicUsize>,
     output_drops: Arc<AtomicUsize>,
 }
@@ -134,6 +184,7 @@ impl Fake {
             starts: AtomicUsize::new(0),
             stages: AtomicUsize::new(0),
             executions: AtomicUsize::new(0),
+            output_stages: AtomicUsize::new(0),
             session_drops: Arc::new(AtomicUsize::new(0)),
             output_drops: Arc::new(AtomicUsize::new(0)),
         }
@@ -169,9 +220,30 @@ impl ActionChainTransport for Fake {
 
     async fn start(&self, inputs: Arc<PreparedActionChainInputs>) -> Result<Session, Self::Error> {
         let attempt = self.starts.fetch_add(1, Ordering::SeqCst);
-        if matches!(self.behavior, Behavior::RetrySource) && attempt > 0 {
+        if matches!(
+            self.behavior,
+            Behavior::RetrySource | Behavior::OutputSource
+        ) && attempt > 0
+        {
             assert_eq!(self.session_drops.load(Ordering::SeqCst), attempt);
             assert_eq!(self.output_drops.load(Ordering::SeqCst), attempt);
+        }
+        if matches!(self.behavior, Behavior::OutputSource) && attempt > 0 {
+            let plan = inputs.plan().unwrap();
+            let action = plan.actions().last().unwrap().action();
+            let root = crate::runtime::configured_output_root(
+                &self.root,
+                action
+                    .context()
+                    .owner()
+                    .configuration()
+                    .slug_configuration()
+                    .unwrap(),
+            );
+            assert_eq!(
+                fs::read(root.join(action.outputs()[0].path())).unwrap(),
+                b"old"
+            );
         }
         let mut bytes = Vec::new();
         if let Some(index) = inputs
@@ -237,12 +309,169 @@ impl ActionChainTransport for Fake {
             session.executed.len(),
             session.inputs.plan().unwrap().actions().len()
         );
+        if matches!(self.behavior, Behavior::OutputCommitFailure) {
+            let plan = session.inputs.plan().unwrap();
+            let action = plan.actions().last().unwrap().action();
+            let root = crate::runtime::configured_output_root(
+                &self.root,
+                action
+                    .context()
+                    .owner()
+                    .configuration()
+                    .slug_configuration()
+                    .unwrap(),
+            );
+            // Sealing has completed; simulate a final namespace change before
+            // the synchronized publication callback. Its preflight must reject.
+            fs::create_dir(root.join(action.outputs()[0].path()))?;
+        }
         Ok(Output {
             bytes: std::mem::take(&mut session.bytes),
             executed: std::mem::take(&mut session.executed),
             drops: self.output_drops.clone(),
         })
     }
+}
+
+impl ActionChainOutputTransport for Fake {
+    async fn stage_outputs(
+        &self,
+        session: &mut Session,
+        staging: &ActionOutputStaging,
+    ) -> Result<(), Self::Error> {
+        self.output_stages.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(staging.outputs().len(), 1);
+        let mut file = staging.create_file(0, "")?;
+        file.write_all(&session.bytes)?;
+        drop(file);
+        match self.behavior {
+            Behavior::OutputSource if session.attempt == 0 => {
+                fs::write(self.root.join("input"), b"bbb")?
+            }
+            Behavior::OutputError => return Err(std::io::Error::other("output transfer failure")),
+            Behavior::OutputPanic => panic!("output transfer panic"),
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+#[test]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn output_download_source_change_retries_before_publication() {
+    let workspace = Workspace::new();
+    let path = workspace.output_path();
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, b"old").unwrap();
+    let transport = Fake::new(workspace.root.path(), Behavior::OutputSource);
+    let accepted = workspace.publish(&transport).unwrap();
+    assert_eq!(fs::read(&path).unwrap(), b"bbb");
+    let published = accepted.terminal_for_test().published_outputs().unwrap();
+    assert_eq!(published.root(), path.parent().unwrap());
+    assert_eq!(published.outputs().len(), 1);
+    assert_eq!(transport.starts.load(Ordering::SeqCst), 2);
+    assert_eq!(transport.output_stages.load(Ordering::SeqCst), 2);
+    assert_eq!(transport.session_drops.load(Ordering::SeqCst), 2);
+    assert_eq!(transport.output_drops.load(Ordering::SeqCst), 1);
+    workspace.assert_stage_cleanup();
+    drop(accepted);
+    assert_eq!(transport.output_drops.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn output_transfer_failure_and_unwind_preserve_old_outputs_and_cleanup() {
+    let workspace = Workspace::new();
+    let path = workspace.output_path();
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(&path, b"old").unwrap();
+    let before = workspace.snapshot();
+    for behavior in [Behavior::OutputError, Behavior::OutputPanic] {
+        let transport = Fake::new(workspace.root.path(), behavior);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            workspace.publish(&transport)
+        }));
+        if matches!(behavior, Behavior::OutputPanic) {
+            assert!(result.is_err());
+        } else {
+            assert!(result.unwrap().is_err());
+        }
+        assert_eq!(fs::read(&path).unwrap(), b"old");
+        assert_eq!(transport.session_drops.load(Ordering::SeqCst), 1);
+        assert_eq!(transport.output_drops.load(Ordering::SeqCst), 0);
+        workspace.assert_restored(&before);
+        workspace.assert_stage_cleanup();
+    }
+    let transport = Fake::new(workspace.root.path(), Behavior::Normal);
+    drop(workspace.publish(&transport).unwrap());
+    assert_eq!(fs::read(path).unwrap(), b"aaa");
+}
+
+#[test]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn post_publication_bookkeeping_errors_report_outputs_changed_without_acceptance() {
+    for fail_close in [false, true] {
+        let workspace = Workspace::new();
+        if fail_close {
+            workspace
+                .runtime
+                .native_demand_sessions
+                .force_next_close_failure();
+        } else {
+            workspace
+                .runtime
+                .native_demand_sessions
+                .force_next_replace_accepted_failure();
+        }
+        let transport = Fake::new(workspace.root.path(), Behavior::Normal);
+        let error = workspace.publish(&transport).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("after action outputs were published"),
+            "{error}"
+        );
+        assert_eq!(fs::read(workspace.output_path()).unwrap(), b"aaa");
+        workspace.assert_stage_cleanup();
+        assert_eq!(transport.output_drops.load(Ordering::SeqCst), 1);
+        assert!(
+            workspace
+                .publish(&transport)
+                .unwrap_err()
+                .to_string()
+                .contains("already active")
+        );
+    }
+}
+
+#[test]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn publication_failure_preserves_partial_output_context_when_abort_also_fails() {
+    let workspace = Workspace::new();
+    workspace
+        .runtime
+        .native_demand_sessions
+        .force_next_restoration_failure();
+    let transport = Fake::new(workspace.root.path(), Behavior::OutputCommitFailure);
+    let error = workspace.publish(&transport).unwrap_err();
+    let message = error.to_string();
+    assert!(message.contains("publishing action outputs"), "{message}");
+    assert!(
+        message.contains("output destination changed during staging"),
+        "{message}"
+    );
+    assert!(message.contains("native abort also failed"), "{message}");
+    assert!(message.contains("command restoration failed"), "{message}");
+    assert!(message.contains("outputs may have changed"), "{message}");
+    workspace.assert_stage_cleanup();
+    assert_eq!(transport.output_drops.load(Ordering::SeqCst), 1);
+    assert!(
+        workspace
+            .publish(&transport)
+            .unwrap_err()
+            .to_string()
+            .contains("already active")
+    );
 }
 
 #[test]

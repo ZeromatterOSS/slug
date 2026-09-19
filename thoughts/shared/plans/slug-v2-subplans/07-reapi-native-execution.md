@@ -144,7 +144,7 @@ hits, before AC/Execute. This rejects NativeLink's advertised in-flight inputs.
 It shares the existing regular-output shape and digest checks. Unsupported headers,
 explicit retries/timeouts and a different cache endpoint fail closed. That source-only API retains scalar output bytes in memory. The selected-chain
 operation below adds generated input binding without retaining output bytes;
-general scheduling and accepted output materialization remain open.
+general scheduling remains open; selected-output publication is described below.
 
 WP-7-35 admits declared regular-file output trees on that same native source Spawn
 operation. Commands sort file/directory lists and their combined output_paths;
@@ -161,9 +161,8 @@ Bounded metadata retains Tree/root digests and regular files' paths/digests/raw
 executable bits. Tree file contents are verified through discard sinks and remain
 in CAS; buffers and manifests are request-owned and never DICE values. Files-only
 local inventory cannot prove a tree cache hit. The detached materializer rejects
-directory-bearing results before writes. Local publication still requires a Core
-generation/configuration-root claim; generated/tree inputs are handled by the
-selected-chain operation below.
+directory-bearing results before writes. The selected-chain operations below own
+generated/tree input binding and validated local publication.
 
 WP-7-36 adds a borrowed BuildCommandEvaluation action_prerequisites projection over
 the validated closure. It resolves declared generated File/Directory inputs by full
@@ -192,8 +191,40 @@ roots, omits nested empty producer directories, and supplies empty declared outp
 directory roots. These policies follow pinned MerkleTreeComputer source; the
 existing Command/Action wire profile and configured identities remain Slug-native.
 Producer manifests retain their original modes and empty directories. Shared
-source-only lowering and FileWrite semantics are unchanged. General build
-scheduling, validated local publication and CLI activation remain open.
+source-only lowering and FileWrite semantics are unchanged.
+
+WP-7-38 adds opt-in publication of only the selected action's File/Directory
+outputs. Core derives the configured root from the validated action owner;
+REAPI reconciles its session's exact result schema and streams verified CAS bytes
+into Core-owned hidden siblings of each destination. Intermediate results stay
+CAS-only. Directory reconstruction preserves all verified manifest empty directories;
+file/tree modes are 0555 regardless of producer executable bits. These content/mode
+rules follow pinned Bazel 9.2; configured paths, preserved empty directories and
+per-artifact atomic replacement are Slug-native.
+
+No-follow descriptor traversal confines roots, configuration markers, package
+parents, artifact leaves and cleanup. Hidden entries must be direct destination
+siblings: Linux cross-parent directory rename needs write permission on the moved
+directory, whereas same-parent rename preserves sealed 0555 roots and old modes.
+All transfers, modes and destination preflight finish before publication. Under the
+existing request-revision owner, Core validates the complete source/build frontier,
+commits the selected DICE revision, then replaces each artifact with renameat2.
+Existing artifacts use exchange; absent artifacts use no-replace. Tree replacement
+removes stale children while preserving unrelated siblings. Empty selected output
+sets are valid. Configuration identity remains structural and collision-checked.
+
+Source/version retries discard private transfers and start a fresh session. Transfer,
+sealing and preflight failures leave old artifacts intact. A final rename failure
+may leave earlier artifacts replaced; later native bookkeeping may also fail after
+publication. Both return no AcceptedCommand or success events and retain the
+possible-output-change diagnostic, even when abort restoration itself fails.
+Retired entries remain at hidden names until attempt cleanup outside the revision
+lock; cleanup follows saved retired identities, never the new published handles.
+
+The current publisher requires Linux GNU and one coordinated publisher per workspace.
+Concurrent external/legacy namespace mutation, crash recovery, symlink artifacts,
+writable-output policy and whole-generation watch publication remain unsupported.
+General build scheduling and CLI activation remain open.
 
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies

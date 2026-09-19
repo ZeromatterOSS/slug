@@ -8,7 +8,10 @@
  * above-listed licenses.
  */
 
+mod action_output_staging;
 mod action_prerequisites;
+pub use action_output_staging::ActionOutputStaging;
+pub use action_output_staging::PublishedActionOutputs;
 pub use action_prerequisites::ActionPrerequisitePlan;
 pub use action_prerequisites::PlannedAction;
 pub use action_prerequisites::PlannedActionInput;
@@ -44,6 +47,7 @@ mod source_input;
 pub mod starlark;
 
 pub use configured_output::configured_output_root;
+pub use dice::ActionChainOutputTransport;
 pub use dice::ActionChainResult;
 pub use dice::ActionChainTransport;
 pub use dice::BuildCommandError;

@@ -52,6 +52,27 @@ impl ConfiguredOutputOwner {
         }
     }
 
+    pub(super) fn stage_action_outputs(
+        &self,
+        action: &slug_analysis_v2::ConfiguredAction,
+    ) -> std::io::Result<super::action_output_staging::ActionOutputStaging> {
+        let configuration = action
+            .context()
+            .owner()
+            .configuration()
+            .slug_configuration()
+            .ok_or_else(|| {
+                std::io::Error::other("output publication requires structural configuration")
+            })?;
+        self.register(configuration.projection(), configuration)
+            .map_err(std::io::Error::other)?;
+        super::action_output_staging::ActionOutputStaging::new(
+            &self.workspace,
+            configuration,
+            action.outputs(),
+        )
+    }
+
     /// Claims the projection first in memory and then durably on disk.
     ///
     /// The mutex is deliberately released before the first filesystem call.

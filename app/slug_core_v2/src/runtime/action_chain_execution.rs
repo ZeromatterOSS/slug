@@ -2,6 +2,9 @@
 
 use super::action_chain_staging::ActionChainStagingKey;
 use super::*;
+use crate::runtime::ActionOutputStaging;
+use crate::runtime::PublishedActionOutputs;
+use crate::runtime::configured_output::ConfiguredOutputOwner;
 
 /// Trusted transport extension point. Core owns selection and freshness; the
 /// implementation owns its external effects and must not publish local outputs.
@@ -36,12 +39,77 @@ pub trait ActionChainTransport: Sync {
     ) -> impl std::future::Future<Output = Result<Self::Output, Self::Error>> + Send;
 }
 
+/// Transport extension for verified transfer of the selected action's outputs.
+/// The supplied capability permits private staging, never visible publication.
+pub trait ActionChainOutputTransport: ActionChainTransport {
+    fn stage_outputs(
+        &self,
+        session: &mut Self::Session,
+        staging: &ActionOutputStaging,
+    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
+}
+
+trait PublicationPolicy<T: ActionChainTransport>: Clone + Sync {
+    fn stage_outputs(
+        &self,
+        transport: &T,
+        session: &mut T::Session,
+        inputs: &PreparedActionChainInputs,
+    ) -> impl std::future::Future<Output = Result<Option<ActionOutputStaging>, NativeDemandSessionError>>;
+}
+
+#[derive(Clone)]
+struct NoPublication;
+impl<T: ActionChainTransport> PublicationPolicy<T> for NoPublication {
+    async fn stage_outputs(
+        &self,
+        _transport: &T,
+        _session: &mut T::Session,
+        _inputs: &PreparedActionChainInputs,
+    ) -> Result<Option<ActionOutputStaging>, NativeDemandSessionError> {
+        Ok(None)
+    }
+}
+
+#[derive(Clone)]
+struct PublishOutputs<'a>(&'a ConfiguredOutputOwner);
+impl<T: ActionChainOutputTransport> PublicationPolicy<T> for PublishOutputs<'_> {
+    async fn stage_outputs(
+        &self,
+        transport: &T,
+        session: &mut T::Session,
+        inputs: &PreparedActionChainInputs,
+    ) -> Result<Option<ActionOutputStaging>, NativeDemandSessionError> {
+        let plan = inputs
+            .plan()
+            .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error}")))?;
+        let selected = plan
+            .actions()
+            .last()
+            .expect("selected chain is nonempty")
+            .action();
+        let mut staging = self
+            .0
+            .stage_action_outputs(selected)
+            .map_err(|error| NativeDemandSessionError::Computation(error.into()))?;
+        transport
+            .stage_outputs(session, &staging)
+            .await
+            .map_err(|error| NativeDemandSessionError::Computation(anyhow::Error::new(error)))?;
+        staging
+            .seal()
+            .map_err(|error| NativeDemandSessionError::Computation(error.into()))?;
+        Ok(Some(staging))
+    }
+}
+
 /// Accessible through AcceptedCommand only after the complete source frontier
 /// passes final validation. Output bytes remain operation-owned until dropped.
 #[derive(Debug)]
 pub struct ActionChainResult<T> {
     inputs: Arc<PreparedActionChainInputs>,
     output: Arc<T>,
+    published_outputs: Option<PublishedActionOutputs>,
 }
 
 impl<T> ActionChainResult<T> {
@@ -51,18 +119,23 @@ impl<T> ActionChainResult<T> {
     pub fn output(&self) -> &T {
         &self.output
     }
+    pub fn published_outputs(&self) -> Option<&PublishedActionOutputs> {
+        self.published_outputs.as_ref()
+    }
 }
 
-struct ActionChainExecutionRoot<'a, T> {
+struct ActionChainExecutionRoot<'a, T, P> {
     staging: ActionChainStagingKey,
     transport: &'a T,
+    publication: P,
 }
 
-impl<T> Clone for ActionChainExecutionRoot<'_, T> {
+impl<T, P: Clone> Clone for ActionChainExecutionRoot<'_, T, P> {
     fn clone(&self) -> Self {
         Self {
             staging: self.staging.clone(),
             transport: self.transport,
+            publication: self.publication.clone(),
         }
     }
 }
@@ -70,6 +143,8 @@ impl<T> Clone for ActionChainExecutionRoot<'_, T> {
 struct ActionChainExecutionTerminal<T> {
     inputs: Arc<PreparedActionChainInputs>,
     output: Option<Arc<T>>,
+    pending_outputs: Option<Arc<Mutex<ActionOutputStaging>>>,
+    published_outputs: Option<PublishedActionOutputs>,
 }
 
 impl<T> Clone for ActionChainExecutionTerminal<T> {
@@ -77,13 +152,32 @@ impl<T> Clone for ActionChainExecutionTerminal<T> {
         Self {
             inputs: self.inputs.clone(),
             output: self.output.clone(),
+            pending_outputs: self.pending_outputs.clone(),
+            published_outputs: self.published_outputs.clone(),
         }
     }
 }
 
 #[async_trait]
-impl<T: ActionChainTransport> NativeCommandRoot for ActionChainExecutionRoot<'_, T> {
+impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
+    for ActionChainExecutionRoot<'_, T, P>
+{
     type Terminal = ActionChainExecutionTerminal<T::Output>;
+
+    fn publish(&self, terminal: &mut Self::Terminal) -> std::io::Result<()> {
+        if let Some(pending) = &terminal.pending_outputs {
+            let published = pending
+                .lock()
+                .map_err(|_| std::io::Error::other("action output stage lock poisoned"))?
+                .publish()?;
+            terminal.published_outputs = Some(published);
+        }
+        Ok(())
+    }
+
+    fn publication_completed(&self, terminal: &Self::Terminal) -> bool {
+        terminal.published_outputs.is_some()
+    }
 
     fn initializes_request_revision(&self) -> bool {
         true
@@ -112,6 +206,8 @@ impl<T: ActionChainTransport> NativeCommandRoot for ActionChainExecutionRoot<'_,
             .map(|inputs| ActionChainExecutionTerminal {
                 inputs,
                 output: None,
+                pending_outputs: None,
+                published_outputs: None,
             }))
     }
 
@@ -154,10 +250,15 @@ impl<T: ActionChainTransport> NativeCommandRoot for ActionChainExecutionRoot<'_,
                         NativeDemandSessionError::Computation(anyhow::Error::new(error))
                     })?;
             }
+            let pending = self
+                .publication
+                .stage_outputs(self.transport, &mut session, &terminal.inputs)
+                .await?;
             let output = self.transport.finish(session).await.map_err(|error| {
                 NativeDemandSessionError::Computation(anyhow::Error::new(error))
             })?;
             terminal.output = Some(Arc::new(output));
+            terminal.pending_outputs = pending.map(|stage| Arc::new(Mutex::new(stage)));
             Ok(())
         }
     }
@@ -181,6 +282,70 @@ impl WorkspaceRuntime {
         configuration_overlay: CommandConfigurationOverlay,
         transport: &T,
     ) -> Result<AcceptedCommand<ActionChainResult<T::Output>>, BuildCommandError> {
+        self.execute_action_chain_with_policy(
+            targets,
+            owner,
+            action,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+            transport,
+            NoPublication,
+        )
+    }
+
+    /// Execute a selected chain and publish only its final action's verified
+    /// outputs after final source validation. Replacement is atomic per artifact;
+    /// a publication or later bookkeeping failure may leave some outputs changed.
+    #[allow(clippy::too_many_arguments)]
+    pub fn execute_and_publish_action_chain_with_repository_environment<
+        T: ActionChainOutputTransport,
+    >(
+        &self,
+        targets: &[TargetPattern],
+        owner: ConfiguredTargetKey,
+        action: usize,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+        transport: &T,
+    ) -> Result<AcceptedCommand<ActionChainResult<T::Output>>, BuildCommandError> {
+        self.execute_action_chain_with_policy(
+            targets,
+            owner,
+            action,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+            transport,
+            PublishOutputs(&self.configured_output),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn execute_action_chain_with_policy<T: ActionChainTransport, P: PublicationPolicy<T>>(
+        &self,
+        targets: &[TargetPattern],
+        owner: ConfiguredTargetKey,
+        action: usize,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+        transport: &T,
+        publication: P,
+    ) -> Result<AcceptedCommand<ActionChainResult<T::Output>>, BuildCommandError> {
         let (build, request) = self.prepare_build_request(
             targets,
             command_policy,
@@ -195,6 +360,7 @@ impl WorkspaceRuntime {
             ActionChainExecutionRoot {
                 staging: ActionChainStagingKey::new(build, owner, action),
                 transport,
+                publication,
             },
         )
         .map(|driven| {
@@ -203,6 +369,7 @@ impl WorkspaceRuntime {
                 output: terminal
                     .output
                     .expect("accepted action chain completed transport"),
+                published_outputs: terminal.published_outputs,
             })
         })
         .map_err(BuildCommandError::infrastructure)
