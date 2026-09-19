@@ -30,6 +30,7 @@ use crate::RunfilesSymlinkDepset;
 use crate::analysis_value::PublicationEqState;
 
 mod layout;
+mod manifest;
 
 pub use layout::RunfilesLayout;
 pub use layout::RunfilesLayoutDiagnostic;
@@ -37,6 +38,8 @@ pub use layout::RunfilesLayoutEntry;
 pub use layout::RunfilesLayoutError;
 pub use layout::RunfilesLayoutTarget;
 pub use layout::RunfilesManifestLink;
+pub use manifest::RunfilesManifestError;
+pub use manifest::SourceManifestError;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RunfilesError {

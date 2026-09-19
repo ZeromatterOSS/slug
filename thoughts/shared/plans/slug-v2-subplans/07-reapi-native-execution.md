@@ -323,11 +323,23 @@ virtual tree itself. The automatic MANIFEST link targets input_manifest and is d
 from authored logical MANIFEST entries. Projection leaves are call-scoped clones over the
 unchanged shared depset graphs; no new DICE state or effects are introduced.
 
+`PreparedRunfilesManifests` joins one retained configured support owner with native source
+observations. The preparation key retains the complete build/source frontier and certificate,
+including overridden source constituents. Source targets use observed requested paths;
+generated targets require exact owner/output declarations and structural configured roots.
+Source and repository mapping bytes are pure call-scoped projections. Source manifests
+preserve conditional escaping, empty trailing spaces and UTF-8 bytes/order (Bazel internal
+strings carry bytes); repository mappings use raw runfiles presence and retained compact
+mapping groups. Preparation is opt-in metadata, with selected-preparation outer errors.
+It observes no generated output and publishes nothing. Materialization namespaces remain
+unsupported until their native generation lifetime/path authority can be retained; Host
+external local-path repositories are supported. Generated unresolved symlinks remain deferred.
+
 Bazel's RunfilesTreeAction is rich metadata, not an ordinary Directory-producing remote
 action. Native completion must publish generated backing artifacts as well as the selected
 tree. Source-manifest targets require observed source/configured-output authority; a logical
-artifact path is not filesystem authorization. Manifest byte projection, virtual support
-results and confined symlink staging remain prerequisites to execution admission. Do not
+artifact path is not filesystem authorization. Virtual support results, native generation
+path authority and confined symlink staging remain prerequisites to execution admission. Do not
 fabricate remote executions for metadata-only nodes or relax arbitrary backend symlink
 rejection. Existing requested Build continues to reject this family before effects.
 

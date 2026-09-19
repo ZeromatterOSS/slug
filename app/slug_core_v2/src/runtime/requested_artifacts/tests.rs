@@ -3,6 +3,9 @@
 #[path = "runfiles_layout_tests.rs"]
 mod runfiles_layout_tests;
 
+#[path = "runfiles_manifest_tests.rs"]
+mod runfiles_manifest_tests;
+
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;

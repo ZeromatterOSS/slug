@@ -29,15 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-47-m7a-runfiles-layout-r1
+Packet: WP-7-48-m7a-runfiles-manifests-r1
 Status: accepted
 
-WP747 accepts the artifact-owned runfiles layout/constituent projection, with seven focused
-checks including ordinary configured binary A/B/A. Exact artifact owners and backing
-dependencies survive layout filtering; RunfilesTree remains metadata, not a remote Directory.
-Native target resolution, manifest projection, virtual support results and confined link/backing
-publication remain open. WP746's public Build activation is accepted at 7ff4cbb2f; its baseline
-external-module-cycle diagnostic defect remains open. M7A partial, M8 unproved.
+WP748 accepts observed native target paths and deterministic source/repository mapping
+manifest bytes, with 18 focused checks and independent review. WP747 is accepted at 0662733cc. Coupled virtual
+support results and confined complete backing/link publication remain next; ordinary Build
+still rejects runfiles. M7A partial, M8 unproved. WP746's baseline external-module-cycle
+diagnostic defect remains open.
 
 ### Earlier generated-input receipt
 

@@ -3059,6 +3059,10 @@ pub use requested_artifacts::RequestedArtifacts;
 pub use requested_artifacts::RequestedOutputGroup;
 pub use requested_artifacts::RequestedTargetArtifacts;
 
+#[path = "runfiles_manifest.rs"]
+mod runfiles_manifest;
+pub use runfiles_manifest::PreparedRunfilesManifests;
+
 #[path = "action_chain_staging.rs"]
 mod action_chain_staging;
 pub use action_chain_staging::PreparedActionChainInputs;

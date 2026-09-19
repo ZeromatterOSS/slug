@@ -151,8 +151,8 @@ fn canonical_repository_placement_and_physical_manifest_are_separate() {
             "dep+/pkg/generated",
             "dep+/pkg/input",
             "root",
-            "\u{10000}",
             "\u{e000}",
+            "\u{10000}",
         ]
     );
     let manifest = layout.manifest_link().unwrap();

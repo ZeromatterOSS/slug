@@ -231,8 +231,9 @@ impl RunfilesSupport {
             .into_iter()
             .map(|(path, target)| RunfilesLayoutEntry { path, target })
             .collect::<Vec<_>>();
-        // PathFragment.compareTo delegates to Java String.compareTo.
-        entries.sort_by(|left, right| left.path.encode_utf16().cmp(right.path.encode_utf16()));
+        // Bazel's internal path strings store raw UTF-8 bytes in Latin-1 chars
+        // (StringEncoding); PathFragment.compareTo therefore compares bytes.
+        entries.sort_by(|left, right| left.path.cmp(&right.path));
         Ok(RunfilesLayout {
             support: self,
             entries,
