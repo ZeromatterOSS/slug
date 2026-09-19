@@ -47,13 +47,15 @@ impl CasUploadPlan {
 pub struct GeneratedOutput {
     path: String,
     digest: ReapiDigest,
+    is_executable: bool,
 }
 
 impl GeneratedOutput {
-    pub fn new(path: impl Into<String>, digest: ReapiDigest) -> Self {
+    pub fn new(path: impl Into<String>, digest: ReapiDigest, is_executable: bool) -> Self {
         Self {
             path: path.into(),
             digest,
+            is_executable,
         }
     }
 
@@ -63,6 +65,40 @@ impl GeneratedOutput {
 
     pub fn digest(&self) -> &ReapiDigest {
         &self.digest
+    }
+
+    /// Remote metadata; local output permission policy is a separate domain.
+    pub fn is_executable(&self) -> bool {
+        self.is_executable
+    }
+}
+
+/// Verified output-tree manifest. Paths are relative to the declared directory;
+/// the empty directory path denotes its root. File content remains in CAS.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct GeneratedDirectory {
+    pub(crate) path: String,
+    pub(crate) tree_digest: ReapiDigest,
+    pub(crate) root_digest: ReapiDigest,
+    pub(crate) directories: Vec<String>,
+    pub(crate) files: Vec<GeneratedOutput>,
+}
+
+impl GeneratedDirectory {
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+    pub fn tree_digest(&self) -> &ReapiDigest {
+        &self.tree_digest
+    }
+    pub fn root_digest(&self) -> &ReapiDigest {
+        &self.root_digest
+    }
+    pub fn directories(&self) -> &[String] {
+        &self.directories
+    }
+    pub fn files(&self) -> &[GeneratedOutput] {
+        &self.files
     }
 }
 

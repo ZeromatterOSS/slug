@@ -422,7 +422,7 @@ fn selected_toolchain_request_reapi_payload_is_not_owner_identity() {
 #[test]
 fn verified_remote_outputs_materialize_beneath_the_requested_root() {
     let root = std::env::temp_dir().join(format!("slug-reapi-test-{}", std::process::id()));
-    let output = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"materialized"));
+    let output = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"materialized"), false);
     let execution = RemoteExecutionResult {
         action_digest: ReapiDigest::of_bytes(b"action"),
         result: slug_reapi_v2::ActionResult::new(vec![output]),
@@ -597,8 +597,8 @@ fn generated_output_reupload_plan_selects_missing_outputs() {
     use slug_reapi_v2::GeneratedOutput;
     use slug_reapi_v2::GeneratedOutputReuploadPlan;
 
-    let present = GeneratedOutput::new("pkg/present.txt", ReapiDigest::of_bytes(b"present"));
-    let missing = GeneratedOutput::new("pkg/missing.txt", ReapiDigest::of_bytes(b"missing"));
+    let present = GeneratedOutput::new("pkg/present.txt", ReapiDigest::of_bytes(b"present"), false);
+    let missing = GeneratedOutput::new("pkg/missing.txt", ReapiDigest::of_bytes(b"missing"), false);
     let plan = GeneratedOutputReuploadPlan::from_missing(
         &[present.clone(), missing.clone()],
         &[missing.digest().clone()],
@@ -614,7 +614,7 @@ fn action_cache_records_action_digest_to_action_result() {
     use slug_reapi_v2::GeneratedOutput;
 
     let action_digest = ReapiDigest::of_bytes(b"action");
-    let output = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"out"));
+    let output = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"out"), false);
     let result = ActionResult::new(vec![output.clone()])
         .with_stdout_digest(ReapiDigest::of_bytes(b"stdout"));
     let mut table = ActionCacheTable::new();
@@ -636,8 +636,8 @@ fn local_action_cache_detects_stale_materialized_outputs() {
     use slug_reapi_v2::ActionResult;
     use slug_reapi_v2::GeneratedOutput;
 
-    let expected = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"expected"));
-    let corrupt = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"corrupt"));
+    let expected = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"expected"), false);
+    let corrupt = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"corrupt"), false);
     let result = ActionResult::new(vec![expected]);
 
     assert_eq!(
@@ -654,8 +654,8 @@ fn remote_action_cache_detects_orphaned_output_blobs() {
     use slug_reapi_v2::ActionResult;
     use slug_reapi_v2::GeneratedOutput;
 
-    let present = GeneratedOutput::new("pkg/present.txt", ReapiDigest::of_bytes(b"present"));
-    let missing = GeneratedOutput::new("pkg/missing.txt", ReapiDigest::of_bytes(b"missing"));
+    let present = GeneratedOutput::new("pkg/present.txt", ReapiDigest::of_bytes(b"present"), false);
+    let missing = GeneratedOutput::new("pkg/missing.txt", ReapiDigest::of_bytes(b"missing"), false);
     let result = ActionResult::new(vec![present.clone(), missing.clone()]);
 
     assert_eq!(

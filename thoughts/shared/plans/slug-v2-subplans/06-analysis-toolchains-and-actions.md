@@ -10,6 +10,16 @@ configuration transitions, toolchain resolution, and action declarations.
 ### Current state
 
 M2 configured analysis is accepted with Slug-native configuration/path identity.
+WP-7-35 adds `ctx.actions.declare_directory(filename, sibling=None)` through the
+active analysis token and existing artifact owner. A phase-local declaration map
+includes predeclared outputs, permits same-kind repeats and rejects type conflicts.
+`File.is_directory` and typed `DefaultInfo.files` retain Directory kind, owner and
+path; executable/runfiles and generated-input restrictions remain unchanged.
+Sibling artifacts and analysis-time tree contents/Args expansion remain unsupported.
+Pinned Bazel 9.2 StarlarkActionFactory.declareDirectory and DefaultInfo own the
+admitted declaration/provider semantics; configured output path identity stays
+Slug-native. REAPI's verified output-tree manifest is operation-owned (Stage 7).
+
 Registration-error identity is implemented and accepted at `a06f3ddfc`; source
 observation presentation is accepted at `ac6140f41`. Preserve the shared typed
 Loading-owned error DAG, structural equality and bounded borrowed Display/Debug.

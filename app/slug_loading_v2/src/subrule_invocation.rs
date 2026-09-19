@@ -126,6 +126,10 @@ pub struct AnalysisSpawnRequest<'v> {
 
 pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
     fn declare_file(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue>;
+    fn declare_directory(&self, _path: &str) -> anyhow::Result<AnalysisArtifactValue> {
+        anyhow::bail!("directory declarations are unavailable in this analysis context")
+    }
+
     fn write(
         &self,
         output: Value<'_>,
@@ -741,6 +745,10 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
             "short_path" => Some(heap.alloc_str(&self.artifact.short_path()).to_value()),
             "basename" => Some(heap.alloc_str(&self.basename()).to_value()),
             "dirname" => Some(heap.alloc_str(&self.dirname()).to_value()),
+            "is_directory" => Some(Value::new_bool(matches!(
+                &self.artifact,
+                AnalysisArtifact::Derived { output, .. } if output.kind() == slug_build_api_v2::ActionOutputKind::Directory
+            ))),
             "is_source" => Some(Value::new_bool(matches!(
                 self.artifact,
                 AnalysisArtifact::Source(_)
@@ -761,6 +769,7 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
             "basename",
             "dirname",
             "is_source",
+            "is_directory",
             "label",
             "path",
             "short_path",
@@ -1461,6 +1470,22 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
             .token
             .require_active("declare_file", actions.context_name)?;
         actions.action_sink.declare_file(path)
+    }
+
+    fn declare_directory(
+        this: Value,
+        filename: &str,
+        #[starlark(require = named)] sibling: Option<Value>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        let actions = AnalysisActions::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
+        actions
+            .token
+            .require_active("declare_directory", actions.context_name)?;
+        if sibling.is_some_and(|value| !value.is_none()) {
+            anyhow::bail!("ctx.actions.declare_directory sibling is not admitted");
+        }
+        actions.action_sink.declare_directory(filename)
     }
 
     fn write(

@@ -71,9 +71,9 @@ impl SourceSpawnReapiPlan {
             .iter()
             .map(|(name, value)| (name.to_owned(), value.to_owned()))
             .collect();
-        let output_files = regular_output_paths(spawn.outputs())?;
+        let (output_files, output_directories) = output_paths(spawn.outputs())?;
         let mut inputs = SourceInputReapiPlan::from_prepared(prepared)?;
-        for output in &output_files {
+        for output in output_files.iter().chain(&output_directories) {
             for input in inputs.input_tree().entries() {
                 if paths_conflict(output, input.path()) {
                     return Err(format!(
@@ -87,7 +87,7 @@ impl SourceSpawnReapiPlan {
             argv: inputs.take_expanded_argv(),
             env,
             output_files,
-            output_directories: Vec::new(),
+            output_directories,
             platform_properties,
         };
         let identity =
@@ -112,20 +112,23 @@ impl SourceSpawnReapiPlan {
     }
 }
 
-fn regular_output_paths(outputs: &[ActionOutput]) -> Result<Vec<String>, String> {
+fn output_paths(outputs: &[ActionOutput]) -> Result<(Vec<String>, Vec<String>), String> {
     if outputs.is_empty() {
-        return Err("Spawn REAPI plan requires declared file outputs".to_owned());
+        return Err("Spawn REAPI plan requires declared outputs".to_owned());
     }
-    let mut paths = Vec::with_capacity(outputs.len());
+    let mut files = Vec::new();
+    let mut directories = Vec::new();
     for output in outputs {
-        if output.kind() != ActionOutputKind::File {
-            return Err("Spawn REAPI plan requires regular file outputs".to_owned());
-        }
         validate_output(output).map_err(|error| error.to_string())?;
-        paths.push(output.path().to_owned());
+        match output.kind() {
+            ActionOutputKind::File => files.push(output.path().to_owned()),
+            ActionOutputKind::Directory => directories.push(output.path().to_owned()),
+            _ => return Err("Spawn REAPI plan requires regular files or directories".to_owned()),
+        }
     }
-    paths.sort();
-    Ok(paths)
+    files.sort();
+    directories.sort();
+    Ok((files, directories))
 }
 
 fn paths_conflict(left: &str, right: &str) -> bool {

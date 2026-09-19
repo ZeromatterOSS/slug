@@ -387,28 +387,18 @@ fn native_spawn_plan_rejects_unmodeled_policy_and_output_collisions() {
 }
 
 #[test]
-fn output_projection_rejects_non_file_and_malformed_paths() {
-    // The Starlark producer currently lacks declare_directory; exercise the
-    // projection guard directly without admitting another declaration surface.
-    for kind in [
-        ActionOutputKind::Directory,
-        ActionOutputKind::Symlink,
-        ActionOutputKind::RunfilesTree,
-    ] {
+fn output_projection_rejects_unsupported_kinds_and_malformed_paths() {
+    for kind in [ActionOutputKind::Symlink, ActionOutputKind::RunfilesTree] {
         assert!(
-            regular_output_paths(&[ActionOutput::new("out", kind)])
+            output_paths(&[ActionOutput::new("out", kind)])
                 .unwrap_err()
-                .contains("regular file outputs")
+                .contains("regular files or directories")
         );
     }
-    assert!(
-        regular_output_paths(&[])
-            .unwrap_err()
-            .contains("declared file outputs")
-    );
+    assert!(output_paths(&[]).unwrap_err().contains("declared outputs"));
     for path in ["", "/out", "../out", "dir/./out", "dir//out", "dir\\out"] {
         assert!(
-            regular_output_paths(&[ActionOutput::new(path, ActionOutputKind::File)]).is_err(),
+            output_paths(&[ActionOutput::new(path, ActionOutputKind::File)]).is_err(),
             "{path}"
         );
     }

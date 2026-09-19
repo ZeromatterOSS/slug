@@ -354,10 +354,16 @@ pub(crate) async fn execute_staged(
                     RemoteExecutionError::Protocol(format!("output {} has no digest", file.path))
                 })
                 .and_then(digest_from_proto)?;
-            Ok(GeneratedOutput::new(file.path.clone(), digest))
+            Ok(GeneratedOutput::new(
+                file.path.clone(),
+                digest,
+                file.is_executable,
+            ))
         })
         .collect::<Result<Vec<_>, RemoteExecutionError>>()?;
-    let mut action_result = ActionResult::new(outputs);
+    let directories =
+        crate::output_tree::fetch_output_trees(cache, &result.output_directories).await?;
+    let mut action_result = ActionResult::new(outputs).with_output_directories(directories);
     if let Some(digest) = result.stdout_digest.as_ref() {
         action_result = action_result.with_stdout_digest(digest_from_proto(digest)?);
     }
@@ -433,6 +439,11 @@ pub fn materialize_outputs(
     output_root: &Path,
     execution: &RemoteExecutionResult,
 ) -> Result<(), RemoteExecutionError> {
+    if !execution.result.output_directories().is_empty() {
+        return Err(RemoteExecutionError::Protocol(
+            "output tree materialization is not admitted".into(),
+        ));
+    }
     for output in execution.result.output_files() {
         let path = safe_output_path(output_root, output.path())?;
         let data = execution.output_blobs.get(output.path()).ok_or_else(|| {
@@ -585,7 +596,9 @@ pub(crate) fn required_digests(
     digests
 }
 
-fn digest_from_proto(digest: &proto::Digest) -> Result<ReapiDigest, RemoteExecutionError> {
+pub(crate) fn digest_from_proto(
+    digest: &proto::Digest,
+) -> Result<ReapiDigest, RemoteExecutionError> {
     let size_bytes: u64 = digest.size_bytes.try_into().map_err(|_| {
         RemoteExecutionError::Protocol(format!("negative digest size for {}", digest.hash))
     })?;
@@ -617,12 +630,11 @@ pub(crate) fn cache_error(error: CacheError) -> RemoteExecutionError {
 }
 
 #[allow(deprecated)]
-fn validate_result_shape(
+pub(crate) fn validate_result_shape(
     result: &proto::ActionResult,
     command: &ReapiCommand,
 ) -> Result<(), RemoteExecutionError> {
-    if !result.output_directories.is_empty()
-        || !result.output_symlinks.is_empty()
+    if !result.output_symlinks.is_empty()
         || !result.output_file_symlinks.is_empty()
         || !result.output_directory_symlinks.is_empty()
     {
@@ -630,16 +642,30 @@ fn validate_result_shape(
             "unsupported REAPI output directory or symlink".to_owned(),
         ));
     }
-    let expected = command.output_files.iter().collect::<BTreeSet<_>>();
-    let actual = result
-        .output_files
-        .iter()
-        .map(|output| &output.path)
-        .collect::<BTreeSet<_>>();
-    if actual.len() != result.output_files.len() || actual != expected {
-        return Err(RemoteExecutionError::Protocol(
-            "ActionResult output paths differ from requested files".to_owned(),
-        ));
+    for (expected, actual) in [
+        (
+            &command.output_files,
+            result
+                .output_files
+                .iter()
+                .map(|file| &file.path)
+                .collect::<Vec<_>>(),
+        ),
+        (
+            &command.output_directories,
+            result
+                .output_directories
+                .iter()
+                .map(|directory| &directory.path)
+                .collect::<Vec<_>>(),
+        ),
+    ] {
+        let unique = actual.iter().copied().collect::<BTreeSet<_>>();
+        if unique.len() != actual.len() || unique != expected.iter().collect() {
+            return Err(RemoteExecutionError::Protocol(
+                "ActionResult output paths or types differ from requested outputs".into(),
+            ));
+        }
     }
     if result
         .output_files

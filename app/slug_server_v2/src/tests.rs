@@ -770,6 +770,7 @@ fn reapi_materialization_uses_distinct_and_restored_structural_configuration_roo
     let output = slug_reapi_v2::GeneratedOutput::new(
         "pkg/out.txt",
         slug_reapi_v2::ReapiDigest::of_bytes(b"materialized"),
+        false,
     );
     let execution = slug_reapi_v2::RemoteExecutionResult {
         action_digest: slug_reapi_v2::ReapiDigest::of_bytes(b"action"),

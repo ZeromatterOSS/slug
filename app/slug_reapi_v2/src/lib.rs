@@ -23,6 +23,7 @@ pub use action_cache::ActionCacheStatus;
 pub use action_cache::ActionCacheTable;
 pub use action_cache::ActionResult;
 pub use cas::CasUploadPlan;
+pub use cas::GeneratedDirectory;
 pub use cas::GeneratedOutput;
 pub use cas::GeneratedOutputReuploadPlan;
 pub use command::ReapiActionIdentity;
@@ -55,3 +56,5 @@ pub use source_spawn::SourceSpawnReapiPlan;
 mod source_execution;
 pub use source_execution::SourceReapiTransport;
 pub use source_execution::StagedSourceAction;
+
+mod output_tree;

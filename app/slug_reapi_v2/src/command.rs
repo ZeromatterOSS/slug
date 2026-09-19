@@ -111,6 +111,13 @@ impl ReapiCommand {
     }
 
     fn to_proto(&self) -> proto::Command {
+        let mut output_paths: Vec<_> = self
+            .output_files
+            .iter()
+            .chain(&self.output_directories)
+            .cloned()
+            .collect();
+        output_paths.sort();
         proto::Command {
             arguments: self.argv.clone(),
             environment_variables: self
@@ -127,12 +134,7 @@ impl ReapiCommand {
             // The v2.2 Action field is authoritative, but the protocol asks
             // clients to also populate this retained Command field.
             platform: Some(platform_from_properties(&self.platform_properties)),
-            output_paths: self
-                .output_files
-                .iter()
-                .chain(&self.output_directories)
-                .cloned()
-                .collect(),
+            output_paths,
             ..Default::default()
         }
     }

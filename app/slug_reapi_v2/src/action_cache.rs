@@ -11,12 +11,14 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use crate::cas::GeneratedDirectory;
 use crate::cas::GeneratedOutput;
 use crate::digest::ReapiDigest;
 
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct ActionResult {
     output_files: Vec<GeneratedOutput>,
+    output_directories: Vec<GeneratedDirectory>,
     stdout_digest: Option<ReapiDigest>,
     stderr_digest: Option<ReapiDigest>,
 }
@@ -25,9 +27,19 @@ impl ActionResult {
     pub fn new(output_files: Vec<GeneratedOutput>) -> Self {
         Self {
             output_files,
+            output_directories: Vec::new(),
             stdout_digest: None,
             stderr_digest: None,
         }
+    }
+
+    pub fn with_output_directories(mut self, directories: Vec<GeneratedDirectory>) -> Self {
+        self.output_directories = directories;
+        self
+    }
+
+    pub fn output_directories(&self) -> &[GeneratedDirectory] {
+        &self.output_directories
     }
 
     pub fn with_stdout_digest(mut self, digest: ReapiDigest) -> Self {
@@ -57,12 +69,18 @@ impl ActionResult {
             .iter()
             .map(|output| (output.path().to_owned(), output.digest().clone()))
             .collect::<BTreeMap<_, _>>();
-        let missing_paths = self
+        let mut missing_paths = self
             .output_files
             .iter()
             .filter(|expected| available.get(expected.path()) != Some(expected.digest()))
             .map(|expected| expected.path().to_owned())
             .collect::<Vec<_>>();
+        // A files-only local inventory cannot prove directory topology/content.
+        missing_paths.extend(
+            self.output_directories
+                .iter()
+                .map(|directory| directory.path().to_owned()),
+        );
         if missing_paths.is_empty() {
             ActionCacheStatus::Hit
         } else {
@@ -76,6 +94,10 @@ impl ActionResult {
             .output_files
             .iter()
             .map(GeneratedOutput::digest)
+            .chain(self.output_directories.iter().flat_map(|directory| {
+                std::iter::once(directory.tree_digest())
+                    .chain(directory.files().iter().map(GeneratedOutput::digest))
+            }))
             .filter(|digest| !available_digests.contains(*digest))
             .cloned()
             .collect::<Vec<_>>();

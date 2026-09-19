@@ -537,7 +537,10 @@ impl DefaultInfo {
                 output,
                 ..
             }) = value.kind()
-                && output.kind() != ActionOutputKind::File
+                && !matches!(
+                    output.kind(),
+                    ActionOutputKind::File | ActionOutputKind::Directory
+                )
             {
                 return Err(ProviderError::InvalidDefaultInfoArtifactKind {
                     kind: output.kind(),

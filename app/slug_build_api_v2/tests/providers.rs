@@ -527,7 +527,7 @@ fn default_info_rejects_non_file_depsets() {
 }
 
 #[test]
-fn default_info_rejects_directory_artifacts_in_the_regular_file_slice() {
+fn default_info_retains_directory_artifacts_and_rejects_unadmitted_kinds() {
     let directory = AnalysisArtifact::Derived {
         owner: AnalysisConfiguredTargetKey::new(
             CanonicalLabel::parse("@@//pkg:owner").unwrap(),
@@ -537,17 +537,26 @@ fn default_info_rejects_directory_artifacts_in_the_regular_file_slice() {
     };
     let files = AnalysisDepset::new(
         DepsetOrder::Default,
-        vec![AnalysisValue::artifact(directory)],
+        vec![AnalysisValue::artifact(directory.clone())],
         Vec::new(),
     )
     .unwrap();
 
-    assert_eq!(
-        DefaultInfo::from_files(files).unwrap_err(),
-        ProviderError::InvalidDefaultInfoArtifactKind {
-            kind: ActionOutputKind::Directory,
-        }
-    );
+    let info = DefaultInfo::from_files(files.clone()).unwrap();
+    assert_eq!(info.files(), &files);
+    assert_eq!(info.files().to_list(), [AnalysisValue::artifact(directory)]);
+    for kind in [ActionOutputKind::Symlink, ActionOutputKind::RunfilesTree] {
+        let files = AnalysisDepset::new(
+            DepsetOrder::Default,
+            vec![AnalysisValue::artifact(derived_artifact("pkg/tree", kind))],
+            Vec::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            DefaultInfo::from_files(files).unwrap_err(),
+            ProviderError::InvalidDefaultInfoArtifactKind { kind }
+        );
+    }
 }
 
 #[test]

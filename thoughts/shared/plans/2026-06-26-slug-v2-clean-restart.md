@@ -29,14 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-34-m7a-source-spawn-execution-r1
-Status: final ACCEPT; checkpoint ready to commit
+Packet: WP-7-35-m7a-source-output-trees-r1
+Status: accepted
 
-One source-only Spawn now runs through request-owned staging, pre-Execute validation,
-NativeLink execution and final native acceptance. Focused lifecycle and actual CAS
-failure proofs pass; independent final review ACCEPT. Generated/tree inputs,
-production scheduling, output materialization and CLI/daemon activation remain
-open; M7A stays partial.
+Public directory declarations and verified regular-file output trees now pass through
+the accepted source Spawn operation. Independent final review ACCEPT; tiny NativeLink
+cold/cache/A-B-A/missing-descendant gate passes in 1.093s. WP-7-34 is pushed at
+e50fcd7cb. Generated/tree inputs, publication ownership, scheduling and CLI activation
+remain open; M7A partial and M8 unproved. Select the next bounded bootstrap prerequisite.
 
 ### Earlier generated-input receipt
 

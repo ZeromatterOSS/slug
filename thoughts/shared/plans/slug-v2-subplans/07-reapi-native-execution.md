@@ -146,6 +146,24 @@ explicit retries/timeouts and a different cache endpoint fail closed. Returned
 output bytes are operation-owned in memory; large-output readiness, generated/tree
 inputs, closure scheduling and accepted output materialization remain open.
 
+WP-7-35 admits declared regular-file output trees on that same native source Spawn
+operation. Commands sort file/directory lists and their combined output_paths;
+results must match exact declared paths and kinds. Verified Tree downloads require
+a root, canonical sorted/unique components, resolved child digests and any supplied
+root digest. Symlinks, node properties, unmodeled protobuf fields and unrelated
+children fail closed. Repeated subtrees and NativeLink's identical root copy
+deduplicate while preserving nested/empty directory occurrences.
+
+Per action, wire Tree bytes and expanded path bytes each cap at 16 MiB; expanded
+entries and predecode Directory/node/digest records each cap at 100,000; depth caps
+at 256. Charges precede download, prost allocation or path expansion as applicable.
+Bounded metadata retains Tree/root digests and regular files' paths/digests/raw
+executable bits. Tree file contents are verified through discard sinks and remain
+in CAS; buffers and manifests are request-owned and never DICE values. Files-only
+local inventory cannot prove a tree cache hit. The detached materializer rejects
+directory-bearing results before writes. Local publication still requires a Core
+generation/configuration-root claim; generated/tree inputs and scheduling stay open.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

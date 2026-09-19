@@ -1044,6 +1044,9 @@ mod toolchain_materialization_tests {
 #[derive(Debug)]
 struct SynchronousAnalysisActionSink {
     actions: Arc<Mutex<CtxActions>>,
+    // Evaluation-scoped declarations, including predeclared outputs. Subrule
+    // calls share this sink; only the resulting Derived artifacts survive it.
+    declared_outputs: Mutex<SmallMap<String, ActionOutputKind>>,
     package_path: String,
     owner: AnalysisConfiguredTargetKey,
     typed_configuration: Result<Option<(HostPathFlavor, RetainedActionEnvironment)>, String>,
@@ -1054,6 +1057,36 @@ struct SynchronousAnalysisActionSink {
 }
 
 impl SynchronousAnalysisActionSink {
+    fn declare_output(
+        &self,
+        path: &str,
+        kind: ActionOutputKind,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        let path = if self.package_path.is_empty() {
+            path.to_owned()
+        } else {
+            format!("{}/{path}", self.package_path)
+        };
+        let output = ActionOutput::new(path.clone(), kind);
+        slug_build_api_v2::actions::registry::validate_output(&output)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        let mut declarations = self
+            .declared_outputs
+            .lock()
+            .map_err(|_| anyhow::anyhow!("ctx.actions declaration lock is poisoned"))?;
+        if let Some(previous) = declarations.get(&path) {
+            if *previous != kind {
+                anyhow::bail!("output '{path}' has already been declared with a different type");
+            }
+        } else {
+            declarations.insert(path, kind);
+        }
+        Ok(AnalysisArtifactValue::new(AnalysisArtifact::Derived {
+            owner: self.owner.clone(),
+            output,
+        }))
+    }
+
     fn action_toolchain_label(
         &self,
         value: Value<'_>,
@@ -1273,21 +1306,11 @@ impl SynchronousAnalysisActionSink {
 
 impl AnalysisActionSink for SynchronousAnalysisActionSink {
     fn declare_file(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
-        let path = if self.package_path.is_empty() {
-            path.to_owned()
-        } else {
-            format!("{}/{path}", self.package_path)
-        };
-        let output = self
-            .actions
-            .lock()
-            .map_err(|_| anyhow::anyhow!("ctx.actions state lock is poisoned"))?
-            .declare_file(path)
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-        Ok(AnalysisArtifactValue::new(AnalysisArtifact::Derived {
-            owner: self.owner.clone(),
-            output,
-        }))
+        self.declare_output(path, ActionOutputKind::File)
+    }
+
+    fn declare_directory(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
+        self.declare_output(path, ActionOutputKind::Directory)
     }
 
     fn write(
@@ -1903,9 +1926,15 @@ fn default_info_files<'v>(
         match value.kind() {
             AnalysisValueKind::Artifact(AnalysisArtifact::Source(_)) => {}
             AnalysisValueKind::Artifact(AnalysisArtifact::Derived { output, .. })
-                if output.kind() == ActionOutputKind::File => {}
+                if matches!(
+                    output.kind(),
+                    ActionOutputKind::File | ActionOutputKind::Directory
+                ) => {}
             AnalysisValueKind::Artifact(AnalysisArtifact::Derived { .. }) => {
-                return Err("DefaultInfo.files depset must contain regular files".to_owned());
+                return Err(
+                    "DefaultInfo.files depset must contain files or declared directories"
+                        .to_owned(),
+                );
             }
             _ => return Err("DefaultInfo.files must be a depset of Files".to_owned()),
         }
@@ -2168,6 +2197,22 @@ pub(crate) fn evaluate_loaded_rule(
     let predeclared_outputs = implementation.predeclared_outputs.clone();
     let action_sink: Arc<dyn AnalysisActionSink> = Arc::new(SynchronousAnalysisActionSink {
         actions: actions.clone(),
+        declared_outputs: Mutex::new(
+            predeclared_output_artifacts(
+                &predeclared_outputs,
+                &resolved_attributes,
+                package_path,
+                &retained_owner,
+            )
+            .into_iter()
+            .map(|artifact| match artifact {
+                AnalysisArtifact::Derived { output, .. } => {
+                    (output.path().to_owned(), output.kind())
+                }
+                AnalysisArtifact::Source(_) => unreachable!("predeclared outputs are derived"),
+            })
+            .collect(),
+        ),
         package_path: package_path.to_owned(),
         owner: retained_owner.clone(),
         typed_configuration,
