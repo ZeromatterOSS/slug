@@ -692,6 +692,10 @@ impl ActivationTracker for AuditedRuntimeActivationTracker {
         self.runtime.root_activated(key, activation);
         self.audit.record_root(key);
     }
+
+    fn root_completed(&self, key: &DynKey, activation: RootActivation, is_transient: bool) {
+        self.runtime.root_completed(key, activation, is_transient);
+    }
 }
 
 #[allow(dead_code)]

@@ -51,6 +51,7 @@ struct AttemptRoot {
     ordinal: u64,
     node: DiceNodeId,
     version: VersionNumber,
+    completed_transient: bool,
 }
 
 #[derive(Debug)]
@@ -94,6 +95,7 @@ pub(super) struct SealedCommandAttempt {
     id: CommandAttemptId,
     version: Option<VersionNumber>,
     roots: Arc<[DiceNodeId]>,
+    transient_roots: Vec<DiceNodeId>,
     allow_unavailable_roots: bool,
     armed: bool,
 }
@@ -744,7 +746,33 @@ impl CommandEffectOwner {
             ordinal: activation.ordinal(),
             node: activation.node(),
             version: activation.version(),
+            completed_transient: false,
         });
+    }
+
+    fn record_root_completion(
+        &self,
+        id: CommandAttemptId,
+        activation: RootActivation,
+        is_transient: bool,
+    ) {
+        let mut state = self
+            .state
+            .lock()
+            .expect("command effect owner mutex poisoned");
+        let CommandEffectPhase::Open(active) = &mut state.phase else {
+            return;
+        };
+        if active.id != id {
+            return;
+        }
+        if let Some(root) = active.roots.iter_mut().find(|root| {
+            root.ordinal == activation.ordinal()
+                && root.node == activation.node()
+                && root.version == activation.version()
+        }) {
+            root.completed_transient = is_transient;
+        }
     }
 
     fn seal_retry(&self, id: CommandAttemptId) -> Result<(), CommandEffectError> {
@@ -798,6 +826,11 @@ impl CommandEffectOwner {
         {
             return Err(CommandEffectError::MixedRootVersions);
         }
+        let transient_roots = roots
+            .iter()
+            .filter(|root| root.completed_transient)
+            .map(|root| root.node)
+            .collect();
         let nodes = roots.into_iter().map(|root| root.node).collect();
         let demands = active
             .demands
@@ -813,6 +846,7 @@ impl CommandEffectOwner {
             id,
             version,
             roots: nodes,
+            transient_roots,
             allow_unavailable_roots,
             armed: true,
         })
@@ -929,6 +963,11 @@ impl AttemptEffectTracker {
         self.owner.record_root(self.id, activation);
     }
 
+    pub(super) fn record_root_completion(&self, activation: RootActivation, is_transient: bool) {
+        self.owner
+            .record_root_completion(self.id, activation, is_transient);
+    }
+
     pub(super) fn seal_retry(&self) -> Result<(), CommandEffectError> {
         self.owner.seal_retry(self.id)
     }
@@ -973,6 +1012,24 @@ impl SealedCommandAttempt {
                 .await
             {
                 Ok(closure) => break closure,
+                Err(ActivationClosureError::Dirty { node, version })
+                    if self.allow_unavailable_roots
+                        && self.version == Some(version)
+                        && self.roots.contains(&node)
+                        && self.transient_roots.contains(&node) =>
+                {
+                    // A completed transient value can leave an older persistent
+                    // root dirty. DICE attests its current completion; this does
+                    // not authorize skipping dirty descendants or stale roots.
+                    // Querying the original closure first preserves its engine
+                    // and live-version checks even when every root is omitted.
+                    self.roots = self
+                        .roots
+                        .iter()
+                        .copied()
+                        .filter(|root| *root != node)
+                        .collect();
+                }
                 Err(ActivationClosureError::UnavailableRoot { root })
                     if self.allow_unavailable_roots =>
                 {
@@ -1102,6 +1159,7 @@ mod tests {
             id,
             version: None,
             roots: Arc::from([]),
+            transient_roots: Vec::new(),
             allow_unavailable_roots: true,
             armed: true,
         });
@@ -2001,3 +2059,7 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "events/transient_root_tests.rs"]
+mod transient_root_tests;

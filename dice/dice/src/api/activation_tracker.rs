@@ -264,6 +264,11 @@ pub trait ActivationTracker: Send + Sync + 'static {
 
     /// Receives each parentless request after indexing and before cache lookup.
     fn root_activated(&self, _key: &DynKey, _activation: RootActivation) {}
+
+    /// Receives successful completion of a parentless request, with its original
+    /// activation identity. Transience includes dependency validity and is reported
+    /// for cache hits too. Cancelled or failed requests do not complete.
+    fn root_completed(&self, _key: &DynKey, _activation: RootActivation, _is_transient: bool) {}
 }
 
 /// Describes the kind of activation, and possibly carries data passed by the key's evaluation.

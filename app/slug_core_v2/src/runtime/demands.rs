@@ -431,6 +431,12 @@ impl ActivationTracker for RuntimeActivationTracker {
             effects.record_root(activation);
         }
     }
+
+    fn root_completed(&self, _key: &DynKey, activation: RootActivation, is_transient: bool) {
+        if let Some(effects) = &self.effects {
+            effects.record_root_completion(activation, is_transient);
+        }
+    }
 }
 
 fn select_demands(

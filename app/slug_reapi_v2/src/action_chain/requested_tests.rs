@@ -196,6 +196,7 @@ fn requested_source_only_does_not_connect_real_reapi_transport() {
         )
         .unwrap();
     drop(accepted.project(|result| {
+        let result = result.as_ref().expect("source-only build succeeds");
         assert!(result.output().is_none());
         let plan = result.inputs().plan().unwrap();
         assert!(plan.actions().is_empty());

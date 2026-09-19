@@ -150,6 +150,7 @@ fn publish(
             Default::default(),
             transport,
         )
+        .map(|accepted| accepted.map_terminal(Result::unwrap))
 }
 
 fn output_root(workspace: &Workspace) -> PathBuf {

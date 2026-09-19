@@ -76,6 +76,8 @@ impl ActionSelection {
 
 /// Complete reachable source metadata, associated with the retained build frontier.
 /// Transport effects and producer results never enter this DICE-owned value.
+/// Requested preparation can retain a failed build; inspect `evaluation()` before
+/// using its metadata. Such failures have no action sources or executable plan.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct PreparedActionChainInputs {
     evaluation: Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
@@ -86,9 +88,12 @@ pub struct PreparedActionChainInputs {
 }
 
 impl PreparedActionChainInputs {
+    pub fn evaluation(&self) -> Result<&BuildCommandEvaluation, &BuildCommandError> {
+        self.evaluation.as_ref().as_ref()
+    }
+
     pub fn plan(&self) -> Result<PreparedActionPlan<'_>, Arc<str>> {
-        self.selection
-            .plan(self.evaluation.as_ref().as_ref().unwrap())
+        self.selection.plan(self.evaluation().map_err(error)?)
     }
 
     pub fn sources(&self) -> impl ExactSizeIterator<Item = &SourceArtifactInput> {
@@ -143,6 +148,18 @@ impl ActionChainStagingKey {
         let mut observations =
             checked_build_frontier(Some(terminal.observations()), terminal.source_certificate())?;
         let evaluation = terminal.result;
+        if matches!(self.selection, ActionSelection::Requested) && evaluation.is_err() {
+            let certificate = SourceCertificate::from_epoch(observations.dupe()).map_err(error)?;
+            return Ok(PreparationOutcome::Complete(Arc::new(
+                PreparedActionChainInputs {
+                    evaluation,
+                    selection: self.selection.clone(),
+                    sources: Arc::from([]),
+                    observations,
+                    certificate,
+                },
+            )));
+        }
         let build = evaluation.as_ref().as_ref().map_err(error)?;
         // Validate the entire reachable plan before observing source content.
         let plan = self.selection.plan(build)?;
@@ -215,9 +232,13 @@ impl Key for ActionChainStagingKey {
         }
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        Self::validity(x) && Self::validity(y) && x.complete_eq(y)
+        matches!(x, PreparationOutcome::Complete(Ok(inputs)) if inputs.evaluation().is_ok())
+            && matches!(y, PreparationOutcome::Complete(Ok(inputs)) if inputs.evaluation().is_ok())
+            && x.complete_eq(y)
     }
     fn validity(value: &Self::Value) -> bool {
+        // Retain the observed build's diagnostic closure for typed failures,
+        // while equality above prevents those failures from cutting off changes.
         matches!(value, PreparationOutcome::Complete(Ok(_)))
     }
 }
@@ -242,6 +263,17 @@ impl NativeCommandRoot for ActionChainStagingKey {
     }
     fn event_reconciliation_policy(&self, _: &Self::Terminal) -> EventReconciliationPolicy {
         EventReconciliationPolicy::SourceCertifiedCurrentClosure
+    }
+    fn allows_unavailable_terminal_roots(&self, terminal: &Self::Terminal) -> bool {
+        matches!(self.selection, ActionSelection::Requested)
+            && matches!(terminal.evaluation(), Err(error) if error.is_analysis_error())
+    }
+    fn terminal_demand_association(&self, terminal: &Self::Terminal) -> TerminalDemandAssociation {
+        if self.allows_unavailable_terminal_roots(terminal) {
+            TerminalDemandAssociation::TransientTerminalLocal
+        } else {
+            TerminalDemandAssociation::ClosureOnly
+        }
     }
     async fn compute(
         &self,
@@ -292,6 +324,8 @@ impl WorkspaceRuntime {
 
     /// Observe all selected sources and reachable action inputs for one requested
     /// forest, including zero-action roots. This metadata does not authorize execution.
+    /// A source-certified build failure is retained in the accepted inputs;
+    /// inspect `PreparedActionChainInputs::evaluation()` to distinguish it.
     #[allow(clippy::too_many_arguments)]
     pub fn prepare_requested_action_inputs_with_repository_environment(
         &self,

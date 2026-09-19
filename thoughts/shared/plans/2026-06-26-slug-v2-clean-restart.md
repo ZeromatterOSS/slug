@@ -29,13 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-44-m7a-requested-publication-r1
+Packet: WP-7-45-m7a-requested-command-terminals-r2
 Status: accepted
 
-WP744 accepts selected-artifact publication across producers/configurations under one
-native full-frontier validation, with 21 focused checks including real multi-producer
-REAPI proof, direct-dependent compile and independent final ACCEPT. WP743 is
-244c6641d. Next: CLI/server requested build activation. M7A partial, M8 unproved.
+WP745 accepts typed requested build failures and diagnostic events, including
+DICE-attested transient roots for recurrent analysis failures, with 21 focused checks
+and direct dependent compilation. WP744 publication remains accepted at 65fc9bf7c.
+Next: WP746 adapter activation, including explicit
+malformed-target and remote-policy handling. M7A partial, M8 unproved.
 
 ### Earlier generated-input receipt
 

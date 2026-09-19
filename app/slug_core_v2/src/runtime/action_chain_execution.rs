@@ -222,6 +222,13 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
     fn event_reconciliation_policy(&self, terminal: &Self::Terminal) -> EventReconciliationPolicy {
         self.staging.event_reconciliation_policy(&terminal.inputs)
     }
+    fn allows_unavailable_terminal_roots(&self, terminal: &Self::Terminal) -> bool {
+        self.staging
+            .allows_unavailable_terminal_roots(&terminal.inputs)
+    }
+    fn terminal_demand_association(&self, terminal: &Self::Terminal) -> TerminalDemandAssociation {
+        self.staging.terminal_demand_association(&terminal.inputs)
+    }
     async fn compute(
         &self,
         transaction: &mut dice::DiceTransaction,
@@ -242,6 +249,11 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
         context: NativeCommandCompletionContext<'a, '_>,
     ) -> impl std::future::Future<Output = Result<(), NativeDemandSessionError>> + 'a {
         async move {
+            if terminal.inputs.evaluation().is_err() {
+                // Retain the typed terminal for native validation and selected
+                // diagnostics, without planning or creating transport effects.
+                return Ok(());
+            }
             let steps = terminal
                 .inputs
                 .plan()
@@ -298,6 +310,8 @@ impl WorkspaceRuntime {
     /// Execute all requested artifact prerequisites in one native attempt.
     /// Zero-action requests still receive final validation but skip transport.
     /// Results remain operation-owned; this operation publishes no outputs.
+    /// Source-certified build failures are accepted typed terminals; execution
+    /// and preparation failures remain outer errors.
     #[allow(clippy::too_many_arguments)]
     pub fn execute_requested_actions_with_repository_environment<T: ActionChainTransport>(
         &self,
@@ -309,7 +323,10 @@ impl WorkspaceRuntime {
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
         configuration_overlay: CommandConfigurationOverlay,
         transport: &T,
-    ) -> Result<AcceptedCommand<RequestedActionResult<T::Output>>, BuildCommandError> {
+    ) -> Result<
+        AcceptedCommand<Result<RequestedActionResult<T::Output>, BuildCommandError>>,
+        BuildCommandError,
+    > {
         self.execute_requested_actions_with_policy(
             targets,
             command_policy,
@@ -326,6 +343,7 @@ impl WorkspaceRuntime {
     /// Execute one requested forest and publish precisely its selected Derived
     /// outputs after full-frontier validation. Later rename/bookkeeping failures
     /// may leave earlier artifacts changed; no accepted result is then returned.
+    /// Source-certified build failures are accepted without transport or publication.
     #[allow(clippy::too_many_arguments)]
     pub fn execute_and_publish_requested_actions_with_repository_environment<
         T: ActionChainOutputTransport,
@@ -339,7 +357,10 @@ impl WorkspaceRuntime {
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
         configuration_overlay: CommandConfigurationOverlay,
         transport: &T,
-    ) -> Result<AcceptedCommand<RequestedActionResult<T::Output>>, BuildCommandError> {
+    ) -> Result<
+        AcceptedCommand<Result<RequestedActionResult<T::Output>, BuildCommandError>>,
+        BuildCommandError,
+    > {
         self.execute_requested_actions_with_policy(
             targets,
             command_policy,
@@ -365,7 +386,10 @@ impl WorkspaceRuntime {
         configuration_overlay: CommandConfigurationOverlay,
         transport: &T,
         publication: P,
-    ) -> Result<AcceptedCommand<RequestedActionResult<T::Output>>, BuildCommandError> {
+    ) -> Result<
+        AcceptedCommand<Result<RequestedActionResult<T::Output>, BuildCommandError>>,
+        BuildCommandError,
+    > {
         let (build, request) = self.prepare_build_request(
             targets,
             command_policy,
@@ -382,10 +406,13 @@ impl WorkspaceRuntime {
             publication,
         )
         .map(|accepted| {
-            accepted.map_terminal(|terminal| RequestedActionResult {
-                inputs: terminal.inputs,
-                output: terminal.output,
-                published_outputs: terminal.published_outputs.unwrap_or_default(),
+            accepted.map_terminal(|terminal| {
+                terminal.inputs.evaluation().map_err(Clone::clone)?;
+                Ok(RequestedActionResult {
+                    inputs: terminal.inputs,
+                    output: terminal.output,
+                    published_outputs: terminal.published_outputs.unwrap_or_default(),
+                })
             })
         })
     }

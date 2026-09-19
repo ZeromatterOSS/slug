@@ -583,3 +583,6 @@ fn final_source_change_retries_whole_chain_with_fresh_session() {
 
 #[path = "requested_tests.rs"]
 mod requested_tests;
+
+#[path = "requested_error_tests.rs"]
+mod requested_error_tests;

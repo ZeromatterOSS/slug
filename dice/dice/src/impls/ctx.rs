@@ -71,6 +71,7 @@ use crate::impls::transaction::TransactionUpdater;
 use crate::impls::user_cycle::KeyComputingUserCycleDetectorData;
 use crate::impls::user_cycle::UserCycleDetectorData;
 use crate::impls::value::DiceComputedValue;
+use crate::impls::value::DiceValidity;
 use crate::impls::value::TrackedInvalidationPaths;
 use crate::impls::worker::DiceTaskWorker;
 use crate::impls::worker::project_for_key;
@@ -707,16 +708,17 @@ impl CoreCtx {
             .dice
             .key_index
             .index(CowDiceKeyHashed::key_ref(key));
-        self.notify_root(dice_key);
+        let activation = self.notify_root(dice_key);
 
         self.async_evaluator
             .per_live_version_ctx
-            .compute_opaque(
+            .compute_opaque_with_root(
                 dice_key,
                 self.parent_key,
                 &self.async_evaluator,
                 self.cycles
                     .subrequest(dice_key, &self.async_evaluator.dice.key_index),
+                activation,
             )
             .map_ok(move |res| (dice_key, res))
     }
@@ -733,7 +735,7 @@ impl CoreCtx {
             .dice
             .key_index
             .index(CowDiceKeyHashed::proj_ref(base.derive_from_key, key));
-        self.notify_root(dice_key);
+        let activation = self.notify_root(dice_key);
 
         let (r, cache_hit) = self
             .async_evaluator
@@ -782,6 +784,19 @@ impl CoreCtx {
             r.invalidation_paths().dupe(),
         );
 
+        if let Some(activation) = activation {
+            self.async_evaluator
+                .user_data
+                .activation_tracker
+                .as_ref()
+                .unwrap()
+                .root_completed(
+                    DynKey::ref_cast(self.async_evaluator.dice.key_index.get(dice_key)),
+                    activation,
+                    r.value().validity() == DiceValidity::Transient,
+                );
+        }
+
         Ok(r.value()
             .downcast_maybe_transient::<K::Value>()
             .expect("Type mismatch when computing key")
@@ -829,26 +844,24 @@ impl CoreCtx {
         self.cycles.cycle_guard()
     }
 
-    fn notify_root(&self, key: DiceKey) {
-        let Some(root_request_ordinal) = &self.root_request_ordinal else {
-            return;
-        };
-        let Some(activation_tracker) = &self.async_evaluator.user_data.activation_tracker else {
-            return;
-        };
+    fn notify_root(&self, key: DiceKey) -> Option<RootActivation> {
+        let root_request_ordinal = self.root_request_ordinal.as_ref()?;
+        let activation_tracker = self.async_evaluator.user_data.activation_tracker.as_ref()?;
         let ordinal = root_request_ordinal
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
                 next.checked_add(1)
             })
             .expect("transaction root request ordinal exhausted");
+        let activation = RootActivation::new(
+            self.async_evaluator.dice.state_handle.node_id(key),
+            self.get_version(),
+            ordinal,
+        );
         activation_tracker.root_activated(
             DynKey::ref_cast(self.async_evaluator.dice.key_index.get(key)),
-            RootActivation::new(
-                self.async_evaluator.dice.state_handle.node_id(key),
-                self.get_version(),
-                ordinal,
-            ),
+            activation,
         );
+        Some(activation)
     }
 }
 
@@ -882,6 +895,17 @@ impl SharedLiveTransactionCtx {
         parent_key: ParentKey,
         eval: &AsyncEvaluator,
         cycles: UserCycleDetectorData,
+    ) -> impl Future<Output = CancellableResult<DiceComputedValue>> + use<> {
+        self.compute_opaque_with_root(key, parent_key, eval, cycles, None)
+    }
+
+    fn compute_opaque_with_root(
+        &self,
+        key: DiceKey,
+        parent_key: ParentKey,
+        eval: &AsyncEvaluator,
+        cycles: UserCycleDetectorData,
+        root: Option<RootActivation>,
     ) -> impl Future<Output = CancellableResult<DiceComputedValue>> + use<> {
         let mut cache_hit = false;
         let res: CancellableResult<DicePromise> = match self.cache.get(key) {
@@ -959,14 +983,16 @@ impl SharedLiveTransactionCtx {
                 .activation_tracker
                 .as_ref()
                 .is_some_and(|tracker| tracker.tracks_rich_activations());
-        if tracks_rich_activations {
+        // Keep root-only callback state inside the existing boxed instrumentation
+        // branch. Ordinary nested computes retain their unboxed future layout.
+        if tracks_rich_activations || root.is_some() {
             let version = self.version;
             let dice = eval.dice.dupe();
             let state = eval.dice.state_handle.dupe();
             let activation_tracker = eval.user_data.activation_tracker.dupe();
             async move {
                 let result = future.await;
-                if result.is_ok() {
+                if result.is_ok() && tracks_rich_activations {
                     if let Some(dependencies) = state.activation_dependencies(version, key).await {
                         if let Some(activation_info) = ActivationInfo::new_rich(
                             &dice.key_index,
@@ -980,6 +1006,14 @@ impl SharedLiveTransactionCtx {
                             activation_info.notify_rich_only();
                         }
                     }
+                }
+                if let (Ok(value), Some(root), Some(tracker)) = (&result, root, &activation_tracker)
+                {
+                    tracker.root_completed(
+                        DynKey::ref_cast(dice.key_index.get(key)),
+                        root,
+                        value.value().validity() == DiceValidity::Transient,
+                    );
                 }
                 result
             }

@@ -70,6 +70,7 @@ fn run(
             Default::default(),
             transport,
         )
+        .map(|accepted| accepted.map_terminal(Result::unwrap))
 }
 
 #[derive(Clone, Copy)]

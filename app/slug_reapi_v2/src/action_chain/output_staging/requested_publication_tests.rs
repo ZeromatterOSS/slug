@@ -186,6 +186,7 @@ fn nativelink_requested_subsets_publish_file_and_tree_from_distinct_producers() 
         .unwrap();
     let mut root = None;
     drop(accepted.project(|accepted| {
+        let accepted = accepted.as_ref().expect("requested build succeeds");
         let plan = accepted.inputs().plan().unwrap();
         let requested = plan.requested().unwrap();
         assert_eq!(requested.selection().targets().len(), 3);

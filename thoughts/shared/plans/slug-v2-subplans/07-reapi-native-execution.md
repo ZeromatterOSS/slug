@@ -269,6 +269,22 @@ requested results have no singular selected action. Portable tests exercise actu
 preflight/binding/result projection; unchanged chain wire/CAS evidence is reused, not a
 new multi-root backend smoke claim.
 
+Requested preparation also retains source-certified failed build evaluations. Its
+read-only evaluation() view returns the original typed error; plan() reports failure
+without attempting execution. Completed typed errors retain their readable DICE
+closure but never compare equal for cutoff; dependency transience still propagates. Native
+acceptance preserves the full error frontier and selected diagnostic events, including
+analysis-error transient demand/unavailable-root handling. DICE root completion attests
+current value transience with the original node/version/request ordinal. For analysis
+errors only, event selection may omit an attested transient root after the persistent
+closure rejects that root as Dirty at the same version; engine/liveness checks run first
+and dirty descendants or stale completions cannot authorize omission. This also permits
+ordinary native builds to recover and fail again in one retained runtime.
+Both requested execution
+operations return an accepted Result: build errors invoke no transport or publication,
+while outer observation, plan/source-input and transport errors remain operation failures.
+This terminal boundary is required before command adapters can activate the path.
+
 The legacy CLI/server all-action executors reject newly activated Alias/GeneratedFile
 requested roots before effects. This temporary gate is removed when the shared selected
 artifact forest replaces both helpers and reaches native validated publication. Closure

@@ -43,6 +43,7 @@ struct Tracker {
     state: Mutex<Vec<(Kind, Vec<Kind>, Option<Data>, bool)>>,
     rich: Mutex<Vec<RichEvent>>,
     roots: Mutex<Vec<RootEvent>>,
+    completed: Mutex<Vec<(RootEvent, bool)>>,
 }
 
 impl Tracker {
@@ -51,6 +52,7 @@ impl Tracker {
             state: Mutex::new(Vec::new()),
             rich: Mutex::new(Vec::new()),
             roots: Mutex::new(Vec::new()),
+            completed: Mutex::new(Vec::new()),
         }
     }
 }
@@ -98,6 +100,17 @@ impl ActivationTracker for Tracker {
             ordinal: activation.ordinal(),
         });
     }
+
+    fn root_completed(&self, key: &DynKey, activation: RootActivation, is_transient: bool) {
+        let event = RootEvent {
+            key: Kind::from_dyn_key(key),
+            node: activation.node(),
+            version: activation.version(),
+            ordinal: activation.ordinal(),
+        };
+        assert!(self.roots.lock().unwrap().contains(&event));
+        self.completed.lock().unwrap().push((event, is_transient));
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Dupe, Clone, Allocative)]
@@ -111,6 +124,9 @@ enum Kind {
     Value,
     Projection,
     Chain(u32),
+    MaybeTransient,
+    InheritedTransient,
+    TransientProjection,
 }
 
 impl Kind {
@@ -149,6 +165,15 @@ impl Kind {
 
         if let Some(key) = key.downcast_ref::<ChainKey>() {
             return Self::Chain(key.0);
+        }
+        if key.downcast_ref::<MaybeTransientKey>().is_some() {
+            return Self::MaybeTransient;
+        }
+        if key.downcast_ref::<InheritedTransientKey>().is_some() {
+            return Self::InheritedTransient;
+        }
+        if key.key_type_name() == TransientProjection::key_type_name() {
+            return Self::TransientProjection;
         }
 
         panic!("Unexpected key: {key}")
@@ -368,6 +393,65 @@ impl ProjectionKey for ValueProjection {
 }
 
 #[derive(Clone, Dupe, Debug, Display, Eq, Hash, PartialEq, Allocative)]
+#[display("{:?}", self)]
+struct MaybeTransientKey;
+
+#[async_trait]
+impl Key for MaybeTransientKey {
+    type Value = i32;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> i32 {
+        ctx.compute(&Injected).await.unwrap()
+    }
+
+    fn equality(x: &i32, y: &i32) -> bool {
+        x == y
+    }
+
+    fn validity(value: &i32) -> bool {
+        *value >= 0
+    }
+}
+
+#[derive(Clone, Dupe, Debug, Display, Eq, Hash, PartialEq, Allocative)]
+#[display("{:?}", self)]
+struct InheritedTransientKey;
+
+#[async_trait]
+impl Key for InheritedTransientKey {
+    type Value = i32;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> i32 {
+        ctx.compute(&MaybeTransientKey).await.unwrap()
+    }
+
+    fn equality(x: &i32, y: &i32) -> bool {
+        x == y
+    }
+}
+
+#[derive(Clone, Dupe, Debug, Display, Eq, Hash, PartialEq, Allocative)]
+#[display("{:?}", self)]
+struct TransientProjection(bool);
+
+impl ProjectionKey for TransientProjection {
+    type DeriveFromKey = MaybeTransientKey;
+    type Value = i32;
+
+    fn compute(&self, _: &i32, _: &DiceProjectionComputations) -> i32 {
+        if self.0 { -1 } else { 1 }
+    }
+
+    fn equality(x: &i32, y: &i32) -> bool {
+        x == y
+    }
+
+    fn validity(value: &i32) -> bool {
+        *value >= 0
+    }
+}
+
+#[derive(Clone, Dupe, Debug, Display, Eq, Hash, PartialEq, Allocative)]
 #[display("chain({})", _0)]
 struct ChainKey(u32);
 
@@ -557,6 +641,93 @@ async fn parentless_root_ordinals_are_clone_shared_and_include_cached_projection
     assert_eq!(roots[0].node, roots[1].node);
     assert_eq!(roots[0].node, roots[2].node);
     assert_eq!(roots[3].node, roots[4].node);
+    assert_eq!(
+        tracker.completed.lock().unwrap().as_slice(),
+        roots
+            .iter()
+            .cloned()
+            .map(|root| (root, false))
+            .collect::<Vec<_>>()
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn root_completions_track_actual_validity_through_repair_and_cached_projections()
+-> anyhow::Result<()> {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut prior_identity = None;
+    for value in [1, -1, -2, 2] {
+        let tracker = Arc::new(Tracker::new());
+        let mut updater = dice.updater_with_data(user_data(&tracker));
+        updater.changed_to(vec![(Injected, value)])?;
+        let mut transaction = updater.commit().await;
+        // The parent declares every value valid: its actual transience must
+        // still include its dependency, including on the second cached request.
+        assert_eq!(transaction.compute(&InheritedTransientKey).await?, value);
+        assert_eq!(transaction.compute(&InheritedTransientKey).await?, value);
+        let opaque = transaction.compute_opaque(&MaybeTransientKey).await?;
+        for transient in [false, true] {
+            for _ in 0..2 {
+                assert_eq!(
+                    transaction.projection(&opaque, &TransientProjection(transient))?,
+                    if transient { -1 } else { 1 }
+                );
+            }
+        }
+        let roots = tracker.roots.lock().unwrap();
+        let completed = tracker.completed.lock().unwrap();
+        assert_eq!(roots.len(), 7);
+        assert_eq!(completed.len(), roots.len());
+        for (ordinal, (root, (completion, transient))) in
+            roots.iter().zip(completed.iter()).enumerate()
+        {
+            assert_eq!(root.ordinal, ordinal as u64);
+            assert_eq!(root.version, transaction.version());
+            assert_eq!(root, completion);
+            assert_eq!(*transient, value < 0 || ordinal >= 5);
+        }
+        let identity = roots.iter().map(|root| root.node).collect::<Vec<_>>();
+        if let Some(prior) = prior_identity {
+            assert_eq!(identity, prior);
+        }
+        prior_identity = Some(identity);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn cancelled_parentless_request_has_start_without_completion() -> anyhow::Result<()> {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(Tracker::new());
+    let started = Arc::new(Notify::new());
+    let release = Arc::new(Notify::new());
+    let mut data = user_data(&tracker);
+    data.data.set(TestGate {
+        started: started.dupe(),
+        release: release.dupe(),
+    });
+    let mut updater = dice.updater_with_data(data);
+    updater.changed_to(vec![(Selector, false)])?;
+    let mut transaction = updater.commit().await;
+    {
+        let request = transaction.compute(&GraphKey::DelayedBranch);
+        tokio::pin!(request);
+        tokio::select! {
+            _ = started.notified() => {},
+            result = &mut request => panic!("gated request completed early: {result:?}"),
+        }
+        assert_eq!(tracker.roots.lock().unwrap().len(), 1);
+        assert!(tracker.completed.lock().unwrap().is_empty());
+    }
+    release.notify_one();
+    transaction.compute(&ValueKey).await?;
+    let roots = tracker.roots.lock().unwrap();
+    assert_eq!(roots.len(), 2);
+    assert_eq!(
+        tracker.completed.lock().unwrap().as_slice(),
+        &[(roots[1].clone(), false)]
+    );
     Ok(())
 }
 
@@ -716,14 +887,24 @@ async fn out_of_order_old_completion_preserves_each_terminal_version() -> anyhow
         old_compute.compute(&GraphKey::DelayedBranch).await.unwrap();
     });
     started.notified().await;
+    assert_eq!(old_tracker.roots.lock().unwrap().len(), 1);
+    assert!(old_tracker.completed.lock().unwrap().is_empty());
 
     let new_tracker = Arc::new(Tracker::new());
     let mut updater = dice.updater_with_data(user_data(&new_tracker));
     updater.changed_to(vec![(Selector, true)])?;
     let mut new = updater.commit().await;
     new.compute(&GraphKey::DelayedBranch).await?;
+    assert_eq!(new_tracker.completed.lock().unwrap().len(), 1);
+    assert!(old_tracker.completed.lock().unwrap().is_empty());
     release.notify_one();
     old_task.await.unwrap();
+    for tracker in [&old_tracker, &new_tracker] {
+        assert_eq!(
+            tracker.completed.lock().unwrap().as_slice(),
+            &[(tracker.roots.lock().unwrap()[0].clone(), false)]
+        );
+    }
 
     let branch = node_for(&new_tracker, Kind::Graph(GraphKey::DelayedBranch));
     let selector = node_for(&new_tracker, Kind::Selector);
@@ -834,7 +1015,12 @@ async fn activation_closure_returns_typed_foreign_unavailable_dirty_and_unverifi
         }
     );
     let roots_before_failed_request = tracker.roots.lock().unwrap().len();
+    let completions_before_failed_request = tracker.completed.lock().unwrap().len();
     assert!(old.compute(&ValueKey).await.is_err());
+    assert_eq!(
+        tracker.completed.lock().unwrap().len(),
+        completions_before_failed_request
+    );
     let roots = tracker.roots.lock().unwrap();
     assert_eq!(roots.len(), roots_before_failed_request + 1);
     assert_eq!(roots.last().unwrap().key, Kind::Value);
