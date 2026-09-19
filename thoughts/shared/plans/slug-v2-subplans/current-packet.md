@@ -1,157 +1,135 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-35-m7a-source-output-trees-r1
+Packet: WP-7-36-m7a-generated-action-prerequisites-r1
 Status: accepted
 
-## Outcome, demand and classification
+## Outcome and demand
 
-A public authored rule declares a directory output; a source-only typed Spawn
-executes through WP-7-34's native operation and returns a verified regular-file
-output tree, including nested and empty directories. This advances the build-script
-out_dir obligation observed for LALRPOP and REAPI proto generation in bootstrap-
-readiness. It does not admit generated/tree inputs, closure scheduling, local
-materialization, CLI activation, the compiler closure or bootstrap.
+A consumer selected from the validated configured action closure resolves each
+retained generated File/Directory input to its declared producer and returns a
+stable prerequisite-first action plan. A tiny public rule's source -> generated
+file/tree -> consumer chain is reachable; missing owners/outputs, wrong kinds,
+cycles and unsupported action/input shapes reject the complete plan.
 
-Pinned oracle: Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a,
-StarlarkActionFactory.declareDirectory, DefaultInfo and RemoteExecutionService ActionResultMetadata/
-parseDirectory and pinned REAPI Directory/Tree/OutputDirectory messages already in
-slug_reapi_cache_v2. Read the pinned Git objects, not the sibling checkout's HEAD.
-Exact: admitted directory declaration kind/owner, regular-file contents, protocol
-size/SHA-256, Directory references and output-path/type matching. Slug-native:
-existing configured/artifact path identity and Command wire profile, bounded tree
-resource policy. Unsupported: sibling declaration, symlinks/node properties,
-root-digest-only directory results, excessive tree resources and generated inputs.
-No Bazel ActionDigest/ActionKey parity claim and no Java semantic delegation.
+Demanded by: bootstrap-readiness's LALRPOP and cache-leaf proto build-script out_dir
+inputs to downstream Rustc. WP-7-35 accepted verified tree outputs at 351486c8c;
+Core source staging still rejects Derived artifacts. Resolving the actual producer
+is necessary before generated content can be staged or actions scheduled. This
+packet implements that owner-preserving prerequisite, not a generated-byte or
+execution claim. Source staging and SourceActionTransport remain source-only.
 
-## Declaration owner
+Pinned source: Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a,
+ArtifactFunction.compute/getGeneratingActionKey and ActionExecutionFunction's
+collectInputs/getInputDepKeys before execution; Actions sharing remains the
+accepted scalar FileWrite closure contract. Exact: resolve retained artifact
+owner/output identity and require prerequisites. Slug-native: existing configured
+identity, deterministic planning order and error rendering. Unsupported/deferred:
+execution scheduling/results, generated CAS binding, tree expansion, discovered
+inputs, symlinks/runfiles, publication, CLI activation, bootstrap and exact ActionKey.
 
-Expose ctx.actions.declare_directory(filename) through the existing active analysis
-call token and AnalysisActionSink. Explicit None sibling may be accepted; a supplied
-File sibling fails closed. The synchronous sink remains the producer: package-
-relative validated path plus the existing Derived artifact owner and Directory kind.
-A phase-local compact declaration map rejects file/directory conflicts at the same
-path and permits repeated same-kind declarations. It is owned by the existing
-analysis sink, shared across its subrule calls, dropped with analysis, and never a
-new graph cache/key. Expose File.is_directory from the retained kind. DefaultInfo.files
-retains File and Directory artifacts; executable and generated-input restrictions
-remain unchanged. Declared tree
-contents are not available in analysis and no Args directory expansion is admitted.
-Existing configured/source observation dependencies own edit/restoration invalidation.
+## Ownership and algorithm
 
-## REAPI ownership and validation
+ValidatedActionClosure remains the sole producer of conflict-free owner-complete
+configured actions. Add a borrowed planning projection on BuildCommandEvaluation
+for one selected owner/action. Its result borrows that evaluation and exposes only
+ordered configured actions plus their direct producer dependencies and declared
+artifact inputs; it conveys no Execute authority. No new DICE key/cache or retained
+semantic fact: the projection is derived solely from the already DICE-owned closure,
+like existing FileWrite semantic views. No filesystem, repository, source digest,
+remote cache or request mutation occurs. Edit/restoration uses existing configured
+DICE dependencies and native acceptance; a held plan remains a view of that result,
+never permission to execute it later.
 
-SourceSpawnReapiPlan admits File and Directory output kinds; sorts each legacy field
-and the combined output_paths; preserves all current source/virtual input-output
-collision checks across both kinds. RunfilesTree/Symlink remain rejected. Closure
-conflict validation and Core execution-representative selection remain authoritative.
+Build phase-local compact indices for exact retained artifact owner plus full
+ActionOutput (path AND kind); use the same Analysis-owned configured-key projection
+as artifact production, including execution-platform preference. Never infer a
+producer from execution path alone or match a prefix/descendant of a tree. Preserve
+source artifact leaves without content observation. Keep whole-tree inputs as one
+artifact edge; no traversal/expansion of runtime tree contents.
 
-The shared executor matches exact file/directory result sets and rejects duplicate,
-wrong-type, missing or extra outputs and all symlink fields. For each output directory,
-require a Tree digest and present Tree.root, fetch through verified CAS reads, decode the Tree and verify
-child Directory references by canonical message SHA-256. If root_directory_digest is
-supplied it must match the Tree root. Validate component names and unique names across
-files/directories; require sorted protocol node lists, reject missing child references,
-symlinks and unsupported node properties. Preserve empty directories and repeated
-subtree occurrences; identical serialized child directories may deduplicate.
-NativeLink includes the root again among children; an identical root copy is
-allowed and deduplicated after content/digest comparison, still charged to budgets.
-Do not trust is_topologically_sorted as validation. Unreferenced Tree children fail
-closed. Bound aggregate wire Tree bytes (16 MiB), aggregate expanded entries including
-roots (100,000), aggregate expanded path bytes (16 MiB) per action, and depth (256)
-per path. Reject oversized declared digests before download and check remaining
-wire budget in the sink. Charge each expanded path before allocation/queueing.
-Before prost decoding, scan length-delimited Directory/node/digest records and cap their
-aggregate count at 100,000 as well, rejecting unsupported properties/symlinks. This
-bounds allocation from many tiny duplicate/empty records before expanded checks.
-Reject unmodeled protobuf fields in Tree, Directory, FileNode, DirectoryNode and
-Digest before prost can discard them and alter Directory hashing.
-Use explicit resource errors rather than stack recursion or unbounded DAG expansion.
-These are admitted implementation resource limits, not user test deadlines.
+Typed Spawn ordinary inputs admit whole-tree Directory artifacts in direct lists
+and top-level depsets, matching pinned StarlarkActionFactory Artifact inputs.
+Tools/executable restrictions and the legacy helper remain unchanged; no runtime
+tree expansion is admitted. Reachable supported actions are typed Spawn and the accepted scalar FileWrite
+shape. Spawn input discovery visits inputs, tools and the artifact/FilesToRun
+executable, preserving stable first occurrence. Reject unused-input pruning,
+runfiles support, raw executable strings/shells, unadmitted derived kinds and every
+reachable unsupported action before returning a plan. Reuse the source-staging
+collector by separating its declared-artifact collection from its source-only
+restriction; the old source-only guard remains effective.
 
-Return explicit directory metadata alongside ActionResult files: Tree/root digests,
-regular file paths/digests/executable bits and empty/nested directory topology.
-Operation-owned Tree decode buffers are dropped after producing the bounded manifest;
-metadata drops on Core retry/unwind or caller drop and none enters DICE. Tree file
-blobs use read_blob_verified with a discard sink, so their content is not retained
-in output_blobs. Existing standalone output-file buffers remain unchanged; no large-
-output readiness claim. The graph-independent cache leaf remains unchanged. All tree
-file blobs are hash/size verified before native acceptance; no file is written locally. Preserve regular file metadata in both
-standalone and tree outputs. Existing cache validation helpers must not falsely
-report a directory-bearing result as complete from a files-only inventory.
-The existing detached materialize_outputs must fail before writes on directory
-results; FileWrite behavior stays protected. No new local publication API.
+Resolve duplicate scalar FileWrite actions through the validated closure's existing
+sharing relation: one canonical execution action per physical output/configuration,
+while exact artifact lookup first proves the requested declared owner and output.
+Do not conflate declared owners across configurations or toolchain execution-platform
+preferences; physical sharing occurs only through the closure's admitted relation.
+Index construction must reject ambiguous retained ownership rather than choose one.
 
-## Scope, proof and release boundary
+Iterative DFS (no call-stack recursion) follows retained input order, deduplicates
+shared prerequisites, detects visiting-state cycles including self-reference, and
+returns prerequisite-first indices. Scratch indices/DFS state and result vectors
+are projection-owned and freed on error/drop; actions borrow the retained closure.
+Declared artifact leaves are cloned into projection-owned inputs by the existing
+collector, without copying depset graphs. Use existing compact SmallMap/SmallSet
+utilities (Stage 9 retained-utility disposition); no new interner,
+DICE locks, global state, Rust dependencies or bytes in DICE. Complexity is linear
+in closure output index size plus reachable declared inputs/actions, apart from
+existing compact-map and closure execution-representative lookup costs. No per-edge
+rescan of the full closure.
 
-Allowlist: build_api providers/mod.rs and tests/providers.rs for retained directory
-files; loading subrule_invocation.rs and focused existing action-sink tests;
-analysis starlark_rule.rs and focused declaration tests; REAPI source_spawn.rs/tests,
-command.rs, executor.rs, cas.rs, action_cache.rs, lib.rs, new output_tree.rs/tests,
-source_execution/tests.rs and focused integration tests. Minimal direct-consumer
-struct/API corrections only if the explicit result type requires them. Canonical,
-manifest and Stage 7/6 owner paragraphs. Prefer existing dependencies and fixtures.
-Large analysis/loading files gain only delegation and bounded declaration ownership;
-Tree validation lives in a separate module. No CLI/server activation or scheduler.
+## Scope and evidence
 
-Reuse WP-7-34's source/certificate mutation, cancellation, revision retry and events
-proof; this packet changes output decoding, not the native lifecycle. New tests use
-one tiny authored rule/script and public Core operation: File.is_directory and owner/
-path, repeated declarations/type conflicts, invalid paths/sibling, cold Execute and
-AC replay with nested/empty tree contents and exact bytes/digests; source A/B/A
-restores action identity. Pure decoder negatives cover corrupt/missing Tree or file
-bytes, malformed names, duplicates/order, unresolved directory references, root
-mismatch, symlink/properties, extra/wrong result types and resource limits. No compiler
-action, copied ruleset, broad suite or fresh Bazel run. Reuse pinned source evidence.
-Protect FileWrite wire and regular source execution. All runtime gates expected
-under a few seconds; >~30 seconds requires strict necessity and none are planned.
-Pinned compile preparation separately capped at 60 seconds with no-run JSON, exact
-selector preflight, direct CLI/Core/REAPI/server compile coverage, format/diff and
-plan/archive checks. Receipts target/wp735. Design and final independent review.
+Allowlist: Core runtime/configured_action_closure.rs, new action_prerequisites.rs
+and focused tests, runtime/dice.rs/mod.rs delegation/exports, source_staging.rs
+collector extraction; Analysis key.rs minimal public projection method reusing
+analysis_value::analysis_configured_key and starlark_rule.rs typed input admission. Canonical/current manifest, Stage 6/7
+owner paragraphs and bootstrap-readiness status correction only.
 
-REPLAN if generated-input semantic ownership is needed, tree metadata cannot be
-verified without a cache-leaf semantic dependency, declaration requires a new DICE
-owner, or output handling invokes local publication. Keep M7A partial and M8 unproved.
+Tests: pure diamond/shared producer, File and Directory identity, same path in
+different configurations, missing owner/output and wrong-kind, unsupported
+reachable action, self/two-action cycle, shared FileWrite representative. Public
+BUILD/defs native evaluation proves a multi-action generated chain and same-DICE
+producer/input edit/restoration; original source staging still rejects its Derived
+input. Reuse accepted root-conflict/lifecycle evidence, run focused affected
+conflict and source-staging controls. No transport/Bazel/build action invocation.
+Pinned no-run preparation separately capped at 60s, exact selector preflight;
+Core tests and direct REAPI/CLI compilation; rustfmt/diff/plan/archive checks.
+Tests expected under a few seconds; none requiring >30s are planned. Receipts
+in target/wp736. Independent design and final review before atomic checkpoint.
 
-Predecessor WP-7-34 accepted/pushed e50fcd7cb: request-owned source-only Spawn
-execution with all-input CAS completion verification and post-Execute native
-acceptance. Eight Core gates, policy and two NativeLink gates; longest batch 1.438s.
+REPLAN if resolving ownership requires a new semantic identity, a producer outside
+the validated closure must be synthesized, or this projection is used to authorize
+execution/publication. M7A remains partial and M8 unproved. Future generated-input
+execution must bind verified producer results and whole-tree CAS manifests within
+one native request and revalidate the full source frontier.
 
-Local publication is deferred for a concrete ownership gap: an old held accepted
-result currently has no generation token and cannot safely choose an arbitrary
-output root. Future publication must claim the selected target configuration under
-Core's workspace owner and serialize a one-use accepted-generation check with
-acceptance/final renames. Pinned Bazel OutputPermissions.READONLY is 0555 regardless
-REAPI is_executable; per-file temp+move permits a reported partial multi-file failure,
-never a successful build claim. This packet does not reuse the detached materializer.
+## Acceptance receipt
 
-## Validation receipt
+Baseline 351486c8c; review/wp736-generated-prerequisites. The intervening
+instruction-only commit 8b043b0e8 implements the user's explicit request for more
+parallel agents and is already pushed. Independent design/correction/final review
+ACCEPT covers this planning boundary only. No runtime generated-input admission.
 
-Candidate base e50fcd7cb, branch review/wp735-source-output-trees. Pinned nightly
-2025-09-14; receipts and no-run JSON in target/wp735. Exact selector preflights
-precede ordinary execution; ignored wire selectors each list exactly once and use
-fresh verifying NativeLink storage with supervised backend termination/removal.
-The final wire harness reuses tools/v2_oracle_lib/nativelink.py's configuration.
+Eight exact Core selectors pass: four pure prerequisite/ownership/tool/cycle gates,
+one public native list/depset/generated-chain A/B/A plus tool/executable negatives,
+one protected source-staging gate and two protected conflict/sharing gates. The
+native final selector takes 0.363s; the longest focused group takes 0.854s. Passing
+unchanged selectors are reused from earlier correction runs. No build action,
+backend, network, Bazel oracle or broad suite was run for this packet.
 
-- Four tree decoder/result-shape gates, two protected source Spawn gates and the
-  unsupported output projection pass. Root-duplicate/unknown-field corrections
-  rerun the two affected decoder gates in 0.004s; unchanged passing gates reused.
-- Public directory declaration/package owner/type conflict/restoration and
-  executable rejection: 0.469s. Four retained provider gates: 0.002s.
-- Eight REAPI/cache/materializer integration gates: 0.003s. Existing escaped
-  context/action lifetime gate: 0.494s.
-- NativeLink tree cold/cache/A-B-A/nested/empty/missing-descendant: 1.093s;
-  source execution/incomplete CAS: 0.778s; protected FileWrite: 0.378s.
-- Direct server tests and REAPI integration compile; CLI check covers Core,
-  Loading, Analysis, build_api and REAPI. Final CLI check: 7.733s. Fifteen recorded
-  compile preparations including corrected compiler failures total 117.935s;
-  longest 20.522s. All preparation was separate from test execution.
-- Rustfmt, git diff --check, plan status and archive checks pass. Runtime groups
-  stayed below 1.32s. Total packet wall/review time was not continuously recorded.
+Pinned nightly-2025-09-14 no-run compile and CLI dependency-chain check pass,
+covering Analysis/Core/REAPI/server consumers. Six separate preparations including
+two corrected compiler failures total 71.257s; longest 25.341s, under the 60s
+preparation cap. Exact selection/runtime/compile receipts live in target/wp736
+(focused.receipt, focused-final.receipt, native-final.receipt and no-run JSON).
+Rustfmt, diff, plan and archive checks pass. Packet wall/review time was not
+continuously recorded; parallel test/review work overlapped root implementation.
 
-Corrected failures: fixture canonical-package spelling; both Starlark and retained
-DefaultInfo guards; NativeLink root duplication. Temporary harness omitted
-capabilities and used a noop slow store; the repository configuration restored the
-required incomplete-upload behavior without changing production code or assertions.
-Design correction review ACCEPT covers retained directories, schema-aware scanning
-and identical root duplication. Independent final review ACCEPT confirms only the
-operation-owned manifest boundary; M7A remains partial and M8 remains unproved.
+Corrected failures: test contexts must be unique per execution group; typed Spawn
+ordinary inputs needed the reviewed directory admission; SmallMap indexing and a
+test snapshot type annotation required compiler corrections. Negative Analysis
+checks use the existing observed preparation API: the general build wrapper
+surfaced a dirty activation-closure error instead of the semantic rejection after
+the mutation sequence. That wrapper's error-reporting lifecycle is not repaired or
+claimed here. Observed preparation rejects directory tools/executables exactly,
+and all Derived inputs remain rejected by source staging.

@@ -8,6 +8,10 @@
  * above-listed licenses.
  */
 
+mod action_prerequisites;
+pub use action_prerequisites::ActionPrerequisitePlan;
+pub use action_prerequisites::PlannedAction;
+pub use action_prerequisites::PlannedActionInput;
 mod configured_action_closure;
 mod configured_output;
 mod demands;

@@ -122,6 +122,19 @@ fn error(value: impl fmt::Display) -> Arc<str> {
 }
 
 fn declared_sources(spawn: &SpawnSpec) -> Result<SmallSet<AnalysisArtifact>, Arc<str>> {
+    let sources = declared_artifacts(spawn)?;
+    if sources
+        .iter()
+        .any(|artifact| !matches!(artifact, AnalysisArtifact::Source(_)))
+    {
+        return Err(error("generated file/tree source staging is not admitted"));
+    }
+    Ok(sources)
+}
+
+pub(in crate::runtime) fn declared_artifacts(
+    spawn: &SpawnSpec,
+) -> Result<SmallSet<AnalysisArtifact>, Arc<str>> {
     if spawn.unused_inputs_list().is_some() {
         return Err(error(
             "unused-input pruning is not admitted for source staging",
@@ -178,12 +191,6 @@ fn declared_sources(spawn: &SpawnSpec) -> Result<SmallSet<AnalysisArtifact>, Arc
                 "source staging requires an artifact-backed executable",
             ));
         }
-    }
-    if sources
-        .iter()
-        .any(|artifact| !matches!(artifact, AnalysisArtifact::Source(_)))
-    {
-        return Err(error("generated file/tree source staging is not admitted"));
     }
     Ok(sources)
 }

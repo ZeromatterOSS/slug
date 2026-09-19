@@ -164,6 +164,17 @@ local inventory cannot prove a tree cache hit. The detached materializer rejects
 directory-bearing results before writes. Local publication still requires a Core
 generation/configuration-root claim; generated/tree inputs and scheduling stay open.
 
+WP-7-36 adds a borrowed BuildCommandEvaluation action_prerequisites projection over
+the validated closure. It resolves declared generated File/Directory inputs by full
+artifact owner/path/kind before following admitted scalar FileWrite sharing. An
+iterative traversal emits each reachable FileWrite/typed Spawn once, before its
+consumers, with input-to-producer indices; source leaves remain unobserved. Missing,
+ambiguous, cyclic and unsupported prerequisites reject the entire plan. Scratch
+maps and artifact leaves are projection-owned, configured actions stay borrowed,
+and all semantic inputs remain in the existing DICE-owned closure. A held plan
+conveys no execution authority; generated CAS/result binding and scheduling remain
+open, and source staging still rejects every Derived input before observing bytes.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

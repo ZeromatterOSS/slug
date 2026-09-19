@@ -241,6 +241,11 @@ pub struct ConfiguredTargetKey {
 }
 
 impl ConfiguredTargetKey {
+    /// The exact owner identity retained by generated analysis artifacts.
+    pub fn artifact_owner(&self) -> slug_build_api_v2::AnalysisConfiguredTargetKey {
+        crate::analysis_value::analysis_configured_key(self)
+    }
+
     pub fn new(label: CanonicalLabel, configuration: ConfigurationKey) -> Self {
         Self {
             label,

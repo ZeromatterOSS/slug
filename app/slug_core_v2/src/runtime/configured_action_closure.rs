@@ -218,7 +218,7 @@ fn validate_prefix_outputs(rows: &[OutputRow<'_>]) -> Result<(), ConfiguredActio
     Ok(())
 }
 
-fn scalar_file_write(action: &ConfiguredAction) -> bool {
+pub(super) fn scalar_file_write(action: &ConfiguredAction) -> bool {
     matches!(action.kind(), ActionKind::Write { .. })
         && matches!(action.outputs(), [output] if output.kind() == ActionOutputKind::File)
         && action.argv().is_empty()

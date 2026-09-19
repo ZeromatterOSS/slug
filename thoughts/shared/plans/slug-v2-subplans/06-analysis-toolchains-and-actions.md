@@ -20,6 +20,13 @@ Pinned Bazel 9.2 StarlarkActionFactory.declareDirectory and DefaultInfo own the
 admitted declaration/provider semantics; configured output path identity stays
 Slug-native. REAPI's verified output-tree manifest is operation-owned (Stage 7).
 
+WP-7-36 admits these whole-tree artifacts in typed Spawn ordinary input lists and
+top-level depsets. The retained ArtifactInputs keep exact owner/path/kind and
+depset representation; tree Args expansion and directory executable/tool admission
+remain unsupported. ConfiguredTargetKey.artifact_owner exposes the existing
+Analysis producer projection, including full configuration and toolchain execution-
+platform preference, for Core prerequisite lookup. No new artifact identity.
+
 Registration-error identity is implemented and accepted at `a06f3ddfc`; source
 observation presentation is accepted at `ac6140f41`. Preserve the shared typed
 Loading-owned error DAG, structural equality and bounded borrowed Display/Debug.

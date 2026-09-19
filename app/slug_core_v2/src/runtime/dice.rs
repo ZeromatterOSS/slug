@@ -2981,7 +2981,7 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
 }
 
 #[path = "source_staging.rs"]
-mod source_staging;
+pub(super) mod source_staging;
 pub use source_staging::PreparedSourceActionInputs;
 #[path = "source_execution.rs"]
 mod source_execution;
@@ -3333,6 +3333,16 @@ impl SingletonRootSingleBuildCommandKey {
 }
 
 impl BuildCommandEvaluation {
+    /// Plan declared prerequisites from this validated closure only. This view
+    /// neither observes input bytes nor authorizes execution or publication.
+    pub fn action_prerequisites(
+        &self,
+        owner: &ConfiguredTargetKey,
+        action: usize,
+    ) -> Result<super::ActionPrerequisitePlan<'_>, Arc<str>> {
+        super::ActionPrerequisitePlan::new(&self.action_closure, owner, action)
+    }
+
     pub fn loaded_package_count(&self) -> usize {
         self.targets.len()
     }

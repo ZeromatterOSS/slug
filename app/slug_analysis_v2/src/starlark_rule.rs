@@ -1371,8 +1371,9 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             };
         let mut lowerer = AnalysisValueLowerer::default();
         let (command_line, _) = retained_command_line(request.arguments, &mut lowerer)?;
-        let inputs = retained_artifact_inputs(request.inputs, false, "inputs", &mut lowerer)?;
-        let tools = retained_artifact_inputs(request.tools, true, "tools", &mut lowerer)?;
+        let inputs =
+            retained_artifact_inputs(request.inputs, false, false, "inputs", &mut lowerer)?;
+        let tools = retained_artifact_inputs(request.tools, true, false, "tools", &mut lowerer)?;
         let action_environment = configured_environment.for_action(
             request.use_default_shell_env,
             string_dict(request.env, "ctx.actions.run env")?,
@@ -1412,7 +1413,7 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             path_flavor,
             has_arguments,
         )?;
-        let inputs = retained_artifact_inputs(request.inputs, false, "inputs", &mut lowerer)?;
+        let inputs = retained_artifact_inputs(request.inputs, false, true, "inputs", &mut lowerer)?;
         let outputs = self.outputs(request.outputs, operation)?;
         let unused_inputs_list = optional_regular_file(
             request.unused_inputs_list,
@@ -1735,6 +1736,7 @@ fn vector_scalar_value(value: Value<'_>) -> anyhow::Result<slug_build_api_v2::Re
 fn retained_artifact_inputs<'v>(
     value: Option<Value<'v>>,
     allow_nested_depsets: bool,
+    allow_directories: bool,
     name: &str,
     lowerer: &mut AnalysisValueLowerer<'v>,
 ) -> anyhow::Result<ArtifactInputs> {
@@ -1751,7 +1753,7 @@ fn retained_artifact_inputs<'v>(
         AnalysisValueKind::Depset(depset) => {
             let retained = RetainedArtifactInputs::new(depset.clone())
                 .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-            validate_regular_inputs(&retained, name)?;
+            validate_input_artifacts(&retained, name, allow_directories)?;
             return Ok(ArtifactInputs::new(vec![ArtifactInputSource::Depset(
                 retained,
             )]));
@@ -1763,13 +1765,17 @@ fn retained_artifact_inputs<'v>(
         .iter()
         .map(|value| match value.kind() {
             AnalysisValueKind::Artifact(artifact) => {
-                reject_directory_artifact(artifact, &format!("ctx.actions.run {name}"))?;
+                validate_input_artifact(
+                    artifact,
+                    &format!("ctx.actions.run {name}"),
+                    allow_directories,
+                )?;
                 Ok(ArtifactInputSource::Direct(artifact.clone()))
             }
             AnalysisValueKind::Depset(depset) if allow_nested_depsets => {
                 let retained = RetainedArtifactInputs::new(depset.clone())
                     .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-                validate_regular_inputs(&retained, name)?;
+                validate_input_artifacts(&retained, name, allow_directories)?;
                 Ok(ArtifactInputSource::Depset(retained))
             }
             _ => Err(anyhow::anyhow!(
@@ -1785,23 +1791,37 @@ fn retained_artifact_inputs<'v>(
     Ok(ArtifactInputs::new(sources))
 }
 
-fn reject_directory_artifact(artifact: &AnalysisArtifact, name: &str) -> anyhow::Result<()> {
-    if matches!(
-        artifact,
-        AnalysisArtifact::Derived { output, .. } if output.kind() == ActionOutputKind::Directory
-    ) {
+fn validate_input_artifact(
+    artifact: &AnalysisArtifact,
+    name: &str,
+    allow_directories: bool,
+) -> anyhow::Result<()> {
+    if !allow_directories
+        && matches!(
+            artifact,
+            AnalysisArtifact::Derived { output, .. } if output.kind() == ActionOutputKind::Directory
+        )
+    {
         anyhow::bail!("{name} must contain only regular Files")
     }
     Ok(())
 }
 
-fn validate_regular_inputs(inputs: &RetainedArtifactInputs, name: &str) -> anyhow::Result<()> {
+fn validate_input_artifacts(
+    inputs: &RetainedArtifactInputs,
+    name: &str,
+    allow_directories: bool,
+) -> anyhow::Result<()> {
     let mut error = None;
     inputs
         .visit(|artifact| {
             if error.is_none() {
-                error =
-                    reject_directory_artifact(artifact, &format!("ctx.actions.run {name}")).err();
+                error = validate_input_artifact(
+                    artifact,
+                    &format!("ctx.actions.run {name}"),
+                    allow_directories,
+                )
+                .err();
             }
         })
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;

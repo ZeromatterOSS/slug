@@ -29,14 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-35-m7a-source-output-trees-r1
+Packet: WP-7-36-m7a-generated-action-prerequisites-r1
 Status: accepted
 
-Public directory declarations and verified regular-file output trees now pass through
-the accepted source Spawn operation. Independent final review ACCEPT; tiny NativeLink
-cold/cache/A-B-A/missing-descendant gate passes in 1.093s. WP-7-34 is pushed at
-e50fcd7cb. Generated/tree inputs, publication ownership, scheduling and CLI activation
-remain open; M7A partial and M8 unproved. Select the next bounded bootstrap prerequisite.
+Generated File/Directory inputs resolve to owner-preserving action prerequisites
+inside the validated configured closure. Independent final review ACCEPT; eight
+focused gates pass, with the final native chain/restoration/negative selector at
+0.363s. WP-7-35 is accepted/pushed at 351486c8c. Generated-input binding, execution
+scheduling, local publication and CLI activation remain open. Select the generated
+producer-result binding prerequisite next; M7A partial and M8 unproved.
 
 ### Earlier generated-input receipt
 
