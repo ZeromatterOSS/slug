@@ -15,6 +15,7 @@ use std::sync::Arc;
 use compact_str::CompactString;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
+use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::ProviderIdentity;
 use slug_configuration_v2::HostPathFlavor;
 use slug_identity_v2::CanonicalLabel;
@@ -250,10 +251,8 @@ pub(crate) fn validate_configured_dependency(
         return Ok(ConfiguredDependencyDisposition::Filtered);
     }
 
-    let file = matches!(
-        result.kind(),
-        ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
-    );
+    let file = source_file_label(result).is_some()
+        || matches!(result.kind(), ConfiguredNodeKind::GeneratedFile);
     if prerequisite_rule_class.is_some() {
         let providers_match = !validation.required_providers.is_empty()
             && validation.required_providers.iter().any(|alternative| {
@@ -348,6 +347,23 @@ fn rule_or_provider_error(
     ))
 }
 
+fn source_file_label(result: &ConfiguredNodeResult) -> Option<&CanonicalLabel> {
+    let ConfiguredNodeKey::Null(actual) = result.actual_target() else {
+        return None;
+    };
+    let value = result
+        .providers()
+        .default_info()?
+        .files()
+        .singleton_value()?;
+    match value.kind() {
+        AnalysisValueKind::Artifact(AnalysisArtifact::Source(label)) if label == actual => {
+            Some(label)
+        }
+        _ => None,
+    }
+}
+
 fn validate_file_admissibility(
     dependency: &DeclaredDependencyKey,
     result: &ConfiguredNodeResult,
@@ -355,15 +371,13 @@ fn validate_file_admissibility(
     direct_file: bool,
 ) -> Result<(), AnalysisError> {
     let policy = &validation.file_admissibility;
-    if validation.skip_analysis_time_filetype_check
-        && !matches!(result.kind(), ConfiguredNodeKind::SourceFile)
-    {
+    let source_label = source_file_label(result);
+    if validation.skip_analysis_time_filetype_check && source_label.is_none() {
         return Ok(());
     }
     if direct_file {
-        let filename = result
-            .key()
-            .label()
+        let label = source_label.unwrap_or_else(|| result.key().label());
+        let filename = label
             .target()
             .as_str()
             .rsplit('/')
@@ -374,8 +388,7 @@ fn validate_file_admissibility(
         }
         return Err(AnalysisError::message(format!(
             "configured dependency `{}` source file {} does not match its admitted file types",
-            dependency.attribute,
-            result.key().label()
+            dependency.attribute, label
         )));
     }
     if policy.is_no_files() || (policy.is_any_file() && !policy.single_artifact()) {

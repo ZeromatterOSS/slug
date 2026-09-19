@@ -28,12 +28,12 @@ const DEFS: &str = r#"def _impl(ctx):
     done = ctx.actions.declare_file('done')
     result_tree = ctx.actions.declare_directory('result_tree')
     ctx.actions.write(seed, 'seed')
-    ctx.actions.run(executable=ctx.attr.tool, inputs=[seed, ctx.attr.input], outputs=[file, tree, empty], arguments=['produce'])
+    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[seed, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[file, tree, empty], arguments=['produce'])
     args = ctx.actions.args()
     args.add('consume')
     args.use_param_file('@%s', use_always = True)
     args.set_param_file_format('multiline')
-    ctx.actions.run(executable=ctx.attr.tool, inputs=[file, tree, empty, ctx.attr.input], outputs=[done, result_tree], arguments=[args])
+    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[file, tree, empty, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[done, result_tree], arguments=[args])
     return [DefaultInfo(files=depset([done]))]
 stage = rule(implementation=_impl, attrs={'input':attr.label(allow_single_file=True), 'tool':attr.label(allow_single_file=True)})
 "#;

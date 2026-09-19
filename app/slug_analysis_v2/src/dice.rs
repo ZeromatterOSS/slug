@@ -29,6 +29,7 @@ use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::ConfiguredTargetValue;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::FilesToRunProvider;
+use slug_build_api_v2::OutputGroupInfo;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderValue;
 use slug_configuration_v2::HostPathFlavor;
@@ -2057,8 +2058,7 @@ fn native_configured_result(
     )
 }
 
-fn configured_dependency_file_path(result: &ConfiguredNodeResult) -> String {
-    let label = result.key().label();
+fn configured_file_path(label: &CanonicalLabel) -> String {
     let package = label.package().package().as_str();
     if package.is_empty() {
         label.target().as_str().to_owned()
@@ -2067,31 +2067,36 @@ fn configured_dependency_file_path(result: &ConfiguredNodeResult) -> String {
     }
 }
 
-fn materialized_target_providers(
-    result: &ConfiguredNodeResult,
-) -> Result<ProviderCollection, AnalysisError> {
-    if !matches!(
-        result.kind(),
-        ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
-    ) {
-        return Ok(result.providers().clone());
+fn file_target_providers(
+    artifact: AnalysisArtifact,
+    generator: Option<&ConfiguredNodeResult>,
+) -> ProviderCollection {
+    let mut providers = vec![ProviderValue::DefaultInfo(DefaultInfo::from_file_target(
+        artifact,
+    ))];
+    if let Some(validation) = generator
+        .and_then(|generator| generator.providers().output_group_info())
+        .and_then(|groups| groups.groups().get("_validation"))
+        .filter(|validation| !validation.is_empty())
+    {
+        providers.push(ProviderValue::OutputGroupInfo(
+            OutputGroupInfo::new([("_validation", validation.clone())])
+                .expect("generator validation group already contains only artifacts"),
+        ));
     }
-    let artifact = configured_dependency_artifact(result, None)?;
-    ProviderCollection::new(vec![ProviderValue::DefaultInfo(
-        DefaultInfo::from_file_target(artifact),
-    )])
-    .map_err(|error| AnalysisError::message(error.to_string()))
+    ProviderCollection::new(providers)
+        .expect("file target has one DefaultInfo and optional output groups")
 }
 
 fn configured_target_analysis_value(
     result: &ConfiguredNodeResult,
 ) -> Result<AnalysisValue, AnalysisError> {
     let identity = result.actual_configured_target().map_or_else(
-        || AnalysisTargetIdentity::null(result.key().label().clone()),
+        || AnalysisTargetIdentity::null(result.actual_target().label().clone()),
         |key| AnalysisTargetIdentity::from(crate::analysis_value::analysis_configured_key(key)),
     );
     Ok(AnalysisValue::configured_target(
-        ConfiguredTargetValue::new(identity, materialized_target_providers(result)?),
+        ConfiguredTargetValue::new(identity, result.providers().clone()),
     ))
 }
 
@@ -2102,68 +2107,9 @@ fn derived_artifact(owner: &ConfiguredTargetKey, path: impl Into<String>) -> Ana
     }
 }
 
-fn configured_dependency_artifact(
-    result: &ConfiguredNodeResult,
-    explicit_path: Option<&str>,
-) -> Result<AnalysisArtifact, AnalysisError> {
-    match result.kind() {
-        ConfiguredNodeKind::SourceFile => {
-            Ok(AnalysisArtifact::Source(result.key().label().clone()))
-        }
-        ConfiguredNodeKind::GeneratedFile => {
-            let mut producers = result
-                .edges()
-                .iter()
-                .filter(|edge| {
-                    matches!(
-                        edge.kind(),
-                        crate::configured_target::ConfiguredEdgeKind::GeneratedBy
-                    )
-                })
-                .filter_map(|edge| edge.configured_target());
-            let producer = producers.next().ok_or_else(|| {
-                AnalysisError::message(format!(
-                    "generated configured dependency {} has no generating target",
-                    result.key().label()
-                ))
-            })?;
-            if producers.next().is_some() {
-                return Err(AnalysisError::message(format!(
-                    "generated configured dependency {} has ambiguous generating targets",
-                    result.key().label()
-                )));
-            }
-            let path = configured_dependency_file_path(result);
-            Ok(derived_artifact(producer, path))
-        }
-        _ => {
-            let owner = result.actual_configured_target().ok_or_else(|| {
-                AnalysisError::message(format!(
-                    "configured dependency {} has no configured target identity",
-                    result.key().label()
-                ))
-            })?;
-            let path = explicit_path.ok_or_else(|| {
-                AnalysisError::message(format!(
-                    "configured dependency {} did not retain a file path",
-                    result.key().label()
-                ))
-            })?;
-            Ok(derived_artifact(owner, path))
-        }
-    }
-}
-
 fn configured_executable_provider(
     result: &ConfiguredNodeResult,
 ) -> Result<FilesToRunProvider, AnalysisError> {
-    if matches!(
-        result.kind(),
-        ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
-    ) {
-        return configured_dependency_artifact(result, None)
-            .map(FilesToRunProvider::single_executable_without_support);
-    }
     let provider = result
         .providers()
         .default_info()
@@ -2193,26 +2139,18 @@ fn configured_attribute_item(
         ));
     }
     if row.allow_single_file() {
-        let artifact = if matches!(
-            result.kind(),
-            ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
-        ) {
-            configured_dependency_artifact(result, None)?
-        } else {
-            let artifacts = result
-                .providers()
-                .default_info()
-                .map(DefaultInfo::file_artifacts)
-                .unwrap_or_default();
-            let [artifact] = artifacts.as_slice() else {
-                return Err(AnalysisError::message(format!(
-                    "configured dependency {} did not retain exactly one File",
-                    result.key().label()
-                )));
-            };
-            artifact.clone()
+        let artifacts = result
+            .providers()
+            .default_info()
+            .map(DefaultInfo::file_artifacts)
+            .unwrap_or_default();
+        let [artifact] = artifacts.as_slice() else {
+            return Err(AnalysisError::message(format!(
+                "configured dependency {} did not retain exactly one File",
+                result.key().label()
+            )));
         };
-        return Ok(AnalysisValue::artifact(artifact));
+        return Ok(AnalysisValue::artifact(artifact.clone()));
     }
     configured_target_analysis_value(result)
 }
@@ -2385,15 +2323,9 @@ where
                     .transpose()?
             };
             dependencies.push(PreparedDependency {
-                key: result
-                    .result()
-                    .actual_configured_target()
-                    .cloned()
-                    .map(ConfiguredNodeKey::configured)
-                    .unwrap_or_else(|| result.result().key().clone()),
+                key: result.result().actual_target().clone(),
                 providers: result.result().providers().clone(),
                 attribute: dependency.attribute.clone(),
-                target_shape: dependency.configured_row.is_some(),
                 filtered,
                 executable,
             });
@@ -2745,19 +2677,11 @@ async fn compute_actual_child(
     workspace: NormalizedAbsolutePath,
     requested: Arc<ConfiguredNodeResult>,
 ) -> RootAnalysisDriverValue {
-    let actual = requested
-        .actual_configured_target()
-        .expect("configured child publishes actual identity");
-    if requested.configured_target_key() == Some(actual) {
+    let actual = requested.actual_target();
+    if requested.key() == actual {
         return LoadingPreparationOutcome::Complete(Ok(Arc::new(Ok(requested))));
     }
-    compute_configured_node_child(
-        ctx,
-        mode,
-        workspace,
-        ConfiguredNodeKey::configured(actual.clone()),
-    )
-    .await
+    compute_configured_node_child(ctx, mode, workspace, actual.clone()).await
 }
 
 async fn observed_configured_result(
@@ -5290,7 +5214,7 @@ impl ConfiguredNodeAnalysisKey {
                             package,
                             self.node.clone(),
                             ConfiguredNodeKind::SourceFile,
-                            native_empty_providers(),
+                            file_target_providers(AnalysisArtifact::Source(label.clone()), None),
                             None,
                             Vec::new(),
                             &[],
@@ -5950,14 +5874,7 @@ impl ConfiguredNodeAnalysisKey {
                         std::slice::from_ref(&child),
                         &selector_rows,
                     )
-                    .map(|result| {
-                        result.with_actual_configured_target(
-                            child
-                                .actual_configured_target()
-                                .expect("configured alias child publishes actual identity")
-                                .clone(),
-                        )
-                    }),
+                    .map(|result| result.with_actual_target(child.actual_target().clone())),
                 );
             }
             (
@@ -5980,6 +5897,15 @@ impl ConfiguredNodeAnalysisKey {
                     )
                     .await
                 );
+                let Some(owner) = child.actual_configured_target() else {
+                    return root_analysis_driver_complete(Err(AnalysisError::message(
+                        "generated file has no resolved configured generating rule",
+                    )));
+                };
+                let providers = file_target_providers(
+                    derived_artifact(owner, configured_file_path(label)),
+                    Some(&child),
+                );
                 let edges = vec![crate::configured_target::ConfiguredEdge::new(
                     child.key().clone(),
                     crate::configured_target::ConfiguredEdgeKind::GeneratedBy,
@@ -5988,7 +5914,7 @@ impl ConfiguredNodeAnalysisKey {
                     package,
                     self.node.clone(),
                     ConfiguredNodeKind::GeneratedFile,
-                    native_empty_providers(),
+                    providers,
                     None,
                     edges,
                     &[child],

@@ -403,7 +403,6 @@ pub(crate) struct PreparedDependency {
     pub(crate) key: ConfiguredNodeKey,
     pub(crate) providers: ProviderCollection,
     pub(crate) attribute: CompactString,
-    pub(crate) target_shape: bool,
     pub(crate) filtered: bool,
     pub(crate) executable: Option<slug_build_api_v2::FilesToRunProvider>,
 }
@@ -2108,6 +2107,13 @@ pub(crate) fn evaluate_loaded_rule(
     let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
         return Err(format!("target `{target_name}` is not a Starlark rule").into());
     };
+    let validation_groups = crate::output_groups::collect_validation_groups(
+        implementation.schema(),
+        &dependencies,
+        implementation
+            .late_bound_rule_attributes()
+            .map(|(name, _)| name),
+    )?;
     let reserves_executable = rule_capability.as_ref().is_some_and(|cap| cap.executable);
     if let Some(output) = implementation.predeclared_outputs.iter().find(|output| {
         (reserves_executable && output.key == "executable")
@@ -2269,15 +2275,10 @@ pub(crate) fn evaluate_loaded_rule(
             .map(|dependency| {
                 let target = if dependency.filtered {
                     None
-                } else if dependency.target_shape {
-                    Some(
-                        materializer
-                            .configured_dependency_target(&dependency.key, dependency.providers)?,
-                    )
                 } else {
                     Some(
                         materializer
-                            .configured_dependency(&dependency.key, dependency.providers)?,
+                            .configured_dependency_target(&dependency.key, dependency.providers)?,
                     )
                 };
                 Ok(AnalysisDependency {
@@ -2464,6 +2465,8 @@ pub(crate) fn evaluate_loaded_rule(
         &runfiles_packages,
         support_configuration,
     )?;
+    let providers =
+        crate::output_groups::complete_rule_output_groups(providers, validation_groups)?;
     let declared_outputs = providers
         .default_info()
         .expect("ProviderCollection validated DefaultInfo")

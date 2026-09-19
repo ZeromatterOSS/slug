@@ -64,8 +64,11 @@ def _forward(ctx):
     _check(groups, dependency[Payload].shared)
     nested = dependency[Payload]
     _check(nested.groups, nested.shared)
-    if groups != nested.groups or {groups: "ok"}[nested.groups] != "ok":
-        fail("nested group retained a different builtin identity")
+    effective_nested = Groups(_hidden_top_level_INTERNAL_ = [], **{name: depset(transitive = [nested.groups[name]]) for name in nested.groups})
+    if groups != effective_nested or {groups: "ok"}[effective_nested] != "ok":
+        fail("configured group completion changed nested builtin identity")
+    if nested.groups.empty != depset(order = "preorder") or groups.empty != depset():
+        fail("configured completion rewrote the separately nested provider")
     if OutputGroupInfo in dependency and dependency[OutputGroupInfo].value != "user":
         fail("user provider was confused with builtin OutputGroupInfo")
     return [groups, Payload(groups = nested.groups, shared = nested.shared)]

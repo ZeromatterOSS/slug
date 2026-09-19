@@ -29,15 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-39-m7a-artifact-owned-output-groups-r1
+Packet: WP-7-40-m7a-effective-configured-outputs-r1
 Status: accepted
 
-WP739 accepts artifact-owned OutputGroupInfo construction and configured provider
-round trips, preserving owners, depset topology and cross-provider sharing. Nineteen
-focused gates and Core/CLI checks pass with independent final ACCEPT. WP738 selected
-output publication remains accepted at 0ec1eb5e7. Next requested-build selection must
-account for implicit validation/runfiles groups and source/alias/generated targets
-before scheduling and CLI activation. M7A remains partial and M8 unproved.
+WP740 accepts effective configured output metadata: hidden runfiles and eligible
+validation groups, authoritative source/generated providers, and actual source/alias
+Target identity. Thirty-six checks pass with final ACCEPT. WP739 remains accepted at
+2a7ea14ab. Next is ordinary requested-group selection from these owners and shared
+prerequisite scheduling; runfiles-family execution and CLI activation remain open.
+M7A remains partial and M8 unproved.
 
 ### Earlier generated-input receipt
 

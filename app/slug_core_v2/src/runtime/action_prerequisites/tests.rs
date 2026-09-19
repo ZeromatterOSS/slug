@@ -397,8 +397,8 @@ fn native_generated_prerequisites_restore_and_source_staging_stays_closed() {
     file = ctx.actions.declare_file('file')
     done = ctx.actions.declare_file('done')
     ctx.actions.write(seed, 'A')
-    ctx.actions.run(executable=ctx.attr.tool, inputs=[seed, ctx.attr.input], outputs=[tree, file])
-    ctx.actions.run(executable=ctx.attr.tool, inputs=[tree, file], outputs=[done])
+    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[seed, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[tree, file])
+    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[tree, file], outputs=[done])
     return [DefaultInfo(files=depset([done]))]
 stage = rule(implementation=_impl, attrs={'input':attr.label(allow_single_file=True), 'tool':attr.label(allow_single_file=True)})
 "#;
@@ -497,13 +497,16 @@ stage = rule(implementation=_impl, attrs={'input':attr.label(allow_single_file=T
             "ctx.actions.run executable must contain only regular Files",
         ),
         (
-            "executable=ctx.attr.tool, tools=[tree], inputs=[tree, file]",
+            "executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], tools=[tree], inputs=[tree, file]",
             "ctx.actions.run tools must contain only regular Files",
         ),
     ] {
         std::fs::write(
             root.path().join("defs.bzl"),
-            defs.replace("executable=ctx.attr.tool, inputs=[tree, file]", replacement),
+            defs.replace(
+                "executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[tree, file]",
+                replacement,
+            ),
         )
         .unwrap();
         let error = runtime

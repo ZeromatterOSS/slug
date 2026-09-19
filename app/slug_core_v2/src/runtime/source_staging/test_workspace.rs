@@ -57,7 +57,7 @@ pub const DEFS: &str = r#"def _impl(ctx):
     args.add('parameter')
     args.use_param_file('@%s', use_always = True)
     args.set_param_file_format('multiline')
-    ctx.actions.run(executable = ctx.attr.tool, inputs = depset([ctx.attr.input, ctx.attr.tool]), tools = [ctx.attr.tool], outputs = [out], arguments = [args])
+    ctx.actions.run(executable = ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs = depset([ctx.attr.input[DefaultInfo].files.to_list()[0], ctx.attr.tool[DefaultInfo].files.to_list()[0]]), tools = [ctx.attr.tool[DefaultInfo].files.to_list()[0]], outputs = [out], arguments = [args])
     return [DefaultInfo(files = depset([out]))]
 stage = rule(implementation = _impl, attrs = {'input': attr.label(allow_single_file = True), 'tool': attr.label(allow_single_file = True)})
 "#;

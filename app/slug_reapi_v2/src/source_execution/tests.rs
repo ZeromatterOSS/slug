@@ -321,7 +321,7 @@ impl SourceActionTransport for IncompleteCas {
 }
 
 fn tree_defs() -> String {
-    fixture::DEFS.replace("out = ctx.actions.declare_file('shared.out')", "out = ctx.actions.declare_directory('tree', sibling=None)\n    repeated = ctx.actions.declare_directory(filename='tree')\n    if not out.is_directory or out.is_source or out != repeated or ctx.attr.input.is_directory:\n        fail('directory artifact metadata')\n    plain = ctx.actions.declare_file('a.out')")
+    fixture::DEFS.replace("out = ctx.actions.declare_file('shared.out')", "out = ctx.actions.declare_directory('tree', sibling=None)\n    repeated = ctx.actions.declare_directory(filename='tree')\n    if not out.is_directory or out.is_source or out != repeated or ctx.attr.input[DefaultInfo].files.to_list()[0].is_directory:\n        fail('directory artifact metadata')\n    plain = ctx.actions.declare_file('a.out')")
         .replace("outputs = [out]", "outputs = [out, plain]")
 }
 
@@ -344,7 +344,7 @@ fn native_directory_declarations_and_command_paths_follow_retained_kinds() {
         (defs.replace("out = ctx.actions.declare_directory", "reserved = ctx.actions.declare_file('tree')\n    out = ctx.actions.declare_directory"), "different type"),
         (defs.replace("stage = rule(implementation = _impl, attrs", "stage = rule(implementation = _impl, outputs={'reserved':'tree'}, attrs"), "different type"),
         (defs.replace("'tree', sibling=None", "'../tree', sibling=None"), "invalid action output"),
-        (defs.replace("'tree', sibling=None", "'tree', sibling=ctx.attr.input"), "sibling is not admitted"),
+        (defs.replace("'tree', sibling=None", "'tree', sibling=ctx.attr.input[DefaultInfo].files.to_list()[0]"), "sibling is not admitted"),
         (defs.replace("DefaultInfo(files = depset([out]))", "DefaultInfo(files = depset([out]), executable = out)"), "executable must be a declared file"),
     ] {
         std::fs::write(workspace.root.join("pkg/defs.bzl"), changed).unwrap();

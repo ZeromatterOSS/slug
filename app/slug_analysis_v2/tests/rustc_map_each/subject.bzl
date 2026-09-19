@@ -10,7 +10,7 @@ def _no_coverage():
     return False
 
 def _dependency_crates(ctx):
-    files = ctx.attr.dependency_files
+    files = [target[DefaultInfo].files.to_list()[0] for target in ctx.attr.dependency_files]
     if not files:
         return depset(), depset()
     a = CrateInfo(name = "a", output = files[0], metadata = files[1], metadata_supports_pipelining = True)
@@ -25,14 +25,14 @@ def _native_library(static = None, pic = None, dynamic = None, interface = None,
     return struct(static_library = static, pic_static_library = pic, dynamic_library = dynamic, interface_library = interface, alwayslink = alwayslink)
 
 def _cc_native_inputs(ctx):
-    files = ctx.attr.native_files
+    files = [target[DefaultInfo].files.to_list()[0] for target in ctx.attr.native_files]
     static = cc_common.create_library_to_link(actions = ctx.actions, static_library = files[0], pic_static_library = files[1])
     always = cc_common.create_library_to_link(actions = ctx.actions, static_library = files[2], alwayslink = True)
     first = cc_common.create_linker_input(
         owner = ctx.label,
         libraries = depset([static, always]),
         user_link_flags = [[ctx.attr.native_user_flag], "-pthread"],
-        additional_inputs = depset([ctx.attr.native_unused_input] if ctx.attr.native_unused_input else []),
+        additional_inputs = depset([ctx.attr.native_unused_input[DefaultInfo].files.to_list()[0]] if ctx.attr.native_unused_input else []),
     )
     second = cc_common.create_linker_input(owner = ctx.label, libraries = depset([static]))
     linking = cc_common.create_linking_context(linker_inputs = depset([second], transitive = [depset([first])]))
@@ -42,7 +42,7 @@ def _cc_native_inputs(ctx):
 def _native_inputs(ctx):
     if ctx.attr.real_cc:
         return _cc_native_inputs(ctx)
-    files = ctx.attr.native_files
+    files = [target[DefaultInfo].files.to_list()[0] for target in ctx.attr.native_files]
     if not files:
         return depset(), {}, None
     static = _native_library(static = files[0], pic = files[1])
@@ -60,11 +60,12 @@ def _native_inputs(ctx):
 
 def _impl(ctx):
     output = ctx.actions.declare_file("out/probe.rlib")
-    if not ctx.attr.src.is_source or output.is_source:
+    source = ctx.attr.src[DefaultInfo].files.to_list()[0]
+    if not source.is_source or output.is_source:
         fail("File.is_source must distinguish source and generated artifacts")
-    if "is_source" not in dir(ctx.attr.src) or "is_source" not in dir(output):
+    if "is_source" not in dir(source) or "is_source" not in dir(output):
         fail("File.is_source must be discoverable")
-    source_paths = [ctx.attr.src.path, ctx.attr.src.short_path, ctx.attr.src.dirname, ctx.attr.src.label.workspace_root]
+    source_paths = [source.path, source.short_path, source.dirname, source.label.workspace_root]
     if source_paths != ctx.attr.expected_source_paths:
         fail("source File paths: expected {}, got {}".format(ctx.attr.expected_source_paths, source_paths))
     if ctx.label.workspace_root != "external/rules_rust+":
@@ -75,11 +76,15 @@ def _impl(ctx):
         fail("Label.workspace_root must ignore package and target components")
     if output.dirname != "out":
         fail("File.dirname must distinguish the execution root and nested directories")
-    root = ctx.attr.src
+    root = source
     if ctx.attr.generated:
         root = ctx.actions.declare_file("generated/input.rs")
         ctx.actions.write(root, "pub fn generated() {}\n")
-    stdlib = depset(ctx.attr.stdlib[1:], transitive = [depset(ctx.attr.stdlib[:1])])
+    stdlib_files = [target[DefaultInfo].files.to_list()[0] for target in ctx.attr.stdlib]
+    stdlib = depset(stdlib_files[1:], transitive = [depset(stdlib_files[:1])])
+    dependency_files = [target[DefaultInfo].files.to_list()[0] for target in ctx.attr.dependency_files]
+    native_files = [target[DefaultInfo].files.to_list()[0] for target in ctx.attr.native_files]
+    sysroot = ctx.attr.sysroot[DefaultInfo].files.to_list()[0] if ctx.attr.sysroot else None
     direct_crates, transitive_crates = _dependency_crates(ctx)
     native_inputs, ambiguous_libs, cc = _native_inputs(ctx)
     # Exercise the argument-builder API with a real source File and native
@@ -88,7 +93,7 @@ def _impl(ctx):
         actions = ctx.actions,
         attr = struct(),
         label = ctx.label,
-        executable = struct(_process_wrapper = ctx.attr.src),
+        executable = struct(_process_wrapper = source),
         var = {"COMPILATION_MODE": "dbg"},
         genfiles_dir = struct(path = "genfiles"),
         configuration = struct(coverage_enabled = False),
@@ -98,7 +103,7 @@ def _impl(ctx):
     toolchain = struct(
         target_arch = "x86_64",
         target_abi = "gnu",
-        linker = ctx.attr.native_files[7] if ctx.attr.native_files else None,
+        linker = native_files[7] if native_files else None,
         linker_type = "direct" if ctx.attr.direct_linker else "indirect",
         linker_preference = "rust",
         target_os = "linux",
@@ -109,8 +114,8 @@ def _impl(ctx):
         _codegen_units = 0,
         coverage_supported = False,
         _experimental_link_std_dylib = False,
-        _toolchain_generated_sysroot = ctx.attr.sysroot != None,
-        sysroot_anchor = ctx.attr.sysroot,
+        _toolchain_generated_sysroot = sysroot != None,
+        sysroot_anchor = sysroot,
         _rename_first_party_crates = False,
         extra_rustc_flags_for_crate_types = {},
         extra_exec_rustc_flags = [],
@@ -155,7 +160,7 @@ def _impl(ctx):
         force_depend_on_objects = ctx.attr.force_objects,
         force_all_deps_direct = ctx.attr.force_direct,
     )
-    inputs = depset([root] + ctx.attr.dependency_files + ctx.attr.native_files + ([] if ctx.attr.sysroot == None else [ctx.attr.sysroot]), transitive = [stdlib])
+    inputs = depset([root] + dependency_files + native_files + ([] if sysroot == None else [sysroot]), transitive = [stdlib])
     ctx.actions.run(outputs = [output], executable = "process_wrapper", arguments = args.all, inputs = inputs, env = env)
     return [DefaultInfo(files = depset([output]))] + ([cc] if cc else [])
 

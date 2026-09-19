@@ -815,24 +815,6 @@ impl<'a> AnalysisValueMaterializer<'a> {
         })
     }
 
-    pub(crate) fn configured_dependency(
-        &mut self,
-        key: &ConfiguredNodeKey,
-        providers: ProviderCollection,
-    ) -> Result<FrozenValue, String> {
-        let Some(configured) = key.configured_target() else {
-            return Ok(self
-                .heap
-                .alloc(AnalysisArtifactValue::new(AnalysisArtifact::Source(
-                    key.label().clone(),
-                ))));
-        };
-        self.target(&ConfiguredTargetValue::new(
-            analysis_configured_key(configured),
-            providers,
-        ))
-    }
-
     pub(crate) fn configured_dependency_target(
         &mut self,
         key: &ConfiguredNodeKey,

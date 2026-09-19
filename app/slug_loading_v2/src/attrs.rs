@@ -401,6 +401,22 @@ impl AttributeSchema {
     pub fn ordinary_dependency(&self) -> bool {
         self.ordinary_dependency
     }
+    /// Whether ordinary rule completion imports this attribute's validations.
+    /// Late-bound names have Bazel's `:` classification, unlike literal private
+    /// defaults with `$` names. Their retained callable owner supplies this bit.
+    /// Executable metadata alone is not a tool edge; the transition or explicit
+    /// tool flag supplies that classification.
+    pub fn propagates_validations(&self, late_bound: bool) -> bool {
+        self.ordinary_dependency
+            && (late_bound || !self.query_name.starts_with('$'))
+            && !self.flags.contains(AttributePropertyFlag::SkipValidations)
+            && !self.flags.contains(AttributePropertyFlag::IsToolDependency)
+            && !matches!(
+                self.dependency_configuration,
+                AttributeDependencyConfiguration::Exec
+                    | AttributeDependencyConfiguration::ExecGroup(_)
+            )
+    }
     pub fn is_builtin(&self) -> bool {
         self.builtin
     }
@@ -1623,6 +1639,9 @@ fn combine_attr_candidates<'a>(
     }
     Ok(combined)
 }
+
+#[cfg(test)]
+mod validation_tests;
 
 #[cfg(test)]
 mod tests {

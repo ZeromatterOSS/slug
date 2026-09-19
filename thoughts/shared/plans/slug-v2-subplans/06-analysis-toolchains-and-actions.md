@@ -37,8 +37,24 @@ to the default empty. Publication uses the shared provider equality state.
 Field iteration follows pinned Bazel UTF-16 ordering; public dir() inherits native
 Rust ordering. User providers named OutputGroupInfo remain distinct. Configured
 _validation_transitive overrides reject pending the native allowlist/propagation
-owner. Implicit runfiles/validation groups, internal merges, requested-output
-scheduling and CLI activation remain deferred.
+owner. WP-7-40 completes returned groups through stable builders after runfiles
+support: binary runfiles trees or nonbinary default-runfiles files/symlink targets
+join the hidden group, and eligible ordinary dependencies contribute validations.
+Implicit/tool/skip-validation/filtered edges do not contribute. Target-configured
+configuration_field late-bound attributes may contribute: their leading underscore
+does not classify them as ordinary implicit edges. Constructor-only
+and nested values retain their original graphs; DefaultInfo files stay independent
+from explicit OutputGroupInfo.default until command selection.
+
+Source and generated-file configured nodes now own singleton file providers;
+generated files additionally forward only their generator's nonempty validations.
+Dependency views consume these providers directly. Ordinary ctx.attr label
+dependencies expose Targets, including sources; callers obtain Files from DefaultInfo
+instead of a source-only projection. One actual-target node identity
+represents configured and null targets, allowing aliases to preserve source identity
+without a configured-only fallback or panic. Source aliases retain source filename
+admissibility checks. Internal merges, private validation overrides, analysis-test
+execution, requested-output scheduling and CLI activation remain deferred.
 
 Registration-error identity is implemented and accepted at `a06f3ddfc`; source
 observation presentation is accepted at `ac6140f41`. Preserve the shared typed

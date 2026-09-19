@@ -260,7 +260,7 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
         ),
         (
             "transitive_crates = transitive_crates",
-            "transitive_crates = depset([ctx.attr.src])",
+            "transitive_crates = depset([ctx.attr.src[DefaultInfo].files.to_list()[0]])",
             "requires pinned CrateInfo",
         ),
     ] {
@@ -378,7 +378,7 @@ async fn pinned_rustc_file_dirnames_preserve_order_and_generated_root() {
             "action inputs require a depset of File",
         ),
         (
-            "sysroot_anchor = ctx.attr.sysroot",
+            "sysroot_anchor = sysroot",
             "sysroot_anchor = 'not-a-file'",
             "Args file dirname mapping requires Files",
         ),

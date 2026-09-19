@@ -756,7 +756,7 @@ impl ToolchainTopology {
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct ConfiguredNodeResult {
     key: ConfiguredNodeKey,
-    actual_configured_target: Option<ConfiguredTargetKey>,
+    actual_target: ConfiguredNodeKey,
     kind: ConfiguredNodeKind,
     providers: ProviderCollection,
     actions: Arc<[ConfiguredAction]>,
@@ -875,7 +875,7 @@ impl ConfiguredNodeResult {
         runfiles_packages: RunfilesPackageDepset,
     ) -> Self {
         Self {
-            actual_configured_target: Some(key.clone()),
+            actual_target: key.clone().into(),
             key: key.into(),
             kind: ConfiguredNodeKind::Rule,
             providers,
@@ -902,10 +902,10 @@ impl ConfiguredNodeResult {
             ConfiguredNodeKind::Rule,
             "native nodes cannot be rules"
         );
-        let actual_configured_target = key.configured_target().cloned();
+        let actual_target = key.clone();
         Self {
             key,
-            actual_configured_target,
+            actual_target,
             kind,
             providers,
             actions: Arc::from([]),
@@ -929,8 +929,12 @@ impl ConfiguredNodeResult {
         self.key.configured_target()
     }
 
+    pub fn actual_target(&self) -> &ConfiguredNodeKey {
+        &self.actual_target
+    }
+
     pub fn actual_configured_target(&self) -> Option<&ConfiguredTargetKey> {
-        self.actual_configured_target.as_ref()
+        self.actual_target.configured_target()
     }
 
     pub fn providers(&self) -> &ProviderCollection {
@@ -1088,9 +1092,9 @@ impl ConfiguredNodeResult {
         self
     }
 
-    pub(crate) fn with_actual_configured_target(mut self, actual: ConfiguredTargetKey) -> Self {
+    pub(crate) fn with_actual_target(mut self, actual: ConfiguredNodeKey) -> Self {
         assert!(self.configured_target_key().is_some());
-        self.actual_configured_target = Some(actual);
+        self.actual_target = actual;
         self
     }
 

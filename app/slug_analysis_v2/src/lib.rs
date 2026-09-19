@@ -19,6 +19,7 @@ mod exec_group;
 mod execution_groups;
 mod files_to_run_spawn;
 pub mod key;
+mod output_groups;
 pub mod result;
 mod runfiles_support;
 pub mod starlark_rule;

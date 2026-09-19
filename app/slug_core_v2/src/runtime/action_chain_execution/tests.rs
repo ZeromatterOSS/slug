@@ -16,10 +16,10 @@ const DEFS: &str = r#"def _impl(ctx):
     right = ctx.actions.declare_file('right')
     done = ctx.actions.declare_file('done')
     ctx.actions.write(seed, 'seed')
-    ctx.actions.run(executable=ctx.attr.tool, inputs=[seed, ctx.attr.input], outputs=[file, tree])
-    ctx.actions.run(executable=ctx.attr.tool, inputs=[file], outputs=[left])
-    ctx.actions.run(executable=ctx.attr.tool, inputs=[tree], outputs=[right])
-    ctx.actions.run(executable=ctx.attr.tool, inputs=[left, right], outputs=[done])
+    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[seed, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[file, tree])
+    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[file], outputs=[left])
+    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[tree], outputs=[right])
+    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[left, right], outputs=[done])
     return [DefaultInfo(files=depset([done]))]
 stage = rule(implementation=_impl, attrs={'input':attr.label(allow_single_file=True), 'tool':attr.label(allow_single_file=True)})
 "#;

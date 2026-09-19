@@ -155,6 +155,8 @@ use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::path_observation_shards;
 use starlark_map::small_map::SmallMap;
 
+mod effective_output_groups;
+mod file_output_providers;
 mod output_group_info;
 mod rustc_map_each;
 
@@ -11042,7 +11044,7 @@ async fn vector_args_param_policy_and_args_write_use_one_generic_recipe() {
     fs::write(
         package.join("defs.bzl"),
         r#"def _impl(ctx):
-    source = ctx.attr.src
+    source = ctx.attr.src[DefaultInfo].files.to_list()[0]
     tool = ctx.actions.declare_file("tool")
     first = ctx.actions.declare_file("first.out")
     second = ctx.actions.declare_file("second.out")
@@ -12557,7 +12559,7 @@ def _probe(ctx):
         fail("label_keyed_string_dict orientation changed: %s" % label_keyed)
     if [dep.label.name for dep in ctx.attr.list_dict["group"]] != ["other", "chosen"]:
         fail("label_list_dict orientation changed")
-    if ctx.attr.source.basename != "data.txt":
+    if ctx.attr.source[DefaultInfo].files.to_list()[0].basename != "data.txt":
         fail("exec source file did not materialize")
     return [ProbeInfo(value = ctx.executable.scalar.basename + ":" + ctx.executable.target_tool.basename)]
 
