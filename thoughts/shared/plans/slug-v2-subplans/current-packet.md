@@ -1,135 +1,155 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-36-m7a-generated-action-prerequisites-r1
+Packet: WP-7-37-m7a-generated-chain-execution-r1
 Status: accepted
 
-## Outcome and demand
+## Outcome and compatibility
 
-A consumer selected from the validated configured action closure resolves each
-retained generated File/Directory input to its declared producer and returns a
-stable prerequisite-first action plan. A tiny public rule's source -> generated
-file/tree -> consumer chain is reachable; missing owners/outputs, wrong kinds,
-cycles and unsupported action/input shapes reject the complete plan.
+Execute a selected typed Spawn and its reachable FileWrite/Spawn prerequisites
+inside one Core native request. Bind generated File/Directory inputs only to
+verified producer results from that attempt, and accept the selected result only
+after final validation of the entire reachable source frontier. This advances the
+bootstrap LALRPOP/proto build-script out_dir -> Rustc dependency requirement.
+Baseline 99c9f146e: WP736 accepted owner-preserving prerequisite planning; WP734
+owns native completion/precheck/finalization; WP735 owns verified output manifests.
 
-Demanded by: bootstrap-readiness's LALRPOP and cache-leaf proto build-script out_dir
-inputs to downstream Rustc. WP-7-35 accepted verified tree outputs at 351486c8c;
-Core source staging still rejects Derived artifacts. Resolving the actual producer
-is necessary before generated content can be staged or actions scheduled. This
-packet implements that owner-preserving prerequisite, not a generated-byte or
-execution claim. Source staging and SourceActionTransport remain source-only.
+Pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
+ArtifactFunction generating-action lookup and ActionExecutionFunction input
+prerequisites, plus MerkleTreeComputer.java:1033-1047 (all input file nodes
+executable), 847-880 (tree inputs rebuilt from file children), 299-305 (empty
+output-directory roots). Exact: retained producer ownership, verified CAS SHA-256,
+source/generated/forced-param input file executable policy and generated tree projection from file children.
+Keep declared tree roots even when empty, omit nested empty producer directories
+unless needed as ancestors, and include declared output-directory roots in the
+new chain's input tree. Producer manifests retain their truthful modes/empty dirs.
+Slug-native: configured identities, sequential order, errors, existing Command/
+Action wire profile. No full Bazel input-root/Action digest parity claim. Deferred:
+runfiles/symlinks/discovered inputs, missing-CAS producer recovery, CLI activation,
+local publication, full build scheduling, bootstrap and exact ActionKey.
 
-Pinned source: Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a,
-ArtifactFunction.compute/getGeneratingActionKey and ActionExecutionFunction's
-collectInputs/getInputDepKeys before execution; Actions sharing remains the
-accepted scalar FileWrite closure contract. Exact: resolve retained artifact
-owner/output identity and require prerequisites. Slug-native: existing configured
-identity, deterministic planning order and error rendering. Unsupported/deferred:
-execution scheduling/results, generated CAS binding, tree expansion, discovered
-inputs, symlinks/runfiles, publication, CLI activation, bootstrap and exact ActionKey.
+## Ownership and lifecycle
 
-## Ownership and algorithm
+Add a selected-chain DICE preparation key over BuildCommandRootKey + configured
+owner + action ordinal. Compute the existing observed build root, derive WP736's
+borrowed plan, observe every deduplicated reachable Source input using existing
+SourceArtifactInputObservationKey, and union those observations with the complete
+build frontier into one associated SourceCertificate. Need/errors, equality,
+validity, event reconciliation and request initialization follow SourceStagingKey.
+No remote results, byte buffers, channels or open files enter DICE. Existing
+source-only preparation retains its Derived rejection. Read docs/developers/dice.md;
+reuse native dependency recording/finalization and existing lifecycle evidence.
 
-ValidatedActionClosure remains the sole producer of conflict-free owner-complete
-configured actions. Add a borrowed planning projection on BuildCommandEvaluation
-for one selected owner/action. Its result borrows that evaluation and exposes only
-ordered configured actions plus their direct producer dependencies and declared
-artifact inputs; it conveys no Execute authority. No new DICE key/cache or retained
-semantic fact: the projection is derived solely from the already DICE-owned closure,
-like existing FileWrite semantic views. No filesystem, repository, source digest,
-remote cache or request mutation occurs. Edit/restoration uses existing configured
-DICE dependencies and native acceptance; a held plan remains a view of that result,
-never permission to execute it later.
+PreparedActionChainInputs privately retains evaluation, selection, observed
+sources and certificate; public plan(), sources(), observations(), open_source()
+are borrowed metadata/source transfer projections. Rebuild the plan at operation
+start rather than retaining a self-referential graph. Factor source opening and
+build-frontier checking for reuse where useful. Use existing compact SmallSet/
+SmallMap and Arc retained storage (Stage 9 retained utility disposition); no new
+interner, dependency, global cache or lock.
 
-Build phase-local compact indices for exact retained artifact owner plus full
-ActionOutput (path AND kind); use the same Analysis-owned configured-key projection
-as artifact production, including execution-platform preference. Never infer a
-producer from execution path alone or match a prefix/descendant of a tree. Preserve
-source artifact leaves without content observation. Keep whole-tree inputs as one
-artifact edge; no traversal/expansion of runtime tree contents.
+Core ActionChainTransport has Session:Send, Staged:Send, Output:Send+Sync and Error;
+start(Arc<PreparedActionChainInputs>) -> Session; stage(&mut Session,index) -> Staged;
+execute(&mut Session,index,Staged) -> (); finish(Session) -> Output. All methods are async and
+return Send futures. This is a trusted extension like SourceActionTransport. Core
+starts a fresh session each native attempt, walks the prerequisite-first plan,
+stages then prechecks the FULL certificate before each Execute, and invokes the
+existing final native validation/retry. Stage/precheck failures abort the chain;
+all provisional session/results drop on failure, cancellation or retry. No lock
+is held over transport effects. AcceptedCommand<ActionChainResult<Output>> exposes
+only final accepted inputs/output; no local publication authority is added.
 
-Typed Spawn ordinary inputs admit whole-tree Directory artifacts in direct lists
-and top-level depsets, matching pinned StarlarkActionFactory Artifact inputs.
-Tools/executable restrictions and the legacy helper remain unchanged; no runtime
-tree expansion is admitted. Reachable supported actions are typed Spawn and the accepted scalar FileWrite
-shape. Spawn input discovery visits inputs, tools and the artifact/FilesToRun
-executable, preserving stable first occurrence. Reject unused-input pruning,
-runfiles support, raw executable strings/shells, unadmitted derived kinds and every
-reachable unsupported action before returning a plan. Reuse the source-staging
-collector by separating its declared-artifact collection from its source-only
-restriction; the old source-only guard remains effective.
+REAPI ActionChainReapiTransport owns immutable config; private session/staged fields
+bind endpoint, instance, step order and verified results. Preflight every reachable
+action's lowering/policy, exact declared input/output/param namespace collision and
+forced-param expansion before connecting or executing. Reuse shared Spawn command
+policy and FileWrite lowering; expand each Spawn once. Resolve each generated
+input through the plan producer index and exact declared output path AND kind.
+Only verified AC/Execute results produced inside this session enter its table;
+never accept caller-supplied RemoteExecutionResult as provenance. Keep intermediate
+file content in CAS by verifying through a discard sink; return bounded output
+metadata (existing tree budgets) and execution evidence, with empty output_blobs.
 
-Resolve duplicate scalar FileWrite actions through the validated closure's existing
-sharing relation: one canonical execution action per physical output/configuration,
-while exact artifact lookup first proves the requested declared owner and output.
-Do not conflate declared owners across configurations or toolchain execution-platform
-preferences; physical sharing occurs only through the closure's admitted relation.
-Index construction must reject ambiguous retained ownership rather than choose one.
+Compose input files with explicit executable mode plus explicit directory roots;
+rebuild canonical Directory blobs from verified tree file children. Reject file/
+directory/ancestor/mode conflicts, whole-tree versus param/source/output namespace
+collisions, including empty roots. Preserve explicit dirs through param composition.
+Generated digests are CAS-only; sources are openable only via prepared observations;
+protocol/Directory/param/FileWrite content blobs are locally owned uploads. Missing
+generated content fails before consumer Execute even if another upload category
+shares that digest. Verify all required digests after staging, including CAS hits.
+One channel/instance per attempt; no output-path reads or producer rerun fallback.
 
-Iterative DFS (no call-stack recursion) follows retained input order, deduplicates
-shared prerequisites, detects visiting-state cycles including self-reference, and
-returns prerequisite-first indices. Scratch indices/DFS state and result vectors
-are projection-owned and freed on error/drop; actions borrow the retained closure.
-Declared artifact leaves are cloned into projection-owned inputs by the existing
-collector, without copying depset graphs. Use existing compact SmallMap/SmallSet
-utilities (Stage 9 retained-utility disposition); no new interner,
-DICE locks, global state, Rust dependencies or bytes in DICE. Complexity is linear
-in closure output index size plus reachable declared inputs/actions, apart from
-existing compact-map and closure execution-representative lookup costs. No per-edge
-rescan of the full closure.
+New preparation memory is DICE-owned semantic Arc metadata; plans/templates and
+verified results are attempt-owned, Directory reconstruction is action scratch,
+and verified transfer buffers remain cache-library bounded. No copied depset graph
+or cloned action graph. Release on attempt completion/error/cancellation; accepted
+output metadata survives only with its result. Complexity: one plan/source pass,
+linear step traversal and bounded per-tree reconstruction plus ordered protocol
+sorting. Existing large dice.rs receives only module/export delegation; new chain
+logic and focused tests live in separate modules. No performance claim.
 
-## Scope and evidence
+## Scope and validation
 
-Allowlist: Core runtime/configured_action_closure.rs, new action_prerequisites.rs
-and focused tests, runtime/dice.rs/mod.rs delegation/exports, source_staging.rs
-collector extraction; Analysis key.rs minimal public projection method reusing
-analysis_value::analysis_configured_key and starlark_rule.rs typed input admission. Canonical/current manifest, Stage 6/7
-owner paragraphs and bootstrap-readiness status correction only.
+Allowlist: Core runtime new action_chain_staging.rs/action_chain_execution.rs and
+focused test files; minimal source_staging.rs helper extraction, dice.rs/mod.rs
+registration/exports. REAPI new action_chain.rs and tests; input_tree.rs/tests,
+Cargo.toml/BUILD.bazel promoting the existing Analysis dependency for shared typed projection;
+source_spawn.rs shared command projection, executor.rs metadata-only verified
+output mode/shared lowering, lib.rs exports. Scheduling and Stage 7/bootstrap
+status paragraphs. No CLI activation or standalone publication edits.
 
-Tests: pure diamond/shared producer, File and Directory identity, same path in
-different configurations, missing owner/output and wrong-kind, unsupported
-reachable action, self/two-action cycle, shared FileWrite representative. Public
-BUILD/defs native evaluation proves a multi-action generated chain and same-DICE
-producer/input edit/restoration; original source staging still rejects its Derived
-input. Reuse accepted root-conflict/lifecycle evidence, run focused affected
-conflict and source-staging controls. No transport/Bazel/build action invocation.
-Pinned no-run preparation separately capped at 60s, exact selector preflight;
-Core tests and direct REAPI/CLI compilation; rustfmt/diff/plan/archive checks.
-Tests expected under a few seconds; none requiring >30s are planned. Receipts
-in target/wp736. Independent design and final review before atomic checkpoint.
+Parallel workers: Core preparation/lifecycle; REAPI input-tree representation;
+root REAPI session/lowering/integration. Independent design then final review.
+Discriminators: public source -> File+Directory -> consumer (including FileWrite,
+forced params, executable policy, nested files and empty tree policy); diamond
+producer once; full source frontier mutation during consumer staging and restored
+fresh attempt; unsupported downstream policy fails before effects; producer
+failure/missing or corrupt output blocks consumer; generated CAS eviction between
+steps blocks consumer; empty-root/param/output and same-digest/mode collisions.
+Reuse WP735 output-tree corruption/budget gates and WP736 exact-owner/cycle gates.
+NativeLink wire gate uses a tiny public workspace and fresh supervised storage;
+portable pure/Core transport tests cover lifecycle/failure boundaries.
 
-REPLAN if resolving ownership requires a new semantic identity, a producer outside
-the validated closure must be synthesized, or this projection is used to authorize
-execution/publication. M7A remains partial and M8 unproved. Future generated-input
-execution must bind verified producer results and whole-tree CAS manifests within
-one native request and revalidate the full source frontier.
+Compile separately with pinned nightly, each preparation capped at 60s; exact
+selector preflight and focused groups expected under a few seconds. Any >30s
+runtime test needs strict necessity; none planned. Compile Core/REAPI plus CLI
+direct consumer, rustfmt, diff/plan/archive checks. Receipts target/wp737. Reuse
+passing unchanged tests; no broad suite or fresh Bazel run required. Keep review
+branch until independent final ACCEPT, then commit/fast-forward main/push as
+already authorized. M7A remains partial and M8 unproved. REPLAN for new semantic
+identity, producer synthesis outside the closure, or publication/recovery needs.
 
-## Acceptance receipt
+## Validation receipt
 
-Baseline 351486c8c; review/wp736-generated-prerequisites. The intervening
-instruction-only commit 8b043b0e8 implements the user's explicit request for more
-parallel agents and is already pushed. Independent design/correction/final review
-ACCEPT covers this planning boundary only. No runtime generated-input admission.
+Baseline 99c9f146e, review/wp737-generated-execution. Independent design and final review ACCEPT. Eight Core selectors pass in 3.025s: four new chain gates
+(diamond/selected FileWrite, producer-only source and build-frontier changes during
+downstream staging, failure/unwind disposal, whole-chain fresh retry) plus four
+protected source lifecycle/staging controls. Sixteen focused REAPI selectors pass:
+15 in 1.732s plus the added empty-tree namespace case in 0.323s. They cover shared
+lowering, explicit directory/mode serialization, params, preflight before connecting,
+whole-tree/output/source namespace conflicts and protected tree integrity/budgets.
 
-Eight exact Core selectors pass: four pure prerequisite/ownership/tool/cycle gates,
-one public native list/depset/generated-chain A/B/A plus tool/executable negatives,
-one protected source-staging gate and two protected conflict/sharing gates. The
-native final selector takes 0.363s; the longest focused group takes 0.854s. Passing
-unchanged selectors are reused from earlier correction runs. No build action,
-backend, network, Bazel oracle or broad suite was run for this packet.
+Four supervised fresh-backend NativeLink selectors pass: public FileWrite ->
+File/Directory producer -> forced-param consumer with cold execution, A/A/B/A cache and
+content identity in 2.188s; actual generated CAS removal/corruption plus producer
+exit/missing-output rejection in 2.123s; protected source-tree execution in 1.247s;
+protected FileWrite bytes/mode in 0.292s. The generated/source digest deliberately
+matches: after eviction, two failed reads clear NativeLink's stale filesystem
+indices and FindMissing must report absence before the adapter rejects it without
+source reupload. Corruption is still advertised present and fails verified read.
+All backends terminated and fresh roots were removed. No local chain output was
+published. No Bazel oracle fixture, CLI activation or broad suite was added/run.
 
-Pinned nightly-2025-09-14 no-run compile and CLI dependency-chain check pass,
-covering Analysis/Core/REAPI/server consumers. Six separate preparations including
-two corrected compiler failures total 71.257s; longest 25.341s, under the 60s
-preparation cap. Exact selection/runtime/compile receipts live in target/wp736
-(focused.receipt, focused-final.receipt, native-final.receipt and no-run JSON).
-Rustfmt, diff, plan and archive checks pass. Packet wall/review time was not
-continuously recorded; parallel test/review work overlapped root implementation.
+Seven separate pinned preparations total 84.208s, maximum 28.743s under the 60s
+preparation cap. Core/REAPI no-run builds and CLI dependency-chain check pass.
+Initial REAPI compile needed two routine corrections (Derived is a struct variant;
+artifact.path returns Cow). The negative wire fixture needed diagnostic attribution
+for NativeLink's stale index and owner-write permission on its exact temporary CAS
+inode before corruption. These changed test setup/assertions, not production
+semantics. Initial failures and final receipts remain under target/wp737; passing
+unchanged selectors were reused after test-only additions/corrections.
 
-Corrected failures: test contexts must be unique per execution group; typed Spawn
-ordinary inputs needed the reviewed directory admission; SmallMap indexing and a
-test snapshot type annotation required compiler corrections. Negative Analysis
-checks use the existing observed preparation API: the general build wrapper
-surfaced a dirty activation-closure error instead of the semantic rejection after
-the mutation sequence. That wrapper's error-reporting lifecycle is not repaired or
-claimed here. Observed preparation rejects directory tools/executables exactly,
-and all Derived inputs remain rejected by source staging.
+Exact selection, rustfmt, diff, plan and archive checks pass. Longest runtime group
+was 3.025s; no >30s runtime test was required. Packet wall/review time was not
+continuously recorded; Core implementation/validation, input-tree implementation,
+wire fixtures and independent review overlapped root REAPI integration.

@@ -74,31 +74,37 @@ impl PreparedSourceActionInputs {
     /// transfer bytes against its digest, and must not infer current provenance
     /// from a successful open. The handle is never retained in DICE.
     pub fn open_source(&self, index: usize) -> std::io::Result<std::fs::File> {
-        let source = self
-            .sources
-            .get(index)
-            .ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::InvalidInput, "unknown prepared source")
-            })?
-            .result()
-            .as_ref()
-            .unwrap();
-        let mut options = std::fs::File::options();
-        options.read(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.custom_flags(nix::libc::O_NONBLOCK);
-        }
-        let file = options.open(source.real_path().as_path())?;
-        if !file.metadata()?.is_file() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "prepared source is no longer a regular file",
-            ));
-        }
-        Ok(file)
+        open_observed_source(&self.sources, index)
     }
+}
+
+pub(super) fn open_observed_source(
+    sources: &[Arc<ObservedSourceArtifactInput>],
+    index: usize,
+) -> std::io::Result<std::fs::File> {
+    let source = sources
+        .get(index)
+        .ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "unknown prepared source")
+        })?
+        .result()
+        .as_ref()
+        .unwrap();
+    let mut options = std::fs::File::options();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(nix::libc::O_NONBLOCK);
+    }
+    let file = options.open(source.real_path().as_path())?;
+    if !file.metadata()?.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "prepared source is no longer a regular file",
+        ));
+    }
+    Ok(file)
 }
 
 pub(super) fn require_execution_representative(
@@ -195,7 +201,7 @@ pub(in crate::runtime) fn declared_artifacts(
     Ok(sources)
 }
 
-fn checked_build_frontier(
+pub(super) fn checked_build_frontier(
     observations: Option<&PathObservationEpoch>,
     certificate: Option<&SourceCertificate>,
 ) -> Result<PathObservationEpoch, Arc<str>> {

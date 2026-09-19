@@ -29,15 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-36-m7a-generated-action-prerequisites-r1
+Packet: WP-7-37-m7a-generated-chain-execution-r1
 Status: accepted
 
-Generated File/Directory inputs resolve to owner-preserving action prerequisites
-inside the validated configured closure. Independent final review ACCEPT; eight
-focused gates pass, with the final native chain/restoration/negative selector at
-0.363s. WP-7-35 is accepted/pushed at 351486c8c. Generated-input binding, execution
-scheduling, local publication and CLI activation remain open. Select the generated
-producer-result binding prerequisite next; M7A partial and M8 unproved.
+Selected FileWrite/Spawn producer-consumer chains execute in one native request,
+bind verified generated File/Directory CAS content and revalidate the complete
+source frontier before each action and final acceptance. Independent final review
+ACCEPT; 28 focused gates pass, longest runtime group 3.025s. General scheduling,
+validated local publication and CLI activation remain open. Select validated
+chain-output publication ownership next; M7A partial and M8 unproved.
 
 ### Earlier generated-input receipt
 

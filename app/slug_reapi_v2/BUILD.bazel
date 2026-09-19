@@ -9,6 +9,7 @@ rust_library(
     aliases = aliases(),
     edition = crate_edition(),
     deps = all_crate_deps(normal = True) + [
+        "//app/slug_analysis_v2",
         "//app/slug_build_api_v2",
         "//app/slug_core_v2",
         "//app/slug_reapi_cache_v2",

@@ -2980,6 +2980,14 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
     }
 }
 
+#[path = "action_chain_staging.rs"]
+mod action_chain_staging;
+pub use action_chain_staging::PreparedActionChainInputs;
+#[path = "action_chain_execution.rs"]
+mod action_chain_execution;
+pub use action_chain_execution::ActionChainResult;
+pub use action_chain_execution::ActionChainTransport;
+
 #[path = "source_staging.rs"]
 pub(super) mod source_staging;
 pub use source_staging::PreparedSourceActionInputs;

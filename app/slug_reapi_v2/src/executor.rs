@@ -60,6 +60,29 @@ impl FileWriteReapiPlan {
         Self::from_action(view.action().spec(), platform_properties)
     }
 
+    /// The caller must select this action through Core's validated prerequisite plan.
+    pub(crate) fn from_chain_action(
+        action: &slug_analysis_v2::ConfiguredAction,
+        remote_defaults: &BTreeMap<String, String>,
+    ) -> Result<Self, String> {
+        let context = action.context();
+        if context.execution_platform().is_none() || context.raw_platform_fact().is_none() {
+            return Err("FileWrite REAPI plan requires a selected execution platform".into());
+        }
+        let fact = context
+            .platform_fact()
+            .ok_or("FileWrite REAPI plan requires platform facts")?;
+        let properties = fact
+            .exec_properties
+            .iter()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect();
+        Self::from_action(
+            action,
+            effective_platform_properties(properties, remote_defaults),
+        )
+    }
+
     fn from_action(
         action: &ActionSpec,
         platform_properties: BTreeMap<String, String>,
@@ -318,6 +341,51 @@ pub(crate) async fn execute_staged(
     inline_output_files: Vec<String>,
     uploads: Vec<ReapiDigest>,
 ) -> Result<RemoteExecutionResult, RemoteExecutionError> {
+    execute_staged_outputs(
+        config,
+        command,
+        identity,
+        cache,
+        channel,
+        inline_output_files,
+        uploads,
+        true,
+    )
+    .await
+}
+
+/// The chain keeps verified scalar content in CAS rather than accumulating bytes.
+pub(crate) async fn execute_staged_metadata(
+    config: &RemoteConfig,
+    command: &ReapiCommand,
+    identity: &ReapiActionIdentity,
+    cache: &CacheClient,
+    channel: tonic::transport::Channel,
+    uploads: Vec<ReapiDigest>,
+) -> Result<RemoteExecutionResult, RemoteExecutionError> {
+    execute_staged_outputs(
+        config,
+        command,
+        identity,
+        cache,
+        channel,
+        Vec::new(),
+        uploads,
+        false,
+    )
+    .await
+}
+
+async fn execute_staged_outputs(
+    config: &RemoteConfig,
+    command: &ReapiCommand,
+    identity: &ReapiActionIdentity,
+    cache: &CacheClient,
+    channel: tonic::transport::Channel,
+    inline_output_files: Vec<String>,
+    uploads: Vec<ReapiDigest>,
+    retain_bytes: bool,
+) -> Result<RemoteExecutionResult, RemoteExecutionError> {
     let mut execution = proto::execution_client::ExecutionClient::new(channel);
     let ac_result = cache
         .get_action_result(&identity.action_digest, inline_output_files.clone())
@@ -342,7 +410,7 @@ pub(crate) async fn execute_staged(
     }
 
     validate_result_shape(&result, &command)?;
-    let output_blobs = fetch_outputs(&cache, &result).await?;
+    let output_blobs = fetch_outputs(&cache, &result, retain_bytes).await?;
     let outputs = result
         .output_files
         .iter()
@@ -682,6 +750,7 @@ pub(crate) fn validate_result_shape(
 async fn fetch_outputs(
     cache: &CacheClient,
     result: &proto::ActionResult,
+    retain_bytes: bool,
 ) -> Result<BTreeMap<String, Vec<u8>>, RemoteExecutionError> {
     let mut output_blobs = BTreeMap::new();
     for output in &result.output_files {
@@ -697,17 +766,28 @@ async fn fetch_outputs(
                     actual,
                 }
             })?;
-            output_blobs.insert(output.path.clone(), output.contents.clone());
+            if retain_bytes {
+                output_blobs.insert(output.path.clone(), output.contents.clone());
+            } else {
+                cache
+                    .read_blob_verified(&digest, |_| Ok(()))
+                    .await
+                    .map_err(cache_error)?;
+            }
         } else {
             let mut scratch = Vec::new();
             cache
                 .read_blob_verified(&digest, |chunk| {
-                    scratch.extend_from_slice(chunk);
+                    if retain_bytes {
+                        scratch.extend_from_slice(chunk);
+                    }
                     Ok(())
                 })
                 .await
                 .map_err(cache_error)?;
-            output_blobs.insert(output.path.clone(), scratch);
+            if retain_bytes {
+                output_blobs.insert(output.path.clone(), scratch);
+            }
         }
     }
     Ok(output_blobs)

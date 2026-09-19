@@ -58,3 +58,9 @@ pub use source_execution::SourceReapiTransport;
 pub use source_execution::StagedSourceAction;
 
 mod output_tree;
+
+mod action_chain;
+pub use action_chain::ActionChainReapiSession;
+pub use action_chain::ActionChainReapiTransport;
+pub use action_chain::ActionChainRemoteResult;
+pub use action_chain::StagedChainAction;

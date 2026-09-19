@@ -142,9 +142,9 @@ The request-local REAPI adapter uploads sources, virtual files, directories, Com
 and Action and verifies every required CAS digest through bounded reads, including
 hits, before AC/Execute. This rejects NativeLink's advertised in-flight inputs.
 It shares the existing regular-output shape and digest checks. Unsupported headers,
-explicit retries/timeouts and a different cache endpoint fail closed. Returned
-output bytes are operation-owned in memory; large-output readiness, generated/tree
-inputs, closure scheduling and accepted output materialization remain open.
+explicit retries/timeouts and a different cache endpoint fail closed. That source-only API retains scalar output bytes in memory. The selected-chain
+operation below adds generated input binding without retaining output bytes;
+general scheduling and accepted output materialization remain open.
 
 WP-7-35 admits declared regular-file output trees on that same native source Spawn
 operation. Commands sort file/directory lists and their combined output_paths;
@@ -162,7 +162,8 @@ executable bits. Tree file contents are verified through discard sinks and remai
 in CAS; buffers and manifests are request-owned and never DICE values. Files-only
 local inventory cannot prove a tree cache hit. The detached materializer rejects
 directory-bearing results before writes. Local publication still requires a Core
-generation/configuration-root claim; generated/tree inputs and scheduling stay open.
+generation/configuration-root claim; generated/tree inputs are handled by the
+selected-chain operation below.
 
 WP-7-36 adds a borrowed BuildCommandEvaluation action_prerequisites projection over
 the validated closure. It resolves declared generated File/Directory inputs by full
@@ -172,8 +173,27 @@ consumers, with input-to-producer indices; source leaves remain unobserved. Miss
 ambiguous, cyclic and unsupported prerequisites reject the entire plan. Scratch
 maps and artifact leaves are projection-owned, configured actions stay borrowed,
 and all semantic inputs remain in the existing DICE-owned closure. A held plan
-conveys no execution authority; generated CAS/result binding and scheduling remain
-open, and source staging still rejects every Derived input before observing bytes.
+conveys no execution authority, and source staging still rejects every Derived
+input before observing bytes.
+
+WP-7-37 adds a selected-chain native operation over that plan. Its DICE preparation
+observes all reachable sources and retains the complete build/source certificate.
+Each attempt creates a fresh transport session, stages prerequisites in order,
+prechecks the entire frontier before every Execute, and reuses native final
+validation/retry. Remote state/results remain attempt-owned. The REAPI session
+preflights every action before connecting, binds each generated input by its exact
+planned producer/output kind, and retains only verified output metadata. Missing
+generated CAS content fails before consumer Execute even if a source or virtual
+file has the same digest; no producer rerun or local-output fallback is admitted.
+
+The chain rebuilds input Directory messages from verified producer file children,
+marks source/generated/forced-param files executable, preserves empty declared tree
+roots, omits nested empty producer directories, and supplies empty declared output
+directory roots. These policies follow pinned MerkleTreeComputer source; the
+existing Command/Action wire profile and configured identities remain Slug-native.
+Producer manifests retain their original modes and empty directories. Shared
+source-only lowering and FileWrite semantics are unchanged. General build
+scheduling, validated local publication and CLI activation remain open.
 
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies

@@ -27,53 +27,13 @@ impl SourceSpawnReapiPlan {
         prepared: Arc<PreparedSourceActionInputs>,
         remote_defaults: &BTreeMap<String, String>,
     ) -> Result<Self, String> {
-        let action = prepared.configured_action();
-        let context = action.context();
-        if context.execution_platform().is_none() {
-            return Err("Spawn REAPI plan requires a selected execution platform".to_owned());
-        }
-        let raw = context
-            .raw_platform_fact()
-            .ok_or("Spawn REAPI plan requires the raw platform fact")?;
-        let effective = context
-            .platform_fact()
-            .ok_or("Spawn REAPI plan requires the effective platform fact")?;
-        if !action.exec_properties().is_empty() {
-            return Err("Spawn REAPI plan rejects legacy action exec_properties".to_owned());
-        }
-        let spawn = prepared.spawn();
-        if spawn.environment().inherited().iter().next().is_some() {
-            return Err("Spawn REAPI plan requires resolved inherited environment".to_owned());
-        }
-        if spawn.execution_requirements().iter().next().is_some() {
-            return Err("Spawn REAPI execution requirements are not admitted".to_owned());
-        }
-        let mut platform_properties = if raw.exec_properties.is_empty() {
-            remote_defaults.clone()
-        } else {
-            BTreeMap::new()
-        };
-        // PlatformUtils falls back to the raw platform when the combined map
-        // is empty (for example, all raw properties belong to another group).
-        let properties = if effective.exec_properties.is_empty() {
-            &raw.exec_properties
-        } else {
-            &effective.exec_properties
-        };
-        platform_properties.extend(
-            properties
-                .iter()
-                .map(|(name, value)| (name.to_string(), value.to_string())),
-        );
-        let env = spawn
-            .environment()
-            .fixed()
-            .iter()
-            .map(|(name, value)| (name.to_owned(), value.to_owned()))
-            .collect();
-        let (output_files, output_directories) = output_paths(spawn.outputs())?;
+        let mut command = spawn_command(prepared.configured_action(), remote_defaults)?;
         let mut inputs = SourceInputReapiPlan::from_prepared(prepared)?;
-        for output in output_files.iter().chain(&output_directories) {
+        for output in command
+            .output_files
+            .iter()
+            .chain(&command.output_directories)
+        {
             for input in inputs.input_tree().entries() {
                 if paths_conflict(output, input.path()) {
                     return Err(format!(
@@ -83,13 +43,7 @@ impl SourceSpawnReapiPlan {
                 }
             }
         }
-        let command = ReapiCommand {
-            argv: inputs.take_expanded_argv(),
-            env,
-            output_files,
-            output_directories,
-            platform_properties,
-        };
+        command.argv = inputs.take_expanded_argv();
         let identity =
             ReapiActionIdentity::new(&command, inputs.input_tree().root_digest().clone(), None);
         Ok(Self {
@@ -110,6 +64,66 @@ impl SourceSpawnReapiPlan {
     pub fn identity(&self) -> &ReapiActionIdentity {
         &self.identity
     }
+}
+
+/// Shared policy projection; argv is supplied by the single owned expansion.
+pub(crate) fn spawn_command(
+    action: &slug_analysis_v2::ConfiguredAction,
+    remote_defaults: &BTreeMap<String, String>,
+) -> Result<ReapiCommand, String> {
+    let context = action.context();
+    if context.execution_platform().is_none() {
+        return Err("Spawn REAPI plan requires a selected execution platform".to_owned());
+    }
+    let raw = context
+        .raw_platform_fact()
+        .ok_or("Spawn REAPI plan requires the raw platform fact")?;
+    let effective = context
+        .platform_fact()
+        .ok_or("Spawn REAPI plan requires the effective platform fact")?;
+    if !action.exec_properties().is_empty() {
+        return Err("Spawn REAPI plan rejects legacy action exec_properties".to_owned());
+    }
+    let spawn = action
+        .spawn_spec()
+        .ok_or("Spawn REAPI plan requires typed Spawn")?;
+    if spawn.environment().inherited().iter().next().is_some() {
+        return Err("Spawn REAPI plan requires resolved inherited environment".to_owned());
+    }
+    if spawn.execution_requirements().iter().next().is_some() {
+        return Err("Spawn REAPI execution requirements are not admitted".to_owned());
+    }
+    let mut platform_properties = if raw.exec_properties.is_empty() {
+        remote_defaults.clone()
+    } else {
+        BTreeMap::new()
+    };
+    // PlatformUtils falls back to the raw platform when the combined map
+    // is empty (for example, all raw properties belong to another group).
+    let properties = if effective.exec_properties.is_empty() {
+        &raw.exec_properties
+    } else {
+        &effective.exec_properties
+    };
+    platform_properties.extend(
+        properties
+            .iter()
+            .map(|(name, value)| (name.to_string(), value.to_string())),
+    );
+    let env = spawn
+        .environment()
+        .fixed()
+        .iter()
+        .map(|(name, value)| (name.to_owned(), value.to_owned()))
+        .collect();
+    let (output_files, output_directories) = output_paths(spawn.outputs())?;
+    Ok(ReapiCommand {
+        argv: Vec::new(),
+        env,
+        output_files,
+        output_directories,
+        platform_properties,
+    })
 }
 
 fn output_paths(outputs: &[ActionOutput]) -> Result<(Vec<String>, Vec<String>), String> {

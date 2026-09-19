@@ -7,6 +7,7 @@ repository = { workspace = true }
 version = "0.1.0"
 
 [dependencies]
+slug_analysis_v2 = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }
 slug_build_api_v2 = { workspace = true }
@@ -17,6 +18,5 @@ tonic = { workspace = true, features = ["transport"] }
 
 [dev-dependencies]
 serde_json = { workspace = true }
-slug_analysis_v2 = { workspace = true }
 slug_configuration_v2 = { workspace = true }
 slug_identity_v2 = { workspace = true }

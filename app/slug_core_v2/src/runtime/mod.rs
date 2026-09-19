@@ -44,10 +44,13 @@ mod source_input;
 pub mod starlark;
 
 pub use configured_output::configured_output_root;
+pub use dice::ActionChainResult;
+pub use dice::ActionChainTransport;
 pub use dice::BuildCommandError;
 pub use dice::BuildCommandEvaluation;
 pub use dice::CqueryCommandError;
 pub use dice::CqueryCommandEvaluation;
+pub use dice::PreparedActionChainInputs;
 #[doc(hidden)]
 pub use dice::PreparedSourceActionInputs;
 pub use dice::ResolvedFileWriteSemanticView;
