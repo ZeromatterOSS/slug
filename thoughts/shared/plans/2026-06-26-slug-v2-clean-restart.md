@@ -29,15 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-40-m7a-effective-configured-outputs-r1
+Packet: WP-7-41-m7a-requested-artifacts-r1
 Status: accepted
 
-WP740 accepts effective configured output metadata: hidden runfiles and eligible
-validation groups, authoritative source/generated providers, and actual source/alias
-Target identity. Thirty-six checks pass with final ACCEPT. WP739 remains accepted at
-2a7ea14ab. Next is ordinary requested-group selection from these owners and shared
-prerequisite scheduling; runfiles-family execution and CLI activation remain open.
-M7A remains partial and M8 unproved.
+WP741 accepts admitted explicit build-root metadata and complete ordinary output
+groups from authoritative providers, retaining requested/artifact identity and source
+freshness. Fourteen focused checks and independent final review pass; three old fixture
+failures are baseline-attributed in the manifest. Next: one shared prerequisite forest
+seeded from selected artifacts. Runfiles execution and CLI activation remain open.
+M7A partial, M8 unproved.
 
 ### Earlier generated-input receipt
 

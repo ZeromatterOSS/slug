@@ -1,183 +1,226 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-40-m7a-effective-configured-outputs-r1
+Packet: WP-7-41-m7a-requested-artifacts-r1
 Status: accepted
 
 ## Outcome and basis
 
-Publish effective output providers on admitted configured rule/source/generated-file
-nodes, with alias forwarding. This is the missing producer-owned metadata required
-before Core can select ordinary requested artifacts. WP739 (2a7ea14ab) accepts typed
-OutputGroupInfo construction; it does not add automatic groups. Current source and
-generated nodes publish empty providers and repair DefaultInfo only in a dependency
-view. Rule publication omits hidden runfiles groups and inherited validations.
+Activate admitted explicit build roots and expose complete ordinary requested-artifact
+selection from BuildCommandEvaluation. This is the next owner boundary needed for
+one shared prerequisite forest and ordinary CLI builds of the retained rules_rust
+closure. It must not select all declared actions or substitute DefaultInfo alone.
+WP740 (15e52a764) accepted effective configured providers and file/alias identity,
+with 36 focused checks; its full receipt remains in that commit's manifest.
 
-Demanded by the ordinary build of the retained CLI/rules_rust production closure,
-whose DefaultInfo executable/runfiles and OutputGroupInfo were source-inventoried in
-WP739. No production input is declared unnecessary from lack of execution coverage.
-Pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a (local git objects):
-RuleConfiguredTargetBuilder.java:145-172 adds binary RunfilesSupport.tree or
-nonbinary default_runfiles.getAllArtifacts to _hidden_top_level_INTERNAL_.
-Runfiles.java:425-436 unions its artifacts and symlink/root-symlink targets.
-RuleConfiguredTargetBuilder.java:535-550,633-658 imports Starlark groups through
-stable-order builders; automatic same-name additions union rather than replace.
-Even supplied groups without additions undergo that stable-builder normalization.
-RuleConfiguredTargetBuilder.java:294-296,360-425 propagates nonempty _validation
-from dependency attributes except skip_validations, tool and implicit attributes;
-analysis-test rules suppress automatic propagation. Attribute.java:2009-2010,
-2119-2126,2273-2274 owns skip/tool/implicit classification. Tool includes explicit
-IS_TOOL_DEPENDENCY and tool transitions; Slug's admitted exec/exec-group transitions
-supply that classification. Existing analysis-test rule execution is not admitted.
-AttributeValueSource.java:24-28,65-71 distinguishes late-bound ':name' from implicit
-'$name'. Reuse implementation.late_bound_rule_attributes() for configuration_field
-defaults: their leading underscore does not suppress validation propagation unless
-another skip/tool policy applies. Hidden subrule dependencies remain excluded.
-FileConfiguredTarget.java:48-49,74-100 exposes each file's singleton artifact;
-OutputFileConfiguredTarget.java:109-120 forwards only nonempty generator _validation;
-AliasConfiguredTarget.java:165-189 forwards the actual providers.
+Pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a, local source:
+analysis/TopLevelArtifactHelper.java:204-255 unions FileProvider/DefaultInfo.files
+then OutputGroupInfo.default through a stable builder, skips empty groups, and marks
+names beginning '_' unimportant. analysis/OutputGroupInfo.java:145-152,207-260
+selects sorted default, temp_files_INTERNAL_, _hidden_top_level_INTERNAL_, plus
+_validation under ordinary validation policy (buildtool/BuildRequestOptions.java:
+179-199; BuildRequest.java:451-458). FileConfiguredTarget.java:48-49,74-100 and
+OutputFileConfiguredTarget.java:109-120 own singleton files and generated validations;
+AliasConfiguredTarget.java:165-189 forwards actual providers. Reuse WP739/740 pinned
+provider/source/alias evidence; no new oracle fixture or donor code.
 
-TopLevelArtifactHelper.java:204-239 later unions DefaultInfo.files with explicit
-OutputGroupInfo.default; neither may replace the other here. OutputGroupInfo.java:
-145-152,246-250 and BuildRequestOptions.java:179-199 establish default selection
-(default, temp_files_INTERNAL_, _hidden_top_level_INTERNAL_, plus _validation).
-Command selection/flags, scheduling, runfiles action execution and CLI activation
-remain subsequent work, not a DefaultInfo-only success path.
+Exact admitted semantics: ordinary groups, union/order/dedup, important flag, file
+subset and alias forwarding. Structural identities and diagnostics remain Slug-native.
+Selection is metadata, not execution or publication authority. User output-group
+flags, validation toggles/aspects, wildcard expansion, additional native rule families,
+external non-source roots and mixed external/root requests, scheduling/transport and CLI execution activation remain
+deferred. Retain all selected artifact kinds, including hidden RunfilesTree; the later
+scheduler must reject unsupported execution rather than drop selected requirements.
 
-Exact admitted metadata: stable configured group completion, automatic hidden group,
-filtered transitive validations, singleton file providers, generated validation-only
-forwarding and alias preservation. Existing structural configured/artifact/path
-identity, diagnostics and dir() ordering remain Slug-native. _validation_transitive
-native/builtin override, analysis-test execution, aspects/internal provider merges,
-unsupported node families, output selection and transport remain deferred. Keep the
-explicit private-override rejection; no native allowlist bypass.
+## Owner and contract
 
-## Ownership and implementation
+BuildCommandRootKey and existing observed/legacy Analysis preparation own requested
+root activation. Preserve request order and duplicates separately from deduplicated
+configured action owners. Activate explicit Starlark rules, exported regular sources,
+generated files and aliases using authoritative ConfiguredNodeResult providers. Resolve
+alias actual kind through Analysis, never by assuming a null key denotes a source or
+by inferring owners from paths. Preserve requested identity and actual_target identity;
+forward providers without rebasing artifacts. Reject unsupported alias actual kinds.
 
-ConfiguredNodeResult/ProviderCollection remains the retained DICE owner. Complete
-rule groups once after DefaultInfo/runfiles support is finalized and before result
-publication, in a cohesive new analysis output_groups module. Existing large
-starlark_rule.rs/lib.rs receive delegation only. Preserve unrelated providers and
-DefaultInfo.files exactly; reject duplicate returned groups before completion.
-Use stable/default AnalysisDepset builders with supplied group depsets as children,
-then append automatic group inputs. Preserve artifact owners/configurations/kinds
-and child graph sharing; do not flatten retained artifact depsets or infer owners
-from output spellings. Configured normalization may change a supplied root's order
-or collapse canonical empties, following the pinned builder; constructor-only and
-nested provider values retain WP739 behavior. Tests must distinguish this boundary.
+Preserve root-source byte checks, SourceCertificate, repository canonical routing,
+Need/outer-error precedence, visibility and request revision behavior. Carry source
+certificates through later metadata-analysis errors as well as success. Alias-to-source
+activation must observe actual source content through existing tracked source owners,
+including external sources, and carry its epoch into final native validation. Source
+metadata analysis alone does not prove bytes fresh. Existing external source loading
+can observe directories; directory artifact selection is explicitly unsupported and
+must not silently produce empty success or manufacture file providers. Analyze admitted
+regular external exported sources through the same authoritative Analysis owner.
+Null source analyses are metadata roots, excluded from ValidatedActionClosure's
+configured owners. Alias/generated dependencies continue to bring in real producers.
+LoadedOnly/wildcard/native-unadmitted results may remain loading metadata for existing
+callers, but the new selection API returns an explicit unsupported error for them.
+An analyzed empty output set and a source-only set are legitimate zero-action selections.
 
-Hidden group: RunfilesSupport.tree when present, otherwise default_runfiles.files
-plus artifact targets of symlinks/root_symlinks; exclude data_runfiles and empty
-filenames as artifacts. An empty hidden group is still present for an ordinary rule.
-Validation: own explicit group plus each nonempty eligible dependency group, in
-retained attribute/dependency order. Use Loaded AttributeSchema policy and prepared
-resolved dependency providers, excluding filtered, tool, implicit and hidden/subrule
-edges; never walk arbitrary configured graph edges. Add narrow Loading policy
-accessors over already-retained flags/configuration/name. No new semantic input.
+Expose a borrowed evaluation-owned selection via a cohesive Core child module. Return
+ordered per-request provenance, actual identity, and ordered nonempty output groups.
+Ordinary group order follows the pinned sorted set: _hidden_top_level_INTERNAL_,
+_validation, default, temp_files_INTERNAL_. Default uses a stable depset builder with
+DefaultInfo.files followed by OutputGroupInfo.default; other groups use the same stable
+builder rule. Flatten only this request-local consumer view. Deduplicate artifacts
+structurally across requests/groups into one ordered artifact table, with per-group
+indices preserving membership and order. Preserve full owner/configuration/output-kind
+identity and source labels. No producer lookup, action traversal or execution filtering
+belongs in selection. Missing-producer/action-family checks belong in the next shared
+prerequisite planner, not a fabricated success here.
 
-Make source/generated DefaultInfo authoritative at their existing DICE compute:
-source carries its existing canonical Source artifact; generated File carries the
-resolved generating configured owner's artifact and only that output, plus the
-nonempty generator _validation group. Aliases reuse actual provider collections;
-remove dependency-view synthesis so direct and dependency projections agree.
-Ordinary ctx.attr label dependencies always expose Targets, including source/null
-identities. Remove the legacy source-only File projection that discarded providers
-(StarlarkAttributesCollection.java:339-369 prerequisite-backed attribute construction).
-File consumers extract through DefaultInfo; subrule single-file projections remain
-separate. Independent review accepts this general correction over alias-only repair.
-Source aliases exposed a pre-existing panic: an optional configured-only actual
-identity cannot represent a null source. Replace it with one actual_target:
-ConfiguredNodeKey in ConfiguredNodeResult, retaining actual_configured_target()
-as a projection. Forward this node through aliases and prepared dependency views;
-compute_actual_child follows the actual node, so invalid source platform/constraint
-references fail normally. Source-alias file admissibility identifies an actual
-null target with a singleton Source artifact, uses its filename, and preserves
-source checks even under skip_analysis_time_filetype_check. Unrelated null nodes
-are not treated as files. Independent design-delta review ACCEPT.
-Preserve existing visibility/source observation/Need/error/dependency ownership;
-no direct filesystem reads, new DICE key, cache, interner or async lock.
+New vectors/maps are command scratch borrowing the retained evaluation; existing Arc
+configured results and SourceCertificate remain DICE retained and Allocative-accounted.
+No new key, global cache, interner, filesystem bypass, or lock across compute. Reuse
+Stage9 SmallMap/SmallSet, Arc and AnalysisDepset dispositions and existing DICE dependency
+recording/equality/invalidation (docs/developers/dice.md). Existing observed branch/closure
+frontier association and native final revision validation remain authoritative. Neither
+selection nor new borrowed views can authorize execution after acceptance.
 
-Use existing AnalysisDepset/Arc/CompactString/SmallMap/Allocative and shared
-PublicationEqState (Stage 9 accepted retained depset/compact-owner dispositions).
-New maps/vectors are completion scratch; retained graph children belong to the
-configured result and no evaluator loan escapes. Native source/provider projection
-must retain external canonical identities and generated configuration ownership.
+## Reviewed integration corrections
 
-## Scope and evidence
+Independent design-delta review ACCEPT: source observation errors can have empty
+epochs; preserve the original error with an optional certificate instead of panicking.
+Only successful eligible source observations require a nonempty certificate. A private
+terminal-aware NativeCommandRoot association hook defaults to prior policy. Certified
+requested source aliases (including SourceCertified/SourceArtifactInput failures) use
+SelectedDependencySuperset: aliases can carry repository dependencies even for a local
+actual source. Activation proves actual SourceFile; no null-key inference is introduced.
+Direct sources and unrelated analyses retain their policy. Certified regular external
+source metadata likewise uses the selected dependency superset; observation-only external
+directories retain ClosureRepositories. Certified external metadata Analysis errors use
+the existing transient/unavailable-root error policy so the original diagnostic survives. Every reported observation
+must still match selected demand/value/Arc; full native closure/revision validation
+remains authoritative. Prove a routed external source alias, content mutation, real
+post-byte metadata failure with preserved certificate, and empty-epoch error handling.
 
-Allowlist: Loading attrs.rs narrow policy accessor and focused child tests;
-Analysis new output_groups.rs and child tests, minimal lib.rs/starlark_rule.rs wiring;
-dice.rs existing source/generated/provider projection branches; result.rs actual-node
-identity replacement and subrule.rs source-alias policy only; new integration
-children tests/effective_output_groups and tests/file_output_providers with minimal
-tests/starlark_rule.rs module wiring. Update affected WP739 output_group_info tests
-only for intentional configured completion, preserving fresh/nested assertions.
-analysis_value.rs legacy source projection removal; existing Analysis rustc_map_each
-and Core/REAPI source-staging/prerequisite/chain test fixtures migrate File extraction
-through DefaultInfo, with affected protected gates. No Core/REAPI production changes.
-Existing analysis tests may receive narrowly required expectation corrections for
-new authoritative file providers/automatic group presence. Build API only if a
-small checked accessor proves necessary. Canonical/current, Stage 6, bootstrap
-readiness status. No Core/REAPI/CLI/server activation or unbounded file refactor.
+External package loading must use the same canonical repository inventory key as
+Analysis. After the apparent route identifies the canonical repository, reuse or
+compute HostCanonicalRepositoryLoadRoute's existing input and observed prefix for
+RepositoryPackageLoadKey::new_canonical. Preserve the original apparent route for
+byte observation/certification and package-before-source ordering. This removes a real
+duplicate BUILD evaluation at its producer identity; never filter duplicate print events.
+Need/path-frontier/typed route errors retain their channels. Complete local builtin
+module prerequisites are required by canonical metadata (including directory loading).
+The protected external test supplies those locally and preserves one BUILD event,
+source frontier, invalidation and package/source Need assertions. Its local virtual
+probes seed current shards/runtime data and its legacy comparison seeds snapshots.
+Independent design-delta review ACCEPT; no Loading/Analysis key or semantics change.
 
-Evidence: explicit hidden group union; binary tree vs nonbinary file/symlink targets
-and exclusion of data/empty entries; empty hidden presence; own/transitive validation
-and skip/implicit/tool/filtered exclusions; stable normalization vs constructor
-identity; unchanged DefaultInfo and explicit default; same-DICE A/B/A through a
-dependency change; source and generated singleton providers; generated validation
-without unrelated generator groups/outputs; alias and dependency equivalence;
-protected user/default/output-group sharing and configured ownership tests.
-Use pinned source regression evidence; no new Bazel oracle is required. Protect
-migrated source fixtures with five Core source/chain cases, two REAPI declaration/
-preflight cases and one existing supervised NativeLink source/generated-chain
-selected-output publication case. No new wire fixture or transport semantics.
+Wildcard selection rejection is proved from the existing observed package-all DICE
+loading terminal on a warmed fixture. Its native acceptance/expansion remains deferred;
+old StrictPathOnly repository restrictions are not relaxed to obtain a passing test.
+Native scalar LoadedOnly and unsupported alias checks remain separate.
+The protected external test's final return to the root package uses its existing
+scalar //:root loading target, preserving successful metadata, exactly ROOT_BUILD,
+and the subsequent pointer-distinct external-frontier check. Its old //:all request
+also encountered the deferred native wildcard repository restriction; that unrelated
+acceptance claim is not part of this source control. Independent correction review ACCEPT.
 
-Root owns completion helper/wiring and integration. File-provider worker owns dice.rs
-and its new integration child. Loading/policy worker owns attrs.rs and effective
-rule-group integration child. Root alone wires shared test parent and edits manifests.
-Independent design then final review required. Serialize Cargo preparation, allow
-built-executable checks in parallel with disjoint useful work. Exact selector
-preflight; tests expected below a few seconds; >30s needs strict necessity.
-Pinned no-run preparation separately capped60s; compile Loading/Analysis and named
-Core/CLI dependents. Format changed Rust; diff/plan/archive checks; final ACCEPT,
-commit/fast-forward main/push with existing authorization. Receipts target/wp740.
-Checkpoint start 2026-09-19 02:08:58 UTC. M7A partial, M8 unproved.
-REPLAN only if source contradicts the selected ownership or an unmodeled prerequisite
-is necessary; normal compiler/fixture/invocation corrections stay within this packet.
+The existing CLI/server execution helpers enumerate all closure actions. New alias and
+generated roots would implicitly gain wrong execution. Before any runtime/transport or
+output side effects, both helpers reject requested Alias/GeneratedFile kinds using a
+borrowed requested-root kind projection; existing Rule and mixed source/rule admission
+is unchanged. This is a temporary gate, not an execution fallback: the violated invariant
+is requested-artifact scheduling, its deletion condition is replacement of both legacy
+helpers by the native shared selected-artifact forest and validated publication, and the
+next scheduling/CLI-activation packet owns removal. Regression: an alias/generated root
+with unrelated producer outputs and invalid backend is rejected before effects, while a
+Rule root passes admission. Do not change analyses() or closure execution-view meaning.
 
-## Acceptance receipt
+## Scope, evidence and validation
 
-Independent design, bounded identity/projection corrections and final review ACCEPT.
-Checkpoint elapsed approximately 20 minutes from recorded start through final review;
-no REPLAN or new semantic owner.
+Allowlist: Core runtime/dice.rs minimal delegation and root/closure dispatch; new
+runtime/requested_artifacts.rs public selection types with runtime/mod.rs exports;
+new runtime/build_requested_target.rs activation helper if needed; corresponding child
+tests under runtime/requested_artifacts/ and runtime/build_requested_target/ with small
+parent wiring; directly affected Core source/alias/external expectation corrections.
+Analysis public APIs only if existing node-key compute cannot establish actual kind,
+requiring a bounded design-delta review. CLI commands/build.rs and server reapi.rs early legacy-execution guards and focused
+child tests; no broader CLI/REAPI production activation. Scheduling
+files current/canonical, Stage7 owner and bootstrap readiness may record accepted scope.
 
-Thirty-six unique checks pass. Loading policy 2/2 (0.003s), unchanged Analysis
-completion/materializer and protected file-policy units 5/5 (0.007s), final Analysis
-integration 21/21 (3.410s), Core source/chain controls 5/5 (1.884s), REAPI declaration/
-preflight controls 2/2 (0.933s), and the existing NativeLink selected-output
-publication case 1/1 (1.554s). Accepted runtime groups total 7.791s. The integration
-group includes direct and aliased source Target/provider equivalence, transitioned
-generated ownership and validation-only forwarding, ordinary and late-bound validation
-eligibility, runfiles groups, A/B/A, six protected Rustc/external-source cases and
-existing provider/default/file/platform/Args/execution-group behavior.
+The existing dice.rs greatly exceeds 2000 lines and loaded-branch function exceeds150;
+move cohesive activation into its child instead of growing the monolith. Estimated
+production growth 250-500 lines and tests 300-500 is a review trigger, not a hard cap.
+Reviewed error/frontier regressions and two wrapper admission tests exceed the initial
+proof estimate; they cover distinct integration owners with shared fixture scaffolding.
+Long existing CLI/server execution functions receive only early guards; their selected
+scheduler replacement remains the next owner boundary, not a refactor in this packet.
+Root owns selection module, exports, integration, scheduling and validation. Activation
+worker owns dice.rs/new helper only. Test worker owns new integration child only; root
+wires modules. Independent design and final review required.
 
-Independent review required a correction for already-admitted late-bound attributes;
-the retained late-bound declaration now distinguishes ':name' from implicit '$name'.
-Source-alias evidence exposed the legacy provider-discarding File projection; it was
-removed for all ordinary ctx.attr dependencies, with explicit File extraction in
-affected fixtures. An initial test-only redundant Arc wrapper and a group-count
-expectation were corrected. Earlier passing unit checks are reused after unrelated
-policy/projection changes. Initial failed receipts remain attributed, not waived.
+Discriminators: DefaultInfo plus explicit default (overlap and distinct); ordinary
+hidden/validation/temp and exclusion of unrelated groups; stable order/important flags;
+per-request/group membership and global dedup; equal spelling with distinct owner/config
+or kind stays distinct; direct/alias/source/generated subset equivalence; hidden binary
+RunfilesTree retained; empty analyzed selection versus LoadedOnly/wildcard/unsupported
+actual error; duplicate roots and real producer closure; source mutation and A/B/A on
+one runtime; routed external source identity and frontier; existing root source error
+and request freshness controls. No claim of shared scheduling or output publication.
 
-Eight pinned preparation invocations total 160.739s, maximum 57.199s, each under the
-separate 60s cap. Final Loading/Analysis/Core/REAPI no-run compiles and Core/CLI check
-pass. Ordinary and ignored selectors were checked exactly. The wire test's first
-sandbox socket denial was cleaned; the authorized rerun passed with its backend
-terminated and fresh root removed. Wire evidence used a fresh local NativeLink.
-Changed Rust formatting, diff/plan/archive checks pass. Receipts: target/wp740/
-loading-policy-r2, analysis-unit, analysis-policy-protected, analysis-integration-r3,
-core-source-chain-protected, reapi-source-chain-protected,
-nativelink_selected_outputs_publish_modes_and_replace_tree and compile/check files.
+Compile pinned Core tests --no-run separately with 60s preparation cap, then preflight
+all exact ordinary selectors once per executable and execute bounded groups. Aim for
+individual checks below a few seconds; >30s needs strict necessity, 12s is guidance.
+Run focused new integration/selection tests and affected protected source/closure tests;
+compile direct CLI/server dependents and run their focused no-effects admission tests. Reuse unchanged Analysis/REAPI proof. No daemon/wire smoke
+is required without execution changes. Rustfmt changed files, git diff --check,
+v2_plan_status.py and v2_archive_status.sh. Final ACCEPT then commit/fast-forward main
+and push under existing authorization. Receipts target/wp741. M7A partial, M8 unproved.
+REPLAN only on a contradicted ownership contract or newly required semantic prerequisite;
+compiler/invocation/fixture corrections remain within the packet.
 
-The observable gate advanced is authoritative effective configured output metadata.
-Ordinary requested-group selection/shared scheduling, runfiles-family execution and
-CLI activation remain open; M7A partial and M8 unproved.
+## Validation receipt
+
+Base: 15e52a764; candidate branch review/wp741-requested-artifacts. Pinned
+nightly-2025-09-14 on Linux GNU, default Core/CLI/server test features. Direct pinned
+binaries were used after the rustup snap launcher failed; no toolchain substitution.
+Runtime selectors were preflighted per executable before execution. Receipts are local
+under target/wp741; this summary preserves the relevant evidence in Git.
+
+Fourteen distinct focused checks have passing evidence: eight new Core checks
+(structural identity/group union, requested membership/order, runfiles/empty/unsupported,
+source and output-group A/B/A, routed external source/alias bytes and digest, certified
+metadata failure, legacy source alias, and empty observation failure); four protected
+Core checks (generated prerequisites, alias/generated/null closure, Need precedence,
+external event/frontier/source lifecycle); and the CLI and server execution guards.
+No action or remote execution is claimed by these metadata and admission tests.
+
+- core-final-r1: 12 selected, 10 passed, 2 failed, 2.608s. Preserve its unchanged
+  passing evidence. Both failures were corrected and rerun: wildcard fixture
+  prerequisites/metadata-only proof and canonical external BUILD producer sharing.
+- core-canonical-correction: 3 selected, 2 passed, 1 failed, 1.209s. External-source
+  selection and wildcard metadata rejection pass. The protected external check reached
+  its late root wildcard transition; the reviewed scalar transition correction then
+  passed 1/1 in 0.488s (protected-external-final), including its final Arc checks.
+- cli-guard-r2 and server-guard-r2: each 1/1, 0.402s and 0.460s. Alias/generated
+  admission rejects before runtime/transport/output effects; mixed source/rule retains
+  its existing no-actions diagnostic. Their unchanged proof is reused after Core's
+  external canonical-package correction; these guard fixtures contain root-only targets.
+- Final Core preparation core-no-run-r8: exit 0, 10.399s. Direct CLI/server dependent
+  preparation wrappers-no-run-r3: exit 0, 13.712s, after the last production change.
+  Earlier module-path and moved-value compiler errors were corrected. All eleven
+  preparation operations totaled 172.942s; longest 36.764s, within each 60s cap.
+
+Three additional old source/event controls fail on both candidate and the retained
+15e52a764 Core/REAPI test executable (baseline-source-event-controls):
+root_exported_source_revision_bridge_retries_changed_terminal_and_preserves_epoch
+lacks WorkspaceSnapshotKey injection; public_multi_source_edit_restore_without_event_replay
+unwraps a missing certificate; build_command_root_selects_each_terminal_producer_once_for_duplicate_targets
+lacks observation shards and fails event ordering. These are attributed baseline
+fixture failures, not passing gates. The fourth baseline failure was the protected
+external source fixture's stale manual epoch probe; this packet repairs and passes it.
+The new native tests supply current request/observation prerequisites and discriminate
+source freshness, repeated roots and group restoration directly. No broad suite claim.
+
+Final rustfmt checks pass for all nine changed/new Rust modules and separately for
+the touched protected-test function; unrelated old formatting in its large parent is
+preserved. git diff --check, v2_plan_status.py and v2_archive_status.sh pass.
+Independent final review ACCEPT: artifact identity, requested-group provenance,
+source freshness and DICE ownership are preserved; canonical package sharing fixes
+duplicate evaluation, and wrapper guards prevent unintended execution activation.
+Packet/review elapsed time was not continuously recorded; compile and runtime durations
+above are measured. No REPLAN: corrections retained the accepted ownership contract.
+The gate advanced is complete ordinary requested-output metadata. M7A remains partial
+and M8 unproved. Next: one shared prerequisite forest seeded from selected artifacts,
+retaining zero-action roots and rejecting unsupported selected execution kinds.

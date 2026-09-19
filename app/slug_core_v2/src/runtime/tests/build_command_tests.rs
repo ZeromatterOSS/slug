@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "../source_staging/test_workspace.rs"]
+mod external_source_fixture;
+
 fn finalize_epoch_for_test(
     runtime: &WorkspaceRuntime,
     token: crate::runtime::repository_io::RepositorySessionToken,
@@ -3625,9 +3628,21 @@ fn public_external_single_uses_observed_family_and_full_source_certificate() {
         .join("../../target/debug/incremental/slug-public-external-source");
     fs::create_dir_all(&stable_parent).unwrap();
     let workspace = tempfile::tempdir_in(stable_parent).unwrap();
+    // Authoritative canonical source metadata uses selected module routes.
+    // Supply those module declarations locally, preserving this fixture's
+    // independent root/dep events and repository source controls.
+    external_source_fixture::write(workspace.path());
+    let prerequisites = fs::read_to_string(workspace.path().join("MODULE.bazel"))
+        .unwrap()
+        .lines()
+        .filter(|line| {
+            !line.starts_with("module(") && !line.starts_with("register_execution_platforms(")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
     fs::write(
             workspace.path().join("MODULE.bazel"),
-            "print('MODULE')\nmodule(name = 'root')\nbazel_dep(name = 'dep', version = '1.0.0')\nlocal_path_override(module_name = 'dep', path = 'dep')\n",
+            format!("print('MODULE')\nmodule(name = 'root')\nbazel_dep(name = 'dep', version = '1.0.0')\nlocal_path_override(module_name = 'dep', path = 'dep')\n{prerequisites}\n"),
         )
         .unwrap();
     fs::write(
@@ -3668,7 +3683,10 @@ fn public_external_single_uses_observed_family_and_full_source_certificate() {
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
-            &[],
+            &[format!(
+                "file://{}/empty-registry",
+                workspace.path().display()
+            )],
             root_setting_overlay(None),
         )
     };
@@ -3700,8 +3718,8 @@ fn public_external_single_uses_observed_family_and_full_source_certificate() {
 
     let checkpoint = audit.checkpoint();
     let cold = run(&target).unwrap();
-    assert_eq!(accepted_output_text(&cold), ["MODULE", "EXTERNAL_BUILD"]);
     let evaluation = cold.terminal_for_test().as_ref().as_ref().unwrap();
+    assert_eq!(accepted_output_text(&cold), ["MODULE", "EXTERNAL_BUILD"]);
     assert!(evaluation.is_observed_exported_source());
     let snapshot = accepted_native_snapshot(&runtime);
     assert!(!snapshot.selected.repository_requests().is_empty());
@@ -3724,13 +3742,47 @@ fn public_external_single_uses_observed_family_and_full_source_certificate() {
             if bytes.as_ref() == b"A"
     ));
     let legacy_tracker = Arc::new(ObservedBuildTracker::default());
+    let legacy_observations = observe_workspace(workspace.path()).unwrap();
     let legacy = runtime.runtime.block_on(async {
         let data = UserComputationData {
             activation_tracker: Some(legacy_tracker.dupe()),
             cycle_detector: Some(bzl_load_cycle_detector()),
             ..Default::default()
         };
-        let mut transaction = runtime.dice.updater_with_data(data).commit().await;
+        let mut updater = runtime.dice.updater_with_data(data);
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: runtime.workspace.clone(),
+                },
+                Arc::new(WorkspaceSnapshot {
+                    files: Arc::new(
+                        legacy_observations
+                            .files
+                            .into_iter()
+                            .map(|file| (file.path, file.value))
+                            .collect(),
+                    ),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceRawSnapshotKey {
+                    workspace: runtime.workspace.clone(),
+                },
+                Arc::new(WorkspaceRawSnapshot {
+                    files: Arc::new(
+                        legacy_observations
+                            .raw_files
+                            .into_iter()
+                            .map(|file| (file.path, file.value))
+                            .collect(),
+                    ),
+                }),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
         transaction.compute(&observed_key.0).await.unwrap()
     });
     let PreparationOutcome::Complete(legacy) = legacy else {
@@ -3761,8 +3813,24 @@ fn public_external_single_uses_observed_family_and_full_source_certificate() {
         )
         .unwrap()
     };
+    async fn probe_with_epoch(
+        runtime: &WorkspaceRuntime,
+        key: &BuildCommandRootObservationKey,
+        epoch: PathObservationEpoch,
+        tracker: Arc<ObservedBuildTracker>,
+    ) -> ObservedBuildOutcome {
+        let mut data = runtime.user_computation_data(None).unwrap();
+        data.activation_tracker = Some(tracker);
+        let mut updater = runtime.dice.updater_with_data(data);
+        updater.changed_to(path_observation_shards(&epoch)).unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        transaction.compute(key).await.unwrap()
+    }
     let tracker = Arc::new(ObservedBuildTracker::default());
-    let package_need = runtime.runtime.block_on(compute_observed_build_with_epoch(
+    let package_need = runtime.runtime.block_on(probe_with_epoch(
         &runtime,
         &observed_key,
         without("dep/pkg/BUILD.bazel"),
@@ -3793,7 +3861,7 @@ fn public_external_single_uses_observed_family_and_full_source_certificate() {
                     && !dependency.starts_with("observed-host-repository-source-file:"),
             )
     );
-    let source_need = runtime.runtime.block_on(compute_observed_build_with_epoch(
+    let source_need = runtime.runtime.block_on(probe_with_epoch(
         &runtime,
         &observed_key,
         without("dep/pkg/source.txt"),
@@ -3906,11 +3974,13 @@ fn public_external_single_uses_observed_family_and_full_source_certificate() {
         BuildCommandErrorKind::RepositoryRoute(_)
     ));
     assert!(missing_repo.source_certificate().is_none());
-    let root = TargetPattern::parse("//:all").unwrap();
+    // Preserve the external-to-root request transition with a scalar loading
+    // target; native wildcard acceptance with repositories remains deferred.
+    let root = TargetPattern::parse("//:root").unwrap();
     let root = run(&root).unwrap();
     assert!(
         root.terminal_for_test().as_ref().is_ok(),
-        "root PackageAll failed after external build: {:?}",
+        "root loading target failed after external build: {:?}",
         root.terminal_for_test()
     );
     assert_eq!(accepted_output_text(&root), ["ROOT_BUILD"]);

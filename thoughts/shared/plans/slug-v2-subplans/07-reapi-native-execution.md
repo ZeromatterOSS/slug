@@ -226,6 +226,25 @@ Concurrent external/legacy namespace mutation, crash recovery, symlink artifacts
 writable-output policy and whole-generation watch publication remain unsupported.
 General build scheduling and CLI activation remain open.
 
+Core's `BuildCommandEvaluation::requested_artifacts()` is the ordinary requested
+output metadata boundary. It selects sorted hidden, validation, default and temporary
+groups; default is the stable union of DefaultInfo.files and OutputGroupInfo.default.
+The borrowed command view preserves each requested identity/actual identity and group
+membership, with one structurally deduplicated artifact table. It does not filter
+unsupported output kinds, resolve producers, read bytes, or authorize execution.
+Loading-only/wildcard results fail selection explicitly; analyzed empty and source-only
+selections remain distinct valid metadata. Source/generated/alias roots use authoritative
+Analysis providers, and source aliases retain tracked content for native final validation.
+Certified alias and regular external-source metadata use the selected dependency frontier;
+reported observations still match exact selected demand/value/Arc identities.
+
+The legacy CLI/server all-action executors reject newly activated Alias/GeneratedFile
+requested roots before effects. This temporary gate is removed when the shared selected
+artifact forest replaces both helpers and reaches native validated publication. Closure
+inspection APIs retain their existing meaning. General requested-artifact scheduling,
+source-only execution completion, runfiles families and ordinary CLI activation remain
+open; metadata selection does not prove those execution gates.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

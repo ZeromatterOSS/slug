@@ -57,6 +57,9 @@ pub use dice::CqueryCommandEvaluation;
 pub use dice::PreparedActionChainInputs;
 #[doc(hidden)]
 pub use dice::PreparedSourceActionInputs;
+pub use dice::RequestedArtifacts;
+pub use dice::RequestedOutputGroup;
+pub use dice::RequestedTargetArtifacts;
 pub use dice::ResolvedFileWriteSemanticView;
 pub use dice::ResolvedRunSemanticView;
 pub use dice::SourceActionResult;
@@ -83,6 +86,7 @@ pub use file_write_aquery_text::format_file_write_aquery_text_output;
 pub use file_write_aquery_text::format_file_write_aquery_text_output_for_scope;
 pub use file_write_identity::FileWriteSemanticIdentity;
 pub use process_host::ProcessHostOwner;
+pub use slug_analysis_v2::ConfiguredNodeKind;
 pub use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 pub use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 pub use slug_bzlmod_v2::LockfileMode;

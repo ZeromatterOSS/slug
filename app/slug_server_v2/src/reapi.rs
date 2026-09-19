@@ -14,6 +14,7 @@ use std::path::Path;
 
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::BuildCommandEvaluation;
+use slug_core_v2::runtime::ConfiguredNodeKind;
 use slug_reapi_v2::RemoteConfig;
 
 /// Execute all declared actions in the evaluation through REAPI and return the
@@ -27,6 +28,18 @@ pub fn run_reapi_build(
     runtime_mode: &str,
     invalidated_files: usize,
 ) -> ReapiBuildOutcome {
+    if evaluation.requested_target_kinds().any(|kind| {
+        matches!(
+            kind,
+            ConfiguredNodeKind::Alias | ConfiguredNodeKind::GeneratedFile
+        )
+    }) {
+        return ReapiBuildOutcome::error(
+            runtime_mode,
+            invalidated_files,
+            "REAPI execution for requested aliases and generated files is unsupported",
+        );
+    }
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -257,6 +270,165 @@ impl ReapiBuildOutcome {
                 runtime_mode,
                 invalidated_files,
             ),
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
+mod requested_root_guard_fixture;
+
+#[cfg(test)]
+mod requested_root_guard_tests {
+    use slug_core_v2::runtime::BzlmodCommandPolicyKey;
+    use slug_core_v2::runtime::BzlmodEnvironmentPolicyKey;
+    use slug_core_v2::runtime::LockfileMode;
+    use slug_core_v2::runtime::ProcessHostOwner;
+    use slug_core_v2::runtime::TargetPattern;
+    use slug_core_v2::runtime::WorkspaceRuntime;
+
+    use super::requested_root_guard_fixture as fixture;
+    use super::*;
+
+    struct Scratch(std::path::PathBuf);
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            std::fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+
+    #[test]
+    fn requested_alias_and_generated_roots_reject_before_execution_setup() {
+        let parent =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/wp741/guards");
+        std::fs::create_dir_all(&parent).unwrap();
+        let root = Scratch(parent.canonicalize().unwrap().join(format!(
+            "server-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+        )));
+        std::fs::create_dir(&root.0).unwrap();
+        fixture::write(&root.0);
+        std::fs::write(
+            root.0.join("defs.bzl"),
+            r#"
+def _generate(ctx):
+    ctx.actions.write(ctx.outputs.out, "bytes")
+    ctx.actions.write(ctx.actions.declare_file("unrelated.out"), "unselected")
+    return [DefaultInfo(files = depset([ctx.outputs.out]))]
+generate = rule(implementation = _generate, attrs = {"out": attr.output(mandatory = True)})
+def _empty(ctx): return []
+empty = rule(implementation = _empty)
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            root.0.join("BUILD.bazel"),
+            r#"
+load(":defs.bzl", "generate", "empty")
+platform(name = "platform")
+exports_files(["input"])
+generate(name = "producer", out = "generated.out")
+alias(name = "rule_alias", actual = ":producer")
+alias(name = "generated_alias", actual = ":generated.out")
+empty(name = "empty")
+"#,
+        )
+        .unwrap();
+        let workspace = WorkspaceRuntime::new(&root.0, ProcessHostOwner::native()).unwrap();
+        let remote = RemoteConfig::from_args(&["--remote_executor=http://[invalid"]).unwrap();
+        for (targets, rejected) in [
+            (vec!["//:rule_alias"], true),
+            (vec!["//:generated_alias"], true),
+            (vec!["//:generated.out"], true),
+            (vec!["//:input", "//:empty"], false),
+        ] {
+            let accepted = workspace
+                .build_command_with_repository_environment(
+                    &targets
+                        .iter()
+                        .map(|target| TargetPattern::parse(target).unwrap())
+                        .collect::<Vec<_>>(),
+                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                    LockfileMode::Update,
+                    &[format!("file://{}/empty-registry", root.0.display())],
+                    Default::default(),
+                    Default::default(),
+                )
+                .unwrap();
+            let published = accepted
+                .project(|terminal| {
+                    let evaluation = terminal.as_ref().as_ref().unwrap();
+                    assert_eq!(
+                        evaluation.requested_target_kinds().any(|kind| matches!(
+                            kind,
+                            ConfiguredNodeKind::Alias | ConfiguredNodeKind::GeneratedFile
+                        )),
+                        rejected
+                    );
+                    let mut output_paths = Vec::new();
+                    for analysis in evaluation.analyses() {
+                        let configuration = analysis
+                            .configured_target_key()
+                            .unwrap()
+                            .configuration()
+                            .slug_configuration()
+                            .unwrap();
+                        let output_root =
+                            slug_core_v2::runtime::configured_output_root(&root.0, configuration);
+                        for action in analysis.actions() {
+                            for output in action.outputs() {
+                                output_paths.push(output_root.join(output.path()));
+                            }
+                        }
+                    }
+                    assert_eq!(output_paths.len(), if rejected { 2 } else { 0 });
+                    assert!(output_paths.iter().all(|path| !path.exists()));
+                    let execute = || {
+                        let outcome = run_reapi_build(
+                            &root.0,
+                            evaluation,
+                            evaluation.analyzed_target_count(),
+                            evaluation.declared_action_count(),
+                            &remote,
+                            "daemon",
+                            0,
+                        );
+                        slug_core_v2::runtime::TerminalOutput::new(
+                            outcome.exit_code,
+                            String::new(),
+                            outcome.stderr,
+                        )
+                    };
+                    let output = if rejected {
+                        // An unguarded path panics if it reaches nested block_on.
+                        tokio::runtime::Builder::new_current_thread()
+                            .build()
+                            .unwrap()
+                            .block_on(async { execute() })
+                    } else {
+                        execute()
+                    };
+                    assert!(output_paths.iter().all(|path| !path.exists()));
+                    output
+                })
+                .publish();
+            let (_, code, _, stderr) = published.into_parts();
+            assert_eq!(code, 2);
+            if rejected {
+                assert!(
+                    stderr.contains(
+                        "REAPI execution for requested aliases and generated files is unsupported"
+                    ),
+                    "{stderr}"
+                );
+            } else {
+                assert!(
+                    stderr.contains("no executable actions were declared"),
+                    "{stderr}"
+                );
+            }
+            assert!(!root.0.join("generated.out").exists());
         }
     }
 }
