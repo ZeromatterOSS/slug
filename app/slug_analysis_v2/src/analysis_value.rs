@@ -32,6 +32,7 @@ use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::ConfiguredTargetValue;
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::FilesToRunProvider;
+use slug_build_api_v2::OutputGroupInfo;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::ProviderOccurrence;
@@ -41,6 +42,7 @@ use slug_build_api_v2::RunfilesSymlink;
 use slug_build_api_v2::RunfilesSymlinkDepset;
 use slug_loading_v2::provider::StarlarkDepset;
 use slug_loading_v2::provider::StarlarkDepsetSuccessorGen;
+use slug_loading_v2::provider::StarlarkOutputGroupInfo;
 use slug_loading_v2::provider::StarlarkToolchainInfo;
 use slug_loading_v2::provider::alloc_frozen_starlark_label;
 use slug_loading_v2::provider::alloc_starlark_depset;
@@ -487,7 +489,21 @@ impl<'a> AnalysisValueMaterializer<'a> {
         }
     }
 
+    fn output_group_info(&mut self, info: &OutputGroupInfo) -> Result<FrozenValue, String> {
+        let fields = info
+            .groups()
+            .iter()
+            .map(|(name, files)| Ok((CompactString::new(name.as_str()), self.depset(files)?)))
+            .collect::<Result<Vec<_>, String>>()?;
+        Ok(StarlarkOutputGroupInfo::alloc(self.heap, fields))
+    }
+
     fn provider(&mut self, occurrence: &ProviderOccurrence) -> Result<FrozenValue, String> {
+        if occurrence.identity().is_builtin("OutputGroupInfo") {
+            let info =
+                OutputGroupInfo::from_occurrence(occurrence).map_err(|error| error.to_string())?;
+            return self.output_group_info(&info);
+        }
         if let Some(value) = FilesToRunProvider::from_occurrence(occurrence) {
             return Ok(self.files_to_run(&value));
         }
@@ -650,11 +666,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
                 fields.insert("data_runfiles".into(), self.runfiles(&info.data_runfiles)?);
                 fields.insert("files_to_run".into(), self.files_to_run(&info.files_to_run));
             }
-            ProviderValue::OutputGroupInfo(info) => {
-                for (name, files) in &info.groups {
-                    fields.insert(name.as_str().into(), self.file_depset(files));
-                }
-            }
+            ProviderValue::OutputGroupInfo(info) => return self.output_group_info(info),
             ProviderValue::RunEnvironmentInfo(info) => {
                 fields.insert(
                     "environment".into(),
@@ -921,7 +933,9 @@ impl<'v> AnalysisValueLowerer<'v> {
                 continue;
             }
             let provider_fields =
-                if let Some(fields) = StarlarkToolchainInfo::fields_from_value(value) {
+                if let Some(fields) = StarlarkOutputGroupInfo::fields_from_value(value) {
+                    Some(fields)
+                } else if let Some(fields) = StarlarkToolchainInfo::fields_from_value(value) {
                     Some(fields)
                 } else if let Some((_, fields)) = BuiltinProviderView::fields_from_value(value) {
                     Some(fields)
@@ -1048,7 +1062,9 @@ impl<'v> AnalysisValueLowerer<'v> {
         if StarlarkDepset::parts_from_value(value).is_some() {
             return self.lower_depset(value, path);
         }
-        let provider = if let Some(fields) = StarlarkToolchainInfo::fields_from_value(value) {
+        let provider = if let Some(fields) = StarlarkOutputGroupInfo::fields_from_value(value) {
+            Some((ProviderIdentity::builtin("OutputGroupInfo"), fields))
+        } else if let Some(fields) = StarlarkToolchainInfo::fields_from_value(value) {
             Some((ProviderIdentity::builtin("ToolchainInfo"), fields))
         } else if let Some((identity, fields)) = BuiltinProviderView::fields_from_value(value) {
             Some((identity, fields))
@@ -1169,14 +1185,21 @@ mod tests {
             ProviderValue::DefaultInfo(
                 DefaultInfo::from_executable(executable_artifact.clone(), None).unwrap(),
             ),
-            ProviderValue::OutputGroupInfo(OutputGroupInfo::new(BTreeMap::from([(
-                "validation".to_owned(),
-                Depset::from_direct(
-                    slug_build_api_v2::DepsetOrder::Default,
-                    vec!["pkg/validation.txt".to_owned()],
-                )
+            ProviderValue::OutputGroupInfo(
+                OutputGroupInfo::new(BTreeMap::from([(
+                    "validation".to_owned(),
+                    AnalysisDepset::new(
+                        slug_build_api_v2::DepsetOrder::Default,
+                        vec![AnalysisValue::artifact(AnalysisArtifact::Source(
+                            slug_identity_v2::CanonicalLabel::parse("@@//pkg:validation.txt")
+                                .unwrap(),
+                        ))],
+                        vec![],
+                    )
+                    .unwrap(),
+                )]))
                 .unwrap(),
-            )]))),
+            ),
             ProviderValue::RunEnvironmentInfo(RunEnvironmentInfo {
                 environment: BTreeMap::from([("KEY".to_owned(), "value".to_owned())]),
                 inherited_environment: vec!["PATH".to_owned()],
@@ -1256,13 +1279,20 @@ mod tests {
             "bin/tool"
         );
         assert!(files_to_run.runfiles_manifest.to_value().is_none());
-        let output_groups = builtin(target, "OutputGroupInfo");
-        assert_eq!(output_groups.dir_attr(), ["validation"]);
+        let output_groups = target
+            .providers
+            .get(&ProviderIdentity::builtin("OutputGroupInfo"))
+            .unwrap();
+        let fields = StarlarkOutputGroupInfo::fields_from_value(output_groups.to_value()).unwrap();
+        assert_eq!(fields[0].0, "validation");
+        let file = StarlarkDepset::direct_from_value(fields[0].1).unwrap()[0];
         assert_eq!(
-            StarlarkDepset::direct_from_value(field(output_groups, "validation").to_value())
-                .unwrap()[0]
-                .unpack_str(),
-            Some("pkg/validation.txt")
+            AnalysisArtifactValue::from_starlark(file)
+                .unwrap()
+                .artifact()
+                .path()
+                .as_ref(),
+            "pkg/validation.txt"
         );
         let run_environment = builtin(target, "RunEnvironmentInfo");
         let environment =

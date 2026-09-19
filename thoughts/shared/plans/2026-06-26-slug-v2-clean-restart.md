@@ -29,14 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-38-m7a-validated-output-publication-r1
+Packet: WP-7-39-m7a-artifact-owned-output-groups-r1
 Status: accepted
 
-WP738 selected-output publication is accepted: verified File/Directory downloads,
-0555 modes, confined sibling staging and per-artifact replacement under Core's
-final source-validation boundary. All 27 focused gates and the CLI compile
-dependent pass; independent final review ACCEPT. General build scheduling and
-CLI activation remain open; M7A partial and M8 unproved.
+WP739 accepts artifact-owned OutputGroupInfo construction and configured provider
+round trips, preserving owners, depset topology and cross-provider sharing. Nineteen
+focused gates and Core/CLI checks pass with independent final ACCEPT. WP738 selected
+output publication remains accepted at 0ec1eb5e7. Next requested-build selection must
+account for implicit validation/runfiles groups and source/alias/generated targets
+before scheduling and CLI activation. M7A remains partial and M8 unproved.
 
 ### Earlier generated-input receipt
 

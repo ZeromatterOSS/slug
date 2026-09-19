@@ -155,6 +155,7 @@ use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::path_observation_shards;
 use starlark_map::small_map::SmallMap;
 
+mod output_group_info;
 mod rustc_map_each;
 
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]

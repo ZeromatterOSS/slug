@@ -32512,7 +32512,7 @@ RUN = RunEnvironmentInfo
 }
 
 #[test]
-fn output_group_info_is_a_bzl_only_fail_closed_native_declaration() {
+fn output_group_info_is_a_bzl_only_native_provider_callable() {
     let module = eval_bzl_with_identity(
         "NATIVE = OutputGroupInfo\nUSER = provider()",
         clippy_owner(),
@@ -32529,12 +32529,13 @@ fn output_group_info_is_a_bzl_only_fail_closed_native_declaration() {
             .is_ok()
     );
     assert!(eval_global("X = OutputGroupInfo", &build_file_loading_globals()).is_err());
-    let error = eval_bzl_with_identity("X = OutputGroupInfo()", clippy_owner())
-        .unwrap_err()
-        .to_string();
+    let module = eval_bzl_with_identity("X = OutputGroupInfo()", clippy_owner()).unwrap();
     assert!(
-        error.contains("OutputGroupInfo construction is unsupported during loading"),
-        "{error}"
+        crate::provider::StarlarkOutputGroupInfo::fields_from_value(
+            module.get("X").unwrap().value()
+        )
+        .unwrap()
+        .is_empty()
     );
 }
 

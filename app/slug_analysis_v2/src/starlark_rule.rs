@@ -2398,7 +2398,18 @@ pub(crate) fn evaluate_loaded_rule(
                 )
                 .into());
             };
-            provider_values.push(ProviderValue::Occurrence(provider.clone()));
+            if provider.identity().is_builtin("OutputGroupInfo") {
+                let groups = slug_build_api_v2::OutputGroupInfo::from_occurrence(provider)
+                    .map_err(|error| error.to_string())?;
+                if groups.groups().contains_key("_validation_transitive") {
+                    return Err("configured _validation_transitive override is unsupported"
+                        .to_owned()
+                        .into());
+                }
+                provider_values.push(ProviderValue::OutputGroupInfo(groups));
+            } else {
+                provider_values.push(ProviderValue::Occurrence(provider.clone()));
+            }
         }
     }
     if !provider_values

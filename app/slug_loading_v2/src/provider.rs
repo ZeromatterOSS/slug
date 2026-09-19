@@ -73,6 +73,9 @@ use crate::bzl_module::manifest_starlark_sources;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::starlark_label::StarlarkLabel;
 
+mod output_group;
+pub use output_group::StarlarkOutputGroupInfo;
+
 pub fn starlark_label(value: Value<'_>) -> Option<CanonicalLabel> {
     StarlarkLabel::from_value(value).map(|value| value.canonical().clone())
 }
@@ -157,7 +160,7 @@ impl<'v> StarlarkValue<'v> for DeclarationOnlyAppleProviderKey {
     }
 }
 
-/// Fixed `.bzl` declaration token; configured output-group values are deferred.
+/// Builtin callable and configured-target provider key.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct OutputGroupInfo;
 
@@ -174,12 +177,19 @@ impl<'v> StarlarkValue<'v> for OutputGroupInfo {
     fn invoke(
         &self,
         _me: Value<'v>,
-        _args: &Arguments<'v, '_>,
-        _eval: &mut Evaluator<'v, '_, '_>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        Err(starlark::Error::new_other(anyhow::anyhow!(
-            "OutputGroupInfo construction is unsupported during loading"
-        )))
+        output_group::construct(args, eval)
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other).is_some())
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "OutputGroupInfo provider".hash(hasher);
+        Ok(())
     }
 }
 

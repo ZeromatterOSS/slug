@@ -27,6 +27,19 @@ remain unsupported. ConfiguredTargetKey.artifact_owner exposes the existing
 Analysis producer projection, including full configuration and toolchain execution-
 platform preference, for Core prerequisite lookup. No new artifact identity.
 
+WP-7-39 retains OutputGroupInfo as checked artifact depsets in the configured
+provider collection. The kwargs-only loading/analysis constructor normalizes File
+lists/tuples immediately; dependency, forwarded and nested values share its builtin
+identity and the existing graph-aware lowering/materialization memo. Groups retain
+source labels, derived owners/configurations/kinds, depset order/topology and aliases
+across groups/providers. Only an all-empty record canonicalizes its group depsets
+to the default empty. Publication uses the shared provider equality state.
+Field iteration follows pinned Bazel UTF-16 ordering; public dir() inherits native
+Rust ordering. User providers named OutputGroupInfo remain distinct. Configured
+_validation_transitive overrides reject pending the native allowlist/propagation
+owner. Implicit runfiles/validation groups, internal merges, requested-output
+scheduling and CLI activation remain deferred.
+
 Registration-error identity is implemented and accepted at `a06f3ddfc`; source
 observation presentation is accepted at `ac6140f41`. Preserve the shared typed
 Loading-owned error DAG, structural equality and bounded borrowed Display/Debug.

@@ -1,173 +1,156 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-38-m7a-validated-output-publication-r1
+Packet: WP-7-39-m7a-artifact-owned-output-groups-r1
 Status: accepted
 
-## Outcome and compatibility
+## Outcome and basis
 
-Execute the existing selected FileWrite/Spawn prerequisite chain, privately download
-and verify all selected action outputs, and publish those File/Directory artifacts
-only after Core's complete source frontier passes final validation. Intermediate
-producer outputs remain CAS-only. Public library operation only; general scheduling
-and CLI activation stay deferred. This advances bootstrap's generated file/tree
-materialization gate. Baseline e90aeaaaf owns verified chain execution and manifests.
+Retain OutputGroupInfo as owner-bearing artifact depsets and admit its ordinary
+Starlark constructor and provider round trips. This removes a concrete prerequisite
+for requested-output scheduling: current groups are path-only Depset<String>, the
+constructor always rejects, and dependency fields materialize strings. Inferring
+producers from those paths would discard owner/configuration/kind. The authentic
+rules_rust rust/private/rustc.bzl:2153-2168 constructs these groups for metadata and
+other compiler outputs. Baseline 0ec1eb5e7 accepts selected-action execution and
+publication; selecting all requested build artifacts remains separate work.
 
 Pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-RemoteExecutionService.java:1350-1384 completes downloads before moving outputs;
-915-922 uses 0555 regardless of producer executable bit; OutputPermissions.java
-READONLY=0555. FileSystemUtils.moveFile:454-489 does not promise atomic group moves.
-AbstractActionInputPrefetcher:681-728 chmods temporary files, and 365-397 restores
-tree-directory modes while shared package parents remain writable. Exact: verified
-file content and default 0555 file/tree permissions. Slug-native: existing configured
-paths, preserving all verified manifest empty directories, per-declared-output atomic
-replacement and error text. No command-wide filesystem atomicity claim. Deferred:
-symlink artifacts, writable-output policy, Windows/non-Linux publication, general
-scheduling/recovery, CLI/watch activation, bootstrap and exact ActionKey.
+OutputGroupInfoApi.java:41-52 supplies kwargs-only construction;
+OutputGroupInfo.java:575-584 sorts names and converts values through
+StarlarkRuleConfiguredTargetUtil.java:227-235 (list/tuple Artifact sequences become
+stable-order depsets; existing Artifact depsets retain topology/order). No field
+name whitelist or artifact-kind filter exists in this constructor. Empty fields
+remain present. OutputGroupInfo.java:284-306,374-391 canonicalizes every field to
+the common stable-order empty depset only when ALL groups are empty; mixed groups
+retain their supplied empty depsets. OutputGroupInfo.java:329-357,385-391,555-562
+owns attr/index/membership/iteration. StructImpl.java:97-131 and
+Depset.java:550-560 own provider/field/depset-identity equality and hashing.
+Duplicate providers returned by one rule fail (StarlarkRuleConfiguredTargetUtil:
+270-274); internal aspect/rule merge is separate and actually unions all equal
+names despite its stale comment (OutputGroupInfo.java:182-204).
 
-The explicit atomic unit is one declared File or whole declared Directory. Finish
-all downloads/modes/preflight before any artifact rename. CAS, staging, source retry
-or cancellation before publication leaves old artifact outputs intact. A final
-filesystem commit error (or a later bookkeeping error) may leave earlier artifacts
-replaced, but returns no AcceptedCommand or success events. No rollback promise.
-This matches the bounded Bazel output-group model; a whole-bin snapshot would add
-an unneeded O(all existing outputs) owner and is not selected. Stage 7 watch's future
-whole-generation publication remains a separate contract.
+Exact admitted behavior: kwargs, sequence/depset normalization, artifact typing,
+field presence/access, membership/index type behavior, UTF-16-sorted field iteration,
+empty normalization, builtin identity and depset identity/sharing preservation.
+Existing Slug-native structural configured/artifact identities, Rust representation,
+rendered repr/diagnostics and hash bytes remain native. Public dir() inherits the
+Starlark runtime's Rust Unicode sorting, distinct from UTF-16 provider iteration;
+hash/equality consistency is required. No JVM or source-byte/path inference. Unsupported/deferred: implicit
+hidden runfiles groups, transitive validation propagation, internal aspect/group
+merge, requested-output scheduling/flags, CLI activation and bootstrap acceptance.
+Constructor accepts arbitrary names including _validation_transitive; configured
+return of that private override explicitly rejects until its allowlist/propagation
+owner exists (RuleConfiguredTargetBuilder.java:367-381). _validation can be retained
+as declared data but does not claim complete ordinary-build validation semantics.
 
-## Ownership and request lifecycle
+## Ownership and representation
 
-Existing ActionChainStagingKey/evaluation owns selected action and its complete
-source/build certificate. No new semantic DICE key, retained output contents or
-side semantic cache. Use the validated plan's last action and its structural
-configuration, never caller-supplied destination/RemoteExecutionResult provenance.
-ConfiguredOutputOwner retains configuration projection collision ownership and
-configured_output_root spelling. New confined staging reuses its structural register
-but does NOT use existing path-following claim_sidecar I/O.
+The existing ConfiguredNodeResult/ProviderCollection remains the DICE semantic owner.
+Replace only OutputGroupInfo's path-only groups with checked AnalysisDepset values,
+private immutable group storage and accessors. Accept Empty or Artifact element
+metadata and every AnalysisArtifact kind, including source, File, Directory,
+Symlink and RunfilesTree. Keep the FileDepset alias for unrelated runfiles strings.
+Constructor returns Result; prevent unchecked insertion via public mutable fields.
+Provide typed builtin lookup and checked ProviderOccurrence conversion so fresh,
+forwarded dependency and nested provider values use one builtin identity.
 
-Core exposes ActionOutputStaging with read-only declared outputs and methods to
-create a regular file or directory at one output index plus a canonical tree-relative
-path (empty path denotes the declared root). It exposes no arbitrary filesystem
-root or publication method to transports. Exclusively created hidden sibling entries and
-owned directory descriptors survive transfer; successful sealing checks every
-selected output exists with its declared kind, applies 0555 file/tree permissions,
-and finishes file writes before returning a publishable pending object. Ordinary
-package parents remain writable. No output-file content is accumulated in RAM.
+Do not flatten, rebuild, stringify or rebase retained artifact depsets. Reuse the
+existing graph-aware AnalysisValueLowerer and materializer and their occurrence
+memoization. Preserve source labels, derived owners/configurations/path/kind,
+transitive graph topology/order and cross-field/cross-provider sharing. All-empty
+canonicalization is the specified exception. OutputGroupInfo publication equality
+must use the incoming shared PublicationEqState across all groups, not ordinary
+AnalysisDepset occurrence equality or one new state per group. No new DICE key,
+interner, side cache or transport state. Reuse existing compact map/Arc/depset
+owners under Stage 9; retained metadata belongs to the configured graph, evaluator
+values to that evaluator, lowering scratch to the call, with no escaped heap loans.
 
-Add ActionChainOutputTransport: ActionChainTransport with an async stage_outputs
-callback receiving &mut Session and &ActionOutputStaging. REAPI implements it using
-only the current private session's selected verified result and fixed CacheClient.
-Reconcile exact output paths/kinds, reconstruct trees from the bounded manifest,
-and stream every file with read_blob_verified into freshly created staging files.
-Callback bytes are provisional until final digest/size success. Any late failure
-drops the entire staged set. Missing CAS never reads local outputs or reruns a
-producer. Existing metadata-only operation and detached legacy materializer remain
-unchanged. New execute_and_publish_action_chain_with_repository_environment shares
-chain ordering/prechecks through a private publication policy; avoid duplicating
-the complete driver. ActionChainResult gains optional published-output metadata.
+## Starlark and analysis boundary
 
-NativeCommandRoot gets a default no-op synchronous publication callback. Add a
-finalize_native_with_publication variant, preserving the old no-op wrapper/tests.
-Under the existing RequestRevision owner: compare DICE version, reobserve full
-certificate, commit selected DICE revision, then invoke the synchronous publication
-callback before releasing the owner. No downloads, Execute, DICE compute or Starlark
-run under this lock. Publication errors are distinct from observation errors. The
-selected DICE revision may already advance on publication failure; abort restores
-native accepted bookkeeping/events, but does not claim filesystem rollback. Audit
-fallible native bookkeeping after callback and test its failure classification.
-Only the new publishing operation has a pending output capability to commit.
-An older AcceptedCommand cannot authorize later publication. Source/version retry
-never calls the callback and discards the pending stage before a fresh attempt.
+Put the fresh/frozen StarlarkOutputGroupInfo value and constructor in a dedicated
+loading provider child module; provider.rs gets minimal callable/key wiring.
+Construction is also valid during .bzl loading when inputs are valid. Normalize
+list/tuple Files immediately through the existing depset builder, reject every
+wrong element/value before creating the provider, and preserve supplied depsets.
+Validate all fields before all-empty normalization; empty groups cannot hide invalid
+values. Fresh and dependency-rematerialized instances share this value class and
+attr/index/in/iteration/dir/equality/hash behavior. Missing fields differ from present
+empty fields; nonstring membership is false and nonstring indexing errors. Preserve
+arbitrary valid-Unicode group names and compare names by UTF-16 for retained field
+order and iteration; public dir() retains the inherited native ordering above.
 
-## Filesystem boundary
-
-Linux GNU only for the new publisher (the existing nix renameat2 binding). Use existing nix directory-relative operations:
-anchor workspace, walk/create bazel-out/configuration/bin and marker parents with
-O_DIRECTORY|O_NOFOLLOW, and verify canonical configuration marker bytes through
-no-follow regular-file handles. A collision never writes selected artifacts. Reject
-preexisting symlink/special-file roots, parents and artifact leaves. Stage as hidden direct siblings of each destination, outside declared artifact
-paths, using owned descriptor-backed paths only where tempfile requires a path.
-Linux requires write permission on a directory moved between parents; same-parent
-rename preserves sealed 0555 roots and old output modes without any chmod window. Do not follow an unvalidated destination pathname.
-Canonical segments reject empty, dot/dotdot, slash/backslash and NUL components;
-file/tree-relative APIs prevent output-root escape and type/ancestor collisions.
-Paths cap at 256 components; descriptor traversal uses O(depth) handles.
-
-Preflight all destination parents/leaves, then recheck before publication. Existing
-regular files/directories are replaced with renameat2(RENAME_EXCHANGE); absent
-artifacts use RENAME_NOREPLACE. Never remove an old artifact first and never copy
-across filesystems. Unrelated siblings remain untouched; a tree replacement removes
-stale children as one artifact. Configuration root/parent identity changes fail
-closed. The supported writer model is one coordinated Slug publisher per workspace;
-concurrent external/legacy mutation of that output namespace is unsupported, with
-no-follow operations still required to prevent escape. No cross-process writer
-lock or crash-durability guarantee is added.
-
-Retired outputs remain at the pending object's hidden names after swaps; cleanup
-tracks their saved old identities, never the staged-root handles now naming published artifacts.
-Cleanup occurs outside the revision-owner critical section, including error/unwind
-paths. Confined cleanup must handle read-only directories and unlink symlinks
-without following them; it removes only request-owned hidden entries whose identities still match.
-Cleanup failure cannot retroactively turn a successful namespace commit into a
-failed publication. No detached tasks. Metadata/pending handles are attempt-owned;
-accepted published metadata owns no staged buffers or open handles. Reuse compact
-Arc/SmallMap utilities (Stage 9); no new dependency/interner/cache. Work is linear in
-selected manifest entries and retired selected trees, with bounded transfer memory;
-no full-bin scan/copy and no performance claim.
+AnalysisValueLowerer recognizes the wrapper both in reachable-depset discovery and
+generic provider lowering; the materializer handles builtin occurrences and typed
+OutputGroupInfo through the same wrapper and existing depset() path. Rule return
+assembly canonicalizes the builtin occurrence into checked typed OutputGroupInfo,
+including forwarded providers. User providers merely named OutputGroupInfo stay
+separate. Duplicate builtin returns remain errors, never implicit merges. Existing
+DefaultInfo, ToolchainInfo and user-provider lowering must remain unchanged.
 
 ## Scope and evidence
 
-Allowlist: Core new runtime/action_output_staging.rs and platform module plus focused tests; minimal
-configured_output.rs delegation/secure claim ownership, action_chain_execution.rs
-and its tests, dice.rs NativeCommandRoot/driver callback, request_revision.rs hook
-and focused lifecycle tests, mod.rs exports. REAPI new action_chain/output_staging.rs
-and tests plus action_chain.rs trait implementation delegation, lib.rs if needed;
-minimal visibility in action_chain/tests.rs to reuse the existing public fixture.
-Canonical/current manifest, Stage 7 and bootstrap-readiness status only. No CLI or
-server execution activation, old materializer migration or arbitrary output import.
-Large dice.rs gets only delegation/hook wiring; new filesystem logic lives separately.
+Allowlist: slug_build_api_v2/src/providers/mod.rs (or cohesive output-group child)
+and its existing providers tests; slug_loading_v2/src/provider.rs plus new
+provider/output_group.rs and focused child tests, and the one old loading test that
+asserted constructor rejection; slug_analysis_v2/src/analysis_value.rs minimal
+lowering/materialization wiring and existing typed-group test conversion;
+starlark_rule.rs minimal typed return conversion; new focused analysis integration
+test child module and minimal module wiring in tests/starlark_rule.rs to reuse its
+existing configured/DICE test harness. Existing huge
+provider/analysis files gain only delegation, not another embedded value/test owner.
+Canonical/current manifest, Stage 6 and bootstrap readiness owner status only.
+No action selection, scheduler, REAPI, Core or command/daemon edits.
 
-Parallel ownership: root filesystem owner; Core lifecycle worker; REAPI transfer
-worker; independent design/final reviewer. Required evidence: selected File+Directory
-publication with correct bytes/default 0555 even producer false mode, empty/nested
-dirs; same-root tree replacement removes stale children and preserves unrelated
-siblings; configuration A/B/A roots and structural collision; missing/corrupt late
-file after earlier staging leaves old artifact group intact; source mutation during
-output download causes fresh retry with no stale publication; failure/unwind stage
-cleanup; symlink root/parent/leaf and outside sentinels; failed final rename returns
-no acceptance and explicitly reports possible partial publication. Reuse WP737 chain
-and full-frontier controls, WP735 manifest guards, existing revision lifecycle proof.
-Tiny public NativeLink gate plus focused Core/filesystem tests; no fresh Bazel oracle.
+Independent design/final review required for this retained public provider boundary.
+Parallel writers: Build API retained owner/tests; loading evaluator wrapper/tests;
+root analysis handoff/integration tests; separate reviewer. Keep edits disjoint and
+Cargo preparation serialized. Evidence: lists/tuples/depsets, shared transitive
+inputs, all-empty versus mixed-empty orders, arbitrary/reserved/Unicode names,
+empty versus missing, wrong values/elements and duplicates, fresh/dependency
+operations, source and different configured owners with the same output spelling,
+Directory/other artifact-kind retention, forwarded/nested-provider round trips,
+user/builtin distinction, publication alias changes and configured A/B/A invalidation.
+Reuse source-pinned provider/depset evidence; no new Bazel execution is needed.
 
-Pinned no-run preparation separately capped at 60s, exact selector preflight, focused
-runtime groups expected under a few seconds. Any >30s runtime test needs strict
-necessity; none planned. Compile Core/REAPI and CLI direct dependent; rustfmt,
-diff/plan/archive checks. Receipts target/wp738. Independent design/final review
-before commit/fast-forward main/push, already authorized. M7A partial and M8 unproved.
-REPLAN if publication requires whole-generation atomicity, new semantic identity,
-external producers, cross-process coordination or broader CLI scheduling.
-
+Pinned preparation uses no-run Cargo JSON, separately capped at 60s; exact selector
+preflight and focused tests expected under a few seconds. Tests exceeding roughly
+30s require strict necessity. Compile named direct dependents Core and CLI as
+appropriate after Build API/loading/analysis tests; no broad suite or remote probe.
+Changed Rust formatting, diff/plan/archive checks, independent final ACCEPT, then
+commit/fast-forward main/push using existing authorization. Receipts target/wp739.
+Design checkpoint started 2026-09-19 01:50:38 UTC. M7A remains partial; M8 unproved.
+REPLAN only for a necessary new semantic owner or contradiction with pinned provider
+semantics; ordinary invocation/compiler/test corrections remain in this packet.
 
 ## Acceptance receipt
 
-Independent design and final reviews ACCEPT. A measured Linux EACCES failure
-corrected the initial cross-parent staging layout to the reviewed hidden-sibling
-layout; the corrected readonly-tree replacements pass. Review also corrected
-private-prefix depth accounting and preserved publication diagnostics when abort
-restoration fails. No broader scheduling or milestone acceptance is claimed.
+Independent design and final reviews ACCEPT. Checkpoint elapsed approximately
+16 minutes from the recorded design start through final review; no REPLAN.
 
-Pinned Core/REAPI `cargo test --lib --no-run --message-format=json` preparations
-and `cargo check -p slug_cli_v2` pass. Six preparation invocations total 99.884s,
-maximum 29.624s, separately bounded from tests. Final focused evidence comprises
-27 unique passing cases in 8.982s: Core filesystem 8/8 (0.497s), publication
-lifecycle 6/6 (1.621s), unchanged protected chain/revision/configuration controls
-9/9 (1.431s), REAPI schema 1/1 (0.003s), and three fresh NativeLink cases
-(1.500s, 1.999s, 1.931s). The wire cases cover selected-only file/tree publication,
-late missing/corrupt downloads preserving old outputs, and source-change retry.
-All ordinary and ignored selectors were checked exactly. Backend processes exited
-and fresh roots were removed. Initial failing filesystem receipts remain attributed
-to the corrected layout; no failed gate is waived.
+Nineteen unique focused cases pass: Build API 6/6 (0.002s), loading 6/6 (0.010s),
+analysis materializer/lowering 4/4 (0.004s), duplicate/private-override and protected
+recursive-provider integration 2/2 in the initial 0.153s group, and corrected
+configured forwarding/A/B/A 1/1 (0.082s). Source artifacts are checked by the
+retained owner, loading constructor and typed materializer. The configured test
+always declares both File alternatives plus a Directory and changes only selected
+groups; two forwarding edges preserve the original owner, nested builtin identity,
+cross-provider depset sharing and A/B/A publication equality. No actions execute.
 
-Receipts: `target/wp738/core-{filesystem,lifecycle}-r2.receipt`,
-`core-protected.receipt`, `reapi-schema-r2.receipt`, the three `nativelink_*.receipt`,
-and compile JSON/receipts. Changed Rust formatting, diff, plan and archive checks
-pass. The observable gate advanced is validated selected-output materialization;
-M7A remains partial, M8 unproved, and general build/CLI activation remains open.
+Initial compile failures were corrected SmallMap indexing in tests and a missing
+structural-hash trait bound. Integration fixture corrections separated a shadowed
+builtin alias into its own loaded module, replaced unsupported ctx.files access
+with declared artifacts, and asserted the exact root-package relative output path.
+Those failure receipts remain available; no production provider failure is waived.
+The loading selector's old module prefix was corrected before execution. Unchanged
+passing checks are reused after fixture-only edits.
+
+Pinned no-run preparations for Build API/loading/analysis and the Core/CLI check
+pass. Ten preparation invocations, including corrected compiles, total 162.027s
+(maximum 37.481s); these were separate from test runtime and each below the 60s
+preparation cap. Exact selector preflights, changed-Rust formatting, diff, plan and
+archive checks pass. Receipts are in target/wp739: build-api-focused,
+loading-output-groups-r2, analysis-unit, analysis-integration (two passing controls),
+analysis-integration-r5 and dependents-check, plus compile/preflight evidence.
+Observable gate: typed OutputGroupInfo constructor and configured round trips.
+Requested scheduling/implicit groups/CLI activation remain open; M7A partial,
+M8 unproved.

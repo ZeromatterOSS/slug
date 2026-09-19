@@ -624,12 +624,18 @@ fn toolchain_info_uses_builtin_identity_not_a_user_provider_name() {
 #[test]
 fn output_group_info_keeps_named_file_depsets() {
     let mut groups = BTreeMap::new();
-    groups.insert("validation".to_owned(), files(&["pkg/validation.txt"]));
-    groups.insert("hidden_top_level".to_owned(), files(&["pkg/hidden.txt"]));
+    groups.insert(
+        "validation".to_owned(),
+        artifact_files(&["pkg/validation.txt"]),
+    );
+    groups.insert(
+        "hidden_top_level".to_owned(),
+        artifact_files(&["pkg/hidden.txt"]),
+    );
 
     let collection = ProviderCollection::new(vec![
         ProviderValue::DefaultInfo(DefaultInfo::empty()),
-        ProviderValue::OutputGroupInfo(OutputGroupInfo::new(groups)),
+        ProviderValue::OutputGroupInfo(OutputGroupInfo::new(groups).unwrap()),
     ])
     .unwrap();
 
@@ -639,14 +645,289 @@ fn output_group_info_keeps_named_file_depsets() {
     {
         ProviderValue::OutputGroupInfo(info) => {
             assert_eq!(
-                info.groups["hidden_top_level"].to_list(),
-                vec!["pkg/hidden.txt".to_owned()]
+                info.groups().get("hidden_top_level").unwrap().to_list(),
+                vec![AnalysisValue::artifact(source_artifact("pkg/hidden.txt"))]
             );
             assert_eq!(
-                info.groups["validation"].to_list(),
-                vec!["pkg/validation.txt".to_owned()]
+                info.groups().get("validation").unwrap().to_list(),
+                vec![AnalysisValue::artifact(source_artifact(
+                    "pkg/validation.txt"
+                ))]
             );
         }
         other => panic!("expected OutputGroupInfo, got {other:?}"),
+    }
+}
+
+#[test]
+fn output_group_info_validates_every_field_and_normalizes_only_all_empty_groups() {
+    let preorder = AnalysisDepset::empty(DepsetOrder::Preorder);
+    let all_empty = OutputGroupInfo::new([
+        ("\u{e000}", preorder.clone()),
+        ("\u{10000}", AnalysisDepset::empty(DepsetOrder::Postorder)),
+        ("", AnalysisDepset::empty(DepsetOrder::Topological)),
+    ])
+    .unwrap();
+    assert_eq!(
+        all_empty
+            .groups()
+            .keys()
+            .map(|name| name.as_str())
+            .collect::<Vec<_>>(),
+        ["", "\u{10000}", "\u{e000}"]
+    );
+    for group in all_empty.groups().values() {
+        assert!(group.shares_occurrence_with(&AnalysisDepset::empty(DepsetOrder::Default)));
+    }
+    let files = artifact_files(&["pkg/source"]);
+    let mixed = OutputGroupInfo::new([
+        ("_validation_transitive", preorder.clone()),
+        ("arbitrary name", files.clone()),
+    ])
+    .unwrap();
+    assert!(
+        mixed
+            .groups()
+            .get("_validation_transitive")
+            .unwrap()
+            .shares_occurrence_with(&preorder)
+    );
+    assert!(
+        mixed
+            .groups()
+            .get("arbitrary name")
+            .unwrap()
+            .shares_occurrence_with(&files)
+    );
+    assert!(!mixed.groups().contains_key("missing"));
+    assert!(
+        OutputGroupInfo::new(Vec::<(String, AnalysisDepset)>::new())
+            .unwrap()
+            .groups()
+            .is_empty()
+    );
+
+    let invalid = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::string("path")],
+        vec![],
+    )
+    .unwrap();
+    assert!(matches!(
+        OutputGroupInfo::new([("empty", preorder.clone()), ("bad", invalid)]),
+        Err(ProviderError::InvalidOutputGroupFiles {
+            element_type: AnalysisValueType::String,
+            ..
+        })
+    ));
+    assert!(matches!(
+        OutputGroupInfo::new([("same", preorder.clone()), ("same", preorder)]),
+        Err(ProviderError::DuplicateOutputGroup { .. })
+    ));
+    let wrong_field = ProviderOccurrence::new(
+        ProviderIdentity::builtin("OutputGroupInfo"),
+        [("bad", AnalysisValue::string("path"))],
+    );
+    assert!(matches!(
+        OutputGroupInfo::from_occurrence(&wrong_field),
+        Err(ProviderError::InvalidOutputGroupField { .. })
+    ));
+}
+
+#[test]
+fn output_group_info_retains_artifact_owners_kinds_and_builtin_identity() {
+    let artifacts = [
+        source_artifact("pkg/source"),
+        derived_artifact("pkg/file", ActionOutputKind::File),
+        derived_artifact("pkg/tree", ActionOutputKind::Directory),
+        derived_artifact("pkg/link", ActionOutputKind::Symlink),
+        derived_artifact("pkg/runfiles", ActionOutputKind::RunfilesTree),
+        AnalysisArtifact::Derived {
+            owner: AnalysisConfiguredTargetKey::new(
+                CanonicalLabel::parse("@@//pkg:owner").unwrap(),
+                b"other-configuration".as_slice(),
+            ),
+            output: ActionOutput::new("pkg/file", ActionOutputKind::File),
+        },
+    ];
+    let child = AnalysisDepset::new(
+        DepsetOrder::Default,
+        artifacts
+            .iter()
+            .cloned()
+            .map(AnalysisValue::artifact)
+            .collect(),
+        vec![],
+    )
+    .unwrap();
+    let root = AnalysisDepset::new(
+        DepsetOrder::Default,
+        vec![AnalysisValue::artifact(source_artifact("pkg/extra"))],
+        vec![child.clone()],
+    )
+    .unwrap();
+    let info = OutputGroupInfo::new([("first", root.clone()), ("second", root.clone())]).unwrap();
+    let restored = OutputGroupInfo::from_occurrence(&info.to_occurrence()).unwrap();
+    assert!(
+        restored
+            .groups()
+            .get("first")
+            .unwrap()
+            .shares_occurrence_with(&root)
+    );
+    assert!(
+        restored
+            .groups()
+            .get("first")
+            .unwrap()
+            .shares_store_with(&root)
+    );
+    assert!(
+        restored
+            .groups()
+            .get("first")
+            .unwrap()
+            .shares_successors_with(&root)
+    );
+    assert!(
+        restored
+            .groups()
+            .get("first")
+            .unwrap()
+            .shares_occurrence_with(&restored.groups().get("second").unwrap())
+    );
+    let retained_child = restored
+        .groups()
+        .get("first")
+        .unwrap()
+        .successors()
+        .find_map(|successor| match successor {
+            AnalysisDepsetSuccessor::Transitive(child) => Some(child),
+            _ => None,
+        })
+        .unwrap();
+    assert!(retained_child.shares_occurrence_with(&child));
+    assert_eq!(
+        retained_child.to_list(),
+        artifacts
+            .into_iter()
+            .map(AnalysisValue::artifact)
+            .collect::<Vec<_>>()
+    );
+    let user = ProviderOccurrence::new(
+        ProviderIdentity::user(ProviderId::unqualified("OutputGroupInfo").unwrap()),
+        [("first", AnalysisValue::depset(root))],
+    );
+    assert!(matches!(
+        OutputGroupInfo::from_occurrence(&user),
+        Err(ProviderError::InvalidOutputGroupIdentity { .. })
+    ));
+    let collection = ProviderCollection::new(vec![
+        ProviderValue::DefaultInfo(DefaultInfo::empty()),
+        ProviderValue::Occurrence(user),
+        ProviderValue::OutputGroupInfo(info.clone()),
+    ])
+    .unwrap();
+    assert_eq!(collection.output_group_info(), Some(&info));
+}
+
+#[test]
+fn output_group_info_publication_compares_owner_configuration_kind_and_graph() {
+    fn collection(
+        owner: &str,
+        configuration: &[u8],
+        kind: ActionOutputKind,
+        transitive: bool,
+    ) -> ProviderCollection {
+        let values = vec![
+            AnalysisValue::artifact(AnalysisArtifact::Derived {
+                owner: AnalysisConfiguredTargetKey::new(
+                    CanonicalLabel::parse(owner).unwrap(),
+                    configuration,
+                ),
+                output: ActionOutput::new("pkg/same", kind),
+            }),
+            AnalysisValue::artifact(source_artifact("pkg/source")),
+        ];
+        let child = AnalysisDepset::new(DepsetOrder::Default, values.clone(), vec![]).unwrap();
+        let extra = AnalysisValue::artifact(source_artifact("pkg/extra"));
+        let files = if transitive {
+            AnalysisDepset::new(DepsetOrder::Default, vec![extra], vec![child]).unwrap()
+        } else {
+            AnalysisDepset::new(
+                DepsetOrder::Default,
+                values.into_iter().chain([extra]).collect(),
+                vec![],
+            )
+            .unwrap()
+        };
+        ProviderCollection::new(vec![
+            ProviderValue::DefaultInfo(DefaultInfo::empty()),
+            ProviderValue::OutputGroupInfo(OutputGroupInfo::new([("group", files)]).unwrap()),
+        ])
+        .unwrap()
+    }
+    let original = collection("@@//pkg:owner", b"cfg", ActionOutputKind::File, true);
+    assert_eq!(
+        original,
+        collection("@@//pkg:owner", b"cfg", ActionOutputKind::File, true)
+    );
+    assert_ne!(
+        original,
+        collection("@@//pkg:other", b"cfg", ActionOutputKind::File, true)
+    );
+    assert_ne!(
+        original,
+        collection("@@//pkg:owner", b"other", ActionOutputKind::File, true)
+    );
+    assert_ne!(
+        original,
+        collection("@@//pkg:owner", b"cfg", ActionOutputKind::Directory, true)
+    );
+    assert_ne!(
+        original,
+        collection("@@//pkg:owner", b"cfg", ActionOutputKind::File, false)
+    );
+}
+
+#[test]
+fn output_group_info_publication_preserves_cross_group_and_provider_aliases() {
+    fn collection(split_group: bool, split_default: bool, split_user: bool) -> ProviderCollection {
+        let fresh = || artifact_files(&["pkg/a", "pkg/b"]);
+        let shared = fresh();
+        let info = OutputGroupInfo::new([
+            ("first", shared.clone()),
+            ("second", if split_group { fresh() } else { shared.clone() }),
+        ])
+        .unwrap();
+        ProviderCollection::new(vec![
+            ProviderValue::DefaultInfo(
+                DefaultInfo::from_files(if split_default {
+                    fresh()
+                } else {
+                    shared.clone()
+                })
+                .unwrap(),
+            ),
+            ProviderValue::OutputGroupInfo(info),
+            user_provider(
+                ProviderId::unqualified("Nested").unwrap(),
+                [(
+                    "files",
+                    AnalysisValue::depset(if split_user { fresh() } else { shared }),
+                )],
+            ),
+        ])
+        .unwrap()
+    }
+    let shared = collection(false, false, false);
+    assert_eq!(shared, collection(false, false, false));
+    for split in [
+        collection(true, false, false),
+        collection(false, true, false),
+        collection(false, false, true),
+    ] {
+        assert_ne!(shared, split);
+        assert_ne!(split, shared);
     }
 }

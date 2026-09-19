@@ -31,6 +31,10 @@ use crate::analysis_value::PublicationEqState;
 use crate::depset::Depset;
 use crate::depset::DepsetOrder;
 
+mod output_group;
+
+pub use output_group::OutputGroupInfo;
+
 pub type FileDepset = Depset<String>;
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -67,10 +71,30 @@ impl TryFrom<&str> for ProviderName {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ProviderError {
     EmptyProviderName,
-    DuplicateProvider { name: ProviderName },
+    DuplicateProvider {
+        name: ProviderName,
+    },
     MissingDefaultInfo,
-    InvalidDefaultInfoFiles { element_type: AnalysisValueType },
-    InvalidDefaultInfoArtifactKind { kind: ActionOutputKind },
+    InvalidDefaultInfoFiles {
+        element_type: AnalysisValueType,
+    },
+    InvalidDefaultInfoArtifactKind {
+        kind: ActionOutputKind,
+    },
+    InvalidOutputGroupIdentity {
+        identity: ProviderIdentity,
+    },
+    InvalidOutputGroupField {
+        name: CompactString,
+        value_type: AnalysisValueType,
+    },
+    InvalidOutputGroupFiles {
+        name: CompactString,
+        element_type: AnalysisValueType,
+    },
+    DuplicateOutputGroup {
+        name: CompactString,
+    },
     MissingExecutable,
     FilesToRunAlreadyComplete,
     RunfilesMissingExecutable,
@@ -92,6 +116,18 @@ impl fmt::Display for ProviderError {
                 f,
                 "DefaultInfo.files contains unsupported {kind:?} artifact"
             ),
+            Self::InvalidOutputGroupIdentity { identity } => {
+                write!(f, "expected builtin OutputGroupInfo, got {identity:?}")
+            }
+            Self::InvalidOutputGroupField { name, value_type } => write!(
+                f,
+                "OutputGroupInfo.{name} must be a depset of Files, got {value_type:?}"
+            ),
+            Self::InvalidOutputGroupFiles { name, element_type } => write!(
+                f,
+                "OutputGroupInfo.{name} must be a depset of Files, got depset of {element_type:?}"
+            ),
+            Self::DuplicateOutputGroup { name } => write!(f, "output group {name} specified twice"),
             Self::MissingExecutable => {
                 f.write_str("runfiles support requires an executable FilesToRun provider")
             }
@@ -566,17 +602,6 @@ impl DefaultInfo {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub struct OutputGroupInfo {
-    pub groups: BTreeMap<String, FileDepset>,
-}
-
-impl OutputGroupInfo {
-    pub fn new(groups: BTreeMap<String, FileDepset>) -> Self {
-        Self { groups }
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct RunEnvironmentInfo {
     pub environment: BTreeMap<String, String>,
     pub inherited_environment: Vec<String>,
@@ -646,7 +671,9 @@ impl ProviderValue {
             (Self::DefaultInfo(left), Self::DefaultInfo(right)) => {
                 left.publication_eq_with(right, state)
             }
-            (Self::OutputGroupInfo(left), Self::OutputGroupInfo(right)) => left == right,
+            (Self::OutputGroupInfo(left), Self::OutputGroupInfo(right)) => {
+                left.publication_eq_with(right, state)
+            }
             (Self::RunEnvironmentInfo(left), Self::RunEnvironmentInfo(right)) => left == right,
             (Self::FilesToRunProvider(left), Self::FilesToRunProvider(right)) => {
                 left.publication_eq_with(right, state)
@@ -745,6 +772,13 @@ impl ProviderCollection {
         );
         debug_assert!(matches!(previous, Some(ProviderValue::DefaultInfo(_))));
         Self(Arc::new(ProviderCollectionData { providers }))
+    }
+
+    pub fn output_group_info(&self) -> Option<&OutputGroupInfo> {
+        match self.get(&ProviderIdentity::builtin("OutputGroupInfo")) {
+            Some(ProviderValue::OutputGroupInfo(info)) => Some(info),
+            _ => None,
+        }
     }
 
     /// Builtin-only lookup: user providers named `ToolchainInfo` never match.
