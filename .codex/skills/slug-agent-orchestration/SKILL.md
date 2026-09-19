@@ -40,6 +40,10 @@ session's available slots. The user favors faster project progress over modest
 token savings; use the third worker for useful independent work without requiring
 an exceptional critical-path justification. Treat this as an allowance, not a
 quota; small or sequential tasks may need fewer agents.
+While token capacity is comfortable, favor elapsed-time savings when deciding
+whether another useful worker is worth its token cost. As workers finish, reuse
+them for ready independent tasks while the root continues integration; do not
+wait for the whole group unless the next work depends on all their results.
 Examples include disjoint implementation, pinned-source research, focused
 validation on an already-built executable, and independent review. Keep each
 assignment concrete and bounded, give concurrent writers disjoint files/worktrees,
