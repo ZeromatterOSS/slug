@@ -15,6 +15,7 @@ pub use action_output_staging::PublishedActionOutputs;
 pub use action_prerequisites::ActionPrerequisitePlan;
 pub use action_prerequisites::PlannedAction;
 pub use action_prerequisites::PlannedActionInput;
+pub use action_prerequisites::RequestedActionPrerequisitePlan;
 mod configured_action_closure;
 mod configured_output;
 mod demands;

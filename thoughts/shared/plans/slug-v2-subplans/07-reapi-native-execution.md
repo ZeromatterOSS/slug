@@ -235,15 +235,28 @@ unsupported output kinds, resolve producers, read bytes, or authorize execution.
 Loading-only/wildcard results fail selection explicitly; analyzed empty and source-only
 selections remain distinct valid metadata. Source/generated/alias roots use authoritative
 Analysis providers, and source aliases retain tracked content for native final validation.
-Certified alias and regular external-source metadata use the selected dependency frontier;
+Certified direct-source, source-alias and regular external-source metadata use the selected dependency frontier;
 reported observations still match exact selected demand/value/Arc identities.
+
+Core's `requested_action_prerequisites()` consumes that complete selection through
+one shared producer index and iterative traversal over the validated closure. The
+borrowed forest retains the selection and an aligned selected-artifact-to-producer
+index: sources have no producer, while every derived artifact requires its exact
+declared owner/configuration/output kind before admitted scalar FileWrite sharing.
+Actions appear once, prerequisite-first; selected cooutputs share a producer without
+losing artifact membership. Empty and source-only requests retain their identities.
+Missing producers, cycles and unsupported selected/reachable kinds or families reject
+the entire forest. Unselected actions remain absent, while closure-wide output-conflict
+validation remains authoritative. The single-action plan uses the same engine and
+preserves its selected-action-last contract. Neither view grants execution authority.
 
 The legacy CLI/server all-action executors reject newly activated Alias/GeneratedFile
 requested roots before effects. This temporary gate is removed when the shared selected
 artifact forest replaces both helpers and reaches native validated publication. Closure
-inspection APIs retain their existing meaning. General requested-artifact scheduling,
-source-only execution completion, runfiles families and ordinary CLI activation remain
-open; metadata selection does not prove those execution gates.
+inspection APIs retain their existing meaning. Requested-forest source staging must
+include standalone selected sources as well as action inputs. Native forest execution,
+selected-artifact publication across owners, source-only execution completion, runfiles
+families and ordinary CLI activation remain open; planning does not prove those gates.
 
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies

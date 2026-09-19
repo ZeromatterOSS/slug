@@ -1777,20 +1777,26 @@ impl NativeCommandRoot for SingletonRootSingleBuildCommandKey {
         &self,
         terminal: &Self::Terminal,
     ) -> ObservedSelectionAssociation {
-        // Source aliases may have repository dependencies even when the actual
-        // source is local (for example an external select condition). Activation
-        // validates the actual SourceFile before retaining this certificate.
-        let source_alias = terminal.source_certificate().is_some()
+        // Package loading and authoritative source metadata can add repository
+        // dependencies even when a source read fails. A source certificate does
+        // not replace full selected-dependency validation.
+        let certified_source = terminal.source_certificate().is_some()
             && match terminal.result.as_ref() {
                 Ok(evaluation) => matches!(evaluation.targets.as_ref(), [target]
                     if target.analysis.as_ref().is_some_and(|analysis|
-                        analysis.kind() == &ConfiguredNodeKind::Alias
-                            && analysis.actual_configured_target().is_none())),
-                Err(error) => matches!(&error.kind,
-                    BuildCommandErrorKind::SourceCertified { error, .. }
-                        if matches!(error.kind, BuildCommandErrorKind::SourceArtifactInput(_))),
+                        analysis.kind() == &ConfiguredNodeKind::SourceFile
+                            || analysis.kind() == &ConfiguredNodeKind::Alias
+                                && analysis.actual_configured_target().is_none())),
+                Err(error) => match &error.kind {
+                    BuildCommandErrorKind::RootSource { .. } => true,
+                    BuildCommandErrorKind::SourceCertified { error, .. } => {
+                        matches!(error.kind, BuildCommandErrorKind::SourceArtifactInput(_))
+                            || error.is_analysis_error()
+                    }
+                    _ => false,
+                },
             };
-        if source_alias {
+        if certified_source {
             ObservedSelectionAssociation::SelectedDependencySuperset
         } else {
             self.observed_selection_association()
@@ -3428,6 +3434,23 @@ impl BuildCommandEvaluation {
         action: usize,
     ) -> Result<super::ActionPrerequisitePlan<'_>, Arc<str>> {
         super::ActionPrerequisitePlan::new(&self.action_closure, owner, action)
+    }
+
+    /// Plan all ordinary requested artifacts through one shared prerequisite
+    /// forest. This metadata view does not authorize execution or publication.
+    pub fn requested_action_prerequisites(
+        &self,
+    ) -> Result<super::RequestedActionPrerequisitePlan<'_>, Arc<str>> {
+        super::RequestedActionPrerequisitePlan::new(
+            &self.action_closure,
+            self.requested_artifacts()?,
+        )
+    }
+
+    #[cfg(test)]
+    pub(super) fn source_observations_for_test(&self) -> Option<&PathObservationEpoch> {
+        self.source_certificate()
+            .map(SourceCertificate::observations)
     }
 
     pub fn loaded_package_count(&self) -> usize {

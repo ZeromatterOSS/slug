@@ -125,6 +125,14 @@ fn source_bytes_certificate_survives_authoritative_metadata_failure() {
     ));
     assert!(error.is_analysis_error());
     assert!(key.allows_unavailable_terminal_roots(&terminal));
+    assert!(matches!(
+        key.terminal_observed_selection_association(&terminal),
+        ObservedSelectionAssociation::SelectedDependencySuperset
+    ));
+    assert!(matches!(
+        key.terminal_demand_association(&terminal),
+        TerminalDemandAssociation::ClosureOnly
+    ));
     let certificate = error.source_certificate().unwrap();
     assert!(Arc::ptr_eq(
         certificate.observations().get(&bytes_demand).unwrap(),
@@ -146,6 +154,34 @@ fn source_bytes_certificate_survives_authoritative_metadata_failure() {
     ));
     assert!(error.source_certificate().is_none());
     assert!(error.is_analysis_error());
+
+    // Package loading can select repository dependencies even when a source
+    // fails before metadata. Only certified errors get this association policy.
+    let observation = PathObservationResult::FileBytes(PathOperationResult::Missing);
+    let mut source_failure = SingletonRootSingleBuildCommandTerminal {
+        result: Arc::new(Err(BuildCommandError::new(
+            BuildCommandErrorKind::RootSource {
+                source_certificate: Some(Box::new(SourceCertificate::new(
+                    bytes_demand,
+                    Arc::new(observation.clone()),
+                ))),
+                observation,
+            },
+        ))),
+        observations: None,
+    };
+    assert!(matches!(
+        key.terminal_observed_selection_association(&source_failure),
+        ObservedSelectionAssociation::SelectedDependencySuperset
+    ));
+    assert!(!key.allows_unavailable_terminal_roots(&source_failure));
+    let mut uncertified = source_failure.result.as_ref().as_ref().unwrap_err().clone();
+    assert!(uncertified.take_source_certificate().is_some());
+    source_failure.result = Arc::new(Err(uncertified));
+    assert!(matches!(
+        key.terminal_observed_selection_association(&source_failure),
+        ObservedSelectionAssociation::StrictPathOnly
+    ));
 }
 
 #[test]

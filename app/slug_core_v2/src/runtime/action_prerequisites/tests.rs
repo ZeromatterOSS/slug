@@ -526,3 +526,9 @@ stage = rule(implementation=_impl, attrs={'input':attr.label(allow_single_file=T
     }
     assert!(!root.path().join("done").exists());
 }
+
+#[path = "requested_tests.rs"]
+mod requested_tests;
+
+#[path = "engine_tests.rs"]
+mod engine_tests;

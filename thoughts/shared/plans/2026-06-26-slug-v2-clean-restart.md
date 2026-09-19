@@ -29,15 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-41-m7a-requested-artifacts-r1
+Packet: WP-7-42-m7a-requested-prerequisites-r1
 Status: accepted
 
-WP741 accepts admitted explicit build-root metadata and complete ordinary output
-groups from authoritative providers, retaining requested/artifact identity and source
-freshness. Fourteen focused checks and independent final review pass; three old fixture
-failures are baseline-attributed in the manifest. Next: one shared prerequisite forest
-seeded from selected artifacts. Runfiles execution and CLI activation remain open.
-M7A partial, M8 unproved.
+WP742 accepts one shared prerequisite forest from ordinary selected artifacts,
+preserving root/group membership, zero-action requests and exact producer identity.
+Twelve focused checks and independent final review pass, including standalone source
+mutation/delete/recreate. Next: native forest source staging and execution, followed
+by selected-artifact publication and CLI activation. M7A partial, M8 unproved.
 
 ### Earlier generated-input receipt
 
