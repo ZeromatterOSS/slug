@@ -30,15 +30,15 @@ pub struct ActionChainReapiTransport {
 #[derive(Debug)]
 pub struct ActionChainRemoteResult {
     results: Vec<RemoteExecutionResult>,
+    selected: Option<usize>,
 }
 impl ActionChainRemoteResult {
     pub fn results(&self) -> &[RemoteExecutionResult] {
         &self.results
     }
-    pub fn selected(&self) -> &RemoteExecutionResult {
-        self.results
-            .last()
-            .expect("nonempty selected prerequisite chain")
+    /// Requested forests have an ordered result table, but no single selected action.
+    pub fn selected(&self) -> Option<&RemoteExecutionResult> {
+        self.selected.map(|index| &self.results[index])
     }
 }
 
@@ -473,6 +473,12 @@ impl ActionChainTransport for ActionChainReapiTransport {
             return Err(protocol("chain did not complete every prerequisite"));
         }
         Ok(ActionChainRemoteResult {
+            selected: session
+                .inputs
+                .plan()
+                .map_err(command_error)?
+                .selected_action()
+                .map(|_| session.results.len() - 1),
             results: session.results,
         })
     }
@@ -480,3 +486,6 @@ impl ActionChainTransport for ActionChainReapiTransport {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod requested_tests;

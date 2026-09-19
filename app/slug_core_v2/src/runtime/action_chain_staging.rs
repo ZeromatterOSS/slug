@@ -1,4 +1,4 @@
-//! DICE-owned source preparation for a complete selected prerequisite chain.
+//! DICE-owned source preparation for selected actions and requested forests.
 
 use slug_build_api_v2::AnalysisArtifact;
 
@@ -7,14 +7,71 @@ use super::source_staging::open_observed_source;
 use super::*;
 use crate::runtime::ActionPrerequisitePlan;
 use crate::runtime::ObservedSourceArtifactInput;
+use crate::runtime::PlannedAction;
+use crate::runtime::RequestedActionPrerequisitePlan;
 use crate::runtime::SourceArtifactInput;
 use crate::runtime::SourceArtifactInputObservationKey;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(super) struct ActionChainStagingKey {
     build: BuildCommandRootKey,
-    owner: ConfiguredTargetKey,
-    action: usize,
+    selection: ActionSelection,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+enum ActionSelection {
+    Selected {
+        owner: ConfiguredTargetKey,
+        action: usize,
+    },
+    Requested,
+}
+
+/// Borrowed action order with an explicit distinction between a selected action
+/// and a complete requested-artifact forest. Neither conveys execution authority.
+#[derive(Debug)]
+pub enum PreparedActionPlan<'a> {
+    Selected(ActionPrerequisitePlan<'a>),
+    Requested(RequestedActionPrerequisitePlan<'a>),
+}
+
+impl<'a> PreparedActionPlan<'a> {
+    pub fn actions(&self) -> &[PlannedAction<'a>] {
+        match self {
+            Self::Selected(plan) => plan.actions(),
+            Self::Requested(plan) => plan.actions(),
+        }
+    }
+
+    pub fn requested(&self) -> Option<&RequestedActionPrerequisitePlan<'a>> {
+        match self {
+            Self::Selected(_) => None,
+            Self::Requested(plan) => Some(plan),
+        }
+    }
+
+    pub fn selected_action(&self) -> Option<&'a slug_analysis_v2::ConfiguredAction> {
+        match self {
+            Self::Selected(plan) => plan.actions().last().map(PlannedAction::action),
+            Self::Requested(_) => None,
+        }
+    }
+}
+
+impl ActionSelection {
+    fn plan<'a>(
+        &self,
+        build: &'a BuildCommandEvaluation,
+    ) -> Result<PreparedActionPlan<'a>, Arc<str>> {
+        match self {
+            Self::Selected { owner, action } => build
+                .action_prerequisites(owner, *action)
+                .map(PreparedActionPlan::Selected),
+            Self::Requested => build
+                .requested_action_prerequisites()
+                .map(PreparedActionPlan::Requested),
+        }
+    }
 }
 
 /// Complete reachable source metadata, associated with the retained build frontier.
@@ -22,20 +79,16 @@ pub(super) struct ActionChainStagingKey {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct PreparedActionChainInputs {
     evaluation: Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
-    owner: ConfiguredTargetKey,
-    action: usize,
+    selection: ActionSelection,
     sources: Arc<[Arc<ObservedSourceArtifactInput>]>,
     observations: PathObservationEpoch,
     certificate: SourceCertificate,
 }
 
 impl PreparedActionChainInputs {
-    pub fn plan(&self) -> Result<ActionPrerequisitePlan<'_>, Arc<str>> {
-        self.evaluation
-            .as_ref()
-            .as_ref()
-            .unwrap()
-            .action_prerequisites(&self.owner, self.action)
+    pub fn plan(&self) -> Result<PreparedActionPlan<'_>, Arc<str>> {
+        self.selection
+            .plan(self.evaluation.as_ref().as_ref().unwrap())
     }
 
     pub fn sources(&self) -> impl ExactSizeIterator<Item = &SourceArtifactInput> {
@@ -66,8 +119,14 @@ impl ActionChainStagingKey {
     ) -> Self {
         Self {
             build,
-            owner,
-            action,
+            selection: ActionSelection::Selected { owner, action },
+        }
+    }
+
+    pub(super) fn requested(build: BuildCommandRootKey) -> Self {
+        Self {
+            build,
+            selection: ActionSelection::Requested,
         }
     }
 
@@ -86,8 +145,15 @@ impl ActionChainStagingKey {
         let evaluation = terminal.result;
         let build = evaluation.as_ref().as_ref().map_err(error)?;
         // Validate the entire reachable plan before observing source content.
-        let plan = build.action_prerequisites(&self.owner, self.action)?;
+        let plan = self.selection.plan(build)?;
         let mut artifacts = SmallSet::new();
+        if let Some(requested) = plan.requested() {
+            for artifact in requested.selection().artifacts() {
+                if matches!(artifact, AnalysisArtifact::Source(_)) {
+                    artifacts.insert(artifact.clone());
+                }
+            }
+        }
         for step in plan.actions() {
             for input in step.inputs() {
                 if matches!(input.artifact(), AnalysisArtifact::Source(_)) {
@@ -118,8 +184,7 @@ impl ActionChainStagingKey {
         Ok(PreparationOutcome::Complete(Arc::new(
             PreparedActionChainInputs {
                 evaluation,
-                owner: self.owner.clone(),
-                action: self.action,
+                selection: self.selection.clone(),
                 sources: sources.into(),
                 observations,
                 certificate,
@@ -132,8 +197,8 @@ impl fmt::Display for ActionChainStagingKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "action-chain-staging:{}:{:?}:{}",
-            self.build, self.owner, self.action
+            "action-chain-staging:{}:{:?}",
+            self.build, self.selection
         )
     }
 }
@@ -220,15 +285,39 @@ impl WorkspaceRuntime {
             repository_environment,
             configuration_overlay,
         )?;
-        self.drive_command(
-            request,
-            ActionChainStagingKey {
-                build,
-                owner,
-                action,
-            },
-        )
-        .map(|driven| driven.accepted)
-        .map_err(BuildCommandError::infrastructure)
+        self.drive_command(request, ActionChainStagingKey::new(build, owner, action))
+            .map(|driven| driven.accepted)
+            .map_err(BuildCommandError::infrastructure)
+    }
+
+    /// Observe all selected sources and reachable action inputs for one requested
+    /// forest, including zero-action roots. This metadata does not authorize execution.
+    #[allow(clippy::too_many_arguments)]
+    pub fn prepare_requested_action_inputs_with_repository_environment(
+        &self,
+        targets: &[TargetPattern],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+    ) -> Result<AcceptedCommand<Arc<PreparedActionChainInputs>>, BuildCommandError> {
+        let (build, request) = self.prepare_build_request(
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+        )?;
+        self.drive_command(request, ActionChainStagingKey::requested(build))
+            .map(|driven| driven.accepted)
+            .map_err(BuildCommandError::infrastructure)
     }
 }
+
+#[cfg(test)]
+#[path = "action_chain_staging/tests.rs"]
+mod tests;

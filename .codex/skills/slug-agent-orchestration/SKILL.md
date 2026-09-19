@@ -35,8 +35,11 @@ packet touches one of its listed surfaces.
 ## Route
 
 Favor useful parallel work to shorten elapsed time. When independent tasks are
-available, proactively run up to two subagents alongside the root; a third is
-appropriate when it clearly advances the critical path within available slots.
+available, proactively run two or three subagents alongside the root, within the
+session's available slots. The user favors faster project progress over modest
+token savings; use the third worker for useful independent work without requiring
+an exceptional critical-path justification. Treat this as an allowance, not a
+quota; small or sequential tasks may need fewer agents.
 Examples include disjoint implementation, pinned-source research, focused
 validation on an already-built executable, and independent review. Keep each
 assignment concrete and bounded, give concurrent writers disjoint files/worktrees,
@@ -59,6 +62,8 @@ For correction rereviews, inspect the correction and affected evidence only.
 When delegating, pass the packet path, baseline, validation summary, and
 specific question with `fork_turns="none"` unless conversation is essential.
 Never run concurrent Cargo commands sharing a target directory.
+Serialize native freshness tests whose fixtures share observed ancestor paths;
+separate fixture leaf directories do not isolate ancestor metadata changes.
 
 ## Packet
 

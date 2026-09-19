@@ -56,8 +56,10 @@ pub use dice::BuildCommandEvaluation;
 pub use dice::CqueryCommandError;
 pub use dice::CqueryCommandEvaluation;
 pub use dice::PreparedActionChainInputs;
+pub use dice::PreparedActionPlan;
 #[doc(hidden)]
 pub use dice::PreparedSourceActionInputs;
+pub use dice::RequestedActionResult;
 pub use dice::RequestedArtifacts;
 pub use dice::RequestedOutputGroup;
 pub use dice::RequestedTargetArtifacts;

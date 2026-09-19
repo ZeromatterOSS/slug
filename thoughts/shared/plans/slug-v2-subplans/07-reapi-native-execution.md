@@ -250,13 +250,32 @@ the entire forest. Unselected actions remain absent, while closure-wide output-c
 validation remains authoritative. The single-action plan uses the same engine and
 preserves its selected-action-last contract. Neither view grants execution authority.
 
+Requested forests now use the same DICE staging owner and native execution driver as
+selected action chains. An explicit Selected/Requested field participates in staging
+key and value identity. Prepared plans remain borrowed scratch. Requested staging unions
+selected source artifacts with reachable action inputs, so even a source appearing only
+in an output group belongs to the complete source certificate. Empty target lists use
+the existing observed anchor through private staging dispatch; ordinary wildcard
+admission is unchanged.
+
+One fresh transport session executes each nonempty forest attempt in prerequisite order.
+The complete frontier is checked before every Execute and again at native finalization;
+final source changes discard provisional results and retry the whole forest. Failures
+and unwind restore prior accepted state. Zero-action requests still receive native final
+validation and invoke no transport callback. Requested results retain their selection and
+producer bindings; transport output is absent only for zero steps. REAPI keeps its existing
+whole-plan preflight, exact generated input binding and verified result/CAS handling;
+requested results have no singular selected action. Portable tests exercise actual
+preflight/binding/result projection; unchanged chain wire/CAS evidence is reused, not a
+new multi-root backend smoke claim.
+
 The legacy CLI/server all-action executors reject newly activated Alias/GeneratedFile
 requested roots before effects. This temporary gate is removed when the shared selected
 artifact forest replaces both helpers and reaches native validated publication. Closure
-inspection APIs retain their existing meaning. Requested-forest source staging must
-include standalone selected sources as well as action inputs. Native forest execution,
-selected-artifact publication across owners, source-only execution completion, runfiles
-families and ordinary CLI activation remain open; planning does not prove those gates.
+inspection APIs retain their existing meaning. Both Core and REAPI explicitly reject
+requested mode in the single-action publication path. Selected-artifact publication
+across owners, runfiles families and ordinary CLI activation remain open; execution
+metadata does not prove those publication and product gates.
 
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies

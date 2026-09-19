@@ -29,14 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-42-m7a-requested-prerequisites-r1
+Packet: WP-7-43-m7a-requested-execution-r1
 Status: accepted
 
-WP742 accepts one shared prerequisite forest from ordinary selected artifacts,
-preserving root/group membership, zero-action requests and exact producer identity.
-Twelve focused checks and independent final review pass, including standalone source
-mutation/delete/recreate. Next: native forest source staging and execution, followed
-by selected-artifact publication and CLI activation. M7A partial, M8 unproved.
+WP743 accepted requested-forest execution through one native request, preserving the
+complete source frontier, fresh-session retries and zero-action completion. Twenty-two
+focused checks, compile/structural checks and independent final review pass. WP742 is
+accepted at 5ca6f056d. Next: selected-artifact publication across producers/configurations,
+then CLI activation. M7A partial, M8 unproved.
 
 ### Earlier generated-input receipt
 

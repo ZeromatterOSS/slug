@@ -17,6 +17,27 @@ use super::super::tests::Workspace;
 use super::*;
 
 #[test]
+fn requested_mode_is_rejected_before_selected_result_lookup() {
+    use super::super::requested_tests;
+    let workspace = requested_tests::workspace();
+    let inputs = requested_tests::prepare(&workspace, &["//:one", "//:two"]);
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let _entered = runtime.enter();
+    let session = requested_tests::disconnected_session(inputs);
+    assert!(session.results.is_empty());
+    let error = selected_result(&session).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("requested forests do not support output publication"),
+        "{error}"
+    );
+}
+
+#[test]
 fn selected_output_schema_rejects_missing_extra_duplicate_and_wrong_kind() {
     assert!(
         reconcile_outputs(&[], &ActionResult::new(vec![]))
@@ -104,7 +125,7 @@ impl PublicationWorkspace {
                     ActionOutput::new("result_tree", ActionOutputKind::Directory),
                 ]
             );
-            let selected = accepted.output().selected();
+            let selected = accepted.output().selected().unwrap();
             assert!(!selected.result.output_files()[0].is_executable());
             let tree = &selected.result.output_directories()[0];
             assert_eq!(tree.directories(), ["", "empty", "nested"]);

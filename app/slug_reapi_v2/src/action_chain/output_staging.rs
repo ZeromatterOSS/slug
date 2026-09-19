@@ -19,12 +19,30 @@ fn selected_outputs<'a>(
     session: &'a ActionChainReapiSession,
     staging: &ActionOutputStaging,
 ) -> Result<Vec<SelectedOutput<'a>>, RemoteExecutionError> {
+    let result = selected_result(session)?;
+    reconcile_outputs(staging.outputs(), &result.result)
+}
+
+fn selected_result(
+    session: &ActionChainReapiSession,
+) -> Result<&RemoteExecutionResult, RemoteExecutionError> {
+    if session
+        .inputs
+        .plan()
+        .map_err(command_error)?
+        .selected_action()
+        .is_none()
+    {
+        return Err(protocol(
+            "requested forests do not support output publication",
+        ));
+    }
     if session.results.len() != session.templates.len() || session.results.is_empty() {
         return Err(protocol(
             "output staging requires a completed selected chain",
         ));
     }
-    reconcile_outputs(staging.outputs(), &session.results.last().unwrap().result)
+    Ok(session.results.last().unwrap())
 }
 
 fn reconcile_outputs<'a>(

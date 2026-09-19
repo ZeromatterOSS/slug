@@ -1,4 +1,4 @@
-//! One attempt-owned prerequisite chain, inside native selection and finalization.
+//! One attempt-owned prerequisite plan, inside native selection and finalization.
 
 use super::action_chain_staging::ActionChainStagingKey;
 use super::*;
@@ -83,11 +83,11 @@ impl<T: ActionChainOutputTransport> PublicationPolicy<T> for PublishOutputs<'_> 
         let plan = inputs
             .plan()
             .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error}")))?;
-        let selected = plan
-            .actions()
-            .last()
-            .expect("selected chain is nonempty")
-            .action();
+        let selected = plan.selected_action().ok_or_else(|| {
+            NativeDemandSessionError::Computation(anyhow::anyhow!(
+                "requested action output publication is unsupported"
+            ))
+        })?;
         let mut staging = self
             .0
             .stage_action_outputs(selected)
@@ -121,6 +121,24 @@ impl<T> ActionChainResult<T> {
     }
     pub fn published_outputs(&self) -> Option<&PublishedActionOutputs> {
         self.published_outputs.as_ref()
+    }
+}
+
+/// A complete requested forest after native final validation. Zero-action
+/// requests have no transport output; no requested outputs are published.
+#[derive(Debug)]
+pub struct RequestedActionResult<T> {
+    inputs: Arc<PreparedActionChainInputs>,
+    output: Option<Arc<T>>,
+}
+
+impl<T> RequestedActionResult<T> {
+    pub fn inputs(&self) -> &PreparedActionChainInputs {
+        &self.inputs
+    }
+
+    pub fn output(&self) -> Option<&T> {
+        self.output.as_deref()
     }
 }
 
@@ -223,6 +241,11 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
                 .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error}")))?
                 .actions()
                 .len();
+            if steps == 0 {
+                // Native finalization still validates the full build/source
+                // frontier, without inventing a backend session or result.
+                return Ok(());
+            }
             let mut session = self
                 .transport
                 .start(terminal.inputs.clone())
@@ -265,6 +288,44 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
 }
 
 impl WorkspaceRuntime {
+    /// Execute all requested artifact prerequisites in one native attempt.
+    /// Zero-action requests still receive final validation but skip transport.
+    /// Results remain operation-owned; this operation publishes no outputs.
+    #[allow(clippy::too_many_arguments)]
+    pub fn execute_requested_actions_with_repository_environment<T: ActionChainTransport>(
+        &self,
+        targets: &[TargetPattern],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+        transport: &T,
+    ) -> Result<AcceptedCommand<RequestedActionResult<T::Output>>, BuildCommandError> {
+        let (build, request) = self.prepare_build_request(
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+        )?;
+        self.drive_action_chain(
+            request,
+            ActionChainStagingKey::requested(build),
+            transport,
+            NoPublication,
+        )
+        .map(|accepted| {
+            accepted.map_terminal(|terminal| RequestedActionResult {
+                inputs: terminal.inputs,
+                output: terminal.output,
+            })
+        })
+    }
+
     /// Execute a selected action and its reachable prerequisites, prechecking
     /// their complete source frontier before every Execute and final acceptance.
     /// A post-Execute change retries with a fresh session; no outputs are published.
@@ -355,16 +416,14 @@ impl WorkspaceRuntime {
             repository_environment,
             configuration_overlay,
         )?;
-        self.drive_command(
+        self.drive_action_chain(
             request,
-            ActionChainExecutionRoot {
-                staging: ActionChainStagingKey::new(build, owner, action),
-                transport,
-                publication,
-            },
+            ActionChainStagingKey::new(build, owner, action),
+            transport,
+            publication,
         )
-        .map(|driven| {
-            driven.accepted.map_terminal(|terminal| ActionChainResult {
+        .map(|accepted| {
+            accepted.map_terminal(|terminal| ActionChainResult {
                 inputs: terminal.inputs,
                 output: terminal
                     .output
@@ -372,6 +431,24 @@ impl WorkspaceRuntime {
                 published_outputs: terminal.published_outputs,
             })
         })
+    }
+
+    fn drive_action_chain<T: ActionChainTransport, P: PublicationPolicy<T>>(
+        &self,
+        request: NativeDemandRequestInputBundle,
+        staging: ActionChainStagingKey,
+        transport: &T,
+        publication: P,
+    ) -> Result<AcceptedCommand<ActionChainExecutionTerminal<T::Output>>, BuildCommandError> {
+        self.drive_command(
+            request,
+            ActionChainExecutionRoot {
+                staging,
+                transport,
+                publication,
+            },
+        )
+        .map(|driven| driven.accepted)
         .map_err(BuildCommandError::infrastructure)
     }
 }

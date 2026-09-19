@@ -506,7 +506,7 @@ fn nativelink_chain_generated_file_tree_cache_change_restore() {
                 .unwrap();
             assert_eq!(empty.directories(), [""]);
             assert!(empty.files().is_empty());
-            let selected = accepted.output().selected();
+            let selected = accepted.output().selected().unwrap();
             assert_eq!(selected.result.output_files()[0].path(), "done");
             assert_eq!(
                 selected.result.output_files()[0].digest(),

@@ -3058,11 +3058,13 @@ pub use requested_artifacts::RequestedTargetArtifacts;
 #[path = "action_chain_staging.rs"]
 mod action_chain_staging;
 pub use action_chain_staging::PreparedActionChainInputs;
+pub use action_chain_staging::PreparedActionPlan;
 #[path = "action_chain_execution.rs"]
 mod action_chain_execution;
 pub use action_chain_execution::ActionChainOutputTransport;
 pub use action_chain_execution::ActionChainResult;
 pub use action_chain_execution::ActionChainTransport;
+pub use action_chain_execution::RequestedActionResult;
 
 #[path = "source_staging.rs"]
 pub(super) mod source_staging;
@@ -3411,7 +3413,7 @@ impl BuildCommandRootObservationKey {
     // Staging needs a complete observed frontier even for a single rule. Keep
     // the ordinary build entrypoint's accepted dispatch unchanged.
     fn for_source_staging(key: BuildCommandRootKey) -> Option<Self> {
-        if key.initializes_request_revision() {
+        if key.initializes_request_revision() || key.targets.is_empty() {
             Some(Self(key))
         } else {
             Self::new(key)
@@ -5776,7 +5778,10 @@ impl Key for BuildCommandRootObservationKey {
         };
         let outcome = if let Some(label) = self.0.singleton_external_single() {
             compute_external_single_observed(&self.0, &label, ctx).await
-        } else if self.0.observed_multi_root() || self.0.initializes_request_revision() {
+        } else if self.0.observed_multi_root()
+            || self.0.initializes_request_revision()
+            || self.0.targets.is_empty()
+        {
             compute_observed_multi_build_root(&self.0, &configuration, ctx).await
         } else {
             compute_singleton_package_all(&self.0, ctx, BuildAnalysisMode::Observed)

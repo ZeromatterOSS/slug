@@ -572,3 +572,6 @@ fn final_source_change_retries_whole_chain_with_fresh_session() {
     drop(accepted);
     assert_eq!(transport.output_drops.load(Ordering::SeqCst), 2);
 }
+
+#[path = "requested_tests.rs"]
+mod requested_tests;
