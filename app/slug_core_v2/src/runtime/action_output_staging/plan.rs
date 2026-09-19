@@ -4,7 +4,10 @@ use slug_build_api_v2::AnalysisArtifact;
 use starlark_map::small_map::SmallMap;
 
 use super::*;
+use crate::runtime::PreparedActionChainInputs;
 use crate::runtime::PreparedActionPlan;
+
+mod runfiles;
 use crate::runtime::configured_output::ConfiguredOutputOwner;
 
 /// Private destinations for one planned producer's selected output subset.
@@ -13,6 +16,8 @@ use crate::runtime::configured_output::ConfiguredOutputOwner;
 pub struct PlannedActionOutputStaging {
     action_index: usize,
     staging: ActionOutputStaging,
+    backing: Vec<SourceBacking>,
+    covered: Vec<PublishedPlannedActionOutputs>,
 }
 impl PlannedActionOutputStaging {
     pub fn action_index(&self) -> usize {
@@ -22,6 +27,9 @@ impl PlannedActionOutputStaging {
         &self.staging
     }
     pub(in crate::runtime) fn seal(&mut self) -> io::Result<()> {
+        for backing in &mut self.backing {
+            backing.seal()?;
+        }
         self.staging.seal()
     }
     pub(in crate::runtime) fn publish_all(
@@ -31,18 +39,26 @@ impl PlannedActionOutputStaging {
         // Retain every stage, including retired entries, until outside the
         // native revision lock. A later rename failure can still be partial.
         for stage in stages.iter() {
+            for backing in &stage.backing {
+                backing.preflight()?;
+            }
             stage.staging.preflight()?;
         }
-        stages
-            .iter_mut()
-            .map(|stage| {
-                Ok(PublishedPlannedActionOutputs {
-                    action_index: stage.action_index,
-                    outputs: stage.staging.publish()?,
-                })
-            })
-            .collect::<io::Result<Vec<_>>>()
-            .map(Arc::from)
+        for stage in stages.iter_mut() {
+            for backing in &mut stage.backing {
+                backing.publish()?;
+            }
+        }
+        let mut published = Vec::new();
+        // Stages are sorted so all backing artifacts precede physical trees.
+        for stage in stages {
+            published.push(PublishedPlannedActionOutputs {
+                action_index: stage.action_index,
+                outputs: stage.staging.publish()?,
+            });
+            published.extend(stage.covered.iter().cloned());
+        }
+        Ok(published.into())
     }
 }
 
@@ -62,9 +78,28 @@ impl PublishedPlannedActionOutputs {
 }
 
 impl ConfiguredOutputOwner {
+    #[cfg(test)]
     pub(in crate::runtime) fn stage_planned_outputs(
         &self,
         plan: &PreparedActionPlan<'_>,
+    ) -> io::Result<Vec<PlannedActionOutputStaging>> {
+        self.stage_outputs_with_inputs(plan, None)
+    }
+
+    pub(in crate::runtime) fn stage_prepared_outputs(
+        &self,
+        inputs: &PreparedActionChainInputs,
+    ) -> io::Result<Vec<PlannedActionOutputStaging>> {
+        let plan = inputs
+            .plan()
+            .map_err(|error| io::Error::other(error.to_string()))?;
+        self.stage_outputs_with_inputs(&plan, Some(inputs))
+    }
+
+    fn stage_outputs_with_inputs(
+        &self,
+        plan: &PreparedActionPlan<'_>,
+        inputs: Option<&PreparedActionChainInputs>,
     ) -> io::Result<Vec<PlannedActionOutputStaging>> {
         let mut groups: SmallMap<usize, SmallSet<ActionOutput>> = SmallMap::new();
         match plan {
@@ -117,6 +152,7 @@ impl ConfiguredOutputOwner {
                 }
             }
         }
+        let trees = runfiles::expand_groups(plan, inputs, &mut groups)?;
         // Exclude every selected path component, including other producers'
         // not-yet-created package parents, from each hidden sibling allocation.
         let reserved = groups
@@ -124,8 +160,9 @@ impl ConfiguredOutputOwner {
             .flat_map(|outputs| outputs.iter())
             .flat_map(|output| output.path().split('/'))
             .collect();
-        groups
+        let mut stages = groups
             .iter()
+            .filter(|(index, _)| !trees.iter().any(|tree| tree.index == **index))
             .map(|(index, outputs)| {
                 let outputs = outputs.iter().cloned().collect::<Vec<_>>();
                 Ok(PlannedActionOutputStaging {
@@ -135,9 +172,13 @@ impl ConfiguredOutputOwner {
                         &outputs,
                         &reserved,
                     )?,
+                    backing: Vec::new(),
+                    covered: Vec::new(),
                 })
             })
-            .collect()
+            .collect::<io::Result<Vec<_>>>()?;
+        runfiles::stage_trees(self, plan, inputs, trees, &reserved, &mut stages)?;
+        Ok(stages)
     }
 }
 

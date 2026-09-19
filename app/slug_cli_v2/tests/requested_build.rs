@@ -19,6 +19,9 @@ use slug_reapi_v2::ReapiDigest;
 #[path = "../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
 mod fixture;
 
+#[path = "requested_build/runfiles.rs"]
+mod runfiles;
+
 const DEFS: &str = r#"print('WP746_DEFS')
 def _impl(ctx):
     print('WP746_ANALYSIS')

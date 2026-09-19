@@ -339,16 +339,44 @@ paths must lie under their owned roots, while observed symlink targets retain ex
 external-target semantics. Held prepared results keep their roots alive after runtime drop;
 final lease release permits normal TempDir cleanup. Leases grant temporary path lifetime,
 not historical-read authority or durable runfiles backing. Generated unresolved symlinks
-remain deferred. Future publication must stage persistent materialized-source backing or
-supply an output-owned generation lifetime that survives process exit.
+remain deferred.
 
-Bazel's RunfilesTreeAction is rich metadata, not an ordinary Directory-producing remote
-action. Native completion must publish generated backing artifacts as well as the selected
-tree. Source-manifest targets require observed source/configured-output authority; a logical
-artifact path is not filesystem authorization. Virtual support results, durable source
-backing and confined symlink staging remain prerequisites to execution admission. Do not
-fabricate remote executions for metadata-only nodes or relax arbitrary backend symlink
-rejection. Existing requested Build continues to reject this family before effects.
+Ordinary requested Build now admits the four retained support families within the existing
+prerequisite forest. Core certifies every raw source constituent and validates exact support
+owner/artifact pairing and physical topology before effects. Source-manifest Warn diagnostics
+belong to the staging key's DICE evaluation EventBatch, preserving native warm suppression
+and restoration. REAPI keeps typed outcomes at every plan ordinal: actual remote results,
+local manifest bytes/digests, physical symlink-tree completion and virtual RunfilesTree
+completion. Local metadata never fabricates Execute, ActionResult, Directory or AC evidence.
+Ordinary non-runfiles steps reuse the existing borrowed plan without repeated planning.
+
+Publication expands trees (including explicitly requested MANIFEST roots) into all raw
+backing producers and support manifests, even when absent from DefaultInfo. The public
+MANIFEST and tree share one directory replacement and preserve separate producer metadata.
+Core creates only typed layout links/empty entries through confined no-follow descriptors;
+late leaf/descendant conflicts are unsupported before execution. Physical MANIFEST replaces
+an authored MANIFEST leaf while the source-manifest bytes preserve that authored mapping.
+New tree directories use 0755 and empty files 0444 as explicit Slug-native mode normalization.
+Arbitrary backend symlink output admission remains unchanged.
+
+Materialization-source targets project to the reserved
+bazel-out/.slug-runfiles-sources/v1/<sha256>-<size>-<mode> store. Exact selected native leases
+protect copying; digest/length verification and observed execute bits determine sealed
+read-only backing. The store is output ownership, never graph identity or source freshness
+backup. Installed files survive runtime/result/process exit, remain until explicit output
+cleanup, and may leave harmless orphan entries after partial publication. No automatic GC
+or extra power-loss guarantee is claimed. Host sources retain observed requested paths.
+The complete batch is staged/sealed and preflighted before installing backing then trees
+under final native source validation; established partial-publication errors remain explicit.
+
+WP750 evidence covers exact pairing, overlay/conflict handling, missing/corrupt backing,
+mode preservation, confined cleanup, typed mixed-result provenance, warning restoration,
+public binary A/warm-A/B/restored-A plus runtime shutdown, MANIFEST-only selection, and an
+actual CLI process-exit binary smoke. Full production closure execution remains unproved.
+FilesToRun-as-Spawn-input, nested runfiles trees, unresolved Symlink outputs, Run activation,
+exact support ActionKeys and Windows remain deferred. Legacy single-selected-action APIs
+continue to reject directly selecting support families; ordinary requested Build owns their
+coupled publication.
 
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies

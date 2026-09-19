@@ -76,6 +76,34 @@ impl ConfiguredOutputOwner {
         )
     }
 
+    pub(super) fn stage_runfiles(
+        &self,
+        action: &slug_analysis_v2::ConfiguredAction,
+        workspace_name: &str,
+        entries: &[(String, Option<String>)],
+        reserved: &starlark_map::small_set::SmallSet<&str>,
+    ) -> std::io::Result<super::action_output_staging::ActionOutputStaging> {
+        let configuration = action
+            .context()
+            .owner()
+            .configuration()
+            .slug_configuration()
+            .ok_or_else(|| std::io::Error::other("runfiles requires structural configuration"))?;
+        let [output] = action.outputs() else {
+            return Err(std::io::Error::other("runfiles tree must have one output"));
+        };
+        self.register(configuration.projection(), configuration)
+            .map_err(std::io::Error::other)?;
+        super::action_output_staging::ActionOutputStaging::new_runfiles(
+            &self.workspace,
+            configuration,
+            output,
+            workspace_name,
+            entries,
+            reserved,
+        )
+    }
+
     /// Claims the projection first in memory and then durably on disk.
     ///
     /// The mutex is deliberately released before the first filesystem call.

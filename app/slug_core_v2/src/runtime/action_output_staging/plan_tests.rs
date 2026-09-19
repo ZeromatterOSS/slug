@@ -33,6 +33,8 @@ fn stages(workspace: &Workspace) -> Vec<PlannedActionOutputStaging> {
             PlannedActionOutputStaging {
                 action_index: index + 2,
                 staging,
+                backing: Vec::new(),
+                covered: Vec::new(),
             }
         })
         .collect()

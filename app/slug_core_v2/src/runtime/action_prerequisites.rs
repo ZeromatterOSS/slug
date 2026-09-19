@@ -6,7 +6,9 @@ use slug_analysis_v2::ConfiguredAction;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
+use slug_build_api_v2::RunfilesSupportActionSpec;
 use starlark_map::small_map::SmallMap;
+use starlark_map::small_set::SmallSet;
 
 use super::configured_action_closure::ValidatedActionClosure;
 use super::configured_action_closure::scalar_file_write;
@@ -65,8 +67,12 @@ impl<'a> ActionPrerequisitePlan<'a> {
             .iter()
             .position(|owner| owner.configured_target_key() == Some(selected_owner))
             .ok_or("selected action owner is absent from validated closure")?;
-        if owners[selected].actions().get(selected_action).is_none() {
-            return Err("selected action ordinal is absent from validated closure".into());
+        let action = owners[selected]
+            .actions()
+            .get(selected_action)
+            .ok_or("selected action ordinal is absent from validated closure")?;
+        if action.runfiles_support_spec().is_some() {
+            return Err("runfiles support requires requested-artifact execution".into());
         }
         Ok(Self {
             actions: plan_roots(closure, PlanRoots::Action((selected, selected_action)))?.actions,
@@ -179,7 +185,7 @@ fn plan_roots<'a>(
         };
         if !matches!(
             output.kind(),
-            ActionOutputKind::File | ActionOutputKind::Directory
+            ActionOutputKind::File | ActionOutputKind::Directory | ActionOutputKind::RunfilesTree
         ) {
             return Err("unsupported generated prerequisite artifact kind".into());
         }
@@ -199,7 +205,21 @@ fn plan_roots<'a>(
             artifacts.iter().map(&producer).collect::<Result<_, _>>()?
         }
     };
-    walk_prerequisites(closure, seeds, producer)
+    let selected_count = seeds.len();
+    let mut seeds = seeds;
+    // A requested physical MANIFEST also needs its tree/backing completion root.
+    // This is selection expansion, not a new action input or a dependency cycle.
+    for index in 0..selected_count {
+        if let Some((owner, action)) = seeds[index]
+            && let Some(RunfilesSupportActionSpec::SymlinkTree { support, .. }) =
+                owners[owner].actions()[action].runfiles_support_spec()
+        {
+            seeds.push(producer(&support.tree)?);
+        }
+    }
+    let mut forest = walk_prerequisites(closure, seeds, producer)?;
+    forest.producers.truncate(selected_count);
+    Ok(forest)
 }
 
 fn walk_prerequisites<'a>(
@@ -235,12 +255,27 @@ fn walk_prerequisites<'a>(
                     !matches!(
                         output.kind(),
                         ActionOutputKind::File | ActionOutputKind::Directory
-                    )
+                    ) && !(output.kind() == ActionOutputKind::RunfilesTree
+                        && matches!(
+                            action.runfiles_support_spec(),
+                            Some(RunfilesSupportActionSpec::RunfilesTree { .. })
+                        ))
                 }) {
                     return Err("unsupported generated prerequisite output kind".into());
                 }
                 let artifacts = if let Some(spawn) = action.spawn_spec() {
-                    declared_artifacts(spawn)?
+                    let artifacts = declared_artifacts(spawn)?;
+                    if artifacts.iter().any(|artifact| matches!(artifact,
+                        AnalysisArtifact::Derived { output, .. } if output.kind() == ActionOutputKind::RunfilesTree)) {
+                        return Err("runfiles-tree Spawn inputs remain unsupported".into());
+                    }
+                    artifacts
+                } else if let Some(spec) = action.runfiles_support_spec() {
+                    let mut artifacts = SmallSet::new();
+                    spec.visit_declared_inputs(|artifact| {
+                        artifacts.insert(artifact.clone());
+                    });
+                    artifacts
                 } else if scalar_file_write(action) {
                     Default::default()
                 } else {

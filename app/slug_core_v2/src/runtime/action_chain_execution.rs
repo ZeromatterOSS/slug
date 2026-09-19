@@ -84,12 +84,9 @@ impl<T: ActionChainOutputTransport> PublicationPolicy<T> for PublishOutputs<'_> 
         session: &mut T::Session,
         inputs: &PreparedActionChainInputs,
     ) -> Result<Option<Vec<PlannedActionOutputStaging>>, NativeDemandSessionError> {
-        let plan = inputs
-            .plan()
-            .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error}")))?;
         let mut staging = self
             .0
-            .stage_planned_outputs(&plan)
+            .stage_prepared_outputs(inputs)
             .map_err(|error| NativeDemandSessionError::Computation(error.into()))?;
         transport
             .stage_outputs(session, &staging)
@@ -265,6 +262,18 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
                 // frontier, without inventing a backend session or result.
                 return Ok(());
             }
+            let has_runfiles = terminal
+                .inputs
+                .plan()
+                .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error}")))?
+                .actions()
+                .iter()
+                .any(|step| step.action().runfiles_support_spec().is_some());
+            let _generations = if has_runfiles {
+                Some(context.retain_source_generations(terminal.inputs.sources())?)
+            } else {
+                None
+            };
             let mut session = self
                 .transport
                 .start(terminal.inputs.clone())
@@ -340,9 +349,10 @@ impl WorkspaceRuntime {
         )
     }
 
-    /// Execute one requested forest and publish precisely its selected Derived
-    /// outputs after full-frontier validation. Later rename/bookkeeping failures
-    /// may leave earlier artifacts changed; no accepted result is then returned.
+    /// Execute one requested forest and publish selected Derived outputs plus
+    /// required runfiles backing and coupled support outputs after full-frontier
+    /// validation. Later rename/bookkeeping failures may leave earlier artifacts
+    /// changed; no accepted result is then returned.
     /// Source-certified build failures are accepted without transport or publication.
     #[allow(clippy::too_many_arguments)]
     pub fn execute_and_publish_requested_actions_with_repository_environment<

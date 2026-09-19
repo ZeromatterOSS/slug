@@ -6,6 +6,9 @@ mod runfiles_layout_tests;
 #[path = "runfiles_manifest_tests.rs"]
 mod runfiles_manifest_tests;
 
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[path = "runfiles_build_tests.rs"]
+mod runfiles_build_tests;
 #[path = "runfiles_generation_tests.rs"]
 mod runfiles_generation_tests;
 

@@ -367,7 +367,7 @@ impl ActionChainTransport for CheckedTransport {
         self.inner.execute(session, index, staged).await?;
         if index == 1 {
             if let Some(mutation) = self.mutation {
-                let digest = session.results[1].result.output_files()[0].digest();
+                let digest = session.results[1].remote().unwrap().result.output_files()[0].digest();
                 let root = PathBuf::from(std::env::var("SLUG_V2_NATIVELINK_TEST_ROOT").unwrap());
                 // Only the supervised fixture CAS is mutated, never workspace outputs.
                 // NativeLink filesystem_store::DIGEST_FOLDER is "d".
@@ -464,7 +464,12 @@ fn nativelink_chain_generated_file_tree_cache_change_restore() {
     {
         std::fs::write(workspace.root.join("input"), bytes).unwrap();
         drop(workspace.run(&transport).unwrap().project(|accepted| {
-            let results = accepted.output().results();
+            let results = accepted
+                .output()
+                .results()
+                .iter()
+                .map(|step| step.remote().unwrap())
+                .collect::<Vec<_>>();
             assert_eq!(results.len(), 3);
             for (index, result) in results.iter().enumerate() {
                 let hit = if index == 0 { run != 0 } else { hit };
@@ -506,7 +511,7 @@ fn nativelink_chain_generated_file_tree_cache_change_restore() {
                 .unwrap();
             assert_eq!(empty.directories(), [""]);
             assert!(empty.files().is_empty());
-            let selected = accepted.output().selected().unwrap();
+            let selected = accepted.output().selected().unwrap().remote().unwrap();
             assert_eq!(selected.result.output_files()[0].path(), "done");
             assert_eq!(
                 selected.result.output_files()[0].digest(),

@@ -31,6 +31,11 @@ use slug_build_api_v2::ActionOutputKind;
 use slug_configuration_v2::SlugConfiguration;
 use tempfile::NamedTempFile;
 
+mod runfiles;
+mod source_backing;
+pub(super) use runfiles::validate_runfiles;
+pub(super) use source_backing::SourceBacking;
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct Identity(u64, u64);
 fn identity(file: &File) -> io::Result<Identity> {
@@ -243,6 +248,7 @@ pub(super) struct Staging {
     destinations: Vec<Destination>,
     sealed: bool,
     attempted: bool,
+    runfiles: Option<runfiles::RunfilesTopology>,
 }
 impl Staging {
     pub(super) fn new(
@@ -285,6 +291,7 @@ impl Staging {
             destinations,
             sealed: false,
             attempted: false,
+            runfiles: None,
         })
     }
     fn destination(
@@ -370,7 +377,11 @@ impl Staging {
             if entry(&destination.parent, &destination.name)? != destination.cleanup {
                 return Err(io::Error::other("staged output changed during transfer"));
             }
-            seal_entry(&destination.parent, &destination.name)?;
+            if let Some(topology) = &self.runfiles {
+                topology.seal(&destination.staged)?;
+            } else {
+                seal_entry(&destination.parent, &destination.name)?;
+            }
         }
         self.preflight(outputs)?;
         self.sealed = true;

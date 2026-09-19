@@ -4,9 +4,10 @@ use slug_analysis_v2::ConfiguredNodeResult;
 
 use super::*;
 
-pub(super) type DeclaredOutputs<'a> = SmallMap<AnalysisArtifact, &'a ConfiguredTargetKey>;
+pub(in crate::runtime::dice) type DeclaredOutputs<'a> =
+    SmallMap<AnalysisArtifact, &'a ConfiguredTargetKey>;
 
-pub(super) fn declared_outputs<'a>(
+pub(in crate::runtime::dice) fn declared_outputs<'a>(
     owners: impl Iterator<Item = &'a ConfiguredNodeResult>,
 ) -> Result<DeclaredOutputs<'a>, Arc<str>> {
     let mut declared = SmallMap::new();
@@ -38,7 +39,7 @@ pub(super) fn declared_outputs<'a>(
     Ok(declared)
 }
 
-pub(super) fn generated_target(
+pub(in crate::runtime::dice) fn generated_target(
     workspace: &NormalizedAbsolutePath,
     declared: &DeclaredOutputs<'_>,
     artifact: &AnalysisArtifact,
@@ -62,7 +63,9 @@ pub(super) fn generated_target(
     absolute_string(&path)
 }
 
-pub(super) fn absolute_string(path: &std::path::Path) -> Result<String, Arc<str>> {
+pub(in crate::runtime::dice) fn absolute_string(
+    path: &std::path::Path,
+) -> Result<String, Arc<str>> {
     if !path.is_absolute() {
         return Err(error("runfiles target path is not absolute"));
     }

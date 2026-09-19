@@ -10,6 +10,7 @@ use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::ExpandedSpawnCommandLine;
 use slug_core_v2::runtime::ActionChainTransport;
 use slug_core_v2::runtime::PreparedActionChainInputs;
+use slug_core_v2::runtime::PreparedRunfilesAction;
 use slug_reapi_cache_v2::CacheClient;
 use slug_reapi_cache_v2::TransferPolicy;
 
@@ -20,24 +21,27 @@ use crate::source_spawn::spawn_command;
 use crate::*;
 
 mod output_staging;
+mod result;
+pub use result::ActionChainStepResult;
+pub use result::LocalManifestResult;
 
 /// Immutable remote policy. Each Core attempt creates an independent session.
 pub struct ActionChainReapiTransport {
     config: RemoteConfig,
 }
 
-/// Verified metadata in prerequisite order, exposed only after native acceptance.
+/// Remote and local outcomes in plan order, exposed only after native acceptance.
 #[derive(Debug)]
 pub struct ActionChainRemoteResult {
-    results: Vec<RemoteExecutionResult>,
+    results: Vec<ActionChainStepResult>,
     selected: Option<usize>,
 }
 impl ActionChainRemoteResult {
-    pub fn results(&self) -> &[RemoteExecutionResult] {
+    pub fn results(&self) -> &[ActionChainStepResult] {
         &self.results
     }
     /// Requested forests have an ordered result table, but no single selected action.
-    pub fn selected(&self) -> Option<&RemoteExecutionResult> {
+    pub fn selected(&self) -> Option<&ActionChainStepResult> {
         self.selected.map(|index| &self.results[index])
     }
 }
@@ -47,7 +51,7 @@ pub struct ActionChainReapiSession {
     inputs: Arc<PreparedActionChainInputs>,
     config: RemoteConfig,
     templates: Vec<Template>,
-    results: Vec<RemoteExecutionResult>,
+    results: Vec<ActionChainStepResult>,
     cache: CacheClient,
     channel: tonic::transport::Channel,
     identity: Arc<()>,
@@ -55,9 +59,15 @@ pub struct ActionChainReapiSession {
 pub struct StagedChainAction {
     session: Arc<()>,
     index: usize,
-    command: ReapiCommand,
-    identity: ReapiActionIdentity,
-    uploaded: Vec<ReapiDigest>,
+    payload: StagedPayload,
+}
+enum StagedPayload {
+    Remote {
+        command: ReapiCommand,
+        identity: ReapiActionIdentity,
+        uploaded: Vec<ReapiDigest>,
+    },
+    Runfiles(ActionChainStepResult),
 }
 
 enum Binding {
@@ -72,6 +82,7 @@ enum Binding {
     },
 }
 enum Template {
+    Runfiles(ActionChainStepResult),
     Write(FileWriteReapiPlan),
     Spawn {
         command: ReapiCommand,
@@ -84,6 +95,7 @@ struct BoundAction {
     tree: ReapiInputTree,
     sources: BTreeMap<ReapiDigest, usize>,
     generated: BTreeSet<ReapiDigest>,
+    local: BTreeMap<ReapiDigest, Arc<[u8]>>,
 }
 fn command_error(value: impl ToString) -> RemoteExecutionError {
     RemoteExecutionError::Command(value.to_string())
@@ -126,6 +138,15 @@ impl Template {
             .iter()
             .map(|step| {
                 let action = step.action();
+                if action.runfiles_support_spec().is_some()
+                    && let Some(runfiles) = inputs
+                        .prepare_runfiles_action(action)
+                        .map_err(command_error)?
+                {
+                    return Ok(Self::Runfiles(ActionChainStepResult::from_runfiles(
+                        runfiles,
+                    )));
+                }
                 let Some(spawn) = action.spawn_spec() else {
                     return FileWriteReapiPlan::from_chain_action(action, defaults)
                         .map(Self::Write)
@@ -190,7 +211,7 @@ impl Template {
             .collect()
     }
 
-    fn bind(&self, results: &[RemoteExecutionResult]) -> Result<BoundAction, RemoteExecutionError> {
+    fn bind(&self, results: &[ActionChainStepResult]) -> Result<BoundAction, RemoteExecutionError> {
         let Self::Spawn {
             command,
             expanded,
@@ -198,19 +219,21 @@ impl Template {
         } = self
         else {
             let Self::Write(plan) = self else {
-                unreachable!()
+                return Err(protocol("runfiles step has no remote input tree"));
             };
             return Ok(BoundAction {
                 command: plan.command().clone(),
                 tree: plan.input_tree().clone(),
                 sources: BTreeMap::new(),
                 generated: BTreeSet::new(),
+                local: BTreeMap::new(),
             });
         };
         let mut entries = Vec::new();
         let mut directories = command.output_directories.clone();
         let mut sources = BTreeMap::new();
         let mut generated = BTreeSet::new();
+        let mut local = BTreeMap::new();
         for binding in inputs {
             match binding {
                 Binding::Source {
@@ -222,9 +245,22 @@ impl Template {
                     sources.insert(digest.clone(), *index);
                 }
                 Binding::Generated { producer, output } => {
-                    let result = &results
+                    let completed = results
                         .get(*producer)
-                        .ok_or_else(|| protocol("producer has not completed in this attempt"))?
+                        .ok_or_else(|| protocol("producer has not completed in this attempt"))?;
+                    if let Some(file) = completed.local_file() {
+                        if file.output() != output {
+                            return Err(protocol("local producer differs from declared input"));
+                        }
+                        entries.push(input_entry(output.path(), file.digest().clone()));
+                        local.insert(file.digest().clone(), file.bytes.clone());
+                        continue;
+                    }
+                    let result = &completed
+                        .remote()
+                        .ok_or_else(|| {
+                            protocol("virtual runfiles tree cannot bind a remote input")
+                        })?
                         .result;
                     match output.kind() {
                         ActionOutputKind::File => {
@@ -270,6 +306,7 @@ impl Template {
             tree,
             sources,
             generated,
+            local,
         })
     }
 }
@@ -329,21 +366,31 @@ impl ActionChainTransport for ActionChainReapiTransport {
         let templates = Template::prepare(&inputs, &self.config.default_exec_properties)?;
         let endpoint =
             tonic_endpoint(self.config.executor.as_deref().expect("validated executor"))?;
-        let channel = tonic::transport::Endpoint::from_shared(endpoint)
-            .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
-            .connect()
-            .await
+        let endpoint = tonic::transport::Endpoint::from_shared(endpoint)
             .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
+        let remote = templates
+            .iter()
+            .any(|template| !matches!(template, Template::Runfiles(_)));
+        let channel = if remote {
+            endpoint
+                .connect()
+                .await
+                .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
+        } else {
+            endpoint.connect_lazy()
+        };
         let mut cache = CacheClient::new(
             channel.clone(),
             self.config.instance_name.clone().unwrap_or_default(),
             TransferPolicy::default(),
         )
         .map_err(cache_error)?;
-        cache
-            .apply_server_batch_limit()
-            .await
-            .map_err(cache_error)?;
+        if remote {
+            cache
+                .apply_server_batch_limit()
+                .await
+                .map_err(cache_error)?;
+        }
         Ok(ActionChainReapiSession {
             inputs,
             config: self.config.clone(),
@@ -363,11 +410,18 @@ impl ActionChainTransport for ActionChainReapiTransport {
         if index != session.results.len() {
             return Err(protocol("chain staging is out of order"));
         }
-        let bound = session
+        let template = session
             .templates
             .get(index)
-            .ok_or_else(|| protocol("unknown chain step"))?
-            .bind(&session.results)?;
+            .ok_or_else(|| protocol("unknown chain step"))?;
+        if let Template::Runfiles(result) = template {
+            return Ok(StagedChainAction {
+                session: session.identity.clone(),
+                index,
+                payload: StagedPayload::Runfiles(result.clone()),
+            });
+        }
+        let bound = template.bind(&session.results)?;
         let identity =
             ReapiActionIdentity::new(&bound.command, bound.tree.root_digest().clone(), None);
         let blobs = bound
@@ -409,6 +463,12 @@ impl ActionChainTransport for ActionChainReapiTransport {
                     .upload_missing(&[blob.clone()])
                     .await
                     .map_err(cache_error)?;
+            } else if let Some(bytes) = bound.local.get(digest) {
+                session
+                    .cache
+                    .upload_reader_verified(digest, std::io::Cursor::new(bytes.clone()))
+                    .await
+                    .map_err(cache_error)?;
             } else if let Some(index) = bound.sources.get(digest) {
                 let file = session
                     .inputs
@@ -435,9 +495,11 @@ impl ActionChainTransport for ActionChainReapiTransport {
         Ok(StagedChainAction {
             session: session.identity.clone(),
             index,
-            command: bound.command,
-            identity,
-            uploaded: missing.into_iter().collect(),
+            payload: StagedPayload::Remote {
+                command: bound.command,
+                identity,
+                uploaded: missing.into_iter().collect(),
+            },
         })
     }
 
@@ -455,15 +517,24 @@ impl ActionChainTransport for ActionChainReapiTransport {
                 "staged action belongs to another chain attempt or step",
             ));
         }
-        let result = execute_staged_metadata(
-            &session.config,
-            &staged.command,
-            &staged.identity,
-            &session.cache,
-            session.channel.clone(),
-            staged.uploaded,
-        )
-        .await?;
+        let result = match staged.payload {
+            StagedPayload::Runfiles(result) => result,
+            StagedPayload::Remote {
+                command,
+                identity,
+                uploaded,
+            } => ActionChainStepResult::Remote(
+                execute_staged_metadata(
+                    &session.config,
+                    &command,
+                    &identity,
+                    &session.cache,
+                    session.channel.clone(),
+                    uploaded,
+                )
+                .await?,
+            ),
+        };
         session.results.push(result);
         Ok(())
     }
@@ -489,3 +560,9 @@ mod tests;
 
 #[cfg(test)]
 mod requested_tests;
+
+#[cfg(test)]
+mod local_results_tests;
+
+#[cfg(all(test, target_os = "linux", target_env = "gnu"))]
+mod runfiles_tests;

@@ -91,12 +91,7 @@ fn check_layout<'a>(
             .any(|entry| entry.path() == "MANIFEST")
     );
 
-    assert!(
-        value
-            .requested_action_prerequisites()
-            .unwrap_err()
-            .contains("unsupported")
-    );
+    assert!(value.requested_action_prerequisites().is_ok());
     for analysis in value
         .analyses()
         .filter(|analysis| !analysis.actions().is_empty())

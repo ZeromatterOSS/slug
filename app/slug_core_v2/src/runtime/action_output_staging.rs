@@ -11,11 +11,29 @@ use slug_configuration_v2::SlugConfiguration;
 use starlark_map::small_set::SmallSet;
 
 mod plan;
+mod source_backing;
 pub use plan::PlannedActionOutputStaging;
 pub use plan::PublishedPlannedActionOutputs;
+pub(in crate::runtime) use source_backing::SourceBacking;
+pub(in crate::runtime) use source_backing::source_backing_path;
 
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 mod linux;
+
+pub(in crate::runtime) fn validate_runfiles_layout(
+    workspace: &str,
+    entries: &[(String, Option<String>)],
+) -> io::Result<()> {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        linux::validate_runfiles(workspace, entries)
+    }
+    #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+    {
+        let _ = (workspace, entries);
+        Err(unsupported())
+    }
+}
 
 /// Accepted publication metadata; owns no transfer buffers or open handles.
 #[derive(Clone, Debug)]
@@ -76,6 +94,44 @@ impl ActionOutputStaging {
             Err(unsupported())
         }
     }
+    pub(super) fn new_runfiles(
+        workspace: &Path,
+        configuration: &SlugConfiguration,
+        output: &ActionOutput,
+        workspace_name: &str,
+        entries: &[(String, Option<String>)],
+        reserved: &SmallSet<&str>,
+    ) -> io::Result<Self> {
+        #[cfg(all(target_os = "linux", target_env = "gnu"))]
+        {
+            let inner = linux::Staging::new_runfiles(
+                workspace,
+                configuration,
+                output,
+                workspace_name,
+                entries,
+                reserved,
+            )?;
+            Ok(Self {
+                outputs: Arc::from([output.clone()]),
+                root: super::configured_output::configured_output_root(workspace, configuration),
+                inner,
+            })
+        }
+        #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+        {
+            let _ = (
+                workspace,
+                configuration,
+                output,
+                workspace_name,
+                entries,
+                reserved,
+            );
+            Err(unsupported())
+        }
+    }
+
     pub fn outputs(&self) -> &[ActionOutput] {
         &self.outputs
     }

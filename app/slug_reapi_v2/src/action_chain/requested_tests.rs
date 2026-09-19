@@ -118,19 +118,21 @@ fn requested_templates_bind_shared_producer_and_keep_all_root_results() {
             assert!(shared.is_executable());
             assert_eq!(bound.generated, BTreeSet::from([digest.clone()]));
         }
-        session.results.push(RemoteExecutionResult {
-            action_digest: ReapiDigest::of_bytes(&[index as u8]),
-            platform_properties: Default::default(),
-            result: ActionResult::new(
-                step.action()
-                    .outputs()
-                    .iter()
-                    .map(|output| GeneratedOutput::new(output.path(), digest.clone(), false))
-                    .collect(),
-            ),
-            output_blobs: Default::default(),
-            evidence: ExecutionEvidence::reapi("synthetic verified metadata"),
-        });
+        session
+            .results
+            .push(ActionChainStepResult::Remote(RemoteExecutionResult {
+                action_digest: ReapiDigest::of_bytes(&[index as u8]),
+                platform_properties: Default::default(),
+                result: ActionResult::new(
+                    step.action()
+                        .outputs()
+                        .iter()
+                        .map(|output| GeneratedOutput::new(output.path(), digest.clone(), false))
+                        .collect(),
+                ),
+                output_blobs: Default::default(),
+                evidence: ExecutionEvidence::reapi("synthetic verified metadata"),
+            }));
     }
     let result = runtime.block_on(transport().finish(session)).unwrap();
     assert!(result.selected().is_none());
@@ -143,7 +145,12 @@ fn requested_templates_bind_shared_producer_and_keep_all_root_results() {
     {
         if let Some(producer) = producer {
             assert_eq!(
-                result.results()[*producer].result.output_files()[0].path(),
+                result.results()[*producer]
+                    .remote()
+                    .unwrap()
+                    .result
+                    .output_files()[0]
+                    .path(),
                 artifact.path()
             );
         } else {

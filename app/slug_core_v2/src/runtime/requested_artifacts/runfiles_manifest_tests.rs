@@ -113,13 +113,7 @@ pub(super) fn check_frontier(workspace: &Workspace, value: &PreparedRunfilesMani
 }
 
 pub(super) fn check_no_effects(workspace: &Workspace, value: &PreparedRunfilesManifests) {
-    assert!(
-        value
-            .evaluation()
-            .requested_action_prerequisites()
-            .unwrap_err()
-            .contains("unsupported")
-    );
+    assert!(value.evaluation().requested_action_prerequisites().is_ok());
     for node in value
         .evaluation()
         .analyses()

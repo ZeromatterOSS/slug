@@ -12,7 +12,7 @@ use crate::runtime::SourceArtifactInputObservationKey;
 use crate::runtime::repository_io::NativeSourceGenerations;
 
 #[path = "runfiles_manifest/paths.rs"]
-mod paths;
+pub(super) mod paths;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 struct RunfilesManifestPreparationKey {

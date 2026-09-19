@@ -12,6 +12,10 @@ use crate::runtime::RequestedActionPrerequisitePlan;
 use crate::runtime::SourceArtifactInput;
 use crate::runtime::SourceArtifactInputObservationKey;
 
+#[path = "action_chain_staging/runfiles.rs"]
+mod runfiles;
+pub use runfiles::PreparedRunfilesAction;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(super) struct ActionChainStagingKey {
     build: BuildCommandRootKey,
@@ -80,6 +84,7 @@ impl ActionSelection {
 /// using its metadata. Such failures have no action sources or executable plan.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct PreparedActionChainInputs {
+    workspace: NormalizedAbsolutePath,
     evaluation: Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
     selection: ActionSelection,
     sources: Arc<[Arc<ObservedSourceArtifactInput>]>,
@@ -152,6 +157,7 @@ impl ActionChainStagingKey {
             let certificate = SourceCertificate::from_epoch(observations.dupe()).map_err(error)?;
             return Ok(PreparationOutcome::Complete(Arc::new(
                 PreparedActionChainInputs {
+                    workspace: self.build.workspace.dupe(),
                     evaluation,
                     selection: self.selection.clone(),
                     sources: Arc::from([]),
@@ -172,6 +178,13 @@ impl ActionChainStagingKey {
             }
         }
         for step in plan.actions() {
+            if let Some(spec) = step.action().runfiles_support_spec() {
+                for artifact in spec.support().layout().map_err(error)?.constituents() {
+                    if matches!(artifact, AnalysisArtifact::Source(_)) {
+                        artifacts.insert(artifact.clone());
+                    }
+                }
+            }
             for input in step.inputs() {
                 if matches!(input.artifact(), AnalysisArtifact::Source(_)) {
                     artifacts.insert(input.artifact().clone());
@@ -198,15 +211,19 @@ impl ActionChainStagingKey {
             }
         }
         let certificate = SourceCertificate::from_epoch(observations.dupe()).map_err(error)?;
-        Ok(PreparationOutcome::Complete(Arc::new(
-            PreparedActionChainInputs {
-                evaluation,
-                selection: self.selection.clone(),
-                sources: sources.into(),
-                observations,
-                certificate,
-            },
-        )))
+        let prepared = PreparedActionChainInputs {
+            workspace: self.build.workspace.dupe(),
+            evaluation,
+            selection: self.selection.clone(),
+            sources: sources.into(),
+            observations,
+            certificate,
+        };
+        // Pure preflight of all support ownership and physical topology before effects.
+        for step in prepared.plan()?.actions() {
+            prepared.prepare_runfiles_action(step.action())?;
+        }
+        Ok(PreparationOutcome::Complete(Arc::new(prepared)))
     }
 }
 
@@ -224,12 +241,25 @@ impl fmt::Display for ActionChainStagingKey {
 impl Key for ActionChainStagingKey {
     type Value = PreparationOutcome<Result<Arc<PreparedActionChainInputs>, Arc<str>>>;
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        ctx.store_evaluation_data(EventBatch::empty())
+        let (value, events) = match self.prepare(ctx).await {
+            Ok(PreparationOutcome::Complete(inputs)) => match inputs.warning_events() {
+                Ok(events) => (PreparationOutcome::Complete(Ok(inputs)), events),
+                Err(error) => (
+                    PreparationOutcome::Complete(Err(error)),
+                    EventBatch::empty(),
+                ),
+            },
+            Ok(PreparationOutcome::Need(need)) => {
+                (PreparationOutcome::Need(need), EventBatch::empty())
+            }
+            Err(error) => (
+                PreparationOutcome::Complete(Err(error)),
+                EventBatch::empty(),
+            ),
+        };
+        ctx.store_evaluation_data(events)
             .expect("one action chain staging event batch");
-        match self.prepare(ctx).await {
-            Ok(outcome) => outcome.map(Ok),
-            Err(error) => PreparationOutcome::Complete(Err(error)),
-        }
+        value
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         matches!(x, PreparationOutcome::Complete(Ok(inputs)) if inputs.evaluation().is_ok())

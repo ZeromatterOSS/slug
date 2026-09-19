@@ -29,14 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-49-m7a-runfiles-generation-leases-r1
+Packet: WP-7-50-m7a-runfiles-build-publication-r1
 Status: accepted
 
-WP749 accepts exact selected native generation leases with 14 focused checks, keeping
-materialized source paths alive for held accepted results without retaining filesystem
-owners in DICE. WP748 accepted at 0f0570d2f. Durable materialized-source backing, virtual
-support results and complete link/output publication remain next. Ordinary Build still
-rejects runfiles. M7A partial, M8 unproved; WP746's baseline diagnostic defect remains open.
+WP750 accepts ordinary binary Build runfiles on Linux GNU: typed local/remote results,
+complete backing publication and durable materialized sources, verified by 50 portable
+checks plus three real-backend/CLI lifetime proofs. Continue the finite production closure's
+remaining demanded action/tool-input gates. M7A remains partial and M8 unproved; WP746's
+baseline diagnostic defect remains open.
 
 ### Earlier generated-input receipt
 

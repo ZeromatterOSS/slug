@@ -50,13 +50,13 @@ fn complete_session(workspace: &PublicationWorkspace) -> ActionChainReapiSession
                     _ => unreachable!(),
                 }
             }
-            RemoteExecutionResult {
+            ActionChainStepResult::Remote(RemoteExecutionResult {
                 action_digest: ReapiDigest::of_bytes(b"synthetic action"),
                 platform_properties: Default::default(),
                 result: ActionResult::new(files).with_output_directories(directories),
                 output_blobs: Default::default(),
                 evidence: ExecutionEvidence::reapi("synthetic verified metadata"),
-            }
+            })
         })
         .collect();
     session
@@ -87,8 +87,19 @@ fn requested_publication_projects_subsets_and_checks_unselected_cooutputs() {
         panic!("second producer tree");
     };
     assert_eq!(output.path(), "result_tree");
-    assert_eq!(session.results[1].result.output_directories().len(), 2);
-    assert_eq!(session.results[2].result.output_files()[0].path(), "done");
+    assert_eq!(
+        session.results[1]
+            .remote()
+            .unwrap()
+            .result
+            .output_directories()
+            .len(),
+        2
+    );
+    assert_eq!(
+        session.results[2].remote().unwrap().result.output_files()[0].path(),
+        "done"
+    );
 
     // Every malformed result still contains the selected tree. Only unselected
     // cooutputs are missing, extra, duplicated or assigned the wrong kind.
@@ -101,7 +112,10 @@ fn requested_publication_projects_subsets_and_checks_unselected_cooutputs() {
         ActionResult::new(vec![])
             .with_output_directories(vec![directory("done"), directory("result_tree")]),
     ] {
-        session.results[2].result = bad;
+        let ActionChainStepResult::Remote(result) = &mut session.results[2] else {
+            panic!("expected remote producer")
+        };
+        result.result = bad;
         assert!(
             project_outputs(&session, selection).is_err(),
             "unselected cooutput schema must be checked before transfer"
@@ -198,12 +212,27 @@ fn nativelink_requested_subsets_publish_file_and_tree_from_distinct_producers() 
             remote
                 .results()
                 .iter()
-                .all(|result| result.output_blobs.is_empty())
+                .all(|result| result.remote().unwrap().output_blobs.is_empty())
         );
-        assert_eq!(remote.results()[1].result.output_directories().len(), 2);
-        assert_eq!(remote.results()[2].result.output_files()[0].path(), "done");
-        assert!(!remote.results()[1].result.output_files()[0].is_executable());
-        let tree = &remote.results()[2].result.output_directories()[0];
+        assert_eq!(
+            remote.results()[1]
+                .remote()
+                .unwrap()
+                .result
+                .output_directories()
+                .len(),
+            2
+        );
+        assert_eq!(
+            remote.results()[2].remote().unwrap().result.output_files()[0].path(),
+            "done"
+        );
+        assert!(!remote.results()[1].remote().unwrap().result.output_files()[0].is_executable());
+        let tree = &remote.results()[2]
+            .remote()
+            .unwrap()
+            .result
+            .output_directories()[0];
         assert_eq!(tree.directories(), ["", "empty", "nested"]);
         assert!(tree.files().iter().all(|file| !file.is_executable()));
         let groups = accepted.published_outputs();

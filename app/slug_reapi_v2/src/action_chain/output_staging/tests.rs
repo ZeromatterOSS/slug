@@ -17,6 +17,54 @@ use super::super::tests::Workspace;
 use super::*;
 
 #[test]
+fn local_output_reconciliation_checks_full_schema_and_preserves_virtual_kind() {
+    let output = ActionOutput::new("mapping", ActionOutputKind::File);
+    let local = ActionChainStepResult::from_runfiles(PreparedRunfilesAction::Manifest {
+        output: output.clone(),
+        bytes: b"mapping bytes".as_slice().into(),
+    });
+    let selected = reconcile_step_outputs(std::slice::from_ref(&output), &local).unwrap();
+    assert!(
+        matches!(selected.as_slice(), [SelectedOutput::Local(file)] if file.bytes() == b"mapping bytes")
+    );
+    assert!(reconcile_step_outputs(&[], &local).is_err());
+    assert!(
+        reconcile_step_outputs(
+            &[
+                output.clone(),
+                ActionOutput::new("cooutput", ActionOutputKind::File)
+            ],
+            &local
+        )
+        .is_err()
+    );
+    assert!(
+        reconcile_step_outputs(
+            &[ActionOutput::new("mapping", ActionOutputKind::Directory)],
+            &local
+        )
+        .is_err()
+    );
+    let tree = ActionOutput::new("tree", ActionOutputKind::RunfilesTree);
+    let virtual_tree = ActionChainStepResult::RunfilesTree {
+        output: tree.clone(),
+    };
+    assert!(matches!(
+        reconcile_step_outputs(&[tree], &virtual_tree)
+            .unwrap()
+            .as_slice(),
+        [SelectedOutput::RunfilesTree]
+    ));
+    assert!(
+        reconcile_step_outputs(
+            &[ActionOutput::new("tree", ActionOutputKind::Directory)],
+            &virtual_tree
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn selected_output_schema_rejects_missing_extra_duplicate_and_wrong_kind() {
     assert!(
         reconcile_outputs(&[], &ActionResult::new(vec![]))
@@ -104,17 +152,17 @@ impl PublicationWorkspace {
                     ActionOutput::new("result_tree", ActionOutputKind::Directory),
                 ]
             );
-            let selected = accepted.output().selected().unwrap();
+            let selected = accepted.output().selected().unwrap().remote().unwrap();
             assert!(!selected.result.output_files()[0].is_executable());
             let tree = &selected.result.output_directories()[0];
             assert_eq!(tree.directories(), ["", "empty", "nested"]);
             assert!(tree.files().iter().all(|file| !file.is_executable()));
             assert!(
-                accepted
-                    .output()
-                    .results()
-                    .iter()
-                    .all(|result| result.output_blobs.is_empty())
+                accepted.output().results().iter().all(|result| result
+                    .remote()
+                    .unwrap()
+                    .output_blobs
+                    .is_empty())
             );
             root = Some(published.root().to_owned());
             TerminalOutput::new(0, String::new(), String::new())

@@ -8,9 +8,9 @@ use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::RequestedActionResult;
 
 use crate::ActionChainRemoteResult;
+use crate::ActionChainStepResult;
 use crate::ReapiDigest;
 use crate::RemoteExecutionError;
-use crate::RemoteExecutionResult;
 
 /// Render accepted Build evidence without executing, reading or materializing anything.
 /// Publication groups, rather than producer cooutputs, determine materialized digests.
@@ -45,18 +45,36 @@ pub fn requested_build_success_json(
 }
 
 fn materialized_digests<'a>(
-    results: &'a [RemoteExecutionResult],
+    results: &'a [ActionChainStepResult],
     groups: impl IntoIterator<Item = (usize, &'a [ActionOutput])>,
 ) -> Result<Vec<&'a ReapiDigest>, RemoteExecutionError> {
     let mut digests = Vec::new();
     for (index, outputs) in groups {
-        let result = &results
-            .get(index)
-            .ok_or_else(|| {
-                RemoteExecutionError::Protocol("published producer has no result".into())
-            })?
-            .result;
+        let completed = results.get(index).ok_or_else(|| {
+            RemoteExecutionError::Protocol("published producer has no result".into())
+        })?;
         for output in outputs {
+            if let Some(file) = completed.local_file() {
+                if output != file.output() || output.kind() != ActionOutputKind::File {
+                    return Err(RemoteExecutionError::Protocol(
+                        "published local manifest differs from result".into(),
+                    ));
+                }
+                digests.push(file.digest());
+                continue;
+            }
+            if let ActionChainStepResult::RunfilesTree { output: tree } = completed {
+                if output != tree || output.kind() != ActionOutputKind::RunfilesTree {
+                    return Err(RemoteExecutionError::Protocol(
+                        "published runfiles tree differs from result".into(),
+                    ));
+                }
+                continue;
+            }
+            let result = &completed
+                .remote()
+                .expect("all local variants handled")
+                .result;
             match output.kind() {
                 ActionOutputKind::File => {
                     let file = result
@@ -104,7 +122,7 @@ fn digest_json<'a>(digests: impl IntoIterator<Item = &'a ReapiDigest>) -> String
 fn success_json(
     analyzed_target_count: usize,
     declared_action_count: usize,
-    results: &[RemoteExecutionResult],
+    results: &[ActionChainStepResult],
     materialized: &[&ReapiDigest],
     runtime_mode: &str,
     invalidated_files: Option<usize>,
@@ -114,17 +132,25 @@ fn success_json(
     let mut ac_hits = 0;
     let mut ac_misses = 0;
     let mut platform_properties = BTreeMap::new();
-    for result in results {
+    // Local runfiles metadata launches no subprocess; direct_local_actions keeps
+    // its existing meaning and does not count manifest or virtual-tree completion.
+    for result in results.iter().filter_map(ActionChainStepResult::remote) {
         reapi_actions += result.evidence.reapi_actions;
         direct_local_actions += result.evidence.direct_local_actions;
         ac_hits += result.evidence.ac_hits;
         ac_misses += result.evidence.ac_misses;
         platform_properties.extend(result.platform_properties.iter());
     }
-    let action_digests = digest_json(results.iter().map(|result| &result.action_digest));
+    let action_digests = digest_json(
+        results
+            .iter()
+            .filter_map(ActionChainStepResult::remote)
+            .map(|result| &result.action_digest),
+    );
     let uploaded_digests = digest_json(
         results
             .iter()
+            .filter_map(ActionChainStepResult::remote)
             .flat_map(|result| &result.evidence.uploaded_digests),
     );
     let materialized_outputs = digest_json(materialized.iter().copied());

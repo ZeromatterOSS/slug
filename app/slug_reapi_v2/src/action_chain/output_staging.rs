@@ -13,6 +13,8 @@ use super::*;
 enum SelectedOutput<'a> {
     File(&'a GeneratedOutput),
     Directory(&'a GeneratedDirectory),
+    Local(&'a LocalManifestResult),
+    RunfilesTree,
 }
 
 /// Reconcile the entire batch before creating even the first staging file.
@@ -52,7 +54,7 @@ fn project_outputs<'a, 's>(
                 return Err(protocol("duplicate output staging producer"));
             }
             // An unselected cooutput is still part of the producer's contract.
-            let complete = reconcile_outputs(action.outputs(), &session.results[index].result)?;
+            let complete = reconcile_step_outputs(action.outputs(), &session.results[index])?;
             let mut outputs = action
                 .outputs()
                 .iter()
@@ -68,6 +70,35 @@ fn project_outputs<'a, 's>(
                 .collect()
         })
         .collect()
+}
+
+fn reconcile_step_outputs<'a>(
+    declared: &[ActionOutput],
+    result: &'a ActionChainStepResult,
+) -> Result<Vec<SelectedOutput<'a>>, RemoteExecutionError> {
+    let (output, selected) = match result {
+        ActionChainStepResult::Remote(remote) => {
+            return reconcile_outputs(declared, &remote.result);
+        }
+        ActionChainStepResult::Manifest(file) | ActionChainStepResult::SymlinkTree(file) => {
+            if file.output().kind() != ActionOutputKind::File {
+                return Err(protocol("local manifest has a non-file output"));
+            }
+            (file.output(), SelectedOutput::Local(file))
+        }
+        ActionChainStepResult::RunfilesTree { output } => {
+            if output.kind() != ActionOutputKind::RunfilesTree {
+                return Err(protocol("virtual runfiles result has wrong output kind"));
+            }
+            (output, SelectedOutput::RunfilesTree)
+        }
+    };
+    if declared != [output.clone()] {
+        return Err(protocol(
+            "local output differs from complete producer declaration",
+        ));
+    }
+    Ok(vec![selected])
 }
 
 fn reconcile_outputs<'a>(
@@ -118,6 +149,16 @@ async fn stage_output(
     output: SelectedOutput<'_>,
 ) -> Result<(), RemoteExecutionError> {
     match output {
+        SelectedOutput::Local(file) => {
+            let mut destination = staging
+                .create_file(index, "")
+                .map_err(|error| protocol(format!("creating staged manifest: {error}")))?;
+            destination
+                .write_all(file.bytes())
+                .map_err(|error| protocol(format!("writing staged manifest: {error}")))?;
+        }
+        // Core owns the confined writer and couples the physical MANIFEST link.
+        SelectedOutput::RunfilesTree => {}
         SelectedOutput::File(file) => {
             stage_file(cache, staging, index, "", file.digest()).await?;
         }
