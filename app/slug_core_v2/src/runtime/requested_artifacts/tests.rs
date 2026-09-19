@@ -1,5 +1,8 @@
 //! Ordinary requested output selection through the native command owner.
 
+#[path = "runfiles_layout_tests.rs"]
+mod runfiles_layout_tests;
+
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;

@@ -315,6 +315,22 @@ and redacts header values. Existing transport policy rejects unsupported headers
 retries and distinct CAS endpoints before execution; bare value-taking flags cannot vanish.
 Runfiles families, symlink publication and production Rustc execution remain open.
 
+`RunfilesSupport::layout()` supplies the pure runfiles metadata prerequisite. Its sorted
+logical entries preserve exact artifact targets or empty files, pinned overwrite/ancestor
+filter ordering and structured conflict diagnostics. A separate constituent view retains
+raw targets even when hidden/overridden, plus physical support manifests, excluding the
+virtual tree itself. The automatic MANIFEST link targets input_manifest and is distinct
+from authored logical MANIFEST entries. Projection leaves are call-scoped clones over the
+unchanged shared depset graphs; no new DICE state or effects are introduced.
+
+Bazel's RunfilesTreeAction is rich metadata, not an ordinary Directory-producing remote
+action. Native completion must publish generated backing artifacts as well as the selected
+tree. Source-manifest targets require observed source/configured-output authority; a logical
+artifact path is not filesystem authorization. Manifest byte projection, virtual support
+results and confined symlink staging remain prerequisites to execution admission. Do not
+fabricate remote executions for metadata-only nodes or relax arbitrary backend symlink
+rejection. Existing requested Build continues to reject this family before effects.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

@@ -29,6 +29,15 @@ use crate::RunfilesSymlink;
 use crate::RunfilesSymlinkDepset;
 use crate::analysis_value::PublicationEqState;
 
+mod layout;
+
+pub use layout::RunfilesLayout;
+pub use layout::RunfilesLayoutDiagnostic;
+pub use layout::RunfilesLayoutEntry;
+pub use layout::RunfilesLayoutError;
+pub use layout::RunfilesLayoutTarget;
+pub use layout::RunfilesManifestLink;
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RunfilesError {
     InvalidFilesType(AnalysisValueType),

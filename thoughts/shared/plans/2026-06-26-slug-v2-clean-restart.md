@@ -29,15 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-46-m7a-requested-build-activation-r1
+Packet: WP-7-47-m7a-runfiles-layout-r1
 Status: accepted
 
-WP746 accepts Execute-mode Build through requested native execution/publication in
-CLI and daemon, with complete remote policy, typed diagnostics and selected-output evidence.
-Its 28 focused checks include separate fresh-backend one-shot and same-PID daemon A/A/B/A
-proofs. Run remains on its existing path. A Disabled-mode external-module-cycle diagnostic
-failure is reproduced at exact base 643578e1a and remains open. The next demanded execution
-family is default binary runfiles support; see bootstrap-readiness. M7A partial, M8 unproved.
+WP747 accepts the artifact-owned runfiles layout/constituent projection, with seven focused
+checks including ordinary configured binary A/B/A. Exact artifact owners and backing
+dependencies survive layout filtering; RunfilesTree remains metadata, not a remote Directory.
+Native target resolution, manifest projection, virtual support results and confined link/backing
+publication remain open. WP746's public Build activation is accepted at 7ff4cbb2f; its baseline
+external-module-cycle diagnostic defect remains open. M7A partial, M8 unproved.
 
 ### Earlier generated-input receipt
 
