@@ -62,17 +62,6 @@ pub(super) fn generated_target(
     absolute_string(&path)
 }
 
-pub(super) fn require_host_namespace(
-    namespace: slug_workspace_v2::PathObservationNamespace,
-) -> Result<(), Arc<str>> {
-    if namespace != slug_workspace_v2::PathObservationNamespace::Host {
-        return Err(error(
-            "runfiles source has no retained native generation path authority (materialization namespace)",
-        ));
-    }
-    Ok(())
-}
-
 pub(super) fn absolute_string(path: &std::path::Path) -> Result<String, Arc<str>> {
     if !path.is_absolute() {
         return Err(error("runfiles target path is not absolute"));

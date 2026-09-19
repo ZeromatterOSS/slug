@@ -331,15 +331,22 @@ Source and repository mapping bytes are pure call-scoped projections. Source man
 preserve conditional escaping, empty trailing spaces and UTF-8 bytes/order (Bazel internal
 strings carry bytes); repository mappings use raw runfiles presence and retained compact
 mapping groups. Preparation is opt-in metadata, with selected-preparation outer errors.
-It observes no generated output and publishes nothing. Materialization namespaces remain
-unsupported until their native generation lifetime/path authority can be retained; Host
-external local-path repositories are supported. Generated unresolved symlinks remain deferred.
+It observes no generated output and publishes nothing. WP749 separates semantic DICE inputs
+from the public command-owned prepared result. Native completion checks the exact selected
+repository requests/results against the active materializer and retains native generation
+owners for Materialization sources; virtual/unowned generations remain rejected. Requested
+paths must lie under their owned roots, while observed symlink targets retain existing
+external-target semantics. Held prepared results keep their roots alive after runtime drop;
+final lease release permits normal TempDir cleanup. Leases grant temporary path lifetime,
+not historical-read authority or durable runfiles backing. Generated unresolved symlinks
+remain deferred. Future publication must stage persistent materialized-source backing or
+supply an output-owned generation lifetime that survives process exit.
 
 Bazel's RunfilesTreeAction is rich metadata, not an ordinary Directory-producing remote
 action. Native completion must publish generated backing artifacts as well as the selected
 tree. Source-manifest targets require observed source/configured-output authority; a logical
-artifact path is not filesystem authorization. Virtual support results, native generation
-path authority and confined symlink staging remain prerequisites to execution admission. Do not
+artifact path is not filesystem authorization. Virtual support results, durable source
+backing and confined symlink staging remain prerequisites to execution admission. Do not
 fabricate remote executions for metadata-only nodes or relax arbitrary backend symlink
 rejection. Existing requested Build continues to reject this family before effects.
 

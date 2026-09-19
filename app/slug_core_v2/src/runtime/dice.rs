@@ -1104,9 +1104,27 @@ enum TerminalDemandAssociation {
 struct NativeCommandCompletionContext<'a, 'runtime> {
     command: &'a NativeDemandCommand<'runtime>,
     transaction: &'a dice::DiceTransaction,
+    selected_repository_requests: &'a [Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>],
+    selected_repository_results: &'a slug_bzlmod_v2::RepositoryMaterializationResultEpoch,
 }
 
 impl NativeCommandCompletionContext<'_, '_> {
+    fn retain_source_generations<'a>(
+        &self,
+        sources: impl Iterator<Item = &'a crate::runtime::SourceArtifactInput>,
+    ) -> Result<super::repository_io::NativeSourceGenerations, NativeDemandSessionError> {
+        self.command
+            .runtime
+            .repository_materializer
+            .retain_source_generations(
+                self.command.repository_session,
+                self.selected_repository_requests,
+                self.selected_repository_results,
+                sources,
+            )
+            .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error}")))
+    }
+
     async fn validate_sources(
         &self,
         certificate: &SourceCertificate,
@@ -6305,6 +6323,13 @@ impl WorkspaceRuntime {
                                 NativeCommandCompletionContext {
                                     command: guard.command(),
                                     transaction: &transaction,
+                                    selected_repository_requests: prepared
+                                        .snapshot
+                                        .selected
+                                        .repository_requests(),
+                                    selected_repository_results: &prepared
+                                        .snapshot
+                                        .repository_results,
                                 },
                             )
                             .await?;

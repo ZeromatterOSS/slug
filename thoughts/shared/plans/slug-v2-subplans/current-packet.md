@@ -1,137 +1,133 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-48-m7a-runfiles-manifests-r1
+Packet: WP-7-49-m7a-runfiles-generation-leases-r1
 Status: accepted
 
 ## Outcome and basis
 
-Produce deterministic source and repository mapping manifest bytes for retained binary
-runfiles through a native observed preparation owner. WP747 (0662733cc) supplies typed
-layout and complete constituent metadata. This packet supplies the path/byte prerequisite
-for coupled virtual-result integration and complete runfiles publication; ordinary Build
-continues rejecting runfiles until those effects can be admitted together.
+Allow the native runfiles manifest preparation API to return materialized-repository
+source paths backed by exact native generation ownership. Held accepted results keep those
+generations alive across later requests and runtime shutdown. WP748 (0f0570d2f) supplies
+manifest bytes and complete observed metadata but rejects every Materialization namespace.
+This packet replaces that refusal only when the selected native materializer supplies an
+owned generation. Custom/virtual materialization paths without that ownership still fail.
 
-Pinned Bazel 9.2 commit 8220c6198837d5c13d53fea211cf3282aa12408a:
-SourceManifestAction.java:249-315,369-424 owns nested-tree failure, sorted absolute target
-entries, conditional escaping and empty-entry trailing space; generated unresolved symlinks
-require metadata and remain explicitly unsupported here. RepoMappingManifestAction.java:
-186-348 owns repository presence, first package mapping per repo, sort/filter, compact groups
-and CSV lines. StringEncoding.java:25-59 establishes UTF-8 filesystem/BUILD bytes represented
-as Latin-1 internal strings. Correct WP747's UTF-16 interpretation: for Slug valid Unicode,
-internal byte ordering and encoding correspond to UTF-8 bytes, including BMP/supplementary
-order. Paths/configuration directory spelling remain Slug-native; admitted manifest
-formatting and mapping algorithms are exact under these supplied path identities.
+Pinned Bazel 9.2 8220c6198837d5c13d53fea211cf3282aa12408a Artifact.java:362-364 and SourceManifestAction.java:294-315
+require ordinary Artifact.getPath targets; RunfilesSupport.java:467-543 and
+SymlinkTreeHelper.java:167-187 establish backing artifacts and physical links. Existing
+exact byte algorithms remain unchanged. The generation lease/lifetime is Slug-native
+resource ownership, not a claim to reproduce Bazel's repository storage layout. Existing
+Core repository_io tests generated_file_effect_sessions_conflict_replace_reuse_restore_and_discard_post_io,
+retained_session_epochs_acceptance_reuse_and_old_roots_are_exact, and
+retained_native_bridge_authority_lifecycle_and_structural_errors_are_exact establish the
+native generation owner and observation semantics. Read docs/developers/dice.md and reuse
+the native driver's completion/validation boundary; no compute may run under its mutex.
 
-## Owners and contract
+## Contract and ownership
 
-Build API retains RunfilesSupport, RunfilesSupportActionSpec and package mapping depsets.
-Pure encoders consume those owners and layout with a typed artifact-to-absolute-target
-resolver. No filesystem access, action execution or remote ActionResult in the encoders.
-Preserve empty entries, authored root MANIFEST, structured diagnostics and exact artifact
-identity. Reject nested runfiles trees and Error-policy obscuring diagnostics; preserve Warn
-policy diagnostics for the later event owner. Reject generated unresolved Symlink targets
-rather than substituting their output path. Repository presence uses raw runfiles artifact
-owners, normal-symlink presence and root-symlink first segments before layout filtering.
-Compact merging requires producer-owned shared-group identity plus identical retained
-mapping contents and matching canonical name prefix through the last '+', never just
-similar text. Canonical/apparent names and workspace prefix supply the three CSV fields.
+Split the retained DICE manifest input value from the public prepared result. DICE owns only
+existing build/source facts, exact owner coordinates, observation epoch and certificate,
+with structural equality and Allocative. The public command-owned prepared wrapper holds
+an Arc of those semantic inputs plus a private native-generation lease. Preserve its useful
+API methods; it is not a DICE value, and filesystem owners never participate in key/value
+equality. All manifest bytes and lookup maps remain call-scoped scratch.
 
-Core adds RunfilesManifestPreparationKey(build root, selected configured owner), following
-SourceStagingKey's observed-root/Need/native-driver contract. Selection comes from the
-validated action closure and its retained support actions, not caller-invented metadata.
-Resolve raw source constituents through SourceArtifactInputObservationKey and union the
-full observed frontier with build observations. Retain that frontier/certificate and exact
-source metadata; source link targets use observed requested_path rather than real_path,
-matching Artifact.getPath without canonicalizing symlink targets. Reject immutable virtual
-materialization namespaces that do not establish a native on-disk target. Generated target resolution
-requires exact artifact owner/output lookup in the validated closure and structural
-configuration through configured_output_root. No string-derived owner or lookup against
-current output files. Target projection is metadata only; collision registration and
-publication remain the existing effect owner's responsibility.
+NativeCommandRoot::complete obtains the lease after terminal observation association and
+selected-snapshot preparation, before final source validation. Supply the private completion
+context with the selected full repository requests and result epoch. RepositoryMaterializer
+owns lease construction under one short synchronous lock: require the validated active
+session, exact selected full request and active success/result, canonical source repository,
+matching observation instance and generation root, and the actual owned Arc<TempDir> from
+that session's accepted/provisional roots. A historical root or matching integer alone is
+not authority. Require the normalized requested path to lie component-wise beneath the
+exact owned root. Preserve existing observed symlinks whose real target lies outside the
+root: they remain covered by the source certificate; a lease owns the requested artifact
+root, not all mutable target content. No filesystem reopen/canonicalization or side scan
+may create authority. Reject absent/unselected/stale/forged/virtual/root-mismatched requests.
 
-The new prepared value retains Arc build/source facts, owner coordinate, observation epoch
-and certificate, with Allocative and structural equality. Derived paths, layouts and byte
-buffers are call-scoped projection scratch. No new retained cache/interner, file handle, source-byte
-buffer, evaluator reference, output filesystem mutation or lock across compute. Existing
-DICE dependencies own configuration, repository mappings and source invalidation; incomplete
-and failed preparation cannot cut off later success. Native command acceptance validates
-the full source frontier; later execution must validate again before publication. This
-metadata API does not authorize historical filesystem reads or execution. Errors follow
-the selected SourceStaging API (outer preparation errors), not Build-terminal parity. Reuse the Stage 9
-SmallMap/SmallSet, shared Arc/Allocative and WP730/731 observation rows; no donor import.
+Deduplicate lease rows by exact native instance and share them across wrapper clones. Host
+sources require no generation. Complete-only semantic DICE results remain reusable;
+command completion reacquires authority for the current exact selection on every request.
+Retry/rejection/unwind drops attempt wrappers; accepted wrappers retain only required native
+root Arcs. Runtime drop cannot remove roots held by accepted wrappers; after runtime and all
+leases are dropped, existing TempDir cleanup releases them. No new global registry, cache,
+interner, persistent directory layout or materializer eviction policy. Reuse Stage 9's Arc,
+Allocative, SmallMap/SmallSet and existing WP730/731 observed-source ownership rows.
 
-## Scope and evidence
+A lease guarantees root lifetime only while its owner exists, not ongoing source freshness
+or historical reads. The driver still validates the complete source frontier before
+acceptance. This metadata boundary creates no runfiles outputs and does not activate Build.
+Durable runfiles publication must subsequently stage persistent materialized-source backing
+or introduce a durable generation owner that survives command/result/process exit. It must
+never publish permanent links to TempDirs whose only owner is this prepared result.
 
-Allow Build API runfiles/layout.rs and tests for corrected ordering, new
-runfiles/manifest.rs plus child tests, runfiles.rs/lib.rs exports and an action-spec encoder
-method if necessary. Core new runtime/runfiles_manifest.rs plus child helpers/tests, wiring
-in runtime/dice.rs and mod.rs, and requested_artifacts test child wiring/new manifest tests.
-Root owns scheduling/Stage 7/bootstrap notes. No REAPI, CLI, action planner activation,
-source observation semantics, provider schema or dependencies change. Existing large files
-receive module/export wiring only. Estimate 500-850 production and 400-700 proof lines;
-review substantive growth rather than enforcing estimates as caps.
+## Scope and proof
 
-Pure tests discriminate conditional source versus target escaping, spaces/backslashes/newlines,
-empty trailing space, raw UTF-8 and supplementary order, nested/error/warn handling, symlink
-rejection, mapping presence before filtering, empty apparent omission, root workspace naming,
-package dedup, ordering and compact enabled/disabled/equal-content-different-group behavior.
-Native tests reuse the hermetic configured binary fixture and public preparation wrapper:
-exact source/generated/manifest target paths, complete source certificate, source symlink
-requested-path spelling, content and selected-layout A/B/A immutability, deletion/recreation,
-configuration separation, external host source/mapping paths, bad selection/missing producer
-rejection, immutable virtual namespace rejection, no published outputs and
-continued requested-execution rejection. Reuse predecessor layout/selection controls.
-Upstream tests are source regressions; no fresh Bazel process or new fixture directory tree.
+Allow repository_io.rs module wiring and new repository_io/source_generations.rs with focused
+child tests; runfiles_manifest.rs and paths/tests for the semantic/native split; dice.rs
+completion-context fields/accessor and construction wiring; requested_artifacts test child
+wiring plus new native generation integration tests. Root owns current/canonical and Stage 7/
+bootstrap owner notes. No Bzlmod provider/schema, source observation/kernel semantics, REAPI,
+CLI, persistent storage, action execution or output publication changes. Existing large
+repository_io.rs/dice.rs files receive only narrow wiring; put new ownership logic and tests
+in focused children. Estimate 250-450 new production and 300-550 proof lines, plus moving
+existing manifest methods to the semantic input owner as needed. Estimates trigger review.
 
-Independent design and final review. Pinned nightly-2025-09-14, offline no-run preparation
-capped at 60s per operation; shared Cargo and ancestor-observing native tests serial.
-Exact selector preflight; aim for subsecond pure tests and a few seconds of native tests.
-Tests over roughly 30s require strict necessity; 12s remains only an estimate. Format,
-diff, plan and archive checks precede checkpoint commit, fast-forward and authorized push.
-Receipts target/wp748. Replan if retained mapping groups cannot reproduce compact semantics
-or generated targets require a new ownership decision. Run, Windows, arbitrary backend
-symlink outputs, virtual action results and filesystem publication remain deferred. M7A
-remains partial, M8 unproved; WP746's baseline diagnostic defect remains open.
+Use an authored tiny innate repository_rule/ctx.file fixture under the existing hermetic
+native runfiles Workspace. Public prepare A/warm-A/B/restored-A; exact selected canonical
+source identity and manifest requested path, changed/restored digests, immutable held values,
+complete frontier and continued planner rejection. Drop runtime while retaining accepted
+prepared handles and assert source generations still exist with their bytes; drop final
+handles and assert cleanup. Restored source contents need not reuse a physical temp root.
+Materializer unit tests discriminate selected full request/result, wrong instance/root/path,
+stale token, virtual source without an owned root, accepted/provisional lifetime, dedup,
+rejection/discard cleanup, and allowed external symlink real target. Reuse WP748 Host/external
+manifest lifecycle controls and existing native materializer acceptance/abort controls.
 
-Independent design review: ACCEPT. Native path ownership, namespace rejection, selected
-preparation errors, byte encoding and planned discriminators were checked.
+Independent design and final review. Pinned nightly-2025-09-14; no-run offline compilation
+separate from runtime, 60s per preparation; shared Cargo and ancestor-observing native tests
+serial. Exact-selector preflight and focused runtime expected a few seconds; >30s requires
+strict necessity. Format/diff/plan/archive checks and checkpoint commit/authorized main push.
+Receipts target/wp749. Replan if exact native ownership cannot be obtained from the selected
+completion boundary without placing effects in DICE or weakening source validation.
+M7A partial and M8 unproved; ordinary runfiles execution/publication, durable backing and
+WP746's baseline diagnostic defect remain open.
+
+Independent design review: ACCEPT. Requested-path containment preserves existing observed
+symlink semantics; selected native authority and command-only lifetime remain explicit.
 
 ## Acceptance evidence
 
-The pure encoders preserve exact typed resolver identity, conditional source/target escapes,
-empty-entry separators and UTF-8 bytes/order. Repository presence uses raw files and links;
-compact output preserves producer groups and exact mapping content. Shared mapping slices
-use pointer equality before structural comparison, and call-scoped borrowed relevance rows
-avoid repeated filtering of one immutable slice. No pointer enters semantic identity.
+RunfilesManifestInputs remains the sole semantic DICE value. Each native attempt constructs
+a fresh PreparedRunfilesManifests wrapper; completion binds its private deduplicated lease
+to the selected snapshot's exact requests/results and the active materializer's owned roots.
+The source namespace alone cannot create native authority. Source observations and final
+validation are unchanged. Host paths require no lease; materialized paths now prepare only
+with exact native ownership. Metadata preparation still creates no runfiles outputs.
 
-Core's new observed preparation owner validates each raw backing/support artifact against
-its exact declared owner/output/configuration, observes all raw sources and retains the
-complete accepted frontier. Its held values render without consulting current filesystem
-state. Generated output files remain absent and requested execution still rejects runfiles.
-Host sources, including external local-path repositories, are admitted; Materialization
-sources explicitly lack retained native-generation lifetime authority and remain deferred.
+Four new lease tests prove shared clone/dedup lifetime, accepted/discarded generation
+retention, final-owner cleanup, stale/unselected/duplicate/different full requests, forged
+result identity, wrong canonical repository/instance, component-wise escaped requested paths
+(including a second source after dedup), historical roots, mismatched roots, unowned virtual
+generations and external symlink targets. The new public innate ctx.file fixture proves
+A/warm-A/B/restored-A paths, bytes/digests and frontiers, immutable held manifests, no build
+outputs, native root survival after runtime shutdown, and cleanup after final prepared Arc
+drop. Reused WP748 Host/external/symlink/hidden-source controls and existing native driver
+retry/drop plus materializer bridge/generated-effects controls protect inherited behavior.
 
-Pinned offline API/Core no-run preparation passed in 46.071s, then the final correction
-rebuild passed in 19.405s, both within separate 60s operation caps. The PATH rustup launcher
-was unavailable (snap); the installed pinned binaries were checked directly against
-rust-toolchain (rustc 1.91.0-nightly 02c7b1a7a). No executable proof uses a stale CLI binary.
-Final exact-selector preflights and all 18 checks pass: ten API tests in 0.003s and eight Core
-tests in 2.666s. No backend, daemon or fresh Bazel process ran. Initial Core evidence was
-7 pass/1 failure because the new assertion expected source FileDigest at requested_path;
-PathFileDigestObservationKey owns the digest at real_path (path_file_digest.rs:201). The
-assertion was corrected to require that exact namespaced demand; requested-path manifest
-and ReadLink/retargeting assertions remain. No source observation semantics were changed.
+All 14 exact selectors passed on the first runtime run in 2.790s; exact preflight passed.
+Pinned offline Core no-run preparation initially failed at 14.695s on an ambiguous test
+SmallMap key conversion, corrected with an explicit CompactString; production was unchanged.
+The final preparation passed in 25.128s, within the separate 60s cap. No backend, daemon,
+network repository fetch or fresh Bazel process ran. Formatting, diff, plan and archive
+checks pass. Receipts/source hashes: target/wp749. The new lease module is 146 lines; the
+existing manifest module holds the bounded semantic/native split, with narrow context/module
+wiring in large owners. New proof children total 491 lines. No new dependencies, retained
+semantic cache or persistent filesystem layout. Independent final review: ACCEPT, verifying exact selected native generation ownership,
+all 14 focused checks, runtime-drop survival and final-owner cleanup.
 
-New implementation modules total 668 lines, plus small exports/wiring and the layout-order
-correction. New proof modules total 920 lines plus wiring, exceeding the estimate because
-pure byte/identity negatives and the native lifecycle/frontier proof cover distinct owners.
-They remain focused children, with no large production-file expansion. Formatting, diff,
-plan and archive checks pass. Receipts and exact pinned-source hashes are in target/wp748.
-Independent final review: ACCEPT. Exact observed/generated ownership, byte algorithms,
-all 18 focused checks and structural gates were verified; acceptance is metadata-only.
-
-Next integrate virtual runfiles support results and complete backing/link publication under
-native freshness validation, first supplying retained native generation authority where
-materialized repository paths are needed. RunfilesTree stays rich metadata, never a fake
-remote Directory result. This checkpoint closes path/byte preparation only; M7A remains
-partial, M8 unproved and the WP746 baseline diagnostic defect remains open.
+This closes temporary native generation authority for prepared manifest results. Next
+provide durable materialized-source backing and integrate virtual runfiles results with
+complete confined link/backing-output publication under final native source validation.
+An accepted metadata lease is not durable publication authority. M7A remains partial and
+M8 unproved; ordinary runfiles execution and the WP746 baseline diagnostic defect remain open.

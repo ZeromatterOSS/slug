@@ -6,6 +6,9 @@ mod runfiles_layout_tests;
 #[path = "runfiles_manifest_tests.rs"]
 mod runfiles_manifest_tests;
 
+#[path = "runfiles_generation_tests.rs"]
+mod runfiles_generation_tests;
+
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;

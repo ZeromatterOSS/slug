@@ -50,6 +50,9 @@ use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 
+mod source_generations;
+pub(super) use source_generations::NativeSourceGenerations;
+
 struct LocalRepositoryIo {
     immutable_roots: Mutex<RetainedImmutableRoots>,
 }

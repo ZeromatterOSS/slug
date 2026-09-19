@@ -29,14 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-48-m7a-runfiles-manifests-r1
+Packet: WP-7-49-m7a-runfiles-generation-leases-r1
 Status: accepted
 
-WP748 accepts observed native target paths and deterministic source/repository mapping
-manifest bytes, with 18 focused checks and independent review. WP747 is accepted at 0662733cc. Coupled virtual
-support results and confined complete backing/link publication remain next; ordinary Build
-still rejects runfiles. M7A partial, M8 unproved. WP746's baseline external-module-cycle
-diagnostic defect remains open.
+WP749 accepts exact selected native generation leases with 14 focused checks, keeping
+materialized source paths alive for held accepted results without retaining filesystem
+owners in DICE. WP748 accepted at 0f0570d2f. Durable materialized-source backing, virtual
+support results and complete link/output publication remain next. Ordinary Build still
+rejects runfiles. M7A partial, M8 unproved; WP746's baseline diagnostic defect remains open.
 
 ### Earlier generated-input receipt
 

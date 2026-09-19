@@ -12,8 +12,6 @@ use slug_configuration_v2::native::host::AutoCpuToken;
 use slug_configuration_v2::native::host::HostConversionInputs;
 use slug_configuration_v2::native::host::HostPathFlavor;
 use slug_identity_v2::CanonicalLabel;
-use slug_workspace_v2::PathObservationInstanceId;
-use slug_workspace_v2::PathObservationNamespace;
 
 use super::*;
 
@@ -117,17 +115,7 @@ fn generated_targets_require_exact_owner_configuration_and_output_declaration() 
 }
 
 #[test]
-fn materialization_sources_require_native_generation_authority() {
-    paths::require_host_namespace(PathObservationNamespace::Host).unwrap();
-    for instance in [0, 1, u64::MAX] {
-        assert!(
-            paths::require_host_namespace(PathObservationNamespace::Materialization(
-                PathObservationInstanceId::new(instance)
-            ))
-            .unwrap_err()
-            .contains("no retained native generation path authority")
-        );
-    }
+fn source_target_path_spelling_is_absolute() {
     assert_eq!(
         paths::absolute_string(std::path::Path::new("/workspace/link")).unwrap(),
         "/workspace/link"

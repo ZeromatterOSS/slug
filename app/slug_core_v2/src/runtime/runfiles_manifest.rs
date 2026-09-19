@@ -9,6 +9,7 @@ use super::*;
 use crate::runtime::ObservedSourceArtifactInput;
 use crate::runtime::SourceArtifactInput;
 use crate::runtime::SourceArtifactInputObservationKey;
+use crate::runtime::repository_io::NativeSourceGenerations;
 
 #[path = "runfiles_manifest/paths.rs"]
 mod paths;
@@ -19,11 +20,9 @@ struct RunfilesManifestPreparationKey {
     owner: ConfiguredTargetKey,
 }
 
-/// Retained inputs for pure manifest byte projection. Native acceptance validates
-/// this source frontier; later execution must validate again before publication.
-/// This value authorizes neither filesystem reads nor output effects.
+/// Pure DICE metadata. Native filesystem lifetime owners never enter this value.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct PreparedRunfilesManifests {
+struct RunfilesManifestInputs {
     evaluation: Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
     workspace: NormalizedAbsolutePath,
     owner: usize,
@@ -33,8 +32,8 @@ pub struct PreparedRunfilesManifests {
     certificate: SourceCertificate,
 }
 
-impl PreparedRunfilesManifests {
-    pub fn evaluation(&self) -> &BuildCommandEvaluation {
+impl RunfilesManifestInputs {
+    fn evaluation(&self) -> &BuildCommandEvaluation {
         self.evaluation.as_ref().as_ref().unwrap()
     }
 
@@ -44,21 +43,17 @@ impl PreparedRunfilesManifests {
             .unwrap()
     }
 
-    pub fn support(&self) -> &RunfilesSupport {
+    fn support(&self) -> &RunfilesSupport {
         self.mapping_spec().support()
     }
 
-    pub fn sources(&self) -> impl ExactSizeIterator<Item = &SourceArtifactInput> {
+    fn sources(&self) -> impl ExactSizeIterator<Item = &SourceArtifactInput> {
         self.sources
             .iter()
             .map(|source| source.result().as_ref().unwrap())
     }
 
-    pub fn observations(&self) -> &PathObservationEpoch {
-        &self.observations
-    }
-
-    pub fn source_manifest_bytes(&self) -> Result<Vec<u8>, Arc<str>> {
+    fn source_manifest_bytes(&self) -> Result<Vec<u8>, Arc<str>> {
         let declared = paths::declared_outputs(self.evaluation().analyses())?;
         let sources = self
             .sources()
@@ -72,7 +67,6 @@ impl PreparedRunfilesManifests {
                     let source = sources.get(label).ok_or_else(|| {
                         error("runfiles source is absent from prepared observations")
                     })?;
-                    paths::require_host_namespace(source.namespace())?;
                     paths::absolute_string(source.requested_path().as_path())
                 }
                 AnalysisArtifact::Derived { .. } => {
@@ -82,10 +76,47 @@ impl PreparedRunfilesManifests {
             .map_err(error)
     }
 
-    pub fn repo_mapping_manifest_bytes(&self) -> Result<Vec<u8>, Arc<str>> {
+    fn repo_mapping_manifest_bytes(&self) -> Result<Vec<u8>, Arc<str>> {
         self.mapping_spec()
             .repo_mapping_manifest_bytes()
             .map_err(error)
+    }
+}
+
+/// Accepted manifest inputs with command-owned native repository lifetimes.
+///
+/// Held results keep materialized generation roots alive, including after runtime
+/// shutdown. This grants neither historical reads nor durable output publication:
+/// published runfiles must use backing that survives the final handle's release.
+#[derive(Debug, Clone)]
+pub struct PreparedRunfilesManifests {
+    inputs: Arc<RunfilesManifestInputs>,
+    _generations: NativeSourceGenerations,
+}
+
+impl PreparedRunfilesManifests {
+    pub fn evaluation(&self) -> &BuildCommandEvaluation {
+        self.inputs.evaluation()
+    }
+
+    pub fn support(&self) -> &RunfilesSupport {
+        self.inputs.support()
+    }
+
+    pub fn sources(&self) -> impl ExactSizeIterator<Item = &SourceArtifactInput> {
+        self.inputs.sources()
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.inputs.observations
+    }
+
+    pub fn source_manifest_bytes(&self) -> Result<Vec<u8>, Arc<str>> {
+        self.inputs.source_manifest_bytes()
+    }
+
+    pub fn repo_mapping_manifest_bytes(&self) -> Result<Vec<u8>, Arc<str>> {
+        self.inputs.repo_mapping_manifest_bytes()
     }
 }
 
@@ -97,7 +128,7 @@ impl RunfilesManifestPreparationKey {
     async fn prepare(
         &self,
         ctx: &mut DiceComputations<'_>,
-    ) -> Result<PreparationOutcome<Arc<PreparedRunfilesManifests>>, Arc<str>> {
+    ) -> Result<PreparationOutcome<Arc<RunfilesManifestInputs>>, Arc<str>> {
         let root = BuildCommandRootObservationKey::for_source_staging(self.build.clone())
             .ok_or_else(|| {
                 error("runfiles manifest preparation requires an observed build root")
@@ -183,11 +214,10 @@ impl RunfilesManifestPreparationKey {
                 PreparationOutcome::Need(need) => return Ok(PreparationOutcome::Need(need)),
                 PreparationOutcome::Complete(result) => {
                     let source = result.map_err(error)?;
-                    let input = source
+                    source
                         .result()
                         .as_ref()
                         .map_err(|value| error(format!("{value:?}")))?;
-                    paths::require_host_namespace(input.namespace())?;
                     observations = union_build_observations(&observations, source.observations())
                         .map_err(error)?;
                     sources.push(source);
@@ -195,7 +225,7 @@ impl RunfilesManifestPreparationKey {
             }
         }
         let certificate = SourceCertificate::from_epoch(observations.dupe()).map_err(error)?;
-        let prepared = Arc::new(PreparedRunfilesManifests {
+        let prepared = Arc::new(RunfilesManifestInputs {
             evaluation,
             workspace: self.build.workspace.dupe(),
             owner,
@@ -223,7 +253,7 @@ impl fmt::Display for RunfilesManifestPreparationKey {
 
 #[async_trait]
 impl Key for RunfilesManifestPreparationKey {
-    type Value = PreparationOutcome<Result<Arc<PreparedRunfilesManifests>, Arc<str>>>;
+    type Value = PreparationOutcome<Result<Arc<RunfilesManifestInputs>, Arc<str>>>;
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         ctx.store_evaluation_data(EventBatch::empty())
             .expect("one runfiles manifest preparation event batch");
@@ -243,17 +273,29 @@ impl Key for RunfilesManifestPreparationKey {
 #[async_trait]
 impl NativeCommandRoot for RunfilesManifestPreparationKey {
     type Terminal = Arc<PreparedRunfilesManifests>;
+
+    fn complete<'a>(
+        &'a self,
+        terminal: &'a mut Self::Terminal,
+        context: NativeCommandCompletionContext<'a, '_>,
+    ) -> impl std::future::Future<Output = Result<(), NativeDemandSessionError>> + 'a {
+        async move {
+            let generations = context.retain_source_generations(terminal.sources())?;
+            Arc::make_mut(terminal)._generations = generations;
+            Ok(())
+        }
+    }
     fn initializes_request_revision(&self) -> bool {
         true
     }
     fn observations<'a>(&self, terminal: &'a Self::Terminal) -> Option<&'a PathObservationEpoch> {
-        Some(&terminal.observations)
+        Some(&terminal.inputs.observations)
     }
     fn source_certificate<'a>(
         &self,
         terminal: &'a Self::Terminal,
     ) -> Option<&'a SourceCertificate> {
-        Some(&terminal.certificate)
+        Some(&terminal.inputs.certificate)
     }
     fn observed_selection_association(&self) -> ObservedSelectionAssociation {
         ObservedSelectionAssociation::SelectedDependencySuperset
@@ -272,7 +314,12 @@ impl NativeCommandRoot for RunfilesManifestPreparationKey {
         {
             PreparationOutcome::Need(need) => Ok(PreparationOutcome::Need(need)),
             PreparationOutcome::Complete(result) => result
-                .map(PreparationOutcome::Complete)
+                .map(|inputs| {
+                    PreparationOutcome::Complete(Arc::new(PreparedRunfilesManifests {
+                        inputs,
+                        _generations: NativeSourceGenerations::default(),
+                    }))
+                })
                 .map_err(|value| NativeDemandSessionError::Computation(anyhow::anyhow!("{value}"))),
         }
     }

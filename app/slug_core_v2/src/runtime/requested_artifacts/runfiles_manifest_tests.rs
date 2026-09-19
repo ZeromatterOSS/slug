@@ -10,7 +10,10 @@ use crate::runtime::PreparedRunfilesManifests;
 
 type Prepared = AcceptedCommand<Arc<PreparedRunfilesManifests>>;
 
-fn owner(workspace: &Workspace, overlay: CommandConfigurationOverlay) -> ConfiguredTargetKey {
+pub(super) fn owner(
+    workspace: &Workspace,
+    overlay: CommandConfigurationOverlay,
+) -> ConfiguredTargetKey {
     let accepted = workspace
         .runtime
         .build_command_with_repository_environment(
@@ -35,7 +38,7 @@ fn owner(workspace: &Workspace, overlay: CommandConfigurationOverlay) -> Configu
         .clone()
 }
 
-fn prepare(
+pub(super) fn prepare(
     workspace: &Workspace,
     owner: ConfiguredTargetKey,
     overlay: CommandConfigurationOverlay,
@@ -57,7 +60,7 @@ fn prepare(
         )
 }
 
-fn write_binary(workspace: &Workspace, backing: &str, source: &str) {
+pub(super) fn write_binary(workspace: &Workspace, backing: &str, source: &str) {
     fs::write(workspace.root.path().join("defs.bzl"), DEFS.replace("GROUP_VARIANT", "group_a").replace(
         "    return [DefaultInfo(executable = out, runfiles = ctx.runfiles(files = ctx.attr.source[DefaultInfo].files.to_list()))]",
         &format!("    backing = ctx.actions.declare_file('{backing}')\n    ctx.actions.write(backing, 'backing')\n    return [DefaultInfo(files = depset([out]), executable = out, runfiles = ctx.runfiles(files = [backing] + ctx.attr.source[DefaultInfo].files.to_list()))]"),
@@ -72,7 +75,7 @@ fn write_binary(workspace: &Workspace, backing: &str, source: &str) {
     .unwrap();
 }
 
-fn check_frontier(workspace: &Workspace, value: &PreparedRunfilesManifests) {
+pub(super) fn check_frontier(workspace: &Workspace, value: &PreparedRunfilesManifests) {
     for source in value.sources() {
         assert!(
             value
@@ -109,7 +112,7 @@ fn check_frontier(workspace: &Workspace, value: &PreparedRunfilesManifests) {
     );
 }
 
-fn check_no_effects(workspace: &Workspace, value: &PreparedRunfilesManifests) {
+pub(super) fn check_no_effects(workspace: &Workspace, value: &PreparedRunfilesManifests) {
     assert!(
         value
             .evaluation()
