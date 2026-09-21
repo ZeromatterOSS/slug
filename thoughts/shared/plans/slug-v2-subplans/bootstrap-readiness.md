@@ -326,6 +326,12 @@ callback is admitted by WP-7-53 as an authenticated structural recipe with retai
 and forced parameter bytes, including the required unexpanded Directory argument. Full
 Cargo rule/toolchain execution remains open. Virtual Args paramfiles do not prove standalone
 ArgsWrite demand.
+WP754's [native Solib inventory](./solib-construction-inventory.md) identifies missing
+native family identity, bin-relative repository placement and both local/cross-owner
+sharing contracts. The temporary WP714 action JSON is unavailable in the inspected live
+storage; its historical two rows cannot currently be attributed to runtime-library,
+standard-dylib or cdylib construction. A focused CLI-root Solib action observation is
+selected before native implementation. This adds no runtime or full-toolchain admission.
 Run remains deferred and F3 remains closed.
 
 ## Family admission and completion procedure

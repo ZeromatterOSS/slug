@@ -29,14 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-53-m7a-cargo-runfiles-args-r1
+Packet: WP-7-54-m7a-solib-construction-inventory-r1
 Status: accepted
 
-WP753 accepts the production-demanded Cargo runfiles Args callback: authenticated captures,
-structural retained mapping and forced shell-quoted parameter bytes, with public workspace
-name and literal unexpanded Directory prerequisites. Twenty focused tests and CLI/server
-compilation pass. Next: inventory demanded native C++/SolibSymlink construction prerequisites.
-WP752 alias execution/publication is accepted at 74770f888. Full Cargo loading/execution,
+WP754 accepts the native Solib source/prerequisite inventory: family identity,
+repository/bin placement and sharing require explicit producer contracts. The historical
+action-query file is unavailable; next is a narrowly filtered CLI-root Solib observation
+to identify demanded producers before implementation. Independent source review accepts
+the inventory; runtime admission is unchanged. WP753 Cargo Args is accepted at 57856a758
+and WP752 alias execution/publication at 74770f888. Full Cargo loading/execution,
 WP746's baseline diagnostic defect and broader M7A remain open; M8 is unproved.
 
 ### Earlier generated-input receipt
