@@ -22,6 +22,8 @@ use crate::assert::Assert;
 use crate::environment::Module;
 use crate::eval::Evaluator;
 
+mod function_identity;
+
 #[test]
 fn test_lambda() {
     assert::is_true("(lambda x: x)(1) == 1");

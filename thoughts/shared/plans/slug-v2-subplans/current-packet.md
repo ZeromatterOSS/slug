@@ -1,186 +1,189 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-62-m7a-cc-header-info-and-compilation-context-r1
+Packet: WP-7-63-m7a-complete-cc-toolchain-publication-r1
 Status: accepted
 
-## Outcome and compatibility
+## Observable outcome and compatibility
 
-Execute unchanged rules_cc 0.2.17 cc_info.bzl:create_compilation_context with
-artifact-bearing headers, ordinary and exported dependencies, publish its real
-provider, and consume it after rematerialization. compile.bzl:282 requires this
-producer; current native support is only an empty HeaderInfo sentinel. This
-advances the finite C++/Rust bootstrap prerequisites in bootstrap-readiness.md.
-Predecessor WP761 at eeb7dd680 accepted link variables/Rust linker-helper with
-38 focused tests, Core/CLI checks and independent review; receipt is in Git.
+Run the complete unchanged rules_cc 0.2.17 CcToolchainInfo initializer, publish
+every provider field (all51 required inputs, extra_cpp_configuration=None),
+and consume that same provider through unchanged
+configure_features and rules_rust get_linker_and_args. Real Cpp configuration,
+native features/Variables, Files/depsets and CcInfo/compilation contexts replace
+the preceding authored toolchain envelope. This is required before an honest
+toolchain-dependency CppCompile route in the finite bootstrap closure.
+WP762 at9e753ebe3 accepted full HeaderInfo/compilation-context publication with
+33 focused tests, Core/CLI checks and independent review; receipt is in Git.
 
-Exact: HeaderInfo constructors, attributes, immutable lists, occurrence equality,
-ordered header normalization and dependency merge, unchanged compilation-context
-builder for admitted existing inputs. Slug-native: existing structural artifact,
-configuration/path identity and Rust Host observations. Unsupported/deferred:
-transitive native header scanning/memoization, compile/link action production
-and execution, actions2ctx, full CcToolchainInfo callable publication and full
-cc_toolchain producer/FDO, and Host-dependent header normalization during module
-loading without an observed Host. No full cc_library/Rustc/bootstrap claim; M7A remains
-partial and M8 unproved.
+Exact: unchanged constructor field relationships and three callable methods;
+four authenticated recipes (global SupportsPic, fresh AlwaysPic lambda,
+fresh static-runtime closure, fresh dynamic-runtime closure); function alias/
+occurrence equality, hash consistency, keyword-only invocation and captured
+depset behavior. Slug-native: existing artifact/configuration/path domains, Rust
+Host observations and Cpp fragment occurrence identity over full structural
+configuration (not JVM FragmentFactory cache identity). Unsupported/deferred:
+generic callable serialization, unpinned/forged callable recipes, runtime captures
+other than None or admitted depsets, full get_cc_toolchain_provider/rule/FDO
+production, compile/link actions, scanning and execution. Full constructor is
+not full toolchain rule analysis or bootstrap acceptance. M7A partial, M8 unproved.
 
-## Source, ownership and invariants
+## Source and architecture
 
-Bazel 9.2 revision 8220c6198837d5c13d53fea211cf3282aa12408a:
-CcStarlarkInternal.java:1167–1252 binds both named-only constructors and validates
-artifact sequences, derived-only optional module slots and HeaderInfo deps.
-CcCompilationContext.java:558–698 owns four optional modules, four header lists,
-direct dependency nodes and immutable public projections; :743–759 owns identity
-and immutability; :828–900 owns create. CppFileTypes.java:93 and
-util/FileType.java:115–126 own .inc classification: Windows HOST case-insensitive,
-other hosts case-sensitive. Use existing observed Host, never target/exec OS or
-ambient filesystem/platform inference. No upstream HeaderInfo tests were found;
-pinned-source regressions supply discriminators. Native scanner/flattening tests
-are deferred because no scanner or transitive-collection API is activated.
-Existing pinned rules_cc corpus and sources.json supply cc_info.bzl:338,429
-and compile.bzl:282; no upstream body additions or substitutions.
+Bazel9.2 revision8220c6198837d5c13d53fea211cf3282aa12408a:
+StarlarkFunction.java:251–274 and SymbolGenerator.java:139–160 establish function
+occurrence identity/hash/immutability. Fragment.java:38–52 establishes immutable
+hashable fragments; FragmentFactory's required-option cache/object identity is
+explicitly not reproduced. Pinned unchanged cc_toolchain_info.bzl:19–40,97–103,
+143–153 defines callable bodies/captures; complete initializer has51 required
+arguments and optional extra_cpp_configuration. Corpus SHA256:
+f19589572147b7dc8f1b16ab96791b7651923c36821aed70868a74bbfce963f5.
+Existing54-body fixture and sources.json pins remain unchanged.
 
-Normalize public/private independently, ordered-dedup each, move .inc files into
-textual after explicit textual inputs. Append merged dependencies' normalized
-public/private/textual entries in input order with independent dedup. Preserve
-separate-module-header sequence including duplicates. Keep only the supplied
-direct deps (not original header_info deps); merged_deps are merge inputs, not an
-extra retained graph. Separate module requires corresponding main module.
-Module slots reject source artifacts; derived tree artifacts are not rejected.
-List/tuple and existing sequence bindings are admitted, depsets rejected.
-Module attrs and immutable lists are eight noncallable fields, with no deps attr.
-Each constructor has fresh identity; aliases preserve equality/hash across
-freezing and publication. Identity never depends on equal header contents.
+Authenticate the initialized-provider definition at provider() using canonical
+module identity, observed SHA256, actual evaluated full source digest and exact
+definition callsite. The pinned site proves the init binding and returned
+function/capture relationships. Preserve a private authentication tag through
+freeze; only successful genuine initialized invocation registers recipes.
+Raw construction, matching provider IDs/names/repr, or runtime identity tokens
+never confer recipe authority. Verify genuine Cpp input and capture shapes.
+Keep original function Values untouched during evaluation.
 
-BuildAPI owns an immutable Arc/Dupe CcHeaderInfo model: complete owned
-AnalysisArtifact slots and boxed immutable sequences, shared direct dependency
-nodes, and existing occurrence handles. Loading owns validation and native value
-facades; Analysis bridges the same model through ordinary AnalysisValue/provider
-publication. Generic Starlark CcCompilationContextInfo is not replaced.
-Full publication equality checks every artifact owner/slot/list and dependency
-edge plus global occurrence bijection, including aliases outside the HeaderInfo
-graph. Use visited pairs to avoid repeated DAG traversal. Never retain evaluator
-values, action sinks, contexts, raw pointers or borrowed heap data in the model.
+Store actual function Value → typed descriptor registrations in a GC-traced
+module-root owner using Module::extra_value, alongside (not overwriting) the
+existing four empty-depset cache values. Dict keys/descriptor captures must be
+traced and frozen. This is phase-local provenance scratch, released with module;
+Evaluator.extra/AnalysisEvaluationContext cannot root moving heap Values.
+Seed the normal AnalysisValueLowerer from this owner before recursive provider/
+action publication so extracted fields and aliases work regardless of field order.
+No process registry, filename fallback, heap pointer in retained data, or generic
+function bytecode/capture serialization.
 
-This is DICE-retained semantic memory under the configured-node producer and
-its existing observed source/configuration/dependency inputs. Normal publication
-cutoff, invalidation/restoration, retry/cancellation and graph eviction release
-apply. No new DICE key, mutex, cache service or semantic side store. Follow
-docs/developers/dice.md. Stage9 rows for WP726/WP758 own reuse: Arc/Dupe,
-immutable slices, SmallSet ordered normalization, FxHashMap traversal scratch,
-Allocative. No donor import, interner or performance improvement claim.
+Retained starlark runtime gains a generic lazy function identity capability:
+one OnceLock<Arc<()>> per Def instance, requested explicitly by trusted host code.
+Ordinary provide/equality only read existing identity and do not allocate.
+Def/native callable equality must be symmetric. Freeze moves the cell; GC moves
+the payload. Distinct instances sharing DefInfo remain distinct. Keep Def's
+existing function-name hash permanently; native recipes write the same cached
+STRING-hash u32 stream, not the finished function hash. A token is occurrence,
+not source authority. Runtime has no Slug/Bazel names or recipes. BuildAPI retains
+only Arc token and primitive hash, adding no starlark-runtime dependency.
+
+BuildAPI owns complete typed callable recipes and full structural Cpp projection.
+Fresh callable occurrences use shared publication bijection with captures lowered
+through the ordinary bridge (preserve depset owners/order/alias topology).
+Global SupportsPic publication additionally requires the same opaque token:
+do not alpha-rename an externally comparable module-global function after reload.
+Cpp publication checks complete configuration plus local fragment alias topology.
+Native fragments authorize restricted methods using CURRENT evaluator provenance,
+never the producer's caller table. No copied derived flags or independent config.
+
+SupportsPic calls feature_configuration.is_enabled("supports_pic") and returns
+its result; AlwaysPic returns True. Runtime recipes use truthiness of
+is_enabled("static_link_cpp_runtimes"); disabled returns the normal empty depset,
+enabled returns the exact captured depset, enabled None emits original error.
+Preserve keyword-only arity and generic method invocation semantics rather than
+silently requiring only one feature facade. Unsupported captures fail closed.
+
+DICE semantic ownership remains configured-node/provider publication and tracked
+loading/configuration/dependency inputs. No new key/lock/cache/source-loading
+route. Existing validity, cutoff, cancellation/retry and eviction apply; follow
+docs/developers/dice.md. Typed recipe Arc/Dupe, compact ordered scratch, immutable
+slices and Allocative reuse Stage9 WP726/758/760 rows. No donor import or interner.
+Account for lazy slot size and one identity allocation only when issued; no
+throughput, memory reduction or exact numeric hash claim.
 
 ## Scope and coordination
 
-Root: app/slug_build_api_v2/src/cc_header_info.rs, analysis_value.rs, lib.rs and
-cohesive model tests and tests/analysis_value.rs empty-proof migration;
-app/slug_analysis_v2/src/analysis_value.rs and cohesive bridge tests;
-starlark_rule.rs only projects existing structural configuration Host into the
-evaluation context. Rename empty-only variants/functions; no migration shims needed.
-Large analysis_value modules receive bounded dispatch and child tests only.
+Runtime worker: starlark-rust/starlark/src/eval/compiler/def.rs;
+values/types/function.rs (public generic capability); tests/def.rs or cohesive
+child tests and required module export. Then disjoint Loading native callable
+facade/tests and Cpp projection/facade only after root supplies model API.
+Loading paths: new cc_toolchain_callable.rs + tests, analysis_fragments.rs and
+analysis_fragments/cc_feature_tests.rs. Configuration native/cpp_fragment.rs
+only exposes complete already-owned projection, no new command options.
 
-Loading worker: app/slug_loading_v2/src/cc_header_info.rs plus child tests,
-cc_common.rs removal/delegation, lib.rs exports, and only necessary updates to
-existing empty-header tests. subrule_invocation.rs carries an optional observed
-Host OS projection in the evaluator-local AnalysisEvaluationContext, supplied by
-the existing configured producer. Missing stays missing; no ambient fallback.
-This does not require a rule to declare the Cpp fragment and does not retain a
-second configuration. Only nonempty public/private normalization demands Host.
-Root provides shared model API before edits.
+Root: BuildAPI new cc_toolchain_callable.rs and cpp_fragment.rs plus lib.rs,
+analysis_value.rs and child tests; Loading provider.rs initialized authentication
+dispatch and empty-depset root delegation, new cc_toolchain_auth.rs and
+evaluator_roots.rs with tests/lib.rs exports; Analysis analysis_value.rs and
+cohesive callable/fragment bridge tests, starlark_rule.rs normal lowering seed.
+Large provider/analysis modules get bounded hooks, not embedded implementations.
+Loading/Analysis BUILD declarations export the existing pinned source as test
+compile_data; no new corpus copy or module graph edge.
 
-Integration worker: app/slug_analysis_v2/tests/rustc_map_each/cc_headers.rs and
-optional sibling .bzl; mod.rs registration/shared harness only. Use complete
-already-vendored bodies and authored caller inputs, genuine configured ctx/File
-and real dependency providers. No copied production function fragments.
+Integration worker: tests/rustc_map_each/cc_toolchain.rs and sibling .bzl;
+mod.rs registration/helper only. Construct all real provider fields via complete
+unchanged corpus, actual Files/native projections and real CcInfo; retain full
+provider, not a reconstructed struct. Authored inert fields are explicit inputs,
+not claims of full FDO/toolchain producer support.
 
-Reviewer: independent design/final audit. Root owns serialized Cargo, docs,
-integration and atomic commit. Docs: manifest/canonical, bootstrap-readiness,
-Stage6 current owner and matching Stage9 reuse row only if contract changes.
-Estimate 350–650 production and 500–900 proof lines; growth triggers responsibility
-review. No action-execution, configuration or provider-callable changes.
+Reviewer owns independent design/final audit. Root serializes Cargo, integration,
+docs and atomic commit. Docs manifest/canonical, bootstrap-readiness, Stage6 and
+matching Stage9 rows. Estimate800–1400 production/1200–2000 proof lines across
+these cohesive owners; review growth. No actions/config-option/remote changes.
 
-## Evidence and validation
+## Acceptance and validation
 
-Model/Loading tests discriminate order, cross-list independence, Host-sensitive
-.inc relocation, separate duplicates, ordinary versus merged deps, fresh versus
-aliased identity, hash/freeze/GC/immutable-list behavior, all module slots/invalid
-pairs, wrong artifact/sequence/node types and named-only binding. Protect empty
-behavior and established no-Host empty initialization.
-Publication tests discriminate hidden dependency header/module changes, artifact
-owners, repeated DAG aliases and outer value aliases, equal structural rebuilds,
-and producer-heap disposal/rematerialization.
-Authentic builder integration covers public/private/textual and separate headers,
-ordinary/exported dependencies, provider consumption and same-DICE source-input
-change/restoration. Existing corpus provenance remains unchanged; no new oracle
-workspace assets beyond a short authored invocation. Pinned-source regressions
-suffice; no Bazel process needed. Protect prior Rustc/linker proofs.
+Runtime: ordinary defs remain unissued; two-way Def/native equality and dict
+lookup/replacement before/after issuance; same-name closures distinct; issue
+before and after freeze; GC modes; tuple hash consistency; measured slot layout.
+Loading: authenticated exact source versus changed digest/foreign source/raw
+constructor forgery; rooted registry coexists with empty depsets through GC/freeze;
+closure captures and field extraction; Cpp current-caller allowlist behavior.
+BuildAPI/Analysis: every recipe/capture/config input participates in publication;
+fresh alias bijection, global-token discrimination, retained depset alias with
+provider fields, heap disposal and restored invocation. No raw Value retained.
 
-Resolve pinned nightly through rustup. Serialized offline/locked Cargo JSON
-no-run: BuildAPI lib and analysis_value integration, Loading lib, Analysis lib
-and starlark_rule integration;
-Core/CLI compile checks cover direct dependents. Batch preflight exact selectors
-once per executable, then execute selected tests. Preparation cap60s/operation;
-tests expected seconds, not an explicit user ceiling. No daemon or binary smoke.
-Format, diff, plan-status and archive checks. Independent final review includes
-complete ownership/equality and executed evidence, not counts alone.
-REPLAN if real compilation-context invocation needs a new semantic owner outside
-the allowlist, or evidence contradicts the declared source/ownership contract.
-Ordinary implementation/selector failures are corrected within this packet.
+Integration: genuine complete producer/consumer and actual configure/Rust linker
+use; mixed restored/global-vs-new genuine constructor equality and dictionary
+lookups both ways; forcePIC lambda distinction; static/dynamic None/empty/nonempty,
+enabled/disabled and error cases; full provider unused payload; configuration
+and capture changes/restoration in same DICE. Source forgery restoration requires
+successful reauthentication, not alpha-equality of recreated global functions.
+Protect WP762 HeaderInfo and preceding8 Rustc/linker integrations.
 
-Independent design ACCEPT: source-sensitive normalization, derived module slots,
-merge ordering and complete alias-aware DAG publication fit existing owners.
-Partial final review changed publication traversal to an iterative worklist;
-shared-diamond and deep-chain tests discriminate visited-pair and call-stack
-behavior separately. Normal Arc release conventions remain; no bounded-stack
-deep teardown or retained-size improvement is claimed.
+Resolve pinned nightly via rustup. Serialized offline/locked Cargo JSON no-run
+for retained starlark runtime focused tests, BuildAPI lib, Loading lib, Analysis
+lib/starlark_rule integration; Core/CLI checks. Exact selector preflight once per
+unchanged executable.60s preparation cap/operation; tests expected seconds, not
+a user deadline. No Slug/Bazel process or action execution needed. Format/diff,
+plan-status/archive and independent final evidence review before acceptance.
+REPLAN only for a new semantic owner/compatibility decision outside this contract;
+ordinary compile, selector and implementation corrections stay in packet.
 
-## Terminal evidence
+Independent design ACCEPT covers the rooted authentication registry, lazy runtime
+identity protocol, strict global-token publication and current-caller Cpp transport.
 
-Pinned nightly-2025-09-14 tools resolved through rustup. Serialized offline/locked
-Cargo JSON no-run preparation covered BuildAPI lib and analysis_value integration,
-Loading lib, Analysis lib and starlark_rule integration. Final preparations exit0:
-BuildAPI lib0.966s and integration1.417s, Loading3.921s, Analysis lib6.376s and
-integration1.218s. Direct dependent Core and CLI checks exit0 in12.984s/13.635s.
-All preparation attempts stayed below60s (maximum23.510s). Commands and full local
-receipts are in ignored target/wp762; command families are
-`cargo test --offline --locked -p <owner> <target> --no-run --message-format=json`
-and `cargo check --offline --locked -p <dependent> --message-format=json`.
+## Terminal validation receipt
 
-33 distinct exact selectors passed, each exit0/one selected/one passed following
-batch preflight against its unchanged executable:
+Baseline9e753ebe3; pinned nightly-2025-09-14 resolved through rustup. Serialized
+`cargo test --offline --locked -p <owner> --lib --no-run --message-format=json`
+passed for starlark, slug_build_api_v2, slug_loading_v2 and slug_analysis_v2;
+Analysis also passed with `--test starlark_rule`. `cargo check --offline --locked`
+passed for slug_core_v2 and slug_cli_v2, with the latter rechecking current Core
+dependencies. Exact selector preflight preceded each unchanged executable batch.
 
-- BuildAPI: all7 cc_header_info::tests and migrated empty-header integration.
-- Loading: all5 cc_header_info::tests, protected2 empty Cc initialization tests
-  and2 cc_common::solib_tests. GC runs supported Auto/Never/Always modes; billion-
-  element ranges reject after the first invalid integer instead of allocating.
-- Analysis lib: new nonempty heap-disposal/hidden-edge proof, protected empty
-  roundtrip and4 native feature publication/GC/hash tests.
-- Analysis integration:2 rustc_map_each::cc_headers and protected5 original Rustc
-  plus3 cc_linker tests. New authored rule declares no Cpp fragment; actual
-  configured Host still reaches normalization through the existing producer.
+39 selected/pass, zero remaining failures: runtime4 (lazy issuance, equality/hash,
+GC/freeze/layout); BuildAPI7 (recipes/captures/global-token/config/alias);
+Loading12 (auth3, callable3, Cpp5, protected empty-depset1); Analysis2
+(callable producer-heap disposal plus protected HeaderInfo disposal); integration14
+(complete toolchain4, HeaderInfo2, protected Rustc/linker8). Latest test runtime
+1.810s aggregate, max0.202s. Preparation/check aggregate262.897s including failed
+attempts, maximum53.592s; no60s preparation cap exceeded. Local detailed receipts
+are under ignored target/wp763. Function identity slot16bytes, live/frozen Def304
+bytes on this platform; no memory or throughput improvement claim.
 
-Latest local test receipts: tests-1790024123351893815 (BuildAPI7),
-tests-1790024339988902598 (BuildAPI1), tests-1790024662699590282 (Loading9),
-tests-1790024639208900915 (Analysis6), tests-1790024729699719391 (integration10).
-Together1.290s runtime. Failures preserved locally: two preparation failures from
-missing test imports/temporary borrow; one preflight with incomplete module paths;
-three runtime failures (obsolete empty-header hash rejection, GC helper import
-not reexported, duplicate BUILD label before native separate-header inputs).
-Corrections preserved/increased assertions: positive identity hash, separate
-explicit helper import, and single label expanded into duplicate Files in the
-authored caller. No upstream body changes or production fallback was needed.
-
-Independent review required and verified bounded iterative DAG comparison and
-early invalid-range rejection. Roughly440 added production and850 proof lines
-remain within estimates, split across natural BuildAPI/Loading/Analysis owners.
-Only the existing observation/configuration producer supplies Host; no lock,
-new semantic key, Java helper, daemon, Slug/Bazel binary or build action ran.
-Utility-reuse review preserved Arc/Dupe sharing, immutable slices, ordered
-SmallSet scratch and Allocative. No performance improvement claim.
-Observable gate: full artifact-bearing native HeaderInfo and unchanged public
-compilation-context producer/consumer publication with hidden-edge restoration.
-
-Independent final ACCEPT verified the actual diff,33 passing receipts and
-Core/CLI checks. Formatting, diff, plan-status and archive checks pass. About
-21 minutes from packet selection to acceptance (20:46–21:07 UTC); initial source
-research preceded selection, review overlapped work and was not separately timed.
-All15 preparation/check operations totaled130.198s including failed attempts.
+Corrections stayed in contract: macro return spelling/iterator comparison/module
+lifetime and API compiler fixes; authored cross-repo callback injection instead
+of an unsupported canonical load; actual compiler lparen call span(164,164);
+test dialect/private-caller setup, supported statement-safe GC and exact flattened
+capture assertions instead of opaque depset repr. Old failures remain in receipts;
+no assertion was weakened. Existing54-body corpus is unchanged; the existing
+toolchain source is declared in Bazel test compile_data. No Bazel/Slug process,
+daemon or build action ran. Rustfmt, diff, plan-status and archive checks pass.
+Elapsed approximately34minutes from prior acceptance, including design/review;
+separate reviewer wall time is unavailable. No REPLAN was needed. The observable
+gate advanced is complete constructor publication and genuine downstream queries,
+not full toolchain/FDO rule production or CppCompile. M7A remains partial.
+Independent final ACCEPT confirmed the actual implementation,39 passing tests,
+GC/capture/current-caller ownership and corrected Bazel test source declarations.

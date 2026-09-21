@@ -26,6 +26,17 @@ mod cc_common;
 pub mod cc_context;
 mod cc_features;
 mod cc_header_info;
+mod cc_toolchain_auth;
+mod cc_toolchain_callable;
+mod evaluator_roots;
+#[doc(hidden)]
+pub use cc_toolchain_auth::CallableRegistration;
+#[doc(hidden)]
+pub use cc_toolchain_auth::callable_registrations;
+#[doc(hidden)]
+pub use cc_toolchain_callable::alloc_frozen_cc_toolchain_callable;
+#[doc(hidden)]
+pub use cc_toolchain_callable::cc_toolchain_callable;
 mod cc_variables;
 #[doc(hidden)]
 pub use cc_variables::CcVariablesView;

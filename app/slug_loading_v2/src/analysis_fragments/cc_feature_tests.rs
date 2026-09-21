@@ -18,8 +18,67 @@ use starlark::syntax::Dialect;
 
 use super::*;
 use crate::BzlModuleIdentity;
+use crate::BzlModuleSourceProvenance;
+use crate::provider::BzlEvaluationContext;
 
 const FILENAME: &str = "cpp_features.bzl";
+
+#[test]
+fn retained_cpp_fragment_preserves_identity_and_uses_current_caller() {
+    let retained =
+        RetainedCppFragment::new(CppFragmentProjection::new(configuration(true)).unwrap());
+    let frozen_heap = FrozenHeap::new();
+    let cpp = alloc_frozen_cpp_fragment(&frozen_heap, retained.clone());
+    let alias = alloc_frozen_cpp_fragment(&frozen_heap, retained.clone());
+    let distinct = alloc_frozen_cpp_fragment(
+        &frozen_heap,
+        RetainedCppFragment::new(retained.projection().clone()),
+    );
+    assert!(cpp.to_value().equals(alias.to_value()).unwrap());
+    assert!(!cpp.to_value().equals(distinct.to_value()).unwrap());
+    assert_eq!(
+        cpp.to_value().get_hashed().unwrap().hash(),
+        alias.to_value().get_hashed().unwrap().hash()
+    );
+    for allowed in [true, false, true] {
+        let module = Module::new();
+        module.set("cpp", cpp.to_value());
+        let identity = BzlModuleIdentity {
+            label: CanonicalLabel::parse(if allowed {
+                "@@rules_cc+//cc/private:consumer.bzl"
+            } else {
+                "@@//ordinary:consumer.bzl"
+            })
+            .unwrap(),
+            workspace_path: PathBuf::from(FILENAME),
+            repository_mapping: Arc::from([]),
+        };
+        let context = BzlEvaluationContext::macro_runtime_context(
+            identity.clone(),
+            Arc::from([(
+                CompactString::new(FILENAME),
+                BzlModuleSourceProvenance::new(identity, [0; 32]),
+            )]),
+        );
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&context);
+        let result = evaluator.eval_module(
+            AstModule::parse(
+                FILENAME,
+                "def query():\n    return cpp.force_pic()\nRESULT = query()".to_owned(),
+                &Dialect::Bazel,
+            )
+            .unwrap(),
+            &Globals::standard(),
+        );
+        if allowed {
+            assert!(result.is_ok(), "{result:?}");
+            assert_eq!(module.get("RESULT").unwrap().unpack_bool(), Some(true));
+        } else {
+            assert!(result.unwrap_err().to_string().contains("private API"));
+        }
+    }
+}
 fn configuration(changed: bool) -> SlugConfiguration {
     let base = SlugConfiguration::default_target(
         &HostConversionInputs::new(
@@ -79,16 +138,20 @@ fn evaluate_configuration(
     };
     let callers = Arc::from([(
         CompactString::new(FILENAME),
-        BzlModuleSourceProvenance::new(identity, [0; 32]),
+        BzlModuleSourceProvenance::new(identity.clone(), [0; 32]),
     )]);
     module.set(
         "cpp",
-        module.heap().alloc_simple(CppFragmentValue::new(
-            CppFragmentProjection::new(configuration)?,
-            callers,
-        )),
+        module
+            .heap()
+            .alloc_simple(CppFragmentValue::new(CppFragmentProjection::new(
+                configuration,
+            )?)),
     );
-    Evaluator::new(&module)
+    let context = BzlEvaluationContext::macro_runtime_context(identity, callers);
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&context);
+    evaluator
         .eval_module(
             AstModule::parse(FILENAME, source.to_owned(), &Dialect::Bazel)
                 .map_err(starlark::Error::into_anyhow)?,

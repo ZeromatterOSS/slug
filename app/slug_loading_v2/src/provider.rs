@@ -633,6 +633,8 @@ impl<'v> StarlarkValue<'v> for FrozenUserProviderCallable {
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 pub(crate) struct InitializedUserProviderCallable<'v> {
+    #[trace(unsafe_ignore)]
+    authority: Option<crate::cc_toolchain_auth::InitializerAuthority>,
     source_label: CompactString,
     fields: Arc<[CompactString]>,
     init: Value<'v>,
@@ -648,6 +650,7 @@ impl<'v> InitializedUserProviderCallable<'v> {
         let context = BzlEvaluationContext::from_evaluator(eval)
             .map_err(|_| anyhow::anyhow!("provider() may only be called in a .bzl module"))?;
         let provider = eval.heap().alloc_complex(Self {
+            authority: crate::cc_toolchain_auth::authenticate(eval),
             source_label: context.source_label.clone(),
             fields,
             init,
@@ -676,6 +679,7 @@ impl Freeze for InitializedUserProviderCallable<'_> {
             ));
         };
         Ok(FrozenInitializedUserProviderCallable {
+            authority: self.authority,
             id,
             fields: self.fields,
             init: self.init.freeze(freezer)?,
@@ -704,11 +708,19 @@ impl<'v> StarlarkValue<'v> for InitializedUserProviderCallable<'v> {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let id = self.id.get().ok_or_else(unbound_provider_error)?;
-        invoke_initialized_provider(id, &self.fields, self.init, args, eval)
+        invoke_initialized_provider(
+            id,
+            &self.fields,
+            self.init,
+            self.authority.as_ref(),
+            args,
+            eval,
+        )
     }
 }
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct FrozenInitializedUserProviderCallable {
+    authority: Option<crate::cc_toolchain_auth::InitializerAuthority>,
     id: ProviderId,
     fields: Arc<[CompactString]>,
     init: FrozenValue,
@@ -728,7 +740,14 @@ impl<'v> StarlarkValue<'v> for FrozenInitializedUserProviderCallable {
         args: &Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        invoke_initialized_provider(&self.id, &self.fields, self.init.to_value(), args, eval)
+        invoke_initialized_provider(
+            &self.id,
+            &self.fields,
+            self.init.to_value(),
+            self.authority.as_ref(),
+            args,
+            eval,
+        )
     }
 }
 fn unbound_provider_error() -> starlark::Error {
@@ -946,6 +965,7 @@ fn invoke_initialized_provider<'v>(
     id: &ProviderId,
     fields: &Arc<[CompactString]>,
     init: Value<'v>,
+    authority: Option<&crate::cc_toolchain_auth::InitializerAuthority>,
     args: &Arguments<'v, '_>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> starlark::Result<Value<'v>> {
@@ -958,7 +978,11 @@ fn invoke_initialized_provider<'v>(
             initialized.get_type()
         ))
     })?;
-    allocate_schemaful_loading_provider(id, fields, values.iter(), eval)
+    let provider = allocate_schemaful_loading_provider(id, fields, values.iter(), eval)?;
+    if let Some(authority) = authority {
+        crate::cc_toolchain_auth::register(authority, &values, eval)?;
+    }
+    Ok(provider)
 }
 fn invoke_initialized_raw<'v>(
     id: &ProviderId,
@@ -1532,14 +1556,19 @@ fn merge_evaluator_depset_type(
     Ok(())
 }
 
-fn empty_evaluator_depset<'v>(order: DepsetOrder, eval: &mut Evaluator<'v, '_, '_>) -> Value<'v> {
+pub(crate) fn empty_evaluator_depset<'v>(
+    order: DepsetOrder,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> Value<'v> {
     let index = match order {
         DepsetOrder::Default => 0,
         DepsetOrder::Postorder => 1,
         DepsetOrder::Preorder => 2,
         DepsetOrder::Topological => 3,
     };
-    if let Some(cache) = eval.module().extra_value().and_then(TupleRef::from_value) {
+    if let Some(cache) =
+        crate::evaluator_roots::empty_depsets(eval.module()).and_then(TupleRef::from_value)
+    {
         return cache.content()[index];
     }
     let values = [
@@ -1560,8 +1589,7 @@ fn empty_evaluator_depset<'v>(order: DepsetOrder, eval: &mut Evaluator<'v, '_, '
         })
     });
     let value = values[index];
-    eval.module()
-        .set_extra_value(eval.heap().alloc(AllocTuple(values)));
+    crate::evaluator_roots::set_empty_depsets(eval.module(), eval.heap().alloc(AllocTuple(values)));
     value
 }
 

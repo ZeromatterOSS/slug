@@ -373,7 +373,14 @@ survive publication. The unchanged create_compilation_context now runs with real
 Files and configured producer/consumer providers; hidden ordinary-edge changes
 and visible exported-header changes participate in same-DICE restoration.
 This supplies compile.bzl's mandatory context prerequisite, not a compile action,
-native scanner or full CcToolchainInfo publication proof.
+native scanner or full toolchain rule proof. WP763 additionally publishes all
+fields from the unchanged CcToolchainInfo constructor, with real Cpp/Variables/
+features/CcInfo and source-authenticated PIC/runtime callable recipes. Configured
+consumers pass that same provider to unchanged configure_features and Rust linker
+queries. This replaces the authored envelope at the constructor boundary only;
+inert FDO/tool inputs are explicit, not full toolchain production. Generic functions,
+unmodeled captures and unauthenticated recipes remain rejected. Cpp occurrence
+identity is explicitly Slug-native over full structural configuration.
 Compile/actions2ctx, execution-time tree/path mapping and full cc_library remain
 deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside

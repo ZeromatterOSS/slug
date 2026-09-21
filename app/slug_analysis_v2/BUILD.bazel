@@ -7,6 +7,7 @@ exports_files(
     [
         "tests/fixtures/rustc-map-each/rules_cc/cc/cc_toolchain_config_lib.bzl",
         "tests/fixtures/rustc-map-each/rules_cc/cc/private/link/cc_linking_helper.bzl",
+        "tests/fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/cc_toolchain_info.bzl",
     ],
     visibility = ["//app/slug_loading_v2:__pkg__"],
 )

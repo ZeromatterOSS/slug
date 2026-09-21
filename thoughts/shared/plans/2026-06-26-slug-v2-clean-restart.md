@@ -29,13 +29,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-62-m7a-cc-header-info-and-compilation-context-r1
+Packet: WP-7-63-m7a-complete-cc-toolchain-publication-r1
 Status: accepted
+
+WP763 accepts complete unchanged CcToolchainInfo constructor publication and
+downstream configuration/linker use, with authenticated callable recipes and
+full Cpp configuration ownership:39 focused tests, Core/CLI checks and independent
+final ACCEPT. All51 required inputs with extra_cpp_configuration=None are covered;
+generic functions, full toolchain/FDO rules and compile/link actions remain deferred.
 
 WP762 accepts artifact-bearing HeaderInfo construction/merge and unchanged
 compilation-context provider publication/restoration, a mandatory compile
 prerequisite:33 focused tests, Core/CLI checks and independent final ACCEPT.
-Full toolchain-provider callables and compile/link execution remain deferred.
+Full toolchain rule production and compile/link execution remain deferred.
 
 WP761 accepts typed Cpp link-variable prerequisites and unchanged Rust linker-helper
 invocation on a real ctx, with exact exec mapping and configuration restoration;

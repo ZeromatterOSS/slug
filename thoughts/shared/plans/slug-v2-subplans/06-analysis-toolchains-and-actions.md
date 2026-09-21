@@ -171,7 +171,21 @@ uses observed Host for .inc matching, independent of target/exec OS; empty modul
 initialization needs no Host. Ordinary dependencies retain graph edges; exported
 dependencies merge ordered public/private/textual lists. No global counter or
 evaluator heap crosses DICE. Native scanning/transitive memoization, complete
-toolchain callable publication and full Cc compilation remain separate gates.
+toolchain rule production and full Cc compilation remain separate gates.
+
+WP763 publishes the complete unchanged CcToolchainInfo constructor through the
+existing AnalysisValue owner. Loading authenticates the pinned provider definition
+against canonical identity, observed/evaluated source SHA and callsite; only its
+initialized invocation registers four finite callable recipes. The module GC root
+owns registrations/captures alongside empty depsets. Runtime's generic lazy
+occurrence capability preserves symmetric original/native equality and existing
+function-name hashing without retaining a heap or executable closure. Publication
+compares all captures and aliases; the externally comparable module-global recipe
+also requires the original token. Retained Cpp owns the complete configuration,
+uses explicitly Slug-native occurrence identity, and checks private access against
+the current evaluator's provenance. Unchanged configure_features and Rust linker
+queries consume the actual complete provider. Generic callable serialization,
+full toolchain/FDO production and compile/link actions remain deferred.
 
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and

@@ -762,6 +762,20 @@ impl<'a> AnalysisValueMaterializer<'a> {
 
     pub(crate) fn value(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
         Ok(match value.kind() {
+            AnalysisValueKind::CcToolchainCallable(callable) => {
+                let capture = self.value(&callable.model().capture)?;
+                slug_loading_v2::alloc_frozen_cc_toolchain_callable(
+                    self.heap,
+                    callable.clone(),
+                    capture,
+                )
+            }
+            AnalysisValueKind::CppFragment(fragment) => {
+                slug_loading_v2::analysis_fragments::alloc_frozen_cpp_fragment(
+                    self.heap,
+                    fragment.clone(),
+                )
+            }
             AnalysisValueKind::CcToolchainVariables(value) => self.cc_variables(value)?,
             AnalysisValueKind::CcHeaderInfo(info) => {
                 slug_loading_v2::alloc_frozen_cc_header_info(self.heap, info.clone())
@@ -839,12 +853,22 @@ impl<'a> AnalysisValueMaterializer<'a> {
 
 #[derive(Default)]
 pub(crate) struct AnalysisValueLowerer<'v> {
+    callables: SmallMap<ValueIdentity<'v>, (slug_loading_v2::CallableRegistration, Value<'v>)>,
     visiting: HashSet<ValueIdentity<'v>>,
     memo: HashMap<ValueIdentity<'v>, AnalysisValue>,
     lower_depth: usize,
 }
 
 impl<'v> AnalysisValueLowerer<'v> {
+    pub(crate) fn from_module(module: &'v starlark::environment::Module) -> Self {
+        Self {
+            callables: slug_loading_v2::callable_registrations(module)
+                .into_iter()
+                .map(|(function, descriptor, capture)| (function.identity(), (descriptor, capture)))
+                .collect(),
+            ..Self::default()
+        }
+    }
     pub(crate) fn lower(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
         if self.lower_depth == 0 {
             self.lower_depth = 1;
@@ -915,6 +939,10 @@ impl<'v> AnalysisValueLowerer<'v> {
         let mut stack = vec![root];
         while let Some(value) = stack.pop() {
             if !seen.insert(value.identity()) {
+                continue;
+            }
+            if let Some((_, capture)) = self.callables.get(&value.identity()) {
+                stack.push(*capture);
                 continue;
             }
             if let Some(variables) = slug_loading_v2::cc_variables_value(value) {
@@ -1055,6 +1083,25 @@ impl<'v> AnalysisValueLowerer<'v> {
     }
 
     fn lower_recursive(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
+        if let Some((model, _)) = slug_loading_v2::cc_toolchain_callable(value) {
+            return Ok(AnalysisValue::cc_toolchain_callable(model));
+        }
+        if let Some(fragment) = slug_loading_v2::analysis_fragments::cpp_fragment_value(value) {
+            return Ok(AnalysisValue::cpp_fragment(fragment));
+        }
+        if let Some((registration, capture)) = self.callables.get(&value.identity()).cloned() {
+            use slug_build_api_v2::cc_toolchain_callable::CcToolchainCallable;
+            use slug_build_api_v2::cc_toolchain_callable::CcToolchainCallableModel;
+            let capture = self.lower(capture, &format!("{path}.capture"))?;
+            let callable = CcToolchainCallable::new(CcToolchainCallableModel {
+                kind: registration.kind,
+                source: registration.source,
+                identity: registration.identity,
+                name_hash: registration.name_hash,
+                capture,
+            })?;
+            return Ok(AnalysisValue::cc_toolchain_callable(callable));
+        }
         if let Some(variables) = slug_loading_v2::cc_variables_value(value) {
             return self.lower_cc_variables(variables, path);
         }
@@ -1144,6 +1191,9 @@ mod cc_features_tests;
 
 #[cfg(test)]
 mod cc_header_info_tests;
+
+#[cfg(test)]
+mod cc_toolchain_tests;
 
 #[path = "analysis_value/cc_variables.rs"]
 mod cc_variables;

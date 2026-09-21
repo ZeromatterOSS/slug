@@ -2242,7 +2242,6 @@ pub(crate) fn evaluate_loaded_rule(
         module.frozen_heap().alloc(CppFragmentValue::new(
             CppFragmentProjection::new(structural_configuration.clone())
                 .map_err(|error| error.to_string())?,
-            implementation.source_identities_by_filename().clone(),
         ))
     } else {
         FrozenValue::new_none()
@@ -2450,7 +2449,7 @@ pub(crate) fn evaluate_loaded_rule(
 
     let returned = ListRef::from_value(returned)
         .ok_or_else(|| "rule implementation must return a list of providers".to_owned())?;
-    let mut lowerer = AnalysisValueLowerer::default();
+    let mut lowerer = AnalysisValueLowerer::from_module(&module);
     let mut provider_values = Vec::with_capacity(returned.len());
     for (index, value) in returned.iter().enumerate() {
         if let Some(fields) = StarlarkDefaultInfo::fields_from_value(value) {

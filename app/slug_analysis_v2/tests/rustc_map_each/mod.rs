@@ -4,6 +4,7 @@ include!("sources.rs");
 
 mod cc_headers;
 mod cc_linker;
+mod cc_toolchain;
 
 const REPOSITORIES: &[(&str, &str)] = &[
     ("rules_rust+", "rules_rust"),

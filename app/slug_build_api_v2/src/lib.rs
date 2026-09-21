@@ -133,7 +133,14 @@ pub use runfiles_packages::RunfilesPackageMetadata;
 pub use runfiles_packages::RunfilesRepositoryMapping;
 
 mod cc_header_info;
+pub mod cc_toolchain_callable;
+pub use cc_toolchain_callable::CcToolchainCallable;
+pub use cc_toolchain_callable::CcToolchainCallableKind;
+pub use cc_toolchain_callable::CcToolchainCallableModel;
+pub use cc_toolchain_callable::CcToolchainCallableSource;
+mod cpp_fragment;
 pub use cc_features::*;
 pub use cc_header_info::CcHeaderInfo;
 pub use cc_header_info::CcHeaderInfoInput;
 pub use cc_header_info::CcHeaderInfoOccurrence;
+pub use cpp_fragment::RetainedCppFragment;

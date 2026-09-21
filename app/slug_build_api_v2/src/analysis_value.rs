@@ -39,6 +39,8 @@ use crate::providers::ProviderId;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub enum AnalysisValueType {
+    CcToolchainCallable,
+    CppFragment,
     CcHeaderInfo,
     CcToolchainFeatures,
     CcFeatureConfiguration,
@@ -63,6 +65,8 @@ pub enum AnalysisValueType {
 impl AnalysisValueType {
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::CcToolchainCallable => "function",
+            Self::CppFragment => "cpp",
             Self::CcHeaderInfo => "HeaderInfo",
             Self::CcToolchainFeatures => "CcToolchainFeatures",
             Self::CcFeatureConfiguration => "FeatureConfiguration",
@@ -1098,6 +1102,8 @@ pub struct AnalysisValue(Arc<AnalysisValueData>);
 
 #[derive(Debug, Allocative)]
 enum AnalysisValueData {
+    CcToolchainCallable(crate::cc_toolchain_callable::CcToolchainCallable),
+    CppFragment(crate::RetainedCppFragment),
     CcHeaderInfo(crate::CcHeaderInfo),
     CcToolchainFeatures(crate::cc_features::CcToolchainFeatures),
     CcFeatureConfiguration(crate::cc_features::CcFeatureConfiguration),
@@ -1119,6 +1125,8 @@ enum AnalysisValueData {
 
 #[derive(Debug, Clone, Copy)]
 pub enum AnalysisValueKind<'a> {
+    CcToolchainCallable(&'a crate::cc_toolchain_callable::CcToolchainCallable),
+    CppFragment(&'a crate::RetainedCppFragment),
     CcHeaderInfo(&'a crate::CcHeaderInfo),
     CcToolchainFeatures(&'a crate::cc_features::CcToolchainFeatures),
     CcFeatureConfiguration(&'a crate::cc_features::CcFeatureConfiguration),
@@ -1145,6 +1153,14 @@ impl AnalysisValue {
 
     pub fn cc_header_info(info: crate::CcHeaderInfo) -> Self {
         Self::new(AnalysisValueData::CcHeaderInfo(info))
+    }
+
+    pub fn cc_toolchain_callable(value: crate::cc_toolchain_callable::CcToolchainCallable) -> Self {
+        Self::new(AnalysisValueData::CcToolchainCallable(value))
+    }
+
+    pub fn cpp_fragment(value: crate::RetainedCppFragment) -> Self {
+        Self::new(AnalysisValueData::CppFragment(value))
     }
 
     pub fn cc_toolchain_features(value: crate::cc_features::CcToolchainFeatures) -> Self {
@@ -1245,6 +1261,10 @@ impl AnalysisValue {
 
     pub fn kind(&self) -> AnalysisValueKind<'_> {
         match self.0.as_ref() {
+            AnalysisValueData::CcToolchainCallable(value) => {
+                AnalysisValueKind::CcToolchainCallable(value)
+            }
+            AnalysisValueData::CppFragment(value) => AnalysisValueKind::CppFragment(value),
             AnalysisValueData::CcHeaderInfo(value) => AnalysisValueKind::CcHeaderInfo(value),
             AnalysisValueData::CcToolchainFeatures(value) => {
                 AnalysisValueKind::CcToolchainFeatures(value)
@@ -1275,6 +1295,8 @@ impl AnalysisValue {
 
     pub fn value_type(&self) -> AnalysisValueType {
         match self.0.as_ref() {
+            AnalysisValueData::CcToolchainCallable(_) => AnalysisValueType::CcToolchainCallable,
+            AnalysisValueData::CppFragment(_) => AnalysisValueType::CppFragment,
             AnalysisValueData::CcHeaderInfo(_) => AnalysisValueType::CcHeaderInfo,
             AnalysisValueData::CcToolchainFeatures(_) => AnalysisValueType::CcToolchainFeatures,
             AnalysisValueData::CcFeatureConfiguration(_) => {
@@ -1361,6 +1383,13 @@ impl AnalysisValue {
 
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         match (self.0.as_ref(), other.0.as_ref()) {
+            (
+                AnalysisValueData::CcToolchainCallable(left),
+                AnalysisValueData::CcToolchainCallable(right),
+            ) => left.publication_eq_with(right, state),
+            (AnalysisValueData::CppFragment(left), AnalysisValueData::CppFragment(right)) => {
+                left.publication_eq_with(right, state)
+            }
             (
                 AnalysisValueData::CcToolchainVariables(left),
                 AnalysisValueData::CcToolchainVariables(right),
@@ -1461,6 +1490,13 @@ impl PartialEq for AnalysisValue {
     fn eq(&self, other: &Self) -> bool {
         match (self.0.as_ref(), other.0.as_ref()) {
             (
+                AnalysisValueData::CcToolchainCallable(left),
+                AnalysisValueData::CcToolchainCallable(right),
+            ) => left == right,
+            (AnalysisValueData::CppFragment(left), AnalysisValueData::CppFragment(right)) => {
+                left == right
+            }
+            (
                 AnalysisValueData::CcToolchainVariables(left),
                 AnalysisValueData::CcToolchainVariables(right),
             ) => left == right,
@@ -1513,6 +1549,14 @@ impl Eq for AnalysisValue {}
 impl Hash for AnalysisValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self.0.as_ref() {
+            AnalysisValueData::CcToolchainCallable(value) => {
+                17u8.hash(state);
+                value.hash(state);
+            }
+            AnalysisValueData::CppFragment(value) => {
+                18u8.hash(state);
+                value.hash(state);
+            }
             AnalysisValueData::CcToolchainVariables(value) => {
                 16u8.hash(state);
                 value.hash(state);
@@ -1602,6 +1646,10 @@ fn hash_unordered_entries<H: Hasher>(entries: &[(AnalysisValue, AnalysisValue)],
 
 #[derive(Default)]
 pub(crate) struct PublicationEqState {
+    left_cc_callables: FxHashMap<usize, usize>,
+    right_cc_callables: FxHashMap<usize, usize>,
+    left_cpp_fragments: FxHashMap<usize, usize>,
+    right_cpp_fragments: FxHashMap<usize, usize>,
     left_cc_variables: FxHashMap<usize, usize>,
     right_cc_variables: FxHashMap<usize, usize>,
     left_cc_features: FxHashMap<usize, usize>,
@@ -1615,6 +1663,40 @@ pub(crate) struct PublicationEqState {
 }
 
 impl PublicationEqState {
+    pub(crate) fn enter_cc_callable_pair(&mut self, left: usize, right: usize) -> bool {
+        Self::enter_occurrence_pair(
+            &mut self.left_cc_callables,
+            &mut self.right_cc_callables,
+            left,
+            right,
+        )
+    }
+
+    pub(crate) fn enter_cpp_fragment_pair(&mut self, left: usize, right: usize) -> bool {
+        Self::enter_occurrence_pair(
+            &mut self.left_cpp_fragments,
+            &mut self.right_cpp_fragments,
+            left,
+            right,
+        )
+    }
+
+    fn enter_occurrence_pair(
+        lefts: &mut FxHashMap<usize, usize>,
+        rights: &mut FxHashMap<usize, usize>,
+        left: usize,
+        right: usize,
+    ) -> bool {
+        if let Some(previous) = lefts.get(&left) {
+            return *previous == right;
+        }
+        if rights.contains_key(&right) {
+            return false;
+        }
+        lefts.insert(left, right);
+        rights.insert(right, left);
+        true
+    }
     pub(crate) fn enter_cc_variables_pair(
         &mut self,
         left: usize,

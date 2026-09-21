@@ -1,18 +1,23 @@
 //! Evaluator-local configured fragment facades.
 
 use std::fmt;
+use std::hash::Hash;
 use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use slug_build_api_v2::RetainedCppFragment;
 use slug_configuration_v2::CppFragmentProjection;
 use slug_identity_v2::CanonicalLabel;
 use starlark::any::ProvidesStaticType;
+use starlark::collections::StarlarkHasher;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
+use starlark::values::Demand;
+use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
@@ -20,10 +25,11 @@ use starlark::values::StarlarkValue;
 use starlark::values::Value;
 use starlark::values::list::AllocImmutableList;
 use starlark::values::starlark_value;
+use starlark::values::structs::StarlarkStructuralValue;
 use starlark_map::small_set::SmallSet;
 
-use crate::BzlModuleSourceProvenance;
 use crate::builtin_restriction::check_default_allowlist;
+use crate::builtin_restriction::source_identities_for_evaluator;
 use crate::provider::alloc_starlark_label;
 use crate::subrule_invocation::AnalysisCallToken;
 
@@ -42,23 +48,18 @@ const ACTIVE_FRAGMENT_NAMES_EXCEPT_CPP_AND_COVERAGE: &[&str] = &[
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct CppFragmentValue {
-    projection: CppFragmentProjection,
-    callers: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
+    retained: RetainedCppFragment,
 }
 
 impl CppFragmentValue {
-    pub fn new(
-        projection: CppFragmentProjection,
-        callers: Arc<[(CompactString, BzlModuleSourceProvenance)]>,
-    ) -> Self {
+    pub fn new(projection: CppFragmentProjection) -> Self {
         Self {
-            projection,
-            callers,
+            retained: RetainedCppFragment::new(projection),
         }
     }
 
     fn check(&self, eval: &Evaluator<'_, '_, '_>) -> anyhow::Result<()> {
-        check_default_allowlist(eval, &self.callers)
+        check_default_allowlist(eval, &source_identities_for_evaluator(eval)?)
     }
 
     fn optional<'v>(value: Option<&str>, heap: Heap<'v>) -> Value<'v> {
@@ -74,6 +75,22 @@ impl fmt::Display for CppFragmentValue {
 
 starlark::starlark_simple_value!(CppFragmentValue);
 
+pub fn cpp_fragment_value(value: Value<'_>) -> Option<RetainedCppFragment> {
+    CppFragmentValue::from_value(value).map(|value| value.retained.clone())
+}
+pub fn alloc_frozen_cpp_fragment(heap: &FrozenHeap, retained: RetainedCppFragment) -> FrozenValue {
+    heap.alloc(CppFragmentValue { retained })
+}
+impl StarlarkStructuralValue for CppFragmentValue {
+    fn is_structurally_immutable(&self) -> bool {
+        true
+    }
+    fn write_structural_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.retained.hash(hasher);
+        Ok(())
+    }
+}
+
 #[starlark_module]
 fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     fn fission_active_for_current_compilation_mode(
@@ -82,7 +99,8 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     ) -> anyhow::Result<bool> {
         this.check(eval)?;
         Ok(this
-            .projection
+            .retained
+            .projection()
             .fission_active_for_current_compilation_mode()?)
     }
 
@@ -91,7 +109,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'_, '_, '_>,
     ) -> anyhow::Result<bool> {
         this.check(eval)?;
-        Ok(this.projection.should_strip_binaries()?)
+        Ok(this.retained.projection().should_strip_binaries()?)
     }
     fn force_pic(
         this: &CppFragmentValue,
@@ -100,7 +118,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         this.check(eval).map_err(|error| {
             anyhow::anyhow!("{error} (feature 'force_pic' in CppConfiguration)")
         })?;
-        Ok(this.projection.force_pic()?)
+        Ok(this.retained.projection().force_pic()?)
     }
 
     fn use_llvm_coverage_map_format(
@@ -108,7 +126,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'_, '_, '_>,
     ) -> anyhow::Result<bool> {
         this.check(eval)?;
-        Ok(this.projection.use_llvm_coverage_map_format()?)
+        Ok(this.retained.projection().use_llvm_coverage_map_format()?)
     }
 
     fn fdo_instrument<'v>(
@@ -119,7 +137,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
             anyhow::anyhow!("{error} (feature 'fdo_instrument' in CppConfiguration)")
         })?;
         Ok(CppFragmentValue::optional(
-            this.projection.fdo_instrument()?,
+            this.retained.projection().fdo_instrument()?,
             eval.heap(),
         ))
     }
@@ -130,7 +148,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     ) -> anyhow::Result<Value<'v>> {
         this.check(eval)?;
         Ok(CppFragmentValue::optional(
-            this.projection.cs_fdo_instrument()?,
+            this.retained.projection().cs_fdo_instrument()?,
             eval.heap(),
         ))
     }
@@ -138,7 +156,8 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     #[starlark(attribute)]
     fn custom_malloc<'v>(this: &CppFragmentValue, heap: Heap<'v>) -> anyhow::Result<Value<'v>> {
         Ok(this
-            .projection
+            .retained
+            .projection()
             .custom_malloc()?
             .map_or_else(Value::new_none, |label| alloc_starlark_label(heap, label)))
     }
@@ -148,7 +167,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'_, '_, '_>,
     ) -> anyhow::Result<String> {
         this.check(eval)?;
-        Ok(this.projection.compilation_mode()?.to_owned())
+        Ok(this.retained.projection().compilation_mode()?.to_owned())
     }
 
     fn propeller_optimize_absolute_cc_profile<'v>(
@@ -157,7 +176,9 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     ) -> anyhow::Result<Value<'v>> {
         this.check(eval)?;
         Ok(CppFragmentValue::optional(
-            this.projection.propeller_optimize_absolute_cc_profile()?,
+            this.retained
+                .projection()
+                .propeller_optimize_absolute_cc_profile()?,
             eval.heap(),
         ))
     }
@@ -168,7 +189,9 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     ) -> anyhow::Result<Value<'v>> {
         this.check(eval)?;
         Ok(CppFragmentValue::optional(
-            this.projection.propeller_optimize_absolute_ld_profile()?,
+            this.retained
+                .projection()
+                .propeller_optimize_absolute_ld_profile()?,
             eval.heap(),
         ))
     }
@@ -179,7 +202,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     ) -> anyhow::Result<Value<'v>> {
         this.check(eval)?;
         Ok(CppFragmentValue::optional(
-            this.projection.fdo_path()?,
+            this.retained.projection().fdo_path()?,
             eval.heap(),
         ))
     }
@@ -190,7 +213,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     ) -> anyhow::Result<Value<'v>> {
         this.check(eval)?;
         Ok(CppFragmentValue::optional(
-            this.projection.cs_fdo_path()?,
+            this.retained.projection().cs_fdo_path()?,
             eval.heap(),
         ))
     }
@@ -200,33 +223,51 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'_, '_, '_>,
     ) -> anyhow::Result<bool> {
         this.check(eval)?;
-        Ok(this.projection.proto_profile()?)
+        Ok(this.retained.projection().proto_profile()?)
     }
 }
 
 #[starlark_value(type = "cpp")]
 impl<'v> StarlarkValue<'v> for CppFragmentValue {
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(cpp_fragment_value(other).is_some_and(|other| self.retained == other))
+    }
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.retained.hash(hasher);
+        Ok(())
+    }
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn StarlarkStructuralValue>(self);
+    }
     fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         // These are values, not native attribute methods: the engine's direct
         // method-call path invokes a native attribute getter without calling
         // its returned value. CppFragmentProjection::new validated the immutable
         // configuration, so these reads cannot subsequently fail conversion.
         match name {
-            "linkopts" => Some(heap.alloc(AllocImmutableList(
-                self.projection.linkopts().expect("validated Cpp linkopts"),
-            ))),
+            "linkopts" => Some(
+                heap.alloc(AllocImmutableList(
+                    self.retained
+                        .projection()
+                        .linkopts()
+                        .expect("validated Cpp linkopts"),
+                )),
+            ),
             "apple_generate_dsym" => Some(Value::new_bool(
-                self.projection
+                self.retained
+                    .projection()
                     .apple_generate_dsym()
                     .expect("validated Cpp apple_generate_dsym"),
             )),
             "_dont_enable_host_nonhost" => Some(Value::new_bool(
-                self.projection
+                self.retained
+                    .projection()
                     .dont_enable_host_nonhost()
                     .expect("validated Cpp dont_enable_host_nonhost"),
             )),
             "_fdo_prefetch_hints_label" => Some(
-                self.projection
+                self.retained
+                    .projection()
                     .fdo_prefetch_hints_label()
                     .expect("validated Cpp fdo_prefetch_hints_label")
                     .map_or_else(Value::new_none, |label| alloc_starlark_label(heap, label)),
