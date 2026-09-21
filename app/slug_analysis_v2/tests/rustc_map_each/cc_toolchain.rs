@@ -24,7 +24,7 @@ fn build(root: &std::path::Path, static_file: &str, unused: &str) {
     .unwrap();
 }
 
-fn workspace() -> PathBuf {
+pub(super) fn workspace() -> PathBuf {
     let root = super::workspace_with(
         "load('@rules_cc//cc/private:toolchain_proof.bzl','make_subject')\n\
          load('//rust/private:rustc.bzl','get_linker_and_args')\n\

@@ -29,8 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-63-m7a-complete-cc-toolchain-publication-r1
+Packet: WP-7-64-m7a-structural-cpp-compile-inputs-r1
 Status: accepted
+
+WP764 accepts structural Cpp compile inputs and exact target/exec projection,
+consumed by unchanged compile-option/dotd helpers with a genuine toolchain:
+41 focused tests, Core/CLI checks and independent final ACCEPT. The next bounded
+prerequisite is actions2ctx/root/output naming; discovery-aware CppCompile
+production remains a subsequent gate.
 
 WP763 accepts complete unchanged CcToolchainInfo constructor publication and
 downstream configuration/linker use, with authenticated callable recipes and

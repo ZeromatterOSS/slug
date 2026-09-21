@@ -381,6 +381,12 @@ queries. This replaces the authored envelope at the constructor boundary only;
 inert FDO/tool inputs are explicit, not full toolchain production. Generic functions,
 unmodeled captures and unauthenticated recipes remain rejected. Cpp occurrence
 identity is explicitly Slug-native over full structural configuration.
+WP764 passes that genuine published toolchain to unchanged get_copts and
+dotd_files_enabled, with structural compile flags, exact host-to-exec mapping,
+File.extension and typed empty per-file options. The default dotd-on policy and
+feature suppression branches are covered; this is a configuration/input prerequisite,
+not actual bootstrap compile argv, discovery or execution evidence. CppCompile
+still requires distinct mandatory/spawn/cache-only inputs and discovery lifecycle.
 Compile/actions2ctx, execution-time tree/path mapping and full cc_library remain
 deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside

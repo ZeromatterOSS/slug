@@ -53,6 +53,14 @@ pub enum NativeCommandOption {
     CollectCodeCoverage,
     CoverageOutputGenerator,
     Copt,
+    Conlyopt,
+    Cxxopt,
+    HostCopt,
+    HostConlyopt,
+    HostCxxopt,
+    CcDotdFiles,
+    SaveTemps,
+    ProcessHeadersInDependencies,
     ActionEnv,
     HostActionEnv,
     IncompatibleStrictActionEnv,
@@ -91,6 +99,14 @@ impl NativeCommandOption {
             "collect_code_coverage" => Self::CollectCodeCoverage,
             "coverage_output_generator" => Self::CoverageOutputGenerator,
             "copt" => Self::Copt,
+            "conlyopt" => Self::Conlyopt,
+            "cxxopt" => Self::Cxxopt,
+            "host_copt" => Self::HostCopt,
+            "host_conlyopt" => Self::HostConlyopt,
+            "host_cxxopt" => Self::HostCxxopt,
+            "cc_dotd_files" => Self::CcDotdFiles,
+            "save_temps" => Self::SaveTemps,
+            "process_headers_in_dependencies" => Self::ProcessHeadersInDependencies,
             "action_env" => Self::ActionEnv,
             "host_action_env" => Self::HostActionEnv,
             "incompatible_strict_action_env" | "experimental_strict_action_env" => {
@@ -132,6 +148,14 @@ impl NativeCommandOption {
             Self::CollectCodeCoverage => "collect_code_coverage",
             Self::CoverageOutputGenerator => "coverage_output_generator",
             Self::Copt => "copt",
+            Self::Conlyopt => "conlyopt",
+            Self::Cxxopt => "cxxopt",
+            Self::HostCopt => "host_copt",
+            Self::HostConlyopt => "host_conlyopt",
+            Self::HostCxxopt => "host_cxxopt",
+            Self::CcDotdFiles => "cc_dotd_files",
+            Self::SaveTemps => "save_temps",
+            Self::ProcessHeadersInDependencies => "process_headers_in_dependencies",
             Self::ActionEnv => "action_env",
             Self::HostActionEnv => "host_action_env",
             Self::IncompatibleStrictActionEnv => "incompatible_strict_action_env",
@@ -142,6 +166,9 @@ impl NativeCommandOption {
         matches!(
             self,
             Self::CollectCodeCoverage
+                | Self::CcDotdFiles
+                | Self::SaveTemps
+                | Self::ProcessHeadersInDependencies
                 | Self::ExperimentalOmitfp
                 | Self::IncompatibleStrictActionEnv
                 | Self::ForcePic

@@ -727,7 +727,7 @@ impl SlugConfiguration {
         ))
     }
 
-    /// Only the C++ projection slices admitted by WP759/WP761. Bazel's exec
+    /// Only the C++ projection slices admitted by WP759/WP761/WP764. Bazel's exec
     /// transition starts from defaults, then propagates explicit source fields.
     /// Leave unrelated, previously admitted transition behavior unchanged.
     fn project_cc_feature_exec_options(
@@ -736,11 +736,35 @@ impl SlugConfiguration {
     ) -> Result<(), SlugConfigurationError> {
         let host_features = self.option_value(CORE_OPTIONS, "host_features")?.clone();
         let host_linkopts = self.option_value(CPP_OPTIONS, "host_linkopt")?.clone();
+        let add_g0 = self.execution_host_os()? != ActionEnvironmentHostOs::Windows;
+        let host_compile_flags = |name| -> Result<OptionValue, SlugConfigurationError> {
+            let values = self.native_string_list_option(CPP_OPTIONS, name)?;
+            let values = values
+                .iter()
+                .map(|value| NativeValue::Text(value.into()))
+                .chain(add_g0.then(|| NativeValue::Text("-g0".into())))
+                .collect::<Vec<_>>();
+            Ok(OptionValue::Native(NativeOccurrence::List(NativeValues(
+                values.into(),
+            ))))
+        };
+        let host_copts = host_compile_flags("host_copt")?;
+        let host_cxxopts = host_compile_flags("host_cxxopt")?;
+        let host_conlyopts = self.option_value(CPP_OPTIONS, "host_conlyopt")?.clone();
+        let host_per_file_copts = self
+            .option_value(CPP_OPTIONS, "host_per_file_copt")?
+            .clone();
         for record in options {
             match (record.class_name, record.canonical_name) {
                 (CORE_OPTIONS, "features") => record.value = host_features.clone(),
                 (CORE_OPTIONS, "collect_code_coverage")
-                | (CPP_OPTIONS, "force_pic" | "apple_generate_dsym") => {
+                | (
+                    CPP_OPTIONS,
+                    "force_pic"
+                    | "apple_generate_dsym"
+                    | "save_temps"
+                    | "process_headers_in_dependencies",
+                ) => {
                     record.value =
                         OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Bool(false)));
                 }
@@ -749,6 +773,10 @@ impl SlugConfiguration {
                 }
                 (CPP_OPTIONS, "fdo_prefetch_hints") => record.value = OptionValue::Label(None),
                 (CPP_OPTIONS, "linkopt") => record.value = host_linkopts.clone(),
+                (CPP_OPTIONS, "copt") => record.value = host_copts.clone(),
+                (CPP_OPTIONS, "cxxopt") => record.value = host_cxxopts.clone(),
+                (CPP_OPTIONS, "conlyopt") => record.value = host_conlyopts.clone(),
+                (CPP_OPTIONS, "per_file_copt") => record.value = host_per_file_copts.clone(),
                 (CPP_OPTIONS, "fission") => {
                     record.value = OptionValue::Native(NativeOccurrence::Scalar(
                         NativeValue::List(NativeValues(Arc::from([]))),
@@ -1930,6 +1958,9 @@ fn enum_family_tag(value: EnumFamily) -> u16 {
 }
 
 #[cfg(test)]
+mod compile_input_tests;
+
+#[cfg(test)]
 mod tests {
     use std::hash::Hash;
     use std::hash::Hasher;
@@ -2042,14 +2073,17 @@ mod tests {
 
     #[test]
     fn role_projection_preserves_structural_options_without_host_reobservation() {
-        let target =
-            SlugConfiguration::default_target(&host(AutoCpuToken::K8, HostPathFlavor::Unix))
-                .unwrap()
-                .with_starlark_option(StarlarkOption::string(
-                    CanonicalLabel::parse("@@//settings:mode").unwrap(),
-                    "fast",
-                    StarlarkOptionScope::Universal,
-                ));
+        let target = SlugConfiguration::default_target(
+            &host(AutoCpuToken::K8, HostPathFlavor::Unix).with_action_environment_host(
+                ActionEnvironmentHost::without_environment(ActionEnvironmentHostOs::Linux),
+            ),
+        )
+        .unwrap()
+        .with_starlark_option(StarlarkOption::string(
+            CanonicalLabel::parse("@@//settings:mode").unwrap(),
+            "fast",
+            StarlarkOptionScope::Universal,
+        ));
         let exec = target.to_exec().unwrap();
 
         assert_eq!(exec.kind(), SlugConfigurationKind::Exec);
@@ -2133,8 +2167,12 @@ mod tests {
 
     #[test]
     fn all_starlark_value_and_scope_tags_are_structurally_distinct() {
-        let base = SlugConfiguration::default_target(&host(AutoCpuToken::K8, HostPathFlavor::Unix))
-            .unwrap();
+        let base = SlugConfiguration::default_target(
+            &host(AutoCpuToken::K8, HostPathFlavor::Unix).with_action_environment_host(
+                ActionEnvironmentHost::without_environment(ActionEnvironmentHostOs::Linux),
+            ),
+        )
+        .unwrap();
         let label = CanonicalLabel::parse("@@//settings:value").unwrap();
         let values = [
             StarlarkOptionValue::Integer(

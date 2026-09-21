@@ -199,7 +199,7 @@ fn link_projection_preserves_raw_flags_and_omitfp_derivation_structurally() {
 
 #[test]
 fn both_exec_paths_reset_link_modes_remap_host_flags_and_preserve_omitfp() {
-    let base = base(None);
+    let base = base(Some(ActionEnvironmentHostOs::Linux));
     let target = apply(
         &base,
         vec![
@@ -400,7 +400,9 @@ fn both_exec_paths_share_feature_mapping_resets_and_propagation() {
                 .unwrap()
                 .iter()
                 .collect::<Vec<_>>(),
-            ["-Wno-error", "-Wno-error"]
+            // Compile options now follow their own exec remapping: target
+            // FDO-injected options do not replace the host compile flags.
+            ["-g0"]
         );
     }
     assert!(exec.to_exec().is_err());

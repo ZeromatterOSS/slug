@@ -93,6 +93,33 @@ impl StarlarkStructuralValue for CppFragmentValue {
 
 #[starlark_module]
 fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
+    fn should_generate_dotd_files(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        this.check(eval)?;
+        Ok(this.retained.projection().should_generate_dotd_files()?)
+    }
+
+    fn save_temps(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        this.check(eval)?;
+        Ok(this.retained.projection().save_temps()?)
+    }
+
+    fn process_headers_in_dependencies(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        this.check(eval)?;
+        Ok(this
+            .retained
+            .projection()
+            .process_headers_in_dependencies()?)
+    }
+
     fn fission_active_for_current_compilation_mode(
         this: &CppFragmentValue,
         eval: &mut Evaluator<'_, '_, '_>,
@@ -245,6 +272,30 @@ impl<'v> StarlarkValue<'v> for CppFragmentValue {
         // its returned value. CppFragmentProjection::new validated the immutable
         // configuration, so these reads cannot subsequently fail conversion.
         match name {
+            "copts" => Some(
+                heap.alloc(AllocImmutableList(
+                    self.retained
+                        .projection()
+                        .copts()
+                        .expect("validated Cpp copts"),
+                )),
+            ),
+            "conlyopts" => Some(
+                heap.alloc(AllocImmutableList(
+                    self.retained
+                        .projection()
+                        .conlyopts()
+                        .expect("validated Cpp conlyopts"),
+                )),
+            ),
+            "cxxopts" => Some(
+                heap.alloc(AllocImmutableList(
+                    self.retained
+                        .projection()
+                        .cxxopts()
+                        .expect("validated Cpp cxxopts"),
+                )),
+            ),
             "linkopts" => Some(
                 heap.alloc(AllocImmutableList(
                     self.retained
@@ -278,6 +329,9 @@ impl<'v> StarlarkValue<'v> for CppFragmentValue {
 
     fn dir_attr(&self) -> Vec<String> {
         [
+            "copts",
+            "conlyopts",
+            "cxxopts",
             "linkopts",
             "apple_generate_dsym",
             "_dont_enable_host_nonhost",
@@ -297,6 +351,10 @@ impl<'v> StarlarkValue<'v> for CppFragmentValue {
 #[cfg(test)]
 #[path = "analysis_fragments/cc_feature_tests.rs"]
 mod cc_feature_tests;
+
+#[cfg(test)]
+#[path = "analysis_fragments/compile_input_tests.rs"]
+mod compile_input_tests;
 
 /// Bazel's public coverage fragment contains no caller restriction. The
 /// optional canonical label is the complete configured projection.

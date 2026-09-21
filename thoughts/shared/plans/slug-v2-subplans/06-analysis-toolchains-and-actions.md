@@ -187,6 +187,19 @@ the current evaluator's provenance. Unchanged configure_features and Rust linker
 queries consume the actual complete provider. Generic callable serialization,
 full toolchain/FDO production and compile/link actions remain deferred.
 
+WP764 adds exact public copts/conlyopts/cxxopts and private dotd/save-temps/header
+policy getters over that same complete configuration. Eight command admissions
+reuse typed converters; both exec paths map host compile options, append -g0
+according to observed Host OS, propagate dotd and reset save/header policy.
+Missing Host observation fails closed. No new retained option owner or cache is
+introduced. File.extension follows the pinned full exec-path scan; per_file_copts
+requires genuine positional Cpp/File/Label and admits only empty retained state.
+Unchanged get_copts and dotd_files_enabled consume the published complete toolchain
+with ordered language/rule flags, suppression branches and same-DICE restoration.
+Nonempty per-file regex state, actions2ctx/root/naming adapters and discovery-aware
+CppCompile production remain deferred; a generic non-discovering Spawn is not
+evidence for the default dotd-on compile path.
+
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and
 publication preserve immutable cache seeds, parent aliases, raw binding types,

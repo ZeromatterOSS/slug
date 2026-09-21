@@ -80,6 +80,23 @@ impl<'v> StarlarkValue<'v> for CcInternalModule {
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn per_file_copts<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = pos)] cpp_configuration: Value<'v>,
+        #[starlark(require = pos)] source_file: Value<'v>,
+        #[starlark(require = pos)] label: Value<'v>,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        let cpp = crate::analysis_fragments::cpp_fragment_value(cpp_configuration)
+            .ok_or_else(|| anyhow::anyhow!("per_file_copts requires a Cpp configuration"))?;
+        crate::subrule_invocation::AnalysisArtifactValue::from_starlark(source_file)
+            .ok_or_else(|| anyhow::anyhow!("per_file_copts requires a File"))?;
+        crate::provider::starlark_label(label)
+            .ok_or_else(|| anyhow::anyhow!("per_file_copts requires a Label"))?;
+        cpp.projection().per_file_copts_empty()?;
+        Ok(heap.alloc(AllocImmutableList(std::iter::empty::<Value<'v>>())))
+    }
+
     fn cc_toolchain_variables<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = named)] vars: Value<'v>,

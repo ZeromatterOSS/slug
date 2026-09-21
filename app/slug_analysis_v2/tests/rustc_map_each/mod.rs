@@ -2,6 +2,7 @@ use super::*;
 
 include!("sources.rs");
 
+mod cc_compile_inputs;
 mod cc_headers;
 mod cc_linker;
 mod cc_toolchain;

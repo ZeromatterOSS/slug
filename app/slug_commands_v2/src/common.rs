@@ -701,6 +701,55 @@ mod tests {
     }
 
     #[test]
+    fn cpp_compile_string_options_preserve_raw_command_occurrences() {
+        for (name, option) in [
+            ("conlyopt", NativeCommandOption::Conlyopt),
+            ("cxxopt", NativeCommandOption::Cxxopt),
+            ("host_copt", NativeCommandOption::HostCopt),
+            ("host_conlyopt", NativeCommandOption::HostConlyopt),
+            ("host_cxxopt", NativeCommandOption::HostCxxopt),
+        ] {
+            for value in ["", "raw, value", "-Dflag=x,y", "null"] {
+                assert_eq!(
+                    occurrence(&format!("--{name}={value}")).unwrap(),
+                    Some(CommandConfigurationOccurrence::native(
+                        option,
+                        Some(value),
+                        false
+                    ))
+                );
+            }
+            assert!(occurrence(&format!("--{name}")).is_err());
+            assert!(occurrence(&format!("--no{name}")).is_err());
+        }
+    }
+
+    #[test]
+    fn cpp_compile_boolean_options_preserve_no_forms_and_defer_conversion() {
+        for (name, option) in [
+            ("cc_dotd_files", NativeCommandOption::CcDotdFiles),
+            ("save_temps", NativeCommandOption::SaveTemps),
+            (
+                "process_headers_in_dependencies",
+                NativeCommandOption::ProcessHeadersInDependencies,
+            ),
+        ] {
+            for (flag, raw, negated) in [
+                (format!("--{name}"), None, false),
+                (format!("--no{name}"), None, true),
+                (format!("--{name}=false"), Some("false"), false),
+                (format!("--{name}=invalid"), Some("invalid"), false),
+            ] {
+                assert_eq!(
+                    occurrence(&flag).unwrap(),
+                    Some(CommandConfigurationOccurrence::native(option, raw, negated))
+                );
+            }
+            assert!(occurrence(&format!("--no{name}=true")).is_err());
+        }
+    }
+
+    #[test]
     fn cpp_link_configuration_flags_use_existing_typed_command_carrier() {
         for (name, option) in [
             ("fission", NativeCommandOption::Fission),

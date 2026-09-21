@@ -183,7 +183,22 @@ mod command_configuration_tests {
 
     #[test]
     fn target_platform_falls_back_to_host_and_exec_projection_installs_selection() {
-        let target = configuration();
+        let target = SlugConfiguration::default_target(
+            &HostConversionInputs::new(
+                Some(AutoCpuToken::K8),
+                Some(HostPathFlavor::Unix),
+                None,
+                Arc::from([]),
+                Arc::from([]),
+            )
+            .unwrap()
+            .with_action_environment_host(
+                super::super::host::ActionEnvironmentHost::without_environment(
+                    super::super::host::ActionEnvironmentHostOs::Linux,
+                ),
+            ),
+        )
+        .unwrap();
         assert_eq!(
             target.target_platform_label().unwrap().to_string(),
             "@@bazel_tools//tools:host_platform"
@@ -2056,7 +2071,12 @@ fn cpp_fragment_projection_distinguishes_target_and_exec_compilation_modes() {
             Arc::from([]),
             Arc::from([]),
         )
-        .unwrap(),
+        .unwrap()
+        .with_action_environment_host(
+            super::host::ActionEnvironmentHost::without_environment(
+                super::host::ActionEnvironmentHostOs::Linux,
+            ),
+        ),
     )
     .unwrap();
     let target = CppFragmentProjection::new(base.clone()).unwrap();

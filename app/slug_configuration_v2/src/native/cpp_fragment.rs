@@ -40,6 +40,13 @@ impl CppFragmentProjection {
         projection.fission_active_for_current_compilation_mode()?;
         projection.should_strip_binaries()?;
         let _ = projection.linkopts()?;
+        let _ = projection.copts()?;
+        let _ = projection.conlyopts()?;
+        let _ = projection.cxxopts()?;
+        projection.should_generate_dotd_files()?;
+        projection.save_temps()?;
+        projection.process_headers_in_dependencies()?;
+        projection.per_file_copts_empty()?;
         Ok(projection)
     }
 
@@ -162,6 +169,67 @@ impl CppFragmentProjection {
     pub fn apple_generate_dsym(&self) -> Result<bool, SlugConfigurationError> {
         self.configuration
             .native_bool(CPP_OPTIONS, "apple_generate_dsym")
+    }
+
+    pub fn copts(&self) -> Result<impl Iterator<Item = &str>, SlugConfigurationError> {
+        let values = self
+            .configuration
+            .native_string_list_option(CPP_OPTIONS, "copt")?;
+        let omitfp = self
+            .configuration
+            .native_bool(CPP_OPTIONS, "experimental_omitfp")?;
+        let prefix: &[&str] = if omitfp {
+            &[
+                "-fomit-frame-pointer",
+                "-fasynchronous-unwind-tables",
+                "-DNO_FRAME_POINTER",
+            ]
+        } else {
+            &[]
+        };
+        Ok(prefix.iter().copied().chain(values.iter()))
+    }
+
+    pub fn conlyopts(&self) -> Result<impl Iterator<Item = &str>, SlugConfigurationError> {
+        Ok(self
+            .configuration
+            .native_string_list_option(CPP_OPTIONS, "conlyopt")?
+            .iter())
+    }
+
+    pub fn cxxopts(&self) -> Result<impl Iterator<Item = &str>, SlugConfigurationError> {
+        Ok(self
+            .configuration
+            .native_string_list_option(CPP_OPTIONS, "cxxopt")?
+            .iter())
+    }
+
+    pub fn should_generate_dotd_files(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration.native_bool(CPP_OPTIONS, "cc_dotd_files")
+    }
+
+    pub fn save_temps(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration.native_bool(CPP_OPTIONS, "save_temps")
+    }
+
+    pub fn process_headers_in_dependencies(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration
+            .native_bool(CPP_OPTIONS, "process_headers_in_dependencies")
+    }
+
+    /// Regex-backed per-file options remain outside the admitted compile slice.
+    /// Check the owned typed state instead of assuming command admission is the
+    /// only possible source of configuration values.
+    pub fn per_file_copts_empty(&self) -> Result<(), SlugConfigurationError> {
+        match self
+            .configuration
+            .option_value(CPP_OPTIONS, "per_file_copt")?
+        {
+            OptionValue::Native(NativeOccurrence::List(values)) if values.0.is_empty() => Ok(()),
+            _ => Err(SlugConfigurationError::InvalidCppConfiguration {
+                reason: "nonempty or malformed per_file_copt is not admitted",
+            }),
+        }
     }
     pub fn dont_enable_host_nonhost(&self) -> Result<bool, SlugConfigurationError> {
         self.configuration.native_bool(

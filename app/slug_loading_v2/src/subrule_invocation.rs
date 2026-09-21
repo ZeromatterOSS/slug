@@ -779,6 +779,24 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
             "path" => Some(heap.alloc_str(&self.path()).to_value()),
             "short_path" => Some(heap.alloc_str(&self.artifact.short_path()).to_value()),
             "basename" => Some(heap.alloc_str(&self.basename()).to_value()),
+            "extension" => {
+                // Artifact.getExtension delegates to PathFragment's full exec-path
+                // scan, excluding position zero. In particular `.h` and `pkg/.h`
+                // differ; scanning only the basename loses that distinction.
+                let path = self.artifact.path();
+                let mut extension = "";
+                for index in (1..path.len()).rev() {
+                    match path.as_bytes()[index] {
+                        b'.' => {
+                            extension = &path[index + 1..];
+                            break;
+                        }
+                        b'/' => break,
+                        _ => {}
+                    }
+                }
+                Some(heap.alloc_str(extension).to_value())
+            }
             "dirname" => Some(heap.alloc_str(&self.dirname()).to_value()),
             "is_directory" => Some(Value::new_bool(matches!(
                 &self.artifact,
@@ -803,6 +821,7 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
         [
             "basename",
             "dirname",
+            "extension",
             "is_source",
             "is_directory",
             "label",

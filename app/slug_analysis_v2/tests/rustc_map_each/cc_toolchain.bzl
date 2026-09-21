@@ -25,6 +25,7 @@ def _make(ctx):
         compiler = "gcc", target_cpu = "k8", target_libc = "local", target_system_name = "proof-system",
         abi_version = "proof-abi", abi_libc_version = "proof-libc",
         features = [feature(name = "supports_pic"), feature(name = "static_link_cpp_runtimes"),
+            feature(name = "parse_showincludes"), feature(name = "no_dotd_file"),
             feature(name = "probe_env", enabled = True, env_sets = [env_set(actions = ["c++-link-executable"],
                 env_entries = [env_entry(key = "SYSROOT", value = "%{sysroot}")])])],
         tool_paths = [tool_path(name = n, path = "bin/" + n) for n in ["gcc", "ar", "strip"]])
