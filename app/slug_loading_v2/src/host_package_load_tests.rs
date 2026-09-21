@@ -34679,6 +34679,7 @@ ALIASES_EQUAL = FIRST == ALIAS
 CALLS_DISTINCT = FIRST != SECOND
 MODULES_EMPTY = FIRST.header_module == None and FIRST.pic_header_module == None and FIRST.separate_module == None and FIRST.separate_pic_module == None
 LISTS_EMPTY = FIRST.modular_public_headers == [] and FIRST.modular_private_headers == [] and FIRST.textual_headers == [] and FIRST.separate_module_headers == []
+HASHED_ALIAS = {FIRST: True}[ALIAS]
 HAS_ALL_FIELDS = hasattr(FIRST, "header_module") and hasattr(FIRST, "pic_header_module") and hasattr(FIRST, "modular_public_headers") and hasattr(FIRST, "modular_private_headers") and hasattr(FIRST, "textual_headers") and hasattr(FIRST, "separate_module_headers") and hasattr(FIRST, "separate_module") and hasattr(FIRST, "separate_pic_module")
 CcCompilationContextInfo = provider(
     "CcCompilationContext",
@@ -34702,6 +34703,7 @@ NESTED_HEADERS = EMPTY_COMPILATION_CONTEXT._header_info.modular_public_headers
         "CALLS_DISTINCT",
         "MODULES_EMPTY",
         "LISTS_EMPTY",
+        "HASHED_ALIAS",
         "HAS_ALL_FIELDS",
     ] {
         assert_eq!(
@@ -34725,9 +34727,7 @@ NESTED_HEADERS = EMPTY_COMPILATION_CONTEXT._header_info.modular_public_headers
     for failure in [
         "cc_internal = cc_common.internal_DO_NOT_USE()\nX = cc_internal.create_header_info(1)",
         "cc_internal = cc_common.internal_DO_NOT_USE()\nX = cc_internal.create_header_info(unknown = None)",
-        "cc_internal = cc_common.internal_DO_NOT_USE()\nX = cc_internal.create_header_info(header_module = None)",
         "cc_internal = cc_common.internal_DO_NOT_USE()\ncc_internal.create_header_info().modular_public_headers.append('mutable')",
-        "cc_internal = cc_common.internal_DO_NOT_USE()\nX = {cc_internal.create_header_info(): True}",
     ] {
         assert!(
             eval_bzl_with_identity(failure, owner.clone()).is_err(),

@@ -896,6 +896,7 @@ impl PreparedSubruleInvocation {
 pub struct AnalysisEvaluationContext {
     stack: Arc<Mutex<AnalysisCallStack>>,
     payload: Arc<AnalysisEvaluationPayload>,
+    host_os: Option<slug_configuration_v2::native::host::ActionEnvironmentHostOs>,
 }
 
 #[derive(Debug)]
@@ -947,6 +948,7 @@ impl AnalysisEvaluationContext {
         }));
         Self {
             stack,
+            host_os: None,
             payload: Arc::new(AnalysisEvaluationPayload {
                 prepared: prepared
                     .into_iter()
@@ -959,6 +961,24 @@ impl AnalysisEvaluationContext {
                 source_identities_by_filename,
             }),
         }
+    }
+
+    /// Evaluation-local projection of the already-observed configuration Host.
+    /// It is independent of fragment declarations and target/execution OS.
+    pub fn with_host_os(
+        mut self,
+        os: Option<slug_configuration_v2::native::host::ActionEnvironmentHostOs>,
+    ) -> Self {
+        self.host_os = os;
+        self
+    }
+
+    pub(crate) fn header_info_windows_host(&self) -> anyhow::Result<bool> {
+        self.host_os
+            .map(|os| os == slug_configuration_v2::native::host::ActionEnvironmentHostOs::Windows)
+            .ok_or_else(|| {
+                anyhow::anyhow!("HeaderInfo normalization requires observed analysis Host")
+            })
     }
 
     pub fn root_token(&self) -> AnalysisCallToken {

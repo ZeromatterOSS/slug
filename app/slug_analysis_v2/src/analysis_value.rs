@@ -763,8 +763,8 @@ impl<'a> AnalysisValueMaterializer<'a> {
     pub(crate) fn value(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
         Ok(match value.kind() {
             AnalysisValueKind::CcToolchainVariables(value) => self.cc_variables(value)?,
-            AnalysisValueKind::EmptyCcHeaderInfo(occurrence) => {
-                slug_loading_v2::alloc_frozen_empty_cc_header_info(self.heap, occurrence.clone())
+            AnalysisValueKind::CcHeaderInfo(info) => {
+                slug_loading_v2::alloc_frozen_cc_header_info(self.heap, info.clone())
             }
             AnalysisValueKind::CcToolchainFeatures(value) => {
                 slug_loading_v2::alloc_frozen_cc_toolchain_features(self.heap, value.clone())
@@ -1058,8 +1058,8 @@ impl<'v> AnalysisValueLowerer<'v> {
         if let Some(variables) = slug_loading_v2::cc_variables_value(value) {
             return self.lower_cc_variables(variables, path);
         }
-        if let Some(occurrence) = slug_loading_v2::empty_cc_header_info_occurrence(value) {
-            return Ok(AnalysisValue::empty_cc_header_info(occurrence));
+        if let Some(info) = slug_loading_v2::cc_header_info(value) {
+            return Ok(AnalysisValue::cc_header_info(info));
         }
         if let Some(value) = slug_loading_v2::cc_toolchain_features_value(value) {
             return Ok(AnalysisValue::cc_toolchain_features(value));
@@ -1141,6 +1141,9 @@ impl<'v> AnalysisValueLowerer<'v> {
 #[cfg(test)]
 #[path = "analysis_value/cc_features_tests.rs"]
 mod cc_features_tests;
+
+#[cfg(test)]
+mod cc_header_info_tests;
 
 #[path = "analysis_value/cc_variables.rs"]
 mod cc_variables;
@@ -1721,14 +1724,14 @@ mod tests {
     }
     #[test]
     fn empty_header_info_round_trip_preserves_native_type_and_alias_identity() {
-        use slug_build_api_v2::CcHeaderInfoOccurrence;
+        use slug_build_api_v2::CcHeaderInfo;
         let heap = FrozenHeap::new();
-        let token = CcHeaderInfoOccurrence::new();
-        let a = slug_loading_v2::alloc_frozen_empty_cc_header_info(&heap, token.clone());
-        let alias = slug_loading_v2::alloc_frozen_empty_cc_header_info(&heap, token);
-        let b = slug_loading_v2::alloc_frozen_empty_cc_header_info(
+        let token = CcHeaderInfo::create(Default::default(), false, &[]).unwrap();
+        let a = slug_loading_v2::alloc_frozen_cc_header_info(&heap, token.clone());
+        let alias = slug_loading_v2::alloc_frozen_cc_header_info(&heap, token);
+        let b = slug_loading_v2::alloc_frozen_cc_header_info(
             &heap,
-            CcHeaderInfoOccurrence::new(),
+            CcHeaderInfo::create(Default::default(), false, &[]).unwrap(),
         );
         let source = heap.alloc(AllocTuple([a, alias, b]));
         let retained = AnalysisValueLowerer::default()

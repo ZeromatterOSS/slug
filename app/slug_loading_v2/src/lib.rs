@@ -25,6 +25,7 @@ mod canonical_repository_route_tests;
 mod cc_common;
 pub mod cc_context;
 mod cc_features;
+mod cc_header_info;
 mod cc_variables;
 #[doc(hidden)]
 pub use cc_variables::CcVariablesView;
@@ -155,8 +156,8 @@ pub use canonical_repository_route::HostCanonicalRepositoryRouteObservationKey;
 pub use canonical_repository_route::HostCanonicalRepositoryRouteOutcome;
 #[doc(hidden)]
 pub use canonical_repository_route::ObservedHostCanonicalRepositoryRoute;
-pub use cc_common::alloc_frozen_empty_cc_header_info;
-pub use cc_common::empty_cc_header_info_occurrence;
+pub use cc_header_info::alloc_frozen_cc_header_info;
+pub use cc_header_info::cc_header_info;
 pub use cycle_detector::bzl_load_cycle_detector;
 #[doc(hidden)]
 pub use external_subtree_package_set::ExternalSubtreePackageSet;

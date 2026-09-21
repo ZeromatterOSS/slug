@@ -153,7 +153,7 @@ fn actions(sink: Arc<RecordingSink>) -> AnalysisActions {
         [],
         CanonicalLabel::parse("@@//:consumer").unwrap(),
         sink.clone(),
-        FrozenValue::new_none(),
+        starlark::values::FrozenValue::new_none(),
         Arc::from([]),
     );
     AnalysisActions::new(

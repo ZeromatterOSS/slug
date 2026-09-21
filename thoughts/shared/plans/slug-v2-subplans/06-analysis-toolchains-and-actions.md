@@ -162,12 +162,16 @@ nested aliases, reject mutation and direct hashing, and survive module freeze
 and GC without changing mutable collection layout. Structural provider hashing
 rejects mutable nested inputs. The unchanged rules_cc public static/PIC library,
 linker-input/linking-context and CcInfo constructors now feed real provider rows
-to Rustc. Full CcInfo publication retains its native empty HeaderInfo occurrence:
-an Arc token owns native equality/hash; the shared publication equality state
-preserves its alias partition; materialization reconstructs the native type.
-The empty-only producer rejects nonempty HeaderInfo arguments. No global counter
-or evaluator heap crosses DICE. Dynamic solib/LTO/toolchain operations, nonempty
-HeaderInfo and full Cc compilation remain required separate capabilities.
+to Rustc. WP762 extends HeaderInfo to an immutable shared artifact-bearing DAG:
+an Arc token owns native equality/hash; iterative publication comparison checks
+all module/header/dependency payloads and the global alias partition, memoizing
+visited pairs. Loading projects eight immutable attributes; materialization
+reuses the owned model without producer-heap retention. Constructor normalization
+uses observed Host for .inc matching, independent of target/exec OS; empty module
+initialization needs no Host. Ordinary dependencies retain graph edges; exported
+dependencies merge ordered public/private/textual lists. No global counter or
+evaluator heap crosses DICE. Native scanning/transitive memoization, complete
+toolchain callable publication and full Cc compilation remain separate gates.
 
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and

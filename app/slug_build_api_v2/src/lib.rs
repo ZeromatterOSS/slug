@@ -134,4 +134,6 @@ pub use runfiles_packages::RunfilesRepositoryMapping;
 
 mod cc_header_info;
 pub use cc_features::*;
+pub use cc_header_info::CcHeaderInfo;
+pub use cc_header_info::CcHeaderInfoInput;
 pub use cc_header_info::CcHeaderInfoOccurrence;

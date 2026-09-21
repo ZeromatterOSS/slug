@@ -2,6 +2,7 @@ use super::*;
 
 include!("sources.rs");
 
+mod cc_headers;
 mod cc_linker;
 
 const REPOSITORIES: &[(&str, &str)] = &[

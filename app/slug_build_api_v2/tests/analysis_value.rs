@@ -609,9 +609,13 @@ fn depset_publication_equality_is_stack_safe_at_supported_depth() {
 
 #[test]
 fn empty_cc_header_info_retains_occurrences_and_publication_aliases() {
-    use slug_build_api_v2::CcHeaderInfoOccurrence;
-    let a = AnalysisValue::empty_cc_header_info(CcHeaderInfoOccurrence::new());
-    let b = AnalysisValue::empty_cc_header_info(CcHeaderInfoOccurrence::new());
+    use slug_build_api_v2::CcHeaderInfo;
+    let a = AnalysisValue::cc_header_info(
+        CcHeaderInfo::create(Default::default(), false, &[]).unwrap(),
+    );
+    let b = AnalysisValue::cc_header_info(
+        CcHeaderInfo::create(Default::default(), false, &[]).unwrap(),
+    );
     assert_ne!(a, b);
     assert_eq!(a, a.clone());
     assert!(a.is_starlark_hashable());
@@ -633,14 +637,14 @@ fn empty_cc_header_info_retains_occurrences_and_publication_aliases() {
             [("header", value)],
         )
     };
-    let left = make(AnalysisValue::empty_cc_header_info(
-        CcHeaderInfoOccurrence::new(),
+    let left = make(AnalysisValue::cc_header_info(
+        CcHeaderInfo::create(Default::default(), false, &[]).unwrap(),
     ));
-    let right = make(AnalysisValue::empty_cc_header_info(
-        CcHeaderInfoOccurrence::new(),
+    let right = make(AnalysisValue::cc_header_info(
+        CcHeaderInfo::create(Default::default(), false, &[]).unwrap(),
     ));
-    let other = make(AnalysisValue::empty_cc_header_info(
-        CcHeaderInfoOccurrence::new(),
+    let other = make(AnalysisValue::cc_header_info(
+        CcHeaderInfo::create(Default::default(), false, &[]).unwrap(),
     ));
     assert!(slug_build_api_v2::ProviderOccurrence::publication_eq_pairs(
         [(&left, &right), (&left, &right)]

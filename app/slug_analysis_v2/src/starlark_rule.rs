@@ -2396,6 +2396,11 @@ pub(crate) fn evaluate_loaded_rule(
             cpp_fragment,
             coverage_fragment,
             implementation.source_identities_by_filename().clone(),
+        )
+        .with_host_os(
+            key.configuration()
+                .slug_configuration()
+                .and_then(|configuration| configuration.execution_host_os().ok()),
         );
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&analysis_context);

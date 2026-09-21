@@ -39,7 +39,7 @@ use crate::providers::ProviderId;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub enum AnalysisValueType {
-    EmptyCcHeaderInfo,
+    CcHeaderInfo,
     CcToolchainFeatures,
     CcFeatureConfiguration,
     CcToolchainVariables,
@@ -63,7 +63,7 @@ pub enum AnalysisValueType {
 impl AnalysisValueType {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::EmptyCcHeaderInfo => "HeaderInfo",
+            Self::CcHeaderInfo => "HeaderInfo",
             Self::CcToolchainFeatures => "CcToolchainFeatures",
             Self::CcFeatureConfiguration => "FeatureConfiguration",
             Self::CcToolchainVariables => "Variables",
@@ -1098,7 +1098,7 @@ pub struct AnalysisValue(Arc<AnalysisValueData>);
 
 #[derive(Debug, Allocative)]
 enum AnalysisValueData {
-    EmptyCcHeaderInfo(crate::CcHeaderInfoOccurrence),
+    CcHeaderInfo(crate::CcHeaderInfo),
     CcToolchainFeatures(crate::cc_features::CcToolchainFeatures),
     CcFeatureConfiguration(crate::cc_features::CcFeatureConfiguration),
     CcToolchainVariables(crate::cc_variables::CcToolchainVariables),
@@ -1119,7 +1119,7 @@ enum AnalysisValueData {
 
 #[derive(Debug, Clone, Copy)]
 pub enum AnalysisValueKind<'a> {
-    EmptyCcHeaderInfo(&'a crate::CcHeaderInfoOccurrence),
+    CcHeaderInfo(&'a crate::CcHeaderInfo),
     CcToolchainFeatures(&'a crate::cc_features::CcToolchainFeatures),
     CcFeatureConfiguration(&'a crate::cc_features::CcFeatureConfiguration),
     CcToolchainVariables(&'a crate::cc_variables::CcToolchainVariables),
@@ -1143,8 +1143,8 @@ impl AnalysisValue {
         Self(Arc::new(value))
     }
 
-    pub fn empty_cc_header_info(occurrence: crate::CcHeaderInfoOccurrence) -> Self {
-        Self::new(AnalysisValueData::EmptyCcHeaderInfo(occurrence))
+    pub fn cc_header_info(info: crate::CcHeaderInfo) -> Self {
+        Self::new(AnalysisValueData::CcHeaderInfo(info))
     }
 
     pub fn cc_toolchain_features(value: crate::cc_features::CcToolchainFeatures) -> Self {
@@ -1245,9 +1245,7 @@ impl AnalysisValue {
 
     pub fn kind(&self) -> AnalysisValueKind<'_> {
         match self.0.as_ref() {
-            AnalysisValueData::EmptyCcHeaderInfo(value) => {
-                AnalysisValueKind::EmptyCcHeaderInfo(value)
-            }
+            AnalysisValueData::CcHeaderInfo(value) => AnalysisValueKind::CcHeaderInfo(value),
             AnalysisValueData::CcToolchainFeatures(value) => {
                 AnalysisValueKind::CcToolchainFeatures(value)
             }
@@ -1277,7 +1275,7 @@ impl AnalysisValue {
 
     pub fn value_type(&self) -> AnalysisValueType {
         match self.0.as_ref() {
-            AnalysisValueData::EmptyCcHeaderInfo(_) => AnalysisValueType::EmptyCcHeaderInfo,
+            AnalysisValueData::CcHeaderInfo(_) => AnalysisValueType::CcHeaderInfo,
             AnalysisValueData::CcToolchainFeatures(_) => AnalysisValueType::CcToolchainFeatures,
             AnalysisValueData::CcFeatureConfiguration(_) => {
                 AnalysisValueType::CcFeatureConfiguration
@@ -1367,10 +1365,9 @@ impl AnalysisValue {
                 AnalysisValueData::CcToolchainVariables(left),
                 AnalysisValueData::CcToolchainVariables(right),
             ) => left.publication_eq_with(right, state),
-            (
-                AnalysisValueData::EmptyCcHeaderInfo(left),
-                AnalysisValueData::EmptyCcHeaderInfo(right),
-            ) => state.enter_header_info_pair(left.pointer(), right.pointer()),
+            (AnalysisValueData::CcHeaderInfo(left), AnalysisValueData::CcHeaderInfo(right)) => {
+                left.publication_eq_with(right, state)
+            }
             (
                 AnalysisValueData::CcToolchainFeatures(left),
                 AnalysisValueData::CcToolchainFeatures(right),
@@ -1467,10 +1464,9 @@ impl PartialEq for AnalysisValue {
                 AnalysisValueData::CcToolchainVariables(left),
                 AnalysisValueData::CcToolchainVariables(right),
             ) => left == right,
-            (
-                AnalysisValueData::EmptyCcHeaderInfo(left),
-                AnalysisValueData::EmptyCcHeaderInfo(right),
-            ) => left == right,
+            (AnalysisValueData::CcHeaderInfo(left), AnalysisValueData::CcHeaderInfo(right)) => {
+                left == right
+            }
             (
                 AnalysisValueData::CcToolchainFeatures(left),
                 AnalysisValueData::CcToolchainFeatures(right),
@@ -1521,7 +1517,7 @@ impl Hash for AnalysisValue {
                 16u8.hash(state);
                 value.hash(state);
             }
-            AnalysisValueData::EmptyCcHeaderInfo(value) => {
+            AnalysisValueData::CcHeaderInfo(value) => {
                 13u8.hash(state);
                 value.hash(state);
             }
@@ -1647,16 +1643,16 @@ impl PublicationEqState {
         true
     }
 
-    fn enter_header_info_pair(&mut self, left: usize, right: usize) -> bool {
+    pub(crate) fn enter_header_info_pair(&mut self, left: usize, right: usize) -> Result<bool, ()> {
         if let Some(previous) = self.left_header_infos.get(&left) {
-            return *previous == right;
+            return (*previous == right).then_some(false).ok_or(());
         }
         if self.right_header_infos.contains_key(&right) {
-            return false;
+            return Err(());
         }
         self.left_header_infos.insert(left, right);
         self.right_header_infos.insert(right, left);
-        true
+        Ok(true)
     }
 
     pub(crate) fn enter_runfiles_depset_pair(

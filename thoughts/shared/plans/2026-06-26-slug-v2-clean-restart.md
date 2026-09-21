@@ -29,8 +29,13 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-61-m7a-cc-link-variables-and-rust-linker-r1
+Packet: WP-7-62-m7a-cc-header-info-and-compilation-context-r1
 Status: accepted
+
+WP762 accepts artifact-bearing HeaderInfo construction/merge and unchanged
+compilation-context provider publication/restoration, a mandatory compile
+prerequisite:33 focused tests, Core/CLI checks and independent final ACCEPT.
+Full toolchain-provider callables and compile/link execution remain deferred.
 
 WP761 accepts typed Cpp link-variable prerequisites and unchanged Rust linker-helper
 invocation on a real ctx, with exact exec mapping and configuration restoration;

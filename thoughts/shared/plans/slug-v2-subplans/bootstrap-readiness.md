@@ -367,6 +367,13 @@ builder and complete public cc_common export now feed the unchanged Rust
 get_linker_and_args with real ctx/native feature configuration. Authored toolchain
 envelopes remain explicit: this proves action-name/tool/argv/environment selection
 and Rust-preferred filtering, not production toolchain construction or execution.
+WP762 extends native HeaderInfo beyond the empty sentinel: owned artifacts,
+module slots, normalized header lists and ordinary/exported dependency graphs
+survive publication. The unchanged create_compilation_context now runs with real
+Files and configured producer/consumer providers; hidden ordinary-edge changes
+and visible exported-header changes participate in same-DICE restoration.
+This supplies compile.bzl's mandatory context prerequisite, not a compile action,
+native scanner or full CcToolchainInfo publication proof.
 Compile/actions2ctx, execution-time tree/path mapping and full cc_library remain
 deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside
