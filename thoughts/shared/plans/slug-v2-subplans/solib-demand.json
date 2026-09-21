@@ -1,0 +1,351 @@
+{
+  "packet": "WP-7-55-m7a-solib-demand-observation-r1",
+  "sourceBaseline": "40e3c599e1a911265fa2ee29296ed6e242bf5f33",
+  "scope": "Configured production-root Solib declarations under explicit flags; no build actions, runtime admission, downstream-use or full C++ coverage claim.",
+  "bazel": {
+    "version": "9.2.0",
+    "sourceCommit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "binarySha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694"
+  },
+  "invocation": {
+    "cwd": "/run/media/system/Colossus/dev/slug",
+    "argvExcludingDistdirs": [
+      "/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel",
+      "--batch",
+      "--ignore_all_rc_files",
+      "--noblock_for_lock",
+      "--output_base=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5",
+      "aquery",
+      "mnemonic(\"SolibSymlink\", deps(//app/slug_cli_v2:slug))",
+      "--output=jsonproto",
+      "--include_artifacts",
+      "--noinclude_commandline",
+      "--@rules_rust//rust/toolchain/channel=nightly",
+      "--lockfile_mode=error",
+      "--fetch",
+      "--repository_disable_download",
+      "--noshow_progress",
+      "--color=no",
+      "--curses=no"
+    ],
+    "distdirCount": 147,
+    "distdirPolicy": "146 Cargo.Bazel.lock HTTP archives reused from local Cargo cache after exact SHA256 verification, plus packet directory containing pinned rustfmt archive",
+    "distdirReceiptSha256": "d00b5d526b61276ef7a45dee25cbca263077edc26029786b423d13e055edcd04",
+    "removedEnvironmentVariables": [
+      "CARGO_BAZEL_REPIN",
+      "REPIN"
+    ]
+  },
+  "validation": {
+    "exitCode": 0,
+    "elapsedSeconds": 10.518,
+    "capSeconds": 20,
+    "timedOut": false,
+    "processGroupCleanup": "gone",
+    "buildActionsExecuted": 0,
+    "pinsUnchanged": true,
+    "trackedImplementationUnchanged": true,
+    "rawQuerySha256": "0a796b67c943164270c2d682cc6777b00adb1443d45f9a821a3aff3c403fe9ed",
+    "stderrSha256": "30cd8d65f51dd16c9ad00933d6aa4c342d83b1e2db970f45c8b941334d8ec51b",
+    "fullReceiptSha256": "1039959c40b26f8500d94975d42ae926766a8e35a08d2ccbc794fc0c5d6b5eed",
+    "rawGraphNote": "Complete parsed JSON graph below; source whitespace is represented by rawQuerySha256. IDs are local to this dump."
+  },
+  "inputSha256": {
+    ".bazelversion": "1b9487d55bea47fea50d226cc9c53bc548877ad2a318bac8fbc8b320f429e5c5",
+    "MODULE.bazel": "109585b7b40d274ea912d32c73f54c25cc4bef1bc5e60526e18ac9bfe48d210c",
+    "MODULE.bazel.lock": "bcdda78dd82aab5fd7ab1796985a78322b50178dceed7669c1b20173c2634302",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "439ef2d13537ce31f723b417f7a83e4e47c6e3b456dc0ae08d03c40a2d2469e4",
+    "Cargo.Bazel.lock": "9f22aed972a81bfc9402305b032ee4f4f89dcae5ea9f0ee45eb4341f1894bb7e",
+    "app/slug_cli_v2/BUILD.bazel": "0bbc5f4145b5987dcf44254b776d02b9cdd1e4667eaa529d21451f03f7166605"
+  },
+  "cacheRecovery": [
+    {
+      "kind": "missing generated crate hub",
+      "exitCode": 1,
+      "elapsedSeconds": 1.494,
+      "receiptSha256": "b7e41d5c84ac770dd78416a5fed00d93aa2bb10ec4bd8950ab24f1c15dc8c6a2"
+    },
+    {
+      "kind": "missing blake3 archive in Bazel download cache",
+      "exitCode": 1,
+      "elapsedSeconds": 1.548,
+      "receiptSha256": "563374e8bc84b5e0564d22bc9e9d2804dc931c4ce980d2e947de47041b8f5ddf"
+    },
+    {
+      "kind": "missing pinned rustfmt archive",
+      "exitCode": 1,
+      "elapsedSeconds": 6.866,
+      "receiptSha256": "a618fa453c73c728f1ee9ca4676f0df1a8afef5137842cba7295fe6af1edf3dc"
+    }
+  ],
+  "rustfmtAcquisition": {
+    "url": "https://static.rust-lang.org/dist/2025-09-14/rustfmt-nightly-x86_64-unknown-linux-gnu.tar.xz",
+    "sha256": "d9206e55ee07ae3ba9de7190142a8e422a72f300726fa8e094a6300c7128aa82",
+    "sizeBytes": 2257160,
+    "source": "MODULE.bazel pin; HTTPS download verified before distdir reuse; other five tool archive hashes matched existing cache"
+  },
+  "sourceAttribution": {
+    "owner": "@@rules_rust+//ffi/cc/allocator_library:cc_allocator_library",
+    "constructor": "cc_internal.dynamic_library_symlink",
+    "arguments": {
+      "library": "declared dynamic_library.file",
+      "solibDirectory": "_solib_k8",
+      "preserveName": false,
+      "prefixConsumer": false
+    },
+    "inputClassification": "Generated regular library artifact, established by authenticated declare_file/link output source; analysis_v2 Artifact does not encode source/derived identity.",
+    "route": "cc_library -> create_linking_context_from_compilation_outputs -> NODEPS_DYNAMIC_LIBRARY -> _construct_dynamic_library_to_link",
+    "conditions": "dynamic library present, neverlink false, copy_dynamic_libraries_to_binary disabled; observed output matches non-preserved and non-consumer-prefixed branch",
+    "repositoryLayout": "Default nonsibling layout shares configuration bin root; external input root-relative path participates in filename mangling.",
+    "serializedPlatform": "Owner platform, not Solib's empty key platform override; executionInfo is not execProperties.",
+    "sources": [
+      {
+        "ruleset": "rules_rust 0.73.0",
+        "path": "ffi/cc/allocator_library/BUILD.bazel",
+        "sha256": "edc2a26dc549f9c3dd57e841754c46c20987ea58933fc622bd4b80628978d9f6",
+        "lines": [
+          21,
+          28
+        ],
+        "archiveSha256": "2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2",
+        "sourceMetadataSha256": "8eeb3d9ba7c57916b63887a651e8f84c2f68b7243af9e712d728c2a0b7882255"
+      },
+      {
+        "ruleset": "rules_cc 0.2.17",
+        "path": "cc/private/rules_impl/cc_library.bzl",
+        "sha256": "87b491f10af315c9574f7dd96125b05fb53827da2442fbbe2f10e513167d1f70",
+        "lines": [
+          96,
+          152
+        ]
+      },
+      {
+        "ruleset": "rules_cc 0.2.17",
+        "path": "cc/private/link/create_linking_context_from_compilation_outputs.bzl",
+        "sha256": "664a461564abd348111d791aa03da0207fe158620d276b6da1936f8abb23be59",
+        "lines": [
+          104,
+          109
+        ]
+      },
+      {
+        "ruleset": "rules_cc 0.2.17",
+        "path": "cc/private/link/cc_linking_helper.bzl",
+        "sha256": "c45dd243835bd70803a7bb2e0a11167c9ea5ac912b3f02d415841879873b2a03",
+        "lines": [
+          355,
+          497,
+          551
+        ]
+      },
+      {
+        "ruleset": "rules_cc 0.2.17",
+        "path": "cc/private/link/cpp_link_action.bzl",
+        "sha256": "0cbe9d6b0ce0f6bea5abe1d9783b79435f495ba93bdaf402ad9539513a82223f",
+        "lines": [
+          204,
+          207
+        ]
+      }
+    ]
+  },
+  "rawGraph": {
+    "artifacts": [
+      {
+        "id": 1,
+        "pathFragmentId": 1
+      },
+      {
+        "id": 2,
+        "pathFragmentId": 10
+      },
+      {
+        "id": 3,
+        "pathFragmentId": 12
+      },
+      {
+        "id": 4,
+        "pathFragmentId": 20
+      }
+    ],
+    "actions": [
+      {
+        "targetId": 1,
+        "actionKey": "8d45240ad8187c03dcad9bffd5b9f4eece19122c20c3dcdb0d5715056635a83a",
+        "mnemonic": "SolibSymlink",
+        "configurationId": 1,
+        "inputDepSetIds": [
+          1
+        ],
+        "outputIds": [
+          2
+        ],
+        "primaryOutputId": 2,
+        "executionPlatform": "@@platforms//host:host"
+      },
+      {
+        "targetId": 1,
+        "actionKey": "d0ae0dc8301fe5b042d599881356cf51c7275fe66085abd171b9d14653343392",
+        "mnemonic": "SolibSymlink",
+        "configurationId": 2,
+        "inputDepSetIds": [
+          2
+        ],
+        "outputIds": [
+          4
+        ],
+        "primaryOutputId": 4,
+        "executionPlatform": "@@platforms//host:host"
+      }
+    ],
+    "targets": [
+      {
+        "id": 1,
+        "label": "@@rules_rust+//ffi/cc/allocator_library:cc_allocator_library",
+        "ruleClassId": 1
+      }
+    ],
+    "depSetOfFiles": [
+      {
+        "id": 1,
+        "directArtifactIds": [
+          1
+        ]
+      },
+      {
+        "id": 2,
+        "directArtifactIds": [
+          3
+        ]
+      }
+    ],
+    "configuration": [
+      {
+        "id": 1,
+        "mnemonic": "k8-fastbuild",
+        "platformName": "k8",
+        "checksum": "72a5446837369cd26452deae28ca8b1789d1ab4a7c21b1e160e1632e5f6b4b66"
+      },
+      {
+        "id": 2,
+        "mnemonic": "k8-opt-exec",
+        "platformName": "k8",
+        "checksum": "3ebebd5c101e26f1f0848950b37ffdfcc62994b8bdf71fbd334a6c7c2765dcee",
+        "isTool": true
+      }
+    ],
+    "ruleClasses": [
+      {
+        "id": 1,
+        "name": "cc_library"
+      }
+    ],
+    "pathFragments": [
+      {
+        "id": 9,
+        "label": "bazel-out"
+      },
+      {
+        "id": 8,
+        "label": "k8-fastbuild",
+        "parentId": 9
+      },
+      {
+        "id": 7,
+        "label": "bin",
+        "parentId": 8
+      },
+      {
+        "id": 6,
+        "label": "external",
+        "parentId": 7
+      },
+      {
+        "id": 5,
+        "label": "rules_rust+",
+        "parentId": 6
+      },
+      {
+        "id": 4,
+        "label": "ffi",
+        "parentId": 5
+      },
+      {
+        "id": 3,
+        "label": "cc",
+        "parentId": 4
+      },
+      {
+        "id": 2,
+        "label": "allocator_library",
+        "parentId": 3
+      },
+      {
+        "id": 1,
+        "label": "libcc_allocator_library.so",
+        "parentId": 2
+      },
+      {
+        "id": 11,
+        "label": "_solib_k8",
+        "parentId": 7
+      },
+      {
+        "id": 10,
+        "label": "libexternal_Srules_Urust+_Sffi_Scc_Sallocator_Ulibrary_Slibcc_Uallocator_Ulibrary.so",
+        "parentId": 11
+      },
+      {
+        "id": 19,
+        "label": "k8-opt-exec",
+        "parentId": 9
+      },
+      {
+        "id": 18,
+        "label": "bin",
+        "parentId": 19
+      },
+      {
+        "id": 17,
+        "label": "external",
+        "parentId": 18
+      },
+      {
+        "id": 16,
+        "label": "rules_rust+",
+        "parentId": 17
+      },
+      {
+        "id": 15,
+        "label": "ffi",
+        "parentId": 16
+      },
+      {
+        "id": 14,
+        "label": "cc",
+        "parentId": 15
+      },
+      {
+        "id": 13,
+        "label": "allocator_library",
+        "parentId": 14
+      },
+      {
+        "id": 12,
+        "label": "libcc_allocator_library.so",
+        "parentId": 13
+      },
+      {
+        "id": 21,
+        "label": "_solib_k8",
+        "parentId": 18
+      },
+      {
+        "id": 20,
+        "label": "libexternal_Srules_Urust+_Sffi_Scc_Sallocator_Ulibrary_Slibcc_Uallocator_Ulibrary.so",
+        "parentId": 21
+      }
+    ]
+  }
+}

@@ -326,12 +326,14 @@ callback is admitted by WP-7-53 as an authenticated structural recipe with retai
 and forced parameter bytes, including the required unexpanded Directory argument. Full
 Cargo rule/toolchain execution remains open. Virtual Args paramfiles do not prove standalone
 ArgsWrite demand.
-WP754's [native Solib inventory](./solib-construction-inventory.md) identifies missing
-native family identity, bin-relative repository placement and both local/cross-owner
-sharing contracts. The temporary WP714 action JSON is unavailable in the inspected live
-storage; its historical two rows cannot currently be attributed to runtime-library,
-standard-dylib or cdylib construction. A focused CLI-root Solib action observation is
-selected before native implementation. This adds no runtime or full-toolchain admission.
+WP755's [durable Solib observation](./solib-demand.json) identifies two declarations
+for rules_rust's C++ allocator library, in target and exec configurations. Authenticated
+cc_library linking uses dynamic_library_symlink with both flags false on a generated
+library input. The [native inventory](./solib-construction-inventory.md) now selects
+that constructor and structural action boundary, with naming/bin placement and both
+local/cross-owner sharing contracts still to implement. Default nonsibling Bazel bin
+roots are shared; input repository path participates in native mangling. The observation
+ran zero build actions and proves neither downstream use nor full C++ toolchain support.
 Run remains deferred and F3 remains closed.
 
 ## Family admission and completion procedure

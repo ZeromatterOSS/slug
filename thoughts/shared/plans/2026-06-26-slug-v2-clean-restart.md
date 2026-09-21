@@ -29,15 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-54-m7a-solib-construction-inventory-r1
+Packet: WP-7-55-m7a-solib-demand-observation-r1
 Status: accepted
 
-WP754 accepts the native Solib source/prerequisite inventory: family identity,
-repository/bin placement and sharing require explicit producer contracts. The historical
-action-query file is unavailable; next is a narrowly filtered CLI-root Solib observation
-to identify demanded producers before implementation. Independent source review accepts
-the inventory; runtime admission is unchanged. WP753 Cargo Args is accepted at 57856a758
-and WP752 alias execution/publication at 74770f888. Full Cargo loading/execution,
+WP755 recovers two configured Solib declarations for rules_rust's C++ allocator library,
+in target and exec configurations, with authenticated False/False native construction.
+The query ran zero build actions; full parsed evidence is retained in solib-demand.json.
+Default nonsibling bin placement is now source-corrected. Next: implement the demanded
+native constructor/structural action boundary with reviewed naming, sharing and runtime
+gates. Full C++ compile/link/toolchain support remains open; runtime admission is unchanged.
+WP753 Cargo Args is accepted at 57856a758 and WP752 aliases at 74770f888. Full Cargo loading/execution,
 WP746's baseline diagnostic defect and broader M7A remain open; M8 is unproved.
 
 ### Earlier generated-input receipt

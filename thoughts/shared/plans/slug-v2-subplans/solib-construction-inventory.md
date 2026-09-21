@@ -1,7 +1,7 @@
 # Native Solib construction inventory
 
-WP-7-54, source baseline `57856a758`. This inventory selects evidence needed
-before native construction; it admits no runtime behavior. WP752 regular-file
+WP-7-54, source baseline `57856a758`, updated by WP755's production observation.
+This inventory selects prerequisites for native construction; it admits no runtime behavior. WP752 regular-file
 alias execution and WP753 Cargo Args remain accepted at their original boundaries.
 
 ## Demand and provenance
@@ -12,7 +12,8 @@ The predecessor records two SolibSymlink actions in WP714's CLI-root query,
 That temporary file is absent from this checkout and the inspected sibling
 checkouts/target roots. The historical receipt in Stage 10 proves its earlier
 existence; it does not reconstruct its two owners, configurations, inputs,
-outputs or downstream consumers. Exact row attribution remains unproved.
+outputs or downstream consumers. WP755 recovered current producer attribution below;
+it does not reconstruct the old rows or their ambient options.
 
 Pinned Bazel source is Git object
 `8220c6198837d5c13d53fea211cf3282aa12408a` in the local
@@ -30,6 +31,7 @@ routes. A source branch's existence does not prove that the CLI graph takes it:
 | C++ runtime libraries | rules_cc `cc/private/rules_impl/cc_toolchain_provider_helper.bzl:213` iterates `dynamic_runtime_lib[DefaultInfo].files`, filters shared-library names, and calls `cc_common.solib_symlink_action` | Candidate runtime-basename route; selected files/configurations unknown |
 | Rust standard dylib | rules_rust `rust/private/toolchain.bzl:123` selects non-exec + experimental standard-dylib linking + available std_dylib; `rust/private/rust_allocator_libraries.bzl:186` calls public `create_library_to_link(dynamic_library=...)` | Conditional; cannot attribute the missing rows to stdlib |
 | Rust cdylib | rules_rust `rust/private/rustc.bzl:2350` passes dynamic/interface libraries to public `create_library_to_link` without custom symlink paths; bin/proc-macro are excluded and lib/rlib use static input | Conditional default-mangled route on non-Windows; row attribution unknown |
+| Generated cc_library shared library | rules_cc `cc/private/link/cc_linking_helper.bzl:497` uses `dynamic_library_symlink(..., False, False)` for NODEPS_DYNAMIC_LIBRARY unless neverlink/copy-dynamic-libraries suppress it | WP755 observes this route for rules_rust's C++ allocator, in target and exec configurations |
 
 The runtime helper computes toolchain solib directory from target CPU and
 runtime directory from `runtime_solib_dir_base` (`:196`).
@@ -81,8 +83,11 @@ mangled dynamic, explicit-path dynamic, and pure soname helpers respectively.
   The common `actions/ActionKeyComputer.java:37` envelope still applies.
 
 `analysis/RuleContext.java:319,711` places shareable artifacts relative to the
-configuration's bin root for the **consumer repository**, bypassing package
-prefixing. `analysis/CachingAnalysisEnvironment.java:262` preserves artifact
+configuration's bin root, bypassing package prefixing. The repository argument does
+not imply a repository-specific root: `analysis/config/OutputDirectories.java:147`
+uses a shared bin root under default nonsibling layout; only sibling layout uses
+repository-specific roots (`:127`). This corrects WP754's earlier overstatement.
+`analysis/CachingAnalysisEnvironment.java:262` preserves artifact
 ownership. Shared paths never authorize reconstructing ownership from a filename.
 
 `actions/Actions.java:45,376` escapes underscore, slash, backslash, colon and
@@ -112,7 +117,7 @@ erase this distinction or confer an exact ActionKey claim.
 |---|---|---|
 | Native binder | `app/slug_loading_v2/src/cc_common.rs:185`; restricted internal API access at `:288` | Add only the demanded native method; preserve caller restrictions and active-context checks |
 | Action bridge | `app/slug_loading_v2/src/subrule_invocation.rs:127,1164` | Route through existing AnalysisActionSink/token lifetime, never create ownership in Loading |
-| Bin-relative output | `app/slug_analysis_v2/src/starlark_rule.rs:1061` | Ordinary declaration prefixes package; introduce a narrow native declaration and resolve consumer repository separation |
+| Bin-relative output | `app/slug_analysis_v2/src/starlark_rule.rs:1061` | Ordinary declaration prefixes package; introduce a narrow native declaration and preserve input repository identity in naming |
 | Owned artifact/action | `app/slug_build_api_v2/src/analysis_value.rs:327`, `actions/spec.rs:956,968,1264` | Preserve configured owner and complete target artifact; add structural native family identity |
 | Registration/conflicts | `app/slug_build_api_v2/src/actions/registry.rs:57,80` | Current registry rejects all duplicate outputs; specify equivalent native sharing and conflicting-input rejection |
 | Execution dispatch | `app/slug_core_v2/src/runtime/action_prerequisites.rs:301`, `action_prerequisites/symlink.rs:8` | Any current symlink_spec enters generic alias dispatch; new family must be gated deliberately |
@@ -124,9 +129,14 @@ Physical `configured_output_root` is configuration-only
 `app/slug_core_v2/src/runtime/configured_action_closure.rs:122,154` also groups
 conflicts by configuration bytes plus output path, without consumer repository.
 The normal sink receives only the package path (`app/slug_analysis_v2/src/dice.rs:2444`).
-External native outputs therefore need a producer-owned canonical repository
-namespace in their path (or a coordinated root/conflict/publication redesign).
-Preserving repository only in the artifact owner cannot prevent physical collisions.
+The observed default Bazel Solib route also shares that bin root: repository separation
+enters the mangled **input root-relative path**, not an extra consumer-repository root.
+Ordinary Bazel external outputs receive `external/<repo>/<package>` through
+RuleContext.java:730 and PackageIdentifier.java:188; shareable Solib bypasses this.
+A Slug producer must model the input root-relative/repository projection and preserve
+structural ownership. Adding a namespace is a possible Slug-native choice, not a
+requirement proven by Bazel's bin-root API. Keeping repository only in artifact
+identity cannot resolve an otherwise-colliding physical placement.
 Relaxed output bytes never permit conflating two semantic repositories.
 
 Bazel `actions/Actions.java:85,191,200,225` tolerates equivalent shared actions
@@ -163,14 +173,23 @@ duplicate/conflicting generator cases, source/config A/B/A restoration, and expl
 non-admission of unsupported constructors/execution. Existing alias backing tests
 remain evidence for their own family only.
 
-Select a narrowly filtered CLI-root Bazel 9.2 action observation next to recover
-native action owners, configurations, one-input/one-output artifact paths and
-source-versus-generated target classification. Match those rows to the authenticated
-producer routes above before choosing the construction implementation. Freeze root,
-toolchain flags, lockfiles and output-base policy in that packet; execute no build
-actions. Do not rerun F3 or a full build, assume two current rows, or activate the
-smallest method merely because it is easiest. A missing raw receipt warrants this
-specific evidence repair, not a claim that the historical receipt never existed.
+WP755's filtered CLI-root observation succeeds with two Solib actions, both owned by
+`@@rules_rust+//ffi/cc/allocator_library:cc_allocator_library`, under k8-fastbuild and
+k8-opt-exec. The [durable evidence](./solib-demand.json) retains full raw graph and
+source attribution. Both inputs are the declared shared-library outputs of cc_library;
+the source route calls `dynamic_library_symlink(..., False, False)`. Native mangling
+of `external/rules_rust+/ffi/cc/allocator_library/libcc_allocator_library.so` explains
+the exact observed `_solib_k8/libexternal_Srules_Urust+_Sffi_Scc_Sallocator_Ulibrary_Slibcc_Uallocator_Ulibrary.so`.
+Neither mnemonic contains ST-. Serialized owner platform is `@@platforms//host:host`,
+distinct from the native action's empty platform override used by key semantics.
+
+Select the demanded non-preserved, non-consumer-prefixed native Solib construction
+and structural action boundary next, with input repository/root-relative projection,
+duplicate/conflict semantics and explicit execution gating resolved in its design.
+Full allocator cc_library compilation/linking remains separate: native feature,
+compile, link-action wrapping and toolchain APIs are additional prerequisites.
+The filtered graph proves registration in root analysis, not downstream selection or
+execution of either Solib output. No broader query/build or F3 replay is implied.
 
 Exact admitted behavior is unchanged. Native Solib construction/execution,
 aquery projection and exact Bazel ActionKey remain unsupported/deferred. M7A is
