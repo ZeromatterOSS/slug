@@ -155,11 +155,17 @@ fn suspended_root_and_subrule_frames_recover_one_locked_outer_context() {
         assert!(actions_to_context(actions, &eval).unwrap().ptr_eq(original));
     }
     assert!(root.require_active("label", "rule context").is_err());
+    assert!(
+        root.require_active("declare_compile_output_file", "rule context")
+            .is_err()
+    );
     subrule_token
         .require_active("label", "subrule context")
         .unwrap();
     drop(subrule_guard);
     root.require_active("label", "rule context").unwrap();
+    root.require_active("declare_compile_output_file", "rule context")
+        .unwrap();
     assert!(
         actions_to_context(root_actions, &eval)
             .unwrap()

@@ -33,7 +33,13 @@ fn projection(
         CanonicalLabel::parse("@@//:owner").unwrap(),
         crate::ConfigurationKey::from_slug(configuration.clone()),
     );
-    let exec = crate::ConfigurationKey::from_slug(configuration.to_exec().unwrap());
+    // The selected platform's fixture needs a constructible exec configuration,
+    // independently of the intentionally missing Host on the tested owner.
+    let exec = crate::ConfigurationKey::from_slug(
+        self::configuration(Some(ActionEnvironmentHostOs::Linux))
+            .to_exec()
+            .unwrap(),
+    );
     let constraints = constraints
         .iter()
         .map(|(setting, value)| {

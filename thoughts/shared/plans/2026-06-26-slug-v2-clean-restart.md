@@ -29,10 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-66-m7a-coherent-output-roots-r1
+Packet: WP-7-67-m7a-compile-output-declarations-r1
 Status: accepted
 
-WP766 accepts coherent output roots across artifacts, Args, actions and transport,
+WP767 accepts paired compile-output prefix/declaration entrypoints for the
+allocator regular-source path, with genuine configuration/location/owner checks.
+31 focused tests and Core/CLI checks pass; independent final review returns ACCEPT.
+Discovery-aware CppCompile remains a later gate.
+WP766 at0a1d7d943 accepts coherent output roots across artifacts, Args, actions and transport,
 with independent design/final ACCEPT and atomic integration from
 `codex/wp766-output-roots-review`:315 ordinary plus3 fresh NativeLink selectors
 pass, CLI check passes, and legacy Run coverage explicitly preserves its unsupported

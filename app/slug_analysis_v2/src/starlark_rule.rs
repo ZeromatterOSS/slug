@@ -242,6 +242,7 @@ where
 {
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
         demand.provide_value::<&dyn slug_loading_v2::cc_context::CcExecutionContext>(self);
+        demand.provide_value::<&dyn slug_loading_v2::cc_context::CcCompileOutputContext>(self);
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
@@ -1394,6 +1395,10 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
 
     fn declare_file(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
         self.declare_output(path, ActionOutputKind::File)
+    }
+
+    fn declare_compile_output(&self, path: String) -> anyhow::Result<AnalysisArtifactValue> {
+        self.declare_bin_relative_output(path, ActionOutputKind::File)
     }
 
     fn declare_directory(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue> {

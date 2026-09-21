@@ -396,6 +396,11 @@ publication, with real configured root-aware helper callers and three fresh
 NativeLink transport/publication/cache-restoration gates. Equal relative names in
 target/exec configurations coexist without double prefixes. Output/configuration
 tokens remain Slug-native; no getter-only prefix or empty derived root is admitted.
+WP767 adds the demanded regular-source compile-output prefix/declaration pair,
+with genuine configuration, normalized package containment, distinct naming label
+and active owner, and main/external target/exec publication/restoration. Existing
+toolchain naming remains independently protected; this is not full public compile()
+traversal or compiler execution. Other context/tree/action natives remain open.
 Compile action production, execution-time tree/path mapping and full cc_library remain
 deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside

@@ -80,6 +80,25 @@ impl<'v> StarlarkValue<'v> for CcInternalModule {
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn compute_output_name_prefix_dir<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = named)] configuration: Value<'v>,
+        #[starlark(require = named)] purpose: &str,
+    ) -> anyhow::Result<&'static str> {
+        crate::cc_compile_outputs::output_name_prefix(configuration, purpose)
+    }
+
+    fn declare_compile_output_file<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = named)] ctx: Value<'v>,
+        #[starlark(require = named)] label: Value<'v>,
+        #[starlark(require = named)] output_name: &str,
+        #[starlark(require = named)] configuration: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::cc_compile_outputs::declare(ctx, label, output_name, configuration, eval)
+    }
+
     fn actions2ctx_cheat<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = pos)] actions: Value<'v>,

@@ -218,8 +218,20 @@ share immutable typed owners; unchanged rules_cc root-relative/repository helper
 and Rust root/exec slicing consume full exec paths. Structural identity and output
 tokens remain Slug-native; exact named path relationships follow pinned Bazel9.2.
 Ordinary external outputs and shared-bin Solib coordinates remain distinct. Split
-genfiles, direct external generated-label requests, compute_output_name_prefix_dir,
-declare_compile_output_file and discovery-aware CppCompile remain deferred.
+genfiles, direct external generated-label requests and discovery-aware CppCompile
+remain deferred.
+
+WP767 supplies compute_output_name_prefix_dir and declare_compile_output_file.
+The phase-local configuration facade shares the complete SlugConfiguration;
+coverage still projects from it, and configuration provider publication remains
+unsupported. Prefix selection follows the required String purpose suffix, not a
+fabricated configuration mnemonic. Declarations normalize supplied-label _objs
+coordinates and require containment in the active ctx package; supplied label
+locates the File while active ctx owns it. Full configuration equality/liveness
+precede mutation of the existing declaration registry. Main/external and target/
+exec configured publication and A/B/A are covered, with naming protected separately.
+This is not full compile() or compiler-action execution. Alternate roots, sibling/
+Windows layout and normalized backslash/NUL paths remain unsupported.
 
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and

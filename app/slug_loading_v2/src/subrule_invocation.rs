@@ -127,6 +127,12 @@ pub struct AnalysisSpawnRequest<'v> {
 }
 
 pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
+    fn declare_compile_output(
+        &self,
+        _bin_relative_path: String,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        anyhow::bail!("compile output declarations are unavailable in this analysis context")
+    }
     fn dynamic_library_symlink(
         &self,
         _library: Value<'_>,

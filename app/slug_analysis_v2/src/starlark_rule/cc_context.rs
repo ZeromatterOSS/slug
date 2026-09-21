@@ -92,9 +92,7 @@ impl CcContextProjection {
         let configuration = self.configuration.as_ref().ok_or_else(|| {
             anyhow::anyhow!("ctx.configuration requires structural configuration")
         })?;
-        Ok(heap.alloc_simple(ConfigurationValue {
-            coverage_enabled: configuration.coverage_enabled()?,
-        }))
+        slug_loading_v2::cc_compile_outputs::alloc_configuration(heap, configuration.clone())
     }
 
     fn execution_os(&self) -> anyhow::Result<&'static str> {
@@ -153,29 +151,27 @@ impl<'v, V: ValueLike<'v>> CcExecutionContext for AnalysisContextGen<V> {
     }
 }
 
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-struct ConfigurationValue {
-    coverage_enabled: bool,
-}
-
-impl fmt::Display for ConfigurationValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("<configuration>")
-    }
-}
-
-starlark::starlark_simple_value!(ConfigurationValue);
-
-#[starlark_value(type = "configuration")]
-impl<'v> StarlarkValue<'v> for ConfigurationValue {
-    fn get_attr(&self, name: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
-        match name {
-            "coverage_enabled" => Some(Value::new_bool(self.coverage_enabled)),
-            _ => None,
-        }
-    }
-    fn dir_attr(&self) -> Vec<String> {
-        vec!["coverage_enabled".to_owned()]
+impl<'v, V: ValueLike<'v>> slug_loading_v2::cc_context::CcCompileOutputContext
+    for AnalysisContextGen<V>
+{
+    fn declare_compile_output(
+        &self,
+        label: &slug_identity_v2::CanonicalLabel,
+        output_name: &str,
+        configuration: &SlugConfiguration,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        self.token
+            .require_active("declare_compile_output_file", "rule context")?;
+        anyhow::ensure!(
+            configuration == self.output_root.configuration(),
+            "compile output configuration must equal the active ctx output root configuration"
+        );
+        let path = slug_loading_v2::cc_compile_outputs::compile_output_path(
+            &self.target_label,
+            label,
+            output_name,
+        )?;
+        self.action_sink.declare_compile_output(path)
     }
 }
 
