@@ -200,6 +200,21 @@ Nonempty per-file regex state, actions2ctx/root/naming adapters and discovery-aw
 CppCompile production remain deferred; a generic non-discovering Spawn is not
 evidence for the default dotd-on compile path.
 
+WP765 recovers the original analysis ctx through a GC-traced registration in the
+existing evaluator roots. Root/subrule factories retain their existing call-stack
+identity; lookup checks live membership and registration/evaluator association,
+while the returned outer ctx remains locked during subrules. A scoped guard
+clears registration and invalidates root lifetime on success/error. No moving
+Value enters DICE or an untraced host owner. Toolchain artifact naming queries
+the retained feature model using observed non-Windows Host/POSIX semantics.
+Native CcToolchainInfo wrapping requires its real keyed provider, preserved schema
+classification and native model. ProviderOccurrence now carries that classification
+through publication equality and materialization without copying a schema list;
+existing language equality/hash and mixed-schema parity scope are unchanged.
+Roots cannot be supplied by empty placeholders: existing derived paths are
+bin-relative. A coherent output-layout projection across Files, declarations,
+Args and transport remains a prerequisite before root-aware compile helpers.
+
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and
 publication preserve immutable cache seeds, parent aliases, raw binding types,
@@ -215,7 +230,7 @@ including fission membership, mode-dependent strip and ordered linkopts/omitfp.
 Both exec paths share the source-derived reset/host mapping. Getters retain no
 parallel option state. Unchanged link-variable and Rust linker-helper proofs use
 real ctx/native configuration with explicit authored toolchain envelopes.
-Full toolchain/FDO construction, compile/actions2ctx and execution remain separate
+Full toolchain/FDO construction, compile action production and execution remain separate
 gates. WP760's receipt records unsupported value types
 and the deferred frozen diagnostic-cache history explicitly.
 

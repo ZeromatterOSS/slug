@@ -80,6 +80,30 @@ impl<'v> StarlarkValue<'v> for CcInternalModule {
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn actions2ctx_cheat<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = pos)] actions: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::subrule_invocation::actions_to_context(actions, eval)
+    }
+
+    fn get_artifact_name_for_category<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = named)] cc_toolchain: Value<'v>,
+        #[starlark(require = named)] category: &str,
+        #[starlark(require = named)] output_name: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<String> {
+        Ok(crate::cc_artifact_naming::artifact_name_for_category(
+            cc_toolchain,
+            category,
+            output_name,
+            eval,
+        )?
+        .to_string())
+    }
+
     fn per_file_copts<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = pos)] cpp_configuration: Value<'v>,

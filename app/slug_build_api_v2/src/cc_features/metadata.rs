@@ -281,7 +281,7 @@ impl CcArtifactNamePattern {
         })
     }
 }
-fn category_spec(
+pub(super) fn category_spec(
     category: &str,
 ) -> Result<(&'static str, &'static [&'static str]), CcFeatureError> {
     Ok(match category {

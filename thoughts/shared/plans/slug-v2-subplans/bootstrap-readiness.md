@@ -387,7 +387,13 @@ File.extension and typed empty per-file options. The default dotd-on policy and
 feature suppression branches are covered; this is a configuration/input prerequisite,
 not actual bootstrap compile argv, discovery or execution evidence. CppCompile
 still requires distinct mandatory/spawn/cache-only inputs and discovery lifecycle.
-Compile/actions2ctx, execution-time tree/path mapping and full cc_library remain
+WP765 adds original-context recovery with root/subrule lifetime checks and
+toolchain-owned artifact naming through the unchanged public wrapper. Native
+provider schema classification survives publication, including same-key/field
+source changes. Naming admits observed non-Windows Host only. Root-aware compile
+helpers remain blocked on coherent generated artifact roots: current derived
+File paths are bin-relative, so empty or getter-only roots are not admitted.
+Compile action production, execution-time tree/path mapping and full cc_library remain
 deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside
 the admitted boundary. See the current packet for exact/native/deferred classes.

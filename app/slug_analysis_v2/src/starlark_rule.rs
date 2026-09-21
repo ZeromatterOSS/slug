@@ -2440,8 +2440,12 @@ pub(crate) fn evaluate_loaded_rule(
             toolchain,
             exec_groups: prepared_exec_groups,
         });
+        let root_context = analysis_context
+            .enter_root_context(&module, context)
+            .map_err(|error| error.to_string())?;
         let result =
             evaluator.eval_function(implementation.frozen_value().to_value(), &[context], &[]);
+        drop(root_context);
         drop(evaluator);
         result
     }
@@ -2582,3 +2586,6 @@ mod cargo_runfiles_tests;
 
 #[cfg(test)]
 mod solib_tests;
+
+#[cfg(test)]
+mod context_lifecycle_tests;

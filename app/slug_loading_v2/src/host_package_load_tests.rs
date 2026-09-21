@@ -34459,7 +34459,7 @@ RUN_ENVIRONMENT_CALLABLE = RunEnvironmentInfo
     let rematerialized_struct = frozen_heap.alloc(AllocStruct([("value", same)]));
     let provider_id = loading_provider_id(fresh_module.get("PROVIDER_ONE").unwrap()).unwrap();
     let rematerialized_provider =
-        alloc_starlark_user_provider(&frozen_heap, provider_id, [("value".into(), same)]);
+        alloc_starlark_user_provider(&frozen_heap, provider_id, false, [("value".into(), same)]);
 
     for (left, right) in [
         (
@@ -34540,6 +34540,7 @@ RUN_ENVIRONMENT_CALLABLE = RunEnvironmentInfo
     let provider_barrier = alloc_starlark_user_provider(
         &frozen_heap,
         loading_provider_id(fresh_module.get("PROVIDER_ONE").unwrap()).unwrap(),
+        false,
         [("list".into(), frozen_list), ("dict".into(), frozen_dict)],
     );
     assert!(struct_barrier.to_value().get_hashed().is_ok());
@@ -34551,6 +34552,7 @@ RUN_ENVIRONMENT_CALLABLE = RunEnvironmentInfo
         alloc_starlark_user_provider(
             &frozen_heap,
             loading_provider_id(fresh_module.get("PROVIDER_ONE").unwrap()).unwrap(),
+            false,
             [("value".into(), frozen_toolchain)],
         ),
         frozen_list,

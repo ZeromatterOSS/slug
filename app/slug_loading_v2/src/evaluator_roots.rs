@@ -6,14 +6,15 @@ use starlark::values::dict::AllocDict;
 use starlark::values::tuple::AllocTuple;
 use starlark::values::tuple::TupleRef;
 
-fn roots<'v>(module: &'v Module) -> [Value<'v>; 2] {
+fn roots<'v>(module: &'v Module) -> [Value<'v>; 3] {
     if let Some(root) = module.extra_value() {
         let root = TupleRef::from_value(root).expect("Loading owns module extra value");
-        return [root.content()[0], root.content()[1]];
+        return [root.content()[0], root.content()[1], root.content()[2]];
     }
     let roots = [
         Value::new_none(),
         module.heap().alloc(AllocDict(Vec::<(Value, Value)>::new())),
+        Value::new_none(),
     ];
     module.set_extra_value(module.heap().alloc(AllocTuple(roots)));
     roots
@@ -38,4 +39,17 @@ pub(crate) fn existing_callable_registry<'v>(module: &'v Module) -> Option<Value
     module
         .extra_value()
         .map(|root| TupleRef::from_value(root).expect("Loading roots").content()[1])
+}
+
+pub(crate) fn analysis_context<'v>(module: &'v Module) -> Option<Value<'v>> {
+    let value = module
+        .extra_value()
+        .map(|root| TupleRef::from_value(root).expect("Loading roots").content()[2])?;
+    (!value.is_none()).then_some(value)
+}
+
+pub(crate) fn set_analysis_context<'v>(module: &'v Module, context: Value<'v>) {
+    let mut values = roots(module);
+    values[2] = context;
+    module.set_extra_value(module.heap().alloc(AllocTuple(values)));
 }

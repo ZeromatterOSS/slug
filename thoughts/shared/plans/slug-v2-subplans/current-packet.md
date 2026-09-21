@@ -1,143 +1,172 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-64-m7a-structural-cpp-compile-inputs-r1
+Packet: WP-7-65-m7a-cc-context-and-artifact-naming-r1
 Status: accepted
 
-## Observable outcome and compatibility
+## Outcome and boundary
 
-Expose real structural Cpp compile inputs and pass a genuine published
-CcToolchainInfo through unchanged get_copts and dotd_files_enabled. This removes
-the compile-variable/configuration prerequisite on the actual default (dotd-on)
-C/C++ path; it does not substitute a non-discovering Spawn for CppCompile.
-WP763 at10dcaac34 accepted complete constructor publication with39 focused tests,
-Core/CLI checks and final review. Its source/capture/configuration ownership stays.
+Recover the original analysis ctx from genuine actions and expose toolchain-owned
+artifact naming to unchanged rules_cc helpers. WP764 at9e97b5f8c accepted compile
+input projection with41 focused tests and Core/CLI checks. This packet advances
+two independent prerequisites on the demanded native compile path; it does not
+claim full compile invocation, discovery, action production or execution.
 
-Exact: public immutable non-callable copts/conlyopts/cxxopts, omitfp prefix,
-private dotd/save_temps/process_headers getters, admitted command conversion and
-both exec-transition mappings, File.extension and empty per_file_copts binding.
-Slug-native: existing complete configuration/path/Host domains. Deferred:
-nonempty per-file regex state, ObjC, actions2ctx/root/naming adapters, actual
-CppCompile action production, discovery/inclusion validation and execution.
-No claim of actual bootstrap compile argv/discovery evidence: existing filtered
-Solib observations do not establish those facts. M7A remains partial, M8 unproved.
+Exact: actions2ctx_cheat positional binding/no caller gate, original ctx identity,
+same-evaluation root/subrule behavior and locked outer context; named-only
+get_artifact_name_for_category over genuine keyed CcToolchainInfo and its retained
+feature model, exact uppercase category names/defaults/overrides and normalized
+parent/basename composition on observed non-Windows Host. Slug-native: existing configuration/artifact identity
+and path domains, valid-Unicode strings and Rust Host observations.
+Unsupported/deferred: expired/foreign-evaluation actions, roots/bin/genfiles,
+configuration facade expansion, compute_output_name_prefix_dir,
+declare_compile_output_file, actual CppCompile/discovery and execution.
 
-## Evidence and decision
+## Evidence and architecture decision
 
-Pinned Bazel9.2 revision8220c6198837d5c13d53fea211cf3282aa12408a:
-CppConfigurationApi.java42–64 and CppConfiguration.java515–536 establish public
-option lists; copts prepends -fomit-frame-pointer,-fasynchronous-unwind-tables,
--DNO_FRAME_POINTER when experimental_omitfp. CppConfiguration.java395–404,
-833–836,927–930 establishes private boolean methods. CppOptions.java229–264,
-552–567,604–641,948–956 owns defaults and repeated raw-string conversion.
-builtin_exec_platforms.bzl291–347 maps copt=host_copt plus -g0 and cxxopt=host_cxxopt
-plus -g0 on non-Windows observed Host OS, no suffix on Windows; conlyopt=host_conlyopt and
-per_file_copt=host_per_file_copt. cc_dotd_files propagates; save_temps and
-process_headers_in_dependencies reset to defaults. Both existing Slug exec paths
-must share this correction; no parallel derived configuration.
+Pinned Bazel9.2 source8220c6198837d5c13d53fea211cf3282aa12408a:
+CcStarlarkInternal.java346–361,487–494; CcToolchainProvider.java70–77,140–146,
+389–390; CcToolchainFeatures.java1338–1344; ArtifactCategory defaults and
+PathFragment normalization/getParentDirectory/getChild. StarlarkSubrule.java455–456
+unwraps the outer rule; StarlarkRuleContext.java586–587 locks that same ctx during
+subrule calls. Adapt source contracts rather than Java implementation assertions.
+Unchanged rules_cc0.2.17 compile.bzl213,225,248 and repeated artifact category
+queries establish demand; cc_helper_internal and private cc_common wrapper supply
+the genuine naming integration. Existing54-body source corpus remains unchanged.
 
-CcStarlarkInternal.java972–990 owns typed positional Cpp/File/Label binding for
-per_file_copts, with no private caller gate. Empty retained per_file_copt returns
-empty; nonempty remains explicitly rejected until regex semantics are admitted.
-Validate genuine arguments before returning empty. Artifact.java405 delegates
-File.extension to PathFragment.java762; implement that source algorithm, including
-root/nested dotfiles, rather than assuming Rust Path::extension equivalence.
+Live BuildAPI AnalysisArtifact.path/short_path returns bin-relative derived output
+paths, not a modeled root. Core's configured physical bin root is not a retained
+artifact projection. ArtifactRoot.java159–163 rejects an empty derived root.
+Therefore an empty getter or getter-only prefix would break unchanged helper
+slicing and accepted paths. Root/path policy needs a separate coherent design
+across artifact projection, declarations, Args and transport; do not invent it in
+this packet. declare_compile_output_file additionally takes a distinct passed
+configuration/root but current ctx action owner and cannot ignore either.
 
-Unchanged rules_cc0.2.17 compile_build_variables.bzl379–415 owns option/rule/
-language/per-file ordering and extension override. cc_compilation_helper.bzl647–658
-owns dotd option and parse_showincludes/no_dotd_file suppression. compile.bzl398,
-1615–1668,1760,2153–2160 demonstrates process-headers/save-temps/default-discovery
-demand. Existing54-body corpus and sources.json remain unchanged. Upstream Java
-getter/converter tests are represented by pinned-source focused Rust cases;
-actual compiler execution is outside this prerequisite's phase.
+## Ownership and lifecycle
 
-## Ownership and scope
+Existing AnalysisEvaluationContext and token stack remain the only phase-local
+context owner. Add a GC-traced slot in existing evaluator_roots module.extra,
+installed with the exact AnalysisContext Value before invoking its implementation.
+A scoped guard clears the slot and invalidates the root frame on success/error;
+registration rejects an occupied slot so guards cannot clear another registration.
+Never store moving Values in Evaluator.extra, a host Arc/map or DICE. Do not clone
+or reconstruct ctx. Retrieval verifies genuine AnalysisActions, same stack identity
+and a still-live frame (not necessarily top); subrule lookup returns the locked
+original outer ctx. Existing field/action checks retain top-frame restrictions.
+The rooted slot carries a private existing-token marker: action, evaluator and
+registration stack identities must all match, including swapped-evaluator cases.
+Missing registration, foreign or expired actions fail closed. Guard/module release
+owns cleanup, including exceptional exits; no asynchronous lock/await or new cache.
 
-SlugConfiguration remains sole DICE-retained option owner; all fields already
-exist structurally. Admit conlyopt,cxxopt,host_copt,host_conlyopt,host_cxxopt,
-cc_dotd_files,save_temps,process_headers_in_dependencies through existing command
-overlay/converters. Preserve raw repeat order/commas and both exec paths; no
-Java runtime, new DICE key, cache, lock, or fallback. Read docs/developers/dice.md.
-Existing request certificates, validity/cutoff, retry/cancellation and eviction
-apply unchanged. Native projections own cheap shared configuration; returned
-immutable lists are evaluator-phase allocations. No new retained representation,
-interner or performance claim; Stage9 existing configuration/Arc projections apply.
+CcToolchainModel's existing artifact_name_patterns and default table own naming.
+Add only a pure query; no parallel retained model, interner or cache. Validate
+native provider identity/schema and native feature field. A valid raw constructor
+with that provider key is allowed; pinned initializer authority is required for
+callable recipes only, not this native query. Unknown/malformed category/provider/
+model/arguments fail closed. Loading requires the existing observed analysis Host;
+missing observation and Windows Host naming fail closed. BuildAPI exposes an
+explicit POSIX pure query, with no ambient OS read or toolchain exec_os inference.
+Windows normalization and NUL paths are deferred. Returned names are evaluator
+scratch, never identity.
+Existing DICE source certificates, full configuration keys, provider publication,
+cutoff/restoration and eviction remain unchanged. Read docs/developers/dice.md.
 
-Configuration worker owns app/slug_configuration_v2/src/command.rs,
-native/cpp_fragment.rs and cohesive child tests, native/configuration.rs shared
-exec projection and direct command/converter dispatch/test files required by the
-eight admissions. Native cc_feature_tests.rs/configuration.rs/tests.rs test Host fixtures
-may be upgraded to explicit observed OS where newly required. Commands
-app/slug_commands_v2/src/common.rs admits focused binder tests only.
-Large configuration modules get bounded hooks plus child tests, not a new owner.
+Provider publication currently erases schema classification. Preserve one boolean
+on existing ProviderOccurrence, produced from Loading's genuine schemaful versus
+schemaless constructor and carried through lowering/materialization. Restored
+Loading field storage may remain compact schemaless storage with the preserved
+classification; do not infer a schema from populated field names or provider key.
+Publication equality includes this observable native classification. Existing
+Starlark equality/hash remain unchanged, with no new mixed schema/schemaless parity
+claim: StarlarkInfoWithSchema.java214–230 overrides StructImpl equality/hash and
+that broader distinction remains deferred. Only the native schema gate is admitted.
+No schema list copy, new provider identity or side cache. Existing SmallMap/Arc/
+Allocative owners remain; boolean is DICE-retained semantic memory released with
+the provider. Utility-reuse skill and Stage9 provider row apply to this narrow
+representation correction. Test same-key/fields schema distinction across bridge
+and same-DICE source change/restoration; schema-less lookalikes must not gain authority.
 
-Loading worker owns app/slug_loading_v2/src/analysis_fragments.rs and new
-analysis_fragments/compile_input_tests.rs; cc_common.rs thin per_file_copts
-binding (helper in cohesive child if needed); subrule_invocation.rs thin
-File.extension projection and cohesive child tests. BuildAPI's existing
-AnalysisArtifact may expose a shared extension getter in analysis_value.rs with
-focused child tests only if needed to avoid a second artifact algorithm.
-No new function-publication recipe, actions2ctx or action activation.
+## Scope and routing
 
-Root owns integration tests/rustc_map_each/cc_compile_inputs.rs and .bzl,
-mod.rs registration, minimal reuse/export changes in cc_toolchain.rs/.bzl,
-BuildAPI export wiring if needed, scheduling/Stage6/bootstrap/Stage9 docs and
-integration corrections. Existing complete constructor must be reused as a
-dependency; no authored Cpp/feature envelope and no copied upstream body.
-Reviewer owns independent design/final review. Root serializes Cargo.
-Estimate350–700 production and500–1000 proof lines; review growth and ownership.
+Context worker: Loading evaluator_roots.rs, subrule_invocation.rs and cohesive
+child context lifecycle tests; exports in lib.rs only if needed; Analysis
+starlark_rule.rs thin installation hook and cohesive child tests. Large modules
+receive bounded hooks, not a second context owner. Do not edit cc_common.rs.
+Affected tests/subrule.rs may refresh observation-shard injection and explicitly
+assert the existing automatic OutputGroupInfo alongside DefaultInfo/ReturnedInfo;
+no production output-group change or weakened lifecycle assertion.
 
-## Acceptance and validation
+Naming worker: BuildAPI cc_features.rs plus cc_features/metadata.rs/query child
+and focused tests; Loading cc_artifact_naming.rs helper and tests plus lib.rs
+module registration if needed (coordinate root). Do not edit cc_common.rs.
+No new dependencies or retained representations; root reviews normalization edges.
 
-Configuration: defaults/nondefaults/repeated raw values/invalid bools, exact
-omitfp ordering; both existing exec pathways with Linux/Windows discriminators,
-host-to-exec replacement, retained dotd and reset save/process flags. Target
-and exec restoration must compare full structural identities.
-Loading: field vs method shape, immutable/noncallable lists, current private
-caller provenance, typed binder negatives, empty-only per-file rejection,
-File extension dot/empty/Unicode/path edge cases. Preserve existing link getters.
-Integration: unchanged get_copts on real C/C++/headers with override-extension
-ordering, published genuine toolchain, omitfp/raw repeats and source File;
-unchanged dotd predicate all suppression branches; same-DICE A/B/A and unused
-compile option invalidation. Protect the4 full-toolchain and8 Rustc/linker tests.
+Root: provider classification bridge in BuildAPI analysis_value.rs, Loading
+provider.rs (and affected direct callers), Analysis analysis_value.rs with focused
+child tests; thin cc_common.rs binding hooks, integration tests/rustc_map_each/
+cc_context_naming.rs and .bzl, mod.rs, minimal cc_toolchain fixture reuse/override
+hooks, scheduling and Stage6/bootstrap docs. Genuine published toolchain required;
+no authored replacement provider/model and no copied upstream body.
+Independent reviewer: design checkpoint then final actual diff/evidence.
+Root serializes Cargo. Estimate250–500 production and500–1000 proof lines.
 
-Resolve pinned nightly through rustup. Serialized offline/locked Cargo JSON
-no-run for Configuration/Commands/Loading libs and Analysis starlark_rule integration;
-Core/CLI checks. Exact preflight before each executable batch, then execute every
-selected test.60s preparation operation cap; tests expected seconds, no new
-user deadline. No Bazel/Slug process, daemon or action execution needed.
-Format/diff/status/archive and independent final ACCEPT before atomic commit.
-REPLAN only for a new semantic owner/compatibility decision; normal compile/test
-corrections remain in packet. Full CppCompile needs mandatory/spawn/cache-only
-input partitions and discovery-aware lifecycle, not generic Spawn relabeling.
+## Validation and acceptance
 
-Independent design ACCEPT confirms this bounded prerequisite. File.extension
-uses the artifact exec-path, including prefix-sensitive dotfiles. The exec -g0
-branch uses structural observed Host OS; missing observation fails closed, never
-inferred from CPU, path flavor, target OS or selected execution-platform OS.
+Context: original/repeated ctx identity across real GC; genuine positional binding,
+foreign same-number token rejection, missing-root failure, success/error cleanup,
+escaped root/subrule actions, live suspended frame lookup with locked outer ctx
+and post-subrule restoration; callable/depset root coexistence.
+Naming: all22 category defaults, override prefix/extension, normalized nested paths,
+invalid child/category and provider/model/shape negatives, raw valid keyed provider.
+Use source-exact path normalization; name any unsupported Host-specific edge.
+Integration: unchanged public naming helper consumes complete published toolchain;
+configuration/provider A/B/A and unused payload invalidation, root ctx identity
+and ordinary analysis behavior. Preserve WP763/764 toolchain/compile proofs and
+existing lifecycle/subrule tests affected by root cleanup.
 
-## Acceptance receipt
+Pinned nightly via rustup; serial offline/locked Cargo JSON no-run for BuildAPI,
+Loading, Analysis lib and starlark_rule/subrule integrations. Exact preflight then direct test execution;
+Core/CLI check.60s preparation operation cap, expected seconds/test; no new user
+deadline. No Bazel/Slug/daemon/action execution. Formatting/diff/archive/status
+checks and final independent ACCEPT before atomic commit.
+REPLAN only for a new owner/path-policy prerequisite or contradictory parity
+evidence. Normal compile/test corrections stay in the packet. M7A partial/M8
+unproved; coherent roots remain the next explicit design gate.
 
-Accepted against10dcaac34 on2026-09-21 after independent final ACCEPT. The
-observable gate is authentic unchanged compile-option/dotd helper consumption of
-the published complete toolchain, with same-DICE change/restoration. No parity
-class widened; production remains Rust-native. Source corpus54 bodies unchanged.
-The implementation is about220 production lines with cohesive child tests;
-proof growth stays within the declared estimate. No new retained representation.
+Independent design ACCEPT: context identity/lifetime, observed non-Windows naming
+and preserved native provider classification are bounded and ready to implement.
 
-Pinned nightly-2025-09-14, offline/locked, Cargo JSON no-run: Configuration lib
-exit0/1.267s; Commands lib0/10.844s; Loading lib0/17.458s; Analysis starlark_rule
-integration0/7.026s. Two initial test-only borrow/coercion compile errors were
-corrected before execution; their0.565s/4.576s receipts are preserved locally.
-Exact preflight plus individual direct execution: Configuration16/16,
-Commands2/2, Loading9/9, Analysis14/14 (2 new,4 toolchain,8 Rustc/linker).
-All41 selected tests passed, exit0,1.886s total; no failing runtime invocation.
-Core check0/7.575s and CLI check0/7.826s. Total preparation/check57.137s including
-the corrected compile attempts; maximum operation17.458s, below60s cap. Commands,
-outputs and receipts are in ignored target/wp764. Formatting, git diff --check,
-plan status and archive checks pass. No Bazel/Slug action or daemon run.
+## Acceptance evidence
 
-Packet elapsed approximately17 minutes from predecessor acceptance through close;
-parallel design/source/implementation/final review time was not separately timed.
-No REPLAN. Next bounded prerequisite is actions2ctx/root/output naming ownership;
-the actual default dotd-on CppCompile action must later own its separate input
-partitions, discovery and inclusion validation. M7A remains partial; M8 unproved.
+Independent final ACCEPT on2026-09-21 against9e97b5f8c confirms the bounded
+context/naming/classification contract. Pinned nightly-2025-09-14/offline/locked Cargo JSON no-run:
+BuildAPI lib exit0/3.023s, Loading lib0/31.230s, Analysis lib0/7.780s,
+starlark_rule integration0/6.226s after adding the context-publication negative,
+subrule integration0/1.469s after the fixture correction. Core check0/17.188s;
+CLI check0/17.988s. All operations stayed below60s preparation cap. Total
+preparation/check128.537s includes an initial Analysis unit compile failure
+(private test-only imports, corrected to the existing public transfer API),
+earlier successful preparation and the subrule rebuild.
+
+Exact preflight and direct execution: BuildAPI6/6, Loading13/13, Analysis lib8/8,
+starlark_rule17/17 (3 new,2 compile inputs,4 full toolchain,8 Rustc/linker),
+subrule3/3.47 selected tests pass, exit0, latest runtime2.387s. One preflight
+module-path typo was corrected before execution. One preserved runtime failure
+was a stale subrule expectation of2 providers versus the already accepted
+automatic OutputGroupInfo: the fixture now asserts exact3, DefaultInfo and the
+single empty hidden group, retaining all ReturnedInfo/action assertions. It also
+injects existing observation shards; all3 protected tests pass after correction.
+Commands, full output and receipts remain in ignored target/wp765.
+
+The genuine configured proof covers original ctx identity, complete published
+toolchain naming, pattern override, unused configuration payload invalidation,
+same-key/fields schema source change/restoration and ctx publication rejection.
+Loading separately proves real GC, suspended/subrule frames, foreign/stale/occupied
+registration and success/error cleanup. The corpus54 upstream bodies is unchanged;
+only authored caller inputs grew. Roughly300 production and1000 proof lines remain
+cohesive behind thin large-module hooks; no donor import, new cache or performance
+claim. Utility review kept schema metadata to one boolean in the existing owner.
+Formatting/diff/status/archive checks pass; no Bazel/Slug action or daemon run.
+Packet elapsed approximately21 minutes including parallel source/design/final
+review (review time not separately measured). No implementation REPLAN; root-path
+architecture was explicitly separated before activation, not replaced by a shim.

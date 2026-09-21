@@ -517,7 +517,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
         Ok(if occurrence.identity().is_builtin("ToolchainInfo") {
             StarlarkToolchainInfo::alloc(self.heap, fields)
         } else if let Some(id) = occurrence.identity().user_id() {
-            alloc_starlark_user_provider(self.heap, id.dupe(), fields)
+            alloc_starlark_user_provider(self.heap, id.dupe(), occurrence.has_schema(), fields)
         } else {
             self.heap.alloc(BuiltinProviderView {
                 identity: occurrence.identity().clone(),
@@ -1134,9 +1134,12 @@ impl<'v> AnalysisValueLowerer<'v> {
                     Ok((name.clone(), self.lower(value, &format!("{path}.{name}"))?))
                 })
                 .collect::<Result<Vec<_>, String>>()?;
-            return Ok(AnalysisValue::provider(ProviderOccurrence::new(
-                identity, fields,
-            )));
+            return Ok(AnalysisValue::provider(
+                ProviderOccurrence::new(identity, fields).with_schema_classification(
+                    slug_loading_v2::provider::starlark_user_provider_has_schema(value)
+                        .unwrap_or(false),
+                ),
+            ));
         }
         if let Some(values) = ListRef::from_value(value) {
             return values
@@ -1194,6 +1197,9 @@ mod cc_header_info_tests;
 
 #[cfg(test)]
 mod cc_toolchain_tests;
+
+#[cfg(test)]
+mod provider_schema_tests;
 
 #[path = "analysis_value/cc_variables.rs"]
 mod cc_variables;

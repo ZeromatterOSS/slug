@@ -455,6 +455,9 @@ pub struct ProviderOccurrence {
     identity: ProviderIdentity,
     fields: SmallMap<CompactString, AnalysisValue>,
     files_to_run: Option<Arc<FilesToRunProvider>>,
+    // Native provider wrappers can distinguish schemaful declarations even
+    // after publication. This is not inferred from the populated field set.
+    has_schema: bool,
 }
 
 impl ProviderOccurrence {
@@ -471,6 +474,7 @@ impl ProviderOccurrence {
             identity,
             fields,
             files_to_run: None,
+            has_schema: false,
         }
     }
 
@@ -483,6 +487,15 @@ impl ProviderOccurrence {
 
     pub fn identity(&self) -> &ProviderIdentity {
         &self.identity
+    }
+
+    pub fn with_schema_classification(mut self, has_schema: bool) -> Self {
+        self.has_schema = has_schema;
+        self
+    }
+
+    pub fn has_schema(&self) -> bool {
+        self.has_schema
     }
 
     pub fn fields(&self) -> &SmallMap<CompactString, AnalysisValue> {
@@ -529,6 +542,7 @@ impl ProviderOccurrence {
 
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         self.identity == other.identity
+            && self.has_schema == other.has_schema
             && match (&self.files_to_run, &other.files_to_run) {
                 (Some(left), Some(right)) => left.publication_eq_with(right, state),
                 (None, None) => true,

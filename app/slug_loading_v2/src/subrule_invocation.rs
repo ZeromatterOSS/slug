@@ -37,6 +37,7 @@ use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
+use starlark::environment::Module;
 use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
 use starlark::starlark_complex_value;
@@ -58,6 +59,7 @@ use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
+use starlark::values::tuple::AllocTuple;
 use starlark::values::tuple::TupleRef;
 use starlark::values::typing::StarlarkCallable;
 use starlark_map::StarlarkHasher;
@@ -871,6 +873,44 @@ impl AnalysisCallToken {
     }
 }
 
+/// Associates a traced module slot with the existing evaluation stack. It owns
+/// no context payload and contains no moving Starlark Value.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct AnalysisRootContextMarker {
+    #[allocative(skip)]
+    token: AnalysisCallToken,
+}
+
+impl fmt::Display for AnalysisRootContextMarker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<analysis context registration>")
+    }
+}
+
+starlark::starlark_simple_value!(AnalysisRootContextMarker);
+
+#[starlark_value(type = "analysis_context_registration")]
+impl<'v> StarlarkValue<'v> for AnalysisRootContextMarker {}
+
+/// Keeps the original ctx rooted only for its implementation invocation. The
+/// module traces the Value; this host guard stores only its module and token.
+pub struct AnalysisRootContextGuard<'v> {
+    module: &'v Module,
+    token: AnalysisCallToken,
+}
+
+impl Drop for AnalysisRootContextGuard<'_> {
+    fn drop(&mut self) {
+        crate::evaluator_roots::set_analysis_context(self.module, Value::new_none());
+        self.token
+            .stack
+            .lock()
+            .expect("analysis call stack lock is not poisoned")
+            .frames
+            .clear();
+    }
+}
+
 struct CallFrameGuard {
     token: AnalysisCallToken,
 }
@@ -929,6 +969,36 @@ struct AnalysisEvaluationPayload {
 }
 
 impl AnalysisEvaluationContext {
+    /// Register the exact rule ctx allocated by Analysis, never a reconstruction.
+    /// A single module can have only one active configured-analysis invocation.
+    pub fn enter_root_context<'v>(
+        &self,
+        module: &'v Module,
+        context: Value<'v>,
+    ) -> anyhow::Result<AnalysisRootContextGuard<'v>> {
+        if crate::evaluator_roots::analysis_context(module).is_some() {
+            anyhow::bail!("analysis context is already registered in this module");
+        }
+        {
+            let stack = self
+                .stack
+                .lock()
+                .expect("analysis call stack lock is not poisoned");
+            if stack.frames.len() != 1 || stack.frames[0].token != 0 {
+                anyhow::bail!("analysis root context requires a live root implementation frame");
+            }
+        }
+        let token = self.root_token();
+        let marker = module.heap().alloc_simple(AnalysisRootContextMarker {
+            token: token.clone(),
+        });
+        crate::evaluator_roots::set_analysis_context(
+            module,
+            module.heap().alloc(AllocTuple([context, marker])),
+        );
+        Ok(AnalysisRootContextGuard { module, token })
+    }
+
     pub fn new(
         direct: Arc<[Arc<SubruleIdentity>]>,
         prepared: impl IntoIterator<Item = PreparedSubruleInvocation>,
@@ -993,11 +1063,15 @@ impl AnalysisEvaluationContext {
     }
 
     pub(crate) fn header_info_windows_host(&self) -> anyhow::Result<bool> {
+        Ok(self.observed_host_os()?
+            == slug_configuration_v2::native::host::ActionEnvironmentHostOs::Windows)
+    }
+
+    pub(crate) fn observed_host_os(
+        &self,
+    ) -> anyhow::Result<slug_configuration_v2::native::host::ActionEnvironmentHostOs> {
         self.host_os
-            .map(|os| os == slug_configuration_v2::native::host::ActionEnvironmentHostOs::Windows)
-            .ok_or_else(|| {
-                anyhow::anyhow!("HeaderInfo normalization requires observed analysis Host")
-            })
+            .ok_or_else(|| anyhow::anyhow!("operation requires observed analysis Host"))
     }
 
     pub fn root_token(&self) -> AnalysisCallToken {
@@ -1231,6 +1305,49 @@ impl AnalysisActions {
             .absolute_symlink(output, target_path, progress_message)
     }
 }
+
+/// CcStarlarkInternal.actions2ctx_cheat unwraps both rule and subrule action
+/// factories. Suspended live frames are permitted here; the returned ctx retains
+/// its ordinary top-frame checks, so the outer ctx stays locked in subrules.
+pub(crate) fn actions_to_context<'v>(
+    actions: Value<'v>,
+    eval: &Evaluator<'v, '_, '_>,
+) -> anyhow::Result<Value<'v>> {
+    let actions = AnalysisActions::from_value(actions)
+        .ok_or_else(|| anyhow::anyhow!("actions2ctx_cheat requires genuine ctx.actions"))?;
+    let evaluation = AnalysisEvaluationContext::from_evaluator(eval)?;
+    if !Arc::ptr_eq(&actions.token.stack, &evaluation.stack) {
+        anyhow::bail!("actions2ctx_cheat cannot use actions from another evaluation");
+    }
+    {
+        let stack = evaluation
+            .stack
+            .lock()
+            .expect("analysis call stack lock is not poisoned");
+        if !stack
+            .frames
+            .iter()
+            .any(|frame| frame.token == actions.token.token)
+        {
+            anyhow::bail!("actions2ctx_cheat cannot use expired actions");
+        }
+    }
+    let registration = crate::evaluator_roots::analysis_context(eval.module())
+        .ok_or_else(|| anyhow::anyhow!("actions2ctx_cheat requires a registered analysis ctx"))?;
+    let fields = TupleRef::from_value(registration)
+        .expect("analysis context registration tuple")
+        .content();
+    let marker = AnalysisRootContextMarker::from_value(fields[1])
+        .expect("analysis context registration marker");
+    if !Arc::ptr_eq(&marker.token.stack, &evaluation.stack) {
+        anyhow::bail!("actions2ctx_cheat context registration belongs to another evaluation");
+    }
+    Ok(fields[0])
+}
+
+#[cfg(test)]
+#[path = "subrule_invocation/context_lifecycle_tests.rs"]
+mod context_lifecycle_tests;
 
 #[cfg(test)]
 mod native_solib_token_tests {

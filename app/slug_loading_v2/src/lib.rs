@@ -22,6 +22,7 @@ mod canonical_repository_mapping;
 mod canonical_repository_route;
 #[cfg(test)]
 mod canonical_repository_route_tests;
+mod cc_artifact_naming;
 mod cc_common;
 pub mod cc_context;
 mod cc_features;

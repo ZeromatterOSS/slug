@@ -3,7 +3,7 @@
 # rule, FDO production, real tool execution, or compile/link action support.
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
-load("@rules_cc//cc:cc_toolchain_config_lib.bzl", "env_entry", "env_set", "feature", "tool_path")
+load("@rules_cc//cc:cc_toolchain_config_lib.bzl", "artifact_name_pattern", "env_entry", "env_set", "feature", "tool_path")
 load("@rules_cc//cc/private:cc_internal.bzl", "cc_internal")
 load("@rules_cc//cc/private/rules_impl:cc_toolchain_info.bzl", "CcToolchainInfo")
 load("@rules_cc//cc/private/toolchain_config:cc_toolchain_config_info.bzl", "create_cc_toolchain_config_info")
@@ -24,6 +24,7 @@ def _make(ctx):
     info = create_cc_toolchain_config_info(ctx = ctx, toolchain_identifier = "complete-proof",
         compiler = "gcc", target_cpu = "k8", target_libc = "local", target_system_name = "proof-system",
         abi_version = "proof-abi", abi_libc_version = "proof-libc",
+        artifact_name_patterns = [artifact_name_pattern(category_name = "object_file", prefix = ctx.attr.object_prefix, extension = ctx.attr.object_extension)],
         features = [feature(name = "supports_pic"), feature(name = "static_link_cpp_runtimes"),
             feature(name = "parse_showincludes"), feature(name = "no_dotd_file"),
             feature(name = "probe_env", enabled = True, env_sets = [env_set(actions = ["c++-link-executable"],
@@ -139,6 +140,7 @@ def make_subject(get_linker_and_args):
     return rule(implementation = implementation, fragments = ["cpp"], attrs = {
         "compiler": attr.string(default = "gcc"), "dep": attr.label(), "failure": attr.string(),
         "runtime": attr.string(default = "files"), "unused": attr.string(default = "A"),
+        "object_prefix": attr.string(), "object_extension": attr.string(default = ".o"),
         "header": attr.label(default = "@@//:header.h", allow_single_file = True),
         "static_file": attr.label(default = "@@//:static.a", allow_single_file = True),
         "dynamic_file": attr.label(default = "@@//:dynamic.so", allow_single_file = True),

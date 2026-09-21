@@ -13,6 +13,7 @@ use dupe::Dupe;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+mod artifact_naming;
 mod metadata;
 pub use metadata::*;
 mod expansion;

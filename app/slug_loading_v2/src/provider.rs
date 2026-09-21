@@ -806,6 +806,9 @@ struct SchemalessLoadingFieldsGen<V> {
     #[freeze(identity)]
     names: Arc<[CompactString]>,
     values: Vec<V>,
+    // Materialized providers use compact named storage regardless of their
+    // original declaration kind. Preserve that kind for native typed wrappers.
+    has_schema: bool,
 }
 #[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct LoadingStarlarkUserProviderGen<V> {
@@ -858,9 +861,23 @@ pub fn starlark_user_provider_fields<'v>(
     }
 }
 
+pub fn starlark_user_provider_has_schema(value: Value<'_>) -> Option<bool> {
+    fn has_schema<V>(fields: &LoadingProviderFieldsGen<V>) -> bool {
+        match fields {
+            LoadingProviderFieldsGen::Schemaful { .. } => true,
+            LoadingProviderFieldsGen::Schemaless(fields) => fields.has_schema,
+        }
+    }
+    match LoadingStarlarkUserProvider::from_value(value)? {
+        starlark::__macro_refs::Either::Left(provider) => Some(has_schema(&provider.fields)),
+        starlark::__macro_refs::Either::Right(provider) => Some(has_schema(&provider.fields)),
+    }
+}
+
 pub fn alloc_starlark_user_provider(
     heap: &starlark::values::FrozenHeap,
     id: ProviderId,
+    has_schema: bool,
     fields: impl IntoIterator<Item = (CompactString, FrozenValue)>,
 ) -> FrozenValue {
     let mut fields = fields.into_iter().collect::<SmallMap<_, _>>();
@@ -871,6 +888,7 @@ pub fn alloc_starlark_user_provider(
         fields: LoadingProviderFieldsGen::Schemaless(SchemalessLoadingFieldsGen {
             names: names.into(),
             values,
+            has_schema,
         }),
     })
 }
@@ -1061,6 +1079,7 @@ fn invoke_provider<'v>(
         fields: LoadingProviderFieldsGen::Schemaless(SchemalessLoadingFieldsGen {
             names: field_names.into(),
             values,
+            has_schema: false,
         }),
     }))
 }

@@ -333,6 +333,9 @@ async fn analyze_result(
         )])
         .unwrap();
     updater
+        .changed_to(slug_workspace_v2::path_observation_shards(&epoch))
+        .unwrap();
+    updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
     let mut attributes = SmallMap::new();
@@ -1023,7 +1026,18 @@ async fn configured_subrule_dependencies_materialize_and_invoke() {
         result.actions()[0].context().owner().label().to_string(),
         "@@//subject:subject"
     );
-    assert_eq!(result.providers().len(), 2);
+    // The configured output_groups owner adds OutputGroupInfo even when the
+    // implementation returns only DefaultInfo and its authored ReturnedInfo.
+    assert_eq!(result.providers().len(), 3);
+    assert!(result.providers().default_info().is_some());
+    let groups = result.providers().output_group_info().unwrap().groups();
+    assert_eq!(groups.len(), 1);
+    assert!(
+        groups
+            .get("_hidden_top_level_INTERNAL_")
+            .unwrap()
+            .is_empty()
+    );
     let returned = result
         .providers()
         .user(&ProviderId::new("//rules:defs.bzl", "ReturnedInfo").unwrap())
