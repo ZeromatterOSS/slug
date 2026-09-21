@@ -7955,10 +7955,12 @@ keywords before shared attribute population, so symbolic macros do not admit
 the alternate rule spelling. Platform, constraint-setting/value and
 materializer/dependency-resolution classes lack the canonical slot. Bazel's
 `rules_license` repository-name special case suppresses package metadata
-defaults to avoid self-edges. Slug's dormant REPO.bazel evaluator discards all
-`repo()` keyword values, and Slug currently admits repeated BUILD package
-calls. Those independent categories remain unsupported/deferred rather than
-being hidden inside an alias patch.
+defaults to avoid self-edges. At that alias packet's baseline, Slug discarded
+`repo()` keyword values and admitted repeated BUILD package calls; neither was
+hidden inside the alias patch. WP759 now retains typed repository/package feature
+defaults through observed package sources and enforces one nonempty package call
+per BUILD. Other repository package arguments and the rules_license metadata
+special case remain outside that feature admission.
 
 Select
 `WP-4-7A-applicable-licenses-loading-alias-design-r1`. Implement only immediate

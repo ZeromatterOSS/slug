@@ -55,9 +55,12 @@ use starlark::syntax::ast::AstStmt;
 use starlark::syntax::ast::Clause;
 use starlark::syntax::ast::Expr;
 use starlark::syntax::ast::Stmt;
+use starlark::values::UnpackValue;
+use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
 use starlark::values::none::NoneType;
 use starlark::values::range::Range;
+use starlark::values::set::SetRef;
 use starlark::values::tuple::TupleRef;
 
 use crate::NonrootModuleKey;
@@ -93,17 +96,23 @@ const INVALID_UTF8_ERROR_SUFFIX: &str =
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub(crate) struct HostRepoFileValue {
     ignored_directories: Arc<[CompactString]>,
+    features: Arc<[CompactString]>,
 }
 
 impl HostRepoFileValue {
     pub(crate) fn empty() -> Self {
         Self {
             ignored_directories: Arc::from([]),
+            features: Arc::from([]),
         }
     }
 
     pub(crate) fn ignored_directories(&self) -> &[CompactString] {
         &self.ignored_directories
+    }
+
+    pub(crate) fn features(&self) -> &Arc<[CompactString]> {
+        &self.features
     }
 }
 
@@ -243,6 +252,7 @@ struct RepoEvaluationState {
     repo_called: bool,
     ignore_directories_called: bool,
     ignored_directories: Vec<CompactString>,
+    features: Vec<CompactString>,
 }
 
 #[derive(ProvidesStaticType)]
@@ -309,8 +319,24 @@ fn repo_file_globals(builder: &mut GlobalsBuilder) {
                 "at least one argument must be given to the 'repo' function",
             ));
         }
-        // Values are evaluated by Starlark before this call. This projection
-        // deliberately owns no debug representation or package-argument copy.
+        if let Some((_, features)) = kwargs.iter().find(|(name, _)| name.as_str() == "features") {
+            if ListRef::from_value(*features).is_none()
+                && TupleRef::from_value(*features).is_none()
+                && Range::from_value(*features).is_none()
+                && SetRef::unpack_value_opt(*features).is_none()
+                && DictRef::from_value(*features).is_none()
+            {
+                return Err(custom_error("repo features must be a sequence of strings"));
+            }
+            for value in features.iterate(eval.heap())? {
+                let value = value
+                    .unpack_str()
+                    .ok_or_else(|| custom_error("repo features must contain strings"))?;
+                state.features.push(value.into());
+            }
+        }
+        // Unrelated keyword values retain the previously admitted discard-only
+        // behavior; they are not newly activated as repository package defaults.
         state.repo_called = true;
         Ok(NoneType)
     }
@@ -709,6 +735,7 @@ fn evaluate_repo_file(
     let state = context.state.into_inner();
     Ok(HostRepoFileValue {
         ignored_directories: state.ignored_directories.into(),
+        features: state.features.into(),
     })
 }
 
@@ -2087,6 +2114,8 @@ pub(crate) mod tests {
             .is_ok()
         );
     }
+
+    include!("repo_file_feature_tests.rs");
 
     #[test]
     fn repo_global_names_are_exact() {

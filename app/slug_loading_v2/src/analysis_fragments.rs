@@ -75,6 +75,48 @@ starlark::starlark_simple_value!(CppFragmentValue);
 
 #[starlark_module]
 fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
+    fn force_pic(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        this.check(eval).map_err(|error| {
+            anyhow::anyhow!("{error} (feature 'force_pic' in CppConfiguration)")
+        })?;
+        Ok(this.projection.force_pic()?)
+    }
+
+    fn use_llvm_coverage_map_format(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        this.check(eval)?;
+        Ok(this.projection.use_llvm_coverage_map_format()?)
+    }
+
+    fn fdo_instrument<'v>(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        this.check(eval).map_err(|error| {
+            anyhow::anyhow!("{error} (feature 'fdo_instrument' in CppConfiguration)")
+        })?;
+        Ok(CppFragmentValue::optional(
+            this.projection.fdo_instrument()?,
+            eval.heap(),
+        ))
+    }
+
+    fn cs_fdo_instrument<'v>(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        this.check(eval)?;
+        Ok(CppFragmentValue::optional(
+            this.projection.cs_fdo_instrument()?,
+            eval.heap(),
+        ))
+    }
+
     #[starlark(attribute)]
     fn custom_malloc<'v>(this: &CppFragmentValue, heap: Heap<'v>) -> anyhow::Result<Value<'v>> {
         Ok(this
@@ -146,11 +188,52 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
 
 #[starlark_value(type = "cpp")]
 impl<'v> StarlarkValue<'v> for CppFragmentValue {
+    fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        // These are values, not native attribute methods: the engine's direct
+        // method-call path invokes a native attribute getter without calling
+        // its returned value. CppFragmentProjection::new validated the immutable
+        // configuration, so these reads cannot subsequently fail conversion.
+        match name {
+            "apple_generate_dsym" => Some(Value::new_bool(
+                self.projection
+                    .apple_generate_dsym()
+                    .expect("validated Cpp apple_generate_dsym"),
+            )),
+            "_dont_enable_host_nonhost" => Some(Value::new_bool(
+                self.projection
+                    .dont_enable_host_nonhost()
+                    .expect("validated Cpp dont_enable_host_nonhost"),
+            )),
+            "_fdo_prefetch_hints_label" => Some(
+                self.projection
+                    .fdo_prefetch_hints_label()
+                    .expect("validated Cpp fdo_prefetch_hints_label")
+                    .map_or_else(Value::new_none, |label| alloc_starlark_label(heap, label)),
+            ),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        [
+            "apple_generate_dsym",
+            "_dont_enable_host_nonhost",
+            "_fdo_prefetch_hints_label",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect()
+    }
+
     fn get_methods() -> Option<&'static Methods> {
         static METHODS: MethodsStatic = MethodsStatic::new();
         METHODS.methods(cpp_fragment_methods)
     }
 }
+
+#[cfg(test)]
+#[path = "analysis_fragments/cc_feature_tests.rs"]
+mod cc_feature_tests;
 
 /// Bazel's public coverage fragment contains no caller restriction. The
 /// optional canonical label is the complete configured projection.

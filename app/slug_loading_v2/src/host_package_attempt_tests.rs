@@ -82,6 +82,7 @@ impl Key for HostPackageAttemptTestKey {
         evaluate_host_package_attempts(
             ctx,
             HostPackageAttemptInput {
+                repository_features: Arc::from(["repo".into()]),
                 workspace: path("/workspace"),
                 logical_package_root: path("/workspace"),
                 package: self.package.clone(),
@@ -591,7 +592,7 @@ async fn forwards_need_and_restores_outputs_in_one_dice_graph() {
             PathObservationEpoch::new([]).unwrap(),
         )])
         .unwrap();
-    let source = "print(\"final\")\nexports_files(glob([\"entry\"], allow_empty = True))\n";
+    let source = "package(features=['-repo', 'package'])\nprint(\"final\")\nexports_files(glob([\"entry\"], allow_empty = True))\n";
     let key = key("pkg", source);
     let mut transaction = updater.commit().await;
     let need = transaction.compute(&key).await.unwrap();
@@ -627,6 +628,11 @@ async fn forwards_need_and_restores_outputs_in_one_dice_graph() {
         let terminal = complete(&outcome);
         assert_eq!(events(terminal), ["final"]);
         let package = terminal.result.as_ref().unwrap();
+        assert_eq!(package.feature_defaults.repository(), ["repo"]);
+        assert!(package.feature_defaults.package().is_some());
+        let features = package.feature_defaults.resolve(&[], &[]);
+        assert_eq!(features.enabled(), ["package"]);
+        assert_eq!(features.disabled(), ["repo"]);
         assert_eq!(
             package
                 .targets

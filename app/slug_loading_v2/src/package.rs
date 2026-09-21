@@ -161,6 +161,7 @@ pub struct PackageEvaluation {
     pub package_dir: PathBuf,
     pub build_file: PathBuf,
     pub default_visibility: RuleVisibility,
+    pub feature_defaults: crate::package_features::PackageFeatureDefaults,
     pub targets: Vec<PackageTarget>,
     /// Sparse RuleClass values keyed by their stable position in `targets`.
     pub native_attributes: Arc<[NativeTargetAttributes]>,
@@ -184,6 +185,7 @@ impl PartialEq for PackageEvaluation {
         self.package_dir == other.package_dir
             && self.build_file == other.build_file
             && self.default_visibility == other.default_visibility
+            && self.feature_defaults == other.feature_defaults
             && self.targets == other.targets
             && self.native_attributes == other.native_attributes
             && self.macro_instances == other.macro_instances
@@ -1184,6 +1186,8 @@ impl StarlarkRuleImplementation {
 
 #[derive(Debug)]
 struct PackageState {
+    package_called: bool,
+    feature_defaults: crate::package_features::PackageFeatureDefaults,
     default_visibility: RuleVisibility,
     default_deprecation: Option<CompactString>,
     default_testonly: bool,
@@ -1198,6 +1202,8 @@ struct PackageState {
 impl Default for PackageState {
     fn default() -> Self {
         Self {
+            package_called: false,
+            feature_defaults: crate::package_features::PackageFeatureDefaults::default(),
             default_visibility: RuleVisibility::Private,
             default_deprecation: None,
             default_testonly: false,
@@ -1339,6 +1345,12 @@ impl PackageRecorder {
             print_capture: None,
             state: RefCell::new(PackageState::default()),
         }
+    }
+
+    pub(crate) fn with_repository_features(self, features: Arc<[CompactString]>) -> Self {
+        self.state.borrow_mut().feature_defaults =
+            crate::package_features::PackageFeatureDefaults::new(features);
+        self
     }
 
     pub(crate) fn with_bzl_call_sources(
@@ -2357,6 +2369,7 @@ impl PackageRecorder {
             package_dir,
             build_file,
             default_visibility: state.default_visibility,
+            feature_defaults: state.feature_defaults,
             targets: state
                 .targets
                 .into_iter()
@@ -3192,8 +3205,30 @@ fn package_global<'v>(
     default_testonly: Option<bool>,
     default_package_metadata: Option<Value<'v>>,
     default_applicable_licenses: Option<Value<'v>>,
+    features: Option<Value<'v>>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<NoneType> {
+    {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.reject_macro_operation("package()")?;
+        let mut state = recorder.state.borrow_mut();
+        if state.package_called {
+            anyhow::bail!("'package' can only be used once per BUILD file");
+        }
+        state.package_called = true;
+    }
+    if default_visibility.is_none()
+        && default_deprecation.is_none()
+        && default_testonly.is_none()
+        && default_package_metadata.is_none()
+        && default_applicable_licenses.is_none()
+        && features.is_none()
+    {
+        anyhow::bail!("at least one argument must be given to the 'package' function");
+    }
+    let features = features
+        .map(|value| crate::package_features::unpack_feature_strings(value, eval))
+        .transpose()?;
     let recorder = PackageRecorder::from_evaluator(eval)?;
     recorder.reject_macro_operation("package()")?;
     let package_metadata = match (default_package_metadata, default_applicable_licenses) {
@@ -3214,6 +3249,10 @@ fn package_global<'v>(
             })
             .transpose()?,
     )?;
+    if let Some(features) = features {
+        let mut state = recorder.state.borrow_mut();
+        state.feature_defaults = state.feature_defaults.clone().with_package_scope(features);
+    }
     Ok(NoneType)
 }
 
@@ -9190,6 +9229,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         default_testonly: Option<bool>,
         default_package_metadata: Option<Value<'v>>,
         default_applicable_licenses: Option<Value<'v>>,
+        features: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         package_global(
@@ -9198,6 +9238,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             default_testonly,
             default_package_metadata,
             default_applicable_licenses,
+            features,
             eval,
         )
     }
@@ -9844,6 +9885,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         default_testonly: Option<bool>,
         default_package_metadata: Option<Value<'v>>,
         default_applicable_licenses: Option<Value<'v>>,
+        features: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         package_global(
@@ -9852,6 +9894,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
             default_testonly,
             default_package_metadata,
             default_applicable_licenses,
+            features,
             eval,
         )
     }

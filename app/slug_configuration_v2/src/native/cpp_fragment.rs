@@ -30,6 +30,13 @@ impl CppFragmentProjection {
         projection.optional_text("propeller_optimize_absolute_ld_profile")?;
         projection.proto_profile()?;
         projection.custom_malloc()?;
+        projection.force_pic()?;
+        projection.apple_generate_dsym()?;
+        projection.dont_enable_host_nonhost()?;
+        projection.use_llvm_coverage_map_format()?;
+        projection.fdo_instrument()?;
+        projection.cs_fdo_instrument()?;
+        projection.fdo_prefetch_hints_label()?;
         Ok(projection)
     }
 
@@ -85,6 +92,36 @@ impl CppFragmentProjection {
 
     pub fn custom_malloc(&self) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
         self.configuration.cpp_custom_malloc_label()
+    }
+
+    pub fn force_pic(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration.native_bool(CPP_OPTIONS, "force_pic")
+    }
+    pub fn apple_generate_dsym(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration
+            .native_bool(CPP_OPTIONS, "apple_generate_dsym")
+    }
+    pub fn dont_enable_host_nonhost(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration.native_bool(
+            CPP_OPTIONS,
+            "incompatible_dont_enable_host_nonhost_crosstool_features",
+        )
+    }
+    pub fn use_llvm_coverage_map_format(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration
+            .native_bool(CPP_OPTIONS, "experimental_use_llvm_covmap")
+    }
+    // Instrumentation strings are raw option text, not absolute profile paths.
+    pub fn fdo_instrument(&self) -> Result<Option<&str>, SlugConfigurationError> {
+        self.configuration.cpp_text("fdo_instrument")
+    }
+    pub fn cs_fdo_instrument(&self) -> Result<Option<&str>, SlugConfigurationError> {
+        self.configuration.cpp_text("cs_fdo_instrument")
+    }
+    pub fn fdo_prefetch_hints_label(
+        &self,
+    ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
+        self.configuration.cpp_label("fdo_prefetch_hints")
     }
 
     fn optional_text(&self, name: &'static str) -> Result<Option<&str>, SlugConfigurationError> {

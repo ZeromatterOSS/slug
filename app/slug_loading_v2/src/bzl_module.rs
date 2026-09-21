@@ -684,6 +684,7 @@ struct ForceRootPackageObservationOuter(ObservedPathFrontierError);
 
 #[allow(dead_code)]
 struct HostPackageAttemptInput<'a> {
+    repository_features: Arc<[CompactString]>,
     workspace: NormalizedAbsolutePath,
     logical_package_root: NormalizedAbsolutePath,
     package: PackagePath,
@@ -773,6 +774,7 @@ fn evaluate_host_package_attempt(
         input.package_identifier.clone(),
         repository_mapping,
     )
+    .with_repository_features(input.repository_features.dupe())
     .with_bzl_call_sources(package_bzl_call_sources(input.loaded_modules))
     .with_print_capture(print_capture.clone());
     let module = Module::new();
@@ -5971,6 +5973,7 @@ async fn compute_root_package(
     let attempts = evaluate_host_package_attempts_driver(
         ctx,
         HostPackageAttemptInput {
+            repository_features: source.repository_features().dupe(),
             workspace: key.workspace.dupe(),
             logical_package_root: source.package_root().dupe(),
             package: key.package.clone(),
@@ -6531,6 +6534,7 @@ fn project_repository_load_resolution_error(
 }
 
 struct PreparedRepositoryPackageEvaluation {
+    repository_features: Arc<[CompactString]>,
     source_text: Arc<String>,
     glob_source: RepositoryPackageGlobSource,
     logical_package_dir: PathBuf,
@@ -6672,6 +6676,7 @@ fn prepare_repository_package_evaluation(
         key.package, build_basename
     ));
     Ok(PreparedRepositoryPackageEvaluation {
+        repository_features: source.repository_features().dupe(),
         source_text,
         glob_source,
         logical_package_dir,
@@ -6746,6 +6751,7 @@ async fn evaluate_repository_package(
         ),
     };
     let input = HostPackageAttemptInput {
+        repository_features: prepared.repository_features,
         workspace: key.route.workspace().dupe(),
         logical_package_root,
         package: key.package.clone(),

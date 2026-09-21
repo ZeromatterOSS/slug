@@ -701,6 +701,68 @@ mod tests {
     }
 
     #[test]
+    fn feature_configuration_flags_preserve_raw_strings_and_boolean_no_forms() {
+        for (name, option) in [
+            ("features", NativeCommandOption::Features),
+            ("host_features", NativeCommandOption::HostFeatures),
+        ] {
+            for value in ["a,b", "-disabled", "", "null"] {
+                assert_eq!(
+                    occurrence(&format!("--{name}={value}")).unwrap(),
+                    Some(CommandConfigurationOccurrence::native(
+                        option,
+                        Some(value),
+                        false
+                    ))
+                );
+            }
+            assert!(occurrence(&format!("--{name}")).is_err());
+            assert!(occurrence(&format!("--no{name}")).is_err());
+        }
+        for (name, option) in [
+            ("force_pic", NativeCommandOption::ForcePic),
+            (
+                "apple_generate_dsym",
+                NativeCommandOption::AppleGenerateDsym,
+            ),
+            (
+                "experimental_use_llvm_covmap",
+                NativeCommandOption::ExperimentalUseLlvmCovmap,
+            ),
+            (
+                "incompatible_dont_enable_host_nonhost_crosstool_features",
+                NativeCommandOption::IncompatibleDontEnableHostNonhostCrosstoolFeatures,
+            ),
+        ] {
+            assert_eq!(
+                occurrence(&format!("--{name}")).unwrap(),
+                Some(CommandConfigurationOccurrence::native(
+                    option,
+                    None::<&str>,
+                    false
+                ))
+            );
+            assert_eq!(
+                occurrence(&format!("--no{name}")).unwrap(),
+                Some(CommandConfigurationOccurrence::native(
+                    option,
+                    None::<&str>,
+                    true
+                ))
+            );
+            assert_eq!(
+                occurrence(&format!("--{name}=false")).unwrap(),
+                Some(CommandConfigurationOccurrence::native(
+                    option,
+                    Some("false"),
+                    false
+                ))
+            );
+            assert!(occurrence(&format!("--no{name}=true")).is_err());
+        }
+    }
+
+    #[test]
     fn action_environment_flags_use_closed_typed_command_options() {
         assert_eq!(
             occurrence("--action_env=NAME=value").unwrap(),

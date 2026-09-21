@@ -1284,8 +1284,7 @@ def native_emit():
         package.join(BUILD_FILE_PRIMARY),
         r#"
 load(":defs.bzl", "TYPED", "native_emit")
-package(default_testonly = True)
-native.package(default_package_metadata = [TYPED, ":metadata"])
+native.package(default_testonly = True, default_package_metadata = [TYPED, ":metadata"])
 package_group(name = "group", includes = [TYPED, ":included"])
 alias(name = "alias", actual = TYPED)
 test_suite(name = "suite", tests = [TYPED, ":test"])

@@ -22,6 +22,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use compact_str::CompactString;
 use async_trait::async_trait;
 use dice::DiceComputations;
 use dice::Key;
@@ -55,6 +56,10 @@ use crate::host_file::HostFileBytesKey;
 use crate::host_file::HostFileBytesObservationKey;
 use crate::host_file::HostFileError;
 use crate::package_policy::CanonicalDeletedPackagesProjectionKey;
+use crate::repo_file::HostRepoFileKey;
+use crate::repo_file::HostRepoFileObservationKey;
+use crate::repo_file::HostRouteRepoFileKey;
+use crate::repo_file::HostRouteRepoFileObservationKey;
 use crate::repository_ignore::HostRepositoryIgnoreError;
 use crate::repository_ignore::HostRepositoryIgnoreKey;
 use crate::repository_ignore::HostRepositoryIgnoreObservationKey;
@@ -1056,9 +1061,13 @@ pub struct RepositoryPackageSource {
     address: RepositoryPackageSourceAddress,
     build_file_name: HostBuildFileName,
     bytes: Arc<[u8]>,
+    repository_features: Arc<[CompactString]>,
 }
 
 impl RepositoryPackageSource {
+    pub fn repository_features(&self) -> &Arc<[CompactString]> {
+        &self.repository_features
+    }
     pub fn address(&self) -> &RepositoryPackageSourceAddress {
         &self.address
     }
@@ -1443,9 +1452,48 @@ async fn finish_repository_package_source(
     ctx: &mut DiceComputations<'_>,
     mode: RepositoryPackageSourceMode,
     build_file_name: HostBuildFileName,
-    observations: PathObservationEpoch,
+    mut observations: PathObservationEpoch,
 ) -> RepositoryPackageSourceDriverOutcome {
-    match key.route.root_route() {
+    // Package lookup already validates this REPO producer through ignore policy.
+    // Keep a direct dependency here: feature-only edits must not be cut off by
+    // the intentionally narrower IgnoreMatcher equality projection.
+    let repo_key = HostRouteRepoFileKey::from_source_route(key.route.clone());
+    let repo = match mode {
+        RepositoryPackageSourceMode::Legacy => match dice_invariant(ctx.compute(&repo_key).await) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(value) => value,
+        },
+        RepositoryPackageSourceMode::Observed => {
+            match repository_package_source_observed_child(dice_invariant(
+                ctx.compute(&HostRouteRepoFileObservationKey(repo_key))
+                    .await,
+            )) {
+                ControlFlow::Break(outcome) => return outcome,
+                ControlFlow::Continue(value) => {
+                    observations = match union_observations(&observations, value.observations()) {
+                        Ok(value) => value,
+                        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+                    };
+                    value.result().dupe()
+                }
+            }
+        }
+    };
+    let features = match repo.as_ref() {
+        Ok(value) => value.features().dupe(),
+        Err(error) => {
+            return repository_package_source_error_complete(
+                RepositoryPackageSourceErrorInner::Lookup {
+                    package: key.package.clone(),
+                    error: ExternalRepositoryPackageLookupError::RepositoryIgnore(
+                        HostRepositoryIgnoreError::RouteRepoFile(error.clone()),
+                    ),
+                },
+                observations,
+            );
+        }
+    };
+    let outcome = match key.route.root_route() {
         Some(route) => {
             finish_root_repository_package_source(
                 key,
@@ -1467,7 +1515,15 @@ async fn finish_repository_package_source(
             )
             .await
         }
-    }
+    };
+    outcome.map(|result| {
+        result.map(|mut observed| {
+            if let Ok(source) = Arc::make_mut(&mut observed.result) {
+                source.repository_features = features;
+            }
+            observed
+        })
+    })
 }
 
 async fn finish_root_repository_package_source(
@@ -1613,6 +1669,7 @@ async fn finish_canonical_repository_package_source(
                     ),
                     build_file_name,
                     bytes: value.bytes_arc().dupe(),
+                    repository_features: Arc::from([]),
                 }),
                 observations,
             )
@@ -1648,6 +1705,7 @@ fn finish_repository_package_source_value(
                 address: RepositoryPackageSourceAddress::Host(logical_path.dupe()),
                 build_file_name,
                 bytes: bytes.dupe(),
+                repository_features: Arc::from([]),
             }),
             observations,
         ),
@@ -1874,9 +1932,13 @@ pub struct RootPackageSource {
     logical_path: NormalizedAbsolutePath,
     relative_path: Arc<[u8]>,
     bytes: Arc<[u8]>,
+    repository_features: Arc<[CompactString]>,
 }
 
 impl RootPackageSource {
+    pub fn repository_features(&self) -> &Arc<[CompactString]> {
+        &self.repository_features
+    }
     pub fn package_root(&self) -> &NormalizedAbsolutePath {
         &self.package_root
     }
@@ -2236,6 +2298,51 @@ async fn compute_root_package_source(
         }
     }
     let selected = selected.expect("declared package candidate returns or selects a package");
+    let repository_features = if matches!(request, RootPackageSourceRequest::Build(_)) {
+        let (repo, incoming) = match mode {
+            RootPackageSourceMode::Legacy => {
+                match dice_invariant(ctx.compute(&HostRepoFileKey::new(workspace.dupe())).await) {
+                    PathOutcome::Need(need) => return source_need(need),
+                    PathOutcome::Complete(value) => {
+                        (value.as_ref().clone(), PathObservationEpoch::empty())
+                    }
+                }
+            }
+            RootPackageSourceMode::Observed => match dice_invariant(
+                ctx.compute(&HostRepoFileObservationKey::new(workspace.dupe()))
+                    .await,
+            ) {
+                PathOutcome::Need(need) => return source_need(need),
+                PathOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                PathOutcome::Complete(Ok(value)) => {
+                    (value.result().clone(), value.observations().dupe())
+                }
+            },
+        };
+        observations = match merge_source_epoch(mode, observations, &incoming) {
+            Ok(value) => value,
+            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        };
+        match repo {
+            Ok(value) => value.features().dupe(),
+            Err(error) => {
+                return source_error(
+                    RootPackageSourceErrorInner::PackageLookup {
+                        package: declared_package.clone(),
+                        error: HostRootPackageLookupError::RepositoryIgnore(
+                            HostRepositoryIgnoreError::RepoFile(error),
+                        ),
+                    },
+                    observations,
+                );
+            }
+        }
+    } else {
+        // A .bzl source does not consume package defaults.
+        Arc::from([])
+    };
     let package_dir = selected
         .package_root()
         .as_path()
@@ -2282,6 +2389,7 @@ async fn compute_root_package_source(
                 logical_path,
                 relative_path,
                 bytes,
+                repository_features,
             }),
             observations,
         ),

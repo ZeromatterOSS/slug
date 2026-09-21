@@ -1012,6 +1012,11 @@ fn selected_registry_root_package_epoch() -> (PathObservationEpoch, PathObservat
     (epoch.build(), instance)
 }
 
+mod package_feature_tests {
+    use super::*;
+    include!("package_feature_loading_tests.rs");
+}
+
 async fn selected_registry_visibility_transaction(
     epoch: PathObservationEpoch,
     instance: PathObservationInstanceId,

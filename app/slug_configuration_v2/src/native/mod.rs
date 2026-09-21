@@ -13,6 +13,8 @@ mod registry;
 mod value;
 
 #[cfg(test)]
+mod cc_feature_tests;
+#[cfg(test)]
 mod tests;
 
 pub use action_environment::CanonicalStringMap;

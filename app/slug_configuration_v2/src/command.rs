@@ -27,6 +27,12 @@ use serde::Serialize;
 pub enum NativeCommandOption {
     CompilationMode,
     HostCompilationMode,
+    Features,
+    HostFeatures,
+    ForcePic,
+    AppleGenerateDsym,
+    ExperimentalUseLlvmCovmap,
+    IncompatibleDontEnableHostNonhostCrosstoolFeatures,
     FdoOptimize,
     XbinaryFdo,
     FdoProfile,
@@ -52,6 +58,14 @@ impl NativeCommandOption {
         Some(match name {
             "compilation_mode" => Self::CompilationMode,
             "host_compilation_mode" => Self::HostCompilationMode,
+            "features" => Self::Features,
+            "host_features" => Self::HostFeatures,
+            "force_pic" => Self::ForcePic,
+            "apple_generate_dsym" => Self::AppleGenerateDsym,
+            "experimental_use_llvm_covmap" => Self::ExperimentalUseLlvmCovmap,
+            "incompatible_dont_enable_host_nonhost_crosstool_features" => {
+                Self::IncompatibleDontEnableHostNonhostCrosstoolFeatures
+            }
             "fdo_optimize" => Self::FdoOptimize,
             "xbinary_fdo" => Self::XbinaryFdo,
             "fdo_profile" => Self::FdoProfile,
@@ -80,6 +94,14 @@ impl NativeCommandOption {
         match self {
             Self::CompilationMode => "compilation_mode",
             Self::HostCompilationMode => "host_compilation_mode",
+            Self::Features => "features",
+            Self::HostFeatures => "host_features",
+            Self::ForcePic => "force_pic",
+            Self::AppleGenerateDsym => "apple_generate_dsym",
+            Self::ExperimentalUseLlvmCovmap => "experimental_use_llvm_covmap",
+            Self::IncompatibleDontEnableHostNonhostCrosstoolFeatures => {
+                "incompatible_dont_enable_host_nonhost_crosstool_features"
+            }
             Self::FdoOptimize => "fdo_optimize",
             Self::XbinaryFdo => "xbinary_fdo",
             Self::FdoProfile => "fdo_profile",
@@ -104,7 +126,12 @@ impl NativeCommandOption {
     pub const fn is_boolean(self) -> bool {
         matches!(
             self,
-            Self::CollectCodeCoverage | Self::IncompatibleStrictActionEnv
+            Self::CollectCodeCoverage
+                | Self::IncompatibleStrictActionEnv
+                | Self::ForcePic
+                | Self::AppleGenerateDsym
+                | Self::ExperimentalUseLlvmCovmap
+                | Self::IncompatibleDontEnableHostNonhostCrosstoolFeatures
         )
     }
 

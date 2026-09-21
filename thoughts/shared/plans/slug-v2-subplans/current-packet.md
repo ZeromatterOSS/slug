@@ -1,167 +1,224 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-58-m7a-native-cc-feature-model-r1
+Packet: WP-7-59-m7a-public-cc-feature-configuration-r1
 Status: accepted
 
 ## Outcome and compatibility
 
-Implement the native C++ feature-model prerequisite: complete eager metadata
-validation and owned retention, defaults, requested feature selection, and native
-FeatureConfiguration is_requested/is_enabled. WP757 accepted at f921c2d20 found
-no direct declared allocator Solib consumers; native Solib execution stays deferred.
-This packet narrows that selected successor to its native model boundary. The
-unchanged public configure_features entrypoint still requires structural ctx/Cpp
-projections and exec_os; it is not activated or claimed by native selection tests.
-Those projections precede a later end-to-end public configuration admission.
+Run unchanged rules_cc 0.2.17 create_cc_toolchain_config_info (including legacy
+generation), native retained feature-model construction, and unchanged public
+configure_features against a real DICE-analyzed rule context. WP758 at 3a57a616f
+accepted the complete native model/selection and publication prerequisite with
+22 tests and Core/CLI compilation; it did not admit this public entrypoint.
 
-Exact: admitted Bazel 9.2 native constructor validation, declaration ordering,
-defaults, implies/requires/provides selection, membership, fresh-wrapper occurrence
-equality and unhashability. Slug-native: valid-Unicode strings, complete structural
-publication identity including Artifact ownership, deterministic requested insertion
-order without Java request-set cache reuse. Unsupported/deferred: expansion/tool
-lookup/artifact-name APIs, public configure_features/ctx projections, exec_os,
-compile/actions2ctx, action creation/execution, full C++/Cargo loading and M8.
-Admitted execution OS values are LINUX, DARWIN, FREEBSD and OPENBSD; WINDOWS,
-UNKNOWN, unrecognized OS values, NUL-containing tool/tools-directory/path-chunk
-strings and cyclic flag-group metadata fail closed as unsupported. Diagnostic
-checks establish rejection/message shape, not Java stack/location or full error bytes.
+Exact: Bazel 9.2 feature-scope parsing/composition, admitted Cpp/configuration
+projections, command features/host_features and exec remapping, and exec_os from
+the default selected execution platform. Slug-native: valid-Unicode strings and
+existing structural configuration, repository observation, platform and provider
+identity. Host fallback uses structural Rust Host observations. Unsupported:
+unresolved default execution platform, unadmitted platform parents, other repo()
+package arguments, ObjC-only configuration projections, production FDO/toolchain
+provider construction, feature expansion/tool lookup, compile/actions2ctx,
+C++ action creation/execution and full Cargo/C++ loading. Existing native-model
+WINDOWS/UNKNOWN rejection remains; exec_os itself may return either spelling.
+M7A stays partial and M8 unproved.
 
-## Source contract and invariants
+## Source and semantic ownership
 
-Bazel source 8220c6198837d5c13d53fea211cf3282aa12408a under
-src/main/java/com/google/devtools/build/lib/rules/cpp/:
-CcStarlarkInternal.java:257–269; CcToolchainConfigInfo.java:60–91;
-CcToolchainFeaturesLib.java:65–573; CcToolchainVariables.java:151–240;
-CcToolchainFeatures.java:1099–1217,1230–1330 and FeatureSelection.java:115–301.
-FeatureConfigurationForStarlark.java:42–90 and StarlarkValue.java:92–121 own
-fresh occurrence and unhashable semantics. Internal FeatureConfiguration.equals
-omits requested names/tools directory and is NOT Slug publication equality.
+Pinned Bazel source 8220c6198837d5c13d53fea211cf3282aa12408a:
+analysis/config/FeatureSet.java:35–108; analysis/RuleContext.java:269–276;
+packages/PackageArgs.java:175–177,209–221; skyframe/PackageFunction.java:1211;
+packages/PackageCallable.java:61–67 (one nonempty package call per BUILD);
+analysis/starlark/StarlarkRuleContext.java:777–785; rules/cpp/
+CcStarlarkInternal.java:496–501; analysis/constraints/ConstraintConstants.java:30–95;
+rules/cpp/CppConfiguration.java:459,617–695,740–750,773,810,899–924;
+analysis/config/CoreOptions.java features/host_features declarations and
+src/main/starlark/builtins_bzl/common/builtin_exec_platforms.bzl features remapping.
+Follow docs/developers/dice.md; no new DICE key, lock, cache or filesystem bypass.
 
-Retain every parsed feature, action config, recursive flag/env group and condition,
-variable chunk, tool path/origin/Artifact, feature predicate, execution requirement,
-artifact pattern, tools directory and admitted exec OS. Constructor eagerly validates
-metadata even while expansion is deferred. Features precede actions in defaults and
-selection order. Selection does not autoadd defaults; unknown requested names remain
-requested but disabled. Requires is OR-of-AND and does not enable dependencies;
-implication closure is pruned to the source fixed point, cycles allowed. Preserve
-provides multiplicity and reject collisions, including one duplicate provider.
+Feature scopes are parsed separately: disabling beats enabling within a scope,
+no_layering_check disables layering_check, and empty/leading-minus names follow
+source parsing rather than native feature-model name validation. Repo defaults
+are overridden by a single package call, then resolved rule attributes. Enforce
+the source once-per-BUILD and nonempty-call guards in both package spellings;
+repeated calls are rejected, not extra precedence scopes. Global disables win
+all scopes; global enables lose to local disables. Output lists are sorted,
+deduplicated fresh mutable copies. A mutated returned list cannot mutate ctx.
 
-Producer is the existing DICE-owned Starlark evaluation over loaded source,
-configuration and provider inputs. BuildAPI owns immutable typed model/selection
-payloads and occurrence handles. Loading owns parsing/native facades; Analysis owns
-lowering/materialization. Publication compares complete payload plus a bidirectional
-occurrence mapping across the entire retained provider graph. Starlark equality is
-occurrence-only. No evaluator heap, command scratch or borrowed Artifact view escapes.
-No new DICE key/lock/cache, direct filesystem discovery, digest domain or Java runtime.
-Read docs/developers/dice.md and the utility skill. Stage 9's existing Arc,
-CompactString, SmallMap/SmallSet and occurrence-publication dispositions apply.
-New memory is DICE-retained semantic data released with provider/result ownership;
-selection/parser buffers are phase scratch. No service cache/interner. Cheap shared
-clone and Allocative required. No performance claim or benchmark gate.
+The existing observed RepoFile producers own typed repo features. BUILD package
+source results (root and selected external/canonical routes) carry them with
+their existing observation frontier and Need/error behavior; .bzl-only source
+results do not acquire unrelated feature dependencies. PackageEvaluation retains
+repo/package feature inputs and includes them in structural equality. Loading
+owns pure scope normalization/composition using existing compact utilities.
+Analysis consumes resolved rule features and the typed SlugConfiguration global
+features; never reconstruct options from retained-owner identity bytes.
 
-## Scope and ownership
+Command options are immutable structural occurrences in the existing typed
+overlay. Admit features/host_features and the required Cpp booleans together with
+source converter semantics. Both exec transition paths share the admitted projection:
+features <- host_features; reset coverage, force_pic, apple_generate_dsym,
+instrumentation paths and prefetch label to native defaults; propagate coverage
+format and dont-enable-host/nonhost as pinned builtin_exec_platforms requires.
+Preserve the other already-admitted transition behavior. Cpp projections
+read only existing typed retained options: force_pic, apple_generate_dsym,
+dont-enable-host/nonhost, LLVM coverage format, instrumentation paths and prefetch
+label. ctx.configuration.coverage_enabled directly reads collect_code_coverage.
+Do not infer it from presence of an output generator. Preserve existing profile
+validation and private-caller restrictions; do not invent defaults.
 
-BuildAPI worker: new app/slug_build_api_v2/src/cc_features.rs (optional child
-modules/tests beneath cc_features/), lib.rs exports only. Typed model, eager
-normalization helpers and selection algorithm/tests; coordinate parser API first.
-Loading worker: new app/slug_loading_v2/src/cc_features.rs and child parser/tests,
-cc_common.rs factory, lib.rs registration/exports only. Native facades, exact provider
-parsing and focused source-derived invocation/constructor tests.
-Root: app/slug_build_api_v2/src/analysis_value.rs; app/slug_analysis_v2/src/analysis_value.rs
-and new child tests for retention/publication. Loading/Analysis BUILD.bazel changes
-are limited to compile_data and the package-scoped export of the reused constructor
-fixture (required for the new include_str under Bazel). Scheduling docs, bootstrap-readiness
-and Stage 9 architecture row only as changed. No other production/fixture/dependency
-or lockfile edits. Large existing owners receive dispatch integration only; put new
-semantic work and tests in cohesive modules. Estimate 1,500–2,500 production and
-500–900 test lines; larger growth triggers responsibility review, not a weaker model.
-Independent reviewer owns design checkpoint before code and final actual diff review.
+exec_os receives an actual root ctx through a narrow Rust Starlark demand
+capability, with active token checks. Analysis retains the existing default
+ConfiguredActionOwnerContext and cheap structural configuration handle. The
+projection consumes selected canonical OS setting/value labels, not target CPU,
+path flavor, platform name, arbitrary exec group or ambient std::env. A missing OS
+setting alone uses structural ActionEnvironmentHostOs; unfamiliar OS value yields
+UNKNOWN. Missing selected platform or missing required Host state fails closed.
+No evaluator-extra shortcut accepting an authored struct as ctx.
 
-Independent design review ACCEPT: native-only scope is coherent; final review must
-verify complete eager metadata retention and explicit fail-closed OS/path handling.
+New memory is compact DICE-retained package/source semantic data or phase-local
+context projections. Arc/CompactString and small ordered maps/sets follow Stage 9
+existing utility dispositions. No borrowed heap/scratch escapes publication.
+Normal DICE equality/invalidation/cancellation releases apply, including repo-only
+feature edits/restoration. No new digest domain, interner or performance claim.
+
+## Scope and coordination
+
+Package worker: app/slug_bzlmod_v2/src/repo_file.rs, host_package.rs and focused
+child tests; app/slug_loading_v2/src/package.rs, bzl_module.rs, lib.rs and new
+package_features.rs/child tests. Existing host_package_load_tests.rs gets include
+dispatch only; host_package_attempt_tests.rs gets its required input and retry
+retention discriminator. Retain/validate repo and package feature lists,
+propagate observed inputs through existing package sources, and implement pure
+feature composition. Do not route feature semantics through IgnoreMatcher.
+tests/build_file_loading.rs merges the one existing repeated-package fixture
+into one call while preserving its loaded-Label parameter assertions.
+
+Configuration worker: app/slug_configuration_v2/src/command.rs, native/
+configuration.rs, cpp_fragment.rs, mod.rs and focused child tests; lib.rs exports
+only if needed; app/slug_loading_v2/src/analysis_fragments.rs and new child tests.
+Admit typed options, exec remapping, Cpp projections, coverage and Host getters.
+app/slug_commands_v2/src/common.rs limited to feature option binder regressions.
+
+Root: app/slug_analysis_v2/src/starlark_rule.rs and new cohesive child module;
+app/slug_loading_v2/src/cc_common.rs and new narrow context-capability module;
+Loading lib.rs export coordinated with package worker. New
+app/slug_analysis_v2/tests/cc_configure_features/mod.rs plus registration in
+tests/starlark_rule.rs; cargo_runfiles_tests.rs gets only its required context
+initializer. BUILD.bazel compile_data only as necessary. Scheduling
+docs, bootstrap-readiness, Stage 4 package-default boundary note and Stage 9
+architecture row only as changed.
+No dependency/lockfile/source-corpus edits. Large existing files receive bounded
+fields/dispatch; new semantic algorithms and tests belong in cohesive child modules.
+Estimate 800–1,500 production and 700–1,200 test lines; growth triggers responsibility
+review, not weakened admission. Root owns Cargo, integration and commit.
+
+Independent reviewer checks design before implementation and final actual diff.
+Any newly discovered prerequisite/ownership choice returns to root before editing.
+
+Independent design review ACCEPT: complete scope ownership and both exec paths
+are sound. Standard platform OS matching uses exact @@platforms identity (production
+selected-module routing already special-cases it); legacy platforms+ fixtures do
+not establish the positive OS case. Both repository lanes require final evidence.
+
+Reviewed fixture ownership adjustment: use the observed canonical-external
+configured root, as in the accepted Rustc proof, for complete unchanged imports.
+The preexisting root-origin local-override cross-package import restriction
+remains deferred; no production loading workaround is added. Package/REPO edits
+follow the subject's owning repository, while platform targets remain in root.
+Platform positives use explicit @@platforms constraint labels. Fixture preparation
+supplies both demanded generic-bootstrap platforms+ and selected platforms local
+materialization identities; it never normalizes configured labels. Legacy apparent
+@platforms normalization is not claimed by this exact canonical OS projection.
 
 ## Evidence and validation
 
-Pinned-source regressions adapt CcToolchainFeaturesTest.java implications/pruning/
-requirements/cycles (1141–1377), defaults (1558–1579), action/feature links
-(1736–1790,1913–1959), duplicate actions/flag-set actions (1961–2012) and provides
-(2015–2027); StarlarkCcCommonTest.java groups (3158–3402), tools/OS (3484–3724),
-features (4349–4597). Cover nested metadata parsing/invalid inputs, unknown requests,
-default ordering, duplicate symbols and fresh occurrences. Expansion tests remain
-deferred with the unadmitted phase, not skipped parity.
+Source-derived regressions cover contradictory scopes/order/alias/edge names,
+fresh mutable ctx lists, resolved configurable rule features, package and repo
+feature-only equality/invalidation/restoration, feature occurrence conversion and
+target/exec host mapping. Selected-platform tests cover canonical label matching,
+missing versus unfamiliar OS setting/value, target versus exec OS, unresolved
+platform failure and structural Host/platform/configuration changes.
 
-Use existing exact rules_cc source/constructor definitions in the loading fixture
-where practical, authenticated from rules_cc 0.2.17 archive SHA256
+Authentic wrapper proof reuses exactly eight existing bodies: rules_cc action_names,
+cc_toolchain_config_lib, common/semantics, private/cc_internal, private/toolchain_config/
+{cc_toolchain_config_info,legacy_features,configure_features}, plus skylib paths.
+rules_cc archive SHA256
 283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a.
-Authored transport/native calls are explicitly native-boundary proof, not execution
-of the whole public configure_features wrapper or production cc_library. No new
-fixture corpus, Bazel query/build or Java helper. Existing source-freeze tests do not
-prove invocation. No guessed Cpp/context defaults for an end-to-end claim.
+Do not set no_legacy_features. An explicitly authored capability/FDO envelope around
+the authentic native model is a boundary input, not a production toolchain/FDO
+provider claim. Cover mode/default/request/unsupported selection, header/module-map
+gates, PIC error, coverage format, host/nonhost policy, FDO/CSFDO and profile-mode/
+Propeller/prefetch branches as supported by these projections. ObjC remains an
+explicit unsupported facade boundary. Verify same-DICE structural configuration
+and package changes affect published selected/requested membership.
 
-Retention regressions dispose source heap, rematerialize and invoke methods; verify
-alias versus fresh-instance equality, nested metadata/tools directory/request/Artifact
-changes in publication, alias topology changes, rejection from dict/depset before and
-after freeze, and GC safety. Native objects remain unhashable even though Rust payloads
-are immutable. Native model/configuration publication is atomic with all bridges.
+Public/cross-crate plus DICE/platform tier: pinned toolchain, serialized Cargo
+--offline --locked --no-run JSON preparation for Configuration, Bzlmod, Loading,
+Analysis and Commands affected harnesses; preflight all exact selectors once per
+unchanged binary, then focused tests. Check Core and CLI direct dependents. No
+Bazel/Slug binary, daemon or build action needed; no broad suite. Preparation cap
+60s per operation; runtime expected seconds. These are packet caps/estimates, not
+new user ceilings. Root may partition compilation on an observed cap, not silently
+raise it. Format, diff check, plan status and archive status required.
 
-Public/cross-crate tier: serialize pinned-toolchain cargo test --lib --no-run JSON
-for BuildAPI, Loading and Analysis; preflight all exact selectors once per unchanged
-harness; run focused owner and retention tests. Check direct dependent slug_core_v2
-and slug_cli_v2 compilation (no binary invocation). Preparation cap60s per operation;
-runtime expected seconds, no long broad suite. These are packet caps/estimates, not
-new user ceilings. Root owns Cargo orchestration. Format changed Rust, run diff check,
-plan status and archive status. Preserve unfinished candidates if gates remain open.
-
-REPLAN if a complete eager model cannot be represented within the existing ownership
-boundary, source contradicts selected compatibility, or activation requires new
-semantic configuration/platform decisions. Correct ordinary compile/test failures
-within this contract. Acceptance requires independent final review, compact evidence
-and a commit; M7A remains partial and M8 unproved.
+REPLAN only if source contradicts the compatibility contract or a required semantic
+fact has no bounded owner in these existing paths. Ordinary implementation,
+invocation and test-selection corrections stay within the packet. Acceptance needs
+independent final review, compact gate/elapsed receipt and an atomic commit; do not
+land partial feature activation across repository/configuration/context owners.
 
 ## Implementation and validation receipt
 
-Complete native parser/model/selection and both retained bridges are implemented.
-Immutable defaults, complete recursive metadata, source-order provided-symbol
-collision checks, first-seen native predicate normalization, occurrence-only
-Starlark equality and full-payload/alias publication are covered. Retained list
-storage is boxed behind Arc handles; name indexes and selection buffers are scratch.
-No source corpus, dependency, DICE key/lock/cache or action family was added.
-The reused constructor fixture is explicitly declared in Bazel compile_data with a
-Loading-package-only export. Fixture SHA256 f8418490663f7e188fa060265b215e80b154a5d190b32ef75fcb6d0254017808
-matches the exact cc/cc_toolchain_config_lib.bzl archive member.
+The complete scoped path is implemented. Typed repo/default features propagate
+through existing observed root, local-external and canonical package producers,
+with source equality/frontiers and retry restoration preserved. A single package
+scope plus resolved rule/global features feeds fresh mutable ctx lists. Typed Cpp
+and coverage fields, both exec mappings and an active-root-ctx native capability
+read structural configuration/default-platform facts. The public wrapper proof
+executes all eight unchanged sources with legacy generation enabled. No production
+action, foreign-language runtime, source corpus, dependency, DICE key/lock/cache or digest
+domain was added. New public attributes are ordinary non-callable values; this
+avoids the evaluator's native-attribute direct-call path invoking getters as methods.
 
-Pinned nightly-2025-09-14 Cargo --offline --locked --lib --no-run JSON preparation:
-BuildAPI succeeds 2.571s; Loading 29.226s; Analysis 24.667s, then 1.668s after the
-test-only GC harness correction. All selected harnesses were preflighted once per
-unchanged binary. Exact execution: BuildAPI 9/9 native model tests; Loading 6/6
-native boundary tests plus 2/2 protected authentic configure/legacy source-freeze
-tests; Analysis 4/4 native publication/heap/GC/hash tests plus 1/1 protected
-HeaderInfo round trip. Total 22/22, approximately 0.102s summed successful runtime.
-Core cargo check succeeds 24.849s; CLI cargo check succeeds 15.186s. No Slug/Bazel
+Pinned nightly-2025-09-14, offline/locked Cargo JSON preparation and exact preflight
+establish 30/30 focused passes: Configuration 4, Bzlmod 2, Loading 10, protected
+BUILD parameter fixture 1, Analysis OS/lifetime plus protected Cargo capture 3,
+Commands 1, and authentic public wrapper/context-boundary integration 9. The final
+integration receipt is target/wp759/tests-1790019463674841317.receipt.json;
+the final Loading receipt is tests-1790018934335366973.receipt.json in that directory.
+All commands/logs and earlier failed receipts remain under target/wp759.
+Latest successful runtimes sum to 0.362s. Core check passes in 16.842s and CLI
+check in 17.294s. Preparation/check total including corrections is 254.223s;
+the maximum single operation is 30.019s, below the packet's 60s cap. No Slug/Bazel
 binary, daemon, build action or broad suite was invoked.
 
-Two ordinary compile corrections: terminate borrowed scratch indexes before moving
-model data (0.715s failed preparation), and import ValueLike in Loading tests
-(13.085s failed preparation). The first Analysis invocation failed in the test's
-direct post-evaluation GC call (0.004s); corrected to the evaluator's supported
-Assert Auto/Never/Always modes and safe scheduled garbage_collect builtin, then all
-five tests passed. No production assertion was weakened. Total preparation/check
-time including corrections is 111.967s; every operation stayed below its 60s cap.
-Scratch commands, logs and individual receipts are under target/wp758; no failed
-receipt was overwritten. Format, diff, plan status and archive checks pass.
-Test growth is 1,269 lines, above the 500–900 estimate. Responsibility review keeps
-the three cohesive modules: 416 lines model/selection, 491 authenticated parser/API,
-and 362 retained publication/GC. No fixture corpus or large existing test owner grew;
-the extra integration tests discriminate ownership and hash barriers across phases.
+Three ordinary compile corrections added the CompactString import, converted
+Starlark errors to anyhow, and supplied a protected test's new context field.
+Source review corrected dict-key conversion and package once/nonempty semantics;
+focused negative tests exposed and closed native-attribute callability. Fixture
+corrections supplied complete observed shards, the existing closed module setup,
+required repo observations/module mappings and the reviewed canonical-external
+route; no assertion was weakened to admit missing semantic input. The late PIC
+negative explicitly suppresses the authentic legacy enabled-pic default. A label
+test observes str(label) instead of asserting an unrelated debug representation.
+Ten failing test invocations are preserved with their attributed corrections.
 
-Final review checks the complete diff and these discriminators, including the
-immutable-default correction and Bazel compile-data declaration. The selected
-successor is structural ctx/Cpp and exec_os ownership plus unchanged public
-configure_features admission, still before compile/actions2ctx. No fabricated
-configuration defaults or runtime support is implied by this native-only result.
+Responsibility review: approximately 750 net production and 1,715 net test lines.
+Test growth exceeds the 700–1,200 estimate because complete wrapper branches,
+three repository observation lanes and lifecycle/OS/private-call discriminators
+are separate gates. They remain cohesive child modules; large owners receive
+narrow dispatch/fields. All eight source bodies are required load closure, and
+unused proof transport fields were removed. No performance claim is made.
 
-Independent final review ACCEPT. Packet elapsed approximately 28 minutes
-(18:27–18:55 UTC), including source/design work; review overlapped implementation
-and validation. Gate advanced: native C++ feature metadata and selection survive
-provider publication with complete owned payloads. Public configuration, expansion,
-compilation and execution remain separately gated. No semantic REPLAN was required.
+Format, diff, plan-status and archive checks pass. Packet elapsed approximately
+46 minutes (18:55–19:41 UTC), including research and overlapping design/final
+reviews. Gate advanced: unchanged public C++ feature configuration executes on
+owned structural inputs and survives DICE publication/invalidation. Production
+toolchain/FDO construction, expansion/tool lookup and compile/actions2ctx remain
+next boundaries; M7A stays partial and M8 unproved. No semantic REPLAN was needed.
+
+Independent final review ACCEPT: final source, canonical fixture ownership and
+closure claims match the bounded contract; all 30 focused gates and Core/CLI
+checks are verified. Deferred production toolchain/FDO, expansion, compilation,
+execution and loading/mapping boundaries remain explicit.

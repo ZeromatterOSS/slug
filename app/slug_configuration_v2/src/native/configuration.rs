@@ -28,6 +28,7 @@ use super::configuration_field::CppConfigurationField;
 use super::convert::ConvertError;
 use super::defaults::materialize_default;
 use super::host::ActionEnvironmentHost;
+use super::host::ActionEnvironmentHostOs;
 use super::host::AutoCpuToken;
 use super::host::HostConversionInputs;
 use super::host::HostPathFlavor;
@@ -310,6 +311,7 @@ impl fmt::Display for SlugConfigurationProjection {
 pub enum SlugConfigurationError {
     MissingAutoCpu,
     MissingPathFlavor,
+    MissingExecutionHostOs,
     UnsupportedDescriptor { ordinal: u32 },
     InvalidDefault { ordinal: u32 },
     InvalidLabelDefault { ordinal: u32 },
@@ -333,6 +335,9 @@ impl fmt::Display for SlugConfigurationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::MissingAutoCpu => formatter.write_str("native configuration requires AutoCPU"),
+            Self::MissingExecutionHostOs => {
+                formatter.write_str("execution OS fallback requires structural Host OS")
+            }
             Self::MissingPathFlavor => {
                 formatter.write_str("native configuration requires a host path flavor")
             }
@@ -560,9 +565,11 @@ impl SlugConfiguration {
                 actual: self.0.kind,
             });
         }
+        let mut options = self.0.options.to_vec();
+        self.project_cc_feature_exec_options(&mut options)?;
         Ok(finish_configuration(
             SlugConfigurationKind::Exec,
-            self.0.options.dupe(),
+            options.into(),
             self.0.starlark_options.to_exec()?,
             self.0.action_environment_host.dupe(),
         ))
@@ -711,12 +718,39 @@ impl SlugConfiguration {
         if !found_platform || !found_compilation_mode || !found_action_environment {
             return Err(SlugConfigurationError::UnknownNativeOption);
         }
+        self.project_cc_feature_exec_options(&mut options)?;
         Ok(finish_configuration(
             SlugConfigurationKind::Exec,
             options.into(),
             starlark_options,
             self.0.action_environment_host.dupe(),
         ))
+    }
+
+    /// Only the feature-configuration slice admitted by WP759. Bazel's exec
+    /// transition starts from defaults, then propagates explicit source fields.
+    /// Leave unrelated, previously admitted transition behavior unchanged.
+    fn project_cc_feature_exec_options(
+        &self,
+        options: &mut [OptionRecord],
+    ) -> Result<(), SlugConfigurationError> {
+        let host_features = self.option_value(CORE_OPTIONS, "host_features")?.clone();
+        for record in options {
+            match (record.class_name, record.canonical_name) {
+                (CORE_OPTIONS, "features") => record.value = host_features.clone(),
+                (CORE_OPTIONS, "collect_code_coverage")
+                | (CPP_OPTIONS, "force_pic" | "apple_generate_dsym") => {
+                    record.value =
+                        OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Bool(false)));
+                }
+                (CPP_OPTIONS, "fdo_instrument" | "cs_fdo_instrument") => {
+                    record.value = OptionValue::Native(NativeOccurrence::Absent);
+                }
+                (CPP_OPTIONS, "fdo_prefetch_hints") => record.value = OptionValue::Label(None),
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     fn native_label_value(
@@ -1052,6 +1086,20 @@ impl SlugConfiguration {
         self.native_label(COVERAGE_OPTIONS, "coverage_output_generator")
     }
 
+    pub fn coverage_enabled(&self) -> Result<bool, SlugConfigurationError> {
+        self.core_bool("collect_code_coverage")
+    }
+
+    /// The tracked Host observation is used only when the selected platform
+    /// supplies no OS constraint. Do not infer it from target CPU/path flavor.
+    pub fn execution_host_os(&self) -> Result<ActionEnvironmentHostOs, SlugConfigurationError> {
+        self.0
+            .action_environment_host
+            .as_ref()
+            .map(ActionEnvironmentHost::os)
+            .ok_or(SlugConfigurationError::MissingExecutionHostOs)
+    }
+
     pub fn cpp_custom_malloc_label(
         &self,
     ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
@@ -1134,7 +1182,10 @@ impl SlugConfiguration {
         }
     }
 
-    fn cpp_text(&self, name: &'static str) -> Result<Option<&str>, SlugConfigurationError> {
+    pub(super) fn cpp_text(
+        &self,
+        name: &'static str,
+    ) -> Result<Option<&str>, SlugConfigurationError> {
         match self.option_value(CPP_OPTIONS, name)? {
             OptionValue::Native(NativeOccurrence::Absent) => Ok(None),
             OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Text(value))) => {
@@ -1150,7 +1201,7 @@ impl SlugConfiguration {
         self.cpp_text(name).map(|value| value.is_some())
     }
 
-    fn cpp_label(
+    pub(super) fn cpp_label(
         &self,
         name: &'static str,
     ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
@@ -1176,7 +1227,7 @@ impl SlugConfiguration {
         self.native_bool(CORE_OPTIONS, name)
     }
 
-    fn native_bool(
+    pub(super) fn native_bool(
         &self,
         class_name: &'static str,
         name: &'static str,
@@ -1223,6 +1274,8 @@ fn typed_native_command_descriptor(
         NativeCommandOption::CollectCodeCoverage
         | NativeCommandOption::CompilationMode
         | NativeCommandOption::HostCompilationMode
+        | NativeCommandOption::Features
+        | NativeCommandOption::HostFeatures
         | NativeCommandOption::ActionEnv
         | NativeCommandOption::HostActionEnv => CORE_OPTIONS,
         NativeCommandOption::CoverageOutputGenerator => COVERAGE_OPTIONS,

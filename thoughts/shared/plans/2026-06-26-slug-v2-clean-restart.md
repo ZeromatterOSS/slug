@@ -29,13 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-58-m7a-native-cc-feature-model-r1
+Packet: WP-7-59-m7a-public-cc-feature-configuration-r1
 Status: accepted
 
-WP758 accepts complete native C++ feature-model retention and feature selection,
-with 22 focused tests and Core/CLI compilation passing. Next: structural ctx/Cpp
-projections and exec_os before admitting unchanged public configure_features;
-native-boundary tests do not claim that production entrypoint. WP757 at f921c2d20
+WP759 accepts repository/package/rule/global features, structural ctx/Cpp and
+exec_os, with unchanged creator/legacy/public configure_features invocation in a
+real canonical-external analysis context. All 30 focused tests and Core/CLI checks
+pass with independent final ACCEPT. Next: the demanded C++ feature expansion/
+tool lookup and compile/actions2ctx boundary. WP758 at 3a57a616f
+accepts complete native C++ feature-model retention and selection with 22 tests
+and Core/CLI compilation; it does not claim the public entrypoint. WP757 at f921c2d20
 found no direct declared/scheduling consumers of allocator Solib outputs. Native
 execution stays deferred. WP756 at 0763cec2b supplies construction/structural sharing;
 full C++ compile/link support remains open.

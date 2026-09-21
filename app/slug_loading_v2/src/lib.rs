@@ -23,7 +23,9 @@ mod canonical_repository_route;
 #[cfg(test)]
 mod canonical_repository_route_tests;
 mod cc_common;
+pub mod cc_context;
 mod cc_features;
+pub mod package_features;
 #[doc(hidden)]
 pub use cc_features::alloc_frozen_cc_feature_configuration;
 #[doc(hidden)]

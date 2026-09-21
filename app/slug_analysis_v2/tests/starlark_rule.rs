@@ -156,6 +156,7 @@ use slug_workspace_v2::path_observation_shards;
 use starlark_map::small_map::SmallMap;
 
 mod directory_args;
+mod cc_configure_features;
 mod effective_output_groups;
 mod file_output_providers;
 mod output_group_info;

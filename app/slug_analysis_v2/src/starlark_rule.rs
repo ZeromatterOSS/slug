@@ -99,6 +99,7 @@ use starlark::eval::Evaluator;
 use starlark::starlark_complex_value;
 use starlark::starlark_module;
 use starlark::values::Coerce;
+use starlark::values::Demand;
 use starlark::values::Freeze;
 use starlark::values::FreezeResult;
 use starlark::values::Freezer;
@@ -138,6 +139,9 @@ use crate::result::ConfiguredActionOwnerContext;
 use crate::result::ConfiguredNodeResult;
 use crate::runfiles_support::complete_runfiles_support;
 
+mod cc_context;
+use cc_context::CcContextProjection;
+
 /// Errors produced while synchronously evaluating a loaded rule after DICE has
 /// prepared its inputs. The executable-rule case remains distinct so command
 /// owners can classify its established terminal without inspecting text.
@@ -174,6 +178,8 @@ struct AnalysisContextGen<V> {
     #[trace(unsafe_ignore)]
     token: AnalysisCallToken,
     retained_owner: AnalysisConfiguredTargetKey,
+    #[trace(unsafe_ignore)]
+    cc_context: CcContextProjection,
     target_label: slug_identity_v2::CanonicalLabel,
     package_path: String,
     #[trace(unsafe_ignore)]
@@ -201,6 +207,7 @@ impl<'v> Freeze for AnalysisContext<'v> {
             action_sink: self.action_sink,
             token: self.token,
             retained_owner: self.retained_owner,
+            cc_context: self.cc_context,
             target_label: self.target_label,
             package_path: self.package_path,
             dependencies: self.dependencies,
@@ -229,9 +236,16 @@ impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for AnalysisContextGen<V>
 where
     Self: ProvidesStaticType<'v>,
 {
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn slug_loading_v2::cc_context::CcExecutionContext>(self);
+    }
+
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         self.token.require_active(attribute, "rule context").ok()?;
         match attribute {
+            "features" => self.cc_context.features(false, heap).ok(),
+            "disabled_features" => self.cc_context.features(true, heap).ok(),
+            "configuration" => self.cc_context.configuration(heap).ok(),
             "workspace_name" => Some(heap.alloc_str("_main").to_value()),
             "label" => Some(slug_loading_v2::provider::alloc_starlark_label(
                 heap,
@@ -2194,6 +2208,16 @@ pub(crate) fn evaluate_loaded_rule(
         .iter()
         .map(|row| row.action_context().clone())
         .collect::<Vec<_>>();
+    let cc_context = CcContextProjection::new(
+        package,
+        key.configuration().slug_configuration(),
+        &resolved_attributes,
+        exec_groups
+            .row(&ConfiguredExecGroup::Default)
+            .expect("configured execution groups require a default row")
+            .action_context()
+            .clone(),
+    )?;
     let actions = Arc::new(Mutex::new(CtxActions::new()));
     let module = Module::new();
     let needs_cpp_fragment = implementation
@@ -2398,6 +2422,7 @@ pub(crate) fn evaluate_loaded_rule(
         ));
         let context = module.heap().alloc(AnalysisContextGen {
             action_sink,
+            cc_context,
             token: analysis_context.root_token(),
             retained_owner: retained_owner.clone(),
             target_label: key.label().clone(),

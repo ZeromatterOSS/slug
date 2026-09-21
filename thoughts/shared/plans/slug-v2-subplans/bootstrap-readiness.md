@@ -346,12 +346,17 @@ feature/action/flag/environment/tool/pattern retention and native selection, wit
 provider publication preserving payload and wrapper alias identity (WP758).
 The implementation and pinned-source regressions are in BuildAPI/Loading
 cc_features modules; Analysis tests cover publication and heap/GC lifetime.
-This is not the public rules_cc configure_features entrypoint: structural ctx/Cpp
-projections and execution-platform-derived exec_os are still required before that
-unchanged wrapper can be admitted. Windows/unknown execution OS, NUL paths and
-cyclic flag-group metadata fail closed. Expansion, tool lookup, compile/actions2ctx
-and full cc_library remain deferred. The existing Rustc proof's None C++ fields
-do not establish those gates.
+WP759 adds structural repository/package/rule/global feature composition, typed
+Cpp/coverage projections, both exec feature-option mappings and default selected
+execution-platform exec_os. The observed canonical-external analysis proof invokes
+the unchanged creator, legacy generator and public configure_features with a real
+rule ctx; capability/FDO envelopes are explicit boundary inputs, not production
+toolchain/FDO construction. Canonical OS identity is exact; Host fallback remains
+structural Rust Host. Root-origin local-override cross-package imports and legacy
+apparent @platforms normalization remain separately deferred. The model still
+rejects Windows/unknown execution OS, NUL paths and cyclic flag-group metadata.
+Expansion, tool lookup, compile/actions2ctx and full cc_library remain deferred.
+The existing Rustc proof's None C++ fields do not establish those gates.
 Run remains deferred and F3 remains closed.
 
 ## Family admission and completion procedure

@@ -183,6 +183,15 @@ pub fn alloc_frozen_empty_cc_header_info(
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn exec_os<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = pos)] ctx: Value<'v>,
+    ) -> anyhow::Result<&'static str> {
+        ctx.request_value::<&dyn crate::cc_context::CcExecutionContext>()
+            .ok_or_else(|| anyhow::anyhow!("exec_os requires an active rule ctx"))?
+            .execution_os()
+    }
+
     fn cc_toolchain_features<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = named)] toolchain_config_info: Value<'v>,

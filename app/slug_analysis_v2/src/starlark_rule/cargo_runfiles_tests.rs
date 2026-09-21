@@ -351,6 +351,9 @@ fn proof(
         module.frozen_heap().alloc(AnalysisArtifactValue::new(fake))
     };
     let context = module.heap().alloc(AnalysisContextGen {
+        cc_context: CcContextProjection::unconfigured(Arc::new(
+            ConfiguredActionOwnerContext::unresolved_default(key.clone()).unwrap(),
+        )),
         action_sink: sink,
         token: analysis.root_token(),
         retained_owner: owner,
