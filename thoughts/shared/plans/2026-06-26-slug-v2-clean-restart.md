@@ -29,15 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-56-m7a-solib-construction-r1
+Packet: WP-7-57-m7a-solib-consumption-observation-r1
 Status: accepted
 
-WP756 accepts the demanded False/False native Solib constructor and distinct
-structural action boundary, with Slug-native naming, safe duplicate sharing and explicit
-runtime rejection. All15 focused tests and CLI dependency compilation pass; independent
-final review ACCEPT. WP755 at 245f67b63 supplies the two allocator-library declarations.
-Next resolve downstream consumption before selecting native execution or missing C++
-analysis primitives. Full C++ compile/link/toolchain support remains open.
+WP757 accepts evidence of no direct declared/scheduling consumers of allocator Solib outputs,
+with both target/exec producers present as same-dump controls. Native execution stays
+deferred. Next: bounded C++ feature-model/configuration implementation contract,
+which precedes compile/actions2ctx in authentic cc_library. WP756 at 0763cec2b
+supplies construction/structural sharing; full C++ compile/link support remains open.
 WP753 Cargo Args is accepted at 57856a758 and WP752 aliases at 74770f888. Full Cargo loading/execution,
 WP746's baseline diagnostic defect and broader M7A remain open; M8 is unproved.
 

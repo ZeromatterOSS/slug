@@ -1,180 +1,148 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-56-m7a-solib-construction-r1
+Packet: WP-7-57-m7a-solib-consumption-observation-r1
 Status: accepted
 
-## Outcome and evidence
+## Outcome and inherited scope
 
-Implement the demanded native dynamic_library_symlink(actions, library,
-solib_directory, False, False) constructor, retaining a distinct structural
-SolibSymlink action and returning its regular derived File. WP755 accepted at
-245f67b63 identifies two generated allocator-library inputs; reuse
-[solib-demand.json](./solib-demand.json) and the pinned sources/tests in
+Resolve declared downstream input edges for the two allocator Solib outputs
+before selecting native execution versus missing C++ analysis primitives.
+Previous turn is progress: WP756 accepted at 0763cec2b implemented False/False
+construction and structural sharing, with 15 focused tests and CLI compilation.
+Reuse [solib-demand.json](./solib-demand.json) and
 [solib-construction-inventory.md](./solib-construction-inventory.md).
-No new oracle workspace or production build is needed.
+Existing retained query dumps contain producer-only evidence, not consumers.
 
-Bazel 9.2 source at 8220c6198837d5c13d53fea211cf3282aa12408a:
-CcStarlarkInternal.java:204–221; SolibSymlinkAction.java:158–205,228–321;
-Actions.java:45,85,191–225,376; OutputDirectories.java:127–148;
-RuleContext.java:711,730. Reuse unchanged rules_cc helper
-_construct_dynamic_library_to_link NODEPS_DYNAMIC_LIBRARY callsite. The public
-constructor takes the base action factory; its wrapper is not required for this
-leaf proof. Full cc_library prerequisites remain unsupported.
+One bounded production aquery selects both the allocator's backing shared-library
+inputs (positive controls selecting Solib producers) and their mangled outputs
+(consumer edges). One dump permits exact artifact-ID joins; do not join consumers
+by owner/configuration, since tools can cross configurations. A zero-consumer
+result is valid only with the expected target and exec producer controls present,
+fully validated graph references and matching original input/output paths.
+Preserve unexpected rows/configurations explicitly rather than assuming two.
+Do not infer source-vs-derived identity from analysis_v2 Artifact or path shape.
 
-## Compatibility and semantic ownership
+This adds no Slug runtime admission. Existing exact constructor mechanics and
+Slug-native configuration/path/action identities remain unchanged; Solib execution,
+full C++ compilation, aquery/ActionKey projection and M8 remain unsupported/unproved.
+A declared edge is not proof of execution or selected CLI default-output reachability.
+Absent declared edges under these flags is not global absence under other options.
 
-Exact admitted mechanics: False/False escaping, lib prefix, SHA256 long-name
-hashing preserving final extension at >255 UTF-16 units for valid Unicode,
-single regular input/output, SolibSymlink mnemonic, no progress message and
-platform-independent native action semantics. Generated regular library inputs
-only; use the pinned native shared-library filename predicate, not the narrower
-public create_library_to_link predicate.
+## Pinned source and command
 
-Slug-native naming: existing ordinary derived output.path includes the package
-within Slug's configured root. Naming-only input root-relative projection is
-output.path for the main repository, external/<canonical input repository>/output.path
-for external repositories. This does not rewrite the retained input artifact.
-Output is bin-relative solib_directory/mangled_name, without consumer package or
-repository prefix, matching default nonsibling shared bin-root placement.
-Slug owns no Bazel mnemonic/ST-history field: omit ST suffix as an explicit
-Slug-native configuration/path projection. Retain full input configured owner
-and full consumer configuration. Different configured inputs colliding on the
-same projected output fail closed; never share by path alone. Solib-derived
-inputs (output.path beginning _solib_) are rejected; no heuristic prefix stripping.
-This packet supports canonical relative solib directories only.
+Bazel 9.2 source 8220c6198837d5c13d53fea211cf3282aa12408a:
+query2/aquery/AqueryUtils.java:44–61,70–112 selects inputs and flattens the input
+depset; AqueryActionFilter.java:46–55 uses full-string regex matching on exec paths.
+AqueryProcessor.java:194–195 loses filters on a non-function query root, so no
+union expression. analysis_v2.proto and KnownNestedSets own graph/schema limits.
+Rules_rust 0.73 utils.bzl:229–254 and rustc.bzl:353–359,738–795 choose static/PIC
+before interface/dynamic library inputs; authenticate relevant release source.
 
-Unsupported/deferred: true flags, source/tree inputs, runtime-basename/custom-path
-constructors, exact Bazel configuration/output bytes, ownerless alias equivalence,
-ActionKey/aquery projection, native Solib execution/materialization and REAPI,
-wrap_link_actions, and complete C++ compile/link/toolchain support.
+Exact query:
+inputs("bazel-out/[^/]+/bin/(external/rules_rust[+]/ffi/cc/allocator_library/libcc_allocator_library[.]so|_solib_k8/libexternal_Srules_Urust[+]_Sffi_Scc_Sallocator_Ulibrary_Slibcc_Uallocator_Ulibrary[.]so)", deps(//app/slug_cli_v2:slug))
 
-BuildAPI owns SolibSymlinkSpec(input AnalysisArtifact, output ActionOutput), a
-separate ActionPayload/ActionKind and accessor. Never expose it via symlink_spec().
-AnalysisActionSink and active AnalysisActions carry the constructor into the
-existing synchronous analysis sink; no evaluator value survives publication.
-Same-owner identical native registration is idempotent through the existing
-registry owner lookup; nonidentical duplicates retain conflict behavior.
-Core ValidatedActionClosure permits cross-owner duplicates only for structurally
-equal native specs and empty action execution properties/group. Retain every
-configured owner; ignore native owner platform facts only for native sharing.
-Mixed families remain unsupported. Existing scalar FileWrite sharing is unchanged.
-Prerequisite/runtime and REAPI entrypoints must still reject native Solib.
+Use cached SHA256-verified Bazel executable
+/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel
+Verify executable SHA256 and --version=9.2.0 against WP755 before use.
+Flags: --batch --ignore_all_rc_files --noblock_for_lock,
+--output_base=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5,
+aquery <query> --output=jsonproto --include_artifacts --noinclude_commandline
+--include_pruned_inputs --include_aspects --@rules_rust//rust/toolchain/channel=nightly
+--lockfile_mode=error --nofetch --repository_disable_download --noshow_progress
+--color=no --curses=no. Include-pruned selects original inputs plus scheduling
+dependencies, a conservative declared-input view shared by filter and dump.
+Include-aspects explicitly retains aspect actions in the scoped graph. No-edge
+results do not prove absence from runfiles/output groups, tree membership or
+root default-output selection; preserve that residual rather than broadening claims.
+No build/test command, source helper execution, credentials/RC inspection, or Slug
+binary invocation. No repin or lockfile mutation. Hash relevant input pins before/after.
 
-All new state is DICE-retained through existing configured analysis/actions and
-closure values, with structural Eq and Allocative. Existing source/configuration
-dependencies own invalidation/restoration; no key, discovery bypass, extra cache,
-interner, async work or lock across compute. Existing canonical labels, shared
-configured identity and ActionOutput storage are reused (Stage 9 utility row).
-Naming/hash buffers are construction scratch; no performance improvement claim.
+## Ownership, scope and validation
 
-## Scope and work division
+Root owns runner/query/process cleanup, scheduling and integration. Scratch under
+target/wp757 reuses WP755 runner/process-group logic. Twenty-second query cap,
+separate from source preparation/version preflight; expected roughly ten seconds.
+This is a packet operation cap, not a global user deadline. Inspect current Bazel/
+Java/Cargo processes before invocation; do not interfere with another user's server.
+Dedicated process group, at most5s TERM plus5s KILL cleanup. Preserve each receipt,
+exact argv, hashes, exit/elapsed/timeout/group status; no overwrite of failed evidence.
+Diagnose environment failures before a corrected invocation, never relax pins.
 
-Baseline 245f67b63, clean. Root owns scheduling, integration, Core sharing/runtime
-gates and tests. BuildAPI worker owns actions/solib_symlink.rs (new), spec.rs,
-ctx_actions.rs, reapi_projection.rs, mod.rs, lib.rs, Cargo.toml/BUILD.bazel and the narrow Cargo.lock
-dependency-list update if workspace sha2 reuse requires it. Loading/Analysis
-worker owns cc_common.rs and its new child test module, subrule_invocation.rs,
-starlark_rule.rs and new starlark_rule/solib_tests.rs, reusing unchanged
-rustc-map-each fixture source. Root owns the two Loading/Analysis BUILD.bazel
-entries declaring that reused source as test compile_data, with package-private
-source visibility; no new fixture copy or build-graph semantic dependency.
-Root may edit runtime/configured_action_closure.rs and new bounded test module
-under runtime/action_prerequisites plus its module registration; docs allowlist
-is this manifest, canonical Live Status, bootstrap-readiness, inventory and
-Stage 9 adopted reuse row. Exhaustive enum consumers may receive only required
-fail-closed match arms, reported before edits. No fixture-copy growth.
+Extractor worker owns scratch target/wp757/extract.py after design acceptance:
+validate duplicate IDs/JSON keys, path/depset cycles and complete action references;
+retain matching artifact IDs/paths, ordered output IDs, owner/rule/configuration,
+mnemonic and serialized execution platform/info. Record flattened membership only,
+not an exact nested-set traversal-order claim. Same-dump producer output IDs bind
+consumers. Negative extraction checks must reject a missing control, dangling
+reference and fabricated/nonmatching input row. No persistent Slug state is changed.
 
-Large spec.rs/starlark_rule.rs remain existing dispatch/sink owners; isolate
-naming logic and new tests in child modules. Estimate <300 production and <400
-test lines; exceeding these is a cohesion review trigger, not a hard stop.
-Independent design review precedes implementation; same reviewer checks final
-diff and invariant-to-test evidence. Other workers use disjoint files.
+Tracked allowlist: current manifest, canonical Live Status, bootstrap-readiness,
+solib-construction-inventory and new solib-consumption.json. Prefer compact matched
+edges/source witnesses/receipt plus raw hash over retaining thousands of irrelevant
+input artifacts; retain the complete raw graph only if small. Raw observations are
+evidence, never Slug runtime input. No implementation, fixture, dependency or lock edits.
 
-## Validation and closure
+Independent design review checks query semantics, positive controls and negative
+claims; final review checks actual rows/source attribution and successor selection.
+Source worker authenticates static/dynamic selection and runtime-file branches from
+pinned archives while root runs the query. No Cargo/daemon suite is relevant.
+Run extraction/negative checks, git diff --check, plan status and archive checks.
+Commit accepted evidence with elapsed/review time and actual gate advanced.
 
-Public cross-crate tier. Resolve pinned nightly-2025-09-14 tools explicitly;
-serialize Cargo, compile --no-run JSON separately (60s preparation operation cap),
-preflight exact named tests once per unchanged executable. Focused BuildAPI
-proofs cover escaping/threshold/hash/extension, main/external projections,
-input/config structural identity, invalid inputs, idempotence/conflict and REAPI
-rejection. Analysis proofs cover active token, binder flags/types, bin-relative
-declarations and retained input/output. The unchanged private helper proof runs
-in Loading with the actual private binder and a recording sink; Analysis tests
-connect the same typed AnalysisActions bridge to the actual production sink.
-This segmented proof avoids exporting private production APIs solely for tests;
-it is not a full cc_library loading or DICE integration claim.
-Core proofs cover cross-owner sharing, differing configured input rejection,
-mixed-family rejection, owner-context independence and requested-output runtime
-gating. Compile direct dependents slug_loading_v2, slug_analysis_v2,
-slug_core_v2 and slug_cli_v2; no binary oracle invocation is planned.
-Tests expected seconds; no daemon or broad suite required for this constructor.
-Run formatting, git diff --check, plan status and archive checks; record exact
-selection/pass counts, elapsed times and final review, then commit accepted work.
+REPLAN only if producer controls cannot identify the known outputs or evidence
+requires a broader observation/semantic decision; root may select a bounded safe
+successor within the ongoing plan. Native execution is selected only if current
+evidence demonstrates demand; otherwise retain its explicit gate and advance the
+missing production C++ analysis prerequisites. M7A remains partial and M8 unproved.
 
-Correct implementation/invocation failures within this contract. REPLAN only if
-source contradicts the selected path/ownership model or safe admission requires
-new configuration provenance, runtime execution or full C++ prerequisites.
-M7A remains partial and M8 unproved. Packet began approximately 17:54 UTC.
-Independent design review ACCEPT: full typed identity, naming projection and
-separate execution gates accepted; final review protects exact filename predicates.
+Independent design review ACCEPT. Bazel --version and binary SHA256 preflight
+match 9.2.0/WP755. Previous turn was progress; current checkout starts clean at
+0763cec2b and no live Bazel/Java/Cargo/slugd process was found before preparation.
 
-Preparation note: initial combined Core no-run preparation reached its 60s cap
-after compiling dependencies and starting Core code generation; no compiler error
-was emitted. The wrapper originally killed Cargo but left rustc briefly alive;
-it exited before the targeted cleanup. Further operations supervise a dedicated
-process group. Split Loading/Analysis test preparation from Core's now-warm
-dependency graph, retaining the same 60s operation cap. This is a resource stop,
-not test evidence or a semantic failure. Test growth exceeds the initial estimate:
-separate binder/sink scaffolding and negative matrices stay in bounded child test
-modules; no production test export or copied fixture corpus is introduced.
+## Observation and selected successor
 
-## Validation receipt
+The query succeeded exit0 in 2.452s, with zero executed build actions, no timeout,
+clean process group, and all 11 input pins unchanged. The only two returned
+actions are the expected target/exec Solib producers, each matched through its
+backing library input. Neither output artifact ID occurs in any action input.
+Raw SHA256 0a796b67c943164270c2d682cc6777b00adb1443d45f9a821a3aff3c403fe9ed
+is byte-for-byte identical to WP755, so reuse its complete retained parsed graph.
+[solib-consumption.json](./solib-consumption.json) owns the new invocation/pins,
+same-dump output IDs and explicit zero consumer lists, without another graph copy.
+The observed graph can reuse WP755's strict parser; no general consumer-graph
+parser is needed for a result identical to the accepted two-producer graph.
 
-All commands use the resolved pinned toolchain, RUSTC/RUSTDOC paths, offline
-locked Cargo and serialized target/debug preparation. Final no-run commands:
-cargo test --offline --locked -p <crate> --lib --no-run --message-format=json.
-BuildAPI exit0 4.183s plus final-source 0.465s; Analysis exit0 45.018s;
-Core exit0 32.541s after the resource split; Loading exit0 31.983s and final
-test-scaffold correction 3.823s. Earlier Loading compile exit101 36.287s was a
-test-only OwnedFrozenValue accessor error, corrected to a retained handle/value().
-Its first test run passed2/3; the unchanged helper's unused depset global was
-missing from authored scaffolding, corrected to an inert fail-if-invoked binding.
-No implementation assertion or unchanged source was weakened.
+Six loaded rules_rust/rules_cc witnesses match their exact release archive
+members and hashes. Static/PIC preference explains why a retained dynamic field
+need not become a Rust input; this is a conditional source explanation, not a
+query observation of selected static archives. cc_library data_runfiles can still
+retain a dynamic artifact, so do not generalize the negative to runfiles or other
+options. Native Solib execution remains explicitly deferred.
 
-Final preflight-selected tests all pass: BuildAPI4/4 0.00s, Loading3/3 0.00s,
-Analysis3/3 0.00s, Core5/5 0.01s. Each harness was preflighted after its last
-rebuild with scripts/v2_test_preflight.py <executable> --exact <all named tests>,
-then executed as <executable> --exact <same names> under a 10s cap.
-Exact selection is the four tests in actions::solib_symlink::tests, the two
-cc_common::solib_tests tests plus
-subrule_invocation::native_solib_token_tests::inactive_native_solib_actions_never_reach_sink,
-the three starlark_rule::solib_tests tests, and the three
-runtime::action_prerequisites::tests::solib_tests tests plus protected
-runtime::configured_action_closure::tests::{configured_action_conflicts_compare_raw_platform_not_merged_owner_properties,
-configured_action_conflicts_unresolved_long_unicode_and_distinct_configuration}.
-Harnesses: slug_build_api_v2-18e71ad104d60d52,
-slug_loading_v2-db3f96e2264887f3, slug_analysis_v2-6df0dd9f40d73962,
-slug_core_v2-1bb9a93f43ab610d under target/debug/deps.
+Select the bounded C++ feature-model/configuration implementation contract next,
+before compile/actions2ctx: authenticated cc_library.bzl:30–38 calls toolchain
+lookup and configure_features before compile at :56. Provider construction needs
+native cc_toolchain_features (CcStarlarkInternal.java:257–269), and feature
+configuration uses default_features_and_action_configs plus configure_features
+(CcToolchainFeatures.java:1230–1311). The successor must own complete toolchain feature inputs and the
+required structural ctx/Cpp projections before activating selection; existing
+Rustc tests with authored toolchains/feature_configuration=None do not prove this
+surface. Compile/link primitives remain separately open. No new broad query/build
+or native execution is implied by that selection.
 
-cargo check --offline --locked -p slug_cli_v2 --message-format=json passes exit0
-26.300s, covering named direct dependents plus Query/Commands/REAPI/Server/CLI.
-No Slug binary, daemon, Bazel query/build or broader suite ran. Cargo emitted only
-existing unused perf-event patch notices. Command/compile logs and JSON receipts
-remain under target/wp756; this receipt preserves compact durable evidence.
+Validation: python3 target/wp757/extract.py --self-test target/wp757/actions.json
+passes exit0, two positive and seven negative controls plus two expected producer
+controls and zero consumer edges. Root independently reused WP755's strict reader
+on the new dump. Missing controls, dangling references, nonmatching rows, path/
+depset cycles and duplicate IDs/JSON keys fail closed; synthetic membership is
+only a validator control, not production evidence. Both archive hashes and six
+loaded-file/member comparisons pass. No new fixture corpus or Rust changes;
+git diff --check, plan status and archive checks pass. No process remains live.
 
-Independent final review ACCEPT. Pinned rustfmt checks on all 14 changed Rust
-files, git diff --check, plan status and archive checks pass. No new fixture
-files; the existing authenticated source is explicitly declared as test compile
-data. Approximately 21 minutes elapsed (17:54–18:15 UTC); compile preparation
-including resource-stopped/error attempts and CLI check totals about 241s,
-focused test harness time 0.01s, independent reviews approximately six minutes
-overlapped with implementation/validation. No semantic REPLAN.
-
-Observable gate advanced: production-demanded native False/False construction
-and structural action sharing now exist; execution remains explicitly rejected.
-Next resolve downstream consumption of the two observed Solib outputs from
-existing evidence or one bounded input-filtered production action observation.
-That selects native execution admission versus the separately missing C++
-analysis prerequisites without assuming registration proves execution demand.
-Do not open full allocator compilation or a broad production build implicitly.
-M7A remains partial and M8 unproved.
+Independent final review ACCEPT. Durable receipt comparison also passes exact
+argv/raw graph, all 11 current pins, two controls, zero edges and six source
+witnesses. Packet elapsed approximately 11 minutes (18:16–18:27 UTC), one query
+2.452s, no Rust compilation/tests or build actions; independent review overlapped
+source/extraction work. No environment repair or semantic REPLAN was needed.
+Gate advanced: producer registration no longer supplies an assumed runtime demand;
+the next implementation priority is the preceding C++ feature model/configuration.

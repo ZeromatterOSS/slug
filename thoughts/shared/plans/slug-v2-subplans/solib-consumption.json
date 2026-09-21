@@ -1,0 +1,323 @@
+{
+  "packet": "WP-7-57-m7a-solib-consumption-observation-r1",
+  "sourceBaseline": "0763cec2bd4314bcf2af0ae64d32c3ab5087c4fe",
+  "scope": "Direct declared/scheduling inputs under the named production-root aquery; no execution or default-output reachability claim.",
+  "bazel": {
+    "version": "9.2.0",
+    "sourceCommit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "binarySha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694"
+  },
+  "invocation": {
+    "cwd": "/run/media/system/Colossus/dev/slug",
+    "argv": [
+      "/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel",
+      "--batch",
+      "--ignore_all_rc_files",
+      "--noblock_for_lock",
+      "--output_base=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5",
+      "aquery",
+      "inputs(\"bazel-out/[^/]+/bin/(external/rules_rust[+]/ffi/cc/allocator_library/libcc_allocator_library[.]so|_solib_k8/libexternal_Srules_Urust[+]_Sffi_Scc_Sallocator_Ulibrary_Slibcc_Uallocator_Ulibrary[.]so)\", deps(//app/slug_cli_v2:slug))",
+      "--output=jsonproto",
+      "--include_artifacts",
+      "--noinclude_commandline",
+      "--include_pruned_inputs",
+      "--include_aspects",
+      "--@rules_rust//rust/toolchain/channel=nightly",
+      "--lockfile_mode=error",
+      "--nofetch",
+      "--repository_disable_download",
+      "--noshow_progress",
+      "--color=no",
+      "--curses=no"
+    ],
+    "removedEnvironmentVariables": [
+      "CARGO_BAZEL_REPIN",
+      "REPIN"
+    ]
+  },
+  "validation": {
+    "exitCode": 0,
+    "elapsedSeconds": 2.452,
+    "capSeconds": 20,
+    "timedOut": false,
+    "processGroupCleanup": "gone",
+    "buildActionsExecuted": 0,
+    "pinsUnchanged": true,
+    "trackedDiffNamesUnchanged": true,
+    "rawQuerySha256": "0a796b67c943164270c2d682cc6777b00adb1443d45f9a821a3aff3c403fe9ed",
+    "stderrSha256": "f325d5231dae302ea55c47fc181c138f1bf8834f47996d6a3cb28981048f3329"
+  },
+  "inputSha256": {
+    ".bazelversion": "1b9487d55bea47fea50d226cc9c53bc548877ad2a318bac8fbc8b320f429e5c5",
+    "MODULE.bazel": "109585b7b40d274ea912d32c73f54c25cc4bef1bc5e60526e18ac9bfe48d210c",
+    "MODULE.bazel.lock": "bcdda78dd82aab5fd7ab1796985a78322b50178dceed7669c1b20173c2634302",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "a3b40b7149e9ed96891f00c9feddf0d865b3e1df589960336407112660fd5736",
+    "Cargo.Bazel.lock": "9f22aed972a81bfc9402305b032ee4f4f89dcae5ea9f0ee45eb4341f1894bb7e",
+    "app/slug_cli_v2/BUILD.bazel": "0bbc5f4145b5987dcf44254b776d02b9cdd1e4667eaa529d21451f03f7166605",
+    "app/slug_build_api_v2/BUILD.bazel": "8f14455eb14e59b5e454d1b37b3397422b0fa983d1d65d153734671da973eea3",
+    "app/slug_loading_v2/BUILD.bazel": "adf3c1b6e428a9630978415a737f5f128d078b1aa0ee44ff894fdaaef43f931a",
+    "app/slug_analysis_v2/BUILD.bazel": "4f952d5b6682e4c04935274e2f59751b715016e2147807bc7c6dc9181072392c",
+    "app/slug_build_api_v2/Cargo.toml": "7e8724fec221e86c8c82572c96ce8856a713742c468f086f15f524620cb2f7ff"
+  },
+  "rawGraph": {
+    "reference": "solib-demand.json#/rawGraph",
+    "note": "The new input-filtered query returned byte-for-byte identical raw JSON to WP755's mnemonic-filtered query. Reuse that complete parsed graph without duplicating it.",
+    "sha256": "0a796b67c943164270c2d682cc6777b00adb1443d45f9a821a3aff3c403fe9ed"
+  },
+  "counts": {
+    "actions": 2,
+    "solibProducerControls": 2,
+    "solibConsumerActions": 0,
+    "solibConsumerEdges": 0,
+    "backingOnlyNonProducerActions": 0
+  },
+  "outputs": [
+    {
+      "producerActionIndex": 0,
+      "owner": "@@rules_rust+//ffi/cc/allocator_library:cc_allocator_library",
+      "ruleClass": "cc_library",
+      "configuration": {
+        "id": 1,
+        "mnemonic": "k8-fastbuild",
+        "platformName": "k8",
+        "checksum": "72a5446837369cd26452deae28ca8b1789d1ab4a7c21b1e160e1632e5f6b4b66",
+        "isTool": false
+      },
+      "input": {
+        "id": 1,
+        "path": "bazel-out/k8-fastbuild/bin/external/rules_rust+/ffi/cc/allocator_library/libcc_allocator_library.so",
+        "isTreeArtifact": false
+      },
+      "output": {
+        "id": 2,
+        "path": "bazel-out/k8-fastbuild/bin/_solib_k8/libexternal_Srules_Urust+_Sffi_Scc_Sallocator_Ulibrary_Slibcc_Uallocator_Ulibrary.so",
+        "isTreeArtifact": false
+      },
+      "executionPlatform": "@@platforms//host:host",
+      "executionInfo": [],
+      "consumerActions": []
+    },
+    {
+      "producerActionIndex": 1,
+      "owner": "@@rules_rust+//ffi/cc/allocator_library:cc_allocator_library",
+      "ruleClass": "cc_library",
+      "configuration": {
+        "id": 2,
+        "mnemonic": "k8-opt-exec",
+        "platformName": "k8",
+        "checksum": "3ebebd5c101e26f1f0848950b37ffdfcc62994b8bdf71fbd334a6c7c2765dcee",
+        "isTool": true
+      },
+      "input": {
+        "id": 3,
+        "path": "bazel-out/k8-opt-exec/bin/external/rules_rust+/ffi/cc/allocator_library/libcc_allocator_library.so",
+        "isTreeArtifact": false
+      },
+      "output": {
+        "id": 4,
+        "path": "bazel-out/k8-opt-exec/bin/_solib_k8/libexternal_Srules_Urust+_Sffi_Scc_Sallocator_Ulibrary_Slibcc_Uallocator_Ulibrary.so",
+        "isTreeArtifact": false
+      },
+      "executionPlatform": "@@platforms//host:host",
+      "executionInfo": [],
+      "consumerActions": []
+    }
+  ],
+  "interpretation": {
+    "observed": "Both target and exec Solib producer controls are present; neither output artifact ID appears in any returned action input. The input filter would include direct declared/scheduling consumers of either named output.",
+    "inference": "Static/PIC preference in authenticated rules_rust source is consistent with the bounded absence, but this query does not observe selected static archives.",
+    "residuals": [
+      "No execution was requested or observed.",
+      "No claim of CLI default-output, runfiles/output-group or tree-contained membership.",
+      "Other configuration/options or future dependency changes can create consumers; cc_library data_runfiles may retain dynamic artifacts.",
+      "Native Solib runtime admission remains deferred; continue missing production C++ analysis prerequisites."
+    ]
+  },
+  "sourceAttribution": {
+    "scope": "Conditional source explanation for allocator Solib consumption; no execution proof or assumed action-query result.",
+    "verification": "Fresh sha256sum of both archives and six loaded files; cmp -s of every loaded file against its exact tar member exited 0.",
+    "loadedSourceBase": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external",
+    "archives": {
+      "rules_rust": {
+        "version": "0.73.0",
+        "sha256": "2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2",
+        "path": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/content_addressable/sha256/2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2/file",
+        "url": "https://github.com/bazelbuild/rules_rust/releases/download/0.73.0/rules_rust-0.73.0.tar.gz",
+        "sourceJsonSha256PinnedByModuleLock": "8eeb3d9ba7c57916b63887a651e8f84c2f68b7243af9e712d728c2a0b7882255"
+      },
+      "rules_cc": {
+        "version": "0.2.17",
+        "sha256": "283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a",
+        "path": "tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/bazelbuild/rules_cc/releases/download/0.2.17/rules_cc-0.2.17.tar.gz",
+        "url": "https://github.com/bazelbuild/rules_cc/releases/download/0.2.17/rules_cc-0.2.17.tar.gz"
+      }
+    },
+    "witnesses": [
+      {
+        "archive": "rules_rust",
+        "member": "./rust/private/utils.bzl",
+        "loadedPath": "rules_rust+/rust/private/utils.bzl",
+        "sha256": "8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace",
+        "anchors": [
+          {
+            "lines": [
+              229,
+              254
+            ],
+            "symbol": "get_preferred_artifact",
+            "explanation": "PIC preference changes ordering of the two static variants; both static variants precede interface and dynamic artifacts."
+          }
+        ]
+      },
+      {
+        "archive": "rules_rust",
+        "member": "./rust/private/rustc.bzl",
+        "loadedPath": "rules_rust+/rust/private/rustc.bzl",
+        "sha256": "a7712508f50e5952f3f51e33c98acbe8ba39554e9c6f6edc26f16820d7c2a9e4",
+        "anchors": [
+          {
+            "lines": [
+              353,
+              359
+            ],
+            "symbol": "_collect_libs_from_linker_inputs",
+            "explanation": "Declared linker artifact list selects get_preferred_artifact for each LibraryToLink."
+          },
+          {
+            "lines": [
+              733,
+              745
+            ],
+            "explanation": "Linking-like actions, or explicit include_linker_inputs, include selected libraries plus additional_inputs and disambiguation artifacts."
+          },
+          {
+            "lines": [
+              783,
+              795
+            ],
+            "explanation": "Rustc input depset includes that artifact list unless experimental cc_common linking takes ownership, plus sources, compile_data, proc-macro data, toolchain files and applicable runtime/linker depsets. These additional inputs can cause consumption independently of command flags."
+          },
+          {
+            "lines": [
+              2073,
+              2083
+            ],
+            "explanation": "Binary/cdylib/staticlib runtime runfiles add dependency dynamic_library only when _is_dylib holds."
+          },
+          {
+            "lines": [
+              2204,
+              2234
+            ],
+            "explanation": "Exec configurations use allocator-specific or toolchain libstd_and_allocator CcInfo; target configurations may select global allocator alternatives. _is_dylib is false when either static_library or pic_static_library exists."
+          },
+          {
+            "lines": [
+              2395,
+              2399
+            ],
+            "explanation": "Rust lib/rlib CcInfo propagation includes selected standard-library and allocator CcInfo, without itself converting every provider artifact into an action input."
+          },
+          {
+            "lines": [
+              2655,
+              2658
+            ],
+            "explanation": "Native link flags choose the preferred artifact and take a static branch whenever static or PIC-static exists."
+          },
+          {
+            "lines": [
+              2700,
+              2707
+            ],
+            "explanation": "Static branch emits static flags; dynamic branch requires _is_dylib."
+          },
+          {
+            "lines": [
+              2831,
+              2835
+            ],
+            "symbol": "_libraries_dirnames",
+            "explanation": "Native search-directory Args also use the preferred artifact, not every dynamic field retained in the provider."
+          }
+        ]
+      },
+      {
+        "archive": "rules_rust",
+        "member": "./rust/private/rust_allocator_libraries.bzl",
+        "loadedPath": "rules_rust+/rust/private/rust_allocator_libraries.bzl",
+        "sha256": "ae4acb50ac6a1b922254a07346d97b4649810d33836f2be4824fd0b7a81e536e",
+        "anchors": [
+          {
+            "lines": [
+              228,
+              238
+            ],
+            "explanation": "Allocator CcInfo linker inputs are retained transitively in standard-library/allocator linking context; this is provider topology, not direct action consumption."
+          }
+        ]
+      },
+      {
+        "archive": "rules_rust",
+        "member": "./rust/private/toolchain.bzl",
+        "loadedPath": "rules_rust+/rust/private/toolchain.bzl",
+        "sha256": "c4b613cee96540a94fbdf4fbdca7b8dc4ef6d3082024c4d3636afc2e9c4d468e",
+        "anchors": [
+          {
+            "lines": [
+              580,
+              591
+            ],
+            "explanation": "Toolchain all_files combines sysroot and C++ toolchain all_files; it does not add allocator DefaultInfo files wholesale."
+          },
+          {
+            "lines": [
+              603,
+              606
+            ],
+            "explanation": "Toolchain exposes allocator CcInfo alternatives for downstream selection."
+          }
+        ]
+      },
+      {
+        "archive": "rules_cc",
+        "member": "rules_cc-0.2.17/cc/common/cc_helper.bzl",
+        "loadedPath": "rules_cc+/cc/common/cc_helper.bzl",
+        "sha256": "22b11a7833958f11fb32ddf6406195e02ccef9dc635369a556cbafa4e933fdbe",
+        "anchors": [
+          {
+            "lines": [
+              237,
+              257
+            ],
+            "symbol": "_get_dynamic_libraries_for_runtime/_get_dynamic_library_for_runtime_or_none",
+            "explanation": "Dynamic runtime artifact is suppressed during static linking when either static variant exists; otherwise returns dynamic_library."
+          }
+        ]
+      },
+      {
+        "archive": "rules_cc",
+        "member": "rules_cc-0.2.17/cc/private/rules_impl/cc_library.bzl",
+        "loadedPath": "rules_cc+/cc/private/rules_impl/cc_library.bzl",
+        "sha256": "87b491f10af315c9574f7dd96125b05fb53827da2442fbbe2f10e513167d1f70",
+        "anchors": [
+          {
+            "lines": [
+              241,
+              262
+            ],
+            "explanation": "Default output files include static variants and prefer resolved_symlink_dynamic_library, the original shared library, over dynamic_library Solib."
+          },
+          {
+            "lines": [
+              298,
+              320
+            ],
+            "explanation": "default_runfiles requests static runtime selection; data_runfiles requests dynamic runtime selection. The latter can retain the Solib despite static linker preference, but a consuming action or runfiles tree must actually reach that provider to establish demand."
+          }
+        ]
+      }
+    ]
+  }
+}

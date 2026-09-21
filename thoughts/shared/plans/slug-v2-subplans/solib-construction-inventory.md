@@ -206,3 +206,12 @@ and runtime constructors, ownerless alias sharing, native Solib execution,
 aquery projection and exact Bazel ActionKey remain unsupported/deferred.
 Requested output and Spawn-prerequisite tests protect the execution boundary.
 M7A is partial and M8 remains unproved.
+
+WP757's [consumer observation](./solib-consumption.json) selects backing libraries
+and Solib outputs through one input regex. Both producer controls are present;
+neither output has a direct declared/scheduling consumer under the recorded
+pruned-input/aspect flags. The raw dump equals WP755 byte-for-byte. This is a
+bounded negative, not absence from runfiles/default outputs or proof of selected
+execution. Static/PIC preference is a source-grounded explanation, not an observed
+static-input inventory. Keep native execution deferred and advance the preceding
+C++ feature-model/configuration prerequisite instead.

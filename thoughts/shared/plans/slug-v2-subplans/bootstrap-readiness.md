@@ -338,6 +338,11 @@ inputs at the same output fail closed. Native execution/REAPI/aquery/ActionKey r
 unsupported; neither the helper/binder nor sink proof establishes full cc_library.
 Default nonsibling Bazel bin roots are shared. The observation
 ran zero build actions and proves neither downstream use nor full C++ toolchain support.
+WP757's [input-filtered observation](./solib-consumption.json) returns the same
+two producer controls and no direct declared/scheduling consumers of their outputs.
+This is not an execution/default-output/runfiles proof. Keep Solib execution gated;
+the next prerequisite is the native C++ feature model/configuration used before
+cc_library compilation, with complete structural toolchain and ctx/Cpp inputs.
 Run remains deferred and F3 remains closed.
 
 ## Family admission and completion procedure
