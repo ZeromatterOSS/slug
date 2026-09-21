@@ -2,6 +2,8 @@ use super::*;
 
 include!("sources.rs");
 
+mod cc_linker;
+
 const REPOSITORIES: &[(&str, &str)] = &[
     ("rules_rust+", "rules_rust"),
     ("rules_cc+", "rules_cc"),
@@ -26,6 +28,13 @@ const BUILTIN_MODULES: &[(&str, &str)] = &[
 ];
 
 fn workspace() -> PathBuf {
+    workspace_with(
+        include_str!("subject.bzl"),
+        "subject(name = 'subject', src = '@@//:lib.rs')\n",
+    )
+}
+
+fn workspace_with(subject: &str, targets: &str) -> PathBuf {
     let workspace = scratch();
     let mut root_module = "module(name = 'root')\n".to_owned();
     for (_, repository) in REPOSITORIES {
@@ -78,14 +87,10 @@ fn workspace() -> PathBuf {
         fs::write(path, source).unwrap();
     }
     fs::write(workspace.join("lib.rs"), "pub fn probe() {}\n").unwrap();
-    fs::write(
-        workspace.join("rules_rust/proof.bzl"),
-        include_str!("subject.bzl"),
-    )
-    .unwrap();
+    fs::write(workspace.join("rules_rust/proof.bzl"), subject).unwrap();
     fs::write(
         workspace.join("rules_rust/BUILD.bazel"),
-        "load(':proof.bzl', 'subject')\nsubject(name = 'subject', src = '@@//:lib.rs')\n",
+        format!("load(':proof.bzl', 'subject')\n{targets}"),
     )
     .unwrap();
     fs::write(workspace.join("BUILD.bazel"), "exports_files(['lib.rs'])\n").unwrap();
@@ -104,6 +109,25 @@ async fn request_with_epoch(
     workspace: &std::path::Path,
     epoch: PathObservationEpoch,
     observed: bool,
+) -> Result<Arc<ConfiguredNodeResult>, String> {
+    request_configured(
+        dice,
+        workspace,
+        epoch,
+        observed,
+        "subject",
+        typed_action_test_configuration(),
+    )
+    .await
+}
+
+async fn request_configured(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    epoch: PathObservationEpoch,
+    observed: bool,
+    target: &str,
+    configuration: ConfigurationKey,
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
     let mut updater = dice.updater_with_data(UserComputationData {
         cycle_detector: Some(analysis_cycle_detector()),
@@ -135,8 +159,8 @@ async fn request_with_epoch(
         let key = match slug_analysis_v2::prepare_configured_node_analysis_observed(
             &mut transaction,
             NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
-            CanonicalLabel::parse("@@rules_rust+//:subject").unwrap(),
-            typed_action_test_configuration(),
+            CanonicalLabel::parse(&format!("@@rules_rust+//:{target}")).unwrap(),
+            configuration,
         )
         .await
         {
@@ -159,8 +183,8 @@ async fn request_with_epoch(
     let key = match prepare_configured_node_analysis(
         &mut transaction,
         NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
-        CanonicalLabel::parse("@@rules_rust+//:subject").unwrap(),
-        typed_action_test_configuration(),
+        CanonicalLabel::parse(&format!("@@rules_rust+//:{target}")).unwrap(),
+        configuration,
     )
     .await
     {

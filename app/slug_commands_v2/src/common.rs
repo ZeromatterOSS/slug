@@ -701,6 +701,45 @@ mod tests {
     }
 
     #[test]
+    fn cpp_link_configuration_flags_use_existing_typed_command_carrier() {
+        for (name, option) in [
+            ("fission", NativeCommandOption::Fission),
+            ("strip", NativeCommandOption::Strip),
+            ("linkopt", NativeCommandOption::Linkopt),
+            ("host_linkopt", NativeCommandOption::HostLinkopt),
+        ] {
+            // Conversion belongs to configuration preparation, not the binder.
+            for value in ["", "raw, value", "-Wl,-pie"] {
+                assert_eq!(
+                    occurrence(&format!("--{name}={value}")).unwrap(),
+                    Some(CommandConfigurationOccurrence::native(
+                        option,
+                        Some(value),
+                        false
+                    ))
+                );
+            }
+            assert!(occurrence(&format!("--{name}")).is_err());
+            assert!(occurrence(&format!("--no{name}")).is_err());
+        }
+        for (flag, raw, negated) in [
+            ("--experimental_omitfp", None, false),
+            ("--noexperimental_omitfp", None, true),
+            ("--experimental_omitfp=false", Some("false"), false),
+        ] {
+            assert_eq!(
+                occurrence(flag).unwrap(),
+                Some(CommandConfigurationOccurrence::native(
+                    NativeCommandOption::ExperimentalOmitfp,
+                    raw,
+                    negated
+                ))
+            );
+        }
+        assert!(occurrence("--noexperimental_omitfp=true").is_err());
+    }
+
+    #[test]
     fn feature_configuration_flags_preserve_raw_strings_and_boolean_no_forms() {
         for (name, option) in [
             ("features", NativeCommandOption::Features),

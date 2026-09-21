@@ -18,6 +18,7 @@ use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::list::AllocImmutableList;
 use starlark::values::starlark_value;
 use starlark_map::small_set::SmallSet;
 
@@ -75,6 +76,23 @@ starlark::starlark_simple_value!(CppFragmentValue);
 
 #[starlark_module]
 fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
+    fn fission_active_for_current_compilation_mode(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        this.check(eval)?;
+        Ok(this
+            .projection
+            .fission_active_for_current_compilation_mode()?)
+    }
+
+    fn should_strip_binaries(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        this.check(eval)?;
+        Ok(this.projection.should_strip_binaries()?)
+    }
     fn force_pic(
         this: &CppFragmentValue,
         eval: &mut Evaluator<'_, '_, '_>,
@@ -194,6 +212,9 @@ impl<'v> StarlarkValue<'v> for CppFragmentValue {
         // its returned value. CppFragmentProjection::new validated the immutable
         // configuration, so these reads cannot subsequently fail conversion.
         match name {
+            "linkopts" => Some(heap.alloc(AllocImmutableList(
+                self.projection.linkopts().expect("validated Cpp linkopts"),
+            ))),
             "apple_generate_dsym" => Some(Value::new_bool(
                 self.projection
                     .apple_generate_dsym()
@@ -216,6 +237,7 @@ impl<'v> StarlarkValue<'v> for CppFragmentValue {
 
     fn dir_attr(&self) -> Vec<String> {
         [
+            "linkopts",
             "apple_generate_dsym",
             "_dont_enable_host_nonhost",
             "_fdo_prefetch_hints_label",

@@ -37,6 +37,9 @@ impl CppFragmentProjection {
         projection.fdo_instrument()?;
         projection.cs_fdo_instrument()?;
         projection.fdo_prefetch_hints_label()?;
+        projection.fission_active_for_current_compilation_mode()?;
+        projection.should_strip_binaries()?;
+        let _ = projection.linkopts()?;
         Ok(projection)
     }
 
@@ -96,6 +99,65 @@ impl CppFragmentProjection {
 
     pub fn force_pic(&self) -> Result<bool, SlugConfigurationError> {
         self.configuration.native_bool(CPP_OPTIONS, "force_pic")
+    }
+
+    pub fn fission_active_for_current_compilation_mode(
+        &self,
+    ) -> Result<bool, SlugConfigurationError> {
+        let invalid = || SlugConfigurationError::InvalidCppConfiguration {
+            reason: "fission has an invalid retained value",
+        };
+        let OptionValue::Native(NativeOccurrence::Scalar(NativeValue::List(values))) =
+            self.configuration.option_value(CPP_OPTIONS, "fission")?
+        else {
+            return Err(invalid());
+        };
+        let mode = self.compilation_mode()?;
+        let mut active = false;
+        for value in values.0.iter() {
+            let NativeValue::Enum(value) = value else {
+                return Err(invalid());
+            };
+            if value.family != EnumFamily::Compilation
+                || !matches!(value.member.as_str(), "fastbuild" | "dbg" | "opt")
+            {
+                return Err(invalid());
+            }
+            active |= value.member == mode;
+        }
+        Ok(active)
+    }
+
+    pub fn should_strip_binaries(&self) -> Result<bool, SlugConfigurationError> {
+        let invalid = || SlugConfigurationError::InvalidCppConfiguration {
+            reason: "strip has an invalid retained value",
+        };
+        let OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Enum(value))) =
+            self.configuration.option_value(CPP_OPTIONS, "strip")?
+        else {
+            return Err(invalid());
+        };
+        if value.family != EnumFamily::Strip {
+            return Err(invalid());
+        }
+        match value.member.as_str() {
+            "always" => Ok(true),
+            "sometimes" => Ok(self.compilation_mode()? == "fastbuild"),
+            "never" => Ok(false),
+            _ => Err(invalid()),
+        }
+    }
+
+    /// Derived link flags borrow the sole option vector. Only the Starlark
+    /// boundary allocates the immutable output list.
+    pub fn linkopts(&self) -> Result<impl Iterator<Item = &str>, SlugConfigurationError> {
+        let values = self
+            .configuration
+            .native_string_list_option(CPP_OPTIONS, "linkopt")?;
+        let omitfp = self
+            .configuration
+            .native_bool(CPP_OPTIONS, "experimental_omitfp")?;
+        Ok(values.iter().chain(omitfp.then_some("-Wl,--eh-frame-hdr")))
     }
     pub fn apple_generate_dsym(&self) -> Result<bool, SlugConfigurationError> {
         self.configuration

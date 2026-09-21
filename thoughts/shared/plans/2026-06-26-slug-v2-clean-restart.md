@@ -29,15 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-60-m7a-cc-variables-and-expansion-r1
+Packet: WP-7-61-m7a-cc-link-variables-and-rust-linker-r1
 Status: accepted
 
-WP760 accepts retained C++ Variables and tool/command/environment/requirements
-expansion through the unchanged compile-variable builder on real configured inputs,
-including provider publication and same-DICE restoration. 32 focused tests,
-Core/CLI checks and independent final ACCEPT. Next demanded gates are link-variable
-Cpp projections/authentic linker arguments, then compile/actions2ctx/full toolchain
-producers; execution remains separate. WP759 at 065830a89 accepts repository/package/rule/global features,
+WP761 accepts typed Cpp link-variable prerequisites and unchanged Rust linker-helper
+invocation on a real ctx, with exact exec mapping and configuration restoration;
+38 focused tests, Core/CLI checks and independent final ACCEPT. WP760 at 3298fc1f2
+accepts Variables/feature expansion through the unchanged compile-variable builder,
+provider publication and restoration: 32 focused tests, Core/CLI checks and final
+ACCEPT. Compile/actions2ctx/full toolchain producers and execution remain separate.
+WP759 at 065830a89 accepts repository/package/rule/global features,
 structural ctx/Cpp and exec_os with unchanged creator/legacy/public configuration;
 30 focused tests, Core/CLI checks and independent final ACCEPT. WP758 at 3a57a616f
 accepts complete native C++ feature-model retention and selection with 22 tests

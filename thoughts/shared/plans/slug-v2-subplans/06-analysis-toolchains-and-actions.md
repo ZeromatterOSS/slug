@@ -179,8 +179,13 @@ BuildAPI owns pure feature expansion behind a narrow lazy variable-access adapte
 no new semantic key, interner or external runtime is introduced. The unchanged
 compile-variable builder and configured dependency query prove the admitted exact
 NOOP-mapper slice; structural artifact/configuration identity remains Slug-native.
-Full toolchain/FDO construction, link-variable Cpp projections, compile/actions2ctx
-and execution remain separate gates. The packet records unsupported value types
+WP761 adds real Cpp link-variable projections over the same SlugConfiguration,
+including fission membership, mode-dependent strip and ordered linkopts/omitfp.
+Both exec paths share the source-derived reset/host mapping. Getters retain no
+parallel option state. Unchanged link-variable and Rust linker-helper proofs use
+real ctx/native configuration with explicit authored toolchain envelopes.
+Full toolchain/FDO construction, compile/actions2ctx and execution remain separate
+gates. WP760's receipt records unsupported value types
 and the deferred frozen diagnostic-cache history explicitly.
 
 ### Analysis surface

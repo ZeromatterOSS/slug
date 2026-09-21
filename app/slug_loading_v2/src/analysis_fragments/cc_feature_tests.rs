@@ -59,6 +59,13 @@ fn configuration(changed: bool) -> SlugConfiguration {
     .unwrap()
 }
 fn evaluate(source: &str, changed: bool, allowed: bool) -> anyhow::Result<String> {
+    evaluate_configuration(source, configuration(changed), allowed)
+}
+fn evaluate_configuration(
+    source: &str,
+    configuration: SlugConfiguration,
+    allowed: bool,
+) -> anyhow::Result<String> {
     let module = Module::new();
     let identity = BzlModuleIdentity {
         label: CanonicalLabel::parse(if allowed {
@@ -77,7 +84,7 @@ fn evaluate(source: &str, changed: bool, allowed: bool) -> anyhow::Result<String
     module.set(
         "cpp",
         module.heap().alloc_simple(CppFragmentValue::new(
-            CppFragmentProjection::new(configuration(changed))?,
+            CppFragmentProjection::new(configuration)?,
             callers,
         )),
     );
@@ -89,6 +96,117 @@ fn evaluate(source: &str, changed: bool, allowed: bool) -> anyhow::Result<String
         )
         .map_err(starlark::Error::into_anyhow)?;
     Ok(module.get("RESULT").unwrap().to_repr())
+}
+
+fn link_configuration(changed: bool) -> SlugConfiguration {
+    let base = configuration(false);
+    if !changed {
+        return base;
+    }
+    let inputs = [
+        (NativeCommandOption::CompilationMode, "dbg"),
+        (NativeCommandOption::Fission, "DBG"),
+        (NativeCommandOption::Strip, "sometimes"),
+        (NativeCommandOption::Linkopt, "-Wl,one,two"),
+        (NativeCommandOption::Linkopt, ""),
+        (NativeCommandOption::Linkopt, "-Wl,one,two"),
+        (NativeCommandOption::ExperimentalOmitfp, "true"),
+    ]
+    .into_iter()
+    .map(|(option, value)| CommandConfigurationOccurrence::native(option, Some(value), false))
+    .collect::<Vec<_>>();
+    let mapping = RepositoryMapping::new(RepositoryMappingId::new("cpp-link-tests").unwrap());
+    base.with_command_configuration_context(
+        base.starlark_options().clone(),
+        &CommandConfigurationOverlay::from(inputs),
+        OptionLabelContext::MainRepository { mapping: &mapping },
+    )
+    .unwrap()
+}
+
+#[test]
+fn cpp_link_projection_methods_use_owned_configuration_and_private_binding() {
+    const READ: &str = "def read(): return (cpp.fission_active_for_current_compilation_mode(), cpp.should_strip_binaries())\nRESULT=read()";
+    assert_eq!(
+        evaluate_configuration(READ, link_configuration(false), true).unwrap(),
+        "(False, True)"
+    );
+    assert_eq!(
+        evaluate_configuration(READ, link_configuration(true), true).unwrap(),
+        "(True, False)"
+    );
+    assert_eq!(
+        evaluate_configuration(READ, link_configuration(false), true).unwrap(),
+        "(False, True)"
+    );
+    for method in [
+        "fission_active_for_current_compilation_mode",
+        "should_strip_binaries",
+    ] {
+        let read = format!("def read(): return cpp.{method}()\nRESULT=read()");
+        let error = evaluate_configuration(&read, link_configuration(true), false)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("cannot use private API"),
+            "{method}: {error}"
+        );
+        for call in [
+            format!("cpp.{method}(1)"),
+            format!("cpp.{method}(unexpected=True)"),
+        ] {
+            let source = format!("def read(): return {call}\nRESULT=read()");
+            assert!(
+                evaluate_configuration(&source, link_configuration(true), true).is_err(),
+                "{call}"
+            );
+        }
+        // Taking a bound method is allowed; calling it still checks its caller.
+        let copied = format!("bound=cpp.{method}\ndef read(): return bound()\nRESULT=read()");
+        assert!(
+            evaluate_configuration(&copied, link_configuration(true), false)
+                .unwrap_err()
+                .to_string()
+                .contains("cannot use private API")
+        );
+        assert!(evaluate_configuration(&copied, link_configuration(true), true).is_ok());
+    }
+}
+
+#[test]
+fn cpp_linkopts_is_public_immutable_noncallable_and_keeps_raw_order() {
+    const READ: &str = "RESULT=(type(cpp.linkopts), cpp.linkopts)";
+    assert_eq!(
+        evaluate_configuration(READ, link_configuration(false), false).unwrap(),
+        "(\"list\", [])"
+    );
+    assert_eq!(
+        evaluate_configuration(READ, link_configuration(true), false).unwrap(),
+        "(\"list\", [\"-Wl,one,two\", \"\", \"-Wl,one,two\", \"-Wl,--eh-frame-hdr\"])"
+    );
+    for source in [
+        "RESULT=cpp.linkopts()",
+        "v=cpp.linkopts\nv.append('bad')\nRESULT=v",
+        "v=cpp.linkopts\nv[0]='bad'\nRESULT=v",
+    ] {
+        assert!(
+            evaluate_configuration(source, link_configuration(true), false).is_err(),
+            "{source}"
+        );
+    }
+    assert_eq!(
+        evaluate_configuration(
+            "RESULT='linkopts' in dir(cpp)",
+            link_configuration(true),
+            false
+        )
+        .unwrap(),
+        "True"
+    );
+    assert_eq!(
+        evaluate_configuration(READ, link_configuration(false), false).unwrap(),
+        "(\"list\", [])"
+    );
 }
 
 #[test]

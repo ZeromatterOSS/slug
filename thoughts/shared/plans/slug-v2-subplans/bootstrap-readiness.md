@@ -361,11 +361,18 @@ legacy generator and public configure_features on a real ctx and source File;
 provider publication and same-DICE changes/restoration preserve complete variables,
 including unused payload and stale dotted-cache snapshots. This is the admitted
 NOOP-mapper/no-execution-metadata slice, not full toolchain/FDO construction.
-Link-variable Cpp projections, compile/actions2ctx, execution-time tree/path mapping
-and full cc_library remain deferred. Variables reject cyclic/foreign publication;
+WP761 adds structural fission/strip/linkopts projections, including omitfp-derived
+flags and exact selected exec resets/host-linkopt mapping. The unchanged link
+builder and complete public cc_common export now feed the unchanged Rust
+get_linker_and_args with real ctx/native feature configuration. Authored toolchain
+envelopes remain explicit: this proves action-name/tool/argv/environment selection
+and Rust-preferred filtering, not production toolchain construction or execution.
+Compile/actions2ctx, execution-time tree/path mapping and full cc_library remain
+deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside
 the admitted boundary. See the current packet for exact/native/deferred classes.
-The existing Rustc proof's None C++ fields do not establish those gates.
+The existing full Rustc argument proof's None C++ fields still do not establish
+those remaining gates; the nonempty C++ linker-helper proof is independently bounded.
 Run remains deferred and F3 remains closed.
 
 ## Family admission and completion procedure

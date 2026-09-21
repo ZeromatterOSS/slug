@@ -59,6 +59,197 @@ fn strings<'a>(config: &'a SlugConfiguration, name: &'static str) -> Vec<&'a str
 }
 
 #[test]
+fn link_projection_strip_and_fission_follow_compilation_mode_matrix() {
+    let base = base(None);
+    for mode in ["fastbuild", "dbg", "opt"] {
+        for strip in ["always", "sometimes", "never"] {
+            for (fission, enabled_modes) in [
+                ("no", vec![]),
+                ("yes", vec!["fastbuild", "dbg", "opt"]),
+                ("DBG,fastbuild,dbg", vec!["dbg", "fastbuild"]),
+                ("opt", vec!["opt"]),
+            ] {
+                let config = apply(
+                    &base,
+                    vec![
+                        native(NativeCommandOption::CompilationMode, mode),
+                        native(NativeCommandOption::Strip, strip),
+                        native(NativeCommandOption::Fission, fission),
+                    ],
+                );
+                let projection = CppFragmentProjection::new(config).unwrap();
+                assert_eq!(
+                    projection.should_strip_binaries().unwrap(),
+                    strip == "always" || (strip == "sometimes" && mode == "fastbuild"),
+                    "{mode}/{strip}"
+                );
+                assert_eq!(
+                    projection
+                        .fission_active_for_current_compilation_mode()
+                        .unwrap(),
+                    enabled_modes.contains(&mode),
+                    "{mode}/{fission}"
+                );
+            }
+        }
+    }
+    let default = CppFragmentProjection::new(base.clone()).unwrap();
+    assert!(default.should_strip_binaries().unwrap());
+    assert!(
+        !default
+            .fission_active_for_current_compilation_mode()
+            .unwrap()
+    );
+    let last = apply(
+        &base,
+        vec![
+            native(NativeCommandOption::Fission, "yes"),
+            native(NativeCommandOption::Fission, "opt"),
+            native(NativeCommandOption::Strip, "always"),
+            native(NativeCommandOption::Strip, "NEVER"),
+        ],
+    );
+    let last = CppFragmentProjection::new(last).unwrap();
+    assert!(!last.fission_active_for_current_compilation_mode().unwrap());
+    assert!(!last.should_strip_binaries().unwrap());
+    let mapping = RepositoryMapping::new(RepositoryMappingId::new("link-validation").unwrap());
+    for (option, value) in [
+        (NativeCommandOption::Fission, "YES"),
+        (NativeCommandOption::Fission, "No"),
+        (NativeCommandOption::Fission, "dbg,"),
+        (NativeCommandOption::Fission, ""),
+        (NativeCommandOption::Strip, "sometimes,never"),
+        (NativeCommandOption::Strip, ""),
+    ] {
+        assert!(
+            base.with_command_configuration_context(
+                base.starlark_options().clone(),
+                &CommandConfigurationOverlay::from(vec![native(option, value)]),
+                OptionLabelContext::MainRepository { mapping: &mapping }
+            )
+            .is_err(),
+            "{option:?}={value}"
+        );
+    }
+}
+
+#[test]
+fn link_projection_preserves_raw_flags_and_omitfp_derivation_structurally() {
+    let base = base(None);
+    let inputs = vec![
+        native(NativeCommandOption::Linkopt, "-Wl,a,b"),
+        native(NativeCommandOption::Linkopt, ""),
+        native(NativeCommandOption::Linkopt, "-Wl,a,b"),
+        native(NativeCommandOption::Linkopt, "-Wl,--eh-frame-hdr"),
+    ];
+    let configured = apply(&base, inputs.clone());
+    let flags = |config| {
+        CppFragmentProjection::new(config)
+            .unwrap()
+            .linkopts()
+            .unwrap()
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    assert!(flags(base.clone()).is_empty());
+    assert_eq!(
+        flags(configured.clone()),
+        ["-Wl,a,b", "", "-Wl,a,b", "-Wl,--eh-frame-hdr"]
+    );
+    let omitfp = apply(
+        &configured,
+        vec![native(NativeCommandOption::ExperimentalOmitfp, "true")],
+    );
+    assert_eq!(
+        flags(omitfp.clone()),
+        [
+            "-Wl,a,b",
+            "",
+            "-Wl,a,b",
+            "-Wl,--eh-frame-hdr",
+            "-Wl,--eh-frame-hdr"
+        ]
+    );
+    assert_eq!(
+        flags(apply(
+            &omitfp,
+            vec![native(NativeCommandOption::ExperimentalOmitfp, "false")]
+        )),
+        flags(configured.clone())
+    );
+    assert_ne!(configured, omitfp);
+    assert_ne!(configured.canonical_bytes(), omitfp.canonical_bytes());
+    assert_eq!(configured, apply(&base, inputs));
+    for (option, value) in [
+        (NativeCommandOption::Fission, "dbg"),
+        (NativeCommandOption::Strip, "never"),
+        (NativeCommandOption::Linkopt, "one"),
+        (NativeCommandOption::HostLinkopt, "host"),
+        (NativeCommandOption::ExperimentalOmitfp, "true"),
+    ] {
+        let changed = apply(&base, vec![native(option, value)]);
+        assert_ne!(base, changed, "{option:?}");
+        assert_ne!(
+            base.canonical_bytes(),
+            changed.canonical_bytes(),
+            "{option:?}"
+        );
+    }
+}
+
+#[test]
+fn both_exec_paths_reset_link_modes_remap_host_flags_and_preserve_omitfp() {
+    let base = base(None);
+    let target = apply(
+        &base,
+        vec![
+            native(NativeCommandOption::Fission, "yes"),
+            native(NativeCommandOption::Strip, "never"),
+            native(NativeCommandOption::Linkopt, "target"),
+            native(NativeCommandOption::HostLinkopt, "host"),
+            native(NativeCommandOption::HostLinkopt, ""),
+            native(NativeCommandOption::HostLinkopt, "host"),
+            native(NativeCommandOption::ExperimentalOmitfp, "true"),
+        ],
+    );
+    let platform = CanonicalLabel::parse("@@//platform:exec").unwrap();
+    let selected = target.to_exec_for_platform(&platform).unwrap();
+    for config in [target.to_exec().unwrap(), selected.clone()] {
+        let projection = CppFragmentProjection::new(config.clone()).unwrap();
+        assert!(
+            !projection
+                .fission_active_for_current_compilation_mode()
+                .unwrap()
+        );
+        assert!(projection.should_strip_binaries().unwrap());
+        assert_eq!(
+            projection.linkopts().unwrap().collect::<Vec<_>>(),
+            ["host", "", "host", "-Wl,--eh-frame-hdr"]
+        );
+        assert_eq!(
+            config
+                .native_string_list_option(CPP, "host_linkopt")
+                .unwrap()
+                .iter()
+                .collect::<Vec<_>>(),
+            ["host", "", "host"]
+        );
+    }
+    assert_eq!(selected, selected.to_exec_for_platform(&platform).unwrap());
+    let target = CppFragmentProjection::new(target).unwrap();
+    assert!(
+        target
+            .fission_active_for_current_compilation_mode()
+            .unwrap()
+    );
+    assert!(!target.should_strip_binaries().unwrap());
+    assert_eq!(
+        target.linkopts().unwrap().collect::<Vec<_>>(),
+        ["target", "-Wl,--eh-frame-hdr"]
+    );
+}
+
+#[test]
 fn feature_occurrences_are_raw_repeated_strings_and_structural() {
     let base = base(None);
     assert!(strings(&base, "features").is_empty());

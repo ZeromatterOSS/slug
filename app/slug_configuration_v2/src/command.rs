@@ -29,6 +29,11 @@ pub enum NativeCommandOption {
     HostCompilationMode,
     Features,
     HostFeatures,
+    Fission,
+    Strip,
+    Linkopt,
+    HostLinkopt,
+    ExperimentalOmitfp,
     ForcePic,
     AppleGenerateDsym,
     ExperimentalUseLlvmCovmap,
@@ -60,6 +65,11 @@ impl NativeCommandOption {
             "host_compilation_mode" => Self::HostCompilationMode,
             "features" => Self::Features,
             "host_features" => Self::HostFeatures,
+            "fission" => Self::Fission,
+            "strip" => Self::Strip,
+            "linkopt" => Self::Linkopt,
+            "host_linkopt" => Self::HostLinkopt,
+            "experimental_omitfp" => Self::ExperimentalOmitfp,
             "force_pic" => Self::ForcePic,
             "apple_generate_dsym" => Self::AppleGenerateDsym,
             "experimental_use_llvm_covmap" => Self::ExperimentalUseLlvmCovmap,
@@ -96,6 +106,11 @@ impl NativeCommandOption {
             Self::HostCompilationMode => "host_compilation_mode",
             Self::Features => "features",
             Self::HostFeatures => "host_features",
+            Self::Fission => "fission",
+            Self::Strip => "strip",
+            Self::Linkopt => "linkopt",
+            Self::HostLinkopt => "host_linkopt",
+            Self::ExperimentalOmitfp => "experimental_omitfp",
             Self::ForcePic => "force_pic",
             Self::AppleGenerateDsym => "apple_generate_dsym",
             Self::ExperimentalUseLlvmCovmap => "experimental_use_llvm_covmap",
@@ -127,6 +142,7 @@ impl NativeCommandOption {
         matches!(
             self,
             Self::CollectCodeCoverage
+                | Self::ExperimentalOmitfp
                 | Self::IncompatibleStrictActionEnv
                 | Self::ForcePic
                 | Self::AppleGenerateDsym

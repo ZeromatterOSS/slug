@@ -727,7 +727,7 @@ impl SlugConfiguration {
         ))
     }
 
-    /// Only the feature-configuration slice admitted by WP759. Bazel's exec
+    /// Only the C++ projection slices admitted by WP759/WP761. Bazel's exec
     /// transition starts from defaults, then propagates explicit source fields.
     /// Leave unrelated, previously admitted transition behavior unchanged.
     fn project_cc_feature_exec_options(
@@ -735,6 +735,7 @@ impl SlugConfiguration {
         options: &mut [OptionRecord],
     ) -> Result<(), SlugConfigurationError> {
         let host_features = self.option_value(CORE_OPTIONS, "host_features")?.clone();
+        let host_linkopts = self.option_value(CPP_OPTIONS, "host_linkopt")?.clone();
         for record in options {
             match (record.class_name, record.canonical_name) {
                 (CORE_OPTIONS, "features") => record.value = host_features.clone(),
@@ -747,6 +748,20 @@ impl SlugConfiguration {
                     record.value = OptionValue::Native(NativeOccurrence::Absent);
                 }
                 (CPP_OPTIONS, "fdo_prefetch_hints") => record.value = OptionValue::Label(None),
+                (CPP_OPTIONS, "linkopt") => record.value = host_linkopts.clone(),
+                (CPP_OPTIONS, "fission") => {
+                    record.value = OptionValue::Native(NativeOccurrence::Scalar(
+                        NativeValue::List(NativeValues(Arc::from([]))),
+                    ));
+                }
+                (CPP_OPTIONS, "strip") => {
+                    record.value = OptionValue::Native(NativeOccurrence::Scalar(
+                        NativeValue::Enum(EnumValue {
+                            family: EnumFamily::Strip,
+                            member: "always".into(),
+                        }),
+                    ));
+                }
                 _ => {}
             }
         }
