@@ -1068,6 +1068,14 @@ impl SynchronousAnalysisActionSink {
         } else {
             format!("{}/{path}", self.package_path)
         };
+        self.declare_bin_relative_output(path, kind)
+    }
+
+    fn declare_bin_relative_output(
+        &self,
+        path: String,
+        kind: ActionOutputKind,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
         let output = ActionOutput::new(path.clone(), kind);
         slug_build_api_v2::actions::registry::validate_output(&output)
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
@@ -1306,6 +1314,21 @@ impl SynchronousAnalysisActionSink {
 }
 
 impl AnalysisActionSink for SynchronousAnalysisActionSink {
+    fn dynamic_library_symlink(
+        &self,
+        library: Value<'_>,
+        solib_directory: &str,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        let input = AnalysisArtifactValue::from_starlark(library)
+            .ok_or_else(|| anyhow::anyhow!("dynamic_library_symlink library must be a File"))?;
+        let spec =
+            slug_build_api_v2::SolibSymlinkSpec::new(input.artifact().clone(), solib_directory)?;
+        let output = self
+            .declare_bin_relative_output(spec.output().path().to_owned(), ActionOutputKind::File)?;
+        self.register(|actions| actions.register_solib_symlink(spec))?;
+        Ok(output)
+    }
+
     fn declare_file(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
         self.declare_output(path, ActionOutputKind::File)
     }
@@ -2527,3 +2550,6 @@ mod cargo_runfiles;
 
 #[cfg(test)]
 mod cargo_runfiles_tests;
+
+#[cfg(test)]
+mod solib_tests;

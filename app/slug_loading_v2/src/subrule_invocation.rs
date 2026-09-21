@@ -125,6 +125,14 @@ pub struct AnalysisSpawnRequest<'v> {
 }
 
 pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
+    fn dynamic_library_symlink(
+        &self,
+        _library: Value<'_>,
+        _solib_directory: &str,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        anyhow::bail!("native Solib construction is unavailable in this analysis context")
+    }
+
     fn declare_file(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue>;
     fn declare_directory(&self, _path: &str) -> anyhow::Result<AnalysisArtifactValue> {
         anyhow::bail!("directory declarations are unavailable in this analysis context")
@@ -1147,6 +1155,17 @@ pub struct AnalysisActions {
 }
 
 impl AnalysisActions {
+    pub fn register_dynamic_library_symlink(
+        &self,
+        library: Value<'_>,
+        solib_directory: &str,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        self.token
+            .require_active("dynamic_library_symlink", self.context_name)?;
+        self.action_sink
+            .dynamic_library_symlink(library, solib_directory)
+    }
+
     pub fn new(
         action_sink: Arc<dyn AnalysisActionSink>,
         token: AnalysisCallToken,
@@ -1171,6 +1190,40 @@ impl AnalysisActions {
             .require_active("absolute_symlink", self.context_name)?;
         self.action_sink
             .absolute_symlink(output, target_path, progress_message)
+    }
+}
+
+#[cfg(test)]
+mod native_solib_token_tests {
+    use super::*;
+
+    #[test]
+    fn inactive_native_solib_actions_never_reach_sink() {
+        let sink = Arc::new(crate::cc_common::solib_tests::RecordingSink::default());
+        let context = AnalysisEvaluationContext::new(
+            Arc::from([]),
+            [],
+            CanonicalLabel::parse("@@//:consumer").unwrap(),
+            sink.clone(),
+            FrozenValue::new_none(),
+            Arc::from([]),
+        );
+        let actions = AnalysisActions::new(
+            sink.clone(),
+            context.root_token(),
+            "rule context",
+            AnalysisActionCallScope::Root,
+        );
+        context.stack.lock().unwrap().frames.clear();
+        let error = actions
+            .register_dynamic_library_symlink(Value::new_none(), "_solib_k8")
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("outside of its own implementation function")
+        );
+        assert!(sink.0.lock().unwrap().is_empty());
     }
 }
 

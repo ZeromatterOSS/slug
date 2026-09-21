@@ -59,6 +59,8 @@ pub use actions::RustCrateArgMapper;
 pub use actions::RustCrateArgsError;
 pub use actions::RustNativeLinkArgMapper;
 pub use actions::RustNativeLinkArgsError;
+pub use actions::SolibSymlinkError;
+pub use actions::SolibSymlinkSpec;
 pub use actions::SpawnCommandLineError;
 pub use actions::SpawnExecutable;
 pub use actions::SpawnSpec;

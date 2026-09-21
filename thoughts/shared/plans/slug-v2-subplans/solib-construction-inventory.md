@@ -1,6 +1,8 @@
 # Native Solib construction inventory
 
-WP-7-54, source baseline `57856a758`, updated by WP755's production observation.
+WP-7-54, source baseline `57856a758`, updated by WP755's production observation
+and WP756's bounded construction result below. Baseline gap descriptions are
+historical; the final section records the implemented boundary.
 This inventory selects prerequisites for native construction; it admits no runtime behavior. WP752 regular-file
 alias execution and WP753 Cargo Args remain accepted at their original boundaries.
 
@@ -145,7 +147,7 @@ inputs/outputs, ignoring owner where shareable, matters; output path equality
 alone is insufficient. A Slug implementation must preserve original artifact
 owners while choosing any execution representative, include every semantic input
 in equality/invalidation, and distinguish same-owner and cross-owner registration.
-Slug currently permits repeated declarations of the same kind but rejects repeated
+The WP754 baseline permits repeated declarations of the same kind but rejects repeated
 registrations. Cross-owner sharing is separately restricted to scalar FileWrite
 (`configured_action_closure.rs:177,221,236`); other colliding families yield
 UnsupportedEquivalence. Both layers need an explicit native Solib contract.
@@ -154,7 +156,7 @@ Configured-analysis DICE values and their existing source/repository/configurati
 dependencies remain the natural producer. Construction must perform no filesystem
 discovery, introduce no semantic side cache or global registry, and retain no
 evaluator heap or command scratch. A future representation change requires the
-utility-reuse skill and Stage 9 review; this inventory changes no representation.
+utility-reuse skill and Stage 9 review; WP756 records that reuse in the Stage 9 ledger.
 
 ## Evidence and selected successor
 
@@ -183,14 +185,24 @@ the exact observed `_solib_k8/libexternal_Srules_Urust+_Sffi_Scc_Sallocator_Ulib
 Neither mnemonic contains ST-. Serialized owner platform is `@@platforms//host:host`,
 distinct from the native action's empty platform override used by key semantics.
 
-Select the demanded non-preserved, non-consumer-prefixed native Solib construction
-and structural action boundary next, with input repository/root-relative projection,
-duplicate/conflict semantics and explicit execution gating resolved in its design.
+WP756 implements the demanded non-preserved, non-consumer-prefixed generated-File
+constructor through a distinct SolibSymlinkSpec and active typed analysis bridge.
+Input naming projects main output.path directly, external inputs as
+external/<input-owner-repository>/output.path, without changing input identity;
+output declaration is bin-relative without consumer package/repository prefixes.
+Full configured input identity governs duplicate sharing and collision rejection.
+The projection omits unowned Bazel ST mnemonic bytes explicitly as Slug-native.
+Pinned escaping/long-name hashing and native filetype predicates have focused
+Rust proofs; the unchanged authenticated helper exercises the real private binder,
+and separate production-sink tests prove artifact/action publication through the
+same bridge. This is a segmented leaf proof, not full-rule analysis or DICE replay.
 Full allocator cc_library compilation/linking remains separate: native feature,
 compile, link-action wrapping and toolchain APIs are additional prerequisites.
 The filtered graph proves registration in root analysis, not downstream selection or
 execution of either Solib output. No broader query/build or F3 replay is implied.
 
-Exact admitted behavior is unchanged. Native Solib construction/execution,
-aquery projection and exact Bazel ActionKey remain unsupported/deferred. M7A is
-partial and M8 remains unproved.
+Existing exact slices are unchanged. True flags, source/tree inputs, custom-path
+and runtime constructors, ownerless alias sharing, native Solib execution,
+aquery projection and exact Bazel ActionKey remain unsupported/deferred.
+Requested output and Spawn-prerequisite tests protect the execution boundary.
+M7A is partial and M8 remains unproved.

@@ -330,9 +330,13 @@ WP755's [durable Solib observation](./solib-demand.json) identifies two declarat
 for rules_rust's C++ allocator library, in target and exec configurations. Authenticated
 cc_library linking uses dynamic_library_symlink with both flags false on a generated
 library input. The [native inventory](./solib-construction-inventory.md) now selects
-that constructor and structural action boundary, with naming/bin placement and both
-local/cross-owner sharing contracts still to implement. Default nonsibling Bazel bin
-roots are shared; input repository path participates in native mangling. The observation
+that constructor and structural action boundary. WP756 implements the False/False
+generated-File leaf, distinct typed action, bin-relative declaration and structural
+local/cross-owner sharing. Input repository path participates in native mangling;
+Slug-native configuration/path projections omit Bazel ST history. Different configured
+inputs at the same output fail closed. Native execution/REAPI/aquery/ActionKey remain
+unsupported; neither the helper/binder nor sink proof establishes full cc_library.
+Default nonsibling Bazel bin roots are shared. The observation
 ran zero build actions and proves neither downstream use nor full C++ toolchain support.
 Run remains deferred and F3 remains closed.
 

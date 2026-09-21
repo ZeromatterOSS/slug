@@ -174,10 +174,25 @@ fn validate_exact_outputs(
                     }
                 }
             };
-            if !scalar_file_write(first.action) || !scalar_file_write(row.action) {
-                return Err(error(true));
-            }
-            if !equivalent_file_write(first.action, row.action) {
+            let equivalent = match (
+                first.action.solib_symlink_spec(),
+                row.action.solib_symlink_spec(),
+            ) {
+                (Some(left), Some(right))
+                    if native_solib_metadata(first.action) && native_solib_metadata(row.action) =>
+                {
+                    // Native Solib has no execution-platform key inputs. Keep full
+                    // configured artifact identity, not only its naming projection.
+                    left == right
+                }
+                (None, None)
+                    if scalar_file_write(first.action) && scalar_file_write(row.action) =>
+                {
+                    equivalent_file_write(first.action, row.action)
+                }
+                _ => return Err(error(true)),
+            };
+            if !equivalent {
                 return Err(error(false));
             }
             if row.coordinate != first.coordinate {
@@ -216,6 +231,10 @@ fn validate_prefix_outputs(rows: &[OutputRow<'_>]) -> Result<(), ConfiguredActio
         ancestors.push(index);
     }
     Ok(())
+}
+
+fn native_solib_metadata(action: &ConfiguredAction) -> bool {
+    action.exec_properties().is_empty() && action.exec_group().is_none()
 }
 
 pub(super) fn scalar_file_write(action: &ConfiguredAction) -> bool {

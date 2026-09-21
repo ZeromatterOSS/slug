@@ -27,6 +27,7 @@ use crate::actions::cargo_runfiles_args::RetainedCargoRunfilesArgs;
 use crate::actions::runfiles_support::RunfilesSupportActionSpec;
 use crate::actions::rust_crate_args::RetainedRustCrateArgs;
 use crate::actions::rust_native_link_args::RetainedRustNativeLinkArgs;
+use crate::actions::solib_symlink::SolibSymlinkSpec;
 use crate::analysis_value::AnalysisArtifact;
 use crate::analysis_value::AnalysisDepset;
 use crate::analysis_value::AnalysisValueKind;
@@ -1147,6 +1148,7 @@ pub enum ActionKind {
     Spawn,
     ArtifactSymlink,
     AbsoluteSymlink,
+    SolibSymlink,
     ArgsWrite,
     RepoMappingManifest,
     SourceSymlinkManifest,
@@ -1173,6 +1175,7 @@ enum ActionPayload {
     Legacy(LegacyActionSpec),
     Spawn(SpawnSpec),
     Symlink(SymlinkSpec),
+    SolibSymlink(SolibSymlinkSpec),
     ArgsWrite(ArgsWriteSpec),
     RunfilesSupport(RunfilesSupportActionSpec),
 }
@@ -1187,6 +1190,7 @@ pub struct ActionSpec {
 static SPAWN_KIND: ActionKind = ActionKind::Spawn;
 static ARTIFACT_SYMLINK_KIND: ActionKind = ActionKind::ArtifactSymlink;
 static ABSOLUTE_SYMLINK_KIND: ActionKind = ActionKind::AbsoluteSymlink;
+static SOLIB_SYMLINK_KIND: ActionKind = ActionKind::SolibSymlink;
 static ARGS_WRITE_KIND: ActionKind = ActionKind::ArgsWrite;
 static REPO_MAPPING_MANIFEST_KIND: ActionKind = ActionKind::RepoMappingManifest;
 static SOURCE_SYMLINK_MANIFEST_KIND: ActionKind = ActionKind::SourceSymlinkManifest;
@@ -1223,6 +1227,10 @@ impl ActionSpec {
         Self::typed(ActionPayload::Symlink(spec))
     }
 
+    pub fn solib_symlink(spec: SolibSymlinkSpec) -> Self {
+        Self::typed(ActionPayload::SolibSymlink(spec))
+    }
+
     pub fn args_write(spec: ArgsWriteSpec) -> Self {
         Self::typed(ActionPayload::ArgsWrite(spec))
     }
@@ -1247,6 +1255,7 @@ impl ActionSpec {
                 SymlinkTarget::Artifact { .. } => &ARTIFACT_SYMLINK_KIND,
                 SymlinkTarget::AbsolutePath { .. } => &ABSOLUTE_SYMLINK_KIND,
             },
+            ActionPayload::SolibSymlink(_) => &SOLIB_SYMLINK_KIND,
             ActionPayload::ArgsWrite(_) => &ARGS_WRITE_KIND,
             ActionPayload::RunfilesSupport(spec) => match spec {
                 RunfilesSupportActionSpec::RepoMappingManifest { .. } => {
@@ -1266,6 +1275,7 @@ impl ActionSpec {
             ActionPayload::Legacy(spec) => &spec.mnemonic,
             ActionPayload::Spawn(spec) => spec.mnemonic(),
             ActionPayload::Symlink(_) => "Symlink",
+            ActionPayload::SolibSymlink(_) => "SolibSymlink",
             ActionPayload::ArgsWrite(_) => "FileWrite",
             ActionPayload::RunfilesSupport(spec) => spec.mnemonic(),
         }
@@ -1311,6 +1321,7 @@ impl ActionSpec {
             ActionPayload::Legacy(spec) => &spec.outputs,
             ActionPayload::Spawn(spec) => spec.outputs(),
             ActionPayload::Symlink(spec) => std::slice::from_ref(spec.output()),
+            ActionPayload::SolibSymlink(spec) => std::slice::from_ref(spec.output()),
             ActionPayload::ArgsWrite(spec) => std::slice::from_ref(spec.output()),
             ActionPayload::RunfilesSupport(spec) => std::slice::from_ref(spec.output()),
         }
@@ -1328,6 +1339,7 @@ impl ActionSpec {
             ActionPayload::Legacy(spec) => spec.progress_message.as_deref(),
             ActionPayload::Spawn(spec) => spec.progress_message(),
             ActionPayload::Symlink(spec) => spec.progress_message(),
+            ActionPayload::SolibSymlink(_) => None,
             ActionPayload::ArgsWrite(_) => None,
             ActionPayload::RunfilesSupport(_) => None,
         }
@@ -1399,6 +1411,13 @@ impl ActionSpec {
     pub fn symlink_spec(&self) -> Option<&SymlinkSpec> {
         match &self.payload {
             ActionPayload::Symlink(spec) => Some(spec),
+            _ => None,
+        }
+    }
+
+    pub fn solib_symlink_spec(&self) -> Option<&SolibSymlinkSpec> {
+        match &self.payload {
+            ActionPayload::SolibSymlink(spec) => Some(spec),
             _ => None,
         }
     }

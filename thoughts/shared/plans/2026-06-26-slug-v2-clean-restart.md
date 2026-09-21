@@ -29,15 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-55-m7a-solib-demand-observation-r1
+Packet: WP-7-56-m7a-solib-construction-r1
 Status: accepted
 
-WP755 recovers two configured Solib declarations for rules_rust's C++ allocator library,
-in target and exec configurations, with authenticated False/False native construction.
-The query ran zero build actions; full parsed evidence is retained in solib-demand.json.
-Default nonsibling bin placement is now source-corrected. Next: implement the demanded
-native constructor/structural action boundary with reviewed naming, sharing and runtime
-gates. Full C++ compile/link/toolchain support remains open; runtime admission is unchanged.
+WP756 accepts the demanded False/False native Solib constructor and distinct
+structural action boundary, with Slug-native naming, safe duplicate sharing and explicit
+runtime rejection. All15 focused tests and CLI dependency compilation pass; independent
+final review ACCEPT. WP755 at 245f67b63 supplies the two allocator-library declarations.
+Next resolve downstream consumption before selecting native execution or missing C++
+analysis primitives. Full C++ compile/link/toolchain support remains open.
 WP753 Cargo Args is accepted at 57856a758 and WP752 aliases at 74770f888. Full Cargo loading/execution,
 WP746's baseline diagnostic defect and broader M7A remain open; M8 is unproved.
 

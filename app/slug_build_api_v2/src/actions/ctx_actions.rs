@@ -14,6 +14,7 @@ use std::ops::Range;
 use crate::actions::registry::ActionError;
 use crate::actions::registry::ActionRegistry;
 use crate::actions::registry::validate_output;
+use crate::actions::solib_symlink::SolibSymlinkSpec;
 use crate::actions::spec::ActionInput;
 use crate::actions::spec::ActionKind;
 use crate::actions::spec::ActionOutput;
@@ -159,6 +160,16 @@ impl CtxActions {
 
     pub fn register_symlink(&mut self, spec: SymlinkSpec) -> Result<usize, ActionError> {
         self.registry.register(ActionSpec::symlink(spec))
+    }
+
+    pub fn register_solib_symlink(&mut self, spec: SolibSymlinkSpec) -> Result<usize, ActionError> {
+        let action = ActionSpec::solib_symlink(spec);
+        if let Some(index) = self.registry.output_owner(action.outputs()[0].path())
+            && self.registry.actions()[index] == action
+        {
+            return Ok(index);
+        }
+        self.registry.register(action)
     }
 
     pub fn register_batch(

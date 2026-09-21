@@ -15,6 +15,7 @@ pub mod registry;
 pub mod runfiles_support;
 mod rust_crate_args;
 mod rust_native_link_args;
+mod solib_symlink;
 mod spawn_command_line;
 pub mod spec;
 
@@ -32,6 +33,8 @@ pub use rust_crate_args::RustCrateArgsError;
 pub use rust_native_link_args::RetainedRustNativeLinkArgs;
 pub use rust_native_link_args::RustNativeLinkArgMapper;
 pub use rust_native_link_args::RustNativeLinkArgsError;
+pub use solib_symlink::SolibSymlinkError;
+pub use solib_symlink::SolibSymlinkSpec;
 pub use spawn_command_line::ExpandedSpawnCommandLine;
 pub use spawn_command_line::SpawnCommandLineError;
 pub use spawn_command_line::VirtualParamFile;

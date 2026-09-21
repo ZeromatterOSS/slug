@@ -183,6 +183,27 @@ pub fn alloc_frozen_empty_cc_header_info(
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn dynamic_library_symlink<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = pos)] actions: Value<'v>,
+        #[starlark(require = pos)] library: Value<'v>,
+        #[starlark(require = pos)] solib_directory: &str,
+        #[starlark(require = pos)] preserve_name: bool,
+        #[starlark(require = pos)] prefix_consumer: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        if preserve_name || prefix_consumer {
+            anyhow::bail!(
+                "dynamic_library_symlink supports only preserve_name=False and prefix_consumer=False"
+            );
+        }
+        let actions = AnalysisActions::from_value(actions)
+            .ok_or_else(|| anyhow::anyhow!("dynamic_library_symlink requires ctx.actions"))?;
+        Ok(eval
+            .heap()
+            .alloc_simple(actions.register_dynamic_library_symlink(library, solib_directory)?))
+    }
+
     fn absolute_symlink<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = named)] ctx: Value<'v>,
@@ -315,3 +336,6 @@ fn cc_common_methods(builder: &mut MethodsBuilder) {
 pub(crate) fn cc_common_globals(builder: &mut GlobalsBuilder) {
     builder.set("cc_common", CcCommonModule);
 }
+
+#[cfg(test)]
+pub(crate) mod solib_tests;

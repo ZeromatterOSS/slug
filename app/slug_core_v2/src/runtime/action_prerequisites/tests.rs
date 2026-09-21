@@ -536,6 +536,9 @@ mod engine_tests;
 #[path = "runfiles_tests.rs"]
 mod runfiles_tests;
 
+#[path = "solib_tests.rs"]
+mod solib_tests;
+
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 #[path = "symlink_tests.rs"]
 mod symlink_tests;
