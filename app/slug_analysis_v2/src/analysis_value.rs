@@ -474,6 +474,7 @@ impl<'v> StarlarkValue<'v> for AnalysisConfiguredTargetValue {
 
 pub(crate) struct AnalysisValueMaterializer<'a> {
     heap: &'a FrozenHeap,
+    cc_variables: SmallMap<slug_build_api_v2::cc_variables::CcVariablesOccurrence, FrozenValue>,
     depsets: HashMap<AnalysisDepset, FrozenValue>,
     file_depsets: HashMap<(usize, u32), FrozenValue>,
     symlink_depsets: HashMap<(usize, u32), FrozenValue>,
@@ -483,6 +484,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
     pub(crate) fn new(heap: &'a FrozenHeap) -> Self {
         Self {
             heap,
+            cc_variables: SmallMap::new(),
             depsets: HashMap::default(),
             file_depsets: HashMap::default(),
             symlink_depsets: HashMap::default(),
@@ -760,6 +762,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
 
     pub(crate) fn value(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
         Ok(match value.kind() {
+            AnalysisValueKind::CcToolchainVariables(value) => self.cc_variables(value)?,
             AnalysisValueKind::EmptyCcHeaderInfo(occurrence) => {
                 slug_loading_v2::alloc_frozen_empty_cc_header_info(self.heap, occurrence.clone())
             }
@@ -914,6 +917,14 @@ impl<'v> AnalysisValueLowerer<'v> {
             if !seen.insert(value.identity()) {
                 continue;
             }
+            if let Some(variables) = slug_loading_v2::cc_variables_value(value) {
+                stack.extend(variables.parent);
+                stack.extend(variables.locals.into_iter().map(|(_, value)| value));
+                for (_, entry) in variables.cache {
+                    stack.extend(entry.values().iter().copied());
+                }
+                continue;
+            }
             if let Some((_, _, _, retained, _, _)) = StarlarkDepset::parts_from_value(value) {
                 if retained.is_none() {
                     roots.push(value);
@@ -1044,6 +1055,9 @@ impl<'v> AnalysisValueLowerer<'v> {
     }
 
     fn lower_recursive(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
+        if let Some(variables) = slug_loading_v2::cc_variables_value(value) {
+            return self.lower_cc_variables(variables, path);
+        }
         if let Some(occurrence) = slug_loading_v2::empty_cc_header_info_occurrence(value) {
             return Ok(AnalysisValue::empty_cc_header_info(occurrence));
         }
@@ -1127,6 +1141,9 @@ impl<'v> AnalysisValueLowerer<'v> {
 #[cfg(test)]
 #[path = "analysis_value/cc_features_tests.rs"]
 mod cc_features_tests;
+
+#[path = "analysis_value/cc_variables.rs"]
+mod cc_variables;
 
 #[cfg(test)]
 mod tests {

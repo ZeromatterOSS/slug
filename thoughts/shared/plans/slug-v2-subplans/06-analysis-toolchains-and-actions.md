@@ -169,6 +169,20 @@ The empty-only producer rejects nonempty HeaderInfo arguments. No global counter
 or evaluator heap crosses DICE. Dynamic solib/LTO/toolchain operations, nonempty
 HeaderInfo and full Cc compilation remain required separate capabilities.
 
+WP760 retains C++ Variables through the existing AnalysisValue publication owner.
+Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and
+publication preserve immutable cache seeds, parent aliases, raw binding types,
+File owners and depset topology. Frozen queries use per-call scratch, never mutate
+published DICE results. Map/Single native equality and raw hashability are distinct
+from structural publication equality, which also compares unexpanded cache payload.
+BuildAPI owns pure feature expansion behind a narrow lazy variable-access adapter;
+no new semantic key, interner or external runtime is introduced. The unchanged
+compile-variable builder and configured dependency query prove the admitted exact
+NOOP-mapper slice; structural artifact/configuration identity remains Slug-native.
+Full toolchain/FDO construction, link-variable Cpp projections, compile/actions2ctx
+and execution remain separate gates. The packet records unsupported value types
+and the deferred frozen diagnostic-cache history explicitly.
+
 ### Analysis surface
 
 - configured target keys and analysis DICE keys;

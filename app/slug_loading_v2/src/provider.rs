@@ -1182,7 +1182,7 @@ impl<'v> StarlarkDepset<'v> {
             starlark::__macro_refs::Either::Right(value) => Some(visit(value, visitor)),
         }
     }
-    fn flatten(value: Value<'v>) -> starlark::Result<Vec<Value<'v>>> {
+    pub(crate) fn flatten(value: Value<'v>) -> starlark::Result<Vec<Value<'v>>> {
         traverse_depset(
             &EvaluatorDepset(value),
             |value| {

@@ -1,6 +1,6 @@
-//! Owned native C++ feature metadata and selection (Bazel 9.2 pinned source).
+//! Owned native C++ feature metadata, selection and expansion (Bazel 9.2 source).
 //!
-//! Expansion, tool lookup, and public rule-context configuration are not admitted.
+//! Expansion admits NOOP path mapping and no execution-time artifact metadata.
 //! Handles have occurrence identity; their payloads have complete structural identity.
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -15,6 +15,8 @@ use starlark_map::small_set::SmallSet;
 
 mod metadata;
 pub use metadata::*;
+mod expansion;
+pub use expansion::CcVariableAccess;
 #[cfg(test)]
 mod tests;
 

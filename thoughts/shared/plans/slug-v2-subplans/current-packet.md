@@ -1,224 +1,232 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-59-m7a-public-cc-feature-configuration-r1
+Packet: WP-7-60-m7a-cc-variables-and-expansion-r1
 Status: accepted
 
 ## Outcome and compatibility
 
-Run unchanged rules_cc 0.2.17 create_cc_toolchain_config_info (including legacy
-generation), native retained feature-model construction, and unchanged public
-configure_features against a real DICE-analyzed rule context. WP758 at 3a57a616f
-accepted the complete native model/selection and publication prerequisite with
-22 tests and Core/CLI compilation; it did not admit this public entrypoint.
+Run unchanged rules_cc 0.2.17 create_compile_variables on real analyzed inputs,
+then select tools and expand command lines, environments and execution requirements
+from the accepted native feature configuration. These variable builders are the
+same producers used by compile.bzl before create_cc_compile_action. This advances
+the demanded compiler prerequisite, not an isolated actions2ctx shim.
+Predecessor WP759 at 065830a89 accepted public feature configuration with 30 focused
+tests, Core/CLI checks and independent final ACCEPT; its receipt is in Git.
 
-Exact: Bazel 9.2 feature-scope parsing/composition, admitted Cpp/configuration
-projections, command features/host_features and exec remapping, and exec_os from
-the default selected execution platform. Slug-native: valid-Unicode strings and
-existing structural configuration, repository observation, platform and provider
-identity. Host fallback uses structural Rust Host observations. Unsupported:
-unresolved default execution platform, unadmitted platform parents, other repo()
-package arguments, ObjC-only configuration projections, production FDO/toolchain
-provider construction, feature expansion/tool lookup, compile/actions2ctx,
-C++ action creation/execution and full Cargo/C++ loading. Existing native-model
-WINDOWS/UNKNOWN rejection remains; exec_os itself may return either spelling.
-M7A stays partial and M8 unproved.
+Exact: named native variable constructors/composition and feature query/expansion
+semantics, including definition order, predicates, explicit iteration, dotted
+lookup and None shadowing, first matching tool and POSIX path origin. Exact
+Starlark observable variable Map/Single distinctions and parent reference equality
+must not be replaced by WP758's occurrence-only wrapper equality. Diagnostics are
+source-derived message-shape regressions. Slug-native: existing structural
+configuration/artifact/publication identity, Rust valid-Unicode strings and hash
+bits. Unsupported/deferred: Windows execution OS, execution-time path mapping/tree
+artifact expansion, foreign/internal VariableValue implementations, cyclic raw
+variable payloads, builtin provider structures other than ToolchainInfo,
+publication of raw set/range bindings (the bridge has no such retained types),
+cross-call diagnostic-cache message history after freeze,
+full toolchain/FDO provider construction, link-variable Cpp
+projections, actions2ctx/compile actions and execution. Existing loading/mapping
+boundaries remain. M7A partial; M8 unproved.
 
-## Source and semantic ownership
+## Source, ownership and lifecycle
 
-Pinned Bazel source 8220c6198837d5c13d53fea211cf3282aa12408a:
-analysis/config/FeatureSet.java:35–108; analysis/RuleContext.java:269–276;
-packages/PackageArgs.java:175–177,209–221; skyframe/PackageFunction.java:1211;
-packages/PackageCallable.java:61–67 (one nonempty package call per BUILD);
-analysis/starlark/StarlarkRuleContext.java:777–785; rules/cpp/
-CcStarlarkInternal.java:496–501; analysis/constraints/ConstraintConstants.java:30–95;
-rules/cpp/CppConfiguration.java:459,617–695,740–750,773,810,899–924;
-analysis/config/CoreOptions.java features/host_features declarations and
-src/main/starlark/builtins_bzl/common/builtin_exec_platforms.bzl features remapping.
-Follow docs/developers/dice.md; no new DICE key, lock, cache or filesystem bypass.
+Pinned Bazel 9.2 revision 8220c6198837d5c13d53fea211cf3282aa12408a:
+rules/cpp/CcStarlarkInternal.java:133–183 constructors/composition/string sequence;
+CcModule.java:62–138 and :202 caller restrictions; CcToolchainFeatures.java:
+Flag/EnvEntry, FlagGroup:200–298, predicates/FlagSet/EnvSet:300–386,
+Tool/ActionConfig:523–724, FeatureConfiguration:904–1004;
+CcToolchainVariables.java:323–461 lookup/cache, :475–708 typed access,
+:795–836 composition/conversion, :846–1056 structure and Map/Single semantics.
+CcToolchainFeaturesTest:231–441,528–1098,1379–1524,1792–1909,1975–1989 and
+StarlarkCcCommonTest:347–391,500–610 provide upstream observable themes.
+Skip Java implementation-only interner assertions.
+Public-global routing is the composed injected facade: builtins_bzl/bazel/exports.bzl
+:17,46–50 and StarlarkBuiltinsFunction:271–287 inject cc_common_bazel.bzl.
+Its six tool/requirements/action-enabled/argv/env/empty wrappers are unrestricted;
+the inner Java CcModule restriction is not exposed as the global API. Preserve
+that distinction instead of inventing a rules_cc-to-builtins source-label mapping.
+The separately restricted get_tool_requirement_for_action alias is not selected.
+Existing rules_cc archive SHA256 is
+283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a.
 
-Feature scopes are parsed separately: disabling beats enabling within a scope,
-no_layering_check disables layering_check, and empty/leading-minus names follow
-source parsing rather than native feature-model name validation. Repo defaults
-are overridden by a single package call, then resolved rule attributes. Enforce
-the source once-per-BUILD and nonempty-call guards in both package spellings;
-repeated calls are rejected, not extra precedence scopes. Global disables win
-all scopes; global enables lose to local disables. Output lists are sorted,
-deduplicated fresh mutable copies. A mutated returned list cannot mutate ctx.
+Follow docs/developers/dice.md. Loading owns evaluator-live variables; Analysis
+owns normal graph publication; BuildAPI owns retained semantic variables and pure
+expansion algorithms. No new DICE key, filesystem observation, cache service,
+global interner, lock across compute, dependency or digest domain.
 
-The existing observed RepoFile producers own typed repo features. BUILD package
-source results (root and selected external/canonical routes) carry them with
-their existing observation frontier and Need/error behavior; .bzl-only source
-results do not acquire unrelated feature dependencies. PackageEvaluation retains
-repo/package feature inputs and includes them in structural equality. Loading
-owns pure scope normalization/composition using existing compact utilities.
-Analysis consumes resolved rule features and the typed SlugConfiguration global
-features; never reconstruct options from retained-owner identity bytes.
+Use a narrow generic variable-access adapter for BuildAPI expansion. Loading
+adapts actual values lazily, avoiding eager expansion of unused variables and
+avoiding a Loading-to-Analysis dependency. Copy the constructor's top-level
+bindings in Java string-sorted key order but preserve nested live value references.
+Combine retains the supplied parent, copies only local bindings of added variables,
+rejects overlapping added local keys, permits local shadowing of parent keys,
+and chooses Single iff one added local key. None shadows a parent's direct key.
+Lookup tries the full direct name first, then longest dotted prefix; scoped
+iteration shadows exactly the named variable while leaving other parent bindings.
+Accept native admitted strings, bools, Files, sequences/dict keys/depsets and
+struct/user-provider/ToolchainInfo structures; preserve value types, order, aliasing
+and deferred type errors. Other builtin providers lack a common live/frozen field
+owner in the current bridge and are not needed by these compile-variable producers;
+reject them on access rather than adding an unrelated provider capability.
+Raw set/range sequence reads may execute live; normal publication rejects those
+raw types instead of flattening them to lists and losing type/equality identity.
+intern_string_sequence converts an admitted empty range to an immutable list.
+Tool lookup uses all declared actions, even disabled ones. Only enabled action
+configs supply action flags; enabled feature flags can match arbitrary actions.
+Environment conflicts fail, never silently last-wins.
 
-Command options are immutable structural occurrences in the existing typed
-overlay. Admit features/host_features and the required Cpp booleans together with
-source converter semantics. Both exec transition paths share the admitted projection:
-features <- host_features; reset coverage, force_pic, apple_generate_dsym,
-instrumentation paths and prefetch label to native defaults; propagate coverage
-format and dont-enable-host/nonhost as pinned builtin_exec_platforms requires.
-Preserve the other already-admitted transition behavior. Cpp projections
-read only existing typed retained options: force_pic, apple_generate_dsym,
-dont-enable-host/nonhost, LLVM coverage format, instrumentation paths and prefetch
-label. ctx.configuration.coverage_enabled directly reads collect_code_coverage.
-Do not infer it from presence of an output generator. Preserve existing profile
-validation and private-caller restrictions; do not invent defaults.
+Variable nodes retain an occurrence token for parent-reference comparison and
+publication alias topology, NOT as their sole Starlark equality. Map is hashable
+even with raw list/dict payloads; Single is unhashable. Use separate raw-payload
+hashing rather than accidentally applying ordinary list/dict hash barriers.
+Parent, local values, File owners and depset structure participate in retained
+semantic publication comparison. Cache entries are excluded from Starlark equality
+and hash, but cannot be excluded from publication if they change future expansion.
+empty_variables uses the source-defined immutable singleton occurrence
+(CcToolchainVariables:272–288), not a fresh parent token per call. A fixed
+OnceLock identity constant is not a semantic interner or mutable cache service.
 
-exec_os receives an actual root ctx through a narrow Rust Starlark demand
-capability, with active token checks. Analysis retains the existing default
-ConfiguredActionOwnerContext and cheap structural configuration handle. The
-projection consumes selected canonical OS setting/value labels, not target CPU,
-path flavor, platform name, arbitrary exec group or ambient std::env. A missing OS
-setting alone uses structural ActionEnvironmentHostOs; unfamiliar OS value yields
-UNKNOWN. Missing selected platform or missing required Host state fails closed.
-No evaluator-extra shortcut accepting an authored struct as ctx.
+Native dotted lookup caches resolved scalar values, sequence snapshots, live
+structure references and missing/error results; direct-key lookups remain live.
+Preserve this within evaluator lifetime and across publication. Live wrappers
+own traced mutable caches. Freeze and Analysis publication retain an immutable
+cache seed, including stale snapshots; frozen adapters add only per-call scratch
+resolutions over that seed. This is sound for the admitted NOOP mapper/no-metadata
+path because frozen raw references cannot change. A materializer yielding mutable
+values must instead install a live seeded cache. Repeated frozen calls preserve
+outputs and failure category; cross-call detailed diagnostic-cache message history
+is explicitly deferred. No semantic state mutates a shared DICE result after
+publication. Never silently deep-copy live inputs or discard stale cache seeds.
+The live cache uses an evaluator-local traced mutex so the generic frozen type
+remains Sync without unsafe claims. Guards only clone/insert cache entries and
+never cross value conversion, evaluation or DICE compute. Freeze consumes it;
+the actual frozen variant contains only an immutable boxed seed.
 
-New memory is compact DICE-retained package/source semantic data or phase-local
-context projections. Arc/CompactString and small ordered maps/sets follow Stage 9
-existing utility dispositions. No borrowed heap/scratch escapes publication.
-Normal DICE equality/invalidation/cancellation releases apply, including repo-only
-feature edits/restoration. No new digest domain, interner or performance claim.
+Retained variable nodes use shared immutable handles, CompactString, compact
+ordered maps/slices and Allocative per Stage 9 utility dispositions. Mutable
+evaluator-local references/cache and expansion stacks/output buffers are phase
+scratch until normal snapshot publication; retained values contain only owned
+AnalysisValues and immutable cache seeds. Normal memo/cycle/depset traversal,
+freeze/GC, equality cutoff, invalidation and cancellation release apply. No
+performance claim or new utility import.
 
 ## Scope and coordination
 
-Package worker: app/slug_bzlmod_v2/src/repo_file.rs, host_package.rs and focused
-child tests; app/slug_loading_v2/src/package.rs, bzl_module.rs, lib.rs and new
-package_features.rs/child tests. Existing host_package_load_tests.rs gets include
-dispatch only; host_package_attempt_tests.rs gets its required input and retry
-retention discriminator. Retain/validate repo and package feature lists,
-propagate observed inputs through existing package sources, and implement pure
-feature composition. Do not route feature semantics through IgnoreMatcher.
-tests/build_file_loading.rs merges the one existing repeated-package fixture
-into one call while preserving its loaded-Label parameter assertions.
+Expansion worker: app/slug_build_api_v2/src/cc_features.rs and metadata.rs narrow
+dispatch/access, new cc_features/expansion.rs and tests; shared adapter interface
+coordinated with Loading worker. Tool/action-enabled, command/environment and
+requirements operations all use the existing selected model.
 
-Configuration worker: app/slug_configuration_v2/src/command.rs, native/
-configuration.rs, cpp_fragment.rs, mod.rs and focused child tests; lib.rs exports
-only if needed; app/slug_loading_v2/src/analysis_fragments.rs and new child tests.
-Admit typed options, exec remapping, Cpp projections, coverage and Host getters.
-app/slug_commands_v2/src/common.rs limited to feature option binder regressions.
+Loading worker: new app/slug_loading_v2/src/cc_variables.rs and children;
+cc_common.rs new native variable/query dispatch, cc_features.rs access as needed,
+lib.rs exports. Implement live variables, native call restrictions, freeze and
+adapter. New semantic code stays in child modules, not the large cc_common owner.
+provider.rs may expose its existing exact depset flattening to this adapter with
+pub(crate) visibility only; do not duplicate or change the traversal.
 
-Root: app/slug_analysis_v2/src/starlark_rule.rs and new cohesive child module;
-app/slug_loading_v2/src/cc_common.rs and new narrow context-capability module;
-Loading lib.rs export coordinated with package worker. New
-app/slug_analysis_v2/tests/cc_configure_features/mod.rs plus registration in
-tests/starlark_rule.rs; cargo_runfiles_tests.rs gets only its required context
-initializer. BUILD.bazel compile_data only as necessary. Scheduling
-docs, bootstrap-readiness, Stage 4 package-default boundary note and Stage 9
-architecture row only as changed.
-No dependency/lockfile/source-corpus edits. Large existing files receive bounded
-fields/dispatch; new semantic algorithms and tests belong in cohesive child modules.
-Estimate 800–1,500 production and 700–1,200 test lines; growth triggers responsibility
-review, not weakened admission. Root owns Cargo, integration and commit.
+Root: new app/slug_build_api_v2/src/cc_variables.rs and lib.rs; BuildAPI
+analysis_value.rs plus Analysis analysis_value.rs narrow variant integration and
+cohesive child tests; new Analysis tests/cc_feature_expansion/ and starlark_rule.rs
+registration; BUILD.bazel only necessary source inclusion. Root owns retained
+publication, authentic integration, Cargo, docs and commit. Reuse WP759 fixture
+setup through a bounded shared test helper if needed; preserve its existing gates.
+No configuration/action-sink/dependency/lockfile/source-corpus edits.
 
-Independent reviewer checks design before implementation and final actual diff.
-Any newly discovered prerequisite/ownership choice returns to root before editing.
+After finishing expansion, that worker is reused for the new authentic Analysis
+integration module and its registration/BUILD source list. Root supplied the
+bounded WP759 shared fixture setup and continues retained bridge/lifetime tests.
 
-Independent design review ACCEPT: complete scope ownership and both exec paths
-are sound. Standard platform OS matching uses exact @@platforms identity (production
-selected-module routing already special-cases it); legacy platforms+ fixtures do
-not establish the positive OS case. Both repository lanes require final evidence.
+Estimate 1,200–2,200 production and 900–1,600 test lines. Growth triggers a
+responsibility/redundancy review, not weaker admission. Independent design and
+final reviews required for the public lifetime/publication boundary.
 
-Reviewed fixture ownership adjustment: use the observed canonical-external
-configured root, as in the accepted Rustc proof, for complete unchanged imports.
-The preexisting root-origin local-override cross-package import restriction
-remains deferred; no production loading workaround is added. Package/REPO edits
-follow the subject's owning repository, while platform targets remain in root.
-Platform positives use explicit @@platforms constraint labels. Fixture preparation
-supplies both demanded generic-bootstrap platforms+ and selected platforms local
-materialization identities; it never normalizes configured labels. Legacy apparent
-@platforms normalization is not claimed by this exact canonical OS projection.
+Independent design review ACCEPT: the live-cache/immutable-seed lifecycle is
+sound for NOOP mapping and immutable frozen inputs. Final review must verify
+parent identity, complete cache publication, raw hashability and frozen-call
+regressions; deferred diagnostic history cannot widen into an exact claim.
 
 ## Evidence and validation
 
-Source-derived regressions cover contradictory scopes/order/alias/edge names,
-fresh mutable ctx lists, resolved configurable rule features, package and repo
-feature-only equality/invalidation/restoration, feature occurrence conversion and
-target/exec host mapping. Selected-platform tests cover canonical label matching,
-missing versus unfamiliar OS setting/value, target versus exec OS, unresolved
-platform failure and structural Host/platform/configuration changes.
+Reuse existing creator/legacy/configuration sources. Authentic compile-variable
+proof additionally imports already-vendored compile_build_variables.bzl,
+cc_helper_internal.bzl, private/paths.bzl and rules_impl/native_cc_common.bzl.
+The complete public cc_common export wrapper is exercised where its existing load
+closure permits; never extract or rewrite a wrapper body to fake production proof.
+Explicit authored capability/FDO envelope remains a boundary input, not full
+production provider construction. Use WP759 canonical-external observed root.
 
-Authentic wrapper proof reuses exactly eight existing bodies: rules_cc action_names,
-cc_toolchain_config_lib, common/semantics, private/cc_internal, private/toolchain_config/
-{cc_toolchain_config_info,legacy_features,configure_features}, plus skylib paths.
-rules_cc archive SHA256
-283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a.
-Do not set no_legacy_features. An explicitly authored capability/FDO envelope around
-the authentic native model is a boundary input, not a production toolchain/FDO
-provider claim. Cover mode/default/request/unsupported selection, header/module-map
-gates, PIC error, coverage format, host/nonhost policy, FDO/CSFDO and profile-mode/
-Propeller/prefetch branches as supported by these projections. ObjC remains an
-explicit unsupported facade boundary. Verify same-DICE structural configuration
-and package changes affect published selected/requested membership.
+Discriminators: selected/unselected actions; first matching tool and no-match;
+all three tool path origins; duplicate requirements/order; action flags before
+feature flags; OR feature predicates and all flag-group guards; nested explicit
+iteration and full-key/longest-prefix lookup; missing/None/wrong types;
+relative path chunks; environment conflicts; variable composition/local-only copy;
+Map/Single equality/hash/parent aliases; top-map copy versus nested live mutation
+and dotted cache snapshots; repeated frozen calls; freeze/GC and provider round trip including unused
+File/depset/cache identity; same-DICE input change/restoration and published reuse.
+Keep execution-time tree expansion and link/compile actions explicitly unproved.
 
-Public/cross-crate plus DICE/platform tier: pinned toolchain, serialized Cargo
---offline --locked --no-run JSON preparation for Configuration, Bzlmod, Loading,
-Analysis and Commands affected harnesses; preflight all exact selectors once per
-unchanged binary, then focused tests. Check Core and CLI direct dependents. No
-Bazel/Slug binary, daemon or build action needed; no broad suite. Preparation cap
-60s per operation; runtime expected seconds. These are packet caps/estimates, not
-new user ceilings. Root may partition compilation on an observed cap, not silently
-raise it. Format, diff check, plan status and archive status required.
+Resolve pinned nightly-2025-09-14 tools; serialize offline/locked Cargo JSON
+--no-run preparation and preflight exact selectors once per unchanged binary.
+Focused BuildAPI, Loading, Analysis unit/integration gates plus Core and CLI
+checks. No Slug/Bazel binary, daemon, build action or broad suite required.
+Preparation cap 60s/operation, expected test runtime seconds; packet estimates
+are not user ceilings. Preserve failed receipts and correct ordinary implementation
+or invocation errors in scope. Format, diff, plan status and archive checks.
 
-REPLAN only if source contradicts the compatibility contract or a required semantic
-fact has no bounded owner in these existing paths. Ordinary implementation,
-invocation and test-selection corrections stay within the packet. Acceptance needs
-independent final review, compact gate/elapsed receipt and an atomic commit; do not
-land partial feature activation across repository/configuration/context owners.
+REPLAN for a contradiction requiring a new semantic owner or unbounded foreign
+runtime, not ordinary coding failures. Acceptance requires actual invariant review,
+source-grounded regressions, terminal validation receipts and atomic commit.
 
-## Implementation and validation receipt
+## Terminal evidence
 
-The complete scoped path is implemented. Typed repo/default features propagate
-through existing observed root, local-external and canonical package producers,
-with source equality/frontiers and retry restoration preserved. A single package
-scope plus resolved rule/global features feeds fresh mutable ctx lists. Typed Cpp
-and coverage fields, both exec mappings and an active-root-ctx native capability
-read structural configuration/default-platform facts. The public wrapper proof
-executes all eight unchanged sources with legacy generation enabled. No production
-action, foreign-language runtime, source corpus, dependency, DICE key/lock/cache or digest
-domain was added. New public attributes are ordinary non-callable values; this
-avoids the evaluator's native-attribute direct-call path invoking getters as methods.
+Pinned nightly-2025-09-14 tools resolved via rustup. Serialized commands:
+`cargo test --offline --locked -p <owner> --lib --no-run --message-format=json`
+for BuildAPI, Loading and Analysis; Analysis integration uses `--test starlark_rule`
+instead of `--lib`. Core and CLI use `cargo check --offline --locked` with JSON.
+Final preparation: BuildAPI 1.319s, Loading 9.180s, Analysis unit 6.829s,
+integration 6.325s; Core check 15.085s and CLI check 15.988s, all exit 0.
+All 13 preparation/check attempts total 147.757s; maximum 30.878s, under 60s cap.
 
-Pinned nightly-2025-09-14, offline/locked Cargo JSON preparation and exact preflight
-establish 30/30 focused passes: Configuration 4, Bzlmod 2, Loading 10, protected
-BUILD parameter fixture 1, Analysis OS/lifetime plus protected Cargo capture 3,
-Commands 1, and authentic public wrapper/context-boundary integration 9. The final
-integration receipt is target/wp759/tests-1790019463674841317.receipt.json;
-the final Loading receipt is tests-1790018934335366973.receipt.json in that directory.
-All commands/logs and earlier failed receipts remain under target/wp759.
-Latest successful runtimes sum to 0.362s. Core check passes in 16.842s and CLI
-check in 17.294s. Preparation/check total including corrections is 254.223s;
-the maximum single operation is 30.019s, below the packet's 60s cap. No Slug/Bazel
-binary, daemon, build action or broad suite was invoked.
+One preflight per unchanged executable/selector set; exact tests then execute
+with `--exact <selector> --nocapture`, exit 0 and exactly one pass each:
 
-Three ordinary compile corrections added the CompactString import, converted
-Starlark errors to anyhow, and supplied a protected test's new context field.
-Source review corrected dict-key conversion and package once/nonempty semantics;
-focused negative tests exposed and closed native-attribute callability. Fixture
-corrections supplied complete observed shards, the existing closed module setup,
-required repo observations/module mappings and the reviewed canonical-external
-route; no assertion was weakened to admit missing semantic input. The late PIC
-negative explicitly suppresses the authentic legacy enabled-pic default. A label
-test observes str(label) instead of asserting an unrelated debug representation.
-Ten failing test invocations are preserved with their attributed corrections.
+- BuildAPI `cc_features::expansion::tests`: 8 tests covering ordering, predicates,
+  guards, nesting, path/chunks, conflicts and lazy iteration.
+- Loading `cc_variables::tests`: 5 tests covering native shape/composition/hash,
+  live cache semantics, deferred failures, frozen seeds, validation/cycles;
+  existing Auto/Never/Always GC modes execute inside the helper.
+- Analysis `analysis_value::cc_variables::tests`: 3 tests covering owned/frozen
+  round trip, all cache entry kinds, alias topology, unused File owner and hash
+  barriers; 2 protected `analysis_value::cc_features_tests` tests.
+- Analysis integration `cc_feature_expansion`: 5 tests covering unchanged
+  compile variables, configured publication, same-DICE change/restoration,
+  live dotted snapshots, public binder/output boundaries and cycle/range rejection;
+  all 9 protected `cc_configure_features` tests also pass.
 
-Responsibility review: approximately 750 net production and 1,715 net test lines.
-Test growth exceeds the 700–1,200 estimate because complete wrapper branches,
-three repository observation lanes and lifecycle/OS/private-call discriminators
-are separate gates. They remain cohesive child modules; large owners receive
-narrow dispatch/fields. All eight source bodies are required load closure, and
-unused proof transport fields were removed. No performance claim is made.
+32 selected/32 passed; latest per-selector runtime total 0.402s. Local receipts
+under ignored `target/wp760`: tests-1790021175969053707 (BuildAPI),
+tests-1790021428375053726 (Loading), tests-1790021683598058283 (Analysis),
+tests-1790021997717773515 (integration), each `.receipt.json`, plus command logs.
+No Bazel/Slug binary, daemon or build action ran; pinned-source regressions and
+unchanged already-vendored helpers supply evidence without expanding the corpus.
 
-Format, diff, plan-status and archive checks pass. Packet elapsed approximately
-46 minutes (18:55–19:41 UTC), including research and overlapping design/final
-reviews. Gate advanced: unchanged public C++ feature configuration executes on
-owned structural inputs and survives DICE publication/invalidation. Production
-toolchain/FDO construction, expansion/tool lookup and compile/actions2ctx remain
-next boundaries; M7A stays partial and M8 unproved. No semantic REPLAN was needed.
+Preserved failures: four compiler attempts exposed ordinary type/lifetime,
+test-module path and private test-harness API mistakes; corrected within existing
+owners, moving live publication proof to integration rather than exposing private
+Loading APIs. Two test attempts expected different diagnostic text; corrected
+against actual native errors. Review also caught unsupported dotted availability
+being masked and eager sequence conversion; both corrected and discriminated.
+No ownership/compatibility replan. Roughly 1,620 production and 1,480 proof lines
+remain within estimate, concentrated in cohesive child modules. Shared utility
+reuse and lifetime ownership are recorded in Stages 6/9 and bootstrap readiness.
 
-Independent final review ACCEPT: final source, canonical fixture ownership and
-closure claims match the bounded contract; all 30 focused gates and Core/CLI
-checks are verified. Deferred production toolchain/FDO, expansion, compilation,
-execution and loading/mapping boundaries remain explicit.
+Next demanded boundary: link-variable Cpp projections and authentic linker-args
+use, then separately scoped compile/actions2ctx/full toolchain producers. This
+packet does not admit action execution, full cc_library or M8 bootstrap.
+
+Independent final review ACCEPT after the final 32-pass receipts and closure
+audit. Rustfmt, diff, plan-status and archive checks pass. Packet elapsed about
+40 minutes (2026-09-21 19:42–20:22 UTC); design/final review overlapped implementation
+and was not timed separately. Observable gate advanced: real configured
+compile-variable production and expansion through published native Variables.

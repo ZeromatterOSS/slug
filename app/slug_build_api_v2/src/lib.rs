@@ -12,6 +12,7 @@ pub mod actions;
 pub mod analysis_value;
 pub mod attrs;
 pub mod cc_features;
+pub mod cc_variables;
 pub mod ctx;
 pub mod depset;
 pub mod providers;
@@ -132,5 +133,5 @@ pub use runfiles_packages::RunfilesPackageMetadata;
 pub use runfiles_packages::RunfilesRepositoryMapping;
 
 mod cc_header_info;
-pub use cc_header_info::CcHeaderInfoOccurrence;
 pub use cc_features::*;
+pub use cc_header_info::CcHeaderInfoOccurrence;

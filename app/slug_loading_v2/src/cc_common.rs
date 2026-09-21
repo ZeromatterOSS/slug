@@ -41,6 +41,7 @@ use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark::values::structs::StarlarkStructuralValue;
 use starlark::values::tuple::TupleRef;
+use starlark::values::tuple::UnpackTuple;
 
 use crate::builtin_restriction::CustomAllowlistEntry;
 use crate::builtin_restriction::check_custom_allowlist;
@@ -183,6 +184,28 @@ pub fn alloc_frozen_empty_cc_header_info(
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn cc_toolchain_variables<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = named)] vars: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::cc_variables::construct(vars, eval.heap())
+    }
+    fn combine_cc_toolchain_variables<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = pos)] parent: Value<'v>,
+        #[starlark(args)] variables: UnpackTuple<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::cc_variables::combine(parent, &variables.items, eval.heap())
+    }
+    fn intern_string_sequence_variable_value<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = pos)] string_sequence: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::cc_variables::string_sequence(string_sequence, eval.heap())
+    }
     fn exec_os<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = pos)] ctx: Value<'v>,
@@ -325,6 +348,63 @@ fn custom_allowlist(value: Value<'_>) -> anyhow::Result<Vec<CustomAllowlistEntry
 
 #[starlark_module]
 fn cc_common_methods(builder: &mut MethodsBuilder) {
+    fn get_tool_for_action<'v>(
+        #[starlark(this)] _cc_common: Value<'v>,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] action_name: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::cc_variables::dispatch::tool(feature_configuration, action_name, eval.heap())
+    }
+    fn get_execution_requirements<'v>(
+        #[starlark(this)] _cc_common: Value<'v>,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] action_name: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::cc_variables::dispatch::requirements(feature_configuration, action_name, eval.heap())
+    }
+    fn action_is_enabled<'v>(
+        #[starlark(this)] _cc_common: Value<'v>,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] action_name: &str,
+    ) -> anyhow::Result<bool> {
+        crate::cc_variables::dispatch::action_enabled(feature_configuration, action_name)
+    }
+    fn get_memory_inefficient_command_line<'v>(
+        #[starlark(this)] _cc_common: Value<'v>,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] action_name: &str,
+        #[starlark(require = named)] variables: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::cc_variables::dispatch::command_line(
+            feature_configuration,
+            action_name,
+            variables,
+            eval,
+        )
+    }
+    fn get_environment_variables<'v>(
+        #[starlark(this)] _cc_common: Value<'v>,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] action_name: &str,
+        #[starlark(require = named)] variables: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::cc_variables::dispatch::environment(
+            feature_configuration,
+            action_name,
+            variables,
+            eval,
+        )
+    }
+    fn empty_variables<'v>(
+        #[starlark(this)] _cc_common: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(crate::cc_variables::dispatch::empty(eval.heap()))
+    }
     #[allow(non_snake_case)]
     fn internal_DO_NOT_USE<'v>(
         #[starlark(this)] _cc_common: Value<'v>,

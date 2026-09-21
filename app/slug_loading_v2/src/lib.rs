@@ -25,6 +25,13 @@ mod canonical_repository_route_tests;
 mod cc_common;
 pub mod cc_context;
 mod cc_features;
+mod cc_variables;
+#[doc(hidden)]
+pub use cc_variables::CcVariablesView;
+#[doc(hidden)]
+pub use cc_variables::alloc_frozen_cc_variables;
+#[doc(hidden)]
+pub use cc_variables::cc_variables_value;
 pub mod package_features;
 #[doc(hidden)]
 pub use cc_features::alloc_frozen_cc_feature_configuration;

@@ -86,6 +86,14 @@ subject = rule(implementation = _impl, fragments = ['cpp'], attrs = {
 "#;
 
 fn workspace(targets: &str) -> PathBuf {
+    workspace_with(targets, SUBJECT, &[])
+}
+
+pub(super) fn workspace_with(
+    targets: &str,
+    subject: &str,
+    extra_sources: &[(&str, &str)],
+) -> PathBuf {
     let root = scratch();
     let mut module = "module(name='root')\n".to_owned();
     for (_, name) in REPOS {
@@ -105,13 +113,13 @@ fn workspace(targets: &str) -> PathBuf {
         .unwrap();
     }
     fs::write(root.join("MODULE.bazel"), module).unwrap();
-    for (path, body) in SOURCES {
+    for (path, body) in SOURCES.iter().chain(extra_sources.iter()) {
         let path = root.join(path);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path.parent().unwrap().join("BUILD.bazel"), "").unwrap();
         fs::write(path, body).unwrap();
     }
-    fs::write(root.join("rules_cc/cc/private/proof.bzl"), SUBJECT).unwrap();
+    fs::write(root.join("rules_cc/cc/private/proof.bzl"), subject).unwrap();
     fs::create_dir_all(root.join("platforms/os")).unwrap();
     fs::write(root.join("platforms/os/BUILD.bazel"), "constraint_setting(name='os')\nconstraint_value(name='linux',constraint_setting=':os')\nconstraint_value(name='macos',constraint_setting=':os')\nconstraint_value(name='mystery',constraint_setting=':os')\n").unwrap();
     build(&root, targets);
@@ -129,7 +137,7 @@ fn build(root: &std::path::Path, targets: &str) {
     .unwrap();
 }
 
-fn config(options: &[(NativeCommandOption, &str)]) -> ConfigurationKey {
+pub(super) fn config(options: &[(NativeCommandOption, &str)]) -> ConfigurationKey {
     let base = typed_action_test_configuration()
         .slug_configuration()
         .unwrap()
@@ -145,7 +153,7 @@ fn config(options: &[(NativeCommandOption, &str)]) -> ConfigurationKey {
     )
 }
 
-async fn request(
+pub(super) async fn request(
     dice: &Arc<Dice>,
     root: &std::path::Path,
     name: &str,
@@ -191,7 +199,7 @@ async fn request(
     }
 }
 
-fn field<'a>(result: &'a ConfiguredNodeResult, name: &str) -> &'a AnalysisValue {
+pub(super) fn field<'a>(result: &'a ConfiguredNodeResult, name: &str) -> &'a AnalysisValue {
     result
         .providers()
         .occurrences()

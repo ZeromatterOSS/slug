@@ -355,7 +355,16 @@ toolchain/FDO construction. Canonical OS identity is exact; Host fallback remain
 structural Rust Host. Root-origin local-override cross-package imports and legacy
 apparent @platforms normalization remain separately deferred. The model still
 rejects Windows/unknown execution OS, NUL paths and cyclic flag-group metadata.
-Expansion, tool lookup, compile/actions2ctx and full cc_library remain deferred.
+WP760 adds native Variables and tool/action-enabled/requirements/argv/environment
+queries. The unchanged compile-variable builder now runs after the creator,
+legacy generator and public configure_features on a real ctx and source File;
+provider publication and same-DICE changes/restoration preserve complete variables,
+including unused payload and stale dotted-cache snapshots. This is the admitted
+NOOP-mapper/no-execution-metadata slice, not full toolchain/FDO construction.
+Link-variable Cpp projections, compile/actions2ctx, execution-time tree/path mapping
+and full cc_library remain deferred. Variables reject cyclic/foreign publication;
+raw set/range publication and non-ToolchainInfo builtin structures remain outside
+the admitted boundary. See the current packet for exact/native/deferred classes.
 The existing Rustc proof's None C++ fields do not establish those gates.
 Run remains deferred and F3 remains closed.
 
