@@ -1,148 +1,167 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-57-m7a-solib-consumption-observation-r1
+Packet: WP-7-58-m7a-native-cc-feature-model-r1
 Status: accepted
 
-## Outcome and inherited scope
+## Outcome and compatibility
 
-Resolve declared downstream input edges for the two allocator Solib outputs
-before selecting native execution versus missing C++ analysis primitives.
-Previous turn is progress: WP756 accepted at 0763cec2b implemented False/False
-construction and structural sharing, with 15 focused tests and CLI compilation.
-Reuse [solib-demand.json](./solib-demand.json) and
-[solib-construction-inventory.md](./solib-construction-inventory.md).
-Existing retained query dumps contain producer-only evidence, not consumers.
+Implement the native C++ feature-model prerequisite: complete eager metadata
+validation and owned retention, defaults, requested feature selection, and native
+FeatureConfiguration is_requested/is_enabled. WP757 accepted at f921c2d20 found
+no direct declared allocator Solib consumers; native Solib execution stays deferred.
+This packet narrows that selected successor to its native model boundary. The
+unchanged public configure_features entrypoint still requires structural ctx/Cpp
+projections and exec_os; it is not activated or claimed by native selection tests.
+Those projections precede a later end-to-end public configuration admission.
 
-One bounded production aquery selects both the allocator's backing shared-library
-inputs (positive controls selecting Solib producers) and their mangled outputs
-(consumer edges). One dump permits exact artifact-ID joins; do not join consumers
-by owner/configuration, since tools can cross configurations. A zero-consumer
-result is valid only with the expected target and exec producer controls present,
-fully validated graph references and matching original input/output paths.
-Preserve unexpected rows/configurations explicitly rather than assuming two.
-Do not infer source-vs-derived identity from analysis_v2 Artifact or path shape.
+Exact: admitted Bazel 9.2 native constructor validation, declaration ordering,
+defaults, implies/requires/provides selection, membership, fresh-wrapper occurrence
+equality and unhashability. Slug-native: valid-Unicode strings, complete structural
+publication identity including Artifact ownership, deterministic requested insertion
+order without Java request-set cache reuse. Unsupported/deferred: expansion/tool
+lookup/artifact-name APIs, public configure_features/ctx projections, exec_os,
+compile/actions2ctx, action creation/execution, full C++/Cargo loading and M8.
+Admitted execution OS values are LINUX, DARWIN, FREEBSD and OPENBSD; WINDOWS,
+UNKNOWN, unrecognized OS values, NUL-containing tool/tools-directory/path-chunk
+strings and cyclic flag-group metadata fail closed as unsupported. Diagnostic
+checks establish rejection/message shape, not Java stack/location or full error bytes.
 
-This adds no Slug runtime admission. Existing exact constructor mechanics and
-Slug-native configuration/path/action identities remain unchanged; Solib execution,
-full C++ compilation, aquery/ActionKey projection and M8 remain unsupported/unproved.
-A declared edge is not proof of execution or selected CLI default-output reachability.
-Absent declared edges under these flags is not global absence under other options.
+## Source contract and invariants
 
-## Pinned source and command
+Bazel source 8220c6198837d5c13d53fea211cf3282aa12408a under
+src/main/java/com/google/devtools/build/lib/rules/cpp/:
+CcStarlarkInternal.java:257–269; CcToolchainConfigInfo.java:60–91;
+CcToolchainFeaturesLib.java:65–573; CcToolchainVariables.java:151–240;
+CcToolchainFeatures.java:1099–1217,1230–1330 and FeatureSelection.java:115–301.
+FeatureConfigurationForStarlark.java:42–90 and StarlarkValue.java:92–121 own
+fresh occurrence and unhashable semantics. Internal FeatureConfiguration.equals
+omits requested names/tools directory and is NOT Slug publication equality.
 
-Bazel 9.2 source 8220c6198837d5c13d53fea211cf3282aa12408a:
-query2/aquery/AqueryUtils.java:44–61,70–112 selects inputs and flattens the input
-depset; AqueryActionFilter.java:46–55 uses full-string regex matching on exec paths.
-AqueryProcessor.java:194–195 loses filters on a non-function query root, so no
-union expression. analysis_v2.proto and KnownNestedSets own graph/schema limits.
-Rules_rust 0.73 utils.bzl:229–254 and rustc.bzl:353–359,738–795 choose static/PIC
-before interface/dynamic library inputs; authenticate relevant release source.
+Retain every parsed feature, action config, recursive flag/env group and condition,
+variable chunk, tool path/origin/Artifact, feature predicate, execution requirement,
+artifact pattern, tools directory and admitted exec OS. Constructor eagerly validates
+metadata even while expansion is deferred. Features precede actions in defaults and
+selection order. Selection does not autoadd defaults; unknown requested names remain
+requested but disabled. Requires is OR-of-AND and does not enable dependencies;
+implication closure is pruned to the source fixed point, cycles allowed. Preserve
+provides multiplicity and reject collisions, including one duplicate provider.
 
-Exact query:
-inputs("bazel-out/[^/]+/bin/(external/rules_rust[+]/ffi/cc/allocator_library/libcc_allocator_library[.]so|_solib_k8/libexternal_Srules_Urust[+]_Sffi_Scc_Sallocator_Ulibrary_Slibcc_Uallocator_Ulibrary[.]so)", deps(//app/slug_cli_v2:slug))
+Producer is the existing DICE-owned Starlark evaluation over loaded source,
+configuration and provider inputs. BuildAPI owns immutable typed model/selection
+payloads and occurrence handles. Loading owns parsing/native facades; Analysis owns
+lowering/materialization. Publication compares complete payload plus a bidirectional
+occurrence mapping across the entire retained provider graph. Starlark equality is
+occurrence-only. No evaluator heap, command scratch or borrowed Artifact view escapes.
+No new DICE key/lock/cache, direct filesystem discovery, digest domain or Java runtime.
+Read docs/developers/dice.md and the utility skill. Stage 9's existing Arc,
+CompactString, SmallMap/SmallSet and occurrence-publication dispositions apply.
+New memory is DICE-retained semantic data released with provider/result ownership;
+selection/parser buffers are phase scratch. No service cache/interner. Cheap shared
+clone and Allocative required. No performance claim or benchmark gate.
 
-Use cached SHA256-verified Bazel executable
-/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel
-Verify executable SHA256 and --version=9.2.0 against WP755 before use.
-Flags: --batch --ignore_all_rc_files --noblock_for_lock,
---output_base=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5,
-aquery <query> --output=jsonproto --include_artifacts --noinclude_commandline
---include_pruned_inputs --include_aspects --@rules_rust//rust/toolchain/channel=nightly
---lockfile_mode=error --nofetch --repository_disable_download --noshow_progress
---color=no --curses=no. Include-pruned selects original inputs plus scheduling
-dependencies, a conservative declared-input view shared by filter and dump.
-Include-aspects explicitly retains aspect actions in the scoped graph. No-edge
-results do not prove absence from runfiles/output groups, tree membership or
-root default-output selection; preserve that residual rather than broadening claims.
-No build/test command, source helper execution, credentials/RC inspection, or Slug
-binary invocation. No repin or lockfile mutation. Hash relevant input pins before/after.
+## Scope and ownership
 
-## Ownership, scope and validation
+BuildAPI worker: new app/slug_build_api_v2/src/cc_features.rs (optional child
+modules/tests beneath cc_features/), lib.rs exports only. Typed model, eager
+normalization helpers and selection algorithm/tests; coordinate parser API first.
+Loading worker: new app/slug_loading_v2/src/cc_features.rs and child parser/tests,
+cc_common.rs factory, lib.rs registration/exports only. Native facades, exact provider
+parsing and focused source-derived invocation/constructor tests.
+Root: app/slug_build_api_v2/src/analysis_value.rs; app/slug_analysis_v2/src/analysis_value.rs
+and new child tests for retention/publication. Loading/Analysis BUILD.bazel changes
+are limited to compile_data and the package-scoped export of the reused constructor
+fixture (required for the new include_str under Bazel). Scheduling docs, bootstrap-readiness
+and Stage 9 architecture row only as changed. No other production/fixture/dependency
+or lockfile edits. Large existing owners receive dispatch integration only; put new
+semantic work and tests in cohesive modules. Estimate 1,500–2,500 production and
+500–900 test lines; larger growth triggers responsibility review, not a weaker model.
+Independent reviewer owns design checkpoint before code and final actual diff review.
 
-Root owns runner/query/process cleanup, scheduling and integration. Scratch under
-target/wp757 reuses WP755 runner/process-group logic. Twenty-second query cap,
-separate from source preparation/version preflight; expected roughly ten seconds.
-This is a packet operation cap, not a global user deadline. Inspect current Bazel/
-Java/Cargo processes before invocation; do not interfere with another user's server.
-Dedicated process group, at most5s TERM plus5s KILL cleanup. Preserve each receipt,
-exact argv, hashes, exit/elapsed/timeout/group status; no overwrite of failed evidence.
-Diagnose environment failures before a corrected invocation, never relax pins.
+Independent design review ACCEPT: native-only scope is coherent; final review must
+verify complete eager metadata retention and explicit fail-closed OS/path handling.
 
-Extractor worker owns scratch target/wp757/extract.py after design acceptance:
-validate duplicate IDs/JSON keys, path/depset cycles and complete action references;
-retain matching artifact IDs/paths, ordered output IDs, owner/rule/configuration,
-mnemonic and serialized execution platform/info. Record flattened membership only,
-not an exact nested-set traversal-order claim. Same-dump producer output IDs bind
-consumers. Negative extraction checks must reject a missing control, dangling
-reference and fabricated/nonmatching input row. No persistent Slug state is changed.
+## Evidence and validation
 
-Tracked allowlist: current manifest, canonical Live Status, bootstrap-readiness,
-solib-construction-inventory and new solib-consumption.json. Prefer compact matched
-edges/source witnesses/receipt plus raw hash over retaining thousands of irrelevant
-input artifacts; retain the complete raw graph only if small. Raw observations are
-evidence, never Slug runtime input. No implementation, fixture, dependency or lock edits.
+Pinned-source regressions adapt CcToolchainFeaturesTest.java implications/pruning/
+requirements/cycles (1141–1377), defaults (1558–1579), action/feature links
+(1736–1790,1913–1959), duplicate actions/flag-set actions (1961–2012) and provides
+(2015–2027); StarlarkCcCommonTest.java groups (3158–3402), tools/OS (3484–3724),
+features (4349–4597). Cover nested metadata parsing/invalid inputs, unknown requests,
+default ordering, duplicate symbols and fresh occurrences. Expansion tests remain
+deferred with the unadmitted phase, not skipped parity.
 
-Independent design review checks query semantics, positive controls and negative
-claims; final review checks actual rows/source attribution and successor selection.
-Source worker authenticates static/dynamic selection and runtime-file branches from
-pinned archives while root runs the query. No Cargo/daemon suite is relevant.
-Run extraction/negative checks, git diff --check, plan status and archive checks.
-Commit accepted evidence with elapsed/review time and actual gate advanced.
+Use existing exact rules_cc source/constructor definitions in the loading fixture
+where practical, authenticated from rules_cc 0.2.17 archive SHA256
+283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a.
+Authored transport/native calls are explicitly native-boundary proof, not execution
+of the whole public configure_features wrapper or production cc_library. No new
+fixture corpus, Bazel query/build or Java helper. Existing source-freeze tests do not
+prove invocation. No guessed Cpp/context defaults for an end-to-end claim.
 
-REPLAN only if producer controls cannot identify the known outputs or evidence
-requires a broader observation/semantic decision; root may select a bounded safe
-successor within the ongoing plan. Native execution is selected only if current
-evidence demonstrates demand; otherwise retain its explicit gate and advance the
-missing production C++ analysis prerequisites. M7A remains partial and M8 unproved.
+Retention regressions dispose source heap, rematerialize and invoke methods; verify
+alias versus fresh-instance equality, nested metadata/tools directory/request/Artifact
+changes in publication, alias topology changes, rejection from dict/depset before and
+after freeze, and GC safety. Native objects remain unhashable even though Rust payloads
+are immutable. Native model/configuration publication is atomic with all bridges.
 
-Independent design review ACCEPT. Bazel --version and binary SHA256 preflight
-match 9.2.0/WP755. Previous turn was progress; current checkout starts clean at
-0763cec2b and no live Bazel/Java/Cargo/slugd process was found before preparation.
+Public/cross-crate tier: serialize pinned-toolchain cargo test --lib --no-run JSON
+for BuildAPI, Loading and Analysis; preflight all exact selectors once per unchanged
+harness; run focused owner and retention tests. Check direct dependent slug_core_v2
+and slug_cli_v2 compilation (no binary invocation). Preparation cap60s per operation;
+runtime expected seconds, no long broad suite. These are packet caps/estimates, not
+new user ceilings. Root owns Cargo orchestration. Format changed Rust, run diff check,
+plan status and archive status. Preserve unfinished candidates if gates remain open.
 
-## Observation and selected successor
+REPLAN if a complete eager model cannot be represented within the existing ownership
+boundary, source contradicts selected compatibility, or activation requires new
+semantic configuration/platform decisions. Correct ordinary compile/test failures
+within this contract. Acceptance requires independent final review, compact evidence
+and a commit; M7A remains partial and M8 unproved.
 
-The query succeeded exit0 in 2.452s, with zero executed build actions, no timeout,
-clean process group, and all 11 input pins unchanged. The only two returned
-actions are the expected target/exec Solib producers, each matched through its
-backing library input. Neither output artifact ID occurs in any action input.
-Raw SHA256 0a796b67c943164270c2d682cc6777b00adb1443d45f9a821a3aff3c403fe9ed
-is byte-for-byte identical to WP755, so reuse its complete retained parsed graph.
-[solib-consumption.json](./solib-consumption.json) owns the new invocation/pins,
-same-dump output IDs and explicit zero consumer lists, without another graph copy.
-The observed graph can reuse WP755's strict parser; no general consumer-graph
-parser is needed for a result identical to the accepted two-producer graph.
+## Implementation and validation receipt
 
-Six loaded rules_rust/rules_cc witnesses match their exact release archive
-members and hashes. Static/PIC preference explains why a retained dynamic field
-need not become a Rust input; this is a conditional source explanation, not a
-query observation of selected static archives. cc_library data_runfiles can still
-retain a dynamic artifact, so do not generalize the negative to runfiles or other
-options. Native Solib execution remains explicitly deferred.
+Complete native parser/model/selection and both retained bridges are implemented.
+Immutable defaults, complete recursive metadata, source-order provided-symbol
+collision checks, first-seen native predicate normalization, occurrence-only
+Starlark equality and full-payload/alias publication are covered. Retained list
+storage is boxed behind Arc handles; name indexes and selection buffers are scratch.
+No source corpus, dependency, DICE key/lock/cache or action family was added.
+The reused constructor fixture is explicitly declared in Bazel compile_data with a
+Loading-package-only export. Fixture SHA256 f8418490663f7e188fa060265b215e80b154a5d190b32ef75fcb6d0254017808
+matches the exact cc/cc_toolchain_config_lib.bzl archive member.
 
-Select the bounded C++ feature-model/configuration implementation contract next,
-before compile/actions2ctx: authenticated cc_library.bzl:30–38 calls toolchain
-lookup and configure_features before compile at :56. Provider construction needs
-native cc_toolchain_features (CcStarlarkInternal.java:257–269), and feature
-configuration uses default_features_and_action_configs plus configure_features
-(CcToolchainFeatures.java:1230–1311). The successor must own complete toolchain feature inputs and the
-required structural ctx/Cpp projections before activating selection; existing
-Rustc tests with authored toolchains/feature_configuration=None do not prove this
-surface. Compile/link primitives remain separately open. No new broad query/build
-or native execution is implied by that selection.
+Pinned nightly-2025-09-14 Cargo --offline --locked --lib --no-run JSON preparation:
+BuildAPI succeeds 2.571s; Loading 29.226s; Analysis 24.667s, then 1.668s after the
+test-only GC harness correction. All selected harnesses were preflighted once per
+unchanged binary. Exact execution: BuildAPI 9/9 native model tests; Loading 6/6
+native boundary tests plus 2/2 protected authentic configure/legacy source-freeze
+tests; Analysis 4/4 native publication/heap/GC/hash tests plus 1/1 protected
+HeaderInfo round trip. Total 22/22, approximately 0.102s summed successful runtime.
+Core cargo check succeeds 24.849s; CLI cargo check succeeds 15.186s. No Slug/Bazel
+binary, daemon, build action or broad suite was invoked.
 
-Validation: python3 target/wp757/extract.py --self-test target/wp757/actions.json
-passes exit0, two positive and seven negative controls plus two expected producer
-controls and zero consumer edges. Root independently reused WP755's strict reader
-on the new dump. Missing controls, dangling references, nonmatching rows, path/
-depset cycles and duplicate IDs/JSON keys fail closed; synthetic membership is
-only a validator control, not production evidence. Both archive hashes and six
-loaded-file/member comparisons pass. No new fixture corpus or Rust changes;
-git diff --check, plan status and archive checks pass. No process remains live.
+Two ordinary compile corrections: terminate borrowed scratch indexes before moving
+model data (0.715s failed preparation), and import ValueLike in Loading tests
+(13.085s failed preparation). The first Analysis invocation failed in the test's
+direct post-evaluation GC call (0.004s); corrected to the evaluator's supported
+Assert Auto/Never/Always modes and safe scheduled garbage_collect builtin, then all
+five tests passed. No production assertion was weakened. Total preparation/check
+time including corrections is 111.967s; every operation stayed below its 60s cap.
+Scratch commands, logs and individual receipts are under target/wp758; no failed
+receipt was overwritten. Format, diff, plan status and archive checks pass.
+Test growth is 1,269 lines, above the 500–900 estimate. Responsibility review keeps
+the three cohesive modules: 416 lines model/selection, 491 authenticated parser/API,
+and 362 retained publication/GC. No fixture corpus or large existing test owner grew;
+the extra integration tests discriminate ownership and hash barriers across phases.
 
-Independent final review ACCEPT. Durable receipt comparison also passes exact
-argv/raw graph, all 11 current pins, two controls, zero edges and six source
-witnesses. Packet elapsed approximately 11 minutes (18:16–18:27 UTC), one query
-2.452s, no Rust compilation/tests or build actions; independent review overlapped
-source/extraction work. No environment repair or semantic REPLAN was needed.
-Gate advanced: producer registration no longer supplies an assumed runtime demand;
-the next implementation priority is the preceding C++ feature model/configuration.
+Final review checks the complete diff and these discriminators, including the
+immutable-default correction and Bazel compile-data declaration. The selected
+successor is structural ctx/Cpp and exec_os ownership plus unchanged public
+configure_features admission, still before compile/actions2ctx. No fabricated
+configuration defaults or runtime support is implied by this native-only result.
+
+Independent final review ACCEPT. Packet elapsed approximately 28 minutes
+(18:27–18:55 UTC), including source/design work; review overlapped implementation
+and validation. Gate advanced: native C++ feature metadata and selection survive
+provider publication with complete owned payloads. Public configuration, expansion,
+compilation and execution remain separately gated. No semantic REPLAN was required.

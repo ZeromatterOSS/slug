@@ -340,9 +340,18 @@ Default nonsibling Bazel bin roots are shared. The observation
 ran zero build actions and proves neither downstream use nor full C++ toolchain support.
 WP757's [input-filtered observation](./solib-consumption.json) returns the same
 two producer controls and no direct declared/scheduling consumers of their outputs.
-This is not an execution/default-output/runfiles proof. Keep Solib execution gated;
-the next prerequisite is the native C++ feature model/configuration used before
-cc_library compilation, with complete structural toolchain and ctx/Cpp inputs.
+This is not an execution/default-output/runfiles proof. Keep Solib execution gated.
+The native C++ feature model/configuration prerequisite now has complete typed
+feature/action/flag/environment/tool/pattern retention and native selection, with
+provider publication preserving payload and wrapper alias identity (WP758).
+The implementation and pinned-source regressions are in BuildAPI/Loading
+cc_features modules; Analysis tests cover publication and heap/GC lifetime.
+This is not the public rules_cc configure_features entrypoint: structural ctx/Cpp
+projections and execution-platform-derived exec_os are still required before that
+unchanged wrapper can be admitted. Windows/unknown execution OS, NUL paths and
+cyclic flag-group metadata fail closed. Expansion, tool lookup, compile/actions2ctx
+and full cc_library remain deferred. The existing Rustc proof's None C++ fields
+do not establish those gates.
 Run remains deferred and F3 remains closed.
 
 ## Family admission and completion procedure

@@ -29,14 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-57-m7a-solib-consumption-observation-r1
+Packet: WP-7-58-m7a-native-cc-feature-model-r1
 Status: accepted
 
-WP757 accepts evidence of no direct declared/scheduling consumers of allocator Solib outputs,
-with both target/exec producers present as same-dump controls. Native execution stays
-deferred. Next: bounded C++ feature-model/configuration implementation contract,
-which precedes compile/actions2ctx in authentic cc_library. WP756 at 0763cec2b
-supplies construction/structural sharing; full C++ compile/link support remains open.
+WP758 accepts complete native C++ feature-model retention and feature selection,
+with 22 focused tests and Core/CLI compilation passing. Next: structural ctx/Cpp
+projections and exec_os before admitting unchanged public configure_features;
+native-boundary tests do not claim that production entrypoint. WP757 at f921c2d20
+found no direct declared/scheduling consumers of allocator Solib outputs. Native
+execution stays deferred. WP756 at 0763cec2b supplies construction/structural sharing;
+full C++ compile/link support remains open.
 WP753 Cargo Args is accepted at 57856a758 and WP752 aliases at 74770f888. Full Cargo loading/execution,
 WP746's baseline diagnostic defect and broader M7A remain open; M8 is unproved.
 

@@ -183,6 +183,15 @@ pub fn alloc_frozen_empty_cc_header_info(
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn cc_toolchain_features<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = named)] toolchain_config_info: Value<'v>,
+        #[starlark(require = named)] tools_directory: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::cc_features::construct(toolchain_config_info, tools_directory, eval)
+    }
+
     fn dynamic_library_symlink<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = pos)] actions: Value<'v>,

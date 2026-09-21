@@ -763,6 +763,12 @@ impl<'a> AnalysisValueMaterializer<'a> {
             AnalysisValueKind::EmptyCcHeaderInfo(occurrence) => {
                 slug_loading_v2::alloc_frozen_empty_cc_header_info(self.heap, occurrence.clone())
             }
+            AnalysisValueKind::CcToolchainFeatures(value) => {
+                slug_loading_v2::alloc_frozen_cc_toolchain_features(self.heap, value.clone())
+            }
+            AnalysisValueKind::CcFeatureConfiguration(value) => {
+                slug_loading_v2::alloc_frozen_cc_feature_configuration(self.heap, value.clone())
+            }
             AnalysisValueKind::None => FrozenValue::new_none(),
             AnalysisValueKind::Boolean(value) => FrozenValue::new_bool(value),
             AnalysisValueKind::Number(AnalysisNumber::Integer(value)) => {
@@ -1041,6 +1047,12 @@ impl<'v> AnalysisValueLowerer<'v> {
         if let Some(occurrence) = slug_loading_v2::empty_cc_header_info_occurrence(value) {
             return Ok(AnalysisValue::empty_cc_header_info(occurrence));
         }
+        if let Some(value) = slug_loading_v2::cc_toolchain_features_value(value) {
+            return Ok(AnalysisValue::cc_toolchain_features(value));
+        }
+        if let Some(value) = slug_loading_v2::cc_feature_configuration_value(value) {
+            return Ok(AnalysisValue::cc_feature_configuration(value));
+        }
         if StarlarkDepset::parts_from_value(value).is_some() {
             return self.lower_depset(value, path);
         }
@@ -1112,6 +1124,10 @@ impl<'v> AnalysisValueLowerer<'v> {
         ))
     }
 }
+#[cfg(test)]
+#[path = "analysis_value/cc_features_tests.rs"]
+mod cc_features_tests;
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;

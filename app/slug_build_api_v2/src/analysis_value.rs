@@ -40,6 +40,8 @@ use crate::providers::ProviderId;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub enum AnalysisValueType {
     EmptyCcHeaderInfo,
+    CcToolchainFeatures,
+    CcFeatureConfiguration,
     Empty,
     None,
     Boolean,
@@ -61,6 +63,8 @@ impl AnalysisValueType {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::EmptyCcHeaderInfo => "HeaderInfo",
+            Self::CcToolchainFeatures => "CcToolchainFeatures",
+            Self::CcFeatureConfiguration => "FeatureConfiguration",
             Self::Empty => "empty",
             Self::None => "NoneType",
             Self::Boolean => "bool",
@@ -1093,6 +1097,8 @@ pub struct AnalysisValue(Arc<AnalysisValueData>);
 #[derive(Debug, Allocative)]
 enum AnalysisValueData {
     EmptyCcHeaderInfo(crate::CcHeaderInfoOccurrence),
+    CcToolchainFeatures(crate::cc_features::CcToolchainFeatures),
+    CcFeatureConfiguration(crate::cc_features::CcFeatureConfiguration),
     None,
     Boolean(bool),
     Number(AnalysisNumber),
@@ -1111,6 +1117,8 @@ enum AnalysisValueData {
 #[derive(Debug, Clone, Copy)]
 pub enum AnalysisValueKind<'a> {
     EmptyCcHeaderInfo(&'a crate::CcHeaderInfoOccurrence),
+    CcToolchainFeatures(&'a crate::cc_features::CcToolchainFeatures),
+    CcFeatureConfiguration(&'a crate::cc_features::CcFeatureConfiguration),
     None,
     Boolean(bool),
     Number(&'a AnalysisNumber),
@@ -1133,6 +1141,14 @@ impl AnalysisValue {
 
     pub fn empty_cc_header_info(occurrence: crate::CcHeaderInfoOccurrence) -> Self {
         Self::new(AnalysisValueData::EmptyCcHeaderInfo(occurrence))
+    }
+
+    pub fn cc_toolchain_features(value: crate::cc_features::CcToolchainFeatures) -> Self {
+        Self::new(AnalysisValueData::CcToolchainFeatures(value))
+    }
+
+    pub fn cc_feature_configuration(value: crate::cc_features::CcFeatureConfiguration) -> Self {
+        Self::new(AnalysisValueData::CcFeatureConfiguration(value))
     }
 
     pub fn none() -> Self {
@@ -1224,6 +1240,12 @@ impl AnalysisValue {
             AnalysisValueData::EmptyCcHeaderInfo(value) => {
                 AnalysisValueKind::EmptyCcHeaderInfo(value)
             }
+            AnalysisValueData::CcToolchainFeatures(value) => {
+                AnalysisValueKind::CcToolchainFeatures(value)
+            }
+            AnalysisValueData::CcFeatureConfiguration(value) => {
+                AnalysisValueKind::CcFeatureConfiguration(value)
+            }
             AnalysisValueData::None => AnalysisValueKind::None,
             AnalysisValueData::Boolean(value) => AnalysisValueKind::Boolean(*value),
             AnalysisValueData::Number(value) => AnalysisValueKind::Number(value),
@@ -1245,6 +1267,10 @@ impl AnalysisValue {
     pub fn value_type(&self) -> AnalysisValueType {
         match self.0.as_ref() {
             AnalysisValueData::EmptyCcHeaderInfo(_) => AnalysisValueType::EmptyCcHeaderInfo,
+            AnalysisValueData::CcToolchainFeatures(_) => AnalysisValueType::CcToolchainFeatures,
+            AnalysisValueData::CcFeatureConfiguration(_) => {
+                AnalysisValueType::CcFeatureConfiguration
+            }
             AnalysisValueData::None => AnalysisValueType::None,
             AnalysisValueData::Boolean(_) => AnalysisValueType::Boolean,
             AnalysisValueData::Number(AnalysisNumber::Integer(_)) => AnalysisValueType::Integer,
@@ -1271,6 +1297,10 @@ impl AnalysisValue {
 
     pub fn is_starlark_immutable(&self) -> bool {
         match self.0.as_ref() {
+            // Bazel's native wrappers inherit isImmutable=false even though the
+            // underlying Rust semantic payload is immutable and owned.
+            AnalysisValueData::CcToolchainFeatures(_)
+            | AnalysisValueData::CcFeatureConfiguration(_) => false,
             AnalysisValueData::Tuple(values) => values.iter().all(Self::is_starlark_immutable),
             AnalysisValueData::Struct(fields) => fields.values().all(Self::is_starlark_immutable),
             AnalysisValueData::Provider(value) => value.is_starlark_immutable(),
@@ -1280,6 +1310,8 @@ impl AnalysisValue {
 
     pub fn is_starlark_hashable(&self) -> bool {
         match self.0.as_ref() {
+            AnalysisValueData::CcToolchainFeatures(_)
+            | AnalysisValueData::CcFeatureConfiguration(_) => false,
             AnalysisValueData::List(_) | AnalysisValueData::Dictionary(_) => false,
             AnalysisValueData::Tuple(values) => values.iter().all(Self::is_starlark_hashable),
             AnalysisValueData::Struct(fields) => fields.values().all(Self::is_starlark_immutable),
@@ -1321,6 +1353,26 @@ impl AnalysisValue {
                 AnalysisValueData::EmptyCcHeaderInfo(left),
                 AnalysisValueData::EmptyCcHeaderInfo(right),
             ) => state.enter_header_info_pair(left.pointer(), right.pointer()),
+            (
+                AnalysisValueData::CcToolchainFeatures(left),
+                AnalysisValueData::CcToolchainFeatures(right),
+            ) => {
+                left.model() == right.model()
+                    && state.enter_cc_feature_pair(
+                        left.occurrence().pointer(),
+                        right.occurrence().pointer(),
+                    )
+            }
+            (
+                AnalysisValueData::CcFeatureConfiguration(left),
+                AnalysisValueData::CcFeatureConfiguration(right),
+            ) => {
+                left.model() == right.model()
+                    && state.enter_cc_feature_pair(
+                        left.occurrence().pointer(),
+                        right.occurrence().pointer(),
+                    )
+            }
             (AnalysisValueData::None, AnalysisValueData::None) => true,
             (AnalysisValueData::Boolean(left), AnalysisValueData::Boolean(right)) => left == right,
             (AnalysisValueData::Number(left), AnalysisValueData::Number(right)) => {
@@ -1397,6 +1449,14 @@ impl PartialEq for AnalysisValue {
                 AnalysisValueData::EmptyCcHeaderInfo(left),
                 AnalysisValueData::EmptyCcHeaderInfo(right),
             ) => left == right,
+            (
+                AnalysisValueData::CcToolchainFeatures(left),
+                AnalysisValueData::CcToolchainFeatures(right),
+            ) => left == right,
+            (
+                AnalysisValueData::CcFeatureConfiguration(left),
+                AnalysisValueData::CcFeatureConfiguration(right),
+            ) => left == right,
             (AnalysisValueData::None, AnalysisValueData::None) => true,
             (AnalysisValueData::Boolean(left), AnalysisValueData::Boolean(right)) => left == right,
             (AnalysisValueData::Number(left), AnalysisValueData::Number(right)) => left == right,
@@ -1437,6 +1497,14 @@ impl Hash for AnalysisValue {
         match self.0.as_ref() {
             AnalysisValueData::EmptyCcHeaderInfo(value) => {
                 13u8.hash(state);
+                value.hash(state);
+            }
+            AnalysisValueData::CcToolchainFeatures(value) => {
+                14u8.hash(state);
+                value.hash(state);
+            }
+            AnalysisValueData::CcFeatureConfiguration(value) => {
+                15u8.hash(state);
                 value.hash(state);
             }
             AnalysisValueData::None => 0u8.hash(state),
@@ -1512,6 +1580,8 @@ fn hash_unordered_entries<H: Hasher>(entries: &[(AnalysisValue, AnalysisValue)],
 
 #[derive(Default)]
 pub(crate) struct PublicationEqState {
+    left_cc_features: FxHashMap<usize, usize>,
+    right_cc_features: FxHashMap<usize, usize>,
     left_header_infos: FxHashMap<usize, usize>,
     right_header_infos: FxHashMap<usize, usize>,
     left_depsets: FxHashMap<(usize, u32), (usize, u32)>,
@@ -1521,6 +1591,18 @@ pub(crate) struct PublicationEqState {
 }
 
 impl PublicationEqState {
+    fn enter_cc_feature_pair(&mut self, left: usize, right: usize) -> bool {
+        if let Some(previous) = self.left_cc_features.get(&left) {
+            return *previous == right;
+        }
+        if self.right_cc_features.contains_key(&right) {
+            return false;
+        }
+        self.left_cc_features.insert(left, right);
+        self.right_cc_features.insert(right, left);
+        true
+    }
+
     fn enter_header_info_pair(&mut self, left: usize, right: usize) -> bool {
         if let Some(previous) = self.left_header_infos.get(&left) {
             return *previous == right;

@@ -23,6 +23,15 @@ mod canonical_repository_route;
 #[cfg(test)]
 mod canonical_repository_route_tests;
 mod cc_common;
+mod cc_features;
+#[doc(hidden)]
+pub use cc_features::alloc_frozen_cc_feature_configuration;
+#[doc(hidden)]
+pub use cc_features::alloc_frozen_cc_toolchain_features;
+#[doc(hidden)]
+pub use cc_features::cc_feature_configuration_value;
+#[doc(hidden)]
+pub use cc_features::cc_toolchain_features_value;
 mod cycle_detector;
 mod external_subtree_package_set;
 pub mod file_discovery;
