@@ -9,7 +9,14 @@ use super::*;
 use crate::runtime::configured_action_closure::ConfiguredActionClosureError;
 
 fn solib(input: AnalysisArtifact) -> ActionSpec {
-    ActionSpec::solib_symlink(SolibSymlinkSpec::new(input, "_solib_k8").unwrap())
+    ActionSpec::solib_symlink(
+        SolibSymlinkSpec::new(
+            input,
+            crate::runtime::configured_output::test_root(),
+            "_solib_k8",
+        )
+        .unwrap(),
+    )
 }
 
 fn resolved_node(owner: ConfiguredTargetKey, action: ActionSpec) -> Arc<ConfiguredNodeResult> {
@@ -57,7 +64,7 @@ fn solib_sharing_preserves_owners_and_ignores_native_owner_platform_facts() {
     assert!(!closure.execution_representative(1, 0));
     let second_output = artifact(
         &key("second", false),
-        action.outputs()[0].path(),
+        action.outputs()[0].root_relative_path(),
         ActionOutputKind::File,
     );
     assert_eq!(
@@ -70,7 +77,24 @@ fn solib_sharing_preserves_owners_and_ignores_native_owner_platform_facts() {
     // Same spelling in a different consumer configuration is a separate root.
     let closure = ValidatedActionClosure::new(Arc::from([
         node(key("target", false), vec![action.clone()]),
-        node(key("exec", true), vec![action]),
+        node(
+            key("exec", true),
+            vec![ActionSpec::solib_symlink(
+                SolibSymlinkSpec::new(
+                    action.solib_symlink_spec().unwrap().input().clone(),
+                    slug_build_api_v2::DerivedArtifactRoot::bin(
+                        key("exec", true)
+                            .configuration()
+                            .slug_configuration()
+                            .unwrap()
+                            .clone(),
+                    )
+                    .unwrap(),
+                    "_solib_k8",
+                )
+                .unwrap(),
+            )],
+        ),
     ]))
     .unwrap();
     assert!(closure.execution_representative(0, 0));
@@ -114,7 +138,11 @@ fn solib_collisions_compare_full_configured_input_and_reject_mixed_families() {
             .into_iter()
             .collect(),
     );
-    for unsupported in [ordinary, decorated, write(action.outputs()[0].path())] {
+    for unsupported in [
+        ordinary,
+        decorated,
+        write(action.outputs()[0].root_relative_path()),
+    ] {
         assert!(matches!(
             ValidatedActionClosure::new(Arc::from([
                 node(first.clone(), vec![action.clone()]),
@@ -136,7 +164,11 @@ fn solib_collisions_compare_full_configured_input_and_reject_mixed_families() {
 fn solib_requested_outputs_and_spawn_inputs_remain_runtime_unsupported() {
     let owner = key("owner", false);
     let action = solib(artifact(&owner, "lib.so", ActionOutputKind::File));
-    let requested = artifact(&owner, action.outputs()[0].path(), ActionOutputKind::File);
+    let requested = artifact(
+        &owner,
+        action.outputs()[0].root_relative_path(),
+        ActionOutputKind::File,
+    );
     assert!(action.symlink_spec().is_none());
     let closure = ValidatedActionClosure::new(Arc::from([node(
         owner.clone(),

@@ -7,6 +7,7 @@ use crate::AnalysisDepset;
 use crate::DepsetOrder;
 use crate::ProviderIdentity;
 use crate::ProviderOccurrence;
+use crate::artifact_root::test_support as root_support;
 
 const KINDS: [CcToolchainCallableKind; 4] = [
     CcToolchainCallableKind::SupportsPic,
@@ -49,7 +50,7 @@ fn capture(owner: &str, configuration: u8, order: DepsetOrder) -> AnalysisValue 
                     CanonicalLabel::parse(owner).unwrap(),
                     vec![configuration],
                 ),
-                output: ActionOutput::new("same.a", ActionOutputKind::File),
+                output: ActionOutput::new(root_support::root(), "same.a", ActionOutputKind::File),
             })],
             vec![],
         )

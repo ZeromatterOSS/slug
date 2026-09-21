@@ -10,6 +10,7 @@
 
 pub mod actions;
 pub mod analysis_value;
+pub mod artifact_root;
 pub mod attrs;
 pub mod cc_features;
 pub mod cc_variables;
@@ -88,6 +89,9 @@ pub use analysis_value::AnalysisValueType;
 pub use analysis_value::ConfiguredTargetValue;
 pub use analysis_value::ProviderIdentity;
 pub use analysis_value::ProviderOccurrence;
+pub use artifact_root::AnalysisArtifactRoot;
+pub use artifact_root::DerivedArtifactRoot;
+pub use artifact_root::repository_relative_output_path;
 pub use attrs::AttributeMap;
 pub use attrs::AttributeValue;
 pub use ctx::ResolvedCommand;

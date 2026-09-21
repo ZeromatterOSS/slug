@@ -58,10 +58,10 @@ fn run_reapi_run_build(
         let mut uploaded_digests: Vec<String> = Vec::new();
         let mut materialized_outputs: Vec<String> = Vec::new();
         let mut platform_properties = std::collections::BTreeMap::new();
-        let mut record = |output_root: &std::path::Path,
+        let mut record = |declarations: &[slug_build_api_v2::ActionOutput],
                           result: slug_reapi_v2::RemoteExecutionResult|
          -> Result<(), String> {
-            slug_reapi_v2::materialize_outputs(output_root, &result)
+            slug_reapi_v2::materialize_configured_outputs(workspace, declarations, &result)
                 .map_err(|error| error.to_string())?;
             reapi_actions += result.evidence.reapi_actions;
             direct_local_actions += result.evidence.direct_local_actions;
@@ -109,38 +109,18 @@ fn run_reapi_run_build(
                 .resolved_file_write_execution_views_in_closure()
                 .map_err(str::to_owned)?;
             for view in views {
-                let configuration = view
-                    .action()
-                    .owner()
-                    .configuration()
-                    .slug_configuration()
-                    .ok_or_else(|| {
-                        "production FileWrite owner has an opaque configuration".to_owned()
-                    })?;
-                let output_root =
-                    slug_core_v2::runtime::configured_output_root(workspace, configuration);
                 let result = slug_reapi_v2::execute_file_write(remote, &view)
                     .await
                     .map_err(|error| error.to_string())?;
-                record(&output_root, result)?;
+                record(view.action().spec().outputs(), result)?;
             }
         } else {
             for analysis in evaluation.analyses() {
-                let configuration = analysis
-                    .configured_target_key()
-                    .ok_or_else(|| "production rule analysis returned a null node".to_owned())?
-                    .configuration()
-                    .slug_configuration()
-                    .ok_or_else(|| {
-                        "production analysis returned an opaque configuration".to_owned()
-                    })?;
-                let output_root =
-                    slug_core_v2::runtime::configured_output_root(workspace, configuration);
                 for action in analysis.actions() {
                     let result = slug_reapi_v2::execute_action(remote, action)
                         .await
                         .map_err(|error| error.to_string())?;
-                    record(&output_root, result)?;
+                    record(action.outputs(), result)?;
                 }
             }
         }
@@ -374,11 +354,14 @@ empty(name = "empty")
                             .configuration()
                             .slug_configuration()
                             .unwrap();
+                        let descriptor =
+                            slug_build_api_v2::DerivedArtifactRoot::bin(configuration.clone())
+                                .unwrap();
                         let output_root =
-                            slug_core_v2::runtime::configured_output_root(&root.0, configuration);
+                            slug_core_v2::runtime::configured_output_root(&root.0, &descriptor);
                         for action in analysis.actions() {
                             for output in action.outputs() {
-                                output_paths.push(output_root.join(output.path()));
+                                output_paths.push(output_root.join(output.root_relative_path()));
                             }
                         }
                     }

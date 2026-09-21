@@ -1,3 +1,5 @@
+use slug_build_api_v2::DerivedArtifactRoot;
+mod root_support;
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -66,7 +68,7 @@ fn derived_artifact(path: &str, kind: ActionOutputKind) -> AnalysisArtifact {
             CanonicalLabel::parse("@@//pkg:owner").unwrap(),
             b"cfg".as_slice(),
         ),
-        output: ActionOutput::new(path, kind),
+        output: ActionOutput::new(root_support::root(), path, kind),
     }
 }
 
@@ -293,10 +295,10 @@ fn files_to_run_private_carrier_preserves_support_topology_and_hash_law() {
     assert_eq!(
         provider_paths,
         [
-            "pkg/default-a",
-            "pkg/default-b",
-            "pkg/tool.runfiles",
-            "pkg/tool",
+            "pkg/default-a".to_owned(),
+            "pkg/default-b".to_owned(),
+            root_support::exec_path("pkg/tool.runfiles"),
+            root_support::exec_path("pkg/tool"),
         ]
     );
     let successors = provider.files().successors().collect::<Vec<_>>();
@@ -580,7 +582,11 @@ fn default_info_retains_directory_artifacts_and_rejects_unadmitted_kinds() {
             CanonicalLabel::parse("@@//pkg:owner").unwrap(),
             b"configured".as_slice(),
         ),
-        output: ActionOutput::new("pkg/tree", ActionOutputKind::Directory),
+        output: ActionOutput::new(
+            root_support::root(),
+            "pkg/tree",
+            ActionOutputKind::Directory,
+        ),
     };
     let files = AnalysisDepset::new(
         DepsetOrder::Default,
@@ -794,7 +800,7 @@ fn output_group_info_retains_artifact_owners_kinds_and_builtin_identity() {
                 CanonicalLabel::parse("@@//pkg:owner").unwrap(),
                 b"other-configuration".as_slice(),
             ),
-            output: ActionOutput::new("pkg/file", ActionOutputKind::File),
+            output: ActionOutput::new(root_support::root(), "pkg/file", ActionOutputKind::File),
         },
     ];
     let child = AnalysisDepset::new(
@@ -892,7 +898,7 @@ fn output_group_info_publication_compares_owner_configuration_kind_and_graph() {
                     CanonicalLabel::parse(owner).unwrap(),
                     configuration,
                 ),
-                output: ActionOutput::new("pkg/same", kind),
+                output: ActionOutput::new(root_support::root(), "pkg/same", kind),
             }),
             AnalysisValue::artifact(source_artifact("pkg/source")),
         ];

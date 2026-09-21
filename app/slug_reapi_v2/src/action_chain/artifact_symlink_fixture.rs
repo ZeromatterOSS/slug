@@ -34,7 +34,7 @@ repo = repository_rule(implementation=_impl, attrs={'content':attr.string()})
         fs::Permissions::from_mode(0o755),
     )
     .unwrap();
-    fs::write(root.join("tools/producer"), "#!/bin/sh\nset -eu\n/bin/cat input > generated\n/bin/cat input > unused\n/bin/chmod 0644 generated unused\n").unwrap();
+    fs::write(root.join("tools/producer"), "#!/bin/sh\nset -eu\n/bin/cat input > \"$1\"\n/bin/cat input > \"$2\"\n/bin/chmod 0644 \"$1\" \"$2\"\n").unwrap();
     symlink("input", root.join("input-link")).unwrap();
     content(root, &module, "aaa");
     module
@@ -153,7 +153,7 @@ manifest_alias(name='manifest_alias', tool=':source_binary')
 const DEFS: &str = r#"def _producer(ctx):
     out = ctx.actions.declare_file('generated')
     unused = ctx.actions.declare_file('unused')
-    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=ctx.attr.source[DefaultInfo].files, outputs=[out, unused])
+    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=ctx.attr.source[DefaultInfo].files, outputs=[out, unused], arguments=[out.path, unused.path])
     return [DefaultInfo(files=depset([out]))]
 producer = rule(implementation=_producer, attrs={'source':attr.label(allow_single_file=True), 'tool':attr.label(allow_single_file=True)})
 def _aliases(ctx):

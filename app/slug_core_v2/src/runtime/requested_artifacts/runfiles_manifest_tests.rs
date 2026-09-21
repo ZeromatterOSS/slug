@@ -121,15 +121,20 @@ pub(super) fn check_no_effects(workspace: &Workspace, value: &PreparedRunfilesMa
     {
         let root = crate::runtime::configured_output_root(
             workspace.root.path(),
-            node.configured_target_key()
-                .unwrap()
-                .configuration()
-                .slug_configuration()
-                .unwrap(),
+            &slug_build_api_v2::DerivedArtifactRoot::bin(
+                (node
+                    .configured_target_key()
+                    .unwrap()
+                    .configuration()
+                    .slug_configuration()
+                    .unwrap())
+                .clone(),
+            )
+            .unwrap(),
         );
         for output in node.actions().iter().flat_map(|action| action.outputs()) {
             assert_eq!(
-                fs::symlink_metadata(root.join(output.path()))
+                fs::symlink_metadata(root.join(output.root_relative_path()))
                     .unwrap_err()
                     .kind(),
                 std::io::ErrorKind::NotFound
@@ -146,7 +151,10 @@ fn expected_manifest(
 ) -> Vec<u8> {
     let root = crate::runtime::configured_output_root(
         workspace.root.path(),
-        key.configuration().slug_configuration().unwrap(),
+        &slug_build_api_v2::DerivedArtifactRoot::bin(
+            (key.configuration().slug_configuration().unwrap()).clone(),
+        )
+        .unwrap(),
     );
     format!("_main/binary.bin {}/binary.bin\n_main/{backing} {}/{backing}\n_main/{source} {}/{source}\n_repo_mapping {}/binary.bin.repo_mapping\n",
         root.display(),root.display(),workspace.root.path().display(),root.display()).into_bytes()
@@ -335,7 +343,10 @@ fn native_manifest_external_mapping_and_configuration_paths_are_owned() {
         )));
         let root = crate::runtime::configured_output_root(
             workspace.root.path(),
-            key.configuration().slug_configuration().unwrap(),
+            &slug_build_api_v2::DerivedArtifactRoot::bin(
+                (key.configuration().slug_configuration().unwrap()).clone(),
+            )
+            .unwrap(),
         );
         assert!(manifest.contains(&format!("_main/binary.bin {}/binary.bin\n", root.display())));
         let mapping = String::from_utf8(value.repo_mapping_manifest_bytes().unwrap()).unwrap();

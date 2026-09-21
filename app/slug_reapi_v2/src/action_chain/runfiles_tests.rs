@@ -188,7 +188,7 @@ fn nativelink_requested_binary_runfiles_backing_change_restore_survives_shutdown
                                     .outputs()
                                     .outputs()
                                     .iter()
-                                    .any(|output| output.path() == "binary")
+                                    .any(|output| output.root_relative_path() == "binary")
                             })
                             .unwrap()
                             .outputs()
@@ -227,18 +227,21 @@ fn nativelink_requested_manifest_root_publishes_complete_runfiles_backing() {
                 let plan = accepted.inputs().plan().unwrap();
                 let artifacts = plan.requested().unwrap().selection().artifacts();
                 assert_eq!(artifacts.len(), 1);
-                assert_eq!(artifacts[0].path(), "binary.runfiles/MANIFEST");
-                let manifest = accepted
-                    .published_outputs()
-                    .iter()
-                    .find(|group| {
-                        group
-                            .outputs()
-                            .outputs()
-                            .iter()
-                            .any(|output| output.path() == "binary.runfiles/MANIFEST")
-                    })
-                    .unwrap();
+                assert_eq!(artifacts[0].short_path(), "binary.runfiles/MANIFEST");
+                assert_eq!(
+                    artifacts[0].path(),
+                    format!("{}/binary.runfiles/MANIFEST", artifacts[0].root().path())
+                );
+                let manifest =
+                    accepted
+                        .published_outputs()
+                        .iter()
+                        .find(|group| {
+                            group.outputs().outputs().iter().any(|output| {
+                                output.root_relative_path() == "binary.runfiles/MANIFEST"
+                            })
+                        })
+                        .unwrap();
                 root = Some(manifest.outputs().root().to_owned());
                 let json: serde_json::Value = serde_json::from_str(
                     &requested_build_success_json(accepted, "one-shot", None).unwrap(),

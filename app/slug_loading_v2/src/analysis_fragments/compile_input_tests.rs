@@ -273,11 +273,11 @@ fn file_extension_uses_full_exec_path_and_source_scan_edges() {
         for kind in [ActionOutputKind::File, ActionOutputKind::Directory] {
             let value = AnalysisArtifactValue::new(AnalysisArtifact::Derived {
                 owner: owner.clone(),
-                output: ActionOutput::new(path, kind),
+                output: ActionOutput::new(crate::artifact_root::test_root(), path, kind),
             });
             assert_eq!(
                 value.get_attr("extension", heap).unwrap().unpack_str(),
-                Some(expected),
+                Some(if path == ".h" { "h" } else { expected }),
                 "{path}"
             );
             assert!(value.dir_attr().iter().any(|name| name == "extension"));

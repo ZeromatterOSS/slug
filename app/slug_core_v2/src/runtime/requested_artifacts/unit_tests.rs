@@ -29,7 +29,7 @@ fn selection_deduplicates_identity_without_collapsing_owner_configuration_or_kin
             CanonicalLabel::parse(label).unwrap(),
             Arc::<[u8]>::from(configuration),
         ),
-        output: ActionOutput::new("out", kind),
+        output: ActionOutput::new(crate::runtime::configured_output::test_root(), "out", kind),
     };
     let distinct = vec![
         AnalysisArtifact::Source(CanonicalLabel::parse("@@//:out").unwrap()),
@@ -39,7 +39,9 @@ fn selection_deduplicates_identity_without_collapsing_owner_configuration_or_kin
         derived("@@//:owner", b"target", ActionOutputKind::Directory),
         derived("@@//:owner", b"target", ActionOutputKind::RunfilesTree),
     ];
-    assert!(distinct.iter().all(|artifact| artifact.path() == "out"));
+    assert!(distinct.iter().all(|artifact| {
+        crate::runtime::configured_output::test_artifact_coordinate(artifact) == "out"
+    }));
     let default = files(&distinct[..3]);
     let explicit = AnalysisDepset::new(
         DepsetOrder::Default,

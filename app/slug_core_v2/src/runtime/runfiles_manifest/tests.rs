@@ -35,6 +35,10 @@ fn key(name: &str, exec: bool) -> ConfiguredTargetKey {
 }
 
 fn producer(key: ConfiguredTargetKey) -> ConfiguredNodeResult {
+    let root = slug_build_api_v2::DerivedArtifactRoot::bin(
+        key.configuration().slug_configuration().unwrap().clone(),
+    )
+    .unwrap();
     let context = Arc::new(ConfiguredActionOwnerContext::unresolved_default(key.clone()).unwrap());
     ConfiguredNodeResult::new_rule(
         key,
@@ -49,7 +53,7 @@ fn producer(key: ConfiguredTargetKey) -> ConfiguredNodeResult {
                 is_executable: false,
             },
             "FileWrite",
-            vec![ActionOutput::new("out", ActionOutputKind::File)],
+            vec![ActionOutput::new(root, "out", ActionOutputKind::File)],
         )],
         vec![context],
     )
@@ -59,7 +63,14 @@ fn producer(key: ConfiguredTargetKey) -> ConfiguredNodeResult {
 fn artifact(key: &ConfiguredTargetKey, name: &str, kind: ActionOutputKind) -> AnalysisArtifact {
     AnalysisArtifact::Derived {
         owner: key.artifact_owner(),
-        output: ActionOutput::new(name, kind),
+        output: ActionOutput::new(
+            slug_build_api_v2::DerivedArtifactRoot::bin(
+                key.configuration().slug_configuration().unwrap().clone(),
+            )
+            .unwrap(),
+            name,
+            kind,
+        ),
     }
 }
 
@@ -73,7 +84,10 @@ fn generated_targets_require_exact_owner_configuration_and_output_declaration() 
     let good = artifact(&target, "out", ActionOutputKind::File);
     let expected = crate::runtime::configured_output_root(
         workspace.as_path(),
-        target.configuration().slug_configuration().unwrap(),
+        &slug_build_api_v2::DerivedArtifactRoot::bin(
+            (target.configuration().slug_configuration().unwrap()).clone(),
+        )
+        .unwrap(),
     )
     .join("out");
     assert_eq!(
@@ -106,7 +120,10 @@ fn generated_targets_require_exact_owner_configuration_and_output_declaration() 
         exec_path,
         crate::runtime::configured_output_root(
             workspace.as_path(),
-            exec.configuration().slug_configuration().unwrap()
+            &slug_build_api_v2::DerivedArtifactRoot::bin(
+                (exec.configuration().slug_configuration().unwrap()).clone()
+            )
+            .unwrap()
         )
         .join("out")
         .to_str()

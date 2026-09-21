@@ -18,7 +18,7 @@ use super::*;
 
 #[test]
 fn local_output_reconciliation_checks_full_schema_and_preserves_virtual_kind() {
-    let output = ActionOutput::new("mapping", ActionOutputKind::File);
+    let output = ActionOutput::new(crate::test_roots::root(), "mapping", ActionOutputKind::File);
     let local = ActionChainStepResult::from_runfiles(PreparedRunfilesAction::Manifest {
         output: output.clone(),
         bytes: b"mapping bytes".as_slice().into(),
@@ -32,7 +32,11 @@ fn local_output_reconciliation_checks_full_schema_and_preserves_virtual_kind() {
         reconcile_step_outputs(
             &[
                 output.clone(),
-                ActionOutput::new("cooutput", ActionOutputKind::File)
+                ActionOutput::new(
+                    crate::test_roots::root(),
+                    "cooutput",
+                    ActionOutputKind::File
+                )
             ],
             &local
         )
@@ -40,12 +44,20 @@ fn local_output_reconciliation_checks_full_schema_and_preserves_virtual_kind() {
     );
     assert!(
         reconcile_step_outputs(
-            &[ActionOutput::new("mapping", ActionOutputKind::Directory)],
+            &[ActionOutput::new(
+                crate::test_roots::root(),
+                "mapping",
+                ActionOutputKind::Directory
+            )],
             &local
         )
         .is_err()
     );
-    let tree = ActionOutput::new("tree", ActionOutputKind::RunfilesTree);
+    let tree = ActionOutput::new(
+        crate::test_roots::root(),
+        "tree",
+        ActionOutputKind::RunfilesTree,
+    );
     let virtual_tree = ActionChainStepResult::RunfilesTree {
         output: tree.clone(),
     };
@@ -57,7 +69,11 @@ fn local_output_reconciliation_checks_full_schema_and_preserves_virtual_kind() {
     ));
     assert!(
         reconcile_step_outputs(
-            &[ActionOutput::new("tree", ActionOutputKind::Directory)],
+            &[ActionOutput::new(
+                crate::test_roots::root(),
+                "tree",
+                ActionOutputKind::Directory
+            )],
             &virtual_tree
         )
         .is_err()
@@ -71,8 +87,16 @@ fn selected_output_schema_rejects_missing_extra_duplicate_and_wrong_kind() {
             .unwrap()
             .is_empty()
     );
-    let file = GeneratedOutput::new("file", ReapiDigest::of_bytes(b"file"), false);
-    let declared = [ActionOutput::new("file", ActionOutputKind::File)];
+    let file = GeneratedOutput::new(
+        crate::test_roots::path("file"),
+        ReapiDigest::of_bytes(b"file"),
+        false,
+    );
+    let declared = [ActionOutput::new(
+        crate::test_roots::root(),
+        "file",
+        ActionOutputKind::File,
+    )];
     assert!(reconcile_outputs(&declared, &ActionResult::new(vec![file.clone()])).is_ok());
     for (outputs, result) in [
         (declared.to_vec(), ActionResult::new(vec![])),
@@ -82,11 +106,19 @@ fn selected_output_schema_rejects_missing_extra_duplicate_and_wrong_kind() {
             ActionResult::new(vec![file.clone(), file.clone()]),
         ),
         (
-            vec![ActionOutput::new("file", ActionOutputKind::Directory)],
+            vec![ActionOutput::new(
+                crate::test_roots::root(),
+                "file",
+                ActionOutputKind::Directory,
+            )],
             ActionResult::new(vec![file.clone()]),
         ),
         (
-            vec![ActionOutput::new("other", ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                crate::test_roots::root(),
+                "other",
+                ActionOutputKind::File,
+            )],
             ActionResult::new(vec![file.clone()]),
         ),
         (
@@ -109,8 +141,8 @@ impl PublicationWorkspace {
     pub(super) fn new() -> Self {
         let workspace = Workspace::new();
         let tool = TOOL.replace(
-            "  /bin/cat file tree/nested/value input > done",
-            "  /bin/cat file tree/nested/value input > done\n  /bin/mkdir -p result_tree/nested result_tree/empty\n  /bin/cat input > result_tree/nested/value\n  if [ \"$(/bin/cat input)\" = aaa ]; then /bin/cat input > result_tree/stale; fi\n  /bin/chmod 0644 done result_tree/nested/value",
+            "  /bin/cat \"$out/file\" \"$out/tree/nested/value\" input > \"$out/done\"",
+            "  /bin/cat \"$out/file\" \"$out/tree/nested/value\" input > \"$out/done\"\n  /bin/mkdir -p \"$out/result_tree/nested\" \"$out/result_tree/empty\"\n  /bin/cat input > \"$out/result_tree/nested/value\"\n  if [ \"$(/bin/cat input)\" = aaa ]; then /bin/cat input > \"$out/result_tree/stale\"; fi\n  /bin/chmod 0644 \"$out/done\" \"$out/result_tree/nested/value\"",
         );
         std::fs::write(workspace.root.join("tools/tool"), tool).unwrap();
         Self(workspace)
@@ -148,8 +180,16 @@ impl PublicationWorkspace {
             assert_eq!(
                 published.outputs(),
                 [
-                    ActionOutput::new("done", ActionOutputKind::File),
-                    ActionOutput::new("result_tree", ActionOutputKind::Directory),
+                    ActionOutput::new(
+                        crate::test_roots::owner_root(&self.owner),
+                        "done",
+                        ActionOutputKind::File
+                    ),
+                    ActionOutput::new(
+                        crate::test_roots::owner_root(&self.owner),
+                        "result_tree",
+                        ActionOutputKind::Directory
+                    ),
                 ]
             );
             let selected = accepted.output().selected().unwrap().remote().unwrap();

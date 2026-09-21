@@ -15,6 +15,7 @@ use crate::RetainedParamFileFormat;
 use crate::RetainedVectorArg;
 use crate::RetainedVectorOptions;
 use crate::RetainedVectorSource;
+use crate::artifact_root::test_support as root_support;
 
 fn source(label: &str) -> AnalysisArtifact {
     AnalysisArtifact::Source(CanonicalLabel::parse(label).unwrap())
@@ -22,7 +23,14 @@ fn source(label: &str) -> AnalysisArtifact {
 fn generated(owner: &str, config: &[u8], path: &str, kind: ActionOutputKind) -> AnalysisArtifact {
     AnalysisArtifact::Derived {
         owner: AnalysisConfiguredTargetKey::new(CanonicalLabel::parse(owner).unwrap(), config),
-        output: ActionOutput::new(path, kind),
+        output: ActionOutput::new(
+            root_support::root(),
+            crate::repository_relative_output_path(
+                CanonicalLabel::parse(owner).unwrap().package().repo(),
+                path,
+            ),
+            kind,
+        ),
     }
 }
 fn files(direct: Vec<AnalysisArtifact>, children: Vec<AnalysisDepset>) -> AnalysisDepset {
@@ -94,7 +102,7 @@ fn unexpanded_directory_depset_keeps_literal_path_and_configured_identity() {
     };
     let a = recipe(first);
     let b = recipe(make(b"b"));
-    assert_eq!(a.render(), ["pkg/tree"]);
+    assert_eq!(a.render(), [root_support::exec_path("pkg/tree")]);
     assert_eq!(a.render(), b.render());
     assert_ne!(a, b);
     assert_eq!(a, recipe(make(b"a")));
@@ -135,12 +143,14 @@ fn cargo_mapping_preserves_depset_order_paths_and_exact_fake_identity() {
     assert_eq!(
         recipe.render(),
         [
-            "pkg/data=workspace/pkg/data",
-            "external/dep+/pkg/external=dep+/pkg/external",
-            // Generated projections deliberately retain the existing Slug-native paths.
-            "pkg/generated=workspace/pkg/generated",
-            "pkg/fake=workspace/pkg/fake",
-            "pkg/fake=workspace/pkg/fake",
+            "pkg/data=workspace/pkg/data".to_owned(),
+            "external/dep+/pkg/external=dep+/pkg/external".to_owned(),
+            format!(
+                "{}=dep+/pkg/generated",
+                root_support::exec_path("external/dep+/pkg/generated")
+            ),
+            format!("{}=workspace/pkg/fake", root_support::exec_path("pkg/fake")),
+            format!("{}=workspace/pkg/fake", root_support::exec_path("pkg/fake")),
         ]
     );
     let mut originals = Vec::new();

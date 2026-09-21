@@ -11,6 +11,13 @@
 #[doc(hidden)]
 pub mod analysis_fragments;
 mod apple_common;
+mod artifact_root;
+#[doc(hidden)]
+pub use artifact_root::alloc_artifact_root;
+#[doc(hidden)]
+pub use artifact_root::alloc_frozen_artifact_root;
+#[doc(hidden)]
+pub use artifact_root::artifact_root_value;
 pub mod attrs;
 mod builtin_restriction;
 pub mod bzl_module;

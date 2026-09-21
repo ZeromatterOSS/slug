@@ -42,7 +42,14 @@ fn key(name: &str, exec: bool) -> ConfiguredTargetKey {
 fn artifact(owner: &ConfiguredTargetKey, path: &str, kind: ActionOutputKind) -> AnalysisArtifact {
     AnalysisArtifact::Derived {
         owner: owner.artifact_owner(),
-        output: ActionOutput::new(path, kind),
+        output: ActionOutput::new(
+            slug_build_api_v2::DerivedArtifactRoot::bin(
+                owner.configuration().slug_configuration().unwrap().clone(),
+            )
+            .unwrap(),
+            path,
+            kind,
+        ),
     }
 }
 fn spawn(inputs: Vec<AnalysisArtifact>, outputs: Vec<ActionOutput>) -> ActionSpec {
@@ -81,17 +88,31 @@ fn node(owner: ConfiguredTargetKey, actions: Vec<ActionSpec>) -> Arc<ConfiguredN
     )
 }
 fn write(path: &str) -> ActionSpec {
+    write_for(&key("unused", false), path)
+}
+fn write_for(owner: &ConfiguredTargetKey, path: &str) -> ActionSpec {
     ActionSpec::new(
         ActionKind::Write {
             content: "same".into(),
             is_executable: false,
         },
         "FileWrite",
-        vec![ActionOutput::new(path, ActionOutputKind::File)],
+        vec![ActionOutput::new(
+            slug_build_api_v2::DerivedArtifactRoot::bin(
+                owner.configuration().slug_configuration().unwrap().clone(),
+            )
+            .unwrap(),
+            path,
+            ActionOutputKind::File,
+        )],
     )
 }
 fn output(path: &str) -> ActionOutput {
-    ActionOutput::new(path, ActionOutputKind::File)
+    ActionOutput::new(
+        crate::runtime::configured_output::test_root(),
+        path,
+        ActionOutputKind::File,
+    )
 }
 
 #[test]
@@ -106,7 +127,11 @@ fn diamond_orders_file_and_tree_producers_once_and_keeps_artifact_bindings() {
                 vec![],
                 vec![
                     output("file"),
-                    ActionOutput::new("tree", ActionOutputKind::Directory),
+                    ActionOutput::new(
+                        crate::runtime::configured_output::test_root(),
+                        "tree",
+                        ActionOutputKind::Directory,
+                    ),
                 ],
             ),
             spawn(vec![file.clone(), tree.clone()], vec![output("left")]),
@@ -125,7 +150,7 @@ fn diamond_orders_file_and_tree_producers_once_and_keeps_artifact_bindings() {
     assert_eq!(
         plan.actions()
             .iter()
-            .map(|step| step.action().outputs()[0].path())
+            .map(|step| step.action().outputs()[0].root_relative_path())
             .collect::<Vec<_>>(),
         ["file", "left", "right", "done"]
     );
@@ -199,10 +224,13 @@ fn generated_executable_and_tools_resolve_and_deduplicate_their_producers() {
         let plan = ActionPrerequisitePlan::new(&closure, &owner, 2).unwrap();
         assert_eq!(plan.actions().len(), 3);
         assert_eq!(
-            plan.actions()[0].action().outputs()[0].path(),
+            plan.actions()[0].action().outputs()[0].root_relative_path(),
             "direct_tool"
         );
-        assert_eq!(plan.actions()[1].action().outputs()[0].path(), "executable");
+        assert_eq!(
+            plan.actions()[1].action().outputs()[0].root_relative_path(),
+            "executable"
+        );
         let inputs = plan.actions()[2].inputs();
         assert_eq!(inputs.len(), 3);
         for (expected, producer) in [
@@ -226,7 +254,7 @@ fn producer_lookup_preserves_configuration_preference_and_declared_owner() {
     let consumer = key("consumer", false);
     let closure = ValidatedActionClosure::new(Arc::from([
         node(target.clone(), vec![write("shared")]),
-        node(exec.clone(), vec![write("shared")]),
+        node(exec.clone(), vec![write_for(&exec, "shared")]),
         node(
             consumer.clone(),
             vec![spawn(

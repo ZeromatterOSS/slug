@@ -149,6 +149,7 @@ impl<T> RequestedActionResult<T> {
 struct ActionChainExecutionRoot<'a, T, P> {
     staging: ActionChainStagingKey,
     transport: &'a T,
+    configured_output: &'a ConfiguredOutputOwner,
     publication: P,
 }
 
@@ -157,6 +158,7 @@ impl<T, P: Clone> Clone for ActionChainExecutionRoot<'_, T, P> {
         Self {
             staging: self.staging.clone(),
             transport: self.transport,
+            configured_output: self.configured_output,
             publication: self.publication.clone(),
         }
     }
@@ -261,6 +263,27 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
                 // Native finalization still validates the full build/source
                 // frontier, without inventing a backend session or result.
                 return Ok(());
+            }
+            // Claim every planned physical namespace before any transport effect,
+            // including execute-only attempts. Configuration equality is structural;
+            // the directory token alone never authorizes reuse. claim releases its
+            // registry mutex before filesystem work and no guard crosses the await.
+            {
+                let plan = terminal.inputs.plan().map_err(|error| {
+                    NativeDemandSessionError::Computation(anyhow::anyhow!("{error}"))
+                })?;
+                let mut claimed = starlark_map::small_set::SmallSet::new();
+                for step in plan.actions() {
+                    for output in step.action().outputs() {
+                        if claimed.insert(output.root()) {
+                            self.configured_output
+                                .claim(output.root().configuration())
+                                .map_err(|error| {
+                                    NativeDemandSessionError::Computation(error.into())
+                                })?;
+                        }
+                    }
+                }
             }
             let needs_source_generations = terminal
                 .inputs
@@ -554,6 +577,7 @@ impl WorkspaceRuntime {
             ActionChainExecutionRoot {
                 staging,
                 transport,
+                configured_output: &self.configured_output,
                 publication,
             },
         )

@@ -11,7 +11,11 @@ use crate::runtime::action_output_staging::tests::root;
 use crate::runtime::action_output_staging::tests::scratch;
 
 fn output() -> ActionOutput {
-    ActionOutput::new("pkg/alias", ActionOutputKind::File)
+    ActionOutput::new(
+        crate::runtime::configured_output::test_root(),
+        "pkg/alias",
+        ActionOutputKind::File,
+    )
 }
 
 #[test]
@@ -25,13 +29,13 @@ fn aliases_and_regular_files_replace_leaves_without_following_or_chmodding_targe
     let output = output();
     let outputs = std::slice::from_ref(&output);
     let root = root(&workspace, &config);
-    let published = root.join(output.path());
+    let published = root.join(output.root_relative_path());
     fs::create_dir_all(published.parent().unwrap()).unwrap();
     fs::write(&published, b"old").unwrap();
     for _ in 0..2 {
         let mut stage = Staging::new_alias(
             workspace.path(),
-            &config,
+            &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
             &output,
             target.to_str().unwrap(),
             &SmallSet::new(),
@@ -50,7 +54,13 @@ fn aliases_and_regular_files_replace_leaves_without_following_or_chmodding_targe
     // to a directory outside the workspace. Its target is never traversed.
     fs::remove_file(&published).unwrap();
     symlink(outside.path(), &published).unwrap();
-    let mut regular = Staging::new(workspace.path(), &config, outputs, &SmallSet::new()).unwrap();
+    let mut regular = Staging::new(
+        workspace.path(),
+        &DerivedArtifactRoot::bin(config.clone()).unwrap(),
+        outputs,
+        &SmallSet::new(),
+    )
+    .unwrap();
     regular
         .create_file(outputs, 0, "")
         .unwrap()
@@ -87,14 +97,14 @@ fn alias_staging_rejects_ancestors_stale_destinations_and_changed_link_text() {
     ] {
         let workspace = Workspace::new();
         let root = root(&workspace, &config);
-        let published = root.join(output.path());
+        let published = root.join(output.root_relative_path());
         fs::create_dir_all(&root).unwrap();
         if mutation == "ancestor" {
             symlink(outside.path(), root.join("pkg")).unwrap();
             assert!(
                 Staging::new_alias(
                     workspace.path(),
-                    &config,
+                    &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
                     &output,
                     target.to_str().unwrap(),
                     &SmallSet::new()
@@ -107,7 +117,7 @@ fn alias_staging_rejects_ancestors_stale_destinations_and_changed_link_text() {
         fs::write(&published, b"old").unwrap();
         let mut stage = Staging::new_alias(
             workspace.path(),
-            &config,
+            &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
             &output,
             target.to_str().unwrap(),
             &SmallSet::new(),
@@ -153,7 +163,7 @@ fn alias_creation_never_claims_a_substituted_directory_for_cleanup() {
     let output = output();
     let mut staging = Staging::new(
         workspace.path(),
-        &config,
+        &DerivedArtifactRoot::bin(config.clone()).unwrap(),
         std::slice::from_ref(&output),
         &SmallSet::new(),
     )

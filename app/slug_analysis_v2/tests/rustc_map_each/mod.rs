@@ -2,6 +2,7 @@ use super::*;
 
 include!("sources.rs");
 
+mod artifact_roots;
 mod cc_compile_inputs;
 mod cc_context_naming;
 mod cc_headers;
@@ -137,9 +138,6 @@ async fn request_configured(
         cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
     });
-    updater
-        .changed_to(slug_workspace_v2::path_observation_shards(&epoch))
-        .unwrap();
     let builtin_repositories = BUILTIN_MODULES
         .iter()
         .map(|(name, _)| (format!("{name}+"), *name))
@@ -242,7 +240,8 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
     let expanded = spawn.expand_forced_param_files().unwrap();
     assert_eq!(expanded.param_files().len(), 1);
     let file = &expanded.param_files()[0];
-    assert_eq!(file.path(), "out/probe.rlib-0.params");
+    let params_path = format!("{}-0.params", spawn.outputs()[0].path());
+    assert_eq!(file.path(), params_path);
     assert_eq!(
         file.bytes(),
         rustc.recipe().render_write_content().as_bytes()
@@ -251,7 +250,7 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
     let mut expected = spawn.invocation().render_prefix();
     for (index, segment) in spawn.command_line().segments().iter().enumerate() {
         if index == 2 {
-            expected.push("@out/probe.rlib-0.params".to_owned());
+            expected.push(format!("@{params_path}"));
         } else {
             expected.extend(
                 slug_build_api_v2::RetainedCommandLine::new(vec![segment.clone()]).render(),
@@ -347,16 +346,24 @@ async fn pinned_rustc_file_dirnames_preserve_order_and_generated_root() {
             .find_map(|action| action.spawn_spec())
             .unwrap();
         let argv = spawn.render_argv();
+        let prefix = spawn.outputs()[0].root().path();
+        let output_dir = format!("{prefix}/external/rules_rust+/out");
         let root = if generated {
-            "generated/input.rs"
+            format!("{prefix}/external/rules_rust+/generated/input.rs")
         } else {
-            "lib.rs"
+            "lib.rs".to_owned()
         };
         assert!(
-            argv.windows(3).any(|args| args == ["--", "rustc", root]),
+            argv.windows(3)
+                .any(|args| args == ["--", "rustc", root.as_str()]),
             "{argv:?}"
         );
-        assert_eq!(argv.iter().filter(|arg| *arg == "--out-dir=out").count(), 1);
+        assert_eq!(
+            argv.iter()
+                .filter(|arg| *arg == &format!("--out-dir={output_dir}"))
+                .count(),
+            1
+        );
         assert_eq!(
             argv.iter()
                 .filter(|arg| *arg == "--sysroot=sysroot")
@@ -372,7 +379,7 @@ async fn pinned_rustc_file_dirnames_preserve_order_and_generated_root() {
         if generated {
             assert!(
                 argv.windows(2)
-                    .any(|args| args == ["--subst", "cargo_manifest_dir=out"]),
+                    .any(|args| args == ["--subst", &format!("cargo_manifest_dir={output_dir}")]),
                 "{argv:?}"
             );
             assert_eq!(
@@ -386,7 +393,7 @@ async fn pinned_rustc_file_dirnames_preserve_order_and_generated_root() {
         };
         let bytes = rustc.recipe().render_write_content();
         assert!(bytes.starts_with(&format!("{root}\n")));
-        assert!(bytes.contains("\n--out-dir=out\n"));
+        assert!(bytes.contains(&format!("\n--out-dir={output_dir}\n")));
         assert!(bytes.contains("\n-L\nstd/a\n-L\nstd/b\n"));
         assert!(bytes.contains("\n--sysroot=sysroot\n"));
         if !generated {

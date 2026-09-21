@@ -113,7 +113,10 @@ impl Workspace {
     fn output_path(&self) -> PathBuf {
         crate::runtime::configured_output_root(
             self.root.path(),
-            self.owner.configuration().slug_configuration().unwrap(),
+            &slug_build_api_v2::DerivedArtifactRoot::bin(
+                (self.owner.configuration().slug_configuration().unwrap()).clone(),
+            )
+            .unwrap(),
         )
         .join("done")
     }
@@ -165,6 +168,40 @@ enum Behavior {
     OutputError,
     OutputPanic,
     OutputCommitFailure,
+}
+
+#[test]
+fn conflicting_configured_root_marker_blocks_all_transport_effects() {
+    for publish in [false, true] {
+        let workspace = Workspace::new();
+        let config = workspace
+            .owner
+            .configuration()
+            .slug_configuration()
+            .unwrap();
+        let marker = workspace
+            .root
+            .path()
+            .join("bazel-out/.slug-configurations")
+            .join(format!(
+                "{}.canonical",
+                config.projection().path_component()
+            ));
+        fs::write(&marker, b"unequal structural configuration").unwrap();
+        let fake = Fake::new(workspace.root.path(), Behavior::Normal);
+        let outcome = if publish {
+            workspace.publish(&fake)
+        } else {
+            workspace.run(4, &fake)
+        };
+        let error = outcome.err().expect("collision must reject the attempt");
+        assert!(error.to_string().contains("collision"), "{error}");
+        assert_eq!(fake.starts.load(Ordering::SeqCst), 0);
+        assert_eq!(fake.stages.load(Ordering::SeqCst), 0);
+        assert_eq!(fake.executions.load(Ordering::SeqCst), 0);
+        assert_eq!(fake.output_stages.load(Ordering::SeqCst), 0);
+        assert!(!workspace.output_path().exists());
+    }
 }
 struct Fake {
     root: PathBuf,
@@ -233,15 +270,19 @@ impl ActionChainTransport for Fake {
             let action = plan.actions().last().unwrap().action();
             let root = crate::runtime::configured_output_root(
                 &self.root,
-                action
-                    .context()
-                    .owner()
-                    .configuration()
-                    .slug_configuration()
-                    .unwrap(),
+                &slug_build_api_v2::DerivedArtifactRoot::bin(
+                    (action
+                        .context()
+                        .owner()
+                        .configuration()
+                        .slug_configuration()
+                        .unwrap())
+                    .clone(),
+                )
+                .unwrap(),
             );
             assert_eq!(
-                fs::read(root.join(action.outputs()[0].path())).unwrap(),
+                fs::read(root.join(action.outputs()[0].root_relative_path())).unwrap(),
                 b"old"
             );
         }
@@ -314,16 +355,20 @@ impl ActionChainTransport for Fake {
             let action = plan.actions().last().unwrap().action();
             let root = crate::runtime::configured_output_root(
                 &self.root,
-                action
-                    .context()
-                    .owner()
-                    .configuration()
-                    .slug_configuration()
-                    .unwrap(),
+                &slug_build_api_v2::DerivedArtifactRoot::bin(
+                    (action
+                        .context()
+                        .owner()
+                        .configuration()
+                        .slug_configuration()
+                        .unwrap())
+                    .clone(),
+                )
+                .unwrap(),
             );
             // Sealing has completed; simulate a final namespace change before
             // the synchronized publication callback. Its preflight must reject.
-            fs::create_dir(root.join(action.outputs()[0].path()))?;
+            fs::create_dir(root.join(action.outputs()[0].root_relative_path()))?;
         }
         Ok(Output {
             bytes: std::mem::take(&mut session.bytes),

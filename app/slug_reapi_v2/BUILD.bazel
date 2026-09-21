@@ -19,7 +19,8 @@ rust_library(
 
 rust_test(
     name = "reapi_test",
-    srcs = ["tests/reapi.rs"],
+    srcs = ["tests/reapi.rs", "tests/root_support/mod.rs"],
+    crate_root = "tests/reapi.rs",
     edition = crate_edition(),
     size = "small",
     visibility = ["//visibility:private"],

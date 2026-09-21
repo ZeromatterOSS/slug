@@ -9,6 +9,11 @@ use super::*;
 pub(super) fn fixture(
     owner: &ConfiguredTargetKey,
 ) -> (FilesToRunProvider, Vec<ActionSpec>, AnalysisArtifact) {
+    let root = slug_build_api_v2::DerivedArtifactRoot::bin(
+        owner.configuration().slug_configuration().unwrap().clone(),
+    )
+    .unwrap();
+    let output = |path| ActionOutput::new(root.clone(), path, ActionOutputKind::File);
     let exe = artifact(owner, "exe", ActionOutputKind::File);
     let source = AnalysisArtifact::Source(CanonicalLabel::parse("@@//:data").unwrap());
     let support = Arc::new(RunfilesSupport {
@@ -34,10 +39,14 @@ pub(super) fn fixture(
         .unwrap()
         .files_to_run;
     let actions = vec![
-        write("exe"),
+        write_for(owner, "exe"),
         spawn(
             vec![],
-            vec![ActionOutput::new("directory", ActionOutputKind::Directory)],
+            vec![ActionOutput::new(
+                root.clone(),
+                "directory",
+                ActionOutputKind::Directory,
+            )],
         ),
         ActionSpec::runfiles_support(RunfilesSupportActionSpec::RepoMappingManifest {
             support: support.clone(),
@@ -59,7 +68,7 @@ pub(super) fn fixture(
         }),
         ActionSpec::runfiles_support(RunfilesSupportActionSpec::RunfilesTree {
             support,
-            output: ActionOutput::new("exe.runfiles", ActionOutputKind::RunfilesTree),
+            output: ActionOutput::new(root.clone(), "exe.runfiles", ActionOutputKind::RunfilesTree),
         }),
     ];
     (provider, actions, source)
@@ -214,7 +223,14 @@ fn malformed_files_to_run_fails_the_whole_forest_in_every_occurrence() {
         *invalid_actions.last_mut().unwrap() =
             ActionSpec::runfiles_support(RunfilesSupportActionSpec::RunfilesTree {
                 support: malformed.clone(),
-                output: ActionOutput::new("exe.runfiles", ActionOutputKind::RunfilesTree),
+                output: ActionOutput::new(
+                    slug_build_api_v2::DerivedArtifactRoot::bin(
+                        tool.configuration().slug_configuration().unwrap().clone(),
+                    )
+                    .unwrap(),
+                    "exe.runfiles",
+                    ActionOutputKind::RunfilesTree,
+                ),
             });
         let closure = ValidatedActionClosure::new(Arc::from([
             node(tool.clone(), invalid_actions),

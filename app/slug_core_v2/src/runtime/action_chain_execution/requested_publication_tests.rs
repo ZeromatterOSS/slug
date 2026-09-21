@@ -157,6 +157,16 @@ fn output_root(workspace: &Workspace) -> PathBuf {
     workspace.output_path().parent().unwrap().to_owned()
 }
 
+fn output_exec_path(workspace: &Workspace, relative: &str) -> String {
+    output_root(workspace)
+        .strip_prefix(workspace.root.path())
+        .unwrap()
+        .join(relative)
+        .to_str()
+        .unwrap()
+        .to_owned()
+}
+
 fn write_old_outputs(workspace: &Workspace) {
     let root = output_root(workspace);
     fs::create_dir_all(root.join("tree")).unwrap();
@@ -222,14 +232,14 @@ fn requested_publication_preserves_strict_subsets_and_producer_bindings() {
     {
         assert_eq!(group.outputs().root(), output_root(&workspace));
         assert_eq!(group.outputs().outputs().len(), 1);
-        assert_eq!(group.outputs().outputs()[0].path(), path);
+        assert_eq!(group.outputs().outputs()[0].root_relative_path(), path);
     }
     assert_eq!(
         transport.batches.lock().unwrap().as_slice(),
         &[vec![
-            (2, vec!["left".to_owned()]),
-            (3, vec!["right".to_owned()]),
-            (1, vec!["tree".to_owned()])
+            (2, vec![output_exec_path(&workspace, "left")]),
+            (3, vec![output_exec_path(&workspace, "right")]),
+            (1, vec![output_exec_path(&workspace, "tree")])
         ]]
     );
     assert_eq!(transport.transfers.load(Ordering::SeqCst), 1);
@@ -276,7 +286,7 @@ shared = rule(implementation=_shared, attrs={'standalone':attr.label(allow_files
     assert_eq!(result.published_outputs()[0].action_index(), 0);
     assert_eq!(
         transport.batches.lock().unwrap().as_slice(),
-        &[vec![(0, vec!["shared".to_owned()])]]
+        &[vec![(0, vec![output_exec_path(&workspace, "shared")])]]
     );
     assert_eq!(
         fs::read(output_root(&workspace).join("shared")).unwrap(),
@@ -424,16 +434,26 @@ configured = rule(implementation=_configured, attrs={'dep':attr.label(cfg='exec'
             .unwrap();
         let root = crate::runtime::configured_output_root(
             workspace.root.path(),
-            producer
-                .context()
-                .owner()
-                .configuration()
-                .slug_configuration()
-                .unwrap(),
+            &slug_build_api_v2::DerivedArtifactRoot::bin(
+                (producer
+                    .context()
+                    .owner()
+                    .configuration()
+                    .slug_configuration()
+                    .unwrap())
+                .clone(),
+            )
+            .unwrap(),
         );
         assert_eq!(group.outputs().root(), root);
-        assert_eq!(artifact.path(), "configured");
-        assert_eq!(group.outputs().outputs()[0].path(), "configured");
+        assert_eq!(
+            crate::runtime::configured_output::test_artifact_coordinate(artifact),
+            "configured"
+        );
+        assert_eq!(
+            group.outputs().outputs()[0].root_relative_path(),
+            "configured"
+        );
         assert_eq!(fs::read(root.join("configured")).unwrap(), b"aaa");
     }
     let modes = plan

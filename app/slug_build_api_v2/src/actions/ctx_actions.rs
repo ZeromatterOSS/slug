@@ -24,14 +24,18 @@ use crate::actions::spec::ArgsWriteSpec;
 use crate::actions::spec::SpawnSpec;
 use crate::actions::spec::SymlinkSpec;
 
-#[derive(Debug, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CtxActions {
+    root: crate::DerivedArtifactRoot,
     registry: ActionRegistry,
 }
 
 impl CtxActions {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(root: crate::DerivedArtifactRoot) -> Self {
+        Self {
+            root,
+            registry: ActionRegistry::new(),
+        }
     }
 
     pub fn declare_file(&self, path: impl Into<String>) -> Result<ActionOutput, ActionError> {
@@ -192,7 +196,7 @@ impl CtxActions {
         path: impl Into<String>,
         kind: ActionOutputKind,
     ) -> Result<ActionOutput, ActionError> {
-        let output = ActionOutput::new(path, kind);
+        let output = ActionOutput::new(self.root.clone(), path, kind);
         validate_output(&output)?;
         Ok(output)
     }

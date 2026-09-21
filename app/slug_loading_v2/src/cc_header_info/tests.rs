@@ -55,7 +55,11 @@ fn evaluate(body: &str, host: Option<ActionEnvironmentHostOs>) -> anyhow::Result
             .heap()
             .alloc(AnalysisArtifactValue::new(AnalysisArtifact::Derived {
                 owner,
-                output: ActionOutput::new("module.pcm", ActionOutputKind::Directory),
+                output: ActionOutput::new(
+                    crate::artifact_root::test_root(),
+                    "module.pcm",
+                    ActionOutputKind::Directory,
+                ),
             })),
     );
     let context = AnalysisEvaluationContext::new(

@@ -277,28 +277,9 @@ fn checked_artifact(
 }
 
 fn artifact_path(artifact: &AnalysisArtifact) -> Result<CompactString, RunfilesLayoutError> {
-    let (repo, relative) = match artifact {
-        AnalysisArtifact::Source(label) => {
-            // Source short_path is the retained canonical label's runfiles projection.
-            let path = artifact.short_path();
-            let relative = if label.package().repo().is_root() {
-                path.as_ref()
-            } else {
-                path.strip_prefix("../").expect("external source prefix")
-            };
-            validate_path(relative)?;
-            return Ok(path.as_ref().into());
-        }
-        AnalysisArtifact::Derived { owner, output } => {
-            (owner.label().package().repo(), output.path())
-        }
-    };
-    validate_path(relative)?;
-    Ok(if repo.is_root() {
-        relative.into()
-    } else {
-        format!("../{}/{relative}", repo.as_str()).into()
-    })
+    let path = artifact.short_path();
+    validate_path(path.strip_prefix("../").unwrap_or(&path))?;
+    Ok(path.as_ref().into())
 }
 
 fn below_prefix(path: &str, prefix: &str) -> bool {
@@ -318,12 +299,9 @@ fn same_location_below(
             left.package().repo() == right.package().repo()
         }
         (
-            AnalysisArtifact::Derived { owner: left, .. },
-            AnalysisArtifact::Derived { owner: right, .. },
-        ) => {
-            left.label().package().repo() == right.label().package().repo()
-                && left.configuration() == right.configuration()
-        }
+            AnalysisArtifact::Derived { output: left, .. },
+            AnalysisArtifact::Derived { output: right, .. },
+        ) => left.root() == right.root(),
         _ => false,
     };
     same_namespace && format!("{}/{suffix}", ancestor.path()) == child.path()

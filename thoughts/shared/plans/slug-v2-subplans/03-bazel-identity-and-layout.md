@@ -15,6 +15,98 @@ depend on them.
 - runfiles and output path string behavior;
 - stable serialization for DICE keys and lockfile-facing values.
 
+## Coherent artifact roots (WP766)
+
+This accepted bounded contract has configured, publication and real transport
+evidence plus independent final ACCEPT in the WP766 receipt. Canonical Live Status and the current
+packet own activation. Exact Bazel output
+bytes remain M9; the following coordinates use Slug-native configuration tokens.
+
+BuildAPI owns immutable `DerivedArtifactRoot` and `AnalysisArtifactRoot` values.
+A derived root retains the complete existing `SlugConfiguration` and the bin root
+kind, shared through Arc/Dupe/Allocative. It does not retain a target, package,
+action owner or execution-platform preference. Equal full configurations share
+root semantics across targets/repositories; action owner remains independently
+part of `AnalysisArtifact::Derived`. Source roots retain canonical repository
+identity within one workspace service and display an empty path. Their logical
+identity is Slug-native, not physical-root equality across workspaces or checkouts.
+
+One producer computes the derived exec prefix:
+`bazel-out/<configuration component>/bin`. The component is the existing complete
+`slugcfg-v2-<hex>` projection with `-exec` appended only for typed Exec role;
+Target has no suffix. HostLike root production remains deferred because admitted
+action owners already require Target/Exec. The role is read from typed configuration,
+never parsed from opaque bytes. This preserves unchanged Rust helpers' first-three-
+components and `-exec` tests. Configuration display tokens and collision-sidecar
+keys stay independent and unchanged; no Bazel-checksum claim follows from the shape.
+
+`ActionOutput` requires a genuine derived root at construction. Its shared immutable
+data retains root, kind and one full exec path; `path()` borrows that full path,
+`root_relative_path()` borrows its suffix, and `root()` borrows the descriptor.
+Constructors take root-relative coordinates, never detect/strip an apparent root
+from input strings. Existing validation rejects malformed relative coordinates
+before registry publication. Eq/Hash (and ordering where needed) use complete root
+semantics, relative coordinate and kind, not just the projected path. Canonical
+configuration bytes are an accepted structural encoding, not a digest. Existing
+Arc configuration is shared; no per-output configuration copy, interner, cache,
+second model or evaluator borrow. Retained strings use CompactString; output/root
+handles remain cheaply cloneable and Allocative. Memory is DICE-retained under
+existing provider/action lifetimes, while formatting/transport maps are scratch.
+
+All ordinary predeclared/declared/generated-target producers use one repository-
+qualified coordinate helper: main `pkg/file`, external `external/<repo>/pkg/file`.
+The explicit bin-relative Solib route bypasses that ordinary prefix: external-owned
+Solib outputs can live at `_solib_...` under the shared bin root. Runfiles support
+outputs inherit the executable's root and extend its relative coordinate.
+Derived File.path is output.path; short_path removes the root and transforms an
+actual leading `external/` coordinate to `../`, never blindly inspecting owner repo.
+Source File.path/short_path keep their accepted repository projections. File.owner
+is the source label or derived action-owner label. Root is immutable/hashable,
+repr `<source root>`/`<derived root>`, with only read-only noncallable `path`.
+Extracted roots lower/materialize through a typed AnalysisValue variant. Context
+bin/genfiles getters obey existing active-frame checks and return the same bin root
+only when the structural merge-genfiles option is true; split genfiles fails closed.
+
+Action registry and closure conflicts use full root plus relative coordinates,
+including same-root/different-owner conflicts. Two unequal roots with colliding
+projected prefixes must fail existing in-memory/durable collision checks before
+execution/publication. Currently admitted action output roots must equal the action
+configuration's bin root; reject mismatches before transport. The representation
+keeps root and action owner separate for later passed-configuration declarations,
+but does not activate those declarations or cross-root action outputs now.
+
+REAPI Command output paths, ActionResult reconciliation, generated input bindings,
+forced paramfile locations and artifact-rendered argv all use full exec paths.
+Do not rewrite arbitrary strings in argv: authored rules now receive correct paths
+from File/ctx. Solib naming and runfiles tree member locations instead explicitly
+select root-relative or runfiles-relative coordinates, retaining their current
+algorithms. Generic low-level ActionSpec construction remains available with rooted
+outputs; there is no rootless mode. Legacy configuration identity/key-only tests
+remain valid, but output fixtures supply explicit structural configurations.
+
+Core physical staging still opens the validated configured bin namespace and
+addresses leaves by `root_relative_path()`. Published capabilities retain rooted
+outputs and expose their physical root; callers join that root with the relative
+coordinate, not `path()`. Do not widen secure publication to the workspace root.
+Runfiles targets and aliases join the same descriptor's prefix exactly once.
+Collision claims, source observation/retry, verified CAS and atomic publication
+remain unchanged. No new DICE key, filesystem observation, lock across compute or
+semantic side registry is introduced. Existing provider/action publication equality
+must include all root facts, including unused configuration payload, and restore A/B/A.
+
+The packet maps its invariant-to-test matrix and protected consumers to configured
+tests, verified generated-file/tree transport, selected publication and target/exec
+cache/change/restore evidence. Getter tests or compilation alone do not establish
+this contract. Sibling layout,
+split genfiles, execution-time path mapping and alternative output-root configuration
+declarations remain unsupported/deferred. Exact existing source paths, content/CAS
+digests, and action-family byte algorithms are not weakened by native output tokens.
+Direct external generated-label requests remain behind the existing target-shape
+guard; external generated Files are admitted through producer providers. Main-repo
+generated-target reconstruction must equal the producer's complete rooted artifact.
+This boundary was explicitly retained at the WP766 proof review, not widened by
+the new root projection.
+
 ## V1 Lessons
 
 V1 accumulated too much Buck cell and output-root residue. V2 should not start

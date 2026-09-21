@@ -21,6 +21,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+use slug_build_api_v2::DerivedArtifactRoot;
 use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::SlugConfigurationProjection;
 use starlark_map::small_map::SmallMap;
@@ -66,11 +67,13 @@ impl ConfiguredOutputOwner {
             .ok_or_else(|| {
                 std::io::Error::other("output publication requires structural configuration")
             })?;
+        let root =
+            DerivedArtifactRoot::bin(configuration.clone()).map_err(std::io::Error::other)?;
         self.register(configuration.projection(), configuration)
             .map_err(std::io::Error::other)?;
         super::action_output_staging::ActionOutputStaging::new_reserved(
             &self.workspace,
-            configuration,
+            &root,
             outputs,
             reserved,
         )
@@ -91,11 +94,13 @@ impl ConfiguredOutputOwner {
         let [output] = action.outputs() else {
             return Err(std::io::Error::other("artifact alias must have one output"));
         };
+        let root =
+            DerivedArtifactRoot::bin(configuration.clone()).map_err(std::io::Error::other)?;
         self.register(configuration.projection(), configuration)
             .map_err(std::io::Error::other)?;
         super::action_output_staging::ActionOutputStaging::new_alias(
             &self.workspace,
-            configuration,
+            &root,
             output,
             target,
             reserved,
@@ -118,11 +123,13 @@ impl ConfiguredOutputOwner {
         let [output] = action.outputs() else {
             return Err(std::io::Error::other("runfiles tree must have one output"));
         };
+        let root =
+            DerivedArtifactRoot::bin(configuration.clone()).map_err(std::io::Error::other)?;
         self.register(configuration.projection(), configuration)
             .map_err(std::io::Error::other)?;
         super::action_output_staging::ActionOutputStaging::new_runfiles(
             &self.workspace,
-            configuration,
+            &root,
             output,
             workspace_name,
             entries,
@@ -222,11 +229,29 @@ impl ConfiguredOutputOwner {
     }
 }
 
-pub fn configured_output_root(workspace: &Path, configuration: &SlugConfiguration) -> PathBuf {
-    workspace
-        .join("bazel-out")
-        .join(configuration.projection().path_component())
-        .join("bin")
+pub fn configured_output_root(workspace: &Path, root: &DerivedArtifactRoot) -> PathBuf {
+    workspace.join(root.path())
+}
+
+#[cfg(test)]
+pub(crate) fn test_root() -> DerivedArtifactRoot {
+    DerivedArtifactRoot::bin(tests::configurations().0).unwrap()
+}
+
+/// Selection/order fixtures name root-relative coordinates. Keep checking the
+/// complete exec-path relationship before comparing those existing coordinates.
+#[cfg(test)]
+pub(crate) fn test_artifact_coordinate(artifact: &slug_build_api_v2::AnalysisArtifact) -> String {
+    match artifact {
+        slug_build_api_v2::AnalysisArtifact::Source(_) => artifact.path().into_owned(),
+        slug_build_api_v2::AnalysisArtifact::Derived { output, .. } => {
+            assert_eq!(
+                artifact.path(),
+                format!("{}/{}", output.root().path(), output.root_relative_path())
+            );
+            output.root_relative_path().to_owned()
+        }
+    }
 }
 
 fn io_error(operation: &'static str, path: &Path, source: std::io::Error) -> ConfiguredOutputError {
@@ -287,7 +312,7 @@ mod tests {
 
     use super::*;
 
-    fn configurations() -> (SlugConfiguration, SlugConfiguration) {
+    pub(super) fn configurations() -> (SlugConfiguration, SlugConfiguration) {
         let host = HostConversionInputs::new(
             Some(AutoCpuToken::K8),
             Some(HostPathFlavor::Unix),
@@ -315,10 +340,22 @@ mod tests {
         owner.claim(&c1).unwrap();
         owner.claim(&c0).unwrap();
 
-        let c0_root = configured_output_root(workspace.path(), &c0);
-        let c1_root = configured_output_root(workspace.path(), &c1);
+        let c0_root = configured_output_root(
+            workspace.path(),
+            &DerivedArtifactRoot::bin(c0.clone()).unwrap(),
+        );
+        let c1_root = configured_output_root(
+            workspace.path(),
+            &DerivedArtifactRoot::bin(c1.clone()).unwrap(),
+        );
         assert_ne!(c0_root, c1_root);
-        assert_eq!(c0_root, configured_output_root(workspace.path(), &c0));
+        assert_eq!(
+            c0_root,
+            configured_output_root(
+                workspace.path(),
+                &DerivedArtifactRoot::bin(c0.clone()).unwrap()
+            )
+        );
         assert_eq!(
             fs::read(
                 workspace

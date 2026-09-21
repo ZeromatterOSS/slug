@@ -1,9 +1,13 @@
 use super::tests::Workspace;
 use super::*;
 
-fn local(path: &str, bytes: &[u8]) -> ActionChainStepResult {
+fn local(
+    path: &str,
+    bytes: &[u8],
+    root: slug_build_api_v2::DerivedArtifactRoot,
+) -> ActionChainStepResult {
     ActionChainStepResult::from_runfiles(PreparedRunfilesAction::Manifest {
-        output: ActionOutput::new(path, ActionOutputKind::File),
+        output: ActionOutput::new(root, path, ActionOutputKind::File),
         bytes: bytes.into(),
     })
 }
@@ -13,7 +17,11 @@ fn local_manifest_binding_preserves_plan_ordinals_and_remote_cas_provenance() {
     let workspace = requested_tests::workspace();
     let inputs = requested_tests::prepare(&workspace, &["//:one", "//:two"]);
     let mut templates = Template::prepare(&inputs, &Default::default()).unwrap();
-    let local_result = local("seed.out", b"manifest bytes\n");
+    let local_result = local(
+        "seed.out",
+        b"manifest bytes\n",
+        crate::test_roots::owner_root(&workspace.owner),
+    );
     let digest = local_result.local_file().unwrap().digest().clone();
     let Template::Spawn {
         inputs: bindings, ..
@@ -25,13 +33,21 @@ fn local_manifest_binding_preserves_plan_ordinals_and_remote_cas_provenance() {
     // ordinal one. Equal bytes must retain the remote producer's CAS obligation.
     bindings.push(Binding::Generated {
         producer: 1,
-        path: "remote".to_owned(),
-        output: ActionOutput::new("remote", ActionOutputKind::File),
+        path: crate::test_roots::owner_path(&workspace.owner, "remote"),
+        output: ActionOutput::new(
+            crate::test_roots::owner_root(&workspace.owner),
+            "remote",
+            ActionOutputKind::File,
+        ),
     });
     let remote = ActionChainStepResult::Remote(RemoteExecutionResult {
         action_digest: ReapiDigest::of_bytes(b"action"),
         platform_properties: Default::default(),
-        result: ActionResult::new(vec![GeneratedOutput::new("remote", digest.clone(), false)]),
+        result: ActionResult::new(vec![GeneratedOutput::new(
+            crate::test_roots::owner_path(&workspace.owner, "remote"),
+            digest.clone(),
+            false,
+        )]),
         output_blobs: Default::default(),
         evidence: ExecutionEvidence::reapi("synthetic verified remote metadata"),
     });
@@ -47,15 +63,23 @@ fn local_manifest_binding_preserves_plan_ordinals_and_remote_cas_provenance() {
             .tree
             .entries()
             .iter()
-            .find(|entry| entry.path() == path)
+            .find(|entry| entry.path() == crate::test_roots::owner_path(&workspace.owner, path))
             .unwrap();
         assert_eq!(entry.digest(), &digest);
         assert!(entry.is_executable());
     }
-    results[0] = local("other", b"manifest bytes\n");
+    results[0] = local(
+        "other",
+        b"manifest bytes\n",
+        crate::test_roots::owner_root(&workspace.owner),
+    );
     assert!(templates[2].bind(&results).is_err());
     results[0] = ActionChainStepResult::RunfilesTree {
-        output: ActionOutput::new("seed.out", ActionOutputKind::RunfilesTree),
+        output: ActionOutput::new(
+            crate::test_roots::owner_root(&workspace.owner),
+            "seed.out",
+            ActionOutputKind::RunfilesTree,
+        ),
     };
     assert!(templates[2].bind(&results).is_err());
 }
@@ -83,17 +107,12 @@ stage = rule(implementation = _impl, executable = True, attrs = {"input": attr.l
             let action = step.action();
             let root = slug_core_v2::runtime::configured_output_root(
                 &workspace.root,
-                action
-                    .context()
-                    .owner()
-                    .configuration()
-                    .slug_configuration()
-                    .unwrap(),
+                action.outputs()[0].root(),
             );
             action
                 .outputs()
                 .iter()
-                .map(move |output| root.join(output.path()))
+                .map(move |output| root.join(output.root_relative_path()))
         })
         .collect::<Vec<_>>();
     let no_outputs = || {
@@ -140,7 +159,10 @@ stage = rule(implementation = _impl, executable = True, attrs = {"input": attr.l
             assert!(selected.remote().is_none());
             let local = selected.local_file().unwrap();
             assert_eq!(local.digest(), &ReapiDigest::of_bytes(local.bytes()));
-            assert_eq!(local.output().path(), "binary.repo_mapping");
+            assert_eq!(
+                local.output().path(),
+                crate::test_roots::owner_path(&workspace.owner, "binary.repo_mapping")
+            );
         });
     no_outputs();
 }

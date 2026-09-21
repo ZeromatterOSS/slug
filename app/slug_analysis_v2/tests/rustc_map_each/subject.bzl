@@ -74,7 +74,7 @@ def _impl(ctx):
         fail("Label.workspace_root must be discoverable")
     if _NESTED_ROOT_LABEL.workspace_root != "" or _NESTED_EXTERNAL_LABEL.workspace_root != "external/rules_rust+":
         fail("Label.workspace_root must ignore package and target components")
-    if output.dirname != "out":
+    if output.dirname != output.root.path + "/external/rules_rust+/out":
         fail("File.dirname must distinguish the execution root and nested directories")
     root = source
     if ctx.attr.generated:

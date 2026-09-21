@@ -28,9 +28,10 @@ pub(super) const DEFS: &str = r#"def _impl(ctx):
     done = ctx.actions.declare_file('done')
     result_tree = ctx.actions.declare_directory('result_tree')
     ctx.actions.write(seed, 'seed')
-    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[seed, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[file, tree, empty], arguments=['produce'])
+    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[seed, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[file, tree, empty], arguments=['produce', file.path])
     args = ctx.actions.args()
     args.add('consume')
+    args.add(file.path)
     args.use_param_file('@%s', use_always = True)
     args.set_param_file_format('multiline')
     ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=[file, tree, empty, ctx.attr.input[DefaultInfo].files.to_list()[0]], outputs=[done, result_tree], arguments=[args])
@@ -41,18 +42,22 @@ stage = rule(implementation=_impl, attrs={'input':attr.label(allow_single_file=T
 pub(super) const TOOL: &str = r#"#!/bin/sh
 set -eu
 if [ "$1" = produce ]; then
-  [ "$(/bin/cat seed)" = seed ]
-  [ -d tree ] && [ -d emptytree ]
-  /bin/mkdir -p tree/nested tree/empty
-  /bin/cat input > tree/nested/value
-  /bin/cat input > file
-  /bin/chmod 0644 tree/nested/value file
+  out=${2%/*}
+  [ "$(/bin/cat "$out/seed")" = seed ]
+  [ -d "$out/tree" ] && [ -d "$out/emptytree" ]
+  /bin/mkdir -p "$out/tree/nested" "$out/tree/empty"
+  /bin/cat input > "$out/tree/nested/value"
+  /bin/cat input > "$out/file"
+  /bin/chmod 0644 "$out/tree/nested/value" "$out/file"
 else
-  read step < "${1#@}"
+  exec 3< "${1#@}"
+  read step <&3
+  read file <&3
+  out=${file%/*}
   [ "$step" = consume ]
-  [ -x file ] && [ -x tree/nested/value ]
-  [ -d emptytree ] && [ -d result_tree ] && [ ! -e tree/empty ]
-  /bin/cat file tree/nested/value input > done
+  [ -x "$out/file" ] && [ -x "$out/tree/nested/value" ]
+  [ -d "$out/emptytree" ] && [ -d "$out/result_tree" ] && [ ! -e "$out/tree/empty" ]
+  /bin/cat "$out/file" "$out/tree/nested/value" input > "$out/done"
 fi
 "#;
 
@@ -173,6 +178,13 @@ impl Workspace {
         ] {
             assert!(
                 !self.root.join(output).exists(),
+                "source workspace must not contain raw output {output}"
+            );
+            assert!(
+                !self
+                    .root
+                    .join(crate::test_roots::owner_path(&self.owner, output))
+                    .exists(),
                 "unexpected local {output}"
             );
         }
@@ -261,7 +273,11 @@ fn empty_tree_namespace_rejects_descendants_and_outputs_but_allows_siblings() {
         let mut inputs = vec![Binding::Generated {
             producer: 0,
             path: "tree".to_owned(),
-            output: ActionOutput::new("tree", ActionOutputKind::Directory),
+            output: ActionOutput::new(
+                crate::test_roots::root(),
+                "tree",
+                ActionOutputKind::Directory,
+            ),
         }];
         inputs.extend(sources.iter().map(|path| Binding::Source {
             path: (*path).to_owned(),
@@ -287,20 +303,37 @@ fn check_projection(session: &ActionChainReapiSession, index: usize) {
     if index == 0 {
         return;
     }
+    let root = session.inputs.plan().unwrap().actions()[index]
+        .action()
+        .outputs()[0]
+        .root()
+        .clone();
+    let path = |relative: &str| format!("{}/{relative}", root.path());
     let bound = session.templates[index].bind(&session.results).unwrap();
     for blob in bound.tree.directory_blobs() {
         let directory = crate::proto::Directory::decode(blob.data()).unwrap();
         assert!(directory.files.iter().all(|file| file.is_executable));
     }
     if index == 1 {
-        assert_eq!(bound.tree.directories(), ["emptytree", "tree"]);
+        assert_eq!(bound.tree.directories(), ["emptytree", "tree"].map(path));
     } else {
         assert_eq!(
             bound.tree.directories(),
-            ["emptytree", "result_tree", "tree"]
+            ["emptytree", "result_tree", "tree"].map(path)
         );
-        let root = decoded_directory(&bound.tree, bound.tree.root_digest());
-        let node = root
+        let mut parent = decoded_directory(&bound.tree, bound.tree.root_digest());
+        for component in root.path().split('/') {
+            let child = parent
+                .directories
+                .iter()
+                .find(|child| child.name == component)
+                .unwrap();
+            parent = decoded_directory(
+                &bound.tree,
+                &crate::executor::digest_from_proto(child.digest.as_ref().unwrap()).unwrap(),
+            );
+        }
+        let node = parent
             .directories
             .iter()
             .find(|node| node.name == "tree")
@@ -315,7 +348,10 @@ fn check_projection(session: &ActionChainReapiSession, index: usize) {
             ["nested"]
         );
         assert_eq!(bound.tree.inline_blobs().len(), 1);
-        assert_eq!(bound.tree.inline_blobs()[0].data(), b"consume\n");
+        assert_eq!(
+            bound.tree.inline_blobs()[0].data(),
+            format!("consume\n{}\n", path("file")).as_bytes()
+        );
         let source = bound
             .sources
             .keys()
@@ -482,13 +518,19 @@ fn nativelink_chain_generated_file_tree_cache_change_restore() {
                     assert!(result.evidence.uploaded_digests.is_empty());
                 }
             }
-            assert_eq!(results[0].result.output_files()[0].path(), "seed");
+            assert_eq!(
+                results[0].result.output_files()[0].path(),
+                crate::test_roots::owner_path(&workspace.owner, "seed")
+            );
             assert_eq!(
                 results[0].result.output_files()[0].digest(),
                 &ReapiDigest::of_bytes(b"seed")
             );
             let producer = &results[1].result;
-            assert_eq!(producer.output_files()[0].path(), "file");
+            assert_eq!(
+                producer.output_files()[0].path(),
+                crate::test_roots::owner_path(&workspace.owner, "file")
+            );
             assert_eq!(
                 producer.output_files()[0].digest(),
                 &ReapiDigest::of_bytes(bytes)
@@ -498,7 +540,7 @@ fn nativelink_chain_generated_file_tree_cache_change_restore() {
             let tree = producer
                 .output_directories()
                 .iter()
-                .find(|tree| tree.path() == "tree")
+                .find(|tree| tree.path() == crate::test_roots::owner_path(&workspace.owner, "tree"))
                 .unwrap();
             assert_eq!(tree.directories(), ["", "empty", "nested"]);
             assert_eq!(tree.files().len(), 1);
@@ -508,19 +550,24 @@ fn nativelink_chain_generated_file_tree_cache_change_restore() {
             let empty = producer
                 .output_directories()
                 .iter()
-                .find(|tree| tree.path() == "emptytree")
+                .find(|tree| {
+                    tree.path() == crate::test_roots::owner_path(&workspace.owner, "emptytree")
+                })
                 .unwrap();
             assert_eq!(empty.directories(), [""]);
             assert!(empty.files().is_empty());
             let selected = accepted.output().selected().unwrap().remote().unwrap();
-            assert_eq!(selected.result.output_files()[0].path(), "done");
+            assert_eq!(
+                selected.result.output_files()[0].path(),
+                crate::test_roots::owner_path(&workspace.owner, "done")
+            );
             assert_eq!(
                 selected.result.output_files()[0].digest(),
                 &ReapiDigest::of_bytes(&bytes.repeat(3))
             );
             assert_eq!(
                 selected.result.output_directories()[0].path(),
-                "result_tree"
+                crate::test_roots::owner_path(&workspace.owner, "result_tree")
             );
             assert_eq!(selected.result.output_directories()[0].directories(), [""]);
             assert!(selected.result.output_directories()[0].files().is_empty());

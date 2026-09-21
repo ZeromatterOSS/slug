@@ -1133,6 +1133,11 @@ impl SlugConfiguration {
         self.core_bool("collect_code_coverage")
     }
 
+    /// The admitted artifact layout merges genfiles into the bin root.
+    pub fn merge_genfiles_directory(&self) -> Result<bool, SlugConfigurationError> {
+        self.native_bool(CORE_OPTIONS, "incompatible_merge_genfiles_directory")
+    }
+
     /// The tracked Host observation is used only when the selected platform
     /// supplies no OS constraint. Do not infer it from target CPU/path flavor.
     pub fn execution_host_os(&self) -> Result<ActionEnvironmentHostOs, SlugConfigurationError> {
@@ -2000,6 +2005,30 @@ mod tests {
                 .unwrap();
         assert_eq!(configuration.option_count(), 341);
         assert_eq!(configuration.kind(), SlugConfigurationKind::Target);
+    }
+
+    #[test]
+    fn merge_genfiles_projection_reads_structural_boolean() {
+        let base = SlugConfiguration::default_target(&host(AutoCpuToken::K8, HostPathFlavor::Unix))
+            .unwrap();
+        assert!(base.merge_genfiles_directory().unwrap());
+        let mut options = base.0.options.to_vec();
+        options
+            .iter_mut()
+            .find(|option| {
+                option.class_name == CORE_OPTIONS
+                    && option.canonical_name == "incompatible_merge_genfiles_directory"
+            })
+            .unwrap()
+            .value = OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Bool(false)));
+        let split = finish_configuration(
+            base.0.kind,
+            options.into(),
+            base.0.starlark_options.dupe(),
+            base.0.action_environment_host.dupe(),
+        );
+        assert!(!split.merge_genfiles_directory().unwrap());
+        assert_ne!(base, split);
     }
 
     #[test]

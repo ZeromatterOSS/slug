@@ -50,7 +50,11 @@ fn native_binary_preflight_observes_hidden_sources_and_couples_manifest_publicat
     for change_output in [true, false] {
         let mut support = original.support().clone();
         let output = if change_output {
-            slug_build_api_v2::ActionOutput::new("forged.runfiles", ActionOutputKind::RunfilesTree)
+            slug_build_api_v2::ActionOutput::new(
+                original.output().root().clone(),
+                "forged.runfiles",
+                ActionOutputKind::RunfilesTree,
+            )
         } else {
             Arc::make_mut(&mut support).runfiles.repository_prefix = "different_workspace".into();
             original.output().clone()
@@ -96,7 +100,7 @@ fn native_binary_preflight_observes_hidden_sources_and_couples_manifest_publicat
     let outputs = stages
         .iter()
         .flat_map(|stage| stage.staging().outputs())
-        .map(|out| out.path())
+        .map(|out| out.root_relative_path())
         .collect::<Vec<_>>();
     assert!(outputs.contains(&"hidden"));
     assert!(outputs.contains(&"binary.bin.runfiles_manifest"));
@@ -119,15 +123,20 @@ fn native_binary_preflight_observes_hidden_sources_and_couples_manifest_publicat
     {
         let root = crate::runtime::configured_output_root(
             workspace.root.path(),
-            node.configured_target_key()
-                .unwrap()
-                .configuration()
-                .slug_configuration()
-                .unwrap(),
+            &slug_build_api_v2::DerivedArtifactRoot::bin(
+                (node
+                    .configured_target_key()
+                    .unwrap()
+                    .configuration()
+                    .slug_configuration()
+                    .unwrap())
+                .clone(),
+            )
+            .unwrap(),
         );
         for action in node.actions() {
             for out in action.outputs() {
-                assert!(fs::symlink_metadata(root.join(out.path())).is_err());
+                assert!(fs::symlink_metadata(root.join(out.root_relative_path())).is_err());
             }
         }
     }
@@ -219,8 +228,6 @@ fn native_runfiles_warnings_are_selected_once_and_restore_after_removal() {
         source,
         "ctx.runfiles(files = [under] + ctx.attr.source[DefaultInfo].files.to_list())",
     );
-    let expected =
-        "WARNING: runfiles symlink under/input -> under/input obscured by under -> under\n";
     for (index, warning) in [true, true, false, true].into_iter().enumerate() {
         if index != 1 {
             fs::write(
@@ -230,12 +237,36 @@ fn native_runfiles_warnings_are_selected_once_and_restore_after_removal() {
             .unwrap();
         }
         let accepted = prepare(&workspace, "//:binary").unwrap();
+        let expected = if warning {
+            let inputs = accepted.terminal_for_test();
+            let output = inputs
+                .plan()
+                .unwrap()
+                .actions()
+                .iter()
+                .flat_map(|step| step.action().outputs())
+                .find(|output| output.root_relative_path() == "under")
+                .unwrap();
+            format!(
+                "WARNING: runfiles symlink under/input -> under/input obscured by under -> {}\n",
+                output.path()
+            )
+        } else {
+            String::new()
+        };
         let (_, status, stdout, stderr) = accepted
             .project(|_| crate::runtime::TerminalOutput::new(0, String::new(), String::new()))
             .publish()
             .into_parts();
         assert_eq!(status, 0);
         assert!(stdout.is_empty());
-        assert_eq!(stderr, if warning && index != 1 { expected } else { "" });
+        assert_eq!(
+            stderr,
+            if warning && index != 1 {
+                expected.as_str()
+            } else {
+                ""
+            }
+        );
     }
 }

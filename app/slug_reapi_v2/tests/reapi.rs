@@ -1,3 +1,99 @@
+mod root_support;
+
+#[test]
+fn configured_output_materialization_checks_complete_schema_before_writes() {
+    use slug_build_api_v2::DerivedArtifactRoot;
+    use slug_configuration_v2::StarlarkOption;
+    use slug_configuration_v2::StarlarkOptionScope;
+    use slug_reapi_v2::ActionResult;
+    use slug_reapi_v2::materialize_configured_outputs;
+    let workspace = std::env::temp_dir().join(format!(
+        "slug-rooted-materialize-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&workspace).unwrap();
+    let root = root_support::root();
+    let first = ActionOutput::new(root.clone(), "pkg/first", ActionOutputKind::File);
+    let second = ActionOutput::new(root.clone(), "pkg/second", ActionOutputKind::File);
+    let foreign = DerivedArtifactRoot::bin(root.configuration().with_starlark_option(
+        StarlarkOption::string(
+            CanonicalLabel::parse("@@//:unused").unwrap(),
+            "changed",
+            StarlarkOptionScope::Universal,
+        ),
+    ))
+    .unwrap();
+    let foreign_output = ActionOutput::new(foreign, "pkg/second", ActionOutputKind::File);
+    let declarations = [first.clone(), second.clone()];
+    let result = |paths: &[&str]| RemoteExecutionResult {
+        action_digest: ReapiDigest::of_bytes(b"test action"),
+        platform_properties: Default::default(),
+        result: ActionResult::new(
+            paths
+                .iter()
+                .map(|path| GeneratedOutput::new(*path, ReapiDigest::of_bytes(b"bytes"), false))
+                .collect(),
+        ),
+        output_blobs: paths
+            .iter()
+            .map(|path| ((*path).to_owned(), b"bytes".to_vec()))
+            .collect(),
+        evidence: ExecutionEvidence::reapi("authored schema fixture"),
+    };
+    for paths in [
+        vec![first.path()],
+        vec![first.path(), second.path(), "extra"],
+        vec![first.path(), first.path()],
+        vec![first.path(), foreign_output.path()],
+    ] {
+        assert!(
+            materialize_configured_outputs(&workspace, &declarations, &result(&paths)).is_err()
+        );
+        assert!(
+            !workspace.join("bazel-out").exists(),
+            "schema rejection must precede every write"
+        );
+    }
+    let valid = result(&[first.path(), second.path()]);
+    for invalid in [
+        vec![first.clone(), foreign_output],
+        vec![first.clone(), first.clone()],
+        vec![ActionOutput::new(
+            root.clone(),
+            "pkg/first",
+            ActionOutputKind::Directory,
+        )],
+    ] {
+        assert!(materialize_configured_outputs(&workspace, &invalid, &valid).is_err());
+        assert!(!workspace.join("bazel-out").exists());
+    }
+    let malformed = ActionOutput::new(root.clone(), "pkg/../escape", ActionOutputKind::File);
+    let malformed_result = result(&[first.path(), malformed.path()]);
+    assert!(
+        materialize_configured_outputs(&workspace, &[first.clone(), malformed], &malformed_result)
+            .is_err()
+    );
+    assert!(
+        !workspace.join("bazel-out").exists(),
+        "valid first output must not be written before a malformed later coordinate is rejected"
+    );
+    materialize_configured_outputs(&workspace, &declarations, &valid).unwrap();
+    for output in declarations {
+        assert_eq!(
+            std::fs::read(workspace.join(output.path())).unwrap(),
+            b"bytes"
+        );
+        assert!(
+            !workspace.join(root.path()).join(output.path()).exists(),
+            "output root must appear exactly once"
+        );
+    }
+    std::fs::remove_dir_all(workspace).unwrap();
+}
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -68,7 +164,11 @@ fn typed_spawn_action() -> ActionSpec {
         RetainedCommandLine::new(Vec::new()),
         ArtifactInputs::new(Vec::new()),
         ArtifactInputs::new(Vec::new()),
-        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+        vec![ActionOutput::new(
+            root_support::root(),
+            "pkg/out.txt",
+            ActionOutputKind::File,
+        )],
         None,
         RetainedActionEnvironment::default(),
         CanonicalStringMap::default(),
@@ -79,7 +179,11 @@ fn typed_spawn_action() -> ActionSpec {
 
 fn typed_args_write_action() -> ActionSpec {
     ActionSpec::args_write(ArgsWriteSpec::new(
-        ActionOutput::new("pkg/args.params", ActionOutputKind::File),
+        ActionOutput::new(
+            root_support::root(),
+            "pkg/args.params",
+            ActionOutputKind::File,
+        ),
         RetainedArgsRecipe::new(Vec::new(), RetainedParamFileFormat::Shell),
         false,
     ))
@@ -127,7 +231,11 @@ fn action_ir_projects_to_reapi_command_and_identity() {
     let action = ActionSpec::new(
         ActionKind::Run,
         "Spawn",
-        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+        vec![ActionOutput::new(
+            root_support::root(),
+            "pkg/out.txt",
+            ActionOutputKind::File,
+        )],
     )
     .with_argv(vec![
         "/bin/sh".to_owned(),
@@ -140,7 +248,10 @@ fn action_ir_projects_to_reapi_command_and_identity() {
     let command = ReapiCommand::from_action(&action).unwrap();
     assert_eq!(command.argv[0], "/bin/sh");
     assert_eq!(command.env, env);
-    assert_eq!(command.output_files, vec!["pkg/out.txt".to_owned()]);
+    assert_eq!(
+        command.output_files,
+        vec![root_support::path("pkg/out.txt")]
+    );
     assert_eq!(command.platform_properties, props);
 
     let identity =
@@ -177,7 +288,11 @@ fn declarative_write_action_rejects_the_raw_executor_projection() {
             is_executable: false,
         },
         "FileWrite",
-        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+        vec![ActionOutput::new(
+            root_support::root(),
+            "pkg/out.txt",
+            ActionOutputKind::File,
+        )],
     );
 
     assert_eq!(
@@ -297,7 +412,11 @@ fn configured_file_write_reapi_plan_reads_retained_platform_properties() {
                         is_executable: false,
                     },
                     "FileWrite",
-                    vec![ActionOutput::new("out.txt", ActionOutputKind::File)],
+                    vec![ActionOutput::new(
+                        root_support::root(),
+                        "out.txt",
+                        ActionOutputKind::File,
+                    )],
                 )],
                 vec![context.clone()],
             )
@@ -390,7 +509,11 @@ fn selected_toolchain_request_reapi_payload_is_not_owner_identity() {
                     is_executable: false,
                 },
                 "FileWrite",
-                vec![ActionOutput::new("same.txt", ActionOutputKind::File)],
+                vec![ActionOutput::new(
+                    root_support::root(),
+                    "same.txt",
+                    ActionOutputKind::File,
+                )],
             )],
             vec![context],
         )
@@ -458,7 +581,11 @@ async fn raw_file_write_execution_rejects_before_transport() {
             is_executable: false,
         },
         "FileWrite",
-        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+        vec![ActionOutput::new(
+            root_support::root(),
+            "pkg/out.txt",
+            ActionOutputKind::File,
+        )],
     );
 
     assert!(
@@ -498,7 +625,11 @@ fn paramfiles_are_part_of_reapi_input_tree() {
     let action = ActionSpec::new(
         ActionKind::Run,
         "Spawn",
-        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+        vec![ActionOutput::new(
+            root_support::root(),
+            "pkg/out.txt",
+            ActionOutputKind::File,
+        )],
     )
     .with_inputs(vec![ActionInput::new(
         "pkg/input.txt",
@@ -556,7 +687,11 @@ fn missing_input_digest_is_rejected_before_upload_planning() {
     let action = ActionSpec::new(
         ActionKind::Run,
         "Spawn",
-        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+        vec![ActionOutput::new(
+            root_support::root(),
+            "pkg/out.txt",
+            ActionOutputKind::File,
+        )],
     )
     .with_inputs(vec![ActionInput::new("pkg/input.txt", None)]);
 
@@ -574,7 +709,11 @@ fn cas_upload_plan_is_digest_first_and_deduped() {
     let action = ActionSpec::new(
         ActionKind::Run,
         "Spawn",
-        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+        vec![ActionOutput::new(
+            root_support::root(),
+            "pkg/out.txt",
+            ActionOutputKind::File,
+        )],
     )
     .with_inputs(vec![
         ActionInput::new("pkg/a.txt", Some(digest.to_string())),
@@ -720,7 +859,13 @@ fn forced_param_files_merge_exact_bytes_and_merkle_topology() {
     let base = ReapiInputTree::from_action(&action).unwrap();
     let original = base.clone();
     let command = forced_command("héllo world");
-    assert_eq!(command.argv(), ["tools/runner", "@pkg/out.txt-0.params"]);
+    assert_eq!(
+        command.argv(),
+        [
+            "tools/runner".to_owned(),
+            format!("@{}", root_support::path("pkg/out.txt-0.params"))
+        ]
+    );
     let merged = base.with_spawn_param_files(&command).unwrap();
     assert_eq!(base, original);
     assert_eq!(merged, base.with_spawn_param_files(&command).unwrap());
@@ -735,7 +880,7 @@ fn forced_param_files_merge_exact_bytes_and_merkle_topology() {
     let entry = merged
         .entries()
         .iter()
-        .find(|entry| entry.path() == "pkg/out.txt-0.params")
+        .find(|entry| entry.path() == root_support::path("pkg/out.txt-0.params"))
         .unwrap();
     assert_eq!(entry.digest(), blob.digest());
     assert_eq!(entry.kind(), InputTreeEntryKind::ParamFile);
@@ -757,9 +902,32 @@ fn forced_param_files_merge_exact_bytes_and_merkle_topology() {
             .iter()
             .map(|node| node.name.as_str())
             .collect::<Vec<_>>(),
-        ["pkg", "src"]
+        ["bazel-out", "src"]
     );
-    let pkg_digest = root.directories[0].digest.as_ref().unwrap();
+    let mut parent = root;
+    for component in [
+        "bazel-out",
+        root_support::root().configuration_component(),
+        "bin",
+    ] {
+        let node = parent
+            .directories
+            .iter()
+            .find(|node| node.name == component)
+            .unwrap();
+        let digest = node.digest.as_ref().unwrap();
+        parent =
+            decode(&ReapiDigest::parse(&format!("{}/{}", digest.hash, digest.size_bytes)).unwrap());
+    }
+    assert_eq!(
+        parent
+            .directories
+            .iter()
+            .map(|node| node.name.as_str())
+            .collect::<Vec<_>>(),
+        ["pkg"]
+    );
+    let pkg_digest = parent.directories[0].digest.as_ref().unwrap();
     let pkg = decode(
         &ReapiDigest::parse(&format!("{}/{}", pkg_digest.hash, pkg_digest.size_bytes)).unwrap(),
     );
@@ -775,7 +943,7 @@ fn forced_param_files_merge_exact_bytes_and_merkle_topology() {
         blob.data().len() as i64
     );
     assert!(pkg.directories.is_empty());
-    assert_eq!(merged.directory_blobs().len(), 3);
+    assert_eq!(merged.directory_blobs().len(), 6);
     assert_ne!(merged.root_digest(), base.root_digest());
     assert_ne!(
         merged.root_digest(),
@@ -799,7 +967,7 @@ fn forced_param_files_reject_input_collisions_atomically() {
     ] {
         let action =
             ActionSpec::new(ActionKind::Run, "Spawn", vec![]).with_inputs(vec![ActionInput::new(
-                path,
+                root_support::path(path),
                 Some(ReapiDigest::of_bytes(bytes).to_string()),
             )]);
         let base = ReapiInputTree::from_action(&action).unwrap();

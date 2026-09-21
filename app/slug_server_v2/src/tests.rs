@@ -761,32 +761,36 @@ fn reapi_materialization_uses_distinct_and_restored_structural_configuration_roo
         "transitioned",
         StarlarkOptionScope::Default,
     ));
+    let c0 = slug_build_api_v2::DerivedArtifactRoot::bin(c0).unwrap();
+    let c1 = slug_build_api_v2::DerivedArtifactRoot::bin(c1).unwrap();
     let c0_root = slug_core_v2::runtime::configured_output_root(&workspace, &c0);
     let c1_root = slug_core_v2::runtime::configured_output_root(&workspace, &c1);
     assert_ne!(c0_root, c1_root);
 
-    let output = slug_reapi_v2::GeneratedOutput::new(
-        "pkg/out.txt",
-        slug_reapi_v2::ReapiDigest::of_bytes(b"materialized"),
-        false,
-    );
-    let execution = slug_reapi_v2::RemoteExecutionResult {
-        action_digest: slug_reapi_v2::ReapiDigest::of_bytes(b"action"),
-        result: slug_reapi_v2::ActionResult::new(vec![output]),
-        output_blobs: [("pkg/out.txt".to_owned(), b"materialized".to_vec())]
-            .into_iter()
-            .collect(),
-        platform_properties: BTreeMap::new(),
-        evidence: slug_reapi_v2::ExecutionEvidence::reapi("test"),
-    };
+    for root in [&c0, &c1, &c0] {
+        let declaration = slug_build_api_v2::ActionOutput::new(
+            root.clone(),
+            "pkg/out.txt",
+            slug_build_api_v2::ActionOutputKind::File,
+        );
+        let output = slug_reapi_v2::GeneratedOutput::new(
+            declaration.path(),
+            slug_reapi_v2::ReapiDigest::of_bytes(b"materialized"),
+            false,
+        );
+        let execution = slug_reapi_v2::RemoteExecutionResult {
+            action_digest: slug_reapi_v2::ReapiDigest::of_bytes(b"action"),
+            result: slug_reapi_v2::ActionResult::new(vec![output]),
+            output_blobs: [(declaration.path().to_owned(), b"materialized".to_vec())]
+                .into_iter()
+                .collect(),
+            platform_properties: BTreeMap::new(),
+            evidence: slug_reapi_v2::ExecutionEvidence::reapi("test"),
+        };
 
-    slug_reapi_v2::materialize_outputs(&c0_root, &execution).unwrap();
-    slug_reapi_v2::materialize_outputs(&c1_root, &execution).unwrap();
-    slug_reapi_v2::materialize_outputs(
-        &slug_core_v2::runtime::configured_output_root(&workspace, &c0),
-        &execution,
-    )
-    .unwrap();
+        slug_reapi_v2::materialize_configured_outputs(&workspace, &[declaration], &execution)
+            .unwrap();
+    }
     assert_eq!(
         fs::read(c0_root.join("pkg/out.txt")).unwrap(),
         b"materialized"

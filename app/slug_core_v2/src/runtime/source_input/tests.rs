@@ -224,7 +224,11 @@ fn source_input_constructor_rejects_derived_files_and_trees() {
     ] {
         let artifact = AnalysisArtifact::Derived {
             owner: slug_build_api_v2::AnalysisConfiguredTargetKey::new(label(), b"cfg".as_slice()),
-            output: slug_build_api_v2::ActionOutput::new("input", kind),
+            output: slug_build_api_v2::ActionOutput::new(
+                crate::runtime::configured_output::test_root(),
+                "input",
+                kind,
+            ),
         };
         assert_eq!(
             SourceArtifactInputObservationKey::new(path("/workspace"), &artifact),

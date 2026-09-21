@@ -163,9 +163,20 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
     let command = proto::Command::decode(plan.command().serialized().as_slice()).unwrap();
     assert_eq!(
         command.arguments,
-        ["tool", "before", "@shared.out-0.params", "after"]
+        [
+            "tool",
+            "before",
+            &format!(
+                "@{}",
+                crate::test_roots::owner_path(&workspace.owner, "shared.out-0.params")
+            ),
+            "after"
+        ]
     );
-    assert_eq!(command.output_files, ["a.out", "shared.out"]);
+    assert_eq!(
+        command.output_files,
+        ["a.out", "shared.out"].map(|path| crate::test_roots::owner_path(&workspace.owner, path))
+    );
     assert_eq!(command.output_paths, command.output_files);
     assert!(command.output_directories.is_empty());
     assert!(command.working_directory.is_empty());
@@ -217,7 +228,9 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
             .input_tree()
             .entries()
             .iter()
-            .any(|entry| entry.path() == "shared.out-0.params" && entry.digest() == param.digest())
+            .any(|entry| entry.path()
+                == crate::test_roots::owner_path(&workspace.owner, "shared.out-0.params")
+                && entry.digest() == param.digest())
     );
 
     let original = plan.identity().clone();
@@ -352,23 +365,38 @@ fn native_spawn_plan_rejects_unmodeled_policy_and_output_collisions() {
             "execution requirements",
         ),
         (
-            workspace.defs.replace("'a.out'", "'input'"),
-            "conflicts with input input",
-        ),
-        (
-            workspace.defs.replace("'a.out'", "'input/child'"),
-            "conflicts with input input",
-        ),
-        (
             workspace.defs.replace("'a.out'", "'shared.out-0.params'"),
-            "virtual parameter file shared.out-0.params conflicts with output",
+            &format!(
+                "virtual parameter file {} conflicts with output",
+                crate::test_roots::owner_path(&workspace.owner, "shared.out-0.params")
+            ),
         ),
     ] {
         workspace.write("defs.bzl", changed);
         let error = workspace.plan().unwrap_err();
         assert!(error.contains(expected), "{error}");
     }
-    // The reverse prefix case requires an input beneath the declared output.
+    // Equal package-relative names no longer overlap across source/bin roots.
+    for name in ["input", "input/child"] {
+        workspace.write(
+            "defs.bzl",
+            workspace.defs.replace("'a.out'", &format!("'{name}'")),
+        );
+        let plan = workspace.plan().unwrap();
+        assert!(
+            plan.command()
+                .output_files
+                .contains(&crate::test_roots::owner_path(&workspace.owner, name))
+        );
+        assert!(
+            plan.inputs()
+                .input_tree()
+                .entries()
+                .iter()
+                .any(|entry| entry.path() == "input")
+        );
+    }
+    // The reverse prefix is disjoint too; source content remains untouched.
     std::fs::create_dir_all(workspace.root.join("folder")).unwrap();
     workspace.write("folder/input", "source under output");
     workspace.write(
@@ -376,10 +404,22 @@ fn native_spawn_plan_rejects_unmodeled_policy_and_output_collisions() {
         workspace.build.replace("'input'", "'folder/input'"),
     );
     workspace.write("defs.bzl", workspace.defs.replace("'a.out'", "'folder'"));
-    let error = workspace.plan().unwrap_err();
+    let plan = workspace.plan().unwrap();
     assert!(
-        error.contains("conflicts with input folder/input"),
-        "{error}"
+        plan.command()
+            .output_files
+            .contains(&crate::test_roots::owner_path(&workspace.owner, "folder"))
+    );
+    assert!(
+        plan.inputs()
+            .input_tree()
+            .entries()
+            .iter()
+            .any(|entry| entry.path() == "folder/input")
+    );
+    assert_eq!(
+        std::fs::read(workspace.root.join("folder/input")).unwrap(),
+        b"source under output"
     );
     workspace.write("BUILD.bazel", &workspace.build);
     workspace.write("defs.bzl", &workspace.defs);
@@ -390,7 +430,7 @@ fn native_spawn_plan_rejects_unmodeled_policy_and_output_collisions() {
 fn output_projection_rejects_unsupported_kinds_and_malformed_paths() {
     for kind in [ActionOutputKind::Symlink, ActionOutputKind::RunfilesTree] {
         assert!(
-            output_paths(&[ActionOutput::new("out", kind)])
+            output_paths(&[ActionOutput::new(crate::test_roots::root(), "out", kind)])
                 .unwrap_err()
                 .contains("regular files or directories")
         );
@@ -398,7 +438,12 @@ fn output_projection_rejects_unsupported_kinds_and_malformed_paths() {
     assert!(output_paths(&[]).unwrap_err().contains("declared outputs"));
     for path in ["", "/out", "../out", "dir/./out", "dir//out", "dir\\out"] {
         assert!(
-            output_paths(&[ActionOutput::new(path, ActionOutputKind::File)]).is_err(),
+            output_paths(&[ActionOutput::new(
+                crate::test_roots::root(),
+                path,
+                ActionOutputKind::File
+            )])
+            .is_err(),
             "{path}"
         );
     }

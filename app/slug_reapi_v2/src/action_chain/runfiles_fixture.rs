@@ -27,7 +27,7 @@ repo = repository_rule(implementation = _impl, attrs = {"content": attr.string()
     fs::create_dir_all(root.join("tools")).unwrap();
     fs::write(
         root.join("tools/tool"),
-        "#!/bin/sh\nset -eu\n/bin/cat input > hidden.txt\n/bin/cat input > unused_cooutput\n",
+        "#!/bin/sh\nset -eu\n/bin/cat input > \"$1\"\n/bin/cat input > \"$2\"\n",
     )
     .unwrap();
     content(root, &module, "aaa");
@@ -47,7 +47,7 @@ const DEFS: &str = r##"def _impl(ctx):
     unused = ctx.actions.declare_file("unused_cooutput")
     never = ctx.actions.declare_file("unused_action")
     ctx.actions.write(executable, '#!/bin/sh\nset -eu\n/bin/cat "$0.runfiles/_main/hidden.txt" "$0.runfiles/+repo+generated/data" "$0.runfiles/+repo+generated/executable_data"\n', is_executable = True)
-    ctx.actions.run(executable = ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs = ctx.attr.input[DefaultInfo].files, outputs = [hidden, unused])
+    ctx.actions.run(executable = ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs = ctx.attr.input[DefaultInfo].files, outputs = [hidden, unused], arguments = [hidden.path, unused.path])
     ctx.actions.write(never, "must not execute")
     files = [hidden]
     for target in ctx.attr.data:

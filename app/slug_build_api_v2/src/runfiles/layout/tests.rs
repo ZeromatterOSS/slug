@@ -11,6 +11,7 @@ use crate::Depset;
 use crate::DepsetOrder;
 use crate::RetainedRunfiles;
 use crate::RunfilesSymlink;
+use crate::artifact_root::test_support as root_support;
 
 fn source(label: &str) -> AnalysisArtifact {
     AnalysisArtifact::Source(CanonicalLabel::parse(label).unwrap())
@@ -27,7 +28,14 @@ fn derived(
             CanonicalLabel::parse(label).unwrap(),
             configuration,
         ),
-        output: ActionOutput::new(path, kind),
+        output: ActionOutput::new(
+            root_support::root_for(configuration),
+            crate::repository_relative_output_path(
+                CanonicalLabel::parse(label).unwrap().package().repo(),
+                path,
+            ),
+            kind,
+        ),
     }
 }
 

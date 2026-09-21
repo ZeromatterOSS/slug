@@ -9,7 +9,11 @@ use crate::runtime::action_output_staging::tests::root;
 use crate::runtime::action_output_staging::tests::scratch;
 
 fn output() -> ActionOutput {
-    ActionOutput::new("pkg/tool.runfiles", ActionOutputKind::RunfilesTree)
+    ActionOutput::new(
+        crate::runtime::configured_output::test_root(),
+        "pkg/tool.runfiles",
+        ActionOutputKind::RunfilesTree,
+    )
 }
 fn reserved() -> SmallSet<&'static str> {
     ["pkg", "tool.runfiles"].into_iter().collect()
@@ -36,7 +40,7 @@ fn typed_runfiles_tree_replaces_links_and_preserves_targets_modes_and_workspace(
     ];
     let mut stage = Staging::new_runfiles(
         workspace.path(),
-        &config,
+        &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
         &output,
         "main",
         &entries,
@@ -56,7 +60,7 @@ fn typed_runfiles_tree_replaces_links_and_preserves_targets_modes_and_workspace(
     stage.seal(std::slice::from_ref(&output)).unwrap();
     stage.publish(std::slice::from_ref(&output)).unwrap();
     drop(stage);
-    let tree = root(&workspace, &config).join(output.path());
+    let tree = root(&workspace, &config).join(output.root_relative_path());
     assert_eq!(fs::read_link(tree.join("external/data")).unwrap(), target);
     assert_eq!(fs::read_link(tree.join("MANIFEST")).unwrap(), manifest);
     for directory in [&tree, &tree.join("main"), &tree.join("external")] {
@@ -78,7 +82,7 @@ fn typed_runfiles_tree_replaces_links_and_preserves_targets_modes_and_workspace(
     );
     let mut replacement = Staging::new_runfiles(
         workspace.path(),
-        &config,
+        &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
         &output,
         "main",
         &[link("main/new", &target), link("MANIFEST", &manifest)],
@@ -124,7 +128,7 @@ fn runfiles_topology_rejects_leaf_prefix_manifest_and_workspace_conflicts_before
     assert!(
         Staging::new_runfiles(
             workspace.path(),
-            &config,
+            &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
             &output(),
             "main",
             &[
@@ -148,7 +152,7 @@ fn runfiles_seal_checks_exact_contents_and_preflight_rejects_changed_destination
     for mutation in 0..3 {
         let mut stage = Staging::new_runfiles(
             workspace.path(),
-            &config,
+            &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
             &output,
             "main",
             &[link("main/link", &outside), ("main/empty".into(), None)],
@@ -169,7 +173,7 @@ fn runfiles_seal_checks_exact_contents_and_preflight_rejects_changed_destination
     }
     let mut stage = Staging::new_runfiles(
         workspace.path(),
-        &config,
+        &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
         &output,
         "main",
         &[link("main/link", &outside)],
@@ -177,7 +181,7 @@ fn runfiles_seal_checks_exact_contents_and_preflight_rejects_changed_destination
     )
     .unwrap();
     stage.seal(std::slice::from_ref(&output)).unwrap();
-    let destination = root(&workspace, &config).join(output.path());
+    let destination = root(&workspace, &config).join(output.root_relative_path());
     symlink(&outside, &destination).unwrap();
     assert!(
         stage

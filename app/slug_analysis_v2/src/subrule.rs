@@ -473,7 +473,11 @@ mod tests {
                 CanonicalLabel::parse("@@//pkg:producer").unwrap(),
                 Arc::<[u8]>::from([]),
             ),
-            output: ActionOutput::new("pkg/tree", ActionOutputKind::Directory),
+            output: ActionOutput::new(
+                crate::analysis_value::test_artifact_root(),
+                "pkg/tree",
+                ActionOutputKind::Directory,
+            ),
         };
         let mut suffix_checks = 0;
         assert!(

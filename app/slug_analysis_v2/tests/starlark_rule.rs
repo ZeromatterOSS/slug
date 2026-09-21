@@ -814,7 +814,10 @@ fn default_test_configuration() -> SlugConfiguration {
             Arc::from([]),
             Arc::from([]),
         )
-        .unwrap(),
+        .unwrap()
+        .with_action_environment_host(ActionEnvironmentHost::without_environment(
+            ActionEnvironmentHostOs::Linux,
+        )),
     )
     .unwrap()
 }
@@ -828,6 +831,14 @@ fn test_configuration() -> ConfigurationKey {
 
 fn typed_action_test_configuration() -> ConfigurationKey {
     typed_action_test_configuration_for(HostPathFlavor::Unix, ActionEnvironmentHostOs::Linux)
+}
+
+fn expected_output_path(configuration: &ConfigurationKey, relative: &str) -> String {
+    let root = slug_build_api_v2::DerivedArtifactRoot::bin(
+        configuration.slug_configuration().unwrap().clone(),
+    )
+    .unwrap();
+    format!("{}/{relative}", root.path())
 }
 
 fn typed_action_test_configuration_for(
@@ -1229,6 +1240,7 @@ fn inject_root_target_inputs_with_policy(
             Arc::new(directory_snapshot(workspace)),
         )])
         .unwrap();
+    updater.changed_to(path_observation_shards(&epoch)).unwrap();
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
@@ -1568,7 +1580,13 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
         .unwrap();
     assert_eq!(provider_value(&first, &consumer), "second");
     assert_eq!(first.actions().len(), 1);
-    assert_eq!(first.declared_outputs(), &["request.out"]);
+    assert_eq!(
+        first.declared_outputs(),
+        &[expected_output_path(
+            first.configured_target_key().unwrap().configuration(),
+            "request.out"
+        )]
+    );
     assert!(first.diagnostics().is_empty());
     assert_eq!(
         candidate_labels(&first),
@@ -8894,6 +8912,7 @@ async fn analyze_node_request_typed_with_epoch(
             Arc::new(directory_snapshot(workspace)),
         )])
         .unwrap();
+    updater.changed_to(path_observation_shards(&epoch)).unwrap();
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
@@ -9024,6 +9043,9 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
                 )])
                 .unwrap();
             updater
+                .changed_to(path_observation_shards(&root_epoch(&workspace)))
+                .unwrap();
+            updater
                 .changed_to(vec![(PathObservationEpochKey, root_epoch(&workspace))])
                 .unwrap();
             inject_test_bzlmod_inputs(&mut updater, &workspace, &[], true);
@@ -9044,16 +9066,17 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
             value.as_ref().as_ref().unwrap().clone()
         });
 
-    assert_eq!(result.declared_outputs(), &["pkg/write_file.txt"]);
+    let expected = expected_output_path(
+        result.configured_target_key().unwrap().configuration(),
+        "pkg/write_file.txt",
+    );
+    assert_eq!(result.declared_outputs(), &[expected.clone()]);
     assert_eq!(
         default_file_paths(result.providers().default_info().unwrap()),
-        ["pkg/write_file.txt"]
+        [expected.clone()]
     );
     assert_eq!(result.actions().len(), 1);
-    assert_eq!(
-        result.actions()[0].outputs()[0].path(),
-        "pkg/write_file.txt"
-    );
+    assert_eq!(result.actions()[0].outputs()[0].path(), expected);
     assert_eq!(
         result.actions()[0].kind(),
         &ActionKind::Write {
@@ -9287,7 +9310,13 @@ parent_rule = rule(implementation = _parent, attrs = {{"dep": attr.label(mandato
         result
             .field("visible")
             .and_then(slug_build_api_v2::AnalysisValue::as_str),
-        Some("payload.txt|nested|a|struct|b,a")
+        Some(
+            format!(
+                "{}|nested|a|struct|b,a",
+                expected_output_path(key.configuration(), "payload.txt")
+            )
+            .as_str()
+        )
     );
     match result.field("target").unwrap().kind() {
         slug_build_api_v2::AnalysisValueKind::ConfiguredTarget(target) => {
@@ -9298,7 +9327,10 @@ parent_rule = rule(implementation = _parent, attrs = {{"dep": attr.label(mandato
     match result.field("artifact").unwrap().kind() {
         slug_build_api_v2::AnalysisValueKind::Artifact(
             slug_build_api_v2::AnalysisArtifact::Derived { output, .. },
-        ) => assert_eq!(output.path(), "payload.txt"),
+        ) => assert_eq!(
+            output.path(),
+            expected_output_path(key.configuration(), "payload.txt")
+        ),
         other => panic!("expected artifact, got {other:?}"),
     }
     let depset = |name| match result.field(name).unwrap().kind() {
@@ -9645,11 +9677,12 @@ bad_default_info = rule(implementation = _bad_default_info)
         .unwrap();
     let info = result.providers().default_info().unwrap();
     assert!(info.files().is_empty());
-    assert_eq!(runfiles_paths(&info.default_runfiles), ["data.txt"]);
+    let data_path = expected_output_path(key.configuration(), "data.txt");
+    assert_eq!(runfiles_paths(&info.default_runfiles), [data_path.clone()]);
     let symlinks = info.default_runfiles.symlinks.to_list();
     assert_eq!(symlinks.len(), 1);
     assert_eq!(symlinks[0].path, "logical/data.txt");
-    assert_eq!(symlinks[0].artifact.path().as_ref(), "data.txt");
+    assert_eq!(symlinks[0].artifact.path().as_ref(), data_path);
     assert_eq!(
         info.default_runfiles.root_symlinks.to_list()[0].path,
         "root-data.txt"
@@ -9713,11 +9746,11 @@ def _consumer(ctx):
     files_to_run = ctx.attr.dep[DefaultInfo].files_to_run
     if type(files_to_run) != "FilesToRunProvider":
         fail("expected dedicated FilesToRunProvider")
-    if files_to_run.executable.path != "implicit":
+    if files_to_run.executable.path != files_to_run.executable.root.path + "/implicit":
         fail("expected typed executable File")
-    if files_to_run.runfiles_manifest.path != "implicit.runfiles/MANIFEST":
+    if files_to_run.runfiles_manifest.path != files_to_run.executable.root.path + "/implicit.runfiles/MANIFEST":
         fail("expected public runfiles manifest")
-    if files_to_run.repo_mapping_manifest.path != "implicit.repo_mapping":
+    if files_to_run.repo_mapping_manifest.path != files_to_run.executable.root.path + "/implicit.repo_mapping":
         fail("expected repository mapping manifest")
     return [DefaultInfo()]
 
@@ -9729,9 +9762,9 @@ def _wrapper(ctx):
 
 def _inspect(ctx, nested):
     files_to_run = nested.values[0]
-    if files_to_run.executable.path != "implicit":
+    if files_to_run.executable.path != files_to_run.executable.root.path + "/implicit":
         fail("nested carrier lost executable")
-    if files_to_run.runfiles_manifest.path != "implicit.runfiles/MANIFEST":
+    if files_to_run.runfiles_manifest.path != files_to_run.executable.root.path + "/implicit.runfiles/MANIFEST":
         fail("nested carrier lost complete support")
 
 inspect = subrule(implementation = _inspect)
@@ -9779,31 +9812,38 @@ predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output()}
         .await
         .unwrap();
     let implicit = implicit.providers().default_info().unwrap();
-    assert_eq!(default_file_paths(implicit), ["implicit"]);
+    let path = |relative: &str| expected_output_path(key("implicit").configuration(), relative);
+    assert_eq!(default_file_paths(implicit), [path("implicit")]);
     assert_eq!(
         implicit.executable.as_ref().map(|value| value.path()),
-        Some("implicit".into())
+        Some(path("implicit").into())
     );
     assert_eq!(implicit.files_to_run.executable, implicit.executable);
     assert!(implicit.files_to_run.support.is_some());
     let support = implicit.files_to_run.support.as_ref().unwrap();
-    assert_eq!(support.tree.path(), "implicit.runfiles");
+    assert_eq!(support.tree.path(), path("implicit.runfiles"));
     assert!(matches!(
         &support.tree,
         slug_build_api_v2::AnalysisArtifact::Derived { output, .. }
             if output.kind() == ActionOutputKind::RunfilesTree
     ));
-    assert_eq!(support.input_manifest.path(), "implicit.runfiles_manifest");
+    assert_eq!(
+        support.input_manifest.path(),
+        path("implicit.runfiles_manifest")
+    );
     assert_eq!(
         support.manifest.as_ref().unwrap().path(),
-        "implicit.runfiles/MANIFEST"
+        path("implicit.runfiles/MANIFEST")
     );
     assert_eq!(
         support.repo_mapping_manifest.as_ref().unwrap().path(),
-        "implicit.repo_mapping"
+        path("implicit.repo_mapping")
     );
-    assert_eq!(runfiles_paths(&implicit.default_runfiles), ["implicit"]);
-    assert_eq!(runfiles_paths(&implicit.data_runfiles), ["implicit"]);
+    assert_eq!(
+        runfiles_paths(&implicit.default_runfiles),
+        [path("implicit")]
+    );
+    assert_eq!(runfiles_paths(&implicit.data_runfiles), [path("implicit")]);
 
     let consumer = analyze_request(&dice, &workspace, &key("consumer"), None, false)
         .await
@@ -9818,13 +9858,16 @@ predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output()}
         .await
         .unwrap();
     let explicit = explicit.providers().default_info().unwrap();
-    assert_eq!(default_file_paths(explicit), ["explicit.txt"]);
+    assert_eq!(default_file_paths(explicit), [path("explicit.txt")]);
     assert_eq!(
         explicit.executable.as_ref().map(|value| value.path()),
-        Some("explicit".into())
+        Some(path("explicit").into())
     );
-    assert_eq!(runfiles_paths(&explicit.default_runfiles), ["explicit"]);
-    assert_eq!(runfiles_paths(&explicit.data_runfiles), ["explicit"]);
+    assert_eq!(
+        runfiles_paths(&explicit.default_runfiles),
+        [path("explicit")]
+    );
+    assert_eq!(runfiles_paths(&explicit.data_runfiles), [path("explicit")]);
 
     let implicit_result = analyze_request(&dice, &workspace, &key("implicit"), None, false)
         .await
@@ -9871,7 +9914,7 @@ predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output()}
         .unwrap();
     assert_eq!(
         default_file_paths(predeclared.providers().default_info().unwrap()),
-        ["fallback.txt"]
+        [path("fallback.txt")]
     );
 
     for (target, expected) in [
@@ -9990,9 +10033,13 @@ reserved_executable = rule(implementation = _collision, outputs = {"executable":
     assert_eq!(
         default_file_paths(result.providers().default_info().unwrap()),
         ["subject.gen", "subject.odd", "explicit.out"]
+            .map(|path| expected_output_path(key("subject").configuration(), path))
     );
     assert_eq!(result.actions().len(), 1);
-    assert_eq!(result.actions()[0].outputs()[0].path(), "subject.gen");
+    assert_eq!(
+        result.actions()[0].outputs()[0].path(),
+        expected_output_path(key("subject").configuration(), "subject.gen")
+    );
     let error = analyze_request(&dice, &workspace, &key("collision"), None, false)
         .await
         .unwrap_err();
@@ -10005,6 +10052,7 @@ reserved_executable = rule(implementation = _collision, outputs = {"executable":
     assert_eq!(
         default_file_paths(synthesized.providers().default_info().unwrap()),
         ["synthesized.gen", "synthesized.out"]
+            .map(|path| expected_output_path(key("synthesized").configuration(), path))
     );
     let reserved_error = "multiple outputs with the same key: executable";
     let error = analyze_request(&dice, &workspace, &key("reserved_executable"), None, false)
@@ -10055,15 +10103,15 @@ async fn executable_default_info_recomputes_and_restores_structural_results() {
 
     assert_eq!(
         default_file_paths(initial.providers().default_info().unwrap()),
-        ["probe"]
+        [expected_output_path(key.configuration(), "probe")]
     );
     assert_eq!(
         default_file_paths(changed.providers().default_info().unwrap()),
-        ["probe.txt"]
+        [expected_output_path(key.configuration(), "probe.txt")]
     );
     assert_eq!(
         runfiles_paths(&changed.providers().default_info().unwrap().default_runfiles),
-        ["probe.txt", "probe"]
+        ["probe.txt", "probe"].map(|path| expected_output_path(key.configuration(), path))
     );
     assert_ne!(initial, changed);
     assert_eq!(initial, restored);
@@ -10222,6 +10270,9 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
         )])
         .unwrap();
     updater
+        .changed_to(path_observation_shards(&root_epoch(&workspace)))
+        .unwrap();
+    updater
         .changed_to(vec![(PathObservationEpochKey, root_epoch(&workspace))])
         .unwrap();
     inject_test_bzlmod_inputs(&mut updater, &workspace, &[], true);
@@ -10294,13 +10345,14 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
             .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some("second,first")
     );
-    assert_eq!(result.declared_outputs(), ["parent/parent.txt"]);
+    let parent_path = expected_output_path(&configuration, "parent/parent.txt");
+    assert_eq!(result.declared_outputs(), [parent_path.clone()]);
     assert_eq!(
         default_file_paths(result.providers().default_info().unwrap()),
-        ["parent/parent.txt"]
+        [parent_path.clone()]
     );
     assert_eq!(result.actions().len(), 1);
-    assert_eq!(result.actions()[0].outputs()[0].path(), "parent/parent.txt");
+    assert_eq!(result.actions()[0].outputs()[0].path(), parent_path);
     assert_eq!(
         result.actions()[0].kind(),
         &ActionKind::Write {
@@ -10336,7 +10388,13 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
         Some("second")
     );
     assert_eq!(leaf.actions().len(), 1);
-    assert_eq!(leaf.actions()[0].outputs()[0].path(), "leaf/second.txt");
+    assert_eq!(
+        leaf.actions()[0].outputs()[0].path(),
+        expected_output_path(
+            leaf.configured_target_key().unwrap().configuration(),
+            "leaf/second.txt"
+        )
+    );
 }
 
 fn write_spawn_envelope_fixture(workspace: &PathBuf) -> PathBuf {
@@ -10465,19 +10523,23 @@ async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
         first.invocation(),
         RetainedSpawnInvocation::Executable(SpawnExecutable::Artifact(_))
     ));
+    let configuration = result.configured_target_key().unwrap().configuration();
+    let tool = expected_output_path(configuration, "pkg/source.tool");
+    let tool_dir = expected_output_path(configuration, "pkg");
+    let formatted_tool = format!("f={tool}%");
     assert_eq!(
         first.render_argv(),
         [
-            "pkg/source.tool",
+            tool.as_str(),
             "head",
             "first",
             "--number",
             "n=7",
             "--file",
-            "f=pkg/source.tool%",
+            formatted_tool.as_str(),
             "source.tool",
-            "pkg",
-            "pkg/source.tool",
+            tool_dir.as_str(),
+            tool.as_str(),
             "pkg/source.tool",
             "from-subrule",
             "literal/looks/like/a/path",
@@ -10489,7 +10551,10 @@ async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
             .iter()
             .map(|output| output.path())
             .collect::<Vec<_>>(),
-        ["pkg/first.out", "pkg/second.out"]
+        ["pkg/first.out", "pkg/second.out"].map(|path| expected_output_path(
+            result.configured_target_key().unwrap().configuration(),
+            path
+        ))
     );
     assert_eq!(first.inputs().sources().len(), 1);
     assert!(matches!(
@@ -10507,7 +10572,7 @@ async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
         first
             .unused_inputs_list()
             .map(|artifact| artifact.path().into_owned()),
-        Some("pkg/source.tool".to_owned())
+        Some(tool)
     );
     assert_eq!(
         first.execution_requirements().iter().collect::<Vec<_>>(),
@@ -10842,7 +10907,16 @@ missing_provider_exec(name = 'missing_provider_exec', dep = ':empty')
         .tools()
         .visit(|artifact| provider_tool_paths.push(artifact.path().into_owned()))
         .unwrap();
-    assert_eq!(provider_tool_paths, ["pkg/tool_a", "pkg/tool_a.runfiles"]);
+    let tool_configuration = root
+        .configured_dependencies()
+        .find(|dependency| dependency.label().to_string() == "@@//pkg:tool_a")
+        .unwrap()
+        .configuration();
+    assert_eq!(
+        provider_tool_paths,
+        ["pkg/tool_a", "pkg/tool_a.runfiles"]
+            .map(|path| expected_output_path(tool_configuration, path))
+    );
 
     let warm = analyze_request(&dice, &workspace, &key("root"), None, false)
         .await
@@ -11097,16 +11171,17 @@ subject = rule(implementation = _impl, attrs = {"src": attr.label(allow_files = 
 
     assert_eq!(result.actions().len(), 4);
     let first = result.actions()[1].spawn_spec().unwrap();
+    let tool_path = expected_output_path(key.configuration(), "pkg/tool");
     assert_eq!(
         first.render_argv(),
         [
-            "pkg/tool",
-            "head",
-            "scalar",
-            "--all=-B v=a% -B v=b% --end",
-            "pkg/source.txt",
-            "--files=[p=pkg/tool]",
-            "--empty=",
+            tool_path.clone(),
+            "head".to_owned(),
+            "scalar".to_owned(),
+            "--all=-B v=a% -B v=b% --end".to_owned(),
+            "pkg/source.txt".to_owned(),
+            format!("--files=[p={tool_path}]"),
+            "--empty=".to_owned(),
         ]
     );
     assert!(!first.render_argv().iter().any(|value| value == "late-list"));
@@ -11143,7 +11218,9 @@ subject = rule(implementation = _impl, attrs = {"src": attr.label(allow_files = 
     assert!(write.is_executable());
     assert_eq!(
         write.render_content(),
-        "scalar\n--all=-B v=a% -B v=b% --end\npkg/source.txt\n--files=[p=pkg/tool]\n--empty=\nlate-action\n"
+        format!(
+            "scalar\n--all=-B v=a% -B v=b% --end\npkg/source.txt\n--files=[p={tool_path}]\n--empty=\nlate-action\n"
+        )
     );
     let warm = analyze_request(&dice, &workspace, &key, None, false)
         .await
@@ -12290,7 +12367,18 @@ parent(
             .field("value")
             .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some(
-            "specific|tail|selected|mapped|reverse|True|grouped|parent/result.txt|parent/extra.txt"
+            format!(
+                "specific|tail|selected|mapped|reverse|True|grouped|{}|{}",
+                expected_output_path(
+                    result.configured_target_key().unwrap().configuration(),
+                    "parent/result.txt"
+                ),
+                expected_output_path(
+                    result.configured_target_key().unwrap().configuration(),
+                    "parent/extra.txt"
+                )
+            )
+            .as_str()
         )
     );
     assert_eq!(
@@ -12306,7 +12394,13 @@ parent(
             "@@//.slug_test_host:host",
         ]
     );
-    assert_eq!(result.declared_outputs(), ["parent/result.txt"]);
+    assert_eq!(
+        result.declared_outputs(),
+        [expected_output_path(
+            result.configured_target_key().unwrap().configuration(),
+            "parent/result.txt"
+        )]
+    );
 }
 
 #[tokio::test]
@@ -13313,7 +13407,6 @@ async fn configurable_alias_propagates_condition_and_child_needs_without_publica
             ..Default::default()
         });
         let epoch = root_epoch(workspace);
-        updater.changed_to(path_observation_shards(&epoch)).unwrap();
         inject_root_target_inputs(&mut updater, workspace, epoch, &[]);
         let outcome = updater.commit().await.compute(key).await.unwrap();
         let AnalysisPreparationOutcome::Need(needs) = outcome else {

@@ -192,6 +192,7 @@ fn variables_retained_hashability_and_unused_artifact_owner_are_not_path_only() 
         AnalysisValue::artifact(AnalysisArtifact::Derived {
             owner: owner(label),
             output: slug_build_api_v2::ActionOutput::new(
+                crate::analysis_value::test_artifact_root(),
                 "same/output.o",
                 slug_build_api_v2::ActionOutputKind::File,
             ),

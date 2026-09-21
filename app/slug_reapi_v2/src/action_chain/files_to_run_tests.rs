@@ -99,17 +99,14 @@ impl Fixture {
         {
             let root = slug_core_v2::runtime::configured_output_root(
                 &self.root,
-                node.configured_target_key()
-                    .unwrap()
-                    .configuration()
-                    .slug_configuration()
-                    .unwrap(),
+                node.actions()[0].outputs()[0].root(),
             );
             for action in node.actions() {
                 for output in action.outputs() {
-                    let path = root.join(output.path());
+                    let path = root.join(output.root_relative_path());
                     if published
-                        && ["implicit.out", "explicit.out", "authored.out"].contains(&output.path())
+                        && ["implicit.out", "explicit.out", "authored.out"]
+                            .contains(&output.root_relative_path())
                     {
                         assert_eq!(
                             fs::read(&path).unwrap(),
@@ -191,7 +188,9 @@ fn is_consumer(session: &ActionChainReapiSession, index: usize) -> bool {
         .action()
         .outputs()
         .iter()
-        .any(|output| ["implicit.out", "explicit.out", "authored.out"].contains(&output.path()))
+        .any(|output| {
+            ["implicit.out", "explicit.out", "authored.out"].contains(&output.root_relative_path())
+        })
 }
 impl ActionChainTransport for CheckedTransport {
     type Session = ActionChainReapiSession;
@@ -275,12 +274,19 @@ impl ActionChainTransport for CheckedTransport {
             self.consumers.fetch_add(1, Ordering::SeqCst);
         }
         self.inner.execute(session, index, staged).await?;
+        let plan = session.inputs.plan().unwrap();
+        let generated_path = plan.actions()[index]
+            .action()
+            .outputs()
+            .iter()
+            .find(|output| output.root_relative_path() == "gen_file")
+            .map(|output| output.path());
         let generated = session.results[index].remote().and_then(|remote| {
             remote
                 .result
                 .output_files()
                 .iter()
-                .find(|file| file.path() == "gen_file")
+                .find(|file| Some(file.path()) == generated_path)
         });
         if let Some(file) = generated {
             self.producers.fetch_add(1, Ordering::SeqCst);
@@ -380,6 +386,19 @@ fn files_to_run_output_namespace_conflict_rejects_before_connection() {
     let valid = prepare();
     Template::prepare(&valid, &Default::default()).unwrap();
     fixture.assert_outputs(&valid, false, b"aaa");
+    let valid_plan = valid.plan().unwrap();
+    let consumer_root = valid_plan
+        .actions()
+        .iter()
+        .flat_map(|step| step.action().outputs())
+        .find(|output| output.root_relative_path() == "implicit.out")
+        .expect("target consumer output")
+        .root()
+        .clone();
+    let conflict_path = format!(
+        "{}/tools/plain_tool.runfiles/consumer.out",
+        consumer_root.path()
+    );
     let defs = fs::read_to_string(fixture.root.join("defs.bzl")).unwrap();
     let needle = "ctx.actions.declare_file(ctx.label.name + '.out')";
     assert!(defs.contains(needle));
@@ -387,28 +406,60 @@ fn files_to_run_output_namespace_conflict_rejects_before_connection() {
         fixture.root.join("defs.bzl"),
         defs.replace(
             needle,
-            "ctx.actions.declare_file('tools/plain_tool.runfiles/consumer.out')",
-        ),
+            "ctx.actions.declare_file(ctx.executable.tool.path[len(ctx.bin_dir.path) + 1:] + '.runfiles/consumer.out' if ctx.label.name == 'implicit' else ctx.label.name + '.out')",
+        ).replace("cfg='exec'", "cfg='target'"),
     )
     .unwrap();
-    // The exec-configured tool and target-configured output are distinct declared
-    // artifacts, but collide in this consumer's remote input/output namespace.
-    let inputs = prepare();
-    let transport = ActionChainReapiTransport::new(
-        RemoteConfig::from_args(&["--remote_executor=grpc://127.0.0.1:1"]).unwrap(),
-    )
-    .unwrap();
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-    let error = match runtime.block_on(transport.start(inputs.clone())) {
-        Err(error) => error,
-        Ok(_) => panic!("conflicting consumer opened a remote session"),
+    // Deliberately select the tool in the consumer configuration: target/exec
+    // roots are now disjoint. This File.path-derived descendant truly overlaps
+    // the tool's runfiles tree, rather than merely sharing a relative spelling.
+    let transport = CheckedTransport {
+        inner: ActionChainReapiTransport::new(
+            RemoteConfig::from_args(&["--remote_executor=grpc://127.0.0.1:1"]).unwrap(),
+        )
+        .unwrap(),
+        mutation: None,
+        consumers: AtomicUsize::new(0),
+        checked: AtomicUsize::new(0),
+        producers: AtomicUsize::new(0),
+        inputs: std::sync::Mutex::new(None),
     };
-    assert!(matches!(error, RemoteExecutionError::Command(_)), "{error}");
-    assert!(error.to_string().contains("namespace conflict"), "{error}");
-    fixture.assert_outputs(&inputs, false, b"aaa");
+    let message = match fixture.run(&transport, false) {
+        Err(error) => error.to_string(),
+        Ok(accepted) => {
+            let mut message = None;
+            drop(accepted.project(|value| {
+                message = Some(
+                    value
+                        .as_ref()
+                        .err()
+                        .expect("invalid closure cannot execute")
+                        .to_string(),
+                );
+                TerminalOutput::new(0, String::new(), String::new())
+            }));
+            message.unwrap()
+        }
+    };
+    assert!(
+        message.starts_with(&format!(
+            "configured action output prefix conflict at {conflict_path}: "
+        )),
+        "{message}"
+    );
+    assert!(message.contains("@@//:plain_tool [target:"), "{message}");
+    assert!(
+        message.contains("versus @@//:implicit [target:"),
+        "{message}"
+    );
+    assert!(
+        transport.inputs.lock().unwrap().is_none(),
+        "native closure must reject before transport.start"
+    );
+    assert_eq!(transport.producers.load(Ordering::SeqCst), 0);
+    assert_eq!(transport.consumers.load(Ordering::SeqCst), 0);
+    assert!(!fixture.root.join(&conflict_path).exists());
+    fixture.assert_outputs(&valid, false, b"aaa");
 }
 
 #[test]

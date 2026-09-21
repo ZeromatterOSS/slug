@@ -58,8 +58,13 @@ pub(in crate::runtime::dice) fn generated_target(
         .configuration()
         .slug_configuration()
         .ok_or_else(|| error("runfiles output producer has no structural Slug configuration"))?;
-    let path = crate::runtime::configured_output_root(workspace.as_path(), configuration)
-        .join(output.path());
+    if output.root().configuration() != configuration {
+        return Err(error(
+            "runfiles output root differs from its producer configuration",
+        ));
+    }
+    let path = crate::runtime::configured_output_root(workspace.as_path(), output.root())
+        .join(output.root_relative_path());
     absolute_string(&path)
 }
 

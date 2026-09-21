@@ -39,7 +39,12 @@ pub use executor::RemoteExecutionError;
 pub use executor::RemoteExecutionResult;
 pub use executor::execute_action;
 pub use executor::execute_file_write;
+pub use executor::materialize_configured_outputs;
 pub use executor::materialize_outputs;
+
+#[cfg(test)]
+#[path = "../tests/root_support/mod.rs"]
+pub(crate) mod test_roots;
 pub use executor::verify_materialized_run_executable;
 pub use input_tree::InputTreeEntryKind;
 pub use input_tree::InputTreeError;

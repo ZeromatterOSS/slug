@@ -18,6 +18,7 @@ use crate::RunfilesPackageDepset;
 use crate::RunfilesPackageMetadata;
 use crate::RunfilesSupport;
 use crate::RunfilesSymlink;
+use crate::artifact_root::test_support as root_support;
 
 fn source(path: &str) -> AnalysisArtifact {
     AnalysisArtifact::Source(CanonicalLabel::parse(&format!("@@//:{path}")).unwrap())
@@ -26,7 +27,14 @@ fn source(path: &str) -> AnalysisArtifact {
 fn generated(owner: &str, config: &[u8], path: &str, kind: ActionOutputKind) -> AnalysisArtifact {
     AnalysisArtifact::Derived {
         owner: AnalysisConfiguredTargetKey::new(CanonicalLabel::parse(owner).unwrap(), config),
-        output: ActionOutput::new(path, kind),
+        output: ActionOutput::new(
+            root_support::root(),
+            crate::repository_relative_output_path(
+                CanonicalLabel::parse(owner).unwrap().package().repo(),
+                path,
+            ),
+            kind,
+        ),
     }
 }
 
@@ -264,7 +272,11 @@ fn mapping_action(
         packages: RunfilesPackageDepset::from_direct(DepsetOrder::Default, packages).unwrap(),
         workspace_name: "workspace".into(),
         emit_compact_repo_mapping: compact,
-        output: ActionOutput::new("bin.repo_mapping", ActionOutputKind::File),
+        output: ActionOutput::new(
+            root_support::root(),
+            "bin.repo_mapping",
+            ActionOutputKind::File,
+        ),
     }
 }
 
@@ -367,7 +379,7 @@ fn repository_mapping_compacts_only_shared_identical_consecutive_prefixes() {
     let wrong_action = RunfilesSupportActionSpec::SourceSymlinkManifest {
         support: Arc::new(super::tests::support()),
         remotable: false,
-        output: ActionOutput::new("manifest", ActionOutputKind::File),
+        output: ActionOutput::new(root_support::root(), "manifest", ActionOutputKind::File),
     };
     assert_eq!(
         wrong_action.repo_mapping_manifest_bytes(),

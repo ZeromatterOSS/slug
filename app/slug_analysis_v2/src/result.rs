@@ -1046,6 +1046,24 @@ impl ConfiguredNodeResult {
         if contexts.iter().any(|context| context.owner() != owner) {
             return Err("configured action context has mismatched owner".to_owned());
         }
+        let root = slug_build_api_v2::DerivedArtifactRoot::bin(
+            owner
+                .configuration()
+                .slug_configuration()
+                .ok_or_else(|| {
+                    "configured action outputs require structural configuration".to_owned()
+                })?
+                .clone(),
+        )?;
+        if specs
+            .iter()
+            .flat_map(|spec| spec.outputs())
+            .any(|output| output.root() != &root)
+        {
+            return Err(
+                "configured action output root differs from action configuration".to_owned(),
+            );
+        }
         let context_count = contexts.len();
         let by_group = contexts
             .into_iter()

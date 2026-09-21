@@ -214,7 +214,7 @@ fn derived(
             CanonicalLabel::parse(label).unwrap(),
             configuration,
         ),
-        output: ActionOutput::new(path, kind),
+        output: ActionOutput::new(crate::analysis_value::test_artifact_root(), path, kind),
     }
 }
 fn rows() -> Vec<AnalysisArtifact> {
@@ -287,7 +287,7 @@ fn proof(
     let owner = key.artifact_owner();
     let sink: Arc<dyn AnalysisActionSink> = Arc::new(Declarations {
         owner: owner.clone(),
-        actions: Mutex::new(CtxActions::new()),
+        actions: Mutex::new(CtxActions::new(crate::analysis_value::test_artifact_root())),
     });
     let identity = BzlModuleIdentity {
         label: CanonicalLabel::parse(if matches!(provenance, Provenance::Relabeled) {
@@ -357,6 +357,7 @@ fn proof(
         action_sink: sink,
         token: analysis.root_token(),
         retained_owner: owner,
+        output_root: crate::analysis_value::test_artifact_root(),
         target_label: key.label().clone(),
         package_path: "pkg".into(),
         dependencies: Arc::from([]),
@@ -478,17 +479,19 @@ fn unchanged_cargo_helper_retains_captures_after_caller_exit_and_gc() {
         .unwrap()
         .expand_forced_param_files()
         .unwrap();
+    let root = crate::analysis_value::test_artifact_root();
+    let prefix = root.path();
     assert_eq!(
         expanded.argv(),
         [
-            "runner",
-            "--cargo_manifest_args=@pkg/build.cargo_runfiles-0.params"
+            "runner".to_owned(),
+            format!("--cargo_manifest_args=@{prefix}/pkg/build.cargo_runfiles-0.params")
         ]
     );
     assert_eq!(expanded.param_files().len(), 1);
     // The unchanged helper leaves the Args format at SHELL_QUOTED. Bazel
     // ShellEscaper excludes = from its safe alphabet, so mappings are quoted.
-    assert_eq!(expanded.param_files()[0].bytes(), b"pkg/build.cargo_runfiles\nkeep\n'pkg/main=_main/pkg/main'\n'external/dep+/pkg/external=dep+/pkg/external'\n'pkg/generated=_main/pkg/generated'\n'pkg/external-generated=_main/pkg/external-generated'\n'pkg/fake=_main/pkg/fake'\n");
+    assert_eq!(expanded.param_files()[0].bytes(), format!("{prefix}/pkg/build.cargo_runfiles\nkeep\n'pkg/main=_main/pkg/main'\n'external/dep+/pkg/external=dep+/pkg/external'\n'{prefix}/pkg/generated=_main/pkg/generated'\n'{prefix}/pkg/external-generated=_main/pkg/external-generated'\n'{prefix}/pkg/fake=_main/pkg/fake'\n").as_bytes());
     // fake/config-one filtered, same rendered path/config-two retained.
     assert_eq!(
         result.actions()[0]

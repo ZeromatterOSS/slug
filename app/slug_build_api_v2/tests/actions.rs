@@ -1,3 +1,5 @@
+use slug_build_api_v2::DerivedArtifactRoot;
+mod root_support;
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -86,7 +88,7 @@ fn derived_artifact(path: &str, kind: ActionOutputKind) -> AnalysisArtifact {
             CanonicalLabel::parse("@@//pkg:owner").unwrap(),
             b"cfg".as_slice(),
         ),
-        output: ActionOutput::new(path, kind),
+        output: ActionOutput::new(root_support::root(), path, kind),
     }
 }
 
@@ -254,7 +256,7 @@ fn rust_crate_args_validate_provider_fields_and_retain_identity() {
             CanonicalLabel::parse("@@//pkg:other").unwrap(),
             b"cfg".as_slice(),
         ),
-        output: ActionOutput::new("out/dep.rlib", ActionOutputKind::File),
+        output: ActionOutput::new(root_support::root(), "out/dep.rlib", ActionOutputKind::File),
     });
     let ordinary = rust_crate_recipe(vec![(rust_crate_depset(first.clone()), Mapper::Extern)]);
     let metadata = rust_crate_recipe(vec![(
@@ -461,7 +463,11 @@ fn spawn_action(inputs: AnalysisDepset, tools: AnalysisDepset) -> ActionSpec {
         ArtifactInputs::new(vec![ArtifactInputSource::Depset(
             RetainedArtifactInputs::new(tools).unwrap(),
         )]),
-        vec![ActionOutput::new("pkg/out", ActionOutputKind::File)],
+        vec![ActionOutput::new(
+            root_support::root(),
+            "pkg/out",
+            ActionOutputKind::File,
+        )],
         None,
         RetainedActionEnvironment::default().for_action(false, [("K", "V")]),
         CanonicalStringMap::default(),
@@ -472,7 +478,7 @@ fn spawn_action(inputs: AnalysisDepset, tools: AnalysisDepset) -> ActionSpec {
 
 #[test]
 fn ctx_actions_records_basic_action_ir() {
-    let mut actions = CtxActions::new();
+    let mut actions = CtxActions::new(root_support::root());
     let write_out = actions.declare_file("pkg/write.txt").unwrap();
     let json_out = actions.declare_file("pkg/write.json").unwrap();
     let run_out = actions.declare_file("pkg/run.txt").unwrap();
@@ -519,7 +525,10 @@ fn ctx_actions_records_basic_action_ir() {
 
     let registry = actions.registry();
     assert_eq!(registry.actions().len(), 6);
-    assert_eq!(registry.output_owner("pkg/run.txt"), Some(2));
+    assert_eq!(
+        registry.output_owner(&root_support::exec_path("pkg/run.txt")),
+        Some(2)
+    );
     assert!(matches!(
         registry.actions()[0].kind(),
         ActionKind::Write {
@@ -613,7 +622,10 @@ fn files_to_run_inputs_visit_complete_provider_files_without_flattening_storage(
         .visit(|artifact| paths.push(artifact.path().into_owned()))
         .unwrap();
 
-    assert_eq!(paths, ["pkg/tool", "pkg/tool.runfiles"]);
+    assert_eq!(
+        paths,
+        ["pkg/tool", "pkg/tool.runfiles"].map(root_support::exec_path)
+    );
     assert!(matches!(
         inputs.sources(),
         [ArtifactInputSource::FilesToRun(provider)]
@@ -676,7 +688,11 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
             ]))]),
             ArtifactInputs::new(Vec::new()),
             ArtifactInputs::new(Vec::new()),
-            vec![ActionOutput::new(output, ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                root_support::root(),
+                output,
+                ActionOutputKind::File,
+            )],
             None,
             RetainedActionEnvironment::default().for_action(false, [("K", environment)]),
             CanonicalStringMap::from_pairs([("requirement", requirement)]),
@@ -703,7 +719,11 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
             RetainedCommandLine::new(Vec::new()),
             ArtifactInputs::new(Vec::new()),
             ArtifactInputs::new(Vec::new()),
-            vec![ActionOutput::new("out", ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                root_support::root(),
+                "out",
+                ActionOutputKind::File,
+            )],
             unused_inputs_list,
             RetainedActionEnvironment::default(),
             CanonicalStringMap::default(),
@@ -765,7 +785,11 @@ fn files_to_run_spawn_equality_shares_one_alias_state_across_invocation_and_tool
             RetainedCommandLine::new(Vec::new()),
             ArtifactInputs::new(Vec::new()),
             ArtifactInputs::new(vec![ArtifactInputSource::FilesToRun(tool)]),
-            vec![ActionOutput::new("pkg/out", ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                root_support::root(),
+                "pkg/out",
+                ActionOutputKind::File,
+            )],
             None,
             RetainedActionEnvironment::default(),
             CanonicalStringMap::default(),
@@ -786,7 +810,7 @@ fn files_to_run_spawn_equality_shares_one_alias_state_across_invocation_and_tool
 
     assert_eq!(aliased, independently_aliased);
     assert_ne!(aliased, split);
-    assert_eq!(aliased.render_argv(), ["pkg/tool"]);
+    assert_eq!(aliased.render_argv(), [root_support::exec_path("pkg/tool")]);
 }
 
 #[test]
@@ -900,14 +924,21 @@ fn args_write_formats_and_ignores_spawn_only_param_policy() {
         "--flag=two words\nquote'd\n"
     );
 
-    let output = ActionOutput::new("pkg/args.params", ActionOutputKind::File);
+    let output = ActionOutput::new(
+        root_support::root(),
+        "pkg/args.params",
+        ActionOutputKind::File,
+    );
     let left = ActionSpec::args_write(ArgsWriteSpec::new(output.clone(), shell.clone(), false));
     let right = ActionSpec::args_write(ArgsWriteSpec::new(output, shell.clone(), false));
     assert_eq!(left, right);
     assert_eq!(left.kind(), &ActionKind::ArgsWrite);
     assert_eq!(left.mnemonic(), "FileWrite");
     let write = left.args_write_spec().unwrap();
-    assert_eq!(write.output().path(), "pkg/args.params");
+    assert_eq!(
+        write.output().path(),
+        root_support::exec_path("pkg/args.params")
+    );
     assert!(!write.is_executable());
     assert_eq!(write.execution_requirements().iter().len(), 0);
     assert_eq!(write.render_content(), shell.render_write_content());
@@ -926,7 +957,7 @@ fn args_write_formats_and_ignores_spawn_only_param_policy() {
         RetainedCommandLine::new(vec![RetainedCommandLineSegment::ArgsSnapshot(spawn_right)])
     );
 
-    let mut actions = CtxActions::new();
+    let mut actions = CtxActions::new(root_support::root());
     let existing = actions.declare_file("pkg/conflict.params").unwrap();
     actions.write(existing, "string content", false).unwrap();
     let conflicting = actions.declare_file("pkg/conflict.params").unwrap();
@@ -936,7 +967,7 @@ fn args_write_formats_and_ignores_spawn_only_param_policy() {
     assert_eq!(
         error,
         ActionError::ConflictingOutput {
-            path: "pkg/conflict.params".to_owned()
+            path: root_support::exec_path("pkg/conflict.params")
         }
     );
     assert_eq!(actions.registry().actions().len(), 1);
@@ -969,7 +1000,11 @@ fn vector_depsets_share_publication_alias_state_with_spawn_inputs() {
                 RetainedArtifactInputs::new(input).unwrap(),
             )]),
             ArtifactInputs::new(Vec::new()),
-            vec![ActionOutput::new("pkg/out", ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                root_support::root(),
+                "pkg/out",
+                ActionOutputKind::File,
+            )],
             None,
             RetainedActionEnvironment::default(),
             CanonicalStringMap::default(),
@@ -1134,23 +1169,33 @@ fn file_dirname_recipes_preserve_identity_and_map_before_uniquify() {
     assert_eq!(nested.dirname(), "pkg/src");
     assert_eq!(
         derived_artifact("bare.rlib", ActionOutputKind::File).dirname(),
-        "."
+        root_support::root().path()
     );
     let result = recipe(vec![root, a.clone(), b.clone(), nested]);
     assert_eq!(
         result.render(),
-        ["-L", "dir=.", "-L", "dir=out", "-L", "dir=pkg/src"]
+        [
+            "-L",
+            "dir=.",
+            "-L",
+            &format!("dir={}", root_support::exec_path("out")),
+            "-L",
+            "dir=pkg/src"
+        ]
     );
     assert_eq!(
         result.render_write_content(),
-        "-L\ndir=.\n-L\ndir=out\n-L\ndir=pkg/src\n"
+        format!(
+            "-L\ndir=.\n-L\ndir={}\n-L\ndir=pkg/src\n",
+            root_support::exec_path("out")
+        )
     );
     let other_owner = AnalysisArtifact::Derived {
         owner: AnalysisConfiguredTargetKey::new(
             CanonicalLabel::parse("@@//pkg:other").unwrap(),
             b"cfg".as_slice(),
         ),
-        output: ActionOutput::new("out/a.rlib", ActionOutputKind::File),
+        output: ActionOutput::new(root_support::root(), "out/a.rlib", ActionOutputKind::File),
     };
     let first = recipe(vec![a.clone()]);
     assert_eq!(first, recipe(vec![a]));
@@ -1221,7 +1266,11 @@ fn file_dirname_depsets_share_publication_alias_state_with_spawn_inputs() {
             )]),
             inputs(input),
             ArtifactInputs::new(Vec::new()),
-            vec![ActionOutput::new("out", ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                root_support::root(),
+                "out",
+                ActionOutputKind::File,
+            )],
             None,
             RetainedActionEnvironment::default(),
             CanonicalStringMap::default(),
@@ -1287,7 +1336,11 @@ fn pinned_regular_crate_root_retains_artifact_and_root_path_identity() {
             CanonicalLabel::parse(&format!("@@//pkg:{name}")).unwrap(),
             b"cfg".as_slice(),
         ),
-        output: ActionOutput::new("pkg/src/lib.rs", ActionOutputKind::File),
+        output: ActionOutput::new(
+            root_support::root(),
+            "pkg/src/lib.rs",
+            ActionOutputKind::File,
+        ),
     };
     let recipe = |artifact, root_path: &str| {
         RetainedArgsRecipe::new(
@@ -1306,7 +1359,7 @@ fn pinned_regular_crate_root_retains_artifact_and_root_path_identity() {
     let other_owner = recipe(owner("second"), "lib.rs");
     let other_root = recipe(owner("first"), "generated.rs");
     for value in [&a, &same, &other_owner, &other_root] {
-        assert_eq!(value.render(), ["pkg/src/lib.rs"]);
+        assert_eq!(value.render(), [root_support::exec_path("pkg/src/lib.rs")]);
     }
     assert_eq!(a, same);
     assert_ne!(a, other_owner);
@@ -1344,7 +1397,11 @@ fn retained_vector_depsets_reject_deferred_types_and_directories() {
         DepsetOrder::Default,
         vec![AnalysisValue::artifact(AnalysisArtifact::Derived {
             owner,
-            output: ActionOutput::new("pkg/tree", ActionOutputKind::Directory),
+            output: ActionOutput::new(
+                root_support::root(),
+                "pkg/tree",
+                ActionOutputKind::Directory,
+            ),
         })],
         Vec::new(),
     )
@@ -1357,7 +1414,7 @@ fn retained_vector_depsets_reject_deferred_types_and_directories() {
 
 #[test]
 fn typed_symlink_variants_are_structurally_distinct_and_fail_reapi_projection() {
-    let output = ActionOutput::new("pkg/link", ActionOutputKind::File);
+    let output = ActionOutput::new(root_support::root(), "pkg/link", ActionOutputKind::File);
     let artifact = ActionSpec::symlink(SymlinkSpec::new(
         output.clone(),
         SymlinkTarget::Artifact {
@@ -1393,7 +1450,7 @@ fn typed_symlink_variants_are_structurally_distinct_and_fail_reapi_projection() 
 
 #[test]
 fn run_shell_pads_empty_dollar_zero_when_arguments_are_present() {
-    let mut actions = CtxActions::new();
+    let mut actions = CtxActions::new(root_support::root());
     let out = actions.declare_file("pkg/out.txt").unwrap();
     actions
         .run_shell(
@@ -1414,7 +1471,7 @@ fn run_shell_pads_empty_dollar_zero_when_arguments_are_present() {
 
 #[test]
 fn run_shell_omits_pad_when_no_arguments() {
-    let mut actions = CtxActions::new();
+    let mut actions = CtxActions::new(root_support::root());
     let out = actions.declare_file("pkg/out.txt").unwrap();
     actions.run_shell(out, "echo hi", vec![], vec![]).unwrap();
     let action = &actions.registry().actions()[0];
@@ -1423,7 +1480,7 @@ fn run_shell_omits_pad_when_no_arguments() {
 
 #[test]
 fn registry_rejects_conflicting_outputs() {
-    let mut actions = CtxActions::new();
+    let mut actions = CtxActions::new(root_support::root());
     let first = actions.declare_file("pkg/out.txt").unwrap();
     let second = actions.declare_file("pkg/out.txt").unwrap();
     actions.write(first, "first", false).unwrap();
@@ -1432,7 +1489,7 @@ fn registry_rejects_conflicting_outputs() {
     assert_eq!(
         err,
         ActionError::ConflictingOutput {
-            path: "pkg/out.txt".to_owned()
+            path: root_support::exec_path("pkg/out.txt")
         }
     );
 }
@@ -1446,14 +1503,18 @@ fn registry_batch_preflight_is_atomic_for_existing_and_internal_conflicts() {
                 is_executable: false,
             },
             "FileWrite",
-            vec![ActionOutput::new(path, ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                root_support::root(),
+                path,
+                ActionOutputKind::File,
+            )],
         )
     };
 
     let support_actions = runfiles_support_specs().map(ActionSpec::runfiles_support);
     for conflicting_path in support_actions
         .iter()
-        .map(|action| action.outputs()[0].path())
+        .map(|action| action.outputs()[0].root_relative_path())
     {
         let mut registry = slug_build_api_v2::ActionRegistry::new();
         registry.register(action(conflicting_path)).unwrap();
@@ -1476,8 +1537,14 @@ fn registry_batch_preflight_is_atomic_for_existing_and_internal_conflicts() {
         .register_batch([action("pkg/one"), action("pkg/two")])
         .unwrap();
     assert_eq!(range, 1..3);
-    assert_eq!(registry.output_owner("pkg/one"), Some(1));
-    assert_eq!(registry.output_owner("pkg/two"), Some(2));
+    assert_eq!(
+        registry.output_owner(&root_support::exec_path("pkg/one")),
+        Some(1)
+    );
+    assert_eq!(
+        registry.output_owner(&root_support::exec_path("pkg/two")),
+        Some(2)
+    );
 }
 
 #[test]
@@ -1546,7 +1613,7 @@ fn runfiles_support_actions_share_one_owner_and_match_the_bazel_input_graph() {
     assert_eq!(
         specs
             .iter()
-            .map(|spec| (spec.output().path(), spec.output().kind()))
+            .map(|spec| (spec.output().root_relative_path(), spec.output().kind()))
             .collect::<Vec<_>>(),
         [
             ("pkg/tool.repo_mapping", ActionOutputKind::File),
@@ -1564,16 +1631,19 @@ fn runfiles_support_actions_share_one_owner_and_match_the_bazel_input_graph() {
         })
         .collect::<Vec<_>>();
     assert_eq!(inputs[0], Vec::<String>::new());
-    assert_eq!(inputs[1], ["pkg/unresolved"]);
-    assert_eq!(inputs[2], ["pkg/tool.runfiles_manifest"]);
+    assert_eq!(inputs[1], [root_support::exec_path("pkg/unresolved")]);
+    assert_eq!(
+        inputs[2],
+        [root_support::exec_path("pkg/tool.runfiles_manifest")]
+    );
     assert_eq!(
         inputs[3],
         [
-            "pkg/tool",
-            "pkg/unresolved",
-            "pkg/data",
-            "pkg/tool.runfiles/MANIFEST",
-            "pkg/tool.repo_mapping",
+            root_support::exec_path("pkg/tool"),
+            root_support::exec_path("pkg/unresolved"),
+            "pkg/data".to_owned(),
+            root_support::exec_path("pkg/tool.runfiles/MANIFEST"),
+            root_support::exec_path("pkg/tool.repo_mapping"),
         ]
     );
 
@@ -1628,7 +1698,11 @@ fn runfiles_support_action_equality_covers_every_retained_semantic_input() {
     }
     let mut output = baseline[3].clone();
     if let RunfilesSupportActionSpec::RunfilesTree { output, .. } = &mut output {
-        *output = ActionOutput::new("pkg/other.runfiles", ActionOutputKind::RunfilesTree);
+        *output = ActionOutput::new(
+            root_support::root(),
+            "pkg/other.runfiles",
+            ActionOutputKind::RunfilesTree,
+        );
     }
     assert_ne!(baseline[2], environment);
     assert_ne!(baseline[3], output);
@@ -1636,7 +1710,7 @@ fn runfiles_support_action_equality_covers_every_retained_semantic_input() {
 
 #[test]
 fn output_paths_are_package_relative() {
-    let actions = CtxActions::new();
+    let actions = CtxActions::new(root_support::root());
     for path in [
         "",
         "/abs/out",
@@ -1658,7 +1732,9 @@ fn output_paths_are_package_relative() {
 
 #[test]
 fn run_actions_project_to_reapi_command_shape() {
-    let output = CtxActions::new().declare_directory("pkg/tree").unwrap();
+    let output = CtxActions::new(root_support::root())
+        .declare_directory("pkg/tree")
+        .unwrap();
     let mut env = BTreeMap::new();
     env.insert("LANG".to_owned(), "C".to_owned());
     let mut exec_properties = BTreeMap::new();
@@ -1676,7 +1752,10 @@ fn run_actions_project_to_reapi_command_shape() {
     );
     assert_eq!(projection.env, env);
     assert_eq!(projection.output_files, Vec::<String>::new());
-    assert_eq!(projection.output_directories, vec!["pkg/tree".to_owned()]);
+    assert_eq!(
+        projection.output_directories,
+        vec![root_support::exec_path("pkg/tree")]
+    );
     assert_eq!(projection.platform_properties, exec_properties);
 }
 
@@ -1690,7 +1769,7 @@ fn param_spawn(segments: Vec<RetainedCommandLineSegment>, outputs: &[&str]) -> S
         ArtifactInputs::new(Vec::new()),
         outputs
             .iter()
-            .map(|path| ActionOutput::new(*path, ActionOutputKind::File))
+            .map(|path| ActionOutput::new(root_support::root(), *path, ActionOutputKind::File))
             .collect::<Vec<_>>(),
         None,
         RetainedActionEnvironment::default(),
@@ -1749,13 +1828,16 @@ fn forced_param_files_preserve_formats_order_and_spill_numbering() {
             "tools/runner",
             "before",
             "inline",
-            "@pkg/primary-0.params",
+            &format!("@{}", root_support::exec_path("pkg/primary-0.params")),
             "between",
-            "--params=%pkg/primary-1.params%",
-            "@pkg/primary-2.params",
+            &format!(
+                "--params=%{}%",
+                root_support::exec_path("pkg/primary-1.params")
+            ),
+            &format!("@{}", root_support::exec_path("pkg/primary-2.params")),
             "quote'd",
             "",
-            "@pkg/primary-3.params",
+            &format!("@{}", root_support::exec_path("pkg/primary-3.params")),
             "after"
         ]
     );
@@ -1763,19 +1845,25 @@ fn forced_param_files_preserve_formats_order_and_spill_numbering() {
         expanded
             .param_files()
             .iter()
-            .map(|file| (file.path(), file.bytes()))
+            .map(|file| (file.path().to_owned(), file.bytes()))
             .collect::<Vec<_>>(),
         vec![
             (
-                "pkg/primary-0.params",
+                root_support::exec_path("pkg/primary-0.params"),
                 b"--flag\n'two words'\n'quote'\\''d'\n''\n".as_slice()
             ),
             (
-                "pkg/primary-1.params",
+                root_support::exec_path("pkg/primary-1.params"),
                 b"--flag\ntwo words\nquote'd\n\n".as_slice()
             ),
-            ("pkg/primary-2.params", b"--flag=two words\n".as_slice()),
-            ("pkg/primary-3.params", b"".as_slice()),
+            (
+                root_support::exec_path("pkg/primary-2.params"),
+                b"--flag=two words\n".as_slice()
+            ),
+            (
+                root_support::exec_path("pkg/primary-3.params"),
+                b"".as_slice()
+            ),
         ]
     );
     assert_eq!(expanded, spec.expand_forced_param_files().unwrap());
@@ -1785,7 +1873,7 @@ fn forced_param_files_preserve_formats_order_and_spill_numbering() {
     );
     assert_eq!(
         reordered.expand_forced_param_files().unwrap().param_files()[0].path(),
-        "pkg/secondary-0.params"
+        root_support::exec_path("pkg/secondary-0.params")
     );
     let inline = param_spawn(vec![param_args(Multiline, &values, None)], &[]);
     assert_eq!(
@@ -1827,7 +1915,7 @@ fn forced_param_files_reject_unowned_limits_invalid_paths_and_output_collisions(
         assert_eq!(
             param_spawn(vec![forced()], &[path]).expand_forced_param_files(),
             Err(SpawnCommandLineError::InvalidPrimaryOutput {
-                path: path.to_owned()
+                path: root_support::exec_path(path)
             })
         );
     }
@@ -1839,8 +1927,8 @@ fn forced_param_files_reject_unowned_limits_invalid_paths_and_output_collisions(
         assert_eq!(
             param_spawn(vec![forced()], &[primary, conflict]).expand_forced_param_files(),
             Err(SpawnCommandLineError::OutputConflict {
-                param_path: format!("{primary}-0.params"),
-                output_path: conflict.to_owned()
+                param_path: root_support::exec_path(&format!("{primary}-0.params")),
+                output_path: root_support::exec_path(conflict)
             })
         );
     }

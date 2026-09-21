@@ -54,6 +54,7 @@ pub enum AnalysisValueType {
     Label,
     ConfiguredTarget,
     Artifact,
+    ArtifactRoot,
     List,
     Tuple,
     Dictionary,
@@ -80,6 +81,7 @@ impl AnalysisValueType {
             Self::Label => "Label",
             Self::ConfiguredTarget => "Target",
             Self::Artifact => "File",
+            Self::ArtifactRoot => "root",
             Self::List => "list",
             Self::Tuple => "tuple",
             Self::Dictionary => "dict",
@@ -343,6 +345,17 @@ pub enum AnalysisArtifact {
 }
 
 impl AnalysisArtifact {
+    pub fn root(&self) -> crate::AnalysisArtifactRoot {
+        match self {
+            Self::Source(label) => {
+                crate::AnalysisArtifactRoot::Source(label.package().repo().clone())
+            }
+            Self::Derived { output, .. } => {
+                crate::AnalysisArtifactRoot::Derived(output.root().clone())
+            }
+        }
+    }
+
     /// Directory of the existing path projection, using Bazel's `.` spelling
     /// for a relative basename. This string is scratch, never artifact identity.
     pub fn dirname(&self) -> String {
@@ -364,12 +377,17 @@ impl AnalysisArtifact {
         }
     }
 
-    /// Source runfiles path relative to the main repository. Derived paths keep
-    /// their existing Slug-native projection until output roots are modeled.
+    /// Runfiles path relative to the main repository, independent of root bytes.
     pub fn short_path(&self) -> Cow<'_, str> {
         match self {
             Self::Source(label) => Self::source_path(label, ".."),
-            Self::Derived { output, .. } => Cow::Borrowed(output.path()),
+            Self::Derived { output, .. } => {
+                let relative = output.root_relative_path();
+                match relative.strip_prefix("external/") {
+                    Some(external) => Cow::Owned(format!("../{external}")),
+                    None => Cow::Borrowed(relative),
+                }
+            }
         }
     }
 
@@ -1129,6 +1147,7 @@ enum AnalysisValueData {
     Label(CanonicalLabel),
     ConfiguredTarget(ConfiguredTargetValue),
     Artifact(AnalysisArtifact),
+    ArtifactRoot(crate::AnalysisArtifactRoot),
     List(Arc<[AnalysisValue]>),
     Tuple(Arc<[AnalysisValue]>),
     Dictionary(Arc<[(AnalysisValue, AnalysisValue)]>),
@@ -1152,6 +1171,7 @@ pub enum AnalysisValueKind<'a> {
     Label(&'a CanonicalLabel),
     ConfiguredTarget(&'a ConfiguredTargetValue),
     Artifact(&'a AnalysisArtifact),
+    ArtifactRoot(&'a crate::AnalysisArtifactRoot),
     List(&'a [AnalysisValue]),
     Tuple(&'a [AnalysisValue]),
     Dictionary(&'a [(AnalysisValue, AnalysisValue)]),
@@ -1227,6 +1247,10 @@ impl AnalysisValue {
         Self::new(AnalysisValueData::Artifact(value))
     }
 
+    pub fn artifact_root(value: crate::AnalysisArtifactRoot) -> Self {
+        Self::new(AnalysisValueData::ArtifactRoot(value))
+    }
+
     pub fn list(values: impl Into<Arc<[AnalysisValue]>>) -> Self {
         Self::new(AnalysisValueData::List(values.into()))
     }
@@ -1298,6 +1322,7 @@ impl AnalysisValue {
                 AnalysisValueKind::ConfiguredTarget(value)
             }
             AnalysisValueData::Artifact(value) => AnalysisValueKind::Artifact(value),
+            AnalysisValueData::ArtifactRoot(value) => AnalysisValueKind::ArtifactRoot(value),
             AnalysisValueData::List(value) => AnalysisValueKind::List(value),
             AnalysisValueData::Tuple(value) => AnalysisValueKind::Tuple(value),
             AnalysisValueData::Dictionary(value) => AnalysisValueKind::Dictionary(value),
@@ -1325,6 +1350,7 @@ impl AnalysisValue {
             AnalysisValueData::Label(_) => AnalysisValueType::Label,
             AnalysisValueData::ConfiguredTarget(_) => AnalysisValueType::ConfiguredTarget,
             AnalysisValueData::Artifact(_) => AnalysisValueType::Artifact,
+            AnalysisValueData::ArtifactRoot(_) => AnalysisValueType::ArtifactRoot,
             AnalysisValueData::List(_) => AnalysisValueType::List,
             AnalysisValueData::Tuple(_) => AnalysisValueType::Tuple,
             AnalysisValueData::Dictionary(_) => AnalysisValueType::Dictionary,
@@ -1448,6 +1474,9 @@ impl AnalysisValue {
             (AnalysisValueData::Artifact(left), AnalysisValueData::Artifact(right)) => {
                 left == right
             }
+            (AnalysisValueData::ArtifactRoot(left), AnalysisValueData::ArtifactRoot(right)) => {
+                left == right
+            }
             (AnalysisValueData::List(left), AnalysisValueData::List(right))
             | (AnalysisValueData::Tuple(left), AnalysisValueData::Tuple(right)) => {
                 publication_slice_eq(left, right, state)
@@ -1537,6 +1566,9 @@ impl PartialEq for AnalysisValue {
             (AnalysisValueData::Artifact(left), AnalysisValueData::Artifact(right)) => {
                 left == right
             }
+            (AnalysisValueData::ArtifactRoot(left), AnalysisValueData::ArtifactRoot(right)) => {
+                left == right
+            }
             (AnalysisValueData::List(left), AnalysisValueData::List(right))
             | (AnalysisValueData::Tuple(left), AnalysisValueData::Tuple(right)) => left == right,
             (AnalysisValueData::Dictionary(left), AnalysisValueData::Dictionary(right)) => {
@@ -1565,6 +1597,10 @@ impl Hash for AnalysisValue {
         match self.0.as_ref() {
             AnalysisValueData::CcToolchainCallable(value) => {
                 17u8.hash(state);
+                value.hash(state);
+            }
+            AnalysisValueData::ArtifactRoot(value) => {
+                19u8.hash(state);
                 value.hash(state);
             }
             AnalysisValueData::CppFragment(value) => {

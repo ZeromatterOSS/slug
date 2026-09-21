@@ -9,6 +9,129 @@ use super::super::tests::DEFS;
 use super::tests::PublicationWorkspace;
 use super::*;
 
+#[test]
+#[ignore = "requires supervised fresh verifying NativeLink and Linux publication"]
+fn nativelink_target_and_exec_roots_coexist_through_cache_change_restore() {
+    use slug_configuration_v2::SlugConfigurationKind;
+    let workspace = PublicationWorkspace::new();
+    let transport = super::tests::transport();
+    let defs = std::fs::read_to_string(workspace.root.join("defs.bzl")).unwrap();
+    let build = std::fs::read_to_string(workspace.root.join("BUILD.bazel")).unwrap();
+    std::fs::write(workspace.root.join("BUILD.bazel"), format!("{build}\nload(':defs.bzl', 'exec_output', 'configured')\nexec_output(name='exec_output')\nconfigured(name='configured', dep='exec_output')\n")).unwrap();
+    let mut original_paths = None;
+    let mut original_digests = None;
+    for (payload, hit) in [("a", false), ("a", true), ("b", false), ("a", true)] {
+        // Authored callers use real FileWrite actions and an ordinary exec edge.
+        // Both producers intentionally declare exactly the same relative name.
+        let added = format!(
+            r#"
+def _exec_output(ctx):
+    out = ctx.actions.declare_file('configured')
+    ctx.actions.write(out, 'wp766 exec {payload}')
+    return [DefaultInfo(files=depset([out]))]
+exec_output = rule(implementation=_exec_output)
+def _configured(ctx):
+    out = ctx.actions.declare_file('configured')
+    ctx.actions.write(out, 'wp766 target {payload}')
+    return [DefaultInfo(files=depset([out], transitive=[ctx.attr.dep[DefaultInfo].files]))]
+configured = rule(implementation=_configured, attrs={{'dep':attr.label(cfg='exec')}})
+"#
+        );
+        std::fs::write(workspace.root.join("defs.bzl"), format!("{defs}{added}")).unwrap();
+        let accepted = workspace
+            .runtime
+            .execute_and_publish_requested_actions_with_repository_environment(
+                &[TargetPattern::parse("//:configured").unwrap()],
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[format!(
+                    "file://{}/empty-registry",
+                    workspace.root.display()
+                )],
+                Default::default(),
+                Default::default(),
+                &transport,
+            )
+            .unwrap();
+        drop(accepted.project(|accepted| {
+            let accepted = accepted
+                .as_ref()
+                .expect("target and exec publication succeeds");
+            let plan = accepted.inputs().plan().unwrap();
+            let remote = accepted.output().unwrap();
+            assert_eq!(plan.actions().len(), 2);
+            assert_eq!(remote.results().len(), 2);
+            assert_eq!(accepted.published_outputs().len(), 2);
+            let mut paths = Vec::new();
+            let mut digests = Vec::new();
+            let mut roles = Vec::new();
+            for group in accepted.published_outputs() {
+                let index = group.action_index();
+                let action = plan.actions()[index].action();
+                let [output] = action.outputs() else {
+                    panic!("one declared output per producer")
+                };
+                assert_eq!(output.root_relative_path(), "configured");
+                let role = output.root().configuration().kind();
+                let name = match role {
+                    SlugConfigurationKind::Target => "target",
+                    SlugConfigurationKind::Exec => "exec",
+                    SlugConfigurationKind::HostLike => panic!("HostLike root is forbidden"),
+                };
+                roles.push(role);
+                let result = remote.results()[index].remote().unwrap();
+                let [file] = result.result.output_files() else {
+                    panic!("one REAPI output per producer")
+                };
+                assert_eq!(file.path(), output.path());
+                assert_eq!(
+                    file.digest(),
+                    &ReapiDigest::of_bytes(format!("wp766 {name} {payload}").as_bytes())
+                );
+                assert_eq!(result.evidence.ac_hits, u64::from(hit));
+                assert_eq!(result.evidence.ac_misses, u64::from(!hit));
+                assert_eq!(group.outputs().outputs(), std::slice::from_ref(output));
+                assert_eq!(
+                    group.outputs().root(),
+                    workspace.root.join(output.root().path())
+                );
+                let physical = group.outputs().root().join(output.root_relative_path());
+                assert_eq!(physical, workspace.root.join(output.path()));
+                assert_eq!(
+                    std::fs::read(&physical).unwrap(),
+                    format!("wp766 {name} {payload}").as_bytes()
+                );
+                assert!(
+                    !group.outputs().root().join(output.path()).exists(),
+                    "root must not be applied twice"
+                );
+                paths.push(physical);
+                digests.push(result.action_digest.clone());
+            }
+            assert!(roles.contains(&SlugConfigurationKind::Target));
+            assert!(roles.contains(&SlugConfigurationKind::Exec));
+            assert_ne!(paths[0], paths[1]);
+            assert_ne!(digests[0], digests[1]);
+            if let Some(original) = &original_paths {
+                assert_eq!(original, &paths);
+            } else {
+                original_paths = Some(paths);
+            }
+            if let Some(original) = &original_digests {
+                assert_eq!(original == &digests, payload == "a");
+            } else {
+                original_digests = Some(digests);
+            }
+            assert!(
+                !workspace.root.join("configured").exists(),
+                "source root must remain untouched"
+            );
+            TerminalOutput::new(0, String::new(), String::new())
+        }));
+    }
+}
+
 fn workspace() -> PublicationWorkspace {
     let workspace = PublicationWorkspace::new();
     std::fs::write(
@@ -71,8 +194,13 @@ fn requested_publication_projects_subsets_and_checks_unselected_cooutputs() {
         .unwrap();
     let _entered = runtime.enter();
     let mut session = complete_session(&workspace);
-    let selected_file = [ActionOutput::new("file", ActionOutputKind::File)];
+    let selected_file = [ActionOutput::new(
+        crate::test_roots::owner_root(&workspace.owner),
+        "file",
+        ActionOutputKind::File,
+    )];
     let selected_tree = [ActionOutput::new(
+        crate::test_roots::owner_root(&workspace.owner),
         "result_tree",
         ActionOutputKind::Directory,
     )];
@@ -82,11 +210,17 @@ fn requested_publication_projects_subsets_and_checks_unselected_cooutputs() {
     let SelectedOutput::File(output) = projected[0][0] else {
         panic!("first producer file");
     };
-    assert_eq!(output.path(), "file");
+    assert_eq!(
+        output.path(),
+        crate::test_roots::owner_path(&workspace.owner, "file")
+    );
     let SelectedOutput::Directory(output) = projected[1][0] else {
         panic!("second producer tree");
     };
-    assert_eq!(output.path(), "result_tree");
+    assert_eq!(
+        output.path(),
+        crate::test_roots::owner_path(&workspace.owner, "result_tree")
+    );
     assert_eq!(
         session.results[1]
             .remote()
@@ -98,19 +232,38 @@ fn requested_publication_projects_subsets_and_checks_unselected_cooutputs() {
     );
     assert_eq!(
         session.results[2].remote().unwrap().result.output_files()[0].path(),
-        "done"
+        crate::test_roots::owner_path(&workspace.owner, "done")
     );
 
     // Every malformed result still contains the selected tree. Only unselected
     // cooutputs are missing, extra, duplicated or assigned the wrong kind.
     for bad in [
-        ActionResult::new(vec![]).with_output_directories(vec![directory("result_tree")]),
-        ActionResult::new(vec![file("done"), file("extra")])
-            .with_output_directories(vec![directory("result_tree")]),
-        ActionResult::new(vec![file("done"), file("done")])
-            .with_output_directories(vec![directory("result_tree")]),
-        ActionResult::new(vec![])
-            .with_output_directories(vec![directory("done"), directory("result_tree")]),
+        ActionResult::new(vec![]).with_output_directories(vec![directory(
+            &crate::test_roots::owner_path(&workspace.owner, "result_tree"),
+        )]),
+        ActionResult::new(vec![
+            file(&crate::test_roots::owner_path(&workspace.owner, "done")),
+            file(&crate::test_roots::owner_path(&workspace.owner, "extra")),
+        ])
+        .with_output_directories(vec![directory(&crate::test_roots::owner_path(
+            &workspace.owner,
+            "result_tree",
+        ))]),
+        ActionResult::new(vec![
+            file(&crate::test_roots::owner_path(&workspace.owner, "done")),
+            file(&crate::test_roots::owner_path(&workspace.owner, "done")),
+        ])
+        .with_output_directories(vec![directory(&crate::test_roots::owner_path(
+            &workspace.owner,
+            "result_tree",
+        ))]),
+        ActionResult::new(vec![]).with_output_directories(vec![
+            directory(&crate::test_roots::owner_path(&workspace.owner, "done")),
+            directory(&crate::test_roots::owner_path(
+                &workspace.owner,
+                "result_tree",
+            )),
+        ]),
     ] {
         let ActionChainStepResult::Remote(result) = &mut session.results[2] else {
             panic!("expected remote producer")
@@ -132,9 +285,21 @@ fn requested_publication_rejects_incomplete_table_invalid_producer_and_subset() 
         .unwrap();
     let _entered = runtime.enter();
     let mut session = complete_session(&workspace);
-    let selected = [ActionOutput::new("file", ActionOutputKind::File)];
-    let wrong_kind = [ActionOutput::new("file", ActionOutputKind::Directory)];
-    let wrong_path = [ActionOutput::new("absent", ActionOutputKind::File)];
+    let selected = [ActionOutput::new(
+        crate::test_roots::owner_root(&workspace.owner),
+        "file",
+        ActionOutputKind::File,
+    )];
+    let wrong_kind = [ActionOutput::new(
+        crate::test_roots::owner_root(&workspace.owner),
+        "file",
+        ActionOutputKind::Directory,
+    )];
+    let wrong_path = [ActionOutput::new(
+        crate::test_roots::owner_root(&workspace.owner),
+        "absent",
+        ActionOutputKind::File,
+    )];
     let duplicate = [selected[0].clone(), selected[0].clone()];
     for bad in [
         wrong_kind.as_slice(),
@@ -225,7 +390,7 @@ fn nativelink_requested_subsets_publish_file_and_tree_from_distinct_producers() 
         );
         assert_eq!(
             remote.results()[2].remote().unwrap().result.output_files()[0].path(),
-            "done"
+            crate::test_roots::owner_path(&workspace.owner, "done")
         );
         assert!(!remote.results()[1].remote().unwrap().result.output_files()[0].is_executable());
         let tree = &remote.results()[2]
@@ -240,12 +405,17 @@ fn nativelink_requested_subsets_publish_file_and_tree_from_distinct_producers() 
         assert_eq!(groups[0].action_index(), 1);
         assert_eq!(
             groups[0].outputs().outputs(),
-            [ActionOutput::new("file", ActionOutputKind::File)]
+            [ActionOutput::new(
+                crate::test_roots::owner_root(&workspace.owner),
+                "file",
+                ActionOutputKind::File
+            )]
         );
         assert_eq!(groups[1].action_index(), 2);
         assert_eq!(
             groups[1].outputs().outputs(),
             [ActionOutput::new(
+                crate::test_roots::owner_root(&workspace.owner),
                 "result_tree",
                 ActionOutputKind::Directory
             )]

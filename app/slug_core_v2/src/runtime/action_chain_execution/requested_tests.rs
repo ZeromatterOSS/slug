@@ -206,7 +206,7 @@ fn requested_forest_executes_shared_producers_once_and_restores_group_bindings()
             .selection()
             .artifacts()
             .iter()
-            .map(|artifact| artifact.path().into_owned())
+            .map(|artifact| crate::runtime::configured_output::test_artifact_coordinate(artifact))
             .collect::<Vec<_>>(),
         ["standalone", "left", "right", "file", "tree"]
     );
@@ -254,7 +254,7 @@ fn requested_forest_executes_shared_producers_once_and_restores_group_bindings()
         let requested = plan.requested().unwrap();
         assert_eq!(result.output().unwrap().inner.executed, [0, 1, 2]);
         assert_eq!(
-            plan.actions().last().unwrap().action().outputs()[0].path(),
+            plan.actions().last().unwrap().action().outputs()[0].root_relative_path(),
             selected
         );
         snapshots.push((

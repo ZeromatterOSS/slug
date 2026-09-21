@@ -52,10 +52,10 @@ pub(crate) fn complete_runfiles_support(
         return Err("runfiles support is unsupported on Windows".to_owned());
     }
 
-    let executable_path = output.path();
+    let executable_path = output.root_relative_path();
     let artifact = |path: String, kind| AnalysisArtifact::Derived {
         owner: owner.clone(),
-        output: ActionOutput::new(path, kind),
+        output: ActionOutput::new(output.root().clone(), path, kind),
     };
     let support = Arc::new(RunfilesSupport {
         runfiles: info.default_runfiles.clone(),

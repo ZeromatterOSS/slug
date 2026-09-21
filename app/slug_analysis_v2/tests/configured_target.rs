@@ -265,6 +265,16 @@ fn target_config() -> ConfigurationKey {
     ConfigurationKey::target("targetabc").unwrap()
 }
 
+fn output_root(configuration: &ConfigurationKey) -> slug_build_api_v2::DerivedArtifactRoot {
+    slug_build_api_v2::DerivedArtifactRoot::bin(
+        configuration
+            .slug_configuration()
+            .expect("action fixture requires structural configuration")
+            .clone(),
+    )
+    .unwrap()
+}
+
 fn structural_configurations() -> [ConfigurationKey; 3] {
     let host = HostConversionInputs::new(
         Some(AutoCpuToken::K8),
@@ -524,7 +534,11 @@ fn publication_result(marker: &str, nested: bool) -> Arc<ConfiguredNodeResult> {
             RetainedArtifactInputs::new(files).unwrap(),
         )]),
         ArtifactInputs::new(Vec::new()),
-        vec![ActionOutput::new("publication.out", ActionOutputKind::File)],
+        vec![ActionOutput::new(
+            output_root(owner.configuration()),
+            "publication.out",
+            ActionOutputKind::File,
+        )],
         None,
         RetainedActionEnvironment::default().for_action(false, Vec::<(String, String)>::new()),
         CanonicalStringMap::default(),
@@ -648,7 +662,11 @@ fn file_write_result(
                     is_executable: false,
                 },
                 "FileWrite",
-                vec![ActionOutput::new(output_path, ActionOutputKind::File)],
+                vec![ActionOutput::new(
+                    output_root(&configuration),
+                    output_path,
+                    ActionOutputKind::File,
+                )],
             )],
             vec![context.clone()],
         )
@@ -662,6 +680,31 @@ fn only_file_write(result: &ConfiguredNodeResult) -> slug_analysis_v2::Configure
         .unwrap()
         .next()
         .unwrap()
+}
+
+#[test]
+fn configured_action_rejects_foreign_output_root() {
+    let configurations = structural_configurations();
+    let baseline = file_write_result(configurations[0].clone(), "@@//:p0", "content", "out");
+    let context = baseline.actions()[0].context().clone();
+    let foreign = ActionSpec::new(
+        ActionKind::Write {
+            content: "content".to_owned(),
+            is_executable: false,
+        },
+        "FileWrite",
+        vec![ActionOutput::new(
+            output_root(&configurations[1]),
+            "out",
+            ActionOutputKind::File,
+        )],
+    );
+    assert_eq!(
+        baseline
+            .with_action_specs(vec![foreign], vec![context])
+            .unwrap_err(),
+        "configured action output root differs from action configuration"
+    );
 }
 
 #[test]
@@ -947,7 +990,11 @@ fn configured_node_result_keeps_provider_collection_outputs_and_diagnostics() {
                     is_executable: false,
                 },
                 "FileWrite",
-                vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+                vec![ActionOutput::new(
+                    output_root(expected_owner.configuration()),
+                    "pkg/out.txt",
+                    ActionOutputKind::File,
+                )],
             )],
             vec![context],
         )
@@ -1113,7 +1160,14 @@ fn configured_file_write_view_tracks_and_restores_structural_identity() {
     assert_eq!(baseline.exec_group(), &ConfiguredExecGroup::Default);
     assert_eq!(baseline.owner().label(), &canonical("@@//:probe"));
     assert_eq!(baseline.execution_platform().label(), &canonical("@@//:p0"));
-    assert_eq!(baseline.output().path(), "path-A.txt");
+    assert_eq!(baseline.output().root_relative_path(), "path-A.txt");
+    assert_eq!(
+        baseline.output().path(),
+        format!(
+            "{}/path-A.txt",
+            output_root(baseline.owner().configuration()).path()
+        )
+    );
     assert!(matches!(
         baseline.spec().kind(),
         ActionKind::Write { content, is_executable: false } if content == "content-A"
@@ -1159,6 +1213,7 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
         vec![constraint],
     )
     .unwrap();
+    let root = output_root(owner.configuration());
     let spec = |path: &str| {
         ActionSpec::new(
             ActionKind::Write {
@@ -1166,7 +1221,11 @@ fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatche
                 is_executable: false,
             },
             "FileWrite",
-            vec![ActionOutput::new(path, ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                root.clone(),
+                path,
+                ActionOutputKind::File,
+            )],
         )
     };
     let providers =
@@ -1401,6 +1460,7 @@ fn configured_action_specs_route_every_group_without_fallback() {
         "@@//:p2",
         "automatic",
     );
+    let root = output_root(owner.configuration());
     let action = |path: &str| {
         ActionSpec::new(
             ActionKind::Write {
@@ -1408,7 +1468,11 @@ fn configured_action_specs_route_every_group_without_fallback() {
                 is_executable: false,
             },
             "FileWrite",
-            vec![ActionOutput::new(path, ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                root.clone(),
+                path,
+                ActionOutputKind::File,
+            )],
         )
     };
     let providers =
@@ -1499,7 +1563,11 @@ fn configured_file_write_view_uses_retained_context_and_rejects_shapes() {
         ActionSpec::new(
             action.kind().clone(),
             "FileWrite",
-            vec![ActionOutput::new("tree", ActionOutputKind::Directory)],
+            vec![ActionOutput::new(
+                action.outputs()[0].root().clone(),
+                "tree",
+                ActionOutputKind::Directory,
+            )],
         ),
     ];
     for unsupported in unsupported_shapes {

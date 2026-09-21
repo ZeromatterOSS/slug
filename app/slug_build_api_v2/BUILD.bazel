@@ -21,22 +21,24 @@ rust_library(
 
 rust_test(
     name = "actions_test",
-    srcs = ["tests/actions.rs", "tests/native_link_args/mod.rs"],
+    srcs = ["tests/actions.rs", "tests/source_paths.rs", "tests/native_link_args/mod.rs", "tests/root_support/mod.rs"],
     crate_root = "tests/actions.rs",
     edition = crate_edition(),
     size = "small",
     visibility = ["//visibility:private"],
-    deps = [":slug_build_api_v2"],
+    deps = [":slug_build_api_v2", "//app/slug_configuration_v2", "//app/slug_identity_v2"],
 )
 
 rust_test(
     name = "ctx_test",
-    srcs = ["tests/ctx.rs"],
+    srcs = ["tests/ctx.rs", "tests/root_support/mod.rs"],
+    crate_root = "tests/ctx.rs",
     edition = crate_edition(),
     size = "small",
     visibility = ["//visibility:private"],
     deps = [
         ":slug_build_api_v2",
+        "//app/slug_configuration_v2",
         "//app/slug_identity_v2",
     ],
 )
@@ -52,9 +54,10 @@ rust_test(
 
 rust_test(
     name = "providers_test",
-    srcs = ["tests/providers.rs"],
+    srcs = ["tests/providers.rs", "tests/root_support/mod.rs"],
+    crate_root = "tests/providers.rs",
     edition = crate_edition(),
     size = "small",
     visibility = ["//visibility:private"],
-    deps = [":slug_build_api_v2"],
+    deps = [":slug_build_api_v2", "//app/slug_configuration_v2", "//app/slug_identity_v2"],
 )

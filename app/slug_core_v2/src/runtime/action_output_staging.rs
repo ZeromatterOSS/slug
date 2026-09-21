@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use slug_build_api_v2::ActionOutput;
-use slug_configuration_v2::SlugConfiguration;
+use slug_build_api_v2::DerivedArtifactRoot;
 use starlark_map::small_set::SmallSet;
 
 mod plan;
@@ -63,40 +63,40 @@ impl ActionOutputStaging {
     #[cfg(test)]
     pub(super) fn new(
         workspace: &Path,
-        configuration: &SlugConfiguration,
+        root: &DerivedArtifactRoot,
         outputs: &[ActionOutput],
     ) -> io::Result<Self> {
         let reserved = outputs
             .iter()
-            .flat_map(|output| output.path().split('/'))
+            .flat_map(|output| output.root_relative_path().split('/'))
             .collect();
-        Self::new_reserved(workspace, configuration, outputs, &reserved)
+        Self::new_reserved(workspace, root, outputs, &reserved)
     }
 
     pub(super) fn new_reserved(
         workspace: &Path,
-        configuration: &SlugConfiguration,
+        root: &DerivedArtifactRoot,
         outputs: &[ActionOutput],
         reserved: &SmallSet<&str>,
     ) -> io::Result<Self> {
         #[cfg(all(target_os = "linux", target_env = "gnu"))]
         {
-            let inner = linux::Staging::new(workspace, configuration, outputs, reserved)?;
+            let inner = linux::Staging::new(workspace, root, outputs, reserved)?;
             Ok(Self {
                 outputs: outputs.to_vec().into(),
-                root: super::configured_output::configured_output_root(workspace, configuration),
+                root: super::configured_output::configured_output_root(workspace, root),
                 inner,
             })
         }
         #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
         {
-            let _ = (workspace, configuration, outputs, reserved);
+            let _ = (workspace, root, outputs, reserved);
             Err(unsupported())
         }
     }
     pub(super) fn new_runfiles(
         workspace: &Path,
-        configuration: &SlugConfiguration,
+        root: &DerivedArtifactRoot,
         output: &ActionOutput,
         workspace_name: &str,
         entries: &[(String, Option<String>)],
@@ -106,7 +106,7 @@ impl ActionOutputStaging {
         {
             let inner = linux::Staging::new_runfiles(
                 workspace,
-                configuration,
+                root,
                 output,
                 workspace_name,
                 entries,
@@ -114,27 +114,20 @@ impl ActionOutputStaging {
             )?;
             Ok(Self {
                 outputs: Arc::from([output.clone()]),
-                root: super::configured_output::configured_output_root(workspace, configuration),
+                root: super::configured_output::configured_output_root(workspace, root),
                 inner,
             })
         }
         #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
         {
-            let _ = (
-                workspace,
-                configuration,
-                output,
-                workspace_name,
-                entries,
-                reserved,
-            );
+            let _ = (workspace, root, output, workspace_name, entries, reserved);
             Err(unsupported())
         }
     }
 
     pub(super) fn new_alias(
         workspace: &Path,
-        configuration: &SlugConfiguration,
+        root: &DerivedArtifactRoot,
         output: &ActionOutput,
         target: &str,
         reserved: &SmallSet<&str>,
@@ -143,19 +136,13 @@ impl ActionOutputStaging {
         {
             Ok(Self {
                 outputs: Arc::from([output.clone()]),
-                root: super::configured_output::configured_output_root(workspace, configuration),
-                inner: linux::Staging::new_alias(
-                    workspace,
-                    configuration,
-                    output,
-                    target,
-                    reserved,
-                )?,
+                root: super::configured_output::configured_output_root(workspace, root),
+                inner: linux::Staging::new_alias(workspace, root, output, target, reserved)?,
             })
         }
         #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
         {
-            let _ = (workspace, configuration, output, target, reserved);
+            let _ = (workspace, root, output, target, reserved);
             Err(unsupported())
         }
     }

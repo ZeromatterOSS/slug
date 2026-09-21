@@ -339,7 +339,11 @@ fn artifact_payload_and_inactive_metadata_are_owned() {
             CanonicalLabel::parse("@@tools+//cc:compiler").unwrap(),
             Arc::<[u8]>::from(&b"configuration"[..]),
         ),
-        output: ActionOutput::new("cc/compiler", ActionOutputKind::File),
+        output: ActionOutput::new(
+            crate::artifact_root::test_root(),
+            "cc/compiler",
+            ActionOutputKind::File,
+        ),
     };
     let module = Module::new();
     module.import_public_symbols(&library());

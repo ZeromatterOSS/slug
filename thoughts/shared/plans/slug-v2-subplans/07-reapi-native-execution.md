@@ -196,7 +196,9 @@ Producer manifests retain their original modes and empty directories. Shared
 source-only lowering and FileWrite semantics are unchanged.
 
 WP-7-38 adds opt-in publication of only the selected action's File/Directory
-outputs. Core derives the configured root from the validated action owner;
+outputs. WP766 makes the derived artifact root mandatory and validates its full
+configuration against the action owner before transport. Wire paths are full
+exec paths; Core opens that configured root and stages root-relative coordinates;
 REAPI reconciles its session's exact result schema and streams verified CAS bytes
 into Core-owned hidden siblings of each destination. Intermediate results stay
 CAS-only. Directory reconstruction preserves all verified manifest empty directories;

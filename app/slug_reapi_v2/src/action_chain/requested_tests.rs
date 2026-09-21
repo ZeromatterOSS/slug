@@ -112,7 +112,9 @@ fn requested_templates_bind_shared_producer_and_keep_all_root_results() {
                 .tree
                 .entries()
                 .iter()
-                .find(|entry| entry.path() == "seed.out")
+                .find(|entry| {
+                    entry.path() == crate::test_roots::owner_path(&workspace.owner, "seed.out")
+                })
                 .unwrap();
             assert_eq!(shared.digest(), &digest);
             assert!(shared.is_executable());

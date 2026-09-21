@@ -2101,9 +2101,21 @@ fn configured_target_analysis_value(
 }
 
 fn derived_artifact(owner: &ConfiguredTargetKey, path: impl Into<String>) -> AnalysisArtifact {
+    let root = slug_build_api_v2::DerivedArtifactRoot::bin(
+        owner
+            .configuration()
+            .slug_configuration()
+            .expect("generated target has structural configuration")
+            .clone(),
+    )
+    .expect("generated target has admitted output root");
+    let path = slug_build_api_v2::repository_relative_output_path(
+        owner.label().package().repo(),
+        &path.into(),
+    );
     AnalysisArtifact::Derived {
         owner: crate::analysis_value::analysis_configured_key(owner),
-        output: ActionOutput::new(path, ActionOutputKind::File),
+        output: ActionOutput::new(root, path, ActionOutputKind::File),
     }
 }
 

@@ -779,6 +779,10 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
     fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match name {
             "path" => Some(heap.alloc_str(&self.path()).to_value()),
+            "root" => Some(crate::artifact_root::alloc_artifact_root(
+                heap,
+                self.artifact.root(),
+            )),
             "short_path" => Some(heap.alloc_str(&self.artifact.short_path()).to_value()),
             "basename" => Some(heap.alloc_str(&self.basename()).to_value()),
             "extension" => {
@@ -808,7 +812,7 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
                 self.artifact,
                 AnalysisArtifact::Source(_)
             ))),
-            "label" => Some(alloc_starlark_label(
+            "label" | "owner" => Some(alloc_starlark_label(
                 heap,
                 match &self.artifact {
                     AnalysisArtifact::Source(label) => label.clone(),
@@ -827,7 +831,9 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
             "is_source",
             "is_directory",
             "label",
+            "owner",
             "path",
+            "root",
             "short_path",
         ]
         .map(str::to_owned)

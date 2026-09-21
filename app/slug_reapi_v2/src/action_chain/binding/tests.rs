@@ -2,16 +2,16 @@ use super::*;
 
 fn generated(path: &str, output: &str, kind: ActionOutputKind) -> Binding {
     Binding::Generated {
-        path: path.into(),
+        path: crate::test_roots::path(path),
         producer: 0,
-        output: ActionOutput::new(output, kind),
+        output: ActionOutput::new(crate::test_roots::root(), output, kind),
     }
 }
 
 fn remote() -> ActionChainStepResult {
     let digest = ReapiDigest::of_bytes(b"");
     let directory = |path: &str, files| GeneratedDirectory {
-        path: path.into(),
+        path: crate::test_roots::path(path),
         tree_digest: ReapiDigest::of_bytes(b"verified tree"),
         root_digest: ReapiDigest::of_bytes(b"verified root"),
         directories: vec![String::new(), "nested-empty".into()],
@@ -20,14 +20,18 @@ fn remote() -> ActionChainStepResult {
     ActionChainStepResult::Remote(RemoteExecutionResult {
         action_digest: ReapiDigest::of_bytes(b"action"),
         platform_properties: Default::default(),
-        result: ActionResult::new(vec![GeneratedOutput::new("backing", digest.clone(), false)])
-            .with_output_directories(vec![
-                directory(
-                    "tree",
-                    vec![GeneratedOutput::new("nested/file", digest, false)],
-                ),
-                directory("empty", Vec::new()),
-            ]),
+        result: ActionResult::new(vec![GeneratedOutput::new(
+            crate::test_roots::path("backing"),
+            digest.clone(),
+            false,
+        )])
+        .with_output_directories(vec![
+            directory(
+                "tree",
+                vec![GeneratedOutput::new("nested/file", digest, false)],
+            ),
+            directory("empty", Vec::new()),
+        ]),
         output_blobs: Default::default(),
         evidence: ExecutionEvidence::reapi("synthetic verified producer metadata"),
     })
@@ -36,14 +40,18 @@ fn remote() -> ActionChainStepResult {
 fn tree(entries: Vec<Binding>) -> Binding {
     Binding::Runfiles {
         producer: 2,
-        output: ActionOutput::new("tool.runfiles", ActionOutputKind::RunfilesTree),
+        output: ActionOutput::new(
+            crate::test_roots::root(),
+            "tool.runfiles",
+            ActionOutputKind::RunfilesTree,
+        ),
         entries,
     }
 }
 
 #[test]
 fn runfiles_aliases_empty_files_and_trees_keep_distinct_provenance() {
-    let mapping = ActionOutput::new("mapping", ActionOutputKind::File);
+    let mapping = ActionOutput::new(crate::test_roots::root(), "mapping", ActionOutputKind::File);
     let results = [
         remote(),
         ActionChainStepResult::from_runfiles(PreparedRunfilesAction::Manifest {
@@ -51,7 +59,11 @@ fn runfiles_aliases_empty_files_and_trees_keep_distinct_provenance() {
             bytes: Arc::from([]),
         }),
         ActionChainStepResult::RunfilesTree {
-            output: ActionOutput::new("tool.runfiles", ActionOutputKind::RunfilesTree),
+            output: ActionOutput::new(
+                crate::test_roots::root(),
+                "tool.runfiles",
+                ActionOutputKind::RunfilesTree,
+            ),
         },
     ];
     let binding = tree(vec![
@@ -67,15 +79,15 @@ fn runfiles_aliases_empty_files_and_trees_keep_distinct_provenance() {
             ActionOutputKind::Directory,
         ),
         Binding::Empty {
-            path: "tool.runfiles/empty-file".into(),
+            path: crate::test_roots::path("tool.runfiles/empty-file"),
         },
         Binding::Source {
-            path: "tool.runfiles/MANIFEST".into(),
+            path: crate::test_roots::path("tool.runfiles/MANIFEST"),
             digest: ReapiDigest::of_bytes(b""),
             index: 7,
         },
         Binding::Generated {
-            path: "tool.runfiles/_repo_mapping".into(),
+            path: crate::test_roots::path("tool.runfiles/_repo_mapping"),
             producer: 1,
             output: mapping,
         },
@@ -100,6 +112,7 @@ fn runfiles_aliases_empty_files_and_trees_keep_distinct_provenance() {
             "tool.runfiles/empty-file",
             "tool.runfiles/tree-alias/nested/file",
         ]
+        .map(crate::test_roots::path)
     );
     assert_eq!(
         tree.directories(),
@@ -108,6 +121,7 @@ fn runfiles_aliases_empty_files_and_trees_keep_distinct_provenance() {
             "tool.runfiles/empty-tree",
             "tool.runfiles/tree-alias"
         ]
+        .map(crate::test_roots::path)
     );
     assert!(
         tree.entries()
@@ -126,7 +140,7 @@ fn runfiles_binding_requires_exact_completed_tree_and_target_results() {
         ActionOutputKind::File,
     )]);
     let completed = |path, kind| ActionChainStepResult::RunfilesTree {
-        output: ActionOutput::new(path, kind),
+        output: ActionOutput::new(crate::test_roots::root(), path, kind),
     };
     for result in [
         completed("wrong.runfiles", ActionOutputKind::RunfilesTree),

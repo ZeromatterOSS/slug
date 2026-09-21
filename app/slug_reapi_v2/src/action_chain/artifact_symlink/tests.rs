@@ -3,7 +3,7 @@ use crate::action_chain::binding::BoundInputs;
 
 fn source(executable: bool, required: bool) -> ArtifactSymlinkTemplate {
     ArtifactSymlinkTemplate {
-        output: ActionOutput::new("first", ActionOutputKind::File),
+        output: ActionOutput::new(crate::test_roots::root(), "first", ActionOutputKind::File),
         input: Binding::Source {
             path: "source".into(),
             digest: ReapiDigest::of_bytes(b"bytes"),
@@ -15,11 +15,11 @@ fn source(executable: bool, required: bool) -> ArtifactSymlinkTemplate {
 }
 fn derived(target: &str, producer: usize, output: &str, required: bool) -> ArtifactSymlinkTemplate {
     ArtifactSymlinkTemplate {
-        output: ActionOutput::new(output, ActionOutputKind::File),
+        output: ActionOutput::new(crate::test_roots::root(), output, ActionOutputKind::File),
         input: Binding::Generated {
-            path: target.into(),
+            path: crate::test_roots::path(target),
             producer,
-            output: ActionOutput::new(target, ActionOutputKind::File),
+            output: ActionOutput::new(crate::test_roots::root(), target, ActionOutputKind::File),
         },
         require_executable: required,
         source_executable: None,
@@ -30,7 +30,7 @@ fn remote(path: &str) -> ActionChainStepResult {
         action_digest: ReapiDigest::of_bytes(b"action"),
         platform_properties: Default::default(),
         result: ActionResult::new(vec![GeneratedOutput::new(
-            path,
+            crate::test_roots::path(path),
             ReapiDigest::of_bytes(b"bytes"),
             false,
         )]),
@@ -75,7 +75,11 @@ fn remote_mode_false_alias_is_executable_and_local_manifest_keeps_bytes() {
         .unwrap();
     assert!(matches!(second.backing(), FileBacking::GeneratedCas));
     let local = ActionChainStepResult::from_runfiles(PreparedRunfilesAction::Manifest {
-        output: ActionOutput::new("manifest", ActionOutputKind::File),
+        output: ActionOutput::new(
+            crate::test_roots::root(),
+            "manifest",
+            ActionOutputKind::File,
+        ),
         bytes: Arc::from(&b"bytes"[..]),
     });
     let alias = derived("manifest", 0, "alias", true)
@@ -92,11 +96,19 @@ fn alias_results_require_exact_producer_and_keep_equal_digest_provenance() {
         Vec::new(),
         vec![remote("wrong")],
         vec![ActionChainStepResult::RunfilesTree {
-            output: ActionOutput::new("first", ActionOutputKind::RunfilesTree),
+            output: ActionOutput::new(
+                crate::test_roots::root(),
+                "first",
+                ActionOutputKind::RunfilesTree,
+            ),
         }],
         vec![ActionChainStepResult::from_runfiles(
             PreparedRunfilesAction::Manifest {
-                output: ActionOutput::new("wrong", ActionOutputKind::File),
+                output: ActionOutput::new(
+                    crate::test_roots::root(),
+                    "wrong",
+                    ActionOutputKind::File,
+                ),
                 bytes: Arc::from(&b"bytes"[..]),
             },
         )],
@@ -104,7 +116,8 @@ fn alias_results_require_exact_producer_and_keep_equal_digest_provenance() {
         assert!(template.resolve(&results).is_err());
     }
     let mut wrong_alias = source(true, false).resolve(&[]).unwrap();
-    wrong_alias.output = ActionOutput::new("wrong", ActionOutputKind::File);
+    wrong_alias.output =
+        ActionOutput::new(crate::test_roots::root(), "wrong", ActionOutputKind::File);
     assert!(
         template
             .resolve(&[ActionChainStepResult::ArtifactSymlink(wrong_alias)])
@@ -116,7 +129,11 @@ fn alias_results_require_exact_producer_and_keep_equal_digest_provenance() {
         .resolve(&[remote("generated")])
         .unwrap();
     let local = ActionChainStepResult::from_runfiles(PreparedRunfilesAction::Manifest {
-        output: ActionOutput::new("manifest", ActionOutputKind::File),
+        output: ActionOutput::new(
+            crate::test_roots::root(),
+            "manifest",
+            ActionOutputKind::File,
+        ),
         bytes: Arc::from(&b"bytes"[..]),
     });
     let local_alias = derived("manifest", 0, "local_alias", false)

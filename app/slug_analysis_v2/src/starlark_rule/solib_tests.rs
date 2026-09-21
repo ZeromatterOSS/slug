@@ -31,7 +31,12 @@ fn sink() -> Arc<SynchronousAnalysisActionSink> {
     )
     .unwrap();
     Arc::new(SynchronousAnalysisActionSink {
-        actions: Arc::new(Mutex::new(CtxActions::new())),
+        root: DerivedArtifactRoot::bin(key.configuration().slug_configuration().unwrap().clone())
+            .unwrap(),
+        actions: Arc::new(Mutex::new(CtxActions::new(
+            DerivedArtifactRoot::bin(key.configuration().slug_configuration().unwrap().clone())
+                .unwrap(),
+        ))),
         declared_outputs: Mutex::new(SmallMap::new()),
         package_path: "ffi/cc/allocator_library".to_owned(),
         owner: key.artifact_owner(),
@@ -58,7 +63,11 @@ fn generated(configuration: &[u8], kind: ActionOutputKind) -> AnalysisArtifact {
             CanonicalLabel::parse("@@rules_rust+//ffi/cc/allocator_library:producer").unwrap(),
             Arc::<[u8]>::from(configuration),
         ),
-        output: ActionOutput::new("ffi/cc/allocator_library/liballocator.so", kind),
+        output: ActionOutput::new(
+            crate::analysis_value::test_artifact_root(),
+            "external/rules_rust+/ffi/cc/allocator_library/liballocator.so",
+            kind,
+        ),
     }
 }
 
@@ -96,7 +105,7 @@ fn native_solib_sink_keeps_input_owner_and_bin_relative_output() {
     };
     assert_eq!(owner, &sink.owner);
     assert_eq!(
-        output.path(),
+        output.root_relative_path(),
         "_solib_k8/libexternal_Srules_Urust+_Sffi_Scc_Sallocator_Ulibrary_Sliballocator.so"
     );
     assert_eq!(output.kind(), ActionOutputKind::File);
@@ -147,7 +156,10 @@ fn native_solib_sink_rejects_types_collisions_and_declared_directory() {
         unreachable!()
     };
     fresh
-        .declare_bin_relative_output(output.path().to_owned(), ActionOutputKind::Directory)
+        .declare_bin_relative_output(
+            output.root_relative_path().to_owned(),
+            ActionOutputKind::Directory,
+        )
         .unwrap();
     assert!(
         fresh

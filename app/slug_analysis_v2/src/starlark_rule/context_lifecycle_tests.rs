@@ -70,6 +70,10 @@ fn check_rule_context_teardown(fail: bool) {
         action_sink: sink,
         token: token.clone(),
         retained_owner: key.artifact_owner(),
+        output_root: DerivedArtifactRoot::bin(
+            key.configuration().slug_configuration().unwrap().clone(),
+        )
+        .unwrap(),
         cc_context: CcContextProjection::unconfigured(Arc::new(
             ConfiguredActionOwnerContext::unresolved_default(key.clone()).unwrap(),
         )),
@@ -105,6 +109,8 @@ fn check_rule_context_teardown(fail: bool) {
     )
     .unwrap();
     let guard = evaluation.enter_root_context(&module, ctx).unwrap();
+    let bin = ctx.get_attr("bin_dir", module.heap()).unwrap().unwrap();
+    assert!(slug_loading_v2::artifact_root_value(bin).is_some());
     let result = eval.eval_function(module.get("implementation").unwrap(), &[ctx], &[]);
     assert_eq!(result.is_err(), fail);
     if let Ok(label) = result {
@@ -115,6 +121,12 @@ fn check_rule_context_teardown(fail: bool) {
     assert!(token.require_active("label", "rule context").is_err());
     assert!(ctx.get_attr("label", module.heap()).unwrap().is_none());
     assert!(ctx.get_attr("actions", module.heap()).unwrap().is_none());
+    assert!(ctx.get_attr("bin_dir", module.heap()).unwrap().is_none());
+    assert!(
+        ctx.get_attr("genfiles_dir", module.heap())
+            .unwrap()
+            .is_none()
+    );
     let saved = ListRef::from_value(module.get("saved").unwrap()).unwrap();
     let actions = AnalysisActions::from_value(saved.content()[0]).unwrap();
     let error = actions

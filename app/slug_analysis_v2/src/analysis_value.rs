@@ -94,6 +94,31 @@ pub(crate) fn analysis_configured_key(key: &ConfiguredTargetKey) -> AnalysisConf
     }
 }
 
+#[cfg(test)]
+pub(crate) fn test_artifact_root() -> slug_build_api_v2::DerivedArtifactRoot {
+    use std::sync::Arc;
+
+    use slug_configuration_v2::native::host::AutoCpuToken;
+    use slug_configuration_v2::native::host::HostConversionInputs;
+    use slug_configuration_v2::native::host::HostPathFlavor;
+    let host = HostConversionInputs::new(
+        Some(AutoCpuToken::K8),
+        Some(HostPathFlavor::Unix),
+        None,
+        Arc::from([]),
+        Arc::from([]),
+    )
+    .unwrap();
+    slug_build_api_v2::DerivedArtifactRoot::bin(
+        slug_configuration_v2::SlugConfiguration::default_target(&host).unwrap(),
+    )
+    .unwrap()
+}
+
+#[cfg(test)]
+#[path = "analysis_value/artifact_root_tests.rs"]
+mod artifact_root_tests;
+
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct BuiltinProviderView {
     identity: ProviderIdentity,
@@ -809,6 +834,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
             AnalysisValueKind::Artifact(value) => {
                 self.heap.alloc(AnalysisArtifactValue::new(value.clone()))
             }
+            AnalysisValueKind::ArtifactRoot(value) => {
+                slug_loading_v2::alloc_frozen_artifact_root(self.heap, value.clone())
+            }
             AnalysisValueKind::List(values) => self.heap.alloc(
                 values
                     .iter()
@@ -907,6 +935,9 @@ impl<'v> AnalysisValueLowerer<'v> {
         }
         if let Some(value) = AnalysisArtifactValue::from_starlark(value) {
             return Ok(AnalysisValue::artifact(value.artifact().clone()));
+        }
+        if let Some(root) = slug_loading_v2::artifact_root_value(value) {
+            return Ok(AnalysisValue::artifact_root(root));
         }
         if let Some(value) = StarlarkFilesToRunProvider::from_value(value) {
             return Ok(AnalysisValue::provider(value.retained.to_occurrence()));
@@ -1444,6 +1475,7 @@ mod tests {
             file_providers(AnalysisArtifact::Derived {
                 owner: generated_owner,
                 output: slug_build_api_v2::ActionOutput::new(
+                    test_artifact_root(),
                     "pkg/generated.txt",
                     slug_build_api_v2::ActionOutputKind::File,
                 ),
@@ -1503,6 +1535,11 @@ mod tests {
                 .expect("round trip retained file DefaultInfo")
                 .file_artifacts();
             assert_eq!(artifacts.len(), 1);
+            let expected = if null_identity {
+                expected.to_owned()
+            } else {
+                format!("{}/{expected}", test_artifact_root().path())
+            };
             assert_eq!(artifacts[0].path().as_ref(), expected);
         }
     }

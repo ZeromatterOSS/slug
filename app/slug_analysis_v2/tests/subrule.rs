@@ -483,8 +483,8 @@ def _subrule(ctx, prefix, suffix = "", **kwargs):
     if kwargs["_none"] != None: fail("absent label was not materialized as None")
     if kwargs["_empty"] != []: fail("absent label_list was not materialized as empty")
     if kwargs["_source"].path != "files/inferred.txt": fail("single file was not materialized")
-    if kwargs["_generated"].path != "deps/generated.bin": fail("generated file was not materialized")
-    if kwargs["_exec"].executable.path != "deps/tool": fail("executable provider was not materialized")
+    if kwargs["_generated"].path != kwargs["_generated"].root.path + "/deps/generated.bin": fail("generated file was not materialized")
+    if kwargs["_exec"].executable.path != kwargs["_exec"].executable.root.path + "/deps/tool": fail("executable provider was not materialized")
     if kwargs["_exported"].executable.path != "files/exported.sh": fail("source executable provider was not materialized")
     if ProfileInfo not in kwargs["_literal"]: fail("Target provider membership was not materialized")
     if kwargs["_alias"].label.name != "literal" or ProfileInfo not in kwargs["_alias"]: fail("alias actual Target was not materialized")
@@ -493,7 +493,7 @@ def _subrule(ctx, prefix, suffix = "", **kwargs):
     if len(source_files) != 1 or source_files[0].path != "files/inferred.txt": fail("source Target DefaultInfo was not materialized as File")
     if DefaultInfo not in kwargs["_generated_provider"]: fail("generated Target has no inherent DefaultInfo")
     generated_files = kwargs["_generated_provider"][DefaultInfo].files.to_list()
-    if len(generated_files) != 1 or generated_files[0].path != "deps/generated.bin": fail("generated Target DefaultInfo was not materialized as File")
+    if len(generated_files) != 1 or generated_files[0].path != generated_files[0].root.path + "/deps/generated.bin": fail("generated Target DefaultInfo was not materialized as File")
     out = ctx.actions.declare_file("subrule.txt")
     ctx.actions.write(out, "subrule")
     return ReturnedInfo(
@@ -1065,6 +1065,11 @@ async fn configured_subrule_dependencies_materialize_and_invoke() {
             .expect("file Target retained materialized DefaultInfo")
             .file_artifacts();
         assert_eq!(files.len(), 1);
+        let expected_path = if null_identity {
+            expected_path.to_owned()
+        } else {
+            format!("{}/{expected_path}", files[0].root().path())
+        };
         assert_eq!(files[0].path().as_ref(), expected_path);
     }
     let implicit = result

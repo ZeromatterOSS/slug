@@ -50,16 +50,23 @@ impl ActionChainTransport for FaultTransport {
             self.consumers.fetch_add(1, Ordering::SeqCst);
         }
         self.inner.execute(session, index, staged).await?;
-        if matches!(&session.results[index], ActionChainStepResult::ArtifactSymlink(alias) if ["generated.first", "generated.alias"].contains(&alias.output().path()))
+        if matches!(&session.results[index], ActionChainStepResult::ArtifactSymlink(alias) if ["generated.first", "generated.alias"].contains(&alias.output().root_relative_path()))
         {
             self.generated_aliases.fetch_add(1, Ordering::SeqCst);
         }
+        let plan = session.inputs.plan().unwrap();
+        let generated_path = plan.actions()[index]
+            .action()
+            .outputs()
+            .iter()
+            .find(|output| output.root_relative_path() == "generated")
+            .map(|output| output.path());
         let Some(file) = session.results[index].remote().and_then(|remote| {
             remote
                 .result
                 .output_files()
                 .iter()
-                .find(|file| file.path() == "generated")
+                .find(|file| Some(file.path()) == generated_path)
         }) else {
             return Ok(());
         };

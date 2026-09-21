@@ -102,18 +102,16 @@ impl Fixture {
             .flat_map(|node| {
                 let root = slug_core_v2::runtime::configured_output_root(
                     &self.root,
-                    node.configured_target_key()
-                        .unwrap()
-                        .configuration()
-                        .slug_configuration()
-                        .unwrap(),
+                    node.actions()[0].outputs()[0].root(),
                 );
                 node.actions().iter().flat_map(move |action| {
                     let root = root.clone();
-                    action
-                        .outputs()
-                        .iter()
-                        .map(move |output| (output.path().to_owned(), root.join(output.path())))
+                    action.outputs().iter().map(move |output| {
+                        (
+                            output.root_relative_path().to_owned(),
+                            root.join(output.root_relative_path()),
+                        )
+                    })
                 })
             })
             .collect()
@@ -262,10 +260,18 @@ fn nativelink_artifact_alias_consumers_restore_without_tool_publication() {
                     } else {
                         original = Some(digests);
                     }
+                    let plan = accepted.inputs().plan().unwrap();
+                    let script_path = plan
+                        .actions()
+                        .iter()
+                        .flat_map(|step| step.action().outputs())
+                        .find(|output| output.root_relative_path() == "tools/generated_script")
+                        .unwrap()
+                        .path();
                     let script = remotes
                         .iter()
                         .flat_map(|remote| remote.result.output_files())
-                        .find(|file| file.path() == "tools/generated_script")
+                        .find(|file| file.path() == script_path)
                         .unwrap();
                     assert!(
                         !script.is_executable(),
@@ -276,7 +282,8 @@ fn nativelink_artifact_alias_consumers_restore_without_tool_publication() {
                         .iter()
                         .find_map(|step| match step {
                             ActionChainStepResult::ArtifactSymlink(alias)
-                                if alias.output().path() == "tools/generated_binary" =>
+                                if alias.output().root_relative_path()
+                                    == "tools/generated_binary" =>
                             {
                                 Some(alias)
                             }
@@ -326,7 +333,11 @@ fn nativelink_artifact_alias_publication_replacement_and_manifest_backing_surviv
                 let requested = accepted.inputs().plan().unwrap();
                 let artifacts = requested.requested().unwrap().selection().artifacts();
                 assert_eq!(artifacts.len(), 1);
-                assert_eq!(artifacts[0].path(), "manifest.alias");
+                assert_eq!(artifacts[0].short_path(), "manifest.alias");
+                assert_eq!(
+                    artifacts[0].path(),
+                    format!("{}/manifest.alias", artifacts[0].root().path())
+                );
                 assert!(
                     accepted
                         .output()
@@ -343,7 +354,7 @@ fn nativelink_artifact_alias_publication_replacement_and_manifest_backing_surviv
                             .outputs()
                             .outputs()
                             .iter()
-                            .any(|out| out.path() == "manifest.alias")
+                            .any(|out| out.root_relative_path() == "manifest.alias")
                     })
                     .map(|group| group.outputs().root().to_owned());
                 TerminalOutput::new(0, String::new(), String::new())

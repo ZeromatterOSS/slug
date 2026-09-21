@@ -302,6 +302,7 @@ fn native_cc_features_publication_compares_unexpanded_metadata_and_requests() {
             configuration,
         ),
         output: slug_build_api_v2::ActionOutput::new(
+            crate::analysis_value::test_artifact_root(),
             "bin/compiler",
             slug_build_api_v2::ActionOutputKind::File,
         ),

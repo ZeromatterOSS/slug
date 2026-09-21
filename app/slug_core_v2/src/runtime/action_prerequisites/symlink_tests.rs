@@ -41,7 +41,7 @@ fn nested_aliases_defer_manifest_tree_completion_and_preserve_selected_spawn_beh
         forest.actions[forest.producers[1].unwrap()]
             .action()
             .outputs()[0]
-            .path(),
+            .root_relative_path(),
         "last"
     );
     assert_eq!(forest.actions.len(), 8); // six support/backing actions plus both aliases
@@ -68,7 +68,7 @@ fn nested_aliases_defer_manifest_tree_completion_and_preserve_selected_spawn_beh
     let selected = ActionPrerequisitePlan::new(&closure, &owner, 2).unwrap();
     assert_eq!(selected.actions().len(), 3);
     assert_eq!(
-        selected.actions().last().unwrap().action().outputs()[0].path(),
+        selected.actions().last().unwrap().action().outputs()[0].root_relative_path(),
         "consumer"
     );
     assert!(

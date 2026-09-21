@@ -1,3 +1,5 @@
+use slug_build_api_v2::DerivedArtifactRoot;
+mod root_support;
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -66,7 +68,7 @@ fn selected_toolchain_request_retained_owner_and_artifact_identity() {
     let artifact = |owner| {
         AnalysisValue::artifact(AnalysisArtifact::Derived {
             owner,
-            output: ActionOutput::new("same.out", ActionOutputKind::File),
+            output: ActionOutput::new(root_support::root(), "same.out", ActionOutputKind::File),
         })
     };
     let values = [ordinary, a.clone(), b].map(artifact);
@@ -179,7 +181,7 @@ fn all_admitted_value_kinds_are_heap_independent_and_distinct() {
                 label("@@//pkg:owner"),
                 b"full-config".as_slice(),
             ),
-            output: ActionOutput::new("pkg/out", ActionOutputKind::File),
+            output: ActionOutput::new(root_support::root(), "pkg/out", ActionOutputKind::File),
         }),
         AnalysisValue::list(vec![AnalysisValue::integer(1)]),
         AnalysisValue::tuple(vec![AnalysisValue::integer(1)]),

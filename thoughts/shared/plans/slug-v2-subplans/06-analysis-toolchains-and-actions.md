@@ -102,7 +102,8 @@ use `external/<canonical repo>/...`, and source short paths use `../<repo>/...`;
 main paths stay repository-relative. AnalysisArtifact owns both projections for
 File/Args/Spawn, and native-library ambiguity lookup uses short_path. Exact path
 shape uses existing Slug-native canonical names. Built-in catalog source-file
-admission, sibling layout and derived-root short-path parity remain deferred.
+admission and sibling layout remain deferred; WP766 supplies the separately
+classified coherent derived-root/short-path relationship below.
 
 WP-7-30 exposes the same observed source-path resolver to Core with its existing
 route/path observation frontier. Configured source analysis still projects only
@@ -211,9 +212,14 @@ Native CcToolchainInfo wrapping requires its real keyed provider, preserved sche
 classification and native model. ProviderOccurrence now carries that classification
 through publication equality and materialization without copying a schema list;
 existing language equality/hash and mixed-schema parity scope are unchanged.
-Roots cannot be supplied by empty placeholders: existing derived paths are
-bin-relative. A coherent output-layout projection across Files, declarations,
-Args and transport remains a prerequisite before root-aware compile helpers.
+WP766 supplies coherent mandatory derived roots across Files, declarations, Args,
+REAPI and physical publication. File.root/owner and live ctx.bin_dir/genfiles_dir
+share immutable typed owners; unchanged rules_cc root-relative/repository helpers
+and Rust root/exec slicing consume full exec paths. Structural identity and output
+tokens remain Slug-native; exact named path relationships follow pinned Bazel9.2.
+Ordinary external outputs and shared-bin Solib coordinates remain distinct. Split
+genfiles, direct external generated-label requests, compute_output_name_prefix_dir,
+declare_compile_output_file and discovery-aware CppCompile remain deferred.
 
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and

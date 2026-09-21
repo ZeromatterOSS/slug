@@ -28,7 +28,7 @@ use nix::unistd::UnlinkatFlags;
 use nix::unistd::unlinkat;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
-use slug_configuration_v2::SlugConfiguration;
+use slug_build_api_v2::DerivedArtifactRoot;
 use tempfile::NamedTempFile;
 
 mod alias;
@@ -253,12 +253,17 @@ pub(super) struct Staging {
 impl Staging {
     pub(super) fn new(
         workspace: &Path,
-        configuration: &SlugConfiguration,
+        root: &DerivedArtifactRoot,
         outputs: &[ActionOutput],
         reserved: &starlark_map::small_set::SmallSet<&str>,
     ) -> io::Result<Self> {
         for output in outputs {
-            component_path(output.path())?;
+            if output.root() != root {
+                return Err(io::Error::other(
+                    "output differs from the physical staging root",
+                ));
+            }
+            component_path(output.root_relative_path())?;
             if !matches!(
                 output.kind(),
                 ActionOutputKind::File | ActionOutputKind::Directory
@@ -271,13 +276,18 @@ impl Staging {
             .custom_flags(nix::libc::O_DIRECTORY | nix::libc::O_NOFOLLOW | nix::libc::O_CLOEXEC)
             .open(workspace)?;
         let bazel = directory(&workspace, "bazel-out", true)?;
-        let projection = configuration.projection().path_component();
-        claim_marker(&bazel, &projection, configuration.canonical_bytes())?;
+        let configuration = root.configuration();
+        claim_marker(
+            &bazel,
+            &configuration.projection().path_component(),
+            configuration.canonical_bytes(),
+        )?;
+        let projection = root.configuration_component().to_owned();
         let configured = directory(&bazel, &projection, true)?;
         let bin = directory(&configured, "bin", true)?;
         let mut destinations = Vec::with_capacity(outputs.len());
         for output in outputs {
-            let parts = component_path(output.path())?;
+            let parts = component_path(output.root_relative_path())?;
             let parent = walk(&bin, &parts[..parts.len() - 1], true)?;
             let previous = entry(&parent, parts.last().unwrap())?;
             destinations.push(Destination::new(parent, previous, output.kind(), reserved)?);
@@ -405,7 +415,7 @@ impl Staging {
             }
         }
         for (output, saved) in outputs.iter().zip(&self.destinations) {
-            let parts = component_path(output.path())?;
+            let parts = component_path(output.root_relative_path())?;
             let parent = walk(&self.bin, &parts[..parts.len() - 1], false)?;
             if identity(&parent)? != identity(&saved.parent)?
                 || entry(&parent, parts.last().unwrap())? != saved.previous
@@ -430,7 +440,10 @@ impl Staging {
         self.preflight_publication(outputs)?;
         self.attempted = true;
         for (output, destination) in outputs.iter().zip(&mut self.destinations) {
-            let name = component_path(output.path())?.last().unwrap().to_string();
+            let name = component_path(output.root_relative_path())?
+                .last()
+                .unwrap()
+                .to_string();
             let flags = if destination.previous.is_some() {
                 RenameFlags::RENAME_EXCHANGE
             } else {

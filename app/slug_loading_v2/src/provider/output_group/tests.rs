@@ -33,7 +33,7 @@ fn evaluate(source: &str) -> Result<FrozenModule, String> {
                 .heap()
                 .alloc(AnalysisArtifactValue::new(AnalysisArtifact::Derived {
                     owner,
-                    output: ActionOutput::new("pkg/same", kind),
+                    output: ActionOutput::new(crate::artifact_root::test_root(), "pkg/same", kind),
                 })),
         );
     }

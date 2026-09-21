@@ -27,6 +27,7 @@ use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::DepsetOrder;
+use slug_build_api_v2::DerivedArtifactRoot;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
@@ -179,6 +180,8 @@ struct AnalysisContextGen<V> {
     token: AnalysisCallToken,
     retained_owner: AnalysisConfiguredTargetKey,
     #[trace(unsafe_ignore)]
+    output_root: DerivedArtifactRoot,
+    #[trace(unsafe_ignore)]
     cc_context: CcContextProjection,
     target_label: slug_identity_v2::CanonicalLabel,
     package_path: String,
@@ -207,6 +210,7 @@ impl<'v> Freeze for AnalysisContext<'v> {
             action_sink: self.action_sink,
             token: self.token,
             retained_owner: self.retained_owner,
+            output_root: self.output_root,
             cc_context: self.cc_context,
             target_label: self.target_label,
             package_path: self.package_path,
@@ -243,6 +247,21 @@ where
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         self.token.require_active(attribute, "rule context").ok()?;
         match attribute {
+            "bin_dir" => Some(slug_loading_v2::alloc_artifact_root(
+                heap,
+                slug_build_api_v2::AnalysisArtifactRoot::Derived(self.output_root.clone()),
+            )),
+            "genfiles_dir" => self
+                .cc_context
+                .merged_genfiles()
+                .ok()
+                .filter(|merged| *merged)
+                .map(|_| {
+                    slug_loading_v2::alloc_artifact_root(
+                        heap,
+                        slug_build_api_v2::AnalysisArtifactRoot::Derived(self.output_root.clone()),
+                    )
+                }),
             "features" => self.cc_context.features(false, heap).ok(),
             "disabled_features" => self.cc_context.features(true, heap).ok(),
             "configuration" => self.cc_context.configuration(heap).ok(),
@@ -272,6 +291,7 @@ where
                 predeclared_outputs: self.predeclared_outputs.clone(),
                 package_path: self.package_path.clone(),
                 owner: self.retained_owner.clone(),
+                root: self.output_root.clone(),
             })),
             "toolchains" => self.toolchain.clone().map(|toolchain| {
                 heap.alloc_simple(AnalysisToolchains {
@@ -546,6 +566,7 @@ struct AnalysisOutputs {
     predeclared_outputs: Arc<[PredeclaredOutput]>,
     package_path: String,
     owner: AnalysisConfiguredTargetKey,
+    root: DerivedArtifactRoot,
 }
 
 impl fmt::Display for AnalysisOutputs {
@@ -572,14 +593,21 @@ impl<'v> StarlarkValue<'v> for AnalysisOutputs {
         if let Some(attribute) = explicit {
             return match (&attribute.kind, &attribute.value) {
                 (AttributeKind::Output, CoercedAttributeValue::None) => Some(Value::new_none()),
-                (AttributeKind::Output, CoercedAttributeValue::Output(label)) => Some(
-                    heap.alloc_simple(predeclared_file(label, &self.package_path, &self.owner)),
-                ),
+                (AttributeKind::Output, CoercedAttributeValue::Output(label)) => {
+                    Some(heap.alloc_simple(predeclared_file(
+                        label,
+                        &self.package_path,
+                        &self.owner,
+                        &self.root,
+                    )))
+                }
                 (AttributeKind::OutputList, CoercedAttributeValue::OutputList(labels)) => Some(
                     heap.alloc(
                         labels
                             .iter()
-                            .map(|label| predeclared_file(label, &self.package_path, &self.owner))
+                            .map(|label| {
+                                predeclared_file(label, &self.package_path, &self.owner, &self.root)
+                            })
                             .collect::<Vec<_>>(),
                     ),
                 ),
@@ -594,6 +622,7 @@ impl<'v> StarlarkValue<'v> for AnalysisOutputs {
                     &output.label,
                     &self.package_path,
                     &self.owner,
+                    &self.root,
                 ))
             })
     }
@@ -603,6 +632,7 @@ fn predeclared_file(
     label: &slug_identity_v2::CanonicalLabel,
     package_path: &str,
     owner: &AnalysisConfiguredTargetKey,
+    root: &DerivedArtifactRoot,
 ) -> AnalysisArtifactValue {
     let target = label.target().as_str();
     let path = if package_path.is_empty() {
@@ -612,7 +642,14 @@ fn predeclared_file(
     };
     AnalysisArtifactValue::new(AnalysisArtifact::Derived {
         owner: owner.clone(),
-        output: ActionOutput::new(path, ActionOutputKind::File),
+        output: ActionOutput::new(
+            root.clone(),
+            slug_build_api_v2::repository_relative_output_path(
+                owner.label().package().repo(),
+                &path,
+            ),
+            ActionOutputKind::File,
+        ),
     })
 }
 
@@ -1058,6 +1095,7 @@ mod toolchain_materialization_tests {
 
 #[derive(Debug)]
 struct SynchronousAnalysisActionSink {
+    root: DerivedArtifactRoot,
     actions: Arc<Mutex<CtxActions>>,
     // Evaluation-scoped declarations, including predeclared outputs. Subrule
     // calls share this sink; only the resulting Derived artifacts survive it.
@@ -1082,7 +1120,13 @@ impl SynchronousAnalysisActionSink {
         } else {
             format!("{}/{path}", self.package_path)
         };
-        self.declare_bin_relative_output(path, kind)
+        self.declare_bin_relative_output(
+            slug_build_api_v2::repository_relative_output_path(
+                self.owner.label().package().repo(),
+                &path,
+            ),
+            kind,
+        )
     }
 
     fn declare_bin_relative_output(
@@ -1090,7 +1134,7 @@ impl SynchronousAnalysisActionSink {
         path: String,
         kind: ActionOutputKind,
     ) -> anyhow::Result<AnalysisArtifactValue> {
-        let output = ActionOutput::new(path.clone(), kind);
+        let output = ActionOutput::new(self.root.clone(), path.clone(), kind);
         slug_build_api_v2::actions::registry::validate_output(&output)
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         let mut declarations = self
@@ -1335,10 +1379,15 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
     ) -> anyhow::Result<AnalysisArtifactValue> {
         let input = AnalysisArtifactValue::from_starlark(library)
             .ok_or_else(|| anyhow::anyhow!("dynamic_library_symlink library must be a File"))?;
-        let spec =
-            slug_build_api_v2::SolibSymlinkSpec::new(input.artifact().clone(), solib_directory)?;
-        let output = self
-            .declare_bin_relative_output(spec.output().path().to_owned(), ActionOutputKind::File)?;
+        let spec = slug_build_api_v2::SolibSymlinkSpec::new(
+            input.artifact().clone(),
+            self.root.clone(),
+            solib_directory,
+        )?;
+        let output = self.declare_bin_relative_output(
+            spec.output().root_relative_path().to_owned(),
+            ActionOutputKind::File,
+        )?;
         self.register(|actions| actions.register_solib_symlink(spec))?;
         Ok(output)
     }
@@ -2041,6 +2090,7 @@ fn predeclared_output_artifacts(
     attributes: &[ResolvedRuleAttribute],
     package_path: &str,
     owner: &AnalysisConfiguredTargetKey,
+    root: &DerivedArtifactRoot,
 ) -> Vec<AnalysisArtifact> {
     let mut outputs = predeclared_outputs
         .iter()
@@ -2058,7 +2108,7 @@ fn predeclared_output_artifacts(
     outputs
         .into_iter()
         .map(|label| {
-            predeclared_file(label, package_path, owner)
+            predeclared_file(label, package_path, owner, root)
                 .artifact()
                 .clone()
         })
@@ -2072,6 +2122,7 @@ fn lower_default_info<'v>(
     predeclared_outputs: &[PredeclaredOutput],
     package_path: &str,
     owner: &AnalysisConfiguredTargetKey,
+    root: &DerivedArtifactRoot,
     test_rule: bool,
     lowerer: &mut AnalysisValueLowerer<'v>,
 ) -> Result<DefaultInfo, String> {
@@ -2093,8 +2144,13 @@ fn lower_default_info<'v>(
         .transpose()?
         .map(Ok)
         .unwrap_or_else(|| {
-            let mut artifacts =
-                predeclared_output_artifacts(predeclared_outputs, attributes, package_path, owner);
+            let mut artifacts = predeclared_output_artifacts(
+                predeclared_outputs,
+                attributes,
+                package_path,
+                owner,
+                root,
+            );
             artifacts.extend(executable.iter().cloned());
             AnalysisDepset::new(
                 DepsetOrder::Default,
@@ -2218,7 +2274,13 @@ pub(crate) fn evaluate_loaded_rule(
             .action_context()
             .clone(),
     )?;
-    let actions = Arc::new(Mutex::new(CtxActions::new()));
+    let output_root = DerivedArtifactRoot::bin(
+        key.configuration()
+            .slug_configuration()
+            .ok_or_else(|| "derived outputs require structural configuration".to_owned())?
+            .clone(),
+    )?;
+    let actions = Arc::new(Mutex::new(CtxActions::new(output_root.clone())));
     let module = Module::new();
     let needs_cpp_fragment = implementation
         .required_fragments()
@@ -2292,6 +2354,7 @@ pub(crate) fn evaluate_loaded_rule(
     let resolved_attributes: Arc<[ResolvedRuleAttribute]> = resolved_attributes.into();
     let predeclared_outputs = implementation.predeclared_outputs.clone();
     let action_sink: Arc<dyn AnalysisActionSink> = Arc::new(SynchronousAnalysisActionSink {
+        root: output_root.clone(),
         actions: actions.clone(),
         declared_outputs: Mutex::new(
             predeclared_output_artifacts(
@@ -2299,11 +2362,12 @@ pub(crate) fn evaluate_loaded_rule(
                 &resolved_attributes,
                 package_path,
                 &retained_owner,
+                &output_root,
             )
             .into_iter()
             .map(|artifact| match artifact {
                 AnalysisArtifact::Derived { output, .. } => {
-                    (output.path().to_owned(), output.kind())
+                    (output.root_relative_path().to_owned(), output.kind())
                 }
                 AnalysisArtifact::Source(_) => unreachable!("predeclared outputs are derived"),
             })
@@ -2429,6 +2493,7 @@ pub(crate) fn evaluate_loaded_rule(
             cc_context,
             token: analysis_context.root_token(),
             retained_owner: retained_owner.clone(),
+            output_root: output_root.clone(),
             target_label: key.label().clone(),
             package_path: package_path.to_owned(),
             dependencies,
@@ -2467,6 +2532,7 @@ pub(crate) fn evaluate_loaded_rule(
                 &predeclared_outputs,
                 package_path,
                 &retained_owner,
+                &output_root,
                 test_rule,
                 &mut lowerer,
             )?));
@@ -2502,6 +2568,7 @@ pub(crate) fn evaluate_loaded_rule(
             &resolved_attributes,
             package_path,
             &retained_owner,
+            &output_root,
         );
         let files = AnalysisDepset::new(
             DepsetOrder::Default,

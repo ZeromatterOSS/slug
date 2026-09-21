@@ -37,6 +37,7 @@ pub(crate) fn artifact() -> AnalysisArtifact {
             Arc::<[u8]>::from(&b"config"[..]),
         ),
         output: ActionOutput::new(
+            crate::artifact_root::test_root(),
             "ffi/cc/allocator_library/liballocator.so",
             ActionOutputKind::File,
         ),
@@ -49,7 +50,11 @@ fn returned_artifact() -> AnalysisArtifact {
     };
     AnalysisArtifact::Derived {
         owner,
-        output: ActionOutput::new("_solib_k8/from_sink.so", ActionOutputKind::File),
+        output: ActionOutput::new(
+            crate::artifact_root::test_root(),
+            "_solib_k8/from_sink.so",
+            ActionOutputKind::File,
+        ),
     }
 }
 impl AnalysisActionSink for RecordingSink {

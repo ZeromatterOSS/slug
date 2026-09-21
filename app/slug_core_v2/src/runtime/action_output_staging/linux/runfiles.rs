@@ -197,7 +197,7 @@ pub(in crate::runtime::action_output_staging) fn validate_runfiles(
 impl Staging {
     pub(in crate::runtime::action_output_staging) fn new_runfiles(
         workspace: &Path,
-        configuration: &SlugConfiguration,
+        root: &DerivedArtifactRoot,
         output: &ActionOutput,
         workspace_name: &str,
         entries: &[(String, Option<String>)],
@@ -211,8 +211,12 @@ impl Staging {
         let topology = RunfilesTopology::new(workspace_name, entries)?;
         // Reuse the physical directory allocation only. The wrapper retains the
         // original RunfilesTree declaration; no remote Directory result is made.
-        let physical = ActionOutput::new(output.path(), ActionOutputKind::Directory);
-        let mut staging = Self::new(workspace, configuration, &[physical], reserved)?;
+        let physical = ActionOutput::new(
+            output.root().clone(),
+            output.root_relative_path(),
+            ActionOutputKind::Directory,
+        );
+        let mut staging = Self::new(workspace, root, &[physical], reserved)?;
         topology.write(&staging.destinations[0].staged)?;
         staging.destinations[0]
             .created

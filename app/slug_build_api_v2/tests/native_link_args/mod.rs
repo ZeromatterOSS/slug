@@ -1,6 +1,7 @@
 use slug_build_api_v2::RetainedRustNativeLinkArgs;
 use slug_build_api_v2::RustNativeLinkArgMapper as Mapper;
 
+use super::root_support;
 use super::*;
 
 fn file(path: &str) -> AnalysisValue {
@@ -370,7 +371,11 @@ fn native_link_rows_preserve_shared_depset_publication_identity() {
                 RetainedArtifactInputs::new(inputs).unwrap(),
             )]),
             ArtifactInputs::new(Vec::new()),
-            vec![ActionOutput::new("out", ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                root_support::root(),
+                "out",
+                ActionOutputKind::File,
+            )],
             None,
             RetainedActionEnvironment::default(),
             CanonicalStringMap::default(),

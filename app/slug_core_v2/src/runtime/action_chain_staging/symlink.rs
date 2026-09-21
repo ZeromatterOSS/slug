@@ -100,9 +100,14 @@ impl PreparedActionChainInputs {
                     .configuration()
                     .slug_configuration()
                     .ok_or_else(|| error("alias target requires structural configuration"))?;
+                if output.root().configuration() != configuration {
+                    return Err(error(
+                        "alias target root differs from its producer configuration",
+                    ));
+                }
                 paths::absolute_string(
-                    &crate::runtime::configured_output_root(self.workspace_path(), configuration)
-                        .join(output.path()),
+                    &crate::runtime::configured_output_root(self.workspace_path(), output.root())
+                        .join(output.root_relative_path()),
                 )?
             }
         };

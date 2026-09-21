@@ -159,7 +159,7 @@ impl ConfiguredOutputOwner {
         let reserved = groups
             .values()
             .flat_map(|outputs| outputs.iter())
-            .flat_map(|output| output.path().split('/'))
+            .flat_map(|output| output.root_relative_path().split('/'))
             .collect();
         let mut seen_backing = SmallSet::new();
         let mut stages = groups

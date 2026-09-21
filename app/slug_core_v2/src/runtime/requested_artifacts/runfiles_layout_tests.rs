@@ -33,12 +33,16 @@ fn check_layout<'a>(
     assert_eq!(&selection.artifacts()[*tree], &support.tree);
 
     let executable = info.executable.as_ref().unwrap();
-    let AnalysisArtifact::Derived { owner, .. } = executable else {
+    let AnalysisArtifact::Derived { owner, output } = executable else {
         panic!("configured executable must be derived")
     };
     let generated = AnalysisArtifact::Derived {
         owner: owner.clone(),
-        output: slug_build_api_v2::ActionOutput::new(generated_name, ActionOutputKind::File),
+        output: slug_build_api_v2::ActionOutput::new(
+            output.root().clone(),
+            generated_name,
+            ActionOutputKind::File,
+        ),
     };
     let source =
         AnalysisArtifact::Source(CanonicalLabel::parse(&format!("@@//:{source_name}")).unwrap());
@@ -102,14 +106,17 @@ fn check_layout<'a>(
             .configuration()
             .slug_configuration()
             .unwrap();
-        let root = crate::runtime::configured_output_root(workspace.root.path(), configuration);
+        let root = crate::runtime::configured_output_root(
+            workspace.root.path(),
+            &slug_build_api_v2::DerivedArtifactRoot::bin((configuration).clone()).unwrap(),
+        );
         for output in analysis
             .actions()
             .iter()
             .flat_map(|action| action.outputs())
         {
             assert_eq!(
-                fs::symlink_metadata(root.join(output.path()))
+                fs::symlink_metadata(root.join(output.root_relative_path()))
                     .unwrap_err()
                     .kind(),
                 std::io::ErrorKind::NotFound

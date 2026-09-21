@@ -21,7 +21,7 @@ pub fn format_file_write_aquery_text(
 ) -> Result<String, &'static str> {
     let action = view.action();
     let owner = action.owner();
-    let output = action.output().path();
+    let output = action.output().root_relative_path();
     validate_renderable_action(
         owner.label(),
         action.spec().mnemonic(),
@@ -37,12 +37,12 @@ pub fn format_file_write_aquery_text(
     let identity = FileWriteSemanticIdentity::from_resolved(view)?;
 
     Ok(format!(
-        "action 'Writing file {output}'\n  Mnemonic: FileWrite\n  Target: {target}\n  Configuration: {configuration}\n  Execution platform: {platform}\n  SlugActionToken: {action_token}\n  Inputs: []\n  Outputs: [bazel-out/{output_configuration}/bin/{output}]\n  IsExecutable: false",
+        "action 'Writing file {output}'\n  Mnemonic: FileWrite\n  Target: {target}\n  Configuration: {configuration}\n  Execution platform: {platform}\n  SlugActionToken: {action_token}\n  Inputs: []\n  Outputs: [{exec_path}]\n  IsExecutable: false",
         target = aquery_label(owner.label()),
         configuration = projection.display_token(),
         platform = aquery_label(action.execution_platform().label()),
         action_token = identity.aquery_display_token(),
-        output_configuration = projection.path_component(),
+        exec_path = action.output().path(),
     ))
 }
 

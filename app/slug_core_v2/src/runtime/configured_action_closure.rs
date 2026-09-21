@@ -52,7 +52,7 @@ struct OutputRow<'a> {
     coordinate: ActionCoordinate,
     output: &'a slug_build_api_v2::ActionOutput,
     action: &'a ConfiguredAction,
-    root: &'a [u8],
+    root: &'a slug_build_api_v2::DerivedArtifactRoot,
     ordinal: u64,
 }
 
@@ -73,9 +73,9 @@ impl ValidatedActionClosure {
                 .cmp(right.root)
                 .then_with(|| {
                     left.output
-                        .path()
+                        .root_relative_path()
                         .split('/')
-                        .cmp(right.output.path().split('/'))
+                        .cmp(right.output.root_relative_path().split('/'))
                 })
                 .then_with(|| left.ordinal.cmp(&right.ordinal))
         });
@@ -117,12 +117,12 @@ fn collect_output_rows<'a>(
     owners: &'a [Arc<ConfiguredNodeResult>],
 ) -> Result<Vec<OutputRow<'a>>, ConfiguredActionClosureError> {
     let mut rows = Vec::new();
+    let mut projected_roots = starlark_map::small_map::SmallMap::new();
     let mut ordinal = 0u64;
     for (owner_index, owner) in owners.iter().enumerate() {
-        let root = owner
+        let configuration = owner
             .configured_target_key()
             .and_then(|key| key.configuration().slug_configuration())
-            .map(|configuration| configuration.canonical_bytes())
             .ok_or(ConfiguredActionClosureError::InvalidOutputRoot)?;
         for (action_index, action) in owner.actions().iter().enumerate() {
             let coordinate = ActionCoordinate {
@@ -130,6 +130,15 @@ fn collect_output_rows<'a>(
                 action: u32::try_from(action_index).expect("closure action count fits u32"),
             };
             for output in action.outputs() {
+                let root = output.root();
+                if root.configuration() != configuration {
+                    return Err(ConfiguredActionClosureError::InvalidOutputRoot);
+                }
+                if let Some(previous) = projected_roots.insert(root.path(), root)
+                    && previous != root
+                {
+                    return Err(ConfiguredActionClosureError::InvalidOutputRoot);
+                }
                 rows.push(OutputRow {
                     coordinate,
                     output,
@@ -206,7 +215,7 @@ fn validate_exact_outputs(
 
 fn validate_prefix_outputs(rows: &[OutputRow<'_>]) -> Result<(), ConfiguredActionClosureError> {
     let mut ancestors: Vec<usize> = Vec::new();
-    let mut previous_path: Option<(&[u8], &str)> = None;
+    let mut previous_path: Option<(&slug_build_api_v2::DerivedArtifactRoot, &str)> = None;
     for (index, row) in rows.iter().enumerate() {
         if previous_path.is_some_and(|(root, path)| root == row.root && path == row.output.path()) {
             continue;
@@ -386,10 +395,26 @@ mod tests {
 
     #[test]
     fn configured_action_conflicts_only_exempt_runfiles_manifest() {
-        let runfiles = ActionOutput::new("tree", ActionOutputKind::RunfilesTree);
-        let directory = ActionOutput::new("tree", ActionOutputKind::Directory);
-        let manifest = ActionOutput::new("tree/MANIFEST", ActionOutputKind::File);
-        let nested = ActionOutput::new("tree/sub/MANIFEST", ActionOutputKind::File);
+        let runfiles = ActionOutput::new(
+            crate::runtime::configured_output::test_root(),
+            "tree",
+            ActionOutputKind::RunfilesTree,
+        );
+        let directory = ActionOutput::new(
+            crate::runtime::configured_output::test_root(),
+            "tree",
+            ActionOutputKind::Directory,
+        );
+        let manifest = ActionOutput::new(
+            crate::runtime::configured_output::test_root(),
+            "tree/MANIFEST",
+            ActionOutputKind::File,
+        );
+        let nested = ActionOutput::new(
+            crate::runtime::configured_output::test_root(),
+            "tree/sub/MANIFEST",
+            ActionOutputKind::File,
+        );
         assert!(runfiles_manifest_exemption(&runfiles, &manifest));
         assert!(!runfiles_manifest_exemption(&directory, &manifest));
         assert!(!runfiles_manifest_exemption(&runfiles, &nested));
@@ -397,7 +422,13 @@ mod tests {
 
     #[test]
     fn configured_action_conflicts_inventory_prefix_and_typed_terminals() {
-        let file = |path| ActionOutput::new(path, ActionOutputKind::File);
+        let file = |path| {
+            ActionOutput::new(
+                crate::runtime::configured_output::test_root(),
+                path,
+                ActionOutputKind::File,
+            )
+        };
         let write = |content: &str| ActionKind::Write {
             content: content.into(),
             is_executable: false,
@@ -406,7 +437,11 @@ mod tests {
             ValidatedActionClosure::new(Arc::from([
                 node(
                     "@@//:directory",
-                    ActionOutput::new("tree", ActionOutputKind::Directory),
+                    ActionOutput::new(
+                        crate::runtime::configured_output::test_root(),
+                        "tree",
+                        ActionOutputKind::Directory
+                    ),
                     write("a")
                 ),
                 node("@@//:file", file("tree/child"), write("b")),
@@ -436,7 +471,11 @@ mod tests {
         let file = |label, path| {
             node(
                 label,
-                ActionOutput::new(path, ActionOutputKind::File),
+                ActionOutput::new(
+                    crate::runtime::configured_output::test_root(),
+                    path,
+                    ActionOutputKind::File,
+                ),
                 ActionKind::Run,
             )
         };
@@ -446,7 +485,11 @@ mod tests {
             ActionOutputKind::Symlink,
             ActionOutputKind::RunfilesTree,
         ] {
-            let parent = node("@@//:outer", ActionOutput::new("a", kind), ActionKind::Run);
+            let parent = node(
+                "@@//:outer",
+                ActionOutput::new(crate::runtime::configured_output::test_root(), "a", kind),
+                ActionKind::Run,
+            );
             assert!(matches!(
                 ValidatedActionClosure::new(Arc::from([
                     parent.clone(),
@@ -468,7 +511,7 @@ mod tests {
             .unwrap_err();
             assert!(
                 matches!(exact, ConfiguredActionClosureError::UnsupportedEquivalence { path, first_owner, second_owner }
-                if path.as_ref() == "z" && first_owner.label().target().as_str() == "first" && second_owner.label().target().as_str() == "second")
+                if path.as_ref() == format!("{}/z", crate::runtime::configured_output::test_root().path()) && first_owner.label().target().as_str() == "first" && second_owner.label().target().as_str() == "second")
             );
         }
         let lexical = ValidatedActionClosure::new(Arc::from([
@@ -479,7 +522,7 @@ mod tests {
         ]))
         .unwrap_err();
         assert!(
-            matches!(lexical, ConfiguredActionClosureError::UnsupportedEquivalence { path, .. } if path.as_ref() == "b")
+            matches!(lexical, ConfiguredActionClosureError::UnsupportedEquivalence { path, .. } if path.as_ref() == format!("{}/b", crate::runtime::configured_output::test_root().path()))
         );
     }
 
@@ -522,9 +565,18 @@ mod tests {
         context: ConfiguredActionOwnerContext,
         content: &str,
     ) -> Arc<ConfiguredNodeResult> {
+        let root = slug_build_api_v2::DerivedArtifactRoot::bin(
+            context
+                .owner()
+                .configuration()
+                .slug_configuration()
+                .unwrap()
+                .clone(),
+        )
+        .unwrap();
         node_with_context(
             context,
-            ActionOutput::new("shared", ActionOutputKind::File),
+            ActionOutput::new(root, "shared", ActionOutputKind::File),
             ActionKind::Write {
                 content: content.into(),
                 is_executable: false,

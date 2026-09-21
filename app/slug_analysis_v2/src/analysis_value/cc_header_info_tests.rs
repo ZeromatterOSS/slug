@@ -14,7 +14,11 @@ fn header_info_owns_artifacts_and_hidden_edges_after_producer_heap_disposal() {
             CanonicalLabel::parse("@@//:producer").unwrap(),
             vec![2, 3],
         ),
-        output: ActionOutput::new("header.pcm", ActionOutputKind::File),
+        output: ActionOutput::new(
+            crate::analysis_value::test_artifact_root(),
+            "header.pcm",
+            ActionOutputKind::File,
+        ),
     };
     let child = CcHeaderInfo::create(
         CcHeaderInfoInput {

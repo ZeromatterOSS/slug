@@ -9284,11 +9284,17 @@ mod tests {
         assert_ne!(
             crate::runtime::configured_output_root(
                 fixture.workspace.path(),
-                c0.slug_configuration().unwrap()
+                &slug_build_api_v2::DerivedArtifactRoot::bin(
+                    c0.slug_configuration().unwrap().clone()
+                )
+                .unwrap()
             ),
             crate::runtime::configured_output_root(
                 fixture.workspace.path(),
-                c1.slug_configuration().unwrap()
+                &slug_build_api_v2::DerivedArtifactRoot::bin(
+                    c1.slug_configuration().unwrap().clone()
+                )
+                .unwrap()
             )
         );
 
@@ -9542,11 +9548,17 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert_ne!(
             crate::runtime::configured_output_root(
                 fixture.workspace.path(),
-                c0.slug_configuration().unwrap()
+                &slug_build_api_v2::DerivedArtifactRoot::bin(
+                    c0.slug_configuration().unwrap().clone()
+                )
+                .unwrap()
             ),
             crate::runtime::configured_output_root(
                 fixture.workspace.path(),
-                c1.slug_configuration().unwrap()
+                &slug_build_api_v2::DerivedArtifactRoot::bin(
+                    c1.slug_configuration().unwrap().clone()
+                )
+                .unwrap()
             )
         );
 
@@ -12171,7 +12183,12 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                     Arc::from([]),
                     Arc::from([]),
                 )
-                .unwrap(),
+                .unwrap()
+                .with_action_environment_host(
+                    slug_configuration_v2::native::host::ActionEnvironmentHost::without_environment(
+                        slug_configuration_v2::native::host::ActionEnvironmentHostOs::Linux,
+                    ),
+                ),
             )
             .unwrap()
             .with_host_platform_label(&CanonicalLabel::parse("@@//.slug_test_host:host").unwrap()),
@@ -12334,6 +12351,9 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                     files: Arc::new(raw_files.into_iter().collect()),
                 }),
             )])
+            .unwrap();
+        updater
+            .changed_to(slug_workspace_v2::path_observation_shards(&epoch))
             .unwrap();
         updater
             .changed_to(vec![(PathObservationEpochKey, epoch)])

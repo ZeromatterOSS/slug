@@ -199,7 +199,36 @@ async fn generated_providers_keep_transitioned_owner_validation_and_alias_a_b_a(
             panic!("producer default output lost owner")
         };
         assert_eq!(owner, &producer_owner);
-        assert_eq!(output.path(), "generated.txt");
+        assert_eq!(output.root_relative_path(), "generated.txt");
+        assert_eq!(
+            output.path(),
+            expected_output_path(
+                producer.configured_target_key().unwrap().configuration(),
+                "generated.txt",
+            )
+        );
+        assert_eq!(
+            output.root().configuration(),
+            producer
+                .configured_target_key()
+                .unwrap()
+                .configuration()
+                .slug_configuration()
+                .unwrap()
+        );
+        let producer_output = producer
+            .actions()
+            .iter()
+            .flat_map(|action| action.outputs())
+            .find(|output| output.root_relative_path() == "generated.txt")
+            .expect("producer retained its predeclared generated output");
+        assert_eq!(
+            artifact,
+            AnalysisArtifact::Derived {
+                owner: producer_owner,
+                output: producer_output.clone(),
+            }
+        );
         assert_eq!(output.kind(), ActionOutputKind::File);
         let groups = generated.providers().output_group_info().unwrap();
         assert_eq!(

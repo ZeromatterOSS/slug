@@ -49,8 +49,8 @@ pub struct RuleContext {
 }
 
 impl RuleContext {
-    pub fn builder(label: CanonicalLabel) -> RuleContextBuilder {
-        RuleContextBuilder::new(label)
+    pub fn builder(label: CanonicalLabel, root: crate::DerivedArtifactRoot) -> RuleContextBuilder {
+        RuleContextBuilder::new(label, root)
     }
 
     pub fn label(&self) -> &CanonicalLabel {
@@ -130,7 +130,7 @@ pub struct RuleContextBuilder {
 }
 
 impl RuleContextBuilder {
-    pub fn new(label: CanonicalLabel) -> Self {
+    pub fn new(label: CanonicalLabel, root: crate::DerivedArtifactRoot) -> Self {
         Self {
             ctx: RuleContext {
                 label,
@@ -139,7 +139,7 @@ impl RuleContextBuilder {
                 files_attrs: BTreeMap::new(),
                 executable_attrs: BTreeMap::new(),
                 outputs: BTreeMap::new(),
-                actions: CtxActions::new(),
+                actions: CtxActions::new(root),
                 fragments: BTreeMap::new(),
                 toolchains: BTreeMap::new(),
                 exec_groups: BTreeMap::new(),

@@ -5,6 +5,7 @@ use crate::ActionOutput;
 use crate::ActionOutputKind;
 use crate::AnalysisConfiguredTargetKey;
 use crate::AnalysisValue;
+use crate::artifact_root::test_support as root_support;
 
 fn source(name: &str) -> AnalysisArtifact {
     AnalysisArtifact::Source(CanonicalLabel::parse(&format!("@@//:{name}")).unwrap())
@@ -30,7 +31,7 @@ fn node(names: &[&str], deps: Vec<CcHeaderInfo>) -> CcHeaderInfo {
 fn derived(owner: &str, kind: ActionOutputKind) -> AnalysisArtifact {
     AnalysisArtifact::Derived {
         owner: AnalysisConfiguredTargetKey::new(CanonicalLabel::parse(owner).unwrap(), vec![1]),
-        output: ActionOutput::new("same.pcm", kind),
+        output: ActionOutput::new(root_support::root(), "same.pcm", kind),
     }
 }
 

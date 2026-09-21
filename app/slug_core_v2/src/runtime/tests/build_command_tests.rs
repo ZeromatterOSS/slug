@@ -793,89 +793,178 @@ async fn resolved_run_view_reuses_exact_executable_filewrite_relation() {
             "write = rule(implementation = _write, executable = True, toolchains",
         ),
     ];
-    let mut accepted_tx =
+    let mut executable_tx =
         build_root_transaction(&dice, resolved_write_epoch(41, "setting_a", &replacements)).await;
-    let accepted = accepted_tx.compute(&key).await.unwrap();
-    let view = complete_build_evaluation(&accepted)
-        .resolved_run_semantic_view()
-        .unwrap();
-    assert_eq!(view.executable(), "write.txt");
-    assert_eq!(view.file_write().action().output().path(), "write.txt");
+    let executable = executable_tx.compute(&key).await.unwrap();
+    let analyzed = complete_build_evaluation(&executable);
+    let actual_owner = analyzed.sole_requested_analysis().unwrap();
+    let actual_default = actual_owner.providers().default_info().unwrap();
+    assert!(actual_owner.providers().output_group_info().is_some());
+    assert_eq!(actual_owner.providers().len(), 2);
+    assert!(actual_default.files_to_run.support.is_some());
+    assert!(actual_default.files_to_run.runfiles_manifest().is_some());
+    assert!(actual_owner.actions().len() > 1);
+    assert_eq!(
+        analyzed.resolved_run_semantic_view().unwrap_err(),
+        "run target requires only built-in DefaultInfo"
+    );
+
+    // Explicit low-level legacy-view fixture, NOT an admitted analyzed rule.
+    // Real analysis above remains unchanged and rejected. Reuse only its loaded
+    // package/anchor and resolved action-owner context; construct new providers,
+    // action and result instead of stripping completed analysis metadata.
+    use slug_build_api_v2::ActionKind;
+    use slug_build_api_v2::ActionOutput;
+    use slug_build_api_v2::ActionOutputKind;
+    use slug_build_api_v2::ActionSpec;
+    use slug_build_api_v2::AnalysisArtifact;
+    use slug_build_api_v2::DefaultInfo;
+    use slug_build_api_v2::DerivedArtifactRoot;
+    use slug_build_api_v2::FilesToRunProvider;
+    use slug_build_api_v2::ProviderCollection;
+    use slug_build_api_v2::ProviderValue;
+    use slug_build_api_v2::RunfilesPackageDepset;
+    let owner_key = actual_owner.configured_target_key().unwrap().clone();
+    let root = DerivedArtifactRoot::bin(
+        owner_key
+            .configuration()
+            .slug_configuration()
+            .unwrap()
+            .clone(),
+    )
+    .unwrap();
+    let output = ActionOutput::new(root.clone(), "legacy-write.txt", ActionOutputKind::File);
+    let AnalysisArtifact::Derived { owner, .. } = actual_default.executable.as_ref().unwrap()
+    else {
+        panic!("the scaffold executable must be derived")
+    };
+    let artifact = AnalysisArtifact::Derived {
+        owner: owner.clone(),
+        output: output.clone(),
+    };
+    let mut info = DefaultInfo::from_file_target(artifact.clone());
+    info.default_runfiles.files = info.files().clone();
+    info.data_runfiles.files = info.files().clone();
+    let action = |output, executable| {
+        ActionSpec::new(
+            ActionKind::Write {
+                content: "legacy\n".to_owned(),
+                is_executable: executable,
+            },
+            "FileWrite",
+            vec![output],
+        )
+    };
+    let write = action(output.clone(), true);
+    let context = actual_owner
+        .actions()
+        .iter()
+        .find(|action| matches!(action.kind(), ActionKind::Write { .. }))
+        .unwrap()
+        .context()
+        .clone();
+    let providers = |info| ProviderCollection::new(vec![ProviderValue::DefaultInfo(info)]).unwrap();
+    let node = |providers, specs| {
+        Arc::new(
+            ConfiguredNodeResult::new_rule(
+                owner_key.clone(),
+                providers,
+                Some(slug_loading_v2::RuleCapability {
+                    rule_class: "legacy_view_fixture".into(),
+                    executable: true,
+                    test_kind: None,
+                }),
+                RunfilesPackageDepset::empty(),
+            )
+            .with_action_specs(specs, vec![context.clone()])
+            .unwrap(),
+        )
+    };
+    let evaluation = |requested, closure: Vec<Arc<ConfiguredNodeResult>>| {
+        let mut target = analyzed.targets[0].clone();
+        target.analysis = Some(requested);
+        BuildCommandEvaluation {
+            anchor: analyzed.anchor.clone(),
+            targets: vec![target].into(),
+            action_closure: super::ValidatedActionClosure::new(closure.into()).unwrap(),
+        }
+    };
+    let owner = node(providers(info.clone()), vec![write.clone()]);
+    let minimal = evaluation(owner.clone(), vec![owner.clone()]);
+    let view = minimal.resolved_run_semantic_view().unwrap();
+    assert_eq!(
+        view.executable(),
+        format!("{}/legacy-write.txt", root.path())
+    );
+    assert_eq!(view.file_write().action().output(), &output);
+    assert!(std::ptr::eq(view.owner(), owner.as_ref()));
     assert!(std::ptr::eq(
-        view.owner().providers().default_info().unwrap(),
         view.default_info(),
+        owner.providers().default_info().unwrap()
     ));
 
-    let fail_closed_cases = [
-        (
-            42,
-            vec![
-                (
-                    "def _write(ctx):",
-                    "Extra = provider(fields = {\"value\": \"value\"})\ndef _write(ctx):",
-                ),
-                (
-                    "ctx.actions.write(out, \"content\\n\")",
-                    "ctx.actions.write(out, \"content\\n\", is_executable = True)",
-                ),
-                (
-                    "return [DefaultInfo(files = depset([out]))]",
-                    "return [DefaultInfo(executable = out), Extra(value = \"extra\")]",
-                ),
-                (
-                    "write = rule(implementation = _write, toolchains",
-                    "write = rule(implementation = _write, executable = True, toolchains",
-                ),
-            ],
-            "run target requires only built-in DefaultInfo",
-        ),
-        (
-            43,
-            vec![
-                (
-                    "ctx.actions.write(out, \"content\\n\")",
-                    "ctx.actions.write(out, \"content\\n\", is_executable = True)",
-                ),
-                (
-                    "return [DefaultInfo(files = depset([out]))]",
-                    "return [DefaultInfo(executable = out, files = depset([]))]",
-                ),
-                (
-                    "write = rule(implementation = _write, toolchains",
-                    "write = rule(implementation = _write, executable = True, toolchains",
-                ),
-            ],
-            "run files and runfiles must contain only the executable",
-        ),
-        (
-            44,
-            vec![
-                (
-                    "return [DefaultInfo(files = depset([out]))]",
-                    "return [DefaultInfo(executable = out)]",
-                ),
-                (
-                    "write = rule(implementation = _write, toolchains",
-                    "write = rule(implementation = _write, executable = True, toolchains",
-                ),
-            ],
-            "run executable is not the sole executable FileWrite output",
-        ),
-    ];
-    for (variant, replacements, expected) in fail_closed_cases {
-        let mut transaction = build_root_transaction(
-            &dice,
-            resolved_write_epoch(variant, "setting_a", &replacements),
-        )
-        .await;
-        let outcome = transaction.compute(&key).await.unwrap();
+    let mut empty_files = DefaultInfo::empty();
+    empty_files.executable = Some(artifact.clone());
+    empty_files.files_to_run = FilesToRunProvider::single_executable_without_support(artifact);
+    empty_files.default_runfiles = info.default_runfiles.clone();
+    empty_files.data_runfiles = info.data_runfiles.clone();
+    let mut empty_default_runfiles = info.clone();
+    empty_default_runfiles.default_runfiles.files =
+        slug_build_api_v2::AnalysisDepset::empty(slug_build_api_v2::DepsetOrder::Default);
+    let mut empty_data_runfiles = info.clone();
+    empty_data_runfiles.data_runfiles = empty_default_runfiles.default_runfiles.clone();
+    for invalid in [empty_files, empty_default_runfiles, empty_data_runfiles] {
+        let invalid_owner = node(providers(invalid), vec![write.clone()]);
         assert_eq!(
-            complete_build_evaluation(&outcome)
+            evaluation(invalid_owner.clone(), vec![invalid_owner])
                 .resolved_run_semantic_view()
                 .unwrap_err(),
-            expected
+            "run files and runfiles must contain only the executable"
         );
     }
+    for invalid_write in [
+        action(output.clone(), false),
+        action(
+            ActionOutput::new(root.clone(), "different.txt", ActionOutputKind::File),
+            true,
+        ),
+    ] {
+        let invalid_owner = node(providers(info.clone()), vec![invalid_write]);
+        assert_eq!(
+            evaluation(invalid_owner.clone(), vec![invalid_owner])
+                .resolved_run_semantic_view()
+                .unwrap_err(),
+            "run executable is not the sole executable FileWrite output"
+        );
+    }
+    let extra = action(
+        ActionOutput::new(root, "extra.txt", ActionOutputKind::File),
+        true,
+    );
+    let extra_owner = node(providers(info.clone()), vec![write, extra]);
+    for closure in [vec![], vec![extra_owner]] {
+        assert_eq!(
+            evaluation(owner.clone(), closure)
+                .resolved_run_semantic_view()
+                .unwrap_err(),
+            "run requires exactly one action in the configured closure"
+        );
+    }
+    let other = Arc::new(ConfiguredNodeResult::new_rule(
+        slug_analysis_v2::ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:other").unwrap(),
+            owner_key.configuration().clone(),
+        ),
+        providers(info),
+        owner.rule_capability().cloned(),
+        RunfilesPackageDepset::empty(),
+    ));
+    assert_eq!(
+        evaluation(other, vec![owner])
+            .resolved_run_semantic_view()
+            .unwrap_err(),
+        "run executable is not the sole executable FileWrite output"
+    );
 }
 
 #[tokio::test]
@@ -974,11 +1063,11 @@ async fn filewrite_aquery_text_matches_frozen_baseline() {
             "action 'Writing file write.txt'\n",
             "  Mnemonic: FileWrite\n",
             "  Target: //:write\n",
-            "  Configuration: slugcfg-v2:3a50fb29d36af6da954342aa166fc2b92c736ec3fc625f6f34bab5272cec7975\n",
+            "  Configuration: slugcfg-v2:d207d0a23a88560854476d34d8fef18d11d94904baa2b0aef3a91fa08c6faa88\n",
             "  Execution platform: //:platform\n",
-            "  SlugActionToken: slugact-display-v1:cba388ad89797e0c8b0c8db2dc49cdb04fed142c96a1cdd5ff5e591529599b67\n",
+            "  SlugActionToken: slugact-display-v1:7e8274de9c2b4d7554a28fb7a61b3af4f2e777f5251055dcf7899e7a650e82f7\n",
             "  Inputs: []\n",
-            "  Outputs: [bazel-out/slugcfg-v2-3a50fb29d36af6da954342aa166fc2b92c736ec3fc625f6f34bab5272cec7975/bin/write.txt]\n",
+            "  Outputs: [bazel-out/slugcfg-v2-d207d0a23a88560854476d34d8fef18d11d94904baa2b0aef3a91fa08c6faa88/bin/write.txt]\n",
             "  IsExecutable: false\n\n",
         )
     );
@@ -2146,13 +2235,13 @@ struct PublicSingletonFixture {
 impl PublicSingletonFixture {
     fn new() -> Self {
         let workspace = tempfile::tempdir_in(env!("CARGO_MANIFEST_DIR")).unwrap();
-    fs::write(
-        workspace.path().join("MODULE.bazel"),
-        "print('MODULE_EVENT')\nmodule(name = 'publication')\n",
-    )
-    .unwrap();
-    fs::create_dir(workspace.path().join("pkg")).unwrap();
-    let build_file = workspace.path().join("pkg/BUILD.bazel");
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "print('MODULE_EVENT')\nmodule(name = 'publication')\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("pkg")).unwrap();
+        let build_file = workspace.path().join("pkg/BUILD.bazel");
         let audit = Arc::new(ExternalQueryActivationAudit::default());
         let runtime = test_runtime(workspace.path())
             .unwrap()
@@ -2611,41 +2700,41 @@ struct PublicMultiFixture {
 
 impl PublicMultiFixture {
     fn new() -> Self {
-    let stable_parent_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../target/debug/incremental/slug-public-observed-multi");
-    fs::create_dir_all(&stable_parent_root).unwrap();
-    let stable_parent = tempfile::tempdir_in(stable_parent_root).unwrap();
-    let workspace = tempfile::tempdir_in(stable_parent.path()).unwrap();
-    fs::write(
-        workspace.path().join("MODULE.bazel"),
-        configured_test_module("print('MODULE')\nmodule(name = 'multi')\n"),
-    )
-    .unwrap();
-    let good_defs = "print('BZL')\ndef _leaf(ctx):\n    print('LEAF_ANALYSIS')\n    return [DefaultInfo(files = depset([]))]\nleaf = rule(implementation = _leaf)\ndef _impl(ctx):\n    print('ANALYSIS')\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl, attrs = {'dep': attr.label()})\n";
-    fs::write(workspace.path().join("defs.bzl"), good_defs).unwrap();
-    fs::write(
+        let stable_parent_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/debug/incremental/slug-public-observed-multi");
+        fs::create_dir_all(&stable_parent_root).unwrap();
+        let stable_parent = tempfile::tempdir_in(stable_parent_root).unwrap();
+        let workspace = tempfile::tempdir_in(stable_parent.path()).unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            configured_test_module("print('MODULE')\nmodule(name = 'multi')\n"),
+        )
+        .unwrap();
+        let good_defs = "print('BZL')\ndef _leaf(ctx):\n    print('LEAF_ANALYSIS')\n    return [DefaultInfo(files = depset([]))]\nleaf = rule(implementation = _leaf)\ndef _impl(ctx):\n    print('ANALYSIS')\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl, attrs = {'dep': attr.label()})\n";
+        fs::write(workspace.path().join("defs.bzl"), good_defs).unwrap();
+        fs::write(
             workspace.path().join("BUILD.bazel"),
             "print('BUILD')\nload('//:defs.bzl', 'probe')\nexports_files(['one.txt', 'two.txt'])\nprobe(name = 'rule', dep = '//dep:leaf')\n",
         )
         .unwrap();
-    fs::create_dir(workspace.path().join("dep")).unwrap();
-    fs::write(
-        workspace.path().join("dep/BUILD.bazel"),
-        "load('//:defs.bzl', 'leaf')\nleaf(name = 'leaf')\n",
-    )
-    .unwrap();
-    fs::write(workspace.path().join("one.txt"), b"one").unwrap();
-    fs::write(workspace.path().join("two.txt"), b"two").unwrap();
-    let audit = Arc::new(ExternalQueryActivationAudit::default());
-    let command_policy = configured_test_command_policy(workspace.path());
-    let runtime = test_runtime(workspace.path())
-        .unwrap()
-        .with_activation_audit(audit.dupe());
-    let targets = [
-        TargetPattern::parse("//:one.txt").unwrap(),
-        TargetPattern::parse("//:rule").unwrap(),
-        TargetPattern::parse("//:two.txt").unwrap(),
-    ];
+        fs::create_dir(workspace.path().join("dep")).unwrap();
+        fs::write(
+            workspace.path().join("dep/BUILD.bazel"),
+            "load('//:defs.bzl', 'leaf')\nleaf(name = 'leaf')\n",
+        )
+        .unwrap();
+        fs::write(workspace.path().join("one.txt"), b"one").unwrap();
+        fs::write(workspace.path().join("two.txt"), b"two").unwrap();
+        let audit = Arc::new(ExternalQueryActivationAudit::default());
+        let command_policy = configured_test_command_policy(workspace.path());
+        let runtime = test_runtime(workspace.path())
+            .unwrap()
+            .with_activation_audit(audit.dupe());
+        let targets = [
+            TargetPattern::parse("//:one.txt").unwrap(),
+            TargetPattern::parse("//:rule").unwrap(),
+            TargetPattern::parse("//:two.txt").unwrap(),
+        ];
         Self {
             _stable_parent: stable_parent,
             workspace,
@@ -2731,11 +2820,11 @@ fn public_multi_observed_superset_certificate_and_dependency_order() {
         .runtime
         .runtime
         .block_on(compute_observed_build_with_epoch(
-        &fixture.runtime,
-        &observed_key,
-        snapshot.path_observations.dupe(),
-        tracker.dupe(),
-    ));
+            &fixture.runtime,
+            &observed_key,
+            snapshot.path_observations.dupe(),
+            tracker.dupe(),
+        ));
     let observed = complete_observed_build(&observed);
     assert_eq!(observed.result().as_ref().as_ref().unwrap(), public);
     assert!(
@@ -2817,11 +2906,11 @@ fn public_multi_source_edit_restore_without_event_replay() {
         .runtime
         .runtime
         .block_on(compute_observed_build_with_epoch(
-        &fixture.runtime,
-        &observed_key,
-        edited_snapshot.path_observations.dupe(),
-        Arc::new(ObservedBuildTracker::default()),
-    ));
+            &fixture.runtime,
+            &observed_key,
+            edited_snapshot.path_observations.dupe(),
+            Arc::new(ObservedBuildTracker::default()),
+        ));
     let edited = complete_observed_build(&edited_outcome);
     assert!(
         edited

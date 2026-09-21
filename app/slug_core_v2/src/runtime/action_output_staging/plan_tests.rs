@@ -20,8 +20,12 @@ fn stages(workspace: &Workspace) -> Vec<PlannedActionOutputStaging> {
             fs::write(output_root.join("same"), b"old").unwrap();
             let mut staging = ActionOutputStaging::new(
                 workspace.path(),
-                config,
-                &[ActionOutput::new("same", ActionOutputKind::File)],
+                &slug_build_api_v2::DerivedArtifactRoot::bin((config).clone()).unwrap(),
+                &[ActionOutput::new(
+                    slug_build_api_v2::DerivedArtifactRoot::bin(config.clone()).unwrap(),
+                    "same",
+                    ActionOutputKind::File,
+                )],
             )
             .unwrap();
             staging
@@ -53,10 +57,15 @@ fn batch_preserves_configuration_destinations_and_producer_associations() {
         [2, 3]
     );
     assert_ne!(published[0].outputs().root(), published[1].outputs().root());
-    for (group, bytes) in published.iter().zip([b"aaa", b"bbb"]) {
+    let (a, b) = configurations();
+    for ((group, bytes), config) in published.iter().zip([b"aaa", b"bbb"]).zip([a, b]) {
         assert_eq!(
             group.outputs().outputs(),
-            [ActionOutput::new("same", ActionOutputKind::File)]
+            [ActionOutput::new(
+                slug_build_api_v2::DerivedArtifactRoot::bin(config).unwrap(),
+                "same",
+                ActionOutputKind::File
+            )]
         );
         assert_eq!(
             fs::read(group.outputs().root().join("same")).unwrap(),

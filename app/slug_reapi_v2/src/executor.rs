@@ -14,6 +14,7 @@ use std::path::Path;
 
 use prost::Message;
 use slug_build_api_v2::ActionKind;
+use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_core_v2::runtime::ResolvedFileWriteSemanticView;
@@ -100,7 +101,7 @@ impl FileWriteReapiPlan {
         if output.kind() != ActionOutputKind::File {
             return Err("FileWrite REAPI plan requires one file output".to_owned());
         }
-        if output.path().split('/').next() == Some(FILE_WRITE_RESERVED_SEGMENT) {
+        if output.root_relative_path().split('/').next() == Some(FILE_WRITE_RESERVED_SEGMENT) {
             return Err(format!(
                 "FileWrite output uses reserved REAPI input namespace: {}",
                 output.path()
@@ -507,13 +508,72 @@ pub fn materialize_outputs(
     output_root: &Path,
     execution: &RemoteExecutionResult,
 ) -> Result<(), RemoteExecutionError> {
+    materialize_output_files(output_root, execution, |output| Ok(output.path()))
+}
+
+/// Materialize an exact declared regular-output set beneath its configured bin
+/// root. Remote exec paths never become workspace-relative write authority.
+pub fn materialize_configured_outputs(
+    workspace: &Path,
+    declarations: &[ActionOutput],
+    execution: &RemoteExecutionResult,
+) -> Result<(), RemoteExecutionError> {
+    let Some(first) = declarations.first() else {
+        return Err(RemoteExecutionError::Protocol(
+            "configured materialization requires outputs".into(),
+        ));
+    };
+    let mut expected = BTreeMap::new();
+    for output in declarations {
+        slug_build_api_v2::actions::registry::validate_output(output).map_err(|_| {
+            RemoteExecutionError::OutputPath {
+                path: output.root_relative_path().to_owned(),
+            }
+        })?;
+        if output.root() != first.root()
+            || output.kind() != ActionOutputKind::File
+            || expected
+                .insert(output.path(), output.root_relative_path())
+                .is_some()
+        {
+            return Err(RemoteExecutionError::Protocol(
+                "invalid configured output declaration set".into(),
+            ));
+        }
+    }
+    let mut seen = BTreeSet::new();
+    for output in execution.result.output_files() {
+        if !expected.contains_key(output.path()) || !seen.insert(output.path()) {
+            return Err(RemoteExecutionError::Protocol(
+                "remote output differs from configured declarations".into(),
+            ));
+        }
+    }
+    if seen.len() != expected.len() || !execution.result.output_directories().is_empty() {
+        return Err(RemoteExecutionError::Protocol(
+            "remote output schema differs from configured declarations".into(),
+        ));
+    }
+    let root = slug_core_v2::runtime::configured_output_root(workspace, first.root());
+    materialize_output_files(&root, execution, |output| {
+        Ok(*expected
+            .get(output.path())
+            .expect("complete result schema checked"))
+    })
+}
+
+fn materialize_output_files<'a>(
+    output_root: &Path,
+    execution: &'a RemoteExecutionResult,
+    relative_path: impl Fn(&'a GeneratedOutput) -> Result<&'a str, RemoteExecutionError>,
+) -> Result<(), RemoteExecutionError> {
     if !execution.result.output_directories().is_empty() {
         return Err(RemoteExecutionError::Protocol(
             "output tree materialization is not admitted".into(),
         ));
     }
     for output in execution.result.output_files() {
-        let path = safe_output_path(output_root, output.path())?;
+        let path = safe_output_path(output_root, relative_path(output)?)?;
         let data = execution.output_blobs.get(output.path()).ok_or_else(|| {
             RemoteExecutionError::Protocol(format!("missing downloaded output {}", output.path()))
         })?;
@@ -559,18 +619,13 @@ pub fn verify_materialized_run_executable(
     workspace: &Path,
     view: &slug_core_v2::runtime::ResolvedRunSemanticView<'_>,
 ) -> Result<std::path::PathBuf, RemoteExecutionError> {
-    let configuration = view
-        .file_write()
-        .action()
-        .owner()
-        .configuration()
-        .slug_configuration()
-        .ok_or_else(|| {
-            RemoteExecutionError::Command(
-                "run FileWrite owner has an opaque configuration".to_owned(),
-            )
-        })?;
-    let root = slug_core_v2::runtime::configured_output_root(workspace, configuration);
+    let output = view.file_write().action().output();
+    if output.path() != view.executable() {
+        return Err(RemoteExecutionError::Command(
+            "run executable differs from its declared output".into(),
+        ));
+    }
+    let root = slug_core_v2::runtime::configured_output_root(workspace, output.root());
     if !root.is_absolute() {
         return Err(RemoteExecutionError::OutputPath {
             path: root.display().to_string(),
@@ -586,8 +641,8 @@ pub fn verify_materialized_run_executable(
             path: root.display().to_string(),
         });
     }
-    let path = safe_output_path(&root, view.executable())?;
-    let segments = view.executable().split('/').collect::<Vec<_>>();
+    let path = safe_output_path(&root, output.root_relative_path())?;
+    let segments = output.root_relative_path().split('/').collect::<Vec<_>>();
     let mut current = root;
     for (index, segment) in segments.iter().enumerate() {
         current.push(segment);
@@ -825,7 +880,11 @@ mod tests {
                 is_executable: executable,
             },
             "FileWrite",
-            vec![ActionOutput::new(output, ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                crate::test_roots::root(),
+                output,
+                ActionOutputKind::File,
+            )],
         )
     }
 
@@ -860,16 +919,26 @@ mod tests {
                 .map(|byte| format!("{byte:02x}"))
                 .collect::<String>()
         };
-        // Frozen from the accepted FileWrite wire projection before the
-        // handwritten schema was replaced by the pinned upstream protocol.
+        // Frozen FileWrite wire oracle, migrated to the explicit WP766 fixture root.
+        // Command SHA-256 and Action bytes/digest were independently recomputed.
         assert_eq!(
             hex(&plan.command.serialized()),
             concat!(
-                "0a0273680a022d630a256370202d2d202224312220222432222026262063686d6f642030343434202d2d2022243222",
-                "0a0e736c75672d66696c6577726974650a1a5f5f736c75675f66696c6577726974655f5f2f636f6e74656e74",
-                "0a0b706b672f6f75742e7478741a0b706b672f6f75742e7478742a200a1e0a0f636f6e7461696e65722d",
-                "696d616765120b73656c65637465643a76313a0b706b672f6f75742e747874"
+                "0a0273680a022d630a256370202d2d202224312220222432222026262063686d6f642030343434202d2d2022",
+                "2432220a0e736c75672d66696c6577726974650a1a5f5f736c75675f66696c6577726974655f5f2f636f6e74",
+                "656e740a6562617a656c2d6f75742f736c75676366672d76322d666666653238363032633664333061646233",
+                "6638626239653732616466636162616437373335323266356463366263336337313931363766363062316364",
+                "34332f62696e2f706b672f6f75742e7478741a6562617a656c2d6f75742f736c75676366672d76322d666666",
+                "6532383630326336643330616462336638626239653732616466636162616437373335323266356463366263",
+                "33633731393136376636306231636434332f62696e2f706b672f6f75742e7478742a200a1e0a0f636f6e7461",
+                "696e65722d696d616765120b73656c65637465643a76313a6562617a656c2d6f75742f736c75676366672d76",
+                "322d666666653238363032633664333061646233663862623965373261646663616261643737333532326635",
+                "646336626333633731393136376636306231636434332f62696e2f706b672f6f75742e747874",
             )
+        );
+        assert_eq!(
+            plan.identity.command_digest.to_string(),
+            "dc806673259e8d18ed2d4b4d5fe37719d52ee99475e01560c3749a95b862ccee/434"
         );
         let directories = plan.input_tree.directory_blobs();
         assert_eq!(
@@ -896,15 +965,15 @@ mod tests {
         );
         assert_eq!(
             plan.identity.action_digest.to_string(),
-            "4efde9fa35a64b7cda6c3fa50a8d0a524a37256a5cfdbffc8bcc12c650cecab4/175"
+            "e5a7f279be75fe0d34402188e85c66a1f2c86dfeabc1c1f5ff7e00ccf94a84cb/175"
         );
         assert_eq!(
             hex(plan.identity.action_bytes()),
             concat!(
-                "0a450a4063613062643232323331333732626664303230353564383731316536633436623633613463383037626261",
-                "33633633303935303434653634643033633038363810a40112440a406231313939336232336565353762303233333135",
-                "6263663363646138396564336235613435343564373261343931663634356563313935646331393238366533105c5220",
-                "0a1e0a0f636f6e7461696e65722d696d616765120b73656c65637465643a7631"
+                "0a450a4064633830363637333235396538643138656432643462346435666533373731396435326565393934",
+                "37356530313536306333373439613935623836326363656510b20312440a4062313139393362323365653537",
+                "6230323333313562636633636461383965643362356134353435643732613439316636343565633139356463",
+                "31393238366533105c52200a1e0a0f636f6e7461696e65722d696d616765120b73656c65637465643a7631",
             )
         );
 
@@ -916,7 +985,7 @@ mod tests {
                 "cp -- \"$1\" \"$2\" && chmod 0444 -- \"$2\"",
                 "slug-filewrite",
                 FILE_WRITE_CONTENT_PATH,
-                "pkg/out.txt",
+                &crate::test_roots::path("pkg/out.txt"),
             ]
         );
         assert!(plan.command.env.is_empty());
@@ -929,8 +998,14 @@ mod tests {
         assert_eq!(plan.input_tree.inline_blobs()[0].data(), content.as_bytes());
 
         let command = proto::Command::decode(plan.command.serialized().as_slice()).unwrap();
-        assert_eq!(command.output_files, ["pkg/out.txt"]);
-        assert_eq!(command.output_paths, ["pkg/out.txt"]);
+        assert_eq!(
+            command.output_files,
+            [crate::test_roots::path("pkg/out.txt")]
+        );
+        assert_eq!(
+            command.output_paths,
+            [crate::test_roots::path("pkg/out.txt")]
+        );
         assert!(command.output_directories.is_empty());
         assert_eq!(
             command.platform.unwrap().properties[0],
@@ -1170,7 +1245,10 @@ mod tests {
             .unwrap();
         assert_eq!(reader_download, reader_bytes);
 
-        assert_eq!(execution.output_blobs["pkg/write_file.txt"], content);
+        assert_eq!(
+            execution.output_blobs[&crate::test_roots::path("pkg/write_file.txt")],
+            content
+        );
         let expected_digest = ReapiDigest::of_bytes(content);
         assert_eq!(
             execution.result.output_files()[0].digest(),
@@ -1181,7 +1259,7 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("slug-filewrite-nativelink-{}", std::process::id()));
         materialize_outputs(&root, &execution).unwrap();
-        let output = root.join("pkg/write_file.txt");
+        let output = root.join(crate::test_roots::path("pkg/write_file.txt"));
         assert_eq!(std::fs::read(&output).unwrap(), content);
         #[cfg(unix)]
         {

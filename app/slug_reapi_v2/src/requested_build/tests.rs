@@ -7,7 +7,11 @@ use crate::RemoteConfig;
 use crate::RemoteExecutionResult;
 
 fn file(path: &str, bytes: &[u8]) -> GeneratedOutput {
-    GeneratedOutput::new(path, ReapiDigest::of_bytes(bytes), false)
+    GeneratedOutput::new(
+        crate::test_roots::path(path),
+        ReapiDigest::of_bytes(bytes),
+        false,
+    )
 }
 
 fn result(
@@ -37,16 +41,16 @@ fn result(
 #[test]
 fn evidence_counts_all_prerequisites_but_only_published_producer_subsets() {
     let selected = file("same", b"selected");
-    let child = file("nested/value", b"tree child");
+    let child = GeneratedOutput::new("nested/value", ReapiDigest::of_bytes(b"tree child"), false);
     let tree = GeneratedDirectory {
-        path: "tree".into(),
+        path: crate::test_roots::path("tree"),
         tree_digest: ReapiDigest::of_bytes(b"tree"),
         root_digest: ReapiDigest::of_bytes(b"root"),
         directories: vec!["".into(), "empty".into(), "nested".into()],
         files: vec![child.clone()],
     };
     let empty = GeneratedDirectory {
-        path: "emptytree".into(),
+        path: crate::test_roots::path("emptytree"),
         files: vec![],
         ..tree.clone()
     };
@@ -64,9 +68,17 @@ fn evidence_counts_all_prerequisites_but_only_published_producer_subsets() {
     };
     first.evidence.uploaded_digests.push(uploaded.clone());
     let outputs = [
-        ActionOutput::new("same", ActionOutputKind::File),
-        ActionOutput::new("tree", ActionOutputKind::Directory),
-        ActionOutput::new("emptytree", ActionOutputKind::Directory),
+        ActionOutput::new(crate::test_roots::root(), "same", ActionOutputKind::File),
+        ActionOutput::new(
+            crate::test_roots::root(),
+            "tree",
+            ActionOutputKind::Directory,
+        ),
+        ActionOutput::new(
+            crate::test_roots::root(),
+            "emptytree",
+            ActionOutputKind::Directory,
+        ),
     ];
     let materialized = materialized_digests(&results, [(1, outputs.as_slice())]).unwrap();
     assert_eq!(materialized, [selected.digest(), child.digest()]);
@@ -134,9 +146,21 @@ fn zero_action_evidence_succeeds_without_materialization_or_daemon_fields() {
 #[test]
 fn mixed_runfiles_results_keep_producer_indices_without_inventing_remote_evidence() {
     use slug_core_v2::runtime::PreparedRunfilesAction;
-    let mapping = ActionOutput::new("binary.repo_mapping", ActionOutputKind::File);
-    let manifest = ActionOutput::new("binary.runfiles/MANIFEST", ActionOutputKind::File);
-    let tree = ActionOutput::new("binary.runfiles", ActionOutputKind::RunfilesTree);
+    let mapping = ActionOutput::new(
+        crate::test_roots::root(),
+        "binary.repo_mapping",
+        ActionOutputKind::File,
+    );
+    let manifest = ActionOutput::new(
+        crate::test_roots::root(),
+        "binary.runfiles/MANIFEST",
+        ActionOutputKind::File,
+    );
+    let tree = ActionOutput::new(
+        crate::test_roots::root(),
+        "binary.runfiles",
+        ActionOutputKind::RunfilesTree,
+    );
     let results = vec![
         ActionChainStepResult::from_runfiles(PreparedRunfilesAction::Manifest {
             output: mapping.clone(),
@@ -151,7 +175,11 @@ fn mixed_runfiles_results_keep_producer_indices_without_inventing_remote_evidenc
             output: tree.clone(),
         },
     ];
-    let file = [ActionOutput::new("binary", ActionOutputKind::File)];
+    let file = [ActionOutput::new(
+        crate::test_roots::root(),
+        "binary",
+        ActionOutputKind::File,
+    )];
     let mapping = [mapping];
     let manifest = [manifest];
     let tree = [tree];

@@ -128,7 +128,11 @@ fn forced_command() -> ExpandedSpawnCommandLine {
         )]),
         ArtifactInputs::new(Vec::new()),
         ArtifactInputs::new(Vec::new()),
-        vec![ActionOutput::new("out", ActionOutputKind::File)],
+        vec![ActionOutput::new(
+            crate::test_roots::root(),
+            "out",
+            ActionOutputKind::File,
+        )],
         None,
         Default::default(),
         Default::default(),
@@ -149,9 +153,31 @@ fn param_composition_preserves_directories_and_explicit_executable_policy() {
             .with_spawn_param_files_executable(&command, executable)
             .unwrap();
         assert_eq!(tree.directories(), base.directories());
-        let root = directory(&tree, tree.root_digest());
-        assert_eq!(root.directories[0].name, "empty");
-        assert_eq!(root.files[0].is_executable, executable);
+        let mut node = directory(&tree, tree.root_digest());
+        assert_eq!(
+            node.directories
+                .iter()
+                .map(|node| node.name.as_str())
+                .collect::<Vec<_>>(),
+            ["bazel-out", "empty"]
+        );
+        for component in [
+            "bazel-out",
+            crate::test_roots::root().configuration_component(),
+            "bin",
+        ] {
+            let child = node
+                .directories
+                .iter()
+                .find(|child| child.name == component)
+                .unwrap();
+            node = directory(
+                &tree,
+                &crate::executor::digest_from_proto(child.digest.as_ref().unwrap()).unwrap(),
+            );
+        }
+        assert_eq!(node.files[0].name, "out-0.params");
+        assert_eq!(node.files[0].is_executable, executable);
         assert_eq!(tree.entries()[0].is_executable(), executable);
         assert_eq!(tree.inline_blobs()[0].data(), b"arg\n");
         if !executable {

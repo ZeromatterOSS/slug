@@ -46,6 +46,7 @@ impl Error for ActionError {}
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct ActionRegistry {
     actions: Vec<ActionSpec>,
+    // Candidate index and projection collision guard, never structural identity.
     output_owners: BTreeMap<String, usize>,
 }
 
@@ -58,7 +59,9 @@ impl ActionRegistry {
         validate_action(&action)?;
         for output in action.outputs() {
             validate_output(output)?;
-            if self.output_owners.contains_key(output.path()) {
+            if self.structural_output_owner(output).is_some()
+                || self.output_owners.contains_key(output.path())
+            {
                 return Err(ActionError::ConflictingOutput {
                     path: output.path().to_owned(),
                 });
@@ -83,7 +86,8 @@ impl ActionRegistry {
             validate_action(action)?;
             for output in action.outputs() {
                 validate_output(output)?;
-                if self.output_owners.contains_key(output.path())
+                if self.structural_output_owner(output).is_some()
+                    || self.output_owners.contains_key(output.path())
                     || pending.insert(output.path().to_owned(), ()).is_some()
                 {
                     return Err(ActionError::ConflictingOutput {
@@ -111,6 +115,21 @@ impl ActionRegistry {
     pub fn output_owner(&self, output_path: &str) -> Option<usize> {
         self.output_owners.get(output_path).copied()
     }
+
+    pub fn structural_output_owner(&self, output: &ActionOutput) -> Option<usize> {
+        // Equal structural coordinates have the same deterministic projection.
+        // Verify the candidate structurally: a projected-path collision must not
+        // silently identify a different root, and kind does not distinguish owners.
+        let candidate = self.output_owner(output.path())?;
+        self.actions[candidate]
+            .outputs()
+            .iter()
+            .any(|declared| {
+                declared.root() == output.root()
+                    && declared.root_relative_path() == output.root_relative_path()
+            })
+            .then_some(candidate)
+    }
 }
 
 fn validate_action(action: &ActionSpec) -> Result<(), ActionError> {
@@ -135,11 +154,15 @@ fn validate_action(action: &ActionSpec) -> Result<(), ActionError> {
 }
 
 pub fn validate_output(output: &ActionOutput) -> Result<(), ActionError> {
-    let path = output.path();
+    validate_output_path(output.root_relative_path())
+}
+
+pub(crate) fn validate_output_path(path: &str) -> Result<(), ActionError> {
     if path.is_empty()
         || path.starts_with('/')
         || path.starts_with('\\')
         || path.contains('\\')
+        || path.contains('\0')
         || path
             .split('/')
             .any(|segment| segment.is_empty() || segment == "." || segment == "..")

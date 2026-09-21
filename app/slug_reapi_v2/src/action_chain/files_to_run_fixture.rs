@@ -38,11 +38,11 @@ consume(name='authored', tool=':authored_tool', runner='tools/runner', explicit=
         root.join("tools/producer"),
         r#"#!/bin/sh
 set -eu
-/bin/mkdir -p gen_tree/nested gen_tree/omitted_empty
-/bin/cat input > gen_file
-/bin/cat input > gen_tree/nested/value
-/bin/cat input > unused_cooutput
-/bin/chmod 0644 gen_file gen_tree/nested/value
+/bin/mkdir -p "$2/nested" "$2/omitted_empty"
+/bin/cat input > "$1"
+/bin/cat input > "$2/nested/value"
+/bin/cat input > "$3"
+/bin/chmod 0644 "$1" "$2/nested/value"
 "#,
     )
     .unwrap();
@@ -67,7 +67,7 @@ const DEFS: &str = r#"def _backing(ctx):
     tree = ctx.actions.declare_directory('gen_tree')
     empty = ctx.actions.declare_directory('empty_tree')
     unused = ctx.actions.declare_file('unused_cooutput')
-    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=ctx.attr.input[DefaultInfo].files, outputs=[file, tree, empty, unused])
+    ctx.actions.run(executable=ctx.attr.tool[DefaultInfo].files.to_list()[0], inputs=ctx.attr.input[DefaultInfo].files, outputs=[file, tree, empty, unused], arguments=[file.path, tree.path, unused.path])
     return [DefaultInfo(files=depset([file, tree, empty]))]
 backing = rule(implementation=_backing, attrs={'input':attr.label(allow_single_file=True), 'tool':attr.label(allow_single_file=True)})
 def _binary(ctx):

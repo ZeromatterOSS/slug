@@ -9,7 +9,7 @@ fn selected_artifacts_preserve_exact_identity_and_shared_file_write_bindings() {
     let closure = ValidatedActionClosure::new(Arc::from([
         node(target.clone(), vec![write("shared")]),
         node(equivalent.clone(), vec![write("shared")]),
-        node(exec.clone(), vec![write("shared")]),
+        node(exec.clone(), vec![write_for(&exec, "shared")]),
         node(
             cooutputs.clone(),
             vec![
@@ -17,7 +17,11 @@ fn selected_artifacts_preserve_exact_identity_and_shared_file_write_bindings() {
                     vec![],
                     vec![
                         output("file"),
-                        ActionOutput::new("tree", ActionOutputKind::Directory),
+                        ActionOutput::new(
+                            crate::runtime::configured_output::test_root(),
+                            "tree",
+                            ActionOutputKind::Directory,
+                        ),
                     ],
                 ),
                 ActionSpec::new(ActionKind::Run, "unselected", vec![output("unused")]),
@@ -77,7 +81,11 @@ fn multiple_selected_roots_share_prerequisites_and_keep_cooutput_input_edges() {
                 vec![seed.clone()],
                 vec![
                     output("file"),
-                    ActionOutput::new("tree", ActionOutputKind::Directory),
+                    ActionOutput::new(
+                        crate::runtime::configured_output::test_root(),
+                        "tree",
+                        ActionOutputKind::Directory,
+                    ),
                 ],
             ),
             spawn(vec![file.clone(), tree.clone()], vec![output("left")]),
@@ -95,7 +103,7 @@ fn multiple_selected_roots_share_prerequisites_and_keep_cooutput_input_edges() {
         forest
             .actions
             .iter()
-            .map(|step| step.action().outputs()[0].path())
+            .map(|step| step.action().outputs()[0].root_relative_path())
             .collect::<Vec<_>>(),
         ["seed", "file", "right", "left"],
     );
@@ -141,19 +149,28 @@ fn invalid_later_selected_roots_reject_the_entire_forest() {
             ActionSpec::new(
                 ActionKind::Run,
                 "symlink",
-                vec![ActionOutput::new("link", ActionOutputKind::Symlink)],
+                vec![ActionOutput::new(
+                    crate::runtime::configured_output::test_root(),
+                    "link",
+                    ActionOutputKind::Symlink,
+                )],
             ),
             ActionSpec::new(
                 ActionKind::Run,
                 "runfiles",
                 vec![ActionOutput::new(
+                    crate::runtime::configured_output::test_root(),
                     "runfiles",
                     ActionOutputKind::RunfilesTree,
                 )],
             ),
             spawn(
                 vec![],
-                vec![ActionOutput::new("tree", ActionOutputKind::Directory)],
+                vec![ActionOutput::new(
+                    crate::runtime::configured_output::test_root(),
+                    "tree",
+                    ActionOutputKind::Directory,
+                )],
             ),
         ],
     )]))

@@ -1,3 +1,5 @@
+use slug_build_api_v2::DerivedArtifactRoot;
+mod root_support;
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
  *
@@ -28,8 +30,10 @@ fn rule_context_exposes_prepared_attrs_files_executable_and_toolchains() {
     attrs.insert("name", AttributeValue::String("demo".to_owned()));
     attrs.insert("dep", AttributeValue::Label(label("@@//dep:lib")));
 
-    let output = CtxActions::new().declare_file("pkg/demo.out").unwrap();
-    let ctx = RuleContext::builder(label("@@//pkg:demo"))
+    let output = CtxActions::new(root_support::root())
+        .declare_file("pkg/demo.out")
+        .unwrap();
+    let ctx = RuleContext::builder(label("@@//pkg:demo"), root_support::root())
         .attrs(attrs)
         .file("src", "pkg/main.in")
         .files("srcs", vec!["pkg/a.in".to_owned(), "pkg/b.in".to_owned()])
@@ -54,7 +58,10 @@ fn rule_context_exposes_prepared_attrs_files_executable_and_toolchains() {
         &["pkg/a.in".to_owned(), "pkg/b.in".to_owned()]
     );
     assert_eq!(ctx.executable("tool"), Some("tools/tool.sh"));
-    assert_eq!(ctx.output("out").unwrap().path(), "pkg/demo.out");
+    assert_eq!(
+        ctx.output("out").unwrap().path(),
+        root_support::exec_path("pkg/demo.out")
+    );
     assert_eq!(ctx.fragment("cpp"), Some("enabled"));
     assert_eq!(
         ctx.toolchain("//toolchains:demo_type"),
@@ -66,7 +73,7 @@ fn rule_context_exposes_prepared_attrs_files_executable_and_toolchains() {
 
 #[test]
 fn expand_location_and_resolve_command_use_prepared_location_map() {
-    let ctx = RuleContext::builder(label("@@//pkg:demo"))
+    let ctx = RuleContext::builder(label("@@//pkg:demo"), root_support::root())
         .location("//pkg:data", "pkg/data.txt")
         .build();
 

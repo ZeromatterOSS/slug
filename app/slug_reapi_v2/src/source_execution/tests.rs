@@ -15,6 +15,10 @@ use super::*;
 #[path = "../../../slug_core_v2/src/runtime/source_staging/test_workspace.rs"]
 mod fixture;
 
+fn source_defs() -> String {
+    fixture::DEFS.replace("arguments = [args]", "arguments = [args, out.path]")
+}
+
 #[test]
 fn unsupported_source_transport_policy_fails_before_connecting() {
     let base = RemoteConfig::from_args(&["--remote_executor=grpc://127.0.0.1:1"]).unwrap();
@@ -60,10 +64,11 @@ impl Workspace {
         std::fs::create_dir_all(&root).unwrap();
         let root = root.canonicalize().unwrap();
         fixture::write(&root);
+        std::fs::write(root.join("defs.bzl"), source_defs()).unwrap();
         std::fs::create_dir_all(root.join("tools")).unwrap();
         std::fs::write(
             root.join("tools/tool"),
-            b"#!/bin/sh\n/bin/cat input > shared.out\n",
+            b"#!/bin/sh\n/bin/cat input > \"$2\"\n",
         )
         .unwrap();
         let build = std::fs::read_to_string(root.join("BUILD.bazel"))
@@ -72,7 +77,7 @@ impl Workspace {
         std::fs::write(root.join("BUILD.bazel"), build).unwrap();
         if !package.is_empty() {
             std::fs::create_dir_all(root.join(package)).unwrap();
-            std::fs::write(root.join(package).join("defs.bzl"), fixture::DEFS).unwrap();
+            std::fs::write(root.join(package).join("defs.bzl"), source_defs()).unwrap();
             std::fs::write(root.join(package).join("BUILD.bazel"),
                 "load(':defs.bzl', 'stage')\nstage(name='one', input='//:input', tool='//:tools/tool')\n").unwrap();
         }
@@ -178,7 +183,16 @@ fn nativelink_native_source_execute_cache_change_and_incomplete_cas() {
         std::fs::write(workspace.root.join("input"), bytes).unwrap();
         drop(workspace.run(&transport).unwrap().project(|accepted| {
             let output = accepted.output();
-            assert_eq!(output.output_blobs.get("shared.out").unwrap(), bytes);
+            assert_eq!(
+                output
+                    .output_blobs
+                    .get(&crate::test_roots::owner_path(
+                        &workspace.owner,
+                        "shared.out"
+                    ))
+                    .unwrap(),
+                bytes
+            );
             assert_eq!(
                 output.result.output_files()[0].digest(),
                 &ReapiBlob::from_bytes(bytes.to_vec()).digest().clone()
@@ -321,8 +335,9 @@ impl SourceActionTransport for IncompleteCas {
 }
 
 fn tree_defs() -> String {
-    fixture::DEFS.replace("out = ctx.actions.declare_file('shared.out')", "out = ctx.actions.declare_directory('tree', sibling=None)\n    repeated = ctx.actions.declare_directory(filename='tree')\n    if not out.is_directory or out.is_source or out != repeated or ctx.attr.input[DefaultInfo].files.to_list()[0].is_directory:\n        fail('directory artifact metadata')\n    plain = ctx.actions.declare_file('a.out')")
+    source_defs().replace("out = ctx.actions.declare_file('shared.out')", "out = ctx.actions.declare_directory('tree', sibling=None)\n    repeated = ctx.actions.declare_directory(filename='tree')\n    if not out.is_directory or out.is_source or out != repeated or ctx.attr.input[DefaultInfo].files.to_list()[0].is_directory:\n        fail('directory artifact metadata')\n    plain = ctx.actions.declare_file('a.out')")
         .replace("outputs = [out]", "outputs = [out, plain]")
+        .replace("arguments = [args, out.path]", "arguments = [args, out.path, plain.path]")
 }
 
 #[test]
@@ -335,10 +350,19 @@ fn native_directory_declarations_and_command_paths_follow_retained_kinds() {
     let owner = prepared.configured_action().context().owner();
     assert_eq!(owner, &workspace.owner);
     let plan = SourceSpawnReapiPlan::from_prepared(prepared, &Default::default()).unwrap();
-    assert_eq!(plan.command().output_directories, ["pkg/tree"]);
-    assert_eq!(plan.command().output_files, ["pkg/a.out"]);
+    assert_eq!(
+        plan.command().output_directories,
+        [crate::test_roots::owner_path(&workspace.owner, "pkg/tree")]
+    );
+    assert_eq!(
+        plan.command().output_files,
+        [crate::test_roots::owner_path(&workspace.owner, "pkg/a.out")]
+    );
     let command = crate::proto::Command::decode(plan.command().serialized().as_slice()).unwrap();
-    assert_eq!(command.output_paths, ["pkg/a.out", "pkg/tree"]);
+    assert_eq!(
+        command.output_paths,
+        ["pkg/a.out", "pkg/tree"].map(|path| crate::test_roots::owner_path(&workspace.owner, path))
+    );
     for (changed, expected) in [
         (defs.replace("repeated = ctx.actions.declare_directory(filename='tree')", "repeated = ctx.actions.declare_file('tree')"), "different type"),
         (defs.replace("out = ctx.actions.declare_directory", "reserved = ctx.actions.declare_file('tree')\n    out = ctx.actions.declare_directory"), "different type"),
@@ -371,7 +395,7 @@ fn nativelink_source_output_tree_cold_cache_restore_and_missing_descendant() {
     let transport = SourceReapiTransport::new(config).unwrap();
     let workspace = Workspace::new();
     std::fs::write(workspace.root.join("defs.bzl"), tree_defs()).unwrap();
-    std::fs::write(workspace.root.join("tools/tool"), b"#!/bin/sh\n/bin/mkdir -p tree/nested tree/empty\n/bin/cat input > tree/nested/value\n/bin/chmod 0644 tree/nested/value\n/bin/cat input > a.out\n").unwrap();
+    std::fs::write(workspace.root.join("tools/tool"), b"#!/bin/sh\n/bin/mkdir -p \"$2/nested\" \"$2/empty\"\n/bin/cat input > \"$2/nested/value\"\n/bin/chmod 0644 \"$2/nested/value\"\n/bin/cat input > \"$3\"\n").unwrap();
     let mut original = None;
     let mut last = None;
     for (bytes, hit) in [
@@ -386,7 +410,10 @@ fn nativelink_source_output_tree_cold_cache_restore_and_missing_descendant() {
             let [directory] = output.result.output_directories() else {
                 panic!("one tree expected")
             };
-            assert_eq!(directory.path(), "tree");
+            assert_eq!(
+                directory.path(),
+                crate::test_roots::owner_path(&workspace.owner, "tree")
+            );
             assert_eq!(directory.directories(), ["", "empty", "nested"]);
             let [file] = directory.files() else {
                 panic!("one descendant expected")
@@ -399,7 +426,10 @@ fn nativelink_source_output_tree_cold_cache_restore_and_missing_descendant() {
                 1,
                 "tree contents are verified but not retained"
             );
-            assert_eq!(output.output_blobs["a.out"], bytes);
+            assert_eq!(
+                output.output_blobs[&crate::test_roots::owner_path(&workspace.owner, "a.out")],
+                bytes
+            );
             assert_eq!(output.evidence.ac_hits, u64::from(hit));
             assert_eq!(output.evidence.ac_misses, u64::from(!hit));
             if let Some(original) = &original {

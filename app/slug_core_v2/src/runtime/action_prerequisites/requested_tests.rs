@@ -105,7 +105,7 @@ fn action_outputs(plan: &RequestedActionPrerequisitePlan<'_>) -> Vec<Vec<String>
             step.action()
                 .outputs()
                 .iter()
-                .map(|output| output.path().to_owned())
+                .map(|output| output.root_relative_path().to_owned())
                 .collect()
         })
         .collect()
@@ -154,7 +154,7 @@ fn native_requested_forest_preserves_membership_and_shares_diamond_and_cooutputs
         selection
             .artifacts()
             .iter()
-            .map(|artifact| artifact.path().into_owned())
+            .map(|artifact| crate::runtime::configured_output::test_artifact_coordinate(artifact))
             .collect::<Vec<_>>(),
         [
             "input",
@@ -236,9 +236,14 @@ fn native_requested_forest_preserves_membership_and_shares_diamond_and_cooutputs
             step.inputs()
                 .iter()
                 .filter_map(|input| {
-                    input
-                        .producer()
-                        .map(|producer| (input.artifact().path().into_owned(), producer))
+                    input.producer().map(|producer| {
+                        (
+                            crate::runtime::configured_output::test_artifact_coordinate(
+                                input.artifact(),
+                            ),
+                            producer,
+                        )
+                    })
                 })
                 .collect::<Vec<_>>()
         })

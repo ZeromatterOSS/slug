@@ -40,7 +40,7 @@ fn source_execution_and_short_paths_preserve_repository_identity() {
         assert_eq!(artifact.path().rsplit('/').next(), Some("lib.rs"));
     }
     let generated = derived_artifact("pkg/out", ActionOutputKind::File);
-    assert_eq!(generated.path(), "pkg/out");
+    assert_eq!(generated.path(), root_support::exec_path("pkg/out"));
     assert_eq!(generated.short_path(), "pkg/out");
     assert_ne!(source("@@dep+//:lib.rs"), source("@@other+//:lib.rs"));
 }
@@ -89,7 +89,11 @@ fn source_args_executable_and_param_bytes_share_execution_paths() {
                     .collect::<Vec<_>>(),
             ),
             ArtifactInputs::new(Vec::new()),
-            vec![ActionOutput::new("out", ActionOutputKind::File)],
+            vec![ActionOutput::new(
+                root_support::root(),
+                "out",
+                ActionOutputKind::File,
+            )],
             None,
             RetainedActionEnvironment::default(),
             CanonicalStringMap::default(),
@@ -108,7 +112,13 @@ fn source_args_executable_and_param_bytes_share_execution_paths() {
         ]
     );
     let expanded = first.expand_forced_param_files().unwrap();
-    assert_eq!(expanded.argv(), ["external/dep+/rustc", "@out-0.params"]);
+    assert_eq!(
+        expanded.argv(),
+        [
+            "external/dep+/rustc".to_owned(),
+            format!("@{}", root_support::exec_path("out-0.params"))
+        ]
+    );
     assert_eq!(
         expanded.param_files()[0].bytes(),
         b"lib.rs\nexternal/dep+/lib.rs\nexternal/other+/lib.rs\n"

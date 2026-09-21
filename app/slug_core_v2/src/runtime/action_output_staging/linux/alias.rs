@@ -8,7 +8,7 @@ use super::*;
 impl Staging {
     pub(in crate::runtime::action_output_staging) fn new_alias(
         workspace: &Path,
-        configuration: &SlugConfiguration,
+        root: &DerivedArtifactRoot,
         output: &ActionOutput,
         target: &str,
         reserved: &starlark_map::small_set::SmallSet<&str>,
@@ -21,12 +21,7 @@ impl Staging {
                 "artifact alias requires File output and absolute target",
             ));
         }
-        let mut staging = Self::new(
-            workspace,
-            configuration,
-            std::slice::from_ref(output),
-            reserved,
-        )?;
+        let mut staging = Self::new(workspace, root, std::slice::from_ref(output), reserved)?;
         let destination = &mut staging.destinations[0];
         // Replace only our owned hidden regular sibling, never the destination.
         if entry(&destination.parent, &destination.name)? != destination.cleanup {

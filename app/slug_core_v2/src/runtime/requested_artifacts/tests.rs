@@ -129,7 +129,7 @@ fn evaluation(accepted: &AcceptedBuild) -> &BuildCommandEvaluation {
 fn paths(artifacts: &[AnalysisArtifact]) -> Vec<String> {
     artifacts
         .iter()
-        .map(|artifact| artifact.path().into_owned())
+        .map(|artifact| crate::runtime::configured_output::test_artifact_coordinate(artifact))
         .collect()
 }
 
@@ -137,7 +137,11 @@ fn selected_paths(selection: &RequestedArtifacts<'_>, group: &RequestedOutputGro
     group
         .artifact_indices()
         .iter()
-        .map(|index| selection.artifacts()[*index].path().into_owned())
+        .map(|index| {
+            crate::runtime::configured_output::test_artifact_coordinate(
+                &selection.artifacts()[*index],
+            )
+        })
         .collect()
 }
 

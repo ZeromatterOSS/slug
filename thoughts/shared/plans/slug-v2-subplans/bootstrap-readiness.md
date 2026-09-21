@@ -390,9 +390,12 @@ still requires distinct mandatory/spawn/cache-only inputs and discovery lifecycl
 WP765 adds original-context recovery with root/subrule lifetime checks and
 toolchain-owned artifact naming through the unchanged public wrapper. Native
 provider schema classification survives publication, including same-key/field
-source changes. Naming admits observed non-Windows Host only. Root-aware compile
-helpers remain blocked on coherent generated artifact roots: current derived
-File paths are bin-relative, so empty or getter-only roots are not admitted.
+source changes. Naming admits observed non-Windows Host only. WP766 supplies
+coherent derived roots through File/ctx, Args, actions, REAPI and confined physical
+publication, with real configured root-aware helper callers and three fresh
+NativeLink transport/publication/cache-restoration gates. Equal relative names in
+target/exec configurations coexist without double prefixes. Output/configuration
+tokens remain Slug-native; no getter-only prefix or empty derived root is admitted.
 Compile action production, execution-time tree/path mapping and full cc_library remain
 deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside

@@ -165,6 +165,14 @@ fn native_source_staging_tracks_sources_and_rejects_conflicting_roots() {
         .unwrap()
         .accepted
         .clone();
+    let expected_path = format!(
+        "{}/shared.out",
+        slug_build_api_v2::DerivedArtifactRoot::bin(
+            owner.configuration().slug_configuration().unwrap().clone()
+        )
+        .unwrap()
+        .path()
+    );
     let combined = key(&runtime, &["//:one", "//:two"], owner);
     let conflict = runtime
         .drive_command(request(&runtime), combined)
@@ -173,7 +181,7 @@ fn native_source_staging_tracks_sources_and_rejects_conflicting_roots() {
     assert!(
         conflict
             .to_string()
-            .contains("unsupported equivalence at shared.out"),
+            .contains(&format!("unsupported equivalence at {expected_path}")),
         "{conflict}"
     );
     fs::remove_file(workspace.path().join("input")).unwrap();
@@ -241,7 +249,11 @@ fn assert_unsupported_shapes(spawn: &SpawnSpec) {
                 CanonicalLabel::parse("@@//:generated").unwrap(),
                 b"cfg".as_slice(),
             ),
-            output: ActionOutput::new("generated", kind),
+            output: ActionOutput::new(
+                crate::runtime::configured_output::test_root(),
+                "generated",
+                kind,
+            ),
         };
         let invalid = replacement(
             spawn.invocation().clone(),

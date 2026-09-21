@@ -39032,3 +39032,6 @@ async fn observed_external_bzl_source_provenance_tracks_helper_revision() {
 
 #[path = "cc_freeze_tests.rs"]
 mod cc_freeze_tests;
+
+#[path = "artifact_root_helper_tests.rs"]
+mod artifact_root_helper_tests;

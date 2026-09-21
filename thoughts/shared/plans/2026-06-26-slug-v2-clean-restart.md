@@ -29,14 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-65-m7a-cc-context-and-artifact-naming-r1
+Packet: WP-7-66-m7a-coherent-output-roots-r1
 Status: accepted
 
-WP765 accepts original-context recovery, toolchain-owned artifact naming and
-publication-preserved native provider schema classification:47 focused tests,
-Core/CLI checks and independent final ACCEPT. Next, output roots require a
-coherent artifact/path/Args/transport design: current derived paths are bin-relative,
-so synthetic empty root getters are not admitted. M7A remains partial; M8 unproved.
+WP766 accepts coherent output roots across artifacts, Args, actions and transport,
+with independent design/final ACCEPT and atomic integration from
+`codex/wp766-output-roots-review`:315 ordinary plus3 fresh NativeLink selectors
+pass, CLI check passes, and legacy Run coverage explicitly preserves its unsupported
+ordinary-analysis boundary. WP765 at d6ed76015
+accepted context recovery, naming and provider classification with47 tests and
+Core/CLI checks. No getter-only prefix or empty derived root is admitted.
+M7A remains partial; M8 unproved.
 
 WP764 accepts structural Cpp compile inputs and exact target/exec projection,
 consumed by unchanged compile-option/dotd helpers with a genuine toolchain:

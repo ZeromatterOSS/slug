@@ -16,6 +16,13 @@ pub(super) struct CcContextProjection {
 }
 
 impl CcContextProjection {
+    pub(super) fn merged_genfiles(&self) -> anyhow::Result<bool> {
+        Ok(self
+            .configuration
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("ctx.genfiles_dir requires structural configuration"))?
+            .merge_genfiles_directory()?)
+    }
     #[cfg(test)]
     pub(super) fn unconfigured(default_execution: Arc<ConfiguredActionOwnerContext>) -> Self {
         Self {

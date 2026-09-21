@@ -6,6 +6,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use slug_build_api_v2::ActionOutputKind;
+use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::StarlarkOption;
 use slug_configuration_v2::StarlarkOptionScope;
 use slug_configuration_v2::native::host::AutoCpuToken;
@@ -54,14 +55,25 @@ pub(super) fn configurations() -> (SlugConfiguration, SlugConfiguration) {
     ));
     (base, other)
 }
-fn outputs() -> Vec<ActionOutput> {
+fn outputs(config: &SlugConfiguration) -> Vec<ActionOutput> {
     vec![
-        ActionOutput::new("pkg/file", ActionOutputKind::File),
-        ActionOutput::new("pkg/tree", ActionOutputKind::Directory),
+        ActionOutput::new(
+            slug_build_api_v2::DerivedArtifactRoot::bin(config.clone()).unwrap(),
+            "pkg/file",
+            ActionOutputKind::File,
+        ),
+        ActionOutput::new(
+            slug_build_api_v2::DerivedArtifactRoot::bin(config.clone()).unwrap(),
+            "pkg/tree",
+            ActionOutputKind::Directory,
+        ),
     ]
 }
 pub(super) fn root(workspace: &Workspace, config: &SlugConfiguration) -> PathBuf {
-    super::super::configured_output::configured_output_root(workspace.path(), config)
+    super::super::configured_output::configured_output_root(
+        workspace.path(),
+        &slug_build_api_v2::DerivedArtifactRoot::bin((config).clone()).unwrap(),
+    )
 }
 fn fill(stage: &ActionOutputStaging, bytes: &[u8]) {
     stage.create_file(0, "").unwrap().write_all(bytes).unwrap();
@@ -110,12 +122,17 @@ fn selected_file_tree_replacement_modes_empty_dirs_and_configuration_a_b_a() {
         (&b, b"other".as_slice()),
         (&a, b"last".as_slice()),
     ] {
-        let mut stage = ActionOutputStaging::new(workspace.path(), config, &outputs()).unwrap();
+        let mut stage = ActionOutputStaging::new(
+            workspace.path(),
+            &slug_build_api_v2::DerivedArtifactRoot::bin((config).clone()).unwrap(),
+            &outputs(&config),
+        )
+        .unwrap();
         fill(&stage, bytes);
         stage.seal().unwrap();
         let published = stage.publish().unwrap();
         assert_eq!(published.root(), root(&workspace, config));
-        assert_eq!(published.outputs(), outputs());
+        assert_eq!(published.outputs(), outputs(config));
         let path = published.root();
         for child in [
             "pkg/file",
@@ -157,7 +174,12 @@ fn selected_file_tree_replacement_modes_empty_dirs_and_configuration_a_b_a() {
         .join(format!("{}.canonical", a.projection().path_component()));
     assert_eq!(fs::read(&marker).unwrap(), a.canonical_bytes());
     fs::write(marker, b.canonical_bytes()).unwrap();
-    let error = ActionOutputStaging::new(workspace.path(), &a, &outputs()).unwrap_err();
+    let error = ActionOutputStaging::new(
+        workspace.path(),
+        &slug_build_api_v2::DerivedArtifactRoot::bin((&a).clone()).unwrap(),
+        &outputs(&a),
+    )
+    .unwrap_err();
     assert!(error.to_string().contains("collision"));
     assert_eq!(fs::read(aroot.join("pkg/file")).unwrap(), b"last");
 }
@@ -166,7 +188,12 @@ fn selected_file_tree_replacement_modes_empty_dirs_and_configuration_a_b_a() {
 fn staging_rejects_escape_type_conflicts_missing_outputs_and_cleans_sealed_trees() {
     let workspace = Workspace::new();
     let (config, _) = configurations();
-    let mut stage = ActionOutputStaging::new(workspace.path(), &config, &outputs()).unwrap();
+    let mut stage = ActionOutputStaging::new(
+        workspace.path(),
+        &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
+        &outputs(&config),
+    )
+    .unwrap();
     for path in [
         "../outside",
         "/absolute",
@@ -235,7 +262,12 @@ fn namespace_ancestor_symlinks_are_rejected_without_touching_outside() {
             workspace.path()
         };
         assert!(
-            ActionOutputStaging::new(requested, &config, &outputs()).is_err(),
+            ActionOutputStaging::new(
+                requested,
+                &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
+                &outputs(&config)
+            )
+            .is_err(),
             "{boundary}"
         );
         assert_eq!(
@@ -257,7 +289,12 @@ fn changed_destination_or_root_fails_preflight_before_any_output_changes() {
         let workspace = Workspace::new();
         let output_root = root(&workspace, &config);
         old_outputs(&output_root);
-        let mut stage = ActionOutputStaging::new(workspace.path(), &config, &outputs()).unwrap();
+        let mut stage = ActionOutputStaging::new(
+            workspace.path(),
+            &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
+            &outputs(&config),
+        )
+        .unwrap();
         fill(&stage, b"new");
         stage.seal().unwrap();
         let changed = if replace_root {
@@ -288,10 +325,23 @@ fn late_rename_failure_reports_partial_publication_and_cleans_retired_outputs() 
     let output_root = root(&workspace, &config);
     old_outputs(&output_root);
     let declared = vec![
-        ActionOutput::new("pkg/file", ActionOutputKind::File),
-        ActionOutput::new("pkg/unrelated", ActionOutputKind::File),
+        ActionOutput::new(
+            crate::runtime::configured_output::test_root(),
+            "pkg/file",
+            ActionOutputKind::File,
+        ),
+        ActionOutput::new(
+            crate::runtime::configured_output::test_root(),
+            "pkg/unrelated",
+            ActionOutputKind::File,
+        ),
     ];
-    let mut stage = ActionOutputStaging::new(workspace.path(), &config, &declared).unwrap();
+    let mut stage = ActionOutputStaging::new(
+        workspace.path(),
+        &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
+        &declared,
+    )
+    .unwrap();
     for i in 0..2 {
         stage
             .create_file(i, "")
@@ -337,7 +387,12 @@ fn retired_tree_cleanup_unlinks_symlinks_without_following_them() {
         fs::Permissions::from_mode(0o555),
     )
     .unwrap();
-    let mut stage = ActionOutputStaging::new(workspace.path(), &config, &outputs()).unwrap();
+    let mut stage = ActionOutputStaging::new(
+        workspace.path(),
+        &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
+        &outputs(&config),
+    )
+    .unwrap();
     fill(&stage, b"new");
     stage.seal().unwrap();
     stage.publish().unwrap();
@@ -357,7 +412,12 @@ fn retired_tree_cleanup_unlinks_symlinks_without_following_them() {
 fn tree_relative_depth_limit_excludes_private_staging_prefix() {
     let workspace = Workspace::new();
     let (config, _) = configurations();
-    let mut stage = ActionOutputStaging::new(workspace.path(), &config, &outputs()).unwrap();
+    let mut stage = ActionOutputStaging::new(
+        workspace.path(),
+        &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
+        &outputs(&config),
+    )
+    .unwrap();
     stage
         .create_file(0, "")
         .unwrap()
@@ -393,7 +453,12 @@ fn empty_selected_output_set_seals_and_publishes_without_artifact_writes() {
     let (config, _) = configurations();
     let output_root = root(&workspace, &config);
     old_outputs(&output_root);
-    let mut stage = ActionOutputStaging::new(workspace.path(), &config, &[]).unwrap();
+    let mut stage = ActionOutputStaging::new(
+        workspace.path(),
+        &slug_build_api_v2::DerivedArtifactRoot::bin((&config).clone()).unwrap(),
+        &[],
+    )
+    .unwrap();
     assert!(stage.create_file(0, "").is_err());
     stage.seal().unwrap();
     let published = stage.publish().unwrap();

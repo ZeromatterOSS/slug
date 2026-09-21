@@ -43,26 +43,40 @@ pub enum ActionOutputKind {
     RunfilesTree,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
-pub struct ActionOutput {
-    path: String,
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+struct ActionOutputData {
+    root: crate::DerivedArtifactRoot,
+    path: CompactString,
     kind: ActionOutputKind,
 }
 
+#[derive(Debug, Clone, Dupe, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub struct ActionOutput(Arc<ActionOutputData>);
+
 impl ActionOutput {
-    pub fn new(path: impl Into<String>, kind: ActionOutputKind) -> Self {
-        Self {
-            path: path.into(),
-            kind,
-        }
+    pub fn new(
+        root: crate::DerivedArtifactRoot,
+        relative: impl Into<String>,
+        kind: ActionOutputKind,
+    ) -> Self {
+        let path = format!("{}/{}", root.path(), relative.into()).into();
+        Self(Arc::new(ActionOutputData { root, path, kind }))
+    }
+
+    pub fn root(&self) -> &crate::DerivedArtifactRoot {
+        &self.0.root
+    }
+
+    pub fn root_relative_path(&self) -> &str {
+        &self.0.path[self.root().path().len() + 1..]
     }
 
     pub fn path(&self) -> &str {
-        &self.path
+        &self.0.path
     }
 
     pub fn kind(&self) -> ActionOutputKind {
-        self.kind
+        self.0.kind
     }
 }
 
