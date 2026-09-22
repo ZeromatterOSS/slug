@@ -29,10 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-70-m7a-cpp-command-expansion-r1
+Packet: WP-7-71-m7a-cpp-dependency-reconciliation-r1
 Status: accepted
 
-WP770 accepts pure typed CppCompile argv/effective-environment expansion from
+WP771 accepts pure CppCompile input-role projection and supplied-dotd dependency
+reconciliation with explicit source-artifact resolution. Independent design/final
+ACCEPT;49 focused tests and Core/CLI checks pass. Core discovery ownership,
+verified dotd acquisition, cache replay and execution remain deferred.
+
+WP770 at b5a6c77f0 accepts pure typed CppCompile argv/effective-environment expansion from
 published recipes, with explicit client environment and source-correct fresh argv
 scope versus original environment cache. Independent design/final ACCEPT,
 42 focused tests and Core/CLI checks pass. Generic command/aquery/ActionKey,

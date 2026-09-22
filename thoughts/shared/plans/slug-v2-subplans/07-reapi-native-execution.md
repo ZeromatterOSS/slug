@@ -36,6 +36,16 @@ family/input-tree/execution capability. Each family first passes its Stage 6/8
 semantic and aquery gates; completing every formatter or backend is not a
 prerequisite. Remaining breadth stays in M7B or a later product packet.
 
+CppCompile has pure BuildAPI argv/environment (WP770) and supplied-dotd
+reconciliation (WP771), not execution admission. The latter preserves mandatory,
+spawn and cache-only input roles and final inclusion validation, but its source
+resolver is an explicit caller capability, not a filesystem fallback. A future
+Core consumer must acquire verified dotd bytes even on remote-cache hits, resolve
+source/generated identities through their semantic owners, own discovered-input
+replay and invalidation under DICE, and revalidate complete frontiers before
+publication. Pre-execution include-path validation also remains required. Do not
+treat fixed-input Spawn transport or attempt-local results as discovery state.
+
 The CLI rules_rust Rustc and cargo build-script `Args.use_param_file` calls
 produce virtual Spawn inputs during execution expansion. Pinned Bazel 9.2
 `CommandLines.expand` and `SpawnAction.getSpawn` own replacement argv, paths

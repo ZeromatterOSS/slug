@@ -6,6 +6,7 @@ use super::super::cc_configure_features::field;
 use super::*;
 
 mod command_expansion;
+mod dependencies;
 mod registration;
 mod registry;
 

@@ -1,159 +1,183 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-70-m7a-cpp-command-expansion-r1
+Packet: WP-7-71-m7a-cpp-dependency-reconciliation-r1
 Status: accepted
 
-## Outcome and compatibility
+## Outcome and demand
 
-Expand a genuinely published CppCompile recipe into complete ordered argv and
-effective environment with explicit client-environment inputs. Pure BuildAPI
-projection only, not compiler execution, aquery or REAPI admission. Predecessor
-WP769 at338aa339f accepted construction/publication with70 tests and Core/CLI
-checks; reuse its54 unchanged upstream bodies and selected-registry caller.
-Full predecessor contract/receipt is pinned in Git.
+Pure no-scanning regular-file input-set projections and supplied-dotd-byte
+reconciliation for published CppCompile recipes. Return immutable discovered
+and post-discovery inputs, not execution authority or recipe mutation.
+Predecessor WP770 at b5a6c77f0 accepts argv/environment with42 tests and Core/CLI
+checks; its full contract/receipt remains in Git.
 
-Demand: authenticated rules_rust allocator BUILD21–28 declares allocator_library.cc;
-unchanged compile.bzl1691–1715 produces the admitted recipe. Commands are an
-execution prerequisite. Solib inventories omit compile argv; inert constructor
-fixtures do not establish production allocator flags/toolchains or execution.
-No additional policy breadth is inferred from absent observations.
+Authenticated rules_rust allocator BUILD21–28 demands regular compilation/dotd.
+allocator_library.cc deliberately has no includes (release/loaded SHA256
+b74910c052d9937d4a36fafe1a054b0a9646a112684af517907dec2eb08e3d94).
+This does not exclude compiler-injected dependencies. Solib inventories do not
+prove allocator argv/toolchain/.d/execution. No new production observation is
+needed for this pinned-source algorithm prerequisite.
 
-Exact admitted algorithms follow pinned Bazel9.2
-8220c6198837d5c13d53fea211cf3282aa12408a:
-CompileCommandLine.java52–58/76–160, CppCompileAction.java979–1001/1245–1264,
-CcToolchainVariables.java lookup/adaptation and Builder801–820,
-ActionEnvironment.java123–131. CompileCommandLineTest126–196 and
-CcToolchainFeaturesTest257–467/1975–1988 supply regression themes; reuse accepted
-Variables/feature tests. Filtering/paramfile/module tests stay outside this slice.
-Exact argv order and environment key/value resolution use NOOP path mapping,
-no execution metadata, no paramfile and always-pass copts filtering.
-Slug-native: structural identity/path tokens, Rust valid-Unicode and diagnostics.
-Existing canonical environment maps do not promise LinkedHashMap iteration order.
+## Compatibility and source
 
-## Semantic owner and design checkpoint
+Pinned Bazel9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
+DependencySet.java137–237, DependencySetTest46–238;
+CppCompileActionBuilder290–297; CppCompileAction318–335/636–678/1085–1160/
+1213–1224/1675–1689/1802–1853; HeaderDiscovery68–283 and HeaderDiscoveryTest.
+Exact named slice: token parsing, POSIX lexical paths, stable first-occurrence
+artifact sets, regular allowed-derived/source resolution and post-result
+inclusion checks. NOOP mapping, nonsibling layout, non-Windows case-sensitive
+execution, no modules/scanning. Slug-native: valid UTF-8 paths, diagnostics,
+structural artifact/configuration identity. Invalid UTF-8/NUL fail closed, not
+Latin-1 reinterpretation or exact arbitrary-byte Bazel paths.
 
-CppCompileSpec remains the immutable recipe in existing configured-node DICE
-results. Add typed expand_command_line() and effective_environment(client_env:
-&CanonicalStringMap) methods with feature-expansion errors. Reuse the feature
-engine through a BuildAPI-private retained CcVariableAccess over AnalysisValue/
-CcToolchainVariables. No Starlark heap round-trip or arbitrary stringification.
-Support published counterparts of Loading adaptation, direct/longest-prefix
-lookup, local None shadowing, sequence/scoped iteration, bool/File/structure
-conversion and lazy errors. Preserve native structure restrictions: not every
-retained provider/value is automatically a native structure.
+Parser preserves order/duplicates across stanzas before artifact dedup. Tabs
+and literal backslashes are not generic whitespace. Nonempty input needs final
+LF; empty/targetless input succeeds. Escaped spaces/continuations/$$ and colon
+lookahead follow source. Stanza output names are not authenticated.
 
-Crucial: getOverwrittenVariables returns fresh empty Variables even without
-modules; CompileCommandLine wraps the original as parent of a fresh empty scope.
-Argv uses that fresh dotted cache over original direct bindings, not original
-dotted seeds. Environment uses original Variables/cache seeds. Model the
-distinction in per-call scratch, without new retained occurrence/global cache
-or published mutation. Repeated calls/errors preserve recipe/provider equality.
+## Owner and API
 
-Argv is selected tool then ordered action-config/feature flags. No implicit -c,
--o, dependency flags, shell quoting or joining: those come from features.
-Environment resolves fixed entries then only declared inherited names from the
-explicit client map (missing names omitted), PWD=/proc/self/cwd unless execution
-requirements contain requires-darwin (presence, not value/Host), then feature
-entries overwrite. Duplicate feature keys remain errors before merging.
-Never read ambient environment. This is not Starlark Action.env. No client env
-enters analysis identity; future execution must obtain it through existing
-immutable request/environment ownership.
+CppCompileSpec remains immutable configured-node DICE data. Add pure methods:
+- input_sets(): mandatory (mandatory spawn + cache-only), additional (declared +
+  prunable), spawn (mandatory spawn + additional), allowed-derived (mandatory +
+  prunable + declared + source, with first path identity at resolution).
+- reconcile_dotd_posix(exec_root, bytes, resolve_source): parse/resolve/validate,
+  return discovered plus post-discovery (mandatory + discovered) inputs.
+Unused declared/prunable headers disappear; mandatory cache-only remain.
+Builtin inputs already belong to mandatory spawn; do not duplicate that policy.
 
-Expansion buffers/caches are call-local scratch released on success/error;
-returned vectors/maps belong to callers. Shared recipe fields stay Arc/Dupe/
-Allocative; use existing SmallMap/CompactString/immutable handles. Stage9 WP760/
-WP769 reuse disposition applies. No donor, new DICE key, filesystem observation,
-interner, lock across compute, or performance/memory-reduction claim.
+The synchronous source resolver receives normalized exec-relative paths after
+allowed-derived lookup. It returns an existing authoritative Source artifact or
+None, propagating errors. Reject non-source/mismatching-path results; never
+manufacture labels from paths. Tests supply explicit genuine artifact maps.
+This is NOT Core source-resolution admission. Its future consumer must use
+repository/package/source ownership and tracked DICE observations.
 
-## Exclusions
+Normalize paths/root lexically with existing POSIX utility, no filesystem reads.
+Absolute builtin-prefix paths are ignored on component boundaries before root
+relativization. Outside-root errors precede unresolved errors when validation is
+enabled. Resolve derived first then source; exclude primary source; ignore
+unresolved .cppmap except the root-relative `.cppmap` (PathFragment extension
+rule). Stable artifact dedup preserves canonical identity, not
+path-only equality. Tree/directory/runfiles inputs fail closed in this regular
+slice; no guessed tree-child mapping.
 
-Keep generic ActionSpec.render_argv (legacy/Spawn preview), CppCompile aquery,
-ActionKey, REAPI command/input tree and Core prerequisite/staging/execution
-guards closed. Typed expansion is not a fixed-input Spawn or cached execution.
-Discovery, modules/overwrites, compiler/Args paramfiles, copts regex, tree/path
-mapping, full toolchain producers and production allocator argv remain deferred.
-Preserve WP769 construction guards; no constructor-time expansion.
+Final inclusion validation checks mandatory + declared + prunable membership or
+ignored directory prefixes. New pure CppFragmentProjection getter reads
+strict_system_includes from the action output root's full configuration, not
+the toolchain producer's Cpp fragment: strict uses builtin
+dirs only, nonstrict also context system_includes/external_includes.
+Preserve source module suffix exemptions without admitting module actions.
+Missing/malformed consumed context fields fail closed, not empty defaults.
+Disabled validation omits ordinary unresolved/outside paths as source does,
+not resolver errors or unsupported byte/artifact types. No partial result on error.
+
+SmallMap/SmallSet, CompactString, shared Artifact handles and existing POSIX
+normalization; all indexes/tokens are call scratch and returned vectors caller-owned.
+No retained layout, global cache/interner, DICE key, lock, filesystem observation,
+donor, performance or memory claim. Stage9 WP769/WP770 disposition applies.
+
+## Exclusions and future execution
+
+Not complete discoverInputs: pre-execution include-flag/path validation, modules,
+tree discovery, Windows/sibling/mapped paths, verified dotd acquisition, Core
+source-resolution hookup, DICE discovered-input replay/cache hits and atomic
+execution publication remain deferred. Do not open generic argv/aquery/ActionKey,
+REAPI, prerequisite/staging/execution guards. Reconciliation never authorizes
+action success. Future execution must own discovered facts and full frontiers
+under DICE; attempt-owned transport results are not a discovery side cache.
 
 ## Scope, routing and proof
 
-Base338aa339f; candidate codex/wp770-cpp-command-expansion-review. Independent
-design ACCEPT on2026-09-22 precedes implementation; final actual-diff/evidence ACCEPT precedes
-atomic integration. Root owns scheduling, small action projection, serial
-validation and closure. Bounded workers own retained adapter, action/integration
-tests, and independent source/design/final review. Concurrent edits are disjoint.
+Base b5a6c77f0; branch codex/wp771-cpp-dependency-reconciliation-review.
+Independent design ACCEPT precedes implementation; final diff/evidence review
+precedes atomic integration. Design ACCEPT2026-09-22 confirms action configuration
+owns strict-system policy and explicit POSIX API admission. Root owns getter/hooks/docs/serial Cargo.
+Worker A owns cpp_compile/dependencies.rs and input_sets.rs/tests; worker B owns
+dependencies/dotd.rs/parser tests; worker C reviews. Root owns configured tests
+unless delegated to a freed worker with disjoint ownership.
 
-Allowlist: BuildAPI cc_variables.rs thin hook and cc_variables/owned_access.rs
-with child tests; actions/cpp_compile.rs thin hook and cpp_compile/expansion.rs
-with child tests. Existing cpp_compile/tests.rs may expose its data constructor
-only to sibling tests and update unchanged generic-refusal diagnostic assertions;
-no test-only production API. Analysis
-tests/rustc_map_each/compile_context.rs thin child hook,
-compile_context/command_expansion.rs and authored lifecycle.bzl/registration.rs
-only for discriminating published-command proof; authored cc_toolchain.bzl may
-add default-preserving feature/env test inputs. Relevant BUILD source declarations
-only if recursive globs do not cover children. Root docs: Stage6/9, bootstrap,
-canonical and manifest. No copied corpus or unrelated transport/production edits.
-actions/spec.rs may clarify the unchanged generic-preview refusal diagnostic;
-typed expansion does not activate that legacy/Spawn preview surface.
-Estimate350–500 production and300–500 test lines; growth triggers responsibility
-review. Central files get hooks; owned adapter is a bounded Loading counterpart,
-not another feature engine. Shared algorithm extraction needs design reassessment.
+Allowlist: BuildAPI actions/cpp_compile.rs, actions/mod.rs, lib.rs thin hooks;
+cpp_compile/dependencies.rs and children/tests; existing cpp_compile/tests.rs
+fixture visibility only. Configuration native/cpp_fragment.rs getter,
+command.rs single StrictSystemIncludes boolean admission, and existing
+native/configuration/compile_input_tests.rs focused policy regressions;
+Commands common.rs existing boolean-capture test row only. Independent design
+delta ACCEPT admits this previously default-only policy through the existing
+typed command/configuration owner, including inherited exec behavior.
+Analysis tests/rustc_map_each/compile_context.rs hook,
+compile_context/dependencies.rs and authored fixtures only for actual recipe/
+header/config restoration. No upstream corpus copies or production Core/REAPI
+edits. Root docs Stage6/7/9/bootstrap/canonical/current.
 
+Estimate350–550 production,450–650 test lines; growth triggers review.
+Parser, artifact reconciliation and actual publication are separate modules.
 Required discriminators:
+- Parser continuations/spaces/dollars/colons/tabs/duplicates/targetless/missing LF,
+  valid Unicode and rejected invalid bytes.
+- Distinct mandatory/spawn/prunable/cache roles, first derived path owner,
+  source/generated/cross-root identity, primary-source exclusion, stable dedup.
+- Builtin component boundaries, outside/unresolved error order, both validation
+  modes, strict system dirs, resolver errors/forgery and tree rejection.
+- Unused-header pruning/cache-only retention, published public compile with
+  supplied dotd, immutable recipe and same-DICE header/config restoration.
+- Protected WP769/770 construction/command/refusals. Synthetic dotd is not
+  compiler-produced evidence.
 
-- Complete argv from unchanged public C/C++ compile, PIC/non-PIC and main/external
-  target/exec roots; tool first, action/feature ordering, duplicates/empty strings.
-- Stale original dotted sequence versus fresh argv overlay, scoped iteration,
-  longest prefix, None shadowing, lazy unused invalid metadata versus used errors.
-- Fixed/inherited/missing env, undeclared client values ignored, Darwin-key
-  presence, PWD/feature precedence, duplicate feature errors.
-- Repeat expansion leaves recipe/cache/provider identity unchanged; errors occur
-  after successful construction. Same-DICE A/B/A yields changed/restored argv.
-- Preserve generic command/REAPI/Core refusals and native construction/publication/
-  order/conflict/GC, feature expansion and Variables-cache proofs.
-
-Pinned nightly tools; serial offline/locked Cargo JSON no-run BuildAPI/Analysis,
-exact batched preflight/execution, Core/CLI checks, Rust formatting and diff/archive/
-status checks. Reuse unaffected WP769 evidence; run affected projection/refusal
-assertions. Preparation capped60s/operation; seconds-scale test estimates are not
-user deadlines. No Bazel/daemon/remote/compiler action invocation selected.
-REPLAN for unowned execution inputs, contradictory source, required discovery or
-new semantic owner. Ordinary implementation/test corrections stay in contract.
-M7A remains partial; M8 unproved.
+Pinned nightly, serial offline/locked JSON no-run, exact batched preflight/tests,
+Core/CLI checks and rustfmt/diff/archive/status checks. Reuse unaffected evidence.
+Preparation60s/operation, seconds-scale tests; no user hard12/15s deadline.
+No Bazel, daemon, compiler or network invocation selected.
+REPLAN for new semantic ownership, contradictory source, unowned policy or
+execution activation. Ordinary corrections remain within this contract.
+M7A partial, M8 unproved.
 
 ## Acceptance evidence — 2026-09-22
 
-Observable gate: published regular CppCompile recipes now expose complete typed
-argv and effective environment without changing construction, structural identity
-or execution admission. Pinned-source regressions implement the source contract
-above; no new Bazel observation, upstream corpus body or external compiler run.
+Observable gate: actual published regular CppCompile recipes expose distinct
+mandatory/additional/spawn/allowed-derived sets and immutable discovered/
+post-discovery inputs from supplied dependency bytes. Unused headers are pruned,
+cache-only mandatory inputs retained, source identity restored through an explicit
+authoritative callback, and action-configuration inclusion policy enforced.
+Pinned-source regressions cover the named slice above, including the root-level
+`.cppmap` extension edge from PathFragment762–771. This ordinary source correction
+was rebuilt and repreflighted; no execution surface or contract was widened.
 
-42 exact nonignored selectors pass: BuildAPI26 (6 retained-adapter,5 typed
-projection,7 protected construction/refusal,8 feature-engine) and Analysis16
-(3 new complete-command/lifecycle,10 protected compile/context,3 Variables-cache).
-The new command matrix covers12 public recipe cases, plus nonvacuous native
-three-action publication. Fresh argv/stale original caches are distinguished at
-adapter, typed projection and real publication boundaries. Existing WP769 GC,
-Core/REAPI refusal and unrelated transport evidence is reused; those owners are
-unchanged. Core/CLI direct-dependent checks pass.
+49 exact nonignored selectors pass: Configuration5 (defaults, conversion,
+malformed policy, both exec paths, structural change/restoration), BuildAPI24
+(5 parser,7 reconciliation,7 protected construction,5 protected command),
+Analysis19 (3 new published pruning/cache-only/header-policy restoration,
+16 protected command/context/cache) and Commands1 (typed boolean capture).
+Published tests cover main/external target/exec roots and nonvacuous native
+three-action recipes; source maps contain genuine published Source artifacts.
+Opposing action/toolchain strict policies and same-path distinct canonical source
+identities discriminate semantic ownership. Existing unaffected WP769 GC and
+Core/REAPI refusal evidence is reused; those owners remain unchanged.
 
-Receipts: target/wp770/tests-1790040597251394662.receipt.json (BuildAPI26),
-tests-1790040559632654034.receipt.json (Analysis16), compile-slug_build_api_v2-3,
-compile-slug_analysis_v2-2, check-slug_core_v2-1 and check-slug_cli_v2-1 receipts.
-Pinned nightly/offline/locked Cargo JSON preparation:7 attempts,52.595s total,
-16.652s maximum; successful selected tests2.381s total,0.270s maximum. Ordinary
-corrections: test imported CanonicalStringMap from the wrong crate; saved-error
-assertion compared prefixed Display rather than raw payload. Neither changed the
-contract. Rebuilt/repreflighted affected executables; no unaccounted failure.
+Latest test receipts under target/wp771:
+tests-1790041500173447643 (Configuration5), tests-1790041848534688301
+(BuildAPI24), tests-1790041884985668647 (Analysis19),
+tests-1790042088834568440 (Commands1), all `.receipt.json`.
+Selected tests total3.325s, maximum0.382s; no runtime failures.
+Pinned nightly/offline/locked JSON no-run preparation receipts preserve all
+attempts, including builds superseded by focused source/test corrections.
+All10 compile/check operations pass:87.462s total,31.080s maximum. Final no-run
+receipts are compile-slug_configuration_v2-2, compile-slug_build_api_v2-3,
+compile-slug_analysis_v2-2 and compile-slug_commands_v2-1; direct-dependent
+check-slug_core_v2-1 and check-slug_cli_v2-1 pass (20.401s/20.399s).
 Rust format, diff, archive and plan-status checks pass.
 
-Growth review:362 lines in two focused production modules, with thin owner hooks;
-test modules exceed the initial estimate (861 lines) because adapter semantics,
-typed composition and actual configured publication require distinct proofs.
-No copied feature engine or retained representation. Independent review covers
-this responsibility split. Independent final ACCEPT follows actual-diff and
-terminal-evidence review. Recorded implementation/validation interval starts
-01:15:46 UTC; acceptance at01:31:23 UTC (~16 minutes), excluding prior
-research/design work. Review time was concurrent and not separately measured.
-All exclusions and M7A/M8 status remain unchanged. Next selection must resolve
-the demanded CppCompile discovery/execution prerequisites before any activation.
+Growth review:416 lines across input projection, byte parser and pure dependency
+reconciliation production modules, with thin owner hooks/policy getter.
+759 lines in three new test modules exceed the estimate because parser quirks,
+artifact/policy semantics and real configured publication need separate proofs.
+Configuration/Commands extend existing tables plus one structural restoration
+test. No copied feature engine, corpus or retained representation. Utility reuse
+keeps compact indexes/tokens call-local and reuses shared Artifact handles; no
+new DICE owner or performance claim. Independent final ACCEPT covers actual
+source, closure,49 passing selectors and Core/CLI gates. Recorded interval begins
+01:36:38 UTC and acceptance is01:57 UTC (~21 minutes), excluding prior source
+research/design; concurrent review time is not separately measured. All exclusions
+remain; M7A partial and M8 unproved. The next packet must resolve the remaining
+CppCompile discovery/execution prerequisites before activation.

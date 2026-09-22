@@ -69,6 +69,7 @@ fn compile_projection_defaults_raw_repeats_and_omitfp_prefix_are_exact() {
     assert!(defaults.conlyopts().unwrap().next().is_none());
     assert!(defaults.cxxopts().unwrap().next().is_none());
     assert!(defaults.should_generate_dotd_files().unwrap());
+    assert!(!defaults.strict_system_includes().unwrap());
     assert!(!defaults.save_temps().unwrap());
     assert!(!defaults.process_headers_in_dependencies().unwrap());
     defaults.per_file_copts_empty().unwrap();
@@ -164,6 +165,7 @@ fn compile_boolean_converters_preserve_values_and_reject_invalid_input() {
         NativeCommandOption::CcDotdFiles,
         NativeCommandOption::SaveTemps,
         NativeCommandOption::ProcessHeadersInDependencies,
+        NativeCommandOption::StrictSystemIncludes,
     ] {
         for (text, expected) in [
             ("true", true),
@@ -184,6 +186,7 @@ fn compile_boolean_converters_preserve_values_and_reject_invalid_input() {
             let actual = match option {
                 NativeCommandOption::CcDotdFiles => projection.should_generate_dotd_files(),
                 NativeCommandOption::SaveTemps => projection.save_temps(),
+                NativeCommandOption::StrictSystemIncludes => projection.strict_system_includes(),
                 _ => projection.process_headers_in_dependencies(),
             }
             .unwrap();
@@ -196,6 +199,35 @@ fn compile_boolean_converters_preserve_values_and_reject_invalid_input() {
             );
         }
     }
+}
+
+#[test]
+fn strict_system_includes_changes_structural_policy_and_restores() {
+    let base = base(Some(ActionEnvironmentHostOs::Linux));
+    let strict = apply(
+        &base,
+        &[(NativeCommandOption::StrictSystemIncludes, "true")],
+    )
+    .unwrap();
+    assert!(cpp(&strict).strict_system_includes().unwrap());
+    assert!(!cpp(&base).strict_system_includes().unwrap());
+    assert_ne!(strict, base);
+    assert_ne!(strict.canonical_bytes(), base.canonical_bytes());
+    let negated = CommandConfigurationOverlay::from(vec![CommandConfigurationOccurrence::native(
+        NativeCommandOption::StrictSystemIncludes,
+        None::<&str>,
+        true,
+    )]);
+    let restored = strict
+        .with_command_configuration(strict.starlark_options().clone(), &negated)
+        .unwrap();
+    assert_eq!(restored, base);
+    assert_eq!(restored.to_exec().unwrap(), base.to_exec().unwrap());
+    let platform = CanonicalLabel::parse("@@//platforms:exec").unwrap();
+    assert_eq!(
+        restored.to_exec_for_platform(&platform).unwrap(),
+        base.to_exec_for_platform(&platform).unwrap()
+    );
 }
 
 #[test]
@@ -221,6 +253,7 @@ fn both_exec_paths_map_host_compile_flags_using_observed_os_and_restore() {
             (NativeCommandOption::CcDotdFiles, "false"),
             (NativeCommandOption::SaveTemps, "true"),
             (NativeCommandOption::ProcessHeadersInDependencies, "true"),
+            (NativeCommandOption::StrictSystemIncludes, "true"),
             (NativeCommandOption::ExperimentalOmitfp, "true"),
         ];
         let target = apply(&base, &input).unwrap();
@@ -269,6 +302,7 @@ fn both_exec_paths_map_host_compile_flags_using_observed_os_and_restore() {
             assert!(!projection.should_generate_dotd_files().unwrap());
             assert!(!projection.save_temps().unwrap());
             assert!(!projection.process_headers_in_dependencies().unwrap());
+            assert!(projection.strict_system_includes().unwrap());
             assert_eq!(exec.execution_host_os().unwrap(), os);
             for name in ["host_copt", "host_cxxopt", "host_conlyopt"] {
                 assert_eq!(
@@ -340,6 +374,7 @@ fn compile_projection_rejects_malformed_lists_booleans_and_nonempty_per_file_sta
         "cc_dotd_files",
         "save_temps",
         "process_headers_in_dependencies",
+        "strict_system_includes",
     ] {
         assert!(
             CppFragmentProjection::new(replace(&base, name, mixed.clone())).is_err(),

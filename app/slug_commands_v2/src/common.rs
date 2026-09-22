@@ -730,6 +730,10 @@ mod tests {
             ("cc_dotd_files", NativeCommandOption::CcDotdFiles),
             ("save_temps", NativeCommandOption::SaveTemps),
             (
+                "strict_system_includes",
+                NativeCommandOption::StrictSystemIncludes,
+            ),
+            (
                 "process_headers_in_dependencies",
                 NativeCommandOption::ProcessHeadersInDependencies,
             ),

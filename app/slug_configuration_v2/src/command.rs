@@ -64,6 +64,7 @@ pub enum NativeCommandOption {
     ActionEnv,
     HostActionEnv,
     IncompatibleStrictActionEnv,
+    StrictSystemIncludes,
 }
 
 impl NativeCommandOption {
@@ -107,6 +108,7 @@ impl NativeCommandOption {
             "cc_dotd_files" => Self::CcDotdFiles,
             "save_temps" => Self::SaveTemps,
             "process_headers_in_dependencies" => Self::ProcessHeadersInDependencies,
+            "strict_system_includes" => Self::StrictSystemIncludes,
             "action_env" => Self::ActionEnv,
             "host_action_env" => Self::HostActionEnv,
             "incompatible_strict_action_env" | "experimental_strict_action_env" => {
@@ -156,6 +158,7 @@ impl NativeCommandOption {
             Self::CcDotdFiles => "cc_dotd_files",
             Self::SaveTemps => "save_temps",
             Self::ProcessHeadersInDependencies => "process_headers_in_dependencies",
+            Self::StrictSystemIncludes => "strict_system_includes",
             Self::ActionEnv => "action_env",
             Self::HostActionEnv => "host_action_env",
             Self::IncompatibleStrictActionEnv => "incompatible_strict_action_env",
@@ -169,6 +172,7 @@ impl NativeCommandOption {
                 | Self::CcDotdFiles
                 | Self::SaveTemps
                 | Self::ProcessHeadersInDependencies
+                | Self::StrictSystemIncludes
                 | Self::ExperimentalOmitfp
                 | Self::IncompatibleStrictActionEnv
                 | Self::ForcePic

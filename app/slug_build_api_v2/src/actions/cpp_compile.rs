@@ -21,7 +21,12 @@ use crate::actions::registry::validate_output;
 use crate::analysis_value::PublicationEqState;
 use crate::cc_variables::CcToolchainVariables;
 
+mod dependencies;
 mod expansion;
+mod input_sets;
+
+pub use dependencies::CppCompileDependencies;
+pub use input_sets::CppCompileInputSets;
 
 /// Immutable eagerly consumed constructor inputs, not an action or a recipe.
 #[derive(Debug, Clone, Allocative)]

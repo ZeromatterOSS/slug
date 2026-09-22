@@ -412,7 +412,11 @@ allocator compiler arguments or execution. WP770 adds pure typed command/environ
 expansion from published recipes, including fresh argv versus original environment
 cache scopes and explicit client-environment resolution. Complete command tests
 cover inert public C/C++ PIC/main/external/target/exec recipes and same-DICE
-restoration; they do not establish production allocator commands. Generic command/
+restoration; they do not establish production allocator commands. WP771 supplies
+regular-file input sets and pure supplied-dotd reconciliation with explicit source
+resolution and action-configuration inclusion policy. Synthetic dependency bytes
+over real published recipes are not compiler-output evidence. Core discovery
+ownership, verified dotd acquisition and cache replay still gate execution. Generic command/
 aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/
 path mapping and full cc_library remain deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside

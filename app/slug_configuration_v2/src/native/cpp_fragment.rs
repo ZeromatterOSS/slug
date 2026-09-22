@@ -44,6 +44,7 @@ impl CppFragmentProjection {
         let _ = projection.conlyopts()?;
         let _ = projection.cxxopts()?;
         projection.should_generate_dotd_files()?;
+        projection.strict_system_includes()?;
         projection.save_temps()?;
         projection.process_headers_in_dependencies()?;
         projection.per_file_copts_empty()?;
@@ -206,6 +207,12 @@ impl CppFragmentProjection {
 
     pub fn should_generate_dotd_files(&self) -> Result<bool, SlugConfigurationError> {
         self.configuration.native_bool(CPP_OPTIONS, "cc_dotd_files")
+    }
+
+    /// Post-compile inclusion policy, sourced from the action configuration.
+    pub fn strict_system_includes(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration
+            .native_bool(CPP_OPTIONS, "strict_system_includes")
     }
 
     pub fn save_temps(&self) -> Result<bool, SlugConfigurationError> {

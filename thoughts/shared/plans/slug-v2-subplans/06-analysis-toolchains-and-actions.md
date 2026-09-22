@@ -271,6 +271,17 @@ paths/identity and diagnostics remain Slug-native. No new DICE owner or executio
 admission is introduced. Published C/C++ PIC/main/external/target/exec command
 regressions use inert toolchains, not production allocator argv evidence.
 
+WP771 adds pure regular-file input-role projection and supplied-dotd reconciliation.
+Mandatory inputs include cache-only dependencies; spawn inputs instead include
+the complete declared/prunable header superset. Parsed dependency paths resolve
+against allowed derived identities first, then an explicit authoritative source
+resolver. Final inclusion checks use action-root strict_system_includes policy,
+declared membership and source-defined ignored directories. Returned discovered/
+post-discovery sets never mutate the configured recipe. Exact POSIX/NOOP lexical
+and resolution algorithms operate on Slug-native valid UTF-8 and structural paths;
+invalid bytes, tree inputs and unmodeled platform policies fail closed. The pure
+resolver seam does not supply Core observation or execution authority.
+
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and
 publication preserve immutable cache seeds, parent aliases, raw binding types,

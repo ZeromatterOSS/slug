@@ -33,6 +33,8 @@ pub use actions::ArtifactInputs;
 pub use actions::CargoRunfilesArgsError;
 pub use actions::CppCompileConstruction;
 pub use actions::CppCompileData;
+pub use actions::CppCompileDependencies;
+pub use actions::CppCompileInputSets;
 pub use actions::CppCompileSpec;
 pub use actions::CtxActions;
 pub use actions::ExpandedSpawnCommandLine;
