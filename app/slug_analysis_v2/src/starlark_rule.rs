@@ -14,6 +14,7 @@ use std::sync::Mutex;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use dupe::Dupe;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisArtifact;
@@ -2581,6 +2582,10 @@ pub(crate) fn evaluate_loaded_rule(
             let lowered = lowerer.lower(value, &format!("$[{index}]"))?;
             if let AnalysisValueKind::PackageSpecificationInfo(info) = lowered.kind() {
                 provider_values.push(ProviderValue::PackageSpecificationInfo(info.clone()));
+                continue;
+            }
+            if let AnalysisValueKind::TemplateVariableInfo(info) = lowered.kind() {
+                provider_values.push(ProviderValue::TemplateVariableInfo(info.dupe()));
                 continue;
             }
             let AnalysisValueKind::Provider(provider) = lowered.kind() else {

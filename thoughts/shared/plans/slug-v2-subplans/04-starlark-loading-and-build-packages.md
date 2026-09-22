@@ -106,6 +106,10 @@ full live/index-only loading gates and focused independent rereview. It retains
 separate direct/transitive identities and callable routes, canonical provider
 predicates, ten typed `cpp` fields, ordinary late-bound rows, and persistent
 `TemplateVariableInfo`, then fails closed before configured hidden resolution.
+WP776 replaces that provider's declaration-only boundary with native construction
+and configured lookup: immutable ordered string snapshots, occurrence Eq/hash,
+fresh mutable variables copies, and typed full-payload/alias publication. This
+does not activate make-variable expansion or unrelated hidden resolution.
 
 Configured hidden-dependency R2 preserved the correct pre-call and deferred-XML
 boundaries, but independent review returned `REPLAN` until a real non-default

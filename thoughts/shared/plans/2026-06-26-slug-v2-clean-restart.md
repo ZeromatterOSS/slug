@@ -29,8 +29,13 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-75-m7a-package-specification-provider-r1
+Packet: WP-7-76-m7a-template-variable-provider-r1
 Status: accepted
+
+WP776 accepts native TemplateVariableInfo with ordered snapshots, occurrence
+identity and complete semantic publication. Authentic make-variable helpers feed
+native construction and downstream lookup;86 tests, Core/CLI checks and independent
+design/final review pass. Full toolchain construction remains deferred.
 
 WP775 accepts genuine package-group provider construction, contains and retained
 allowlist publication into the unchanged toolchain helper. Existing matching and
@@ -40,8 +45,8 @@ independent final review pass. Full toolchain construction stays deferred.
 WP774 accepts genuine ctx.file/ctx.files projections from configured dependency
 providers, consumed by the authentic toolchain-helper/compile proof, with49 focused
 tests and Core/CLI checks. Full rule
-construction still requires template providers and unconditional
-build-info translation; no empty-provider or unstamped bypass is admitted.
+construction still requires unconditional build-info translation and implicit tool
+dependencies; no empty-provider or unstamped bypass is admitted.
 
 WP773 accepts the unchanged no-profile C++ toolchain-provider helper into separate
 public compile consumers, with owned configuration projections and real opt/exec

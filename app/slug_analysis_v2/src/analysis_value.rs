@@ -697,6 +697,12 @@ impl<'a> AnalysisValueMaterializer<'a> {
             ProviderValue::PackageSpecificationInfo(info) => {
                 return Ok(crate::package_specification::alloc(self.heap, info.clone()));
             }
+            ProviderValue::TemplateVariableInfo(info) => {
+                return Ok(slug_loading_v2::alloc_frozen_template_variable_info(
+                    self.heap,
+                    info.dupe(),
+                ));
+            }
             ProviderValue::RunEnvironmentInfo(info) => {
                 fields.insert(
                     "environment".into(),
@@ -810,6 +816,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
             }
             AnalysisValueKind::PackageSpecificationInfo(info) => {
                 crate::package_specification::alloc(self.heap, info.clone())
+            }
+            AnalysisValueKind::TemplateVariableInfo(info) => {
+                slug_loading_v2::alloc_frozen_template_variable_info(self.heap, info.dupe())
             }
             AnalysisValueKind::CcToolchainFeatures(value) => {
                 slug_loading_v2::alloc_frozen_cc_toolchain_features(self.heap, value.clone())
@@ -1122,6 +1131,9 @@ impl<'v> AnalysisValueLowerer<'v> {
     }
 
     fn lower_recursive(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
+        if let Some(info) = slug_loading_v2::template_variable_info(value) {
+            return Ok(AnalysisValue::template_variable_info(info));
+        }
         if let Some(info) = crate::package_specification::from_value(value) {
             return Ok(AnalysisValue::package_specification_info(info));
         }
@@ -1230,9 +1242,12 @@ impl<'v> AnalysisValueLowerer<'v> {
         ))
     }
 }
+
 #[cfg(test)]
 #[path = "analysis_value/cc_features_tests.rs"]
 mod cc_features_tests;
+#[cfg(test)]
+mod template_variable_tests;
 
 #[cfg(test)]
 #[path = "analysis_value/cpp_compile_publication_tests.rs"]

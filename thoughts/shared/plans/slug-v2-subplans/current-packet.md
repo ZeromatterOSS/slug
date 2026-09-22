@@ -1,168 +1,146 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-75-m7a-package-specification-provider-r1
+Packet: WP-7-76-m7a-template-variable-provider-r1
 Status: accepted
 
-## Outcome and demand
+## Outcome and compatibility
 
-Publish genuine PackageSpecificationInfo from native package_group analysis,
-including external groups and tracked includes. Expose contains and preserve full
-semantics through provider publication into the unchanged rules_cc toolchain
-helper, replacing its authored None allowlist with a real group provider.
-This removes a full cc_toolchain prerequisite, not a full-construction or execution
-claim. WP774 at421bb60f1 accepts ctx.file/files with49 tests and Core/CLI checks;
-its receipt remains in Git. M7A partial, M8 unproved.
+Admit genuine platform_common.TemplateVariableInfo construction, Target lookup,
+direct/nested publication and consumption of authentic rules_cc make-variable
+helper outputs. This removes one full cc_toolchain prerequisite; full rule
+construction, build-info status transforms, embedded helpers and execution remain
+deferred. Predecessor WP775 at833968c36 accepted PackageSpecificationInfo with73
+tests and Core/CLI/Query checks; its complete receipt remains in Git. M7A partial,
+M8 unproved.
 
-## Compatibility and sources
+Exact: one required vars dict argument, positional or named; strict string keys
+and values, construction snapshot preserving input order; immutable provider,
+occurrence equality/hash, type TemplateVariableInfo, sole field variables,
+repr struct(variables = {...}). Each variables read returns a fresh mutable dict
+copy, including from frozen providers. Constructor is the native provider key.
+Aliases stay equal and distinct constructors stay unequal even for equal maps.
+Slug-native: structural publication/configuration identity and diagnostic text;
+raw Java identity-hash bytes and source-location diagnostic parity not claimed.
+Deferred: make-variable expansion/merging into ctx.var, full toolchain envelope,
+unrelated provider surfaces and execution. No placeholder provider or bypass.
 
-Exact within already-admitted package-spec syntax: native-only provider creation,
-Target membership/indexing, stable transitive group composition and per-group
-negative exclusions; repository-aware exact/subtree/public/private membership.
-contains is positional-only, Label or string. Strings parse canonical labels
-(// means main; @repo and @@repo are canonical), never caller mapping; Label
-arguments carry already-resolved mapping. Relative strings and bad types fail.
-dir exposes contains; type PackageSpecificationInfo, repr struct(). NativeInfo
-ignores callable fields: distinct instances have equal Starlark equality/hash
-despite differing membership. DICE/publication equality MUST compare all group
-semantics. Global builtin key stays nonconstructible. Immutable captured provider
-data survives context teardown, freeze/GC and downstream publication.
-
-Slug-native: structural publication/configuration identity, diagnostics and current
-error transport. Raw Java hash bytes are not claimed. Deferred: Loading's rejected
-explicit repository package-spec syntax, external declaring visibility,
-TemplateVariableInfo, status transforms, embedded tools, full cc_toolchain and
-execution. No empty-provider fallback or untracked repository inference.
+## Source and ownership
 
 Pinned Bazel9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-PackageSpecificationProvider.java40–60,73–113 (checked includes/stable union/
-canonical contains); PackageSpecificationProviderApi.java31–49;
-NativeInfo.java58–137 (method-excluding equality/hash/repr); Allowlist.java94–98;
-PackageSpecification.java464–596 (unordered exact sets, ordered subtree lists,
-local negatives); Label.java150–165. Adapt AllowlistTest.java120–149,155–230,
-286–321 as authored BUILD/Starlark regressions, not Java probes.
-rules_cc0.2.17 cc_toolchain.bzl60–67,117,350–353 indexes the provider; unchanged
-cc_toolchain_provider_helper.bzl295 retains it. Membership is an API regression,
-not observed allocator execution. Reuse WP773 provenance; no new upstream bodies.
+TemplateVariableInfo.java43–47,63–75; TemplateVariableInfoApi.java43–69;
+NativeInfo.java58–59,125–137; PlatformCommon.java43–45, BuiltinProvider.java94–96;
+Printer.java239–258 native repr escaping (the generic retained Rust formatter
+escapes Latin-1 differently, so this facade owns its bounded exact quoting).
+Mutable-copy chain Eval.java655–661, MethodDescriptor.java240–246/315,
+Starlark.java216–217, Dict.java456–490. Adapt TemplateVariableInfoTest.java34–149
+producer/forwarding/field tests; its make-variable expansion is a deferred phase.
+rules_cc0.2.17 cc_toolchain.bzl124–146 requires constructor136 after unchanged
+cc_helper make-variable477–515/CC_FLAGS791–812 helpers. Reuse authenticated WP773
+corpus; no new upstream bodies or Java probes.
 
-## Ownership and representation
+BuildAPI owns TemplateVariableInfo as one Arc-owned immutable ordered SmallMap
+of CompactString pairs. Arc allocation is native occurrence identity: new always
+allocates, clone/Dupe shares. Native Eq/hash use occurrence only. Publication
+compares complete ordered entries plus a two-way occurrence mapping in existing
+PublicationEqState; same payload with different alias topology is not equivalent.
+Typed ProviderValue and AnalysisValue variants share the same handles through
+direct/nested roots; no generic structural-provider substitution.
+Loading owns constructor/facade and strict binder, fresh evaluator-local mutable
+dict copies. A zero-sized native constructor token replaces only the old generic
+TemplateVariableInfo token: type Provider, native function repr and stable key
+Eq/hash across repeated platform_common accesses. Other constructors are unchanged.
+Analysis only lowers/materializes typed handles and decodes returned
+providers. Existing configured-node/Bzl DICE dependencies own caching/invalidation,
+Need/errors and restoration. No DICE key, lock, counter, registry, interner, cache,
+filesystem discovery or evaluator borrow in retained values.
 
-Move sole PackageGroupContents value/matcher below Loading into BuildAPI. Keep
-Loading's parser and RuleVisibility adapters, reexport the type for Query users.
-Preserve parsing/rebinding. SmallSet exact members, immutable Arc subtree slices,
-Allocative; hash exact sets unordered and subtree lists ordered, consistently with
-Eq. Reuse Stage9 visibility dispositions f9ae7337/76025ede and existing dense
-Depset utilities; no donor semantic code, duplicate matcher or V1/global registry.
-
-PackageSpecificationInfo wraps shared stable Depset<Arc<PackageGroupContents>>.
-Groups remain separate leaves: OR whole groups, never combine negative buckets.
-Includes are transitive children followed by direct local contents. Existing
-ConfiguredNodeAnalysisKey package-group compute_join/cycle guard supplies tracked
-includes, Need/errors and ordered edges. Reject missing/wrong-kind includes;
-retain analysis cycle errors, not Query's different cycle suppression.
-External groups use canonical tracked package loading and contents rebinding.
-Admit only external null PackageGroup and include references, not unrelated
-declaring visibility or target kinds.
-
-One typed ProviderValue and AnalysisValue payload supports direct forwarding and
-nested publication. Starlark equality is deliberately separate from complete
-semantic publication equality, including depset/map-containing payloads. No new
-DICE key, injection, cache, lock, interner, occurrence counter, filesystem scan or
-evaluator borrow. Immutable data is DICE-retained; builders/traversal/comparison
-buffers are scratch. Existing invalidation, publication cutoff, cancellation and
-graph lifetime own release. Dense graph sharing/cheap handles, no performance claim.
+Memory is DICE-retained immutable data; construction/dict copies/bijection maps
+are evaluation/comparison scratch. Existing publication cutoff, graph invalidation,
+cancellation and ownership release apply. Reuse Stage9 Arc/Dupe/CompactString/
+SmallMap/Allocative and occurrence-bijection dispositions (WP758/762/763/765),
+not donor semantic code. No performance or memory-reduction claim.
 
 ## Scope and routing
 
-Base421bb60f1; codex/wp775-package-specification-review. Independent design ACCEPT
-2026-09-22 before production edits; final actual-diff/evidence review before integration.
-Worker1: BuildAPI new package_specification.rs child/tests, lib.rs exports,
-analysis_value.rs closed-kind wiring, providers/mod.rs typed payload/lookup;
-Loading visibility.rs matcher extraction/adapters/tests and reexport if needed;
-package.rs single parser-call adapter since the moved type cannot own Loading parsing.
-Worker2: Analysis dice.rs minimal native branch/gate wiring, new cohesive
-package_specification.rs child/module hook; analysis_value.rs materialize/lower
-wiring and child facade/tests; starlark_rule.rs native return decoding. key.rs
-comment only if needed. A Loading facade/hook may replace the Analysis-local facade
-if required by existing ownership; root must approve before crossing worker scopes.
-Root: new tests/package_specification.rs; tests/starlark_rule.rs hook and obsolete
-package-group predicate expectation; protected delegating fixture's baseline-stale
-source DefaultInfo assertion now checks the exact singleton source File (base
-421bb60f1 already publishes it; production unchanged). rustc_map_each/compile_context/provider.bzl
-and provider.rs genuine allowlist proof; Stage6/bootstrap/Stage9 and scheduling.
-Other edits need root reassessment. Large parents add only closed dispatch/wiring;
-new semantics belong in children. Estimate350–650 net production and350–650 test
-lines plus matcher relocation; no new copied fixtures or crate dependencies.
+Base833968c36; codex/wp776-template-variable-review. Independent design ACCEPT
+before production edits; actual-diff/evidence final review before integration.
+Worker1: app/slug_build_api_v2/src/template_variable_info.rs and child tests;
+lib.rs exports, analysis_value.rs closed variants/bijection, providers/mod.rs
+typed payload; app/slug_loading_v2/src/provider/template_variable_info.rs and
+child tests, provider.rs constructor/key dispatch, lib.rs exports. package.rs
+only if existing platform_common token wiring requires it.
+Worker2: app/slug_analysis_v2/src/analysis_value.rs typed lower/materialize;
+analysis_value/template_variable_tests.rs lifecycle tests; starlark_rule.rs
+returned-provider bridge; tests/rustc_map_each/compile_context/provider.bzl and
+provider.rs authentic helpers/native provider proof.
+Root: tests/template_variable.rs and tests/starlark_rule.rs module hook; Stage4/
+Stage6/bootstrap/Stage9 owner and scheduling documents. Parent production files
+are large: only closed dispatch/wiring there, semantics in cohesive child modules.
+Estimate250–450 production and350–650 test lines. Additional files or growth need
+root reassessment; no dependencies or copied fixture bodies planned.
 
-## Evidence and validation
+## Acceptance and validation
 
-Cover empty/public/private, exact/subtree boundaries, repository mismatch;
-diamond includes and local-negative versus included-positive; missing/wrong-kind/
-cycles; external groups and mapped Label versus canonical string; binding/type/
-relative-string rejection; key nonconstructibility; type/repr/dir/equal-hash and
-different contains results; immutable freeze/GC, direct/nested forwarding.
-Same-DICE group/include A/B/A, missing/recreate, external restoration and unchanged
-helper publication must discriminate complete semantic cutoff despite constant
-Starlark equality. No fresh graph replaces invalidation proof.
+Cover constructor ABI/type negatives, empty/Unicode/order/reflection, native
+occurrence equality/hash in dictionary/depset, provider immutability versus fresh
+mutable dict reads, source-dict mutation snapshot, loading/frozen construction.
+Freeze/GC and source-heap disposal/rematerialization preserve direct/nested aliases
+and complete data, including aliases across native and user-provider roots.
+Same-DICE payload/order A/B/A and alias split/merge invalidate consumers; missing
+source/recreate restores through existing owners, not fresh graphs.
+Authentic unchanged make-variable helpers feed native construction and downstream
+Target indexing in existing main/external target/exec toolchain/compile proof.
 
-Protect Loading visibility/group invalidation, repository rebinding and global
-partition; Query shared matcher compile; Analysis delegating nodes/runfiles/
-ruleclass-bypass and WP774 helper/compile selectors. Root serializes pinned nightly
-offline/locked Cargo JSON --no-run BuildAPI/Loading/Analysis builds and batches
-exact nonignored preflight before test execution. Core/CLI/Query checks.
-Preparation60s/operation; focused runtimes estimated seconds, not user deadlines.
-Rustfmt, diff/archive/status checks. No daemon/Bazel/compiler action/network.
-REPLAN only for new ownership/source contradiction needing broader activation;
-ordinary scoped implementation/invocation/test corrections stay in packet.
+Root serializes freshly resolved pinned nightly offline/locked Cargo JSON
+--no-run BuildAPI/Loading/Analysis tests; exact batched nonignored preflight and
+actual counts. Protect WP775 native allowlist, helper/compile tests and existing
+native publication/lifecycle selectors; Core/CLI direct-dependent checks.
+Preparation60s/operation, small runtimes expected seconds (operation caps, not
+user deadlines). Rustfmt, diff/archive/plan-status checks. No daemon, Bazel/JVM,
+compiler action, CLI invocation or network required. REPLAN only if bounded
+ownership or pinned semantics contradict the contract; ordinary corrections stay
+inside the packet.
 
 ## Acceptance evidence — 2026-09-22
 
-Pinned nightly-2025-09-14 tools resolved via rustup. Serial offline/locked Cargo
-JSON --no-run builds, then exact nonignored preflight and actual execution:
-**73 selected / 73 passed**,5.610s aggregate runtime. BuildAPI5 in0.005s; Loading
-library4 in0.012s, bzl_invalidation1 in0.008s, build_file_loading2 in0.011s;
-Analysis library14 in0.108s and starlark_rule47 in5.466s. The latter includes all
-WP774 integration39 plus new package-group4, helper allowlist1, protected
-delegating/runfiles/ruleclass3. Analysis library includes new facade/GC2,
-protected bypass/external-visibility2 and WP774 library10.
+Freshly resolved nightly-2025-09-14 tools; serial offline/locked Cargo JSON
+--no-run builds, batched exact nonignored preflights and actual execution:
+86 selected /86 passed in5.832s aggregate. BuildAPI9 (0.009s), Loading10 (0.039s),
+Analysis library18 (0.114s), integration49 (5.670s). Receipts and exact commands
+under target/wp776: tests-1790048502948187022,1790048893466275492,
+1790048927080220404,1790048986139665072.receipt.json. Integration retains all47
+WP775 selectors plus two native template producer/forwarder/invalidation tests;
+the four existing helper tests now also prove genuine template construction.
 
-Receipts/logs under target/wp775: tests-1790047148323337319,
-1790047148410699623,1790047189512316365,1790047189557584844,
-1790047605522647252 and1790047605700833066.receipt.json record commands,
-exact selectors, exit0 and counts. Final relevant build receipts all exit0:
-compile-slug_build_api_v2-2 (2.268s), compile-slug_loading_v2-1/-2
-(32.576s/21.764s), compile-slug_analysis_v2-4 (lib+integration7.734s).
-Query check1 exit0 in18.641s; fresh Core/CLI check2 after parser correction exit0
-in1.017s/1.268s. Eight compile attempts117.512s, five checks57.959s, all runtime
-attempts11.153s including superseded failures. Preparation stayed under60s each.
-No Bazel/JVM, daemon, compiler action, CLI invocation or network operation.
-Rustfmt/diff/archive/plan-status checks exit0.
+Final no-run receipts: compile-slug_build_api_v2-1 exit0/3.225s;
+compile-slug_loading_v2-3 exit0/7.930s; compile-slug_analysis_v2-4
+exit0/13.084s (library+integration), then -5 exit0/6.327s (integration-only after
+test-only missing-source expectation correction). Core/CLI check1 exit0 in
+16.787s/17.441s. Nine compile attempts101.196s; both checks34.228s;
+all runtime attempts12.544s. Every preparation stayed below60s. No Bazel/JVM,
+daemon, compiler action, CLI invocation or network. Rustfmt, diff/archive/status
+checks pass. Review branch created03:34:57Z; source research preceded that point.
 
-Distinct proof: whole-group OR restores a locally excluded package through a
-diamond include; canonical strings differ from BUILD-mapped Label arguments;
-main/external group and included-leaf A/B/A plus missing/recreate retain semantics
-through direct native provider forwarding, structs/lists/dictionary keys/depsets
-and unchanged toolchain-helper publication. Native equality/hash remains constant
-while full publication differs. Freeze, source-heap disposal/rematerialization and
-supported forced GC retain membership. Invalid includes/cycles and binding reject.
+Discriminators: ordered maps and direct/nested occurrence aliases, equal-map
+distinct construction and native hash/depset behavior, immutable input snapshots
+versus fresh mutable reads, exact type/key/field reflection, all constructor
+binding negatives; freeze/source-heap disposal/GC; same-DICE value/order and alias
+split/merge A/B/A, missing source Need and recreation. Genuine unchanged helper
+composition checks every ordered variable, global-over-additional collision,
+main/external paths and target/exec configuration, downstream lookup and metadata
+restoration. No new upstream copied body or semantic owner.
 
-Corrections: root-repository test helper uses root(), not empty-name constructor;
-Loading test names required bzl_module prefix (failed preflight executed zero);
-equal-key dictionary literals correctly reject, so replacement/hash proofs use
-sequential assignment. Root .bzl global mapping is not admitted: the integration
-proof instead resolves a genuine BUILD attr Label and publishes it. One production
-correction replaces insufficient canonical-string normalization with the existing
-validated FirstRoundCanonical parser after an absolute-input guard; this rejects
-recursive patterns while admitting native no-colon/repository shorthand. The
-baseline-stale source DefaultInfo assertion was corrected as scoped above.
-All relevant gates were rebuilt/rerun; no failure waived or owner broadened.
-
-Growth: roughly330 net production lines plus matcher relocation; cohesive new
-BuildAPI/Analysis children and small parent dispatch/branch wiring. About780
-test lines exceed the650 estimate for separate immutable native/semantic equality
-container proofs, GC and main/external/helper invalidation; no copied upstream
-body or new external fixture. Utility reuse preserves the sole matcher and dense
-graph ownership, with no interner/cache/performance claim. Independent design and
-final source/correction reviews reused one reviewer; terminal evidence ACCEPT
-at03:28Z confirms73/73 and Core/CLI/Query checks, separate equality domains and
-tracked invalidation. About22min from research through acceptance; reviews were
-interleaved, not separately timed. No REPLAN or claimed workflow speedup.
+Corrections preserve scope: test FreezeError formatting, Dupe import and explicit
+CompactString inference; local native repr quoting fixes a demonstrated generic
+runtime Latin-1 mismatch using Printer.java without altering that runtime.
+Main CROSSTOOLTOP expectation is source-derived '.' rather than empty. The
+same-DICE fixture uses ASCII identifiers to avoid conflating source representation
+with its order/alias proof; native/retention/GC tests retain Unicode coverage.
+Missing .bzl input asserts the existing harness's exact Need outcome rather than
+an invented path-bearing error. All affected evidence was refreshed; no failure
+waived. About320 net production lines in cohesive children/small wiring and775
+test lines; test growth exceeds650 estimate for independent native-key/reflection,
+cross-root/container aliases, GC and exact helper-map discriminators.
+Independent final actual-diff/correction/terminal-evidence review ACCEPT at
+03:51Z, about16min after review-branch creation. Initial research and interleaved
+reviews were not separately timed; no workflow speedup claim or REPLAN.

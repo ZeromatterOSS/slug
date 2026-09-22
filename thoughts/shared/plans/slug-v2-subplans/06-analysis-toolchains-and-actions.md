@@ -320,8 +320,17 @@ Query share the BuildAPI membership value; group-local negatives remain separate
 through stable transitive composition. Native method-only equality is constant,
 but provider publication compares the full membership graph for invalidation.
 The authentic toolchain helper retains a genuine allowlist. This does not admit
-external declaring visibility, broader package-spec syntax, TemplateVariableInfo,
-status transforms or full toolchain construction.
+external declaring visibility, broader package-spec syntax, status transforms or
+full toolchain construction.
+
+WP776 adds native TemplateVariableInfo as a shared immutable ordered string map.
+The Loading constructor snapshots its input and each variables read returns a
+fresh mutable dictionary. Native equality/hash uses occurrence identity, while
+typed direct/nested publication compares the full ordered payload and a shared
+alias bijection. No evaluator heap or context is retained. The unchanged rules_cc
+make-variable helpers feed genuine construction and Target lookup alongside the
+existing CcToolchainInfo proof; ctx.var merging/expansion and full cc_toolchain
+remain deferred.
 
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and

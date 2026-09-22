@@ -164,6 +164,7 @@ mod file_output_providers;
 mod output_group_info;
 mod package_specification;
 mod rustc_map_each;
+mod template_variable;
 mod workspace_name;
 
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]

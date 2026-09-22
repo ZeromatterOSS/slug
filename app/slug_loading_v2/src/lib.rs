@@ -257,6 +257,8 @@ pub use package::RuleCapability;
 pub use package::TestMetadata;
 pub use package::TestRuleKind;
 pub use package::TestSuiteMembership;
+pub use provider::alloc_frozen_template_variable_info;
+pub use provider::template_variable_info;
 pub use registration_expansion::CommandRegistrationExpansionKey;
 #[doc(hidden)]
 pub use registration_expansion::CommandRegistrationExpansionObservationKey;

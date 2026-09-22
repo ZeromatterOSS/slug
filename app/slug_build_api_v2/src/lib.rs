@@ -20,6 +20,7 @@ pub mod package_specification;
 pub mod providers;
 pub mod runfiles;
 pub mod runfiles_packages;
+pub mod template_variable_info;
 
 pub use actions::ActionError;
 pub use actions::ActionInput;
@@ -145,6 +146,7 @@ pub use runfiles::SourceManifestError;
 pub use runfiles_packages::RunfilesPackageDepset;
 pub use runfiles_packages::RunfilesPackageMetadata;
 pub use runfiles_packages::RunfilesRepositoryMapping;
+pub use template_variable_info::TemplateVariableInfo;
 
 mod cc_header_info;
 pub mod cc_toolchain_callable;

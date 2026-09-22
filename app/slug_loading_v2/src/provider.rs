@@ -74,7 +74,11 @@ use crate::bzl_visibility::BzlLoadVisibility;
 use crate::starlark_label::StarlarkLabel;
 
 mod output_group;
+mod template_variable_info;
 pub use output_group::StarlarkOutputGroupInfo;
+pub(crate) use template_variable_info::TemplateVariableInfoConstructor;
+pub use template_variable_info::alloc_frozen_template_variable_info;
+pub use template_variable_info::template_variable_info;
 
 pub fn starlark_label(value: Value<'_>) -> Option<CanonicalLabel> {
     StarlarkLabel::from_value(value).map(|value| value.canonical().clone())
@@ -1631,10 +1635,10 @@ pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> 
     if let Some(callable) = FrozenInitializedUserProviderCallable::from_value(value) {
         return Some(ProviderIdentity::user(callable.id.dupe()));
     }
+    if TemplateVariableInfoConstructor::from_value(value).is_some() {
+        return Some(ProviderIdentity::builtin("TemplateVariableInfo"));
+    }
     if let Some(callable) = AnalysisBuiltinCallable::from_value(value) {
-        if callable.name == "TemplateVariableInfo" {
-            return Some(ProviderIdentity::builtin(callable.name));
-        }
         return matches!(callable.name, "DefaultInfo" | "ToolchainInfo")
             .then(|| ProviderIdentity::builtin(callable.name));
     }
@@ -1653,13 +1657,6 @@ pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> 
 pub fn configured_target_provider_identity(
     value: Value<'_>,
 ) -> starlark::Result<Option<ProviderIdentity>> {
-    if AnalysisBuiltinCallable::from_value(value)
-        .is_some_and(|callable| callable.name == "TemplateVariableInfo")
-    {
-        return Err(starlark::Error::new_other(anyhow::anyhow!(
-            "platform_common.TemplateVariableInfo configured-target membership and indexing are unsupported"
-        )));
-    }
     if let Some(key) = DeclarationOnlyAppleProviderKey::from_value(value) {
         return Err(starlark::Error::new_other(anyhow::anyhow!(
             "apple_common.{} is declaration-only; configured-target membership and indexing are unsupported",
@@ -1676,6 +1673,7 @@ pub fn alloc_starlark_provider_callable(
     name: &'static str,
 ) -> Option<FrozenValue> {
     Some(match name {
+        "TemplateVariableInfo" => heap.alloc(TemplateVariableInfoConstructor),
         "PackageSpecificationInfo" => heap.alloc(BuiltinProviderKey::new(name)),
         "DefaultInfo" | "ToolchainInfo" => heap.alloc(AnalysisBuiltinCallable::new(name)),
         "OutputGroupInfo" => heap.alloc(OutputGroupInfo),
@@ -1920,6 +1918,8 @@ mod tests {
     use super::DeclarationOnlyAppleProviderKey;
     use super::DeclarationOnlyAppleProviderKind;
     use super::StarlarkDefaultInfo;
+    use super::TemplateVariableInfoConstructor;
+    use super::alloc_starlark_provider_callable;
     use super::configured_target_provider_identity;
     use super::starlark_provider_identity;
     use crate::package::loading_globals;
@@ -1978,15 +1978,20 @@ mod tests {
     }
 
     #[test]
-    fn template_variable_info_has_declaration_identity_but_configured_use_stays_closed() {
+    fn template_variable_info_key_identity_and_restoration_are_configured() {
         let heap = starlark::values::FrozenHeap::new();
-        let template = heap.alloc(AnalysisBuiltinCallable::new("TemplateVariableInfo"));
+        let template = heap.alloc(TemplateVariableInfoConstructor);
         let identity = starlark_provider_identity(template.to_value()).unwrap();
         assert!(identity.is_builtin("TemplateVariableInfo"));
-        let error = configured_target_provider_identity(template.to_value()).unwrap_err();
         assert_eq!(
-            error.to_string(),
-            "platform_common.TemplateVariableInfo configured-target membership and indexing are unsupported"
+            configured_target_provider_identity(template.to_value()).unwrap(),
+            Some(identity)
+        );
+        let restored = alloc_starlark_provider_callable(&heap, "TemplateVariableInfo").unwrap();
+        assert!(template.to_value().equals(restored.to_value()).unwrap());
+        assert_eq!(
+            template.to_value().get_hashed().unwrap().hash(),
+            restored.to_value().get_hashed().unwrap().hash()
         );
         for name in ["DefaultInfo", "ToolchainInfo"] {
             let value = heap.alloc(AnalysisBuiltinCallable::new(name));
@@ -1995,8 +2000,7 @@ mod tests {
                 name
             );
         }
-        let error = evaluate_module("X=platform_common.TemplateVariableInfo({})").unwrap_err();
-        assert!(error.contains("unsupported analysis builtin TemplateVariableInfo"));
+        evaluate_module("X=platform_common.TemplateVariableInfo({})").unwrap();
     }
 
     #[test]

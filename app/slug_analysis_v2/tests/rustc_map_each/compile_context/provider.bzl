@@ -4,8 +4,10 @@ load(":cc_toolchain_provider_helper.bzl", "get_cc_toolchain_provider")
 load("//cc/private/rules_impl/fdo:fdo_context.bzl", "create_fdo_context")
 load("//cc/private/toolchain_config:cc_toolchain_config_info.bzl", "create_cc_toolchain_config_info")
 load("//cc:cc_toolchain_config_lib.bzl", "feature", "make_variable", "tool_path")
+load("//cc/common:cc_common.bzl", "cc_common")
+load("//cc/common:cc_helper.bzl", "cc_helper")
 
-ProviderProof = provider(fields = ["toolchain", "variables", "fdo", "files", "cpp", "snapshot"])
+ProviderProof = provider(fields = ["toolchain", "variables", "fdo", "files", "cpp", "snapshot", "template", "make_variables"])
 
 def _impl(ctx):
     tools = ["ar", "cpp", "gcc", "ld", "nm", "objdump", "strip"]
@@ -19,7 +21,7 @@ def _impl(ctx):
         cxx_builtin_include_directories = ["%sysroot%/include", "%workspace%/toolchain/include", "%crosstool_top%/local/include"],
         features = [feature(name = "supports_pic")],
         tool_paths = [tool_path(name = n, path = "bin/../bad" if ctx.attr.failure == "unnormalized" else "bin/" + n) for n in tools],
-        make_variables = [make_variable(name = "CC_FLAGS", value = "--helper-legacy"), make_variable(name = "PRODUCER", value = ctx.attr.metadata)],
+        make_variables = [make_variable(name = "CC_FLAGS", value = "--helper-legacy"), make_variable(name = "PRODUCER", value = ctx.attr.metadata), make_variable(name = "CC", value = "shadowed-by-global-helper")],
     )
     files = depset(ctx.files.inputs)
     libc = depset([ctx.file.libc])
@@ -38,8 +40,15 @@ def _impl(ctx):
         allowlist_for_layering_check = ctx.attr.allowlist[PackageSpecificationInfo], build_info_files = OutputGroupInfo(),
     )
     tc = get_cc_toolchain_provider(ctx, attributes)
-    return [tc, platform_common.ToolchainInfo(cc = tc, cc_provider_in_toolchain = True),
+    # Authored composition of unchanged public helpers, matching cc_toolchain.bzl
+    # 129-136. This is not a claim to execute that rule's attribute envelope.
+    feature_configuration = cc_common.configure_features(ctx = ctx, cc_toolchain = tc,
+        requested_features = ctx.features, unsupported_features = ctx.disabled_features)
+    make_variables = tc._additional_make_variables | cc_helper.get_toolchain_global_make_variables(tc) | cc_helper.get_cc_flags_make_variable(ctx, feature_configuration, tc)
+    template = platform_common.TemplateVariableInfo(make_variables)
+    return [tc, template, platform_common.ToolchainInfo(cc = tc, cc_provider_in_toolchain = True),
         ProviderProof(toolchain = tc, variables = tc._build_variables,
+            template = template, make_variables = make_variables,
             fdo = tc._fdo_context, files = files, cpp = ctx.fragments.cpp,
             snapshot = struct(mode = ctx.fragments.cpp.compilation_mode(), minimum_os = tc._build_variables_dict.get("minimum_os_version"),
                 metadata = tc._additional_make_variables["PRODUCER"],
@@ -53,3 +62,16 @@ helper_subject = rule(implementation = _impl, fragments = ["cpp"], subrules = [c
     "allowlist": attr.label(mandatory = True),
     "metadata": attr.string(default = "A"), "failure": attr.string(),
 })
+
+def _consume_template(ctx):
+    template = ctx.attr.dep[platform_common.TemplateVariableInfo]
+    proof = ctx.attr.dep[ProviderProof]
+    if template != proof.template:
+        fail("direct and nested template provider aliases split")
+    first = template.variables
+    first["CC"] = "local mutation"
+    if template.variables["CC"] == "local mutation":
+        fail("template getter did not allocate a fresh dict")
+    return [template, ProviderProof(template = template, make_variables = template.variables)]
+
+template_consumer = rule(implementation = _consume_template, attrs = {"dep": attr.label()})

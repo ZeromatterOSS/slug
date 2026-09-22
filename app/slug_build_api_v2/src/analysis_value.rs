@@ -39,6 +39,7 @@ use crate::providers::ProviderId;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub enum AnalysisValueType {
+    TemplateVariableInfo,
     PackageSpecificationInfo,
     CcToolchainCallable,
     CppFragment,
@@ -68,6 +69,7 @@ impl AnalysisValueType {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::PackageSpecificationInfo => "PackageSpecificationInfo",
+            Self::TemplateVariableInfo => "TemplateVariableInfo",
             Self::CcToolchainCallable => "function",
             Self::CppFragment => "cpp",
             Self::CcHeaderInfo => "HeaderInfo",
@@ -1136,6 +1138,7 @@ pub struct AnalysisValue(Arc<AnalysisValueData>);
 
 #[derive(Debug, Allocative)]
 enum AnalysisValueData {
+    TemplateVariableInfo(crate::TemplateVariableInfo),
     PackageSpecificationInfo(crate::PackageSpecificationInfo),
     CcToolchainCallable(crate::cc_toolchain_callable::CcToolchainCallable),
     CppFragment(crate::RetainedCppFragment),
@@ -1161,6 +1164,7 @@ enum AnalysisValueData {
 
 #[derive(Debug, Clone, Copy)]
 pub enum AnalysisValueKind<'a> {
+    TemplateVariableInfo(&'a crate::TemplateVariableInfo),
     PackageSpecificationInfo(&'a crate::PackageSpecificationInfo),
     CcToolchainCallable(&'a crate::cc_toolchain_callable::CcToolchainCallable),
     CppFragment(&'a crate::RetainedCppFragment),
@@ -1191,6 +1195,10 @@ impl AnalysisValue {
 
     pub fn package_specification_info(info: crate::PackageSpecificationInfo) -> Self {
         Self::new(AnalysisValueData::PackageSpecificationInfo(info))
+    }
+
+    pub fn template_variable_info(info: crate::TemplateVariableInfo) -> Self {
+        Self::new(AnalysisValueData::TemplateVariableInfo(info))
     }
 
     pub fn cc_header_info(info: crate::CcHeaderInfo) -> Self {
@@ -1307,6 +1315,9 @@ impl AnalysisValue {
 
     pub fn kind(&self) -> AnalysisValueKind<'_> {
         match self.0.as_ref() {
+            AnalysisValueData::TemplateVariableInfo(info) => {
+                AnalysisValueKind::TemplateVariableInfo(info)
+            }
             AnalysisValueData::PackageSpecificationInfo(value) => {
                 AnalysisValueKind::PackageSpecificationInfo(value)
             }
@@ -1345,6 +1356,7 @@ impl AnalysisValue {
 
     pub fn value_type(&self) -> AnalysisValueType {
         match self.0.as_ref() {
+            AnalysisValueData::TemplateVariableInfo(_) => AnalysisValueType::TemplateVariableInfo,
             AnalysisValueData::PackageSpecificationInfo(_) => {
                 AnalysisValueType::PackageSpecificationInfo
             }
@@ -1437,6 +1449,10 @@ impl AnalysisValue {
 
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         match (self.0.as_ref(), other.0.as_ref()) {
+            (
+                AnalysisValueData::TemplateVariableInfo(left),
+                AnalysisValueData::TemplateVariableInfo(right),
+            ) => left.publication_eq_with(right, state),
             (
                 AnalysisValueData::PackageSpecificationInfo(left),
                 AnalysisValueData::PackageSpecificationInfo(right),
@@ -1550,6 +1566,10 @@ fn publication_fields_eq(
 impl PartialEq for AnalysisValue {
     fn eq(&self, other: &Self) -> bool {
         match (self.0.as_ref(), other.0.as_ref()) {
+            (
+                AnalysisValueData::TemplateVariableInfo(left),
+                AnalysisValueData::TemplateVariableInfo(right),
+            ) => left == right,
             // NativeInfo excludes callable fields from equality: contains is
             // the only field. Hidden group semantics still participate above
             // in publication equality, including nested containers/depsets.
@@ -1620,6 +1640,10 @@ impl Eq for AnalysisValue {}
 impl Hash for AnalysisValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self.0.as_ref() {
+            AnalysisValueData::TemplateVariableInfo(info) => {
+                21u8.hash(state);
+                info.hash(state);
+            }
             AnalysisValueData::PackageSpecificationInfo(_) => 20u8.hash(state),
             AnalysisValueData::CcToolchainCallable(value) => {
                 17u8.hash(state);
@@ -1722,6 +1746,8 @@ fn hash_unordered_entries<H: Hasher>(entries: &[(AnalysisValue, AnalysisValue)],
 
 #[derive(Default)]
 pub(crate) struct PublicationEqState {
+    left_template_variables: FxHashMap<usize, usize>,
+    right_template_variables: FxHashMap<usize, usize>,
     left_cc_callables: FxHashMap<usize, usize>,
     right_cc_callables: FxHashMap<usize, usize>,
     left_cpp_fragments: FxHashMap<usize, usize>,
@@ -1739,6 +1765,15 @@ pub(crate) struct PublicationEqState {
 }
 
 impl PublicationEqState {
+    pub(crate) fn enter_template_variable_pair(&mut self, left: usize, right: usize) -> bool {
+        Self::enter_occurrence_pair(
+            &mut self.left_template_variables,
+            &mut self.right_template_variables,
+            left,
+            right,
+        )
+    }
+
     pub(crate) fn enter_cc_callable_pair(&mut self, left: usize, right: usize) -> bool {
         Self::enter_occurrence_pair(
             &mut self.left_cc_callables,

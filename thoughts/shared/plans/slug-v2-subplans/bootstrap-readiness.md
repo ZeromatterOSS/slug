@@ -427,12 +427,16 @@ allowlist/TemplateVariableInfo construction, runtime Solib, modules, profile
 actions or allocator execution. WP774 supplies genuine ctx.file/ctx.files from
 configured dependency DefaultInfo, consumed by that same helper/compile proof.
 WP775 adds the genuine native package-group allowlist and preserves its hidden
-membership through that helper's publication. The full rule's implicit cc_build_info produces both stamped and redacted groups
+membership through that helper's publication. WP776 supplies genuine native
+TemplateVariableInfo from unchanged make-variable helper results, preserving
+ordered values and occurrence aliases across configured dependencies. This does
+not admit ctx.var expansion or the full toolchain envelope. The full rule's
+implicit cc_build_info produces both stamped and redacted groups
 regardless --stamp; status transforms and embedded helper dependencies cannot be
 replaced by empty providers to claim construction. Generic command/
 aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/
 path mapping and full cc_library remain deferred. Variables reject cyclic/foreign publication;
-raw set/range publication and non-ToolchainInfo builtin structures remain outside
+raw set/range publication and unmodeled builtin structures remain outside
 the admitted boundary. See the current packet for exact/native/deferred classes.
 The existing full Rustc argument proof's None C++ fields still do not establish
 those remaining gates; the nonempty C++ linker-helper proof is independently bounded.

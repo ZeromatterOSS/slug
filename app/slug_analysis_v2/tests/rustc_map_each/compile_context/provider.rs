@@ -21,7 +21,7 @@ fn workspace() -> PathBuf {
         } else {
             retained
         };
-        fs::write(path, format!("{retained}\nload('@rules_cc//cc/private/rules_impl:provider_proof.bzl','helper_subject')\npackage_group(name='layering_allowlist',packages=['//allowed/...'])\nhelper_subject(name='producer',metadata='A',allowlist=':layering_allowlist',visibility=['//visibility:public'])\n{}",
+        fs::write(path, format!("{retained}\nload('@rules_cc//cc/private/rules_impl:provider_proof.bzl','helper_subject','template_consumer')\npackage_group(name='layering_allowlist',packages=['//allowed/...'])\nhelper_subject(name='producer',metadata='A',allowlist=':layering_allowlist',visibility=['//visibility:public'])\ntemplate_consumer(name='template_consumer',dep=':producer')\n{}",
             if main { "exports_files(['include/stdc-predef.h'])\n" } else { "" })).unwrap();
     }
     root
@@ -63,6 +63,7 @@ fn check_provider(
         result.actions().is_empty(),
         "no-profile helper must register no actions"
     );
+    check_template(result, main, metadata);
     let tc = field(result, "toolchain");
     let AnalysisValueKind::PackageSpecificationInfo(allowlist) =
         member(tc, "_allowlist_for_layering_check").kind()
@@ -171,6 +172,72 @@ fn check_provider(
     );
 }
 
+fn check_template(result: &ConfiguredNodeResult, main: bool, metadata: &str) {
+    let template = result
+        .providers()
+        .template_variable_info()
+        .expect("native template provider");
+    let AnalysisValueKind::TemplateVariableInfo(nested) = field(result, "template").kind() else {
+        panic!("typed nested template provider")
+    };
+    assert_eq!(
+        template, nested,
+        "native and nested roots share one occurrence"
+    );
+    let prefix = if main { "" } else { "external/rules_rust+/" };
+    let expected = [
+        ("STACK_FRAME_UNLIMITED", "".to_owned()),
+        ("PRODUCER", metadata.to_owned()),
+        ("CC", format!("{prefix}bin/gcc")),
+        ("AR", format!("{prefix}bin/ar")),
+        ("NM", format!("{prefix}bin/nm")),
+        ("LD", format!("{prefix}bin/ld")),
+        ("STRIP", format!("{prefix}bin/strip")),
+        ("C_COMPILER", "gcc".to_owned()),
+        ("GLIBC_VERSION", "local".to_owned()),
+        ("ABI_GLIBC_VERSION", "proof".to_owned()),
+        ("ABI", "proof".to_owned()),
+        (
+            "CROSSTOOLTOP",
+            if main {
+                // cc_helper_internal.get_relative_path normalizes join("", "")
+                // through skylib paths.normalize, whose empty result is ".".
+                ".".to_owned()
+            } else {
+                "external/rules_rust+".to_owned()
+            },
+        ),
+        (
+            "CC_FLAGS",
+            "--helper-legacy --sysroot=/proof-sysroot".to_owned(),
+        ),
+    ];
+    assert_eq!(
+        template
+            .variables()
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect::<Vec<_>>(),
+        expected
+            .iter()
+            .map(|(k, v)| (*k, v.as_str()))
+            .collect::<Vec<_>>()
+    );
+    let AnalysisValueKind::Dictionary(variables) = field(result, "make_variables").kind() else {
+        panic!("actual helper make-variable dict")
+    };
+    assert_eq!(
+        variables
+            .iter()
+            .map(|(k, v)| (k.as_str().unwrap(), v.as_str().unwrap()))
+            .collect::<Vec<_>>(),
+        expected
+            .iter()
+            .map(|(k, v)| (*k, v.as_str()))
+            .collect::<Vec<_>>()
+    );
+}
+
 fn check_compile(result: &ConfiguredNodeResult, main: bool, exec: bool, opt: bool, target: &str) {
     // cc_helper_internal333–354 and compile.bzl1431/1468: opt supports_pic
     // emits PIC for dynamic libraries first, then non-PIC for binaries.
@@ -248,6 +315,19 @@ async fn unchanged_toolchain_helper_publishes_no_profile_providers_into_public_c
             .await
             .unwrap();
             check_provider(&producer, main, is_exec, opt, None, false, "A");
+            let consumer = request(
+                &dice,
+                &root,
+                &label(main, "template_consumer"),
+                configuration.clone(),
+            )
+            .await
+            .unwrap();
+            check_template(&consumer, main, "A");
+            assert_eq!(
+                producer.providers().template_variable_info(),
+                consumer.providers().template_variable_info()
+            );
             for name in ["typed_compile", "typed_c", "typed_pic"] {
                 let result = request(&dice, &root, &label(main, name), configuration.clone())
                     .await
@@ -269,6 +349,10 @@ async fn unchanged_toolchain_helper_restores_files_metadata_and_configuration_in
     let compiled = request(&dice, &root, "@@//:typed_compile", config(&[]))
         .await
         .unwrap();
+    let baseline_consumer = request(&dice, &root, "@@//:template_consumer", config(&[]))
+        .await
+        .unwrap();
+    check_template(&baseline_consumer, true, "A");
     let build = root.join("BUILD.bazel");
     let original = fs::read_to_string(&build).unwrap();
     fs::write(
@@ -281,6 +365,11 @@ async fn unchanged_toolchain_helper_restores_files_metadata_and_configuration_in
         .unwrap();
     check_provider(&changed, true, false, false, None, false, "B");
     assert_ne!(baseline, changed);
+    let changed_consumer = request(&dice, &root, "@@//:template_consumer", config(&[]))
+        .await
+        .unwrap();
+    check_template(&changed_consumer, true, "B");
+    assert_ne!(baseline_consumer, changed_consumer);
     assert_eq!(paths(field(&changed, "files")), ["other.a"]);
     let changed_compile = request(&dice, &root, "@@//:typed_compile", config(&[]))
         .await
@@ -328,6 +417,11 @@ async fn unchanged_toolchain_helper_restores_files_metadata_and_configuration_in
         .unwrap();
     assert_eq!(baseline, restored);
     check_provider(&restored, true, false, false, None, false, "A");
+    let restored_consumer = request(&dice, &root, "@@//:template_consumer", config(&[]))
+        .await
+        .unwrap();
+    assert_eq!(baseline_consumer, restored_consumer);
+    check_template(&restored_consumer, true, "A");
     let restored_compile = request(&dice, &root, "@@//:typed_compile", config(&[]))
         .await
         .unwrap();

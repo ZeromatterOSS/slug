@@ -635,6 +635,7 @@ impl PlatformInfo {
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum ProviderValue {
+    TemplateVariableInfo(crate::TemplateVariableInfo),
     PackageSpecificationInfo(crate::PackageSpecificationInfo),
     DefaultInfo(DefaultInfo),
     OutputGroupInfo(OutputGroupInfo),
@@ -647,6 +648,7 @@ pub enum ProviderValue {
 impl ProviderValue {
     pub fn name(&self) -> ProviderName {
         match self {
+            Self::TemplateVariableInfo(_) => ProviderName("TemplateVariableInfo".into()),
             Self::PackageSpecificationInfo(_) => ProviderName("PackageSpecificationInfo".into()),
             Self::DefaultInfo(_) => ProviderName("DefaultInfo".into()),
             Self::OutputGroupInfo(_) => ProviderName("OutputGroupInfo".into()),
@@ -659,6 +661,7 @@ impl ProviderValue {
 
     fn identity(&self) -> ProviderIdentity {
         match self {
+            Self::TemplateVariableInfo(_) => ProviderIdentity::builtin("TemplateVariableInfo"),
             Self::PackageSpecificationInfo(_) => {
                 ProviderIdentity::builtin("PackageSpecificationInfo")
             }
@@ -673,6 +676,9 @@ impl ProviderValue {
 
     fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         match (self, other) {
+            (Self::TemplateVariableInfo(left), Self::TemplateVariableInfo(right)) => {
+                left.publication_eq_with(right, state)
+            }
             (Self::PackageSpecificationInfo(left), Self::PackageSpecificationInfo(right)) => {
                 left == right
             }
@@ -775,6 +781,13 @@ impl ProviderCollection {
     pub fn package_specification_info(&self) -> Option<&crate::PackageSpecificationInfo> {
         match self.get(&ProviderIdentity::builtin("PackageSpecificationInfo")) {
             Some(ProviderValue::PackageSpecificationInfo(info)) => Some(info),
+            _ => None,
+        }
+    }
+
+    pub fn template_variable_info(&self) -> Option<&crate::TemplateVariableInfo> {
+        match self.get(&ProviderIdentity::builtin("TemplateVariableInfo")) {
+            Some(ProviderValue::TemplateVariableInfo(info)) => Some(info),
             _ => None,
         }
     }

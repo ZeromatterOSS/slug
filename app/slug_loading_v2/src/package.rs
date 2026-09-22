@@ -7626,7 +7626,7 @@ impl<'v> StarlarkValue<'v> for PlatformCommonModule {
                 Some(heap.alloc_simple(AnalysisBuiltinCallable::new("ToolchainInfo")))
             }
             "TemplateVariableInfo" => {
-                Some(heap.alloc_simple(AnalysisBuiltinCallable::new("TemplateVariableInfo")))
+                Some(heap.alloc_simple(crate::provider::TemplateVariableInfoConstructor))
             }
             _ => None,
         }
