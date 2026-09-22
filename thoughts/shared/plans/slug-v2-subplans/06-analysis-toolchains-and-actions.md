@@ -291,6 +291,18 @@ returns the existing input-role sets and caller-owned dangling-option warnings;
 it is not an execution certificate. Neither warnings nor results mutate DICE
 recipes, and failure publishes no partial result.
 
+WP773 supplies the unchanged rules_cc toolchain-provider helper with genuine
+configuration, File depsets and its authentic no-profile FDO subrule. The full
+published CcToolchainInfo feeds separate public C/C++/PIC compile consumers in
+main/external fastbuild, opt and default exec configurations. Configuration owns
+nullable plain-text minimum_os_version and Core stamp options; both exec paths
+reset them. Loading exposes public minimum_os_version/is_tool_configuration
+methods and current-caller-restricted stamp_binaries, without parallel state.
+Exact named helper/configuration semantics retain Slug-native structural identity.
+The fixture authors only the helper's attribute envelope; full cc_toolchain
+attribute extraction, allowlist/TemplateVariableInfo envelope, runtime Solib,
+module maps, profile actions, %package include paths and execution stay deferred.
+
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and
 publication preserve immutable cache seeds, parent aliases, raw binding types,

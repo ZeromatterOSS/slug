@@ -708,6 +708,7 @@ mod tests {
             ("host_copt", NativeCommandOption::HostCopt),
             ("host_conlyopt", NativeCommandOption::HostConlyopt),
             ("host_cxxopt", NativeCommandOption::HostCxxopt),
+            ("minimum_os_version", NativeCommandOption::MinimumOsVersion),
         ] {
             for value in ["", "raw, value", "-Dflag=x,y", "null"] {
                 assert_eq!(
@@ -729,6 +730,7 @@ mod tests {
         for (name, option) in [
             ("cc_dotd_files", NativeCommandOption::CcDotdFiles),
             ("save_temps", NativeCommandOption::SaveTemps),
+            ("stamp", NativeCommandOption::Stamp),
             (
                 "strict_system_includes",
                 NativeCommandOption::StrictSystemIncludes,

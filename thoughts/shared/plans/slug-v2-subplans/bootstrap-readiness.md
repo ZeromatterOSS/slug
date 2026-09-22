@@ -419,7 +419,12 @@ over real published recipes are not compiler-output evidence. Core discovery
 ownership, verified dotd acquisition and cache replay still gate execution. WP772
 adds pure preparation with source-defined include-path checks and original-cache
 compiler options; this does not establish actual allocator flags or full production
-toolchain construction. Generic command/
+toolchain construction. WP773 replaces authored CcToolchainInfo construction with
+the unchanged rules_cc provider helper and authentic no-profile FDO subrule,
+publishing into separate public compile consumers across main/external and
+fastbuild/opt/default exec. It does not yet prove full cc_toolchain attribute/
+allowlist/TemplateVariableInfo construction, runtime Solib, modules, profile
+actions or allocator execution. Generic command/
 aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/
 path mapping and full cc_library remain deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside

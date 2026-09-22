@@ -65,6 +65,8 @@ pub enum NativeCommandOption {
     HostActionEnv,
     IncompatibleStrictActionEnv,
     StrictSystemIncludes,
+    MinimumOsVersion,
+    Stamp,
 }
 
 impl NativeCommandOption {
@@ -109,6 +111,8 @@ impl NativeCommandOption {
             "save_temps" => Self::SaveTemps,
             "process_headers_in_dependencies" => Self::ProcessHeadersInDependencies,
             "strict_system_includes" => Self::StrictSystemIncludes,
+            "minimum_os_version" => Self::MinimumOsVersion,
+            "stamp" => Self::Stamp,
             "action_env" => Self::ActionEnv,
             "host_action_env" => Self::HostActionEnv,
             "incompatible_strict_action_env" | "experimental_strict_action_env" => {
@@ -159,6 +163,8 @@ impl NativeCommandOption {
             Self::SaveTemps => "save_temps",
             Self::ProcessHeadersInDependencies => "process_headers_in_dependencies",
             Self::StrictSystemIncludes => "strict_system_includes",
+            Self::MinimumOsVersion => "minimum_os_version",
+            Self::Stamp => "stamp",
             Self::ActionEnv => "action_env",
             Self::HostActionEnv => "host_action_env",
             Self::IncompatibleStrictActionEnv => "incompatible_strict_action_env",
@@ -173,6 +179,7 @@ impl NativeCommandOption {
                 | Self::SaveTemps
                 | Self::ProcessHeadersInDependencies
                 | Self::StrictSystemIncludes
+                | Self::Stamp
                 | Self::ExperimentalOmitfp
                 | Self::IncompatibleStrictActionEnv
                 | Self::ForcePic

@@ -538,6 +538,10 @@ impl SlugConfiguration {
         self.0.kind
     }
 
+    pub fn stamp_binaries(&self) -> Result<bool, SlugConfigurationError> {
+        self.core_bool("stamp")
+    }
+
     /// Native fallback for rules that do not declare `_use_auto_exec_groups`.
     pub fn incompatible_auto_exec_groups(&self) -> Result<bool, SlugConfigurationError> {
         self.core_bool("incompatible_auto_exec_groups")
@@ -759,7 +763,7 @@ impl SlugConfiguration {
         for record in options {
             match (record.class_name, record.canonical_name) {
                 (CORE_OPTIONS, "features") => record.value = host_features.clone(),
-                (CORE_OPTIONS, "collect_code_coverage")
+                (CORE_OPTIONS, "collect_code_coverage" | "stamp")
                 | (
                     CPP_OPTIONS,
                     "force_pic"
@@ -770,7 +774,7 @@ impl SlugConfiguration {
                     record.value =
                         OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Bool(false)));
                 }
-                (CPP_OPTIONS, "fdo_instrument" | "cs_fdo_instrument") => {
+                (CPP_OPTIONS, "fdo_instrument" | "cs_fdo_instrument" | "minimum_os_version") => {
                     record.value = OptionValue::Native(NativeOccurrence::Absent);
                 }
                 (CPP_OPTIONS, "fdo_prefetch_hints") => record.value = OptionValue::Label(None),
@@ -1326,6 +1330,7 @@ fn typed_native_command_descriptor(
         | NativeCommandOption::HostCompilationMode
         | NativeCommandOption::Features
         | NativeCommandOption::HostFeatures
+        | NativeCommandOption::Stamp
         | NativeCommandOption::ActionEnv
         | NativeCommandOption::HostActionEnv => CORE_OPTIONS,
         NativeCommandOption::CoverageOutputGenerator => COVERAGE_OPTIONS,
@@ -1966,6 +1971,9 @@ fn enum_family_tag(value: EnumFamily) -> u16 {
 
 #[cfg(test)]
 mod compile_input_tests;
+
+#[cfg(test)]
+mod toolchain_provider_tests;
 
 #[cfg(test)]
 mod tests {

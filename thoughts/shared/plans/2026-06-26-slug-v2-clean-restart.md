@@ -29,10 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-72-m7a-cpp-input-preparation-r1
+Packet: WP-7-73-m7a-cc-toolchain-provider-r1
 Status: accepted
 
-WP772 accepts pure CppCompile pre-execution input preparation with original-cache
+WP773 accepts the unchanged no-profile C++ toolchain-provider helper into separate
+public compile consumers, with owned configuration projections and real opt/exec
+FDO subrule evaluation. Independent design/final ACCEPT;58 focused tests and
+Core/CLI checks pass. Full cc_toolchain rule and execution remain deferred.
+
+WP772 at2a097c1b1 accepts pure CppCompile pre-execution input preparation with original-cache
 compiler options and source-defined include-path validation. Independent design/
 final ACCEPT;54 focused tests and Core/CLI checks pass. Tracked discovery,
 cache replay, full production toolchain construction and execution remain deferred.

@@ -1,6 +1,64 @@
 // Verbatim import bodies; provenance and hashes in fixtures/rustc-map-each/sources.json.
 const RUSTC_MAP_EACH_SOURCES: &[(&str, &str)] = &[
     (
+        "rules_cc/cc/common/cc_helper.bzl",
+        include_str!("../fixtures/rustc-map-each/rules_cc/cc/common/cc_helper.bzl"),
+    ),
+    (
+        "rules_cc/cc/common/visibility.bzl",
+        include_str!("../fixtures/rustc-map-each/rules_cc/cc/common/visibility.bzl"),
+    ),
+    (
+        "rules_cc/cc/common/objc_info.bzl",
+        include_str!("../fixtures/rustc-map-each/rules_cc/cc/common/objc_info.bzl"),
+    ),
+    (
+        "rules_cc/cc/private/rules_impl/cc_toolchain_provider_helper.bzl",
+        include_str!(
+            "../fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/cc_toolchain_provider_helper.bzl"
+        ),
+    ),
+    (
+        "rules_cc/cc/private/rules_impl/objc_common.bzl",
+        include_str!("../fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/objc_common.bzl"),
+    ),
+    (
+        "rules_cc/cc/private/rules_impl/objc_compilation_context_info.bzl",
+        include_str!(
+            "../fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/objc_compilation_context_info.bzl"
+        ),
+    ),
+    (
+        "rules_cc/cc/private/rules_impl/fdo/fdo_context.bzl",
+        include_str!(
+            "../fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/fdo/fdo_context.bzl"
+        ),
+    ),
+    (
+        "rules_cc/cc/private/rules_impl/fdo/fdo_prefetch_hints.bzl",
+        include_str!(
+            "../fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/fdo/fdo_prefetch_hints.bzl"
+        ),
+    ),
+    (
+        "rules_cc/cc/private/rules_impl/fdo/fdo_profile.bzl",
+        include_str!(
+            "../fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/fdo/fdo_profile.bzl"
+        ),
+    ),
+    (
+        "rules_cc/cc/private/rules_impl/fdo/memprof_profile.bzl",
+        include_str!(
+            "../fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/fdo/memprof_profile.bzl"
+        ),
+    ),
+    (
+        "rules_cc/cc/private/rules_impl/fdo/propeller_optimize.bzl",
+        include_str!(
+            "../fixtures/rustc-map-each/rules_cc/cc/private/rules_impl/fdo/propeller_optimize.bzl"
+        ),
+    ),
+    (
         "bazel_skylib/lib/paths.bzl",
         include_str!("../fixtures/rustc-map-each/bazel_skylib/lib/paths.bzl"),
     ),

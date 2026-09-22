@@ -4,6 +4,7 @@ use std::fmt;
 
 use allocative::Allocative;
 use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::SlugConfigurationKind;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -45,6 +46,21 @@ impl<'v> StarlarkValue<'v> for ConfigurationValue {
 
 #[starlark_module]
 fn configuration_methods(builder: &mut MethodsBuilder) {
+    fn is_tool_configuration(this: &ConfigurationValue) -> anyhow::Result<bool> {
+        Ok(this.0.kind() == SlugConfigurationKind::Exec)
+    }
+
+    fn stamp_binaries(
+        this: &ConfigurationValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        crate::builtin_restriction::check_default_allowlist(
+            eval,
+            &crate::builtin_restriction::source_identities_for_evaluator(eval)?,
+        )?;
+        Ok(this.0.stamp_binaries()?)
+    }
+
     fn is_sibling_repository_layout(
         this: &ConfigurationValue,
         eval: &mut Evaluator<'_, '_, '_>,

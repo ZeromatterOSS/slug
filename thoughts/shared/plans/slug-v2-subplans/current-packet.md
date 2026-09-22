@@ -1,175 +1,188 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-72-m7a-cpp-input-preparation-r1
+Packet: WP-7-73-m7a-cc-toolchain-provider-r1
 Status: accepted
 
 ## Outcome and demand
 
-Pure pre-execution input preparation for published no-scanning regular-file
-CppCompile recipes: expand discovery compiler options, check include paths,
-then return existing input-role sets and dangling-option warnings. This fills
-the pre-execution check missing from WP771, not tracked discovery or execution.
-WP771 at5c94981ec accepts supplied-dotd reconciliation with49 tests/Core/CLI
-checks and independent acceptance; its complete contract is retained in Git.
-The allocator demands this compile family. Inert configured fixtures establish
-the pure boundary, not production allocator flags or full toolchain construction.
+Invoke the unchanged rules_cc get_cc_toolchain_provider using genuine rule ctx,
+the authentic FDO subrule, configuration provider and File inputs; publish its
+complete CcToolchainInfo into a separate public compile consumer. Bundle the
+three missing configuration projections and their command/exec ownership.
+This replaces authored constructor arguments at the producer boundary, not the
+full cc_toolchain rule envelope or real compiler execution.
+WP772 at2a097c1b1 accepts pure compile input preparation with54 tests and Core/CLI
+checks; its full receipt/contract remains in Git. M7A remains partial, M8 unproved.
 
 ## Compatibility and source
 
+Exact named slice: minimum_os_version nullable string method, public callable
+is_tool_configuration from semantic exec role, restricted stamp_binaries method,
+command conversion/defaults, exec resets, and unchanged default no-profile/
+no-runtime/no-module-map provider helper including opt/default exec configurations.
+Slug-native: structural configuration/artifact/path identity, valid Unicode and
+diagnostics. Full rule attribute extraction/allowlist/TemplateVariableInfo,
+runtime Solib, module maps, profile actions, %package include paths and execution
+remain unsupported/deferred, not silently substituted.
+
 Pinned Bazel9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-CppCompileAction636–678/790–907/1076–1077/1154–1204;
-CompileCommandLine119–154/170–182; CcToolchainVariables304–312;
-CcLibraryConfiguredTargetTest1362–1431 and CcCommonTest1648–1670.
-Exact named slice: no-scanning regular-file original-cache option expansion,
-ordinary/quote/system path extraction, ordered validation and ignored-prefix
-rules under POSIX, NOOP mapping and nonsibling repository layout.
-Slug-native: valid-Unicode/NUL-free consumed paths, structural identity, diagnostic
-text and returned warning collection instead of process stderr. Warnings preceding
-an error are not delivered by this pure Result API. Joined suffixes use Java trim
-(characters <=U+0020), not Unicode whitespace trimming. MSVC option spelling
-classification is admitted on POSIX; Windows path semantics are not.
-Unchanged production Rust implementation only; no Java runtime/helper.
+CppOptions141–148, CppConfiguration345–353,
+BuildConfigurationValue668–676/747–753, CoreOptions349–356,
+FieldOptionDefinition327–340, Converters69–74,
+builtin_exec_platforms221–227/291–353.
+rules_cc0.2.17 release archive SHA256
+283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a:
+cc_toolchain_provider_helper170–305 (SHA256
+92e52421866fb6fcba103159d17575480439aa0567d362937aca03aebb7372e3);
+fdo/fdo_context23–268/430–473 (SHA256
+91b7b46c515b4773d5a241e699027212f679ab93160cc79218bd687eac51d5b7).
+Native source regressions plus authenticated unchanged producer/consumer proof
+suffice; no new Bazel/compiler/network invocation selected.
 
-## Owner and invariant
+## Semantic ownership
 
-Add CppCompileSpec::prepare_inputs_posix() returning
-Result<CppCompileInputPreparation,String>. The result has private fields and
-borrowed getters inputs(): &CppCompileInputSets, warnings(): &[CompactString].
-No Clone requirement or cached result. This is a pure observation, never an
-execution-readiness certificate. The configured-node recipe remains immutable.
+Existing full SlugConfiguration already retains minimum_os_version=Absent and
+stamp=false. Add typed command enum admissions only; all supplied values flow
+through existing immutable request/configuration/DICE equality and hashing.
+Minimum OS is plain text: empty, arbitrary and literal "null" remain strings,
+not parsed versions or absence. New projection uses existing cpp_text, not the
+profile-only populated-value rejection helper. Validate malformed retained types.
+Stamp uses existing CoreOptions bool conversion, including no-form semantics.
+Both exec conversion paths reset minimum_os_version to Absent and stamp to false.
+is_tool_configuration projects exactly SlugConfigurationKind::Exec; the legacy
+raw native "is exec configuration" descriptor is not the active role owner.
 
-Order follows discoverInputs: feature-expand compiler options using ORIGINAL
-Variables/cache (not WP770 fresh-overlay argv and not including selected tool);
-extract system paths/warnings even when needs_include_validation=false. If
-validation is enabled, collect ignored builtin+context system_includes+
-external_includes, then ordinary and quote paths, then validate ordinary→quote→
-system. Return WP771 input_sets only after success. No partial result on error.
-Disabled validation bypasses raw copts/context validation, not compiler-option
-expansion, system-path normalization or existing regular-file restrictions.
+Loading facades borrow/share existing immutable configuration. minimum_os_version
+and is_tool_configuration are unrestricted callable methods; stamp_binaries checks
+the current caller's default allowlist using existing source-provenance machinery.
+No forged struct, trusted-looking receiver or helper handle bypasses that gate.
+No new retained value, DICE key/lock, interner, side cache, filesystem observation
+or independent configuration identity. No hashing/layout or performance change.
 
-Ordinary paths: context includes followed by combined raw user_compile_flags
--I or /I (uppercase I only), standalone flag ignored, case-insensitive msvc
-suffix prefix excluded. Quote paths: context quote_includes followed by raw
--iquote joined trimmed or split untrimmed; dangling warns/skips. System paths:
-original expanded options -isystem or case-insensitive -/imsvc, joined trimmed
-or split untrimmed; dangling warns/skips. No generic shell/option parser. Raw
-copts use existing Variables lookup/sequence/string semantics, absent→empty;
-malformed consumed values fail closed. Framework/forced-include paths are not
-checked in this no-scanning slice.
+## Producer proof and provenance
 
-Normalize via existing POSIX utility. Ignored dirs ALWAYS include builtin+
-context system+external regardless of strict_system_includes (unlike WP771
-post-dotd policy). Match whole components. For other paths remove a leading
-external component as source does, then reject absolute or remaining .. segments.
-Empty and normalized in-root paths succeed. First violation wins. Missing or
-malformed consumed context fails closed. No filesystem, inferred labels, new
-configuration option, retained layout, DICE key/lock or discovery side cache.
-Reuse existing compact strings, original Variables adapter, normalization and
-private path/context helpers; output vectors are caller-owned scratch.
-Ignored directories use existing SmallSet exact lookup before prefix scanning,
-as pinned source does, avoiding an unconditional prefix scan for exact matches.
-Stage9 WP770/WP771 reuse applies; no donor or performance claim.
+Use the existing selected-registry compile_context workspace. Add only the11
+required complete rules_cc load bodies: common/cc_helper, common/visibility,
+common/objc_info, rules_impl/cc_toolchain_provider_helper, rules_impl/objc_common,
+rules_impl/objc_compilation_context_info and fdo/{fdo_context,fdo_prefetch_hints,
+fdo_profile,memprof_profile,propeller_optimize}. All are verbatim authenticated
+release members with sources.json/fixture.toml provenance. Review full import
+closure and growth; no copied mutations, stripped body or profile-subrule shim.
 
-## Scope, routing and proof
+Authored caller lives in cc/private/rules_impl to respect private visibility,
+declares fragments=[cpp] and subrules=[create_fdo_context], supplies an explicit
+attributes struct with genuine config info, File depsets and OutputGroupInfo.
+All seven required tool names are supplied, not the old three-tool fixture.
+No-profile fastbuild and opt/default-exec call authentic FDO; no FDO actions.
+Default exec proof uses the production platform-aware transition and asserts opt
+mode explicitly; the role-only to_exec conversion does not imply opt. Exact PIC
+action order is [PIC] in fastbuild and [PIC, non-PIC] in opt for the PIC consumer;
+other consumers emit [non-PIC]. Every action receives complete downstream checks.
+No runtime/module-map inputs. Assert tool/include/sysroot/build-variable producer
+semantics and complete downstream provider/recipe identity. Actual published
+public compile must expand argv, prepare inputs and preserve execution refusals.
 
-Baseline5c94981ec; branch codex/wp772-cpp-input-preparation-review.
-Independent design ACCEPT2026-09-22 precedes implementation; final actual-diff/evidence
-review precedes atomic integration. Root owns hooks/docs/serial validation.
-Worker A: actions/cpp_compile/input_preparation.rs and child tests; may widen
-dependencies.rs existing context_directories/beneath visibility to pub(super)
-only for same-owner reuse.
-Worker A may also expose expansion.rs test module and expansion/tests.rs
-group/configuration factories to cpp_compile siblings for test-only reuse.
-Worker B: Analysis compile_context/input_preparation.rs
-and compile_context.rs hook; authored compile-context fixture extensions only
-for discriminating cache proof if existing recipes cannot establish it.
-Root: cpp_compile.rs/actions/mod.rs/lib.rs thin type exports; Stage6/7/9/bootstrap,
-canonical/current docs. No production Core/REAPI/Loading/Configuration changes.
+## Scope and routing
 
-Estimate150–250 production and300–500 new test lines. Independent growth review
-if exceeded; extraction, checks and preparation stay one focused owner module.
-Required evidence:
+Base2a097c1b1; branch codex/wp773-cc-toolchain-provider-review.
+Independent design ACCEPT2026-09-22 before implementation and final actual-diff/evidence
+review before atomic integration. Config worker owns:
+app/slug_configuration_v2/src/command.rs, native/configuration.rs,
+native/cpp_fragment.rs and focused native/configuration/toolchain_provider_tests.rs
+plus module hook. Root owns Loading analysis_fragments.rs and focused child
+toolchain_provider_tests.rs; cc_compile_outputs/configuration.rs and child tests;
+Commands common.rs test table rows only. No production Analysis/Core/REAPI edits.
+Fixture worker owns Analysis tests/rustc_map_each/compile_context/provider.rs
+and provider.bzl, parent hook, sources.rs, the11 listed fixture bodies and
+sources.json/fixture.toml. Existing test factory visibility changes only if needed
+for sibling reuse. Root docs Stage6/bootstrap/canonical/current; other owner docs
+only if the implemented gate changes their architecture.
 
-- Source regression escaping relative/absolute include/system paths;
-  context/raw flag ordering, -I combined-only, quote/system joined/split/dangling,
-  MSVC spelling exclusions, Java-vs-Unicode trim, normalization and component
-  boundaries. Framework/forced-include are not accidentally validated.
-- Original cached options versus fresh argv; raw user flags versus feature flags;
-  absent/malformed copts and context, needs-validation=false timing.
-- Strict=true still ignores declared system dirs before execution; post-dotd
-  strict behavior stays protected. First failure and immutable repeats/errors.
-- Actual published main/external target/exec/PIC recipes return exact input_sets;
-  same-DICE BUILD flags/configuration A/B/A changes reject/restore preparation.
-- Protected WP770 command and WP771 input/reconciliation tests, generic command/
-  REAPI refusals. Tests reuse existing authored workspace, no upstream copy.
+Estimate80–180 production and350–600 authored test lines, excluding necessary
+verbatim import closure. Central files get only cohesive methods/enum/reset hooks;
+focused tests live in children. Growth is a review trigger, not an automatic stop.
+Existing shared configuration/AnalysisValue/Variables/provider owners suffice.
+No donor utility or representation change; inherited Stage9 WP763/764 applies.
 
-Pinned nightly serial offline/locked JSON no-run BuildAPI/Analysis, exact batched
-preflight/tests, Core/CLI checks; rustfmt/diff/archive/plan-status gates.
-Preparation60s/operation, seconds-scale runtime estimates, no user hard12/15s
-deadline. No Bazel, daemon, C++ compiler action or network invocation selected.
-REPLAN for contradictory source, new owner/policy or execution activation.
+## Validation and stops
 
-## Remaining boundary
+Required discriminators:
+- defaults, empty/literal-null/arbitrary minimum OS, malformed retained types,
+  stamp boolean aliases/no-form, full structural distinction/restoration;
+  both exec paths erase target minimum OS/stamp, explicit Exec role only.
+- public methods callable in ordinary provenance, stamp denied there but allowed
+  from authenticated rules_cc source; genuine values, no untracked constants.
+- actual helper producer in main/external target/exec, fastbuild/opt with no-profile
+  FDO; complete output consumed by public compile and immutable projections.
+- same-DICE producer File/metadata/configuration A/B/A, missing/error/restoration,
+  source tool-path rejection and no partial provider/actions; unused full
+  configuration remains structural. No request-global repair or direct filesystem
+  resolver in production.
+- protected existing constructor/public compile/command/preparation/dotd/cache
+  and restriction proofs. Reuse unaffected evidence; do not claim full cc_toolchain.
 
-This does not compute/store commandLineKey or discovered-input replay, acquire
-verified dotd bytes (including AC hits), resolve sources through Core, or publish
-action success. Those facts must have tracked DICE ownership and complete source
-frontiers, not attempt-local side caches. Modules/scanning/trees/Windows/sibling/
-mapped paths and generic aquery/ActionKey/REAPI activation remain deferred.
-Full production toolchain construction still has separate configuration/helper
-gaps. M7A partial; M8 unproved.
+Pinned nightly serial offline/locked Cargo JSON no-run for Configuration,
+Loading and Analysis; exact batched preflight/tests; Commands focused capture,
+Core/CLI checks; source hashes/closure, rustfmt, diff, archive and plan-status.
+Preparation60s/operation; small runtime selectors. These are operation estimates/
+caps, not a reinstated user hard12/15s ceiling. No daemon/Bazel/compiler action.
+REPLAN for unowned state, contradictory source, helper requiring a new semantic
+boundary beyond these projections, unauthenticated replacement or execution
+activation. Ordinary scoped corrections stay in this packet.
 
-## Acceptance evidence — 2026-09-22
+## Review and validation receipt
 
-Observable gate: genuine published CppCompile recipes now perform source-defined
-pre-execution option/path checks before returning their complete input-role sets.
-Original discovery cache versus fresh execution argv is discriminated in both
-directions at the unit boundary and over three actually published native recipes.
-Pre-execution ignored-system policy remains distinct from post-dotd strict policy.
-Warnings are returned only on success, explicitly Slug-native delivery.
+Production change is45 net lines plus7 test-hook lines in existing
+Configuration/Loading owners;
+focused tests remain in children, not the large configuration module. Authored
+Config/Loading/provider tests total943 lines, above350–600 estimate: nullable
+option/exec conversion, genuine caller authorization and full producer/consumer
+state restoration are distinct discriminators. The11 mandatory verbatim load
+bodies add2470 lines/100288 bytes, growing corpus54→65; all65 source hashes and
+lengths pass, and each new body is byte-identical to its release archive member.
+Independent review confirmed the complete Objc/FDO load closure is required,
+without admitting unused functions. No new repository or copied mutation.
 
-54 exact nonignored tests pass: BuildAPI32 (8 new preparation,5 dotd parser,
-7 reconciliation,7 construction/refusal,5 command) and Analysis22 (3 new
-preparation,3 dotd publication,16 protected command/context/cache). New public
-matrix covers12 C/C++ PIC/main/external/target/exec cases; same-DICE BUILD flags
-and configuration reject/restore, with whole-result equality and direct restored
-preparation. Authored cache-proof mutation occurs before registry observation;
-upstream source bodies stay unchanged. WP769 GC/Core/REAPI refusal and WP771
-Configuration/Commands evidence is reused for unchanged owners, not claimed as
-fresh full-suite proof.
+Validation uses pinned nightly2025-09-14, offline/locked serial Cargo JSON no-run,
+batched exact preflight and serial runtime selectors. Local detailed receipts:
+target/wp773/*.receipt.json and test logs. Corrections were limited to test
+setup: CanonicalLabel parse error conversion, genuine .bzl function provenance
+for bound method calls, DefaultInfo.files instead of unadmitted ctx.files,
+source-defined PIC action multiplicity, and platform-aware default exec mode.
+No production design contradiction or relaxed assertion; no REPLAN needed.
 
-Latest receipts under target/wp772: tests-1790043019986668259.receipt.json
-(BuildAPI32), tests-1790043004866891317.receipt.json (Analysis22).
-Selected successful tests total3.532s, maximum0.333s. Earlier receipt
-tests-1790042954084333876 has one pass then one fixture-only failure: empty
-options were incorrectly wrapped in an empty flag_group. Corrected the test
-factory to pass no group, preserving production constructor rejection; rebuilt,
-repreflighted and reran all32 tests. No unaccounted runtime failure.
+Final executed gates (all exit0, selected/pass counts identical):
 
-The initial compile was superseded by a source-backed SmallSet exact-match
-short-circuit for ignored dirs. Final BuildAPI no-run receipt is
-compile-slug_build_api_v2-3; Analysis compile-slug_analysis_v2-1 is unaffected by
-the cfg(test)-only fixture correction. Core check-slug_core_v2-1 passes17.339s
-and CLI check-slug_cli_v2-1 passes18.139s. All6 compile/check operations exited0,
-70.796s total,30.762s maximum, using pinned nightly/offline/locked Cargo JSON.
-Rust format, diff, archive and plan-status checks pass. Independent final ACCEPT
-covers the actual implementation, fixture correction,54 tests and Core/CLI gates.
+| Gate | Exact tests | Runtime | Receipt suffix |
+| --- | ---: | ---: | --- |
+| Configuration new6 + protected compile5 | 11 | 0.046s | tests-1790043798015596478 |
+| Loading new3 + protected fragments/outputs13 | 16 | 0.105s | tests-1790044195660172807 |
+| Commands raw minimum/stamp capture tables | 2 | 0.002s | tests-1790044221234214806 |
+| Analysis new producer3 + protected22 + constructor4 | 29 | 4.675s | tests-1790044541154357075 |
 
-Growth review:156-line production owner plus thin exports and same-owner helper
-visibility. New tests total574 lines (389 unit,185 configured), above the estimate
-because flag parsing, cache timing and genuine publication require distinct
-proofs; shared feature factories are reused through cfg(test)-only visibility.
-No feature-engine copy, retained owner or interner. Existing compact scratch
-utilities and shared handles suffice; no performance claim. Recorded interval
-begins02:01 UTC and acceptance is02:13 UTC (~12 minutes), excluding earlier
-source research. Concurrent review is not separately timed. All remaining
-discovery/execution/toolchain gates stay open.
+Total58 unique tests; new provider matrix covers6 producers/18 consumers/22
+compile recipes. Analysis command is cargo test -p slug_analysis_v2 --test
+starlark_rule --no-run; other owners use --lib, all add --offline --locked and
+--message-format=json. Runtime is exact binary --exact SELECTOR --nocapture,
+following v2_test_preflight.py; full selectors and commands are in receipts.
+Final compile times Configuration1.117s, Loading4.121s, Commands3.572s,
+Analysis6.376s. Core/CLI cargo check exit0 in7.626s/8.028s.
+Loading preparation attempts14.237s(exit101),31.672s,4.121s,4.121s; Analysis
+17.204s,1.467s,6.426s,6.376s. All preparation operations stayed below60s.
+Earlier runtime failures are retained alongside the passing receipts; they
+establish test-setup defects, not admitted semantic behavior.
 
-Successor research points to unchanged get_cc_toolchain_provider production,
-not another getter-only proof: genuine ctx/FDO subrule/configuration/Files must
-publish into the public compile consumer. Candidate projection prerequisites are
-minimum_os_version, is_tool_configuration and stamp_binaries; they do not alone
-admit the full cc_toolchain rule, whose allowlist PackageSpecificationInfo and
-currently unsupported TemplateVariableInfo envelope need separate accounting.
-The other required architectural decision remains tracked execution/discovered
-input identity and freshness under DICE, beyond attempt-local transport effects.
+Pinned CppConfigurationStarlarkTest31–45 nullable/arbitrary text and
+CompileBuildVariablesTest405+ minimum-OS propagation are exercised through the
+Rust configuration/projection and unchanged helper proof, without launching Java.
+Rustfmt, git diff --check, v2_archive_status.sh and v2_plan_status.py pass.
+No daemon, Bazel, compiler action, external runtime or remote service invoked.
+
+Independent design and final ACCEPT2026-09-22; final review inspected actual
+source and corrected evidence. Packet elapsed about18 minutes from02:18:43 UTC
+contract activation to02:36:41 acceptance record, plus prior bounded research.
+All compile attempts90.313s, checks15.654s, all recorded runtimes8.958s; final
+unique runtime4.828s. Review ran concurrently; separate review CPU time unavailable.
+Observable gate advanced: authentic no-profile toolchain provider construction
+and complete publication into public compile, not merely new getters. M7A stays
+partial and M8 unproved; full rule construction and discovery/execution remain open.

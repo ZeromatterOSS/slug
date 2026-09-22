@@ -93,6 +93,17 @@ impl StarlarkStructuralValue for CppFragmentValue {
 
 #[starlark_module]
 fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
+    fn minimum_os_version<'v>(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        // Public CppConfiguration method, unlike the private profile getters.
+        Ok(CppFragmentValue::optional(
+            this.retained.projection().minimum_os_version()?,
+            eval.heap(),
+        ))
+    }
+
     fn should_generate_dotd_files(
         this: &CppFragmentValue,
         eval: &mut Evaluator<'_, '_, '_>,
@@ -355,6 +366,10 @@ mod cc_feature_tests;
 #[cfg(test)]
 #[path = "analysis_fragments/compile_input_tests.rs"]
 mod compile_input_tests;
+
+#[cfg(test)]
+#[path = "analysis_fragments/toolchain_provider_tests.rs"]
+mod toolchain_provider_tests;
 
 /// Bazel's public coverage fragment contains no caller restriction. The
 /// optional canonical label is the complete configured projection.

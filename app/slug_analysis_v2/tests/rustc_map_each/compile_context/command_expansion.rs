@@ -4,7 +4,12 @@ use slug_configuration_v2::CanonicalStringMap;
 
 use super::*;
 
-fn expected(spec: &CppCompileSpec, main: bool, exec: bool, user: &[&str]) -> Vec<String> {
+pub(super) fn expected(
+    spec: &CppCompileSpec,
+    main: bool,
+    exec: bool,
+    user: &[&str],
+) -> Vec<String> {
     // legacy_features: dependency, random seed, PIC, defines, include paths;
     // get_features_to_appear_last: user flags, sysroot, compiler input/output.
     // get_copts adds host -g0 once for C and twice for C++ in exec configs.

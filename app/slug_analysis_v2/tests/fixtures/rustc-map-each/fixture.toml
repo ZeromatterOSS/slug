@@ -7,7 +7,11 @@ oracle_notes = "Focused source regression, not full rust_library or CLI equivale
 [provenance]
 bazel_release = "9.2.0"
 bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+toolchain_helper_archive_sha256 = "283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a"
+toolchain_helper_notes = "WP773 adds 11 complete release members for get_cc_toolchain_provider and its authentic FDO subrule load closure. The caller supplies explicit inert attributes and real ctx/Files; this is not full cc_toolchain rule/allowlist/TemplateVariableInfo or compiler execution support. Archive member prefix is rules_cc-0.2.17/."
 source_anchors = [
+  "rules_cc 0.2.17 cc/private/rules_impl/cc_toolchain_provider_helper.bzl#get_cc_toolchain_provider",
+  "rules_cc 0.2.17 cc/private/rules_impl/fdo/fdo_context.bzl#create_fdo_context",
   "src/main/java/com/google/devtools/build/lib/analysis/ConfiguredTargetFactory.java#InputFile",
   "src/main/java/com/google/devtools/build/lib/cmdline/RepositoryName.java#getExecPath",
   "src/main/java/com/google/devtools/build/lib/actions/Artifact.java#getRunfilesPath",

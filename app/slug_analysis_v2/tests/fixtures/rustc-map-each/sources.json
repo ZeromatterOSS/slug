@@ -8,6 +8,61 @@
   },
   "sources": [
     {
+      "path": "rules_cc/cc/common/cc_helper.bzl",
+      "bytes": 47885,
+      "sha256": "22b11a7833958f11fb32ddf6406195e02ccef9dc635369a556cbafa4e933fdbe"
+    },
+    {
+      "path": "rules_cc/cc/common/visibility.bzl",
+      "bytes": 74,
+      "sha256": "141a3ee5bcbef22731f26bcbd157af45f36ed8fcffa853c8b930629e8cbee910"
+    },
+    {
+      "path": "rules_cc/cc/common/objc_info.bzl",
+      "bytes": 902,
+      "sha256": "7cf752dd9e0ae9acade941631faac1a4e0de488ffb1ad96d9e589d7ba04c3743"
+    },
+    {
+      "path": "rules_cc/cc/private/rules_impl/cc_toolchain_provider_helper.bzl",
+      "bytes": 12951,
+      "sha256": "92e52421866fb6fcba103159d17575480439aa0567d362937aca03aebb7372e3"
+    },
+    {
+      "path": "rules_cc/cc/private/rules_impl/objc_common.bzl",
+      "bytes": 9176,
+      "sha256": "ea3c91548de06987bcce37f4460f841126def30c21a4893c5198399e4ac85820"
+    },
+    {
+      "path": "rules_cc/cc/private/rules_impl/objc_compilation_context_info.bzl",
+      "bytes": 2810,
+      "sha256": "c3fbf2b937a709d5baf153b37fc11f4ac70a713c828244513b0615e57208ac47"
+    },
+    {
+      "path": "rules_cc/cc/private/rules_impl/fdo/fdo_context.bzl",
+      "bytes": 19294,
+      "sha256": "91b7b46c515b4773d5a241e699027212f679ab93160cc79218bd687eac51d5b7"
+    },
+    {
+      "path": "rules_cc/cc/private/rules_impl/fdo/fdo_prefetch_hints.bzl",
+      "bytes": 1495,
+      "sha256": "1e91a9c893e5a6c3e79512d867c2c0d1f7c8ea7d6bfb7594ecebaf44c20d8d12"
+    },
+    {
+      "path": "rules_cc/cc/private/rules_impl/fdo/fdo_profile.bzl",
+      "bytes": 2312,
+      "sha256": "282e3a3ffe61729d6eb2addca80c268d13e5f61af5b602c97d8cca0b0287b51c"
+    },
+    {
+      "path": "rules_cc/cc/private/rules_impl/fdo/memprof_profile.bzl",
+      "bytes": 1600,
+      "sha256": "f38b565dc59b0707e0015f5c732cd685b7e81b7387d328887932038b58b4b8e2"
+    },
+    {
+      "path": "rules_cc/cc/private/rules_impl/fdo/propeller_optimize.bzl",
+      "bytes": 1789,
+      "sha256": "cdd5ccc06650172917ced6e2c88ff1ec86a74d4f1bd0f9a853f8867299a9b1e8"
+    },
+    {
       "path": "bazel_skylib/lib/paths.bzl",
       "bytes": 10378,
       "sha256": "96cce43871d8228126a12ceff771351f9030b1e9d029f2185853aa6541766a83"

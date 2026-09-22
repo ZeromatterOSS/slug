@@ -25,6 +25,7 @@ impl CppFragmentProjection {
         configuration.validate_cpp_field_state()?;
         let projection = Self { configuration };
         projection.compilation_mode()?;
+        projection.minimum_os_version()?;
         projection.optional_text("cs_fdo_absolute_path")?;
         projection.optional_text("propeller_optimize_absolute_cc_profile")?;
         projection.optional_text("propeller_optimize_absolute_ld_profile")?;
@@ -65,6 +66,11 @@ impl CppFragmentProjection {
                 reason: "compilation_mode has an invalid retained value",
             }),
         }
+    }
+
+    /// CppOptions.minimum_os_version is nullable plain text, not a parsed version.
+    pub fn minimum_os_version(&self) -> Result<Option<&str>, SlugConfigurationError> {
+        self.configuration.cpp_text("minimum_os_version")
     }
 
     /// Label-backed `--fdo_optimize` state is intentionally not an absolute path.
