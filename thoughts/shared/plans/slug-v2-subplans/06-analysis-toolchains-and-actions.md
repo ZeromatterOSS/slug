@@ -303,6 +303,17 @@ The fixture authors only the helper's attribute envelope; full cc_toolchain
 attribute extraction, allowlist/TemplateVariableInfo envelope, runtime Solib,
 module maps, profile actions, %package include paths and execution stay deferred.
 
+WP774 projects genuine ctx.file/ctx.files from the already-prepared dependency
+DefaultInfo.files. An existing stable depset root owns mixed-order traversal and
+deduplication; runfiles and executable-only Files do not leak into this collection.
+Schema eligibility distinguishes absent optional labels, single-artifact inputs
+and nondependency attributes. Immutable captured structs/lists are ordinary
+publishable data, while retrieving them through an expired ctx remains forbidden.
+No new DICE owner, graph value kind, filesystem lookup or ordering engine exists.
+The authentic helper/compile proof now consumes both facades. Full cc_toolchain
+still requires genuine package-spec/template providers and implicit dependency
+construction, notably both build-info status transforms even when stamping is off.
+
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and
 publication preserve immutable cache seeds, parent aliases, raw binding types,

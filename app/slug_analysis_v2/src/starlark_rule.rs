@@ -140,6 +140,7 @@ use crate::result::ConfiguredActionOwnerContext;
 use crate::result::ConfiguredNodeResult;
 use crate::runfiles_support::complete_runfiles_support;
 
+mod attribute_files;
 mod cc_compile_action;
 mod cc_context;
 use cc_context::CcContextProjection;
@@ -189,6 +190,8 @@ struct AnalysisContextGen<V> {
     #[trace(unsafe_ignore)]
     dependencies: Arc<[AnalysisDependency]>,
     executables: Arc<[AnalysisExecutable]>,
+    attribute_file: FrozenValue,
+    attribute_files: FrozenValue,
     resolved_attributes: Arc<[ResolvedRuleAttribute]>,
     #[trace(unsafe_ignore)]
     predeclared_outputs: Arc<[PredeclaredOutput]>,
@@ -217,6 +220,8 @@ impl<'v> Freeze for AnalysisContext<'v> {
             package_path: self.package_path,
             dependencies: self.dependencies,
             executables: self.executables,
+            attribute_file: self.attribute_file,
+            attribute_files: self.attribute_files,
             resolved_attributes: self.resolved_attributes,
             predeclared_outputs: self.predeclared_outputs,
             build_setting_value: self
@@ -288,6 +293,8 @@ where
                 token: self.token.clone(),
                 executables: self.executables.clone(),
             })),
+            "file" => Some(self.attribute_file.to_value()),
+            "files" => Some(self.attribute_files.to_value()),
             "outputs" => Some(heap.alloc_simple(AnalysisOutputs {
                 token: self.token.clone(),
                 attributes: self.resolved_attributes.clone(),
@@ -2394,8 +2401,20 @@ pub(crate) fn evaluate_loaded_rule(
         target_package: package.runfiles_package().clone(),
         exec_groups: exec_groups.clone(),
     });
-    let (dependencies, executables, toolchain, prepared_exec_groups) = {
+    let (
+        dependencies,
+        executables,
+        attribute_file,
+        attribute_files,
+        toolchain,
+        prepared_exec_groups,
+    ) = {
         let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
+        let (attribute_file, attribute_files) = attribute_files::materialize(
+            implementation.schema(),
+            &dependencies,
+            &mut materializer,
+        )?;
         let executables = implementation
             .schema()
             .iter()
@@ -2439,7 +2458,14 @@ pub(crate) fn evaluate_loaded_rule(
             implementation.definition_source().clone(),
             &mut materializer,
         )?;
-        (dependencies, executables, toolchain, prepared_exec_groups)
+        (
+            dependencies,
+            executables,
+            attribute_file,
+            attribute_files,
+            toolchain,
+            prepared_exec_groups,
+        )
     };
     let prepared_subrules = {
         let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
@@ -2511,6 +2537,8 @@ pub(crate) fn evaluate_loaded_rule(
             package_path: package_path.to_owned(),
             dependencies,
             executables,
+            attribute_file,
+            attribute_files,
             resolved_attributes: resolved_attributes.clone(),
             predeclared_outputs: predeclared_outputs.clone(),
             build_setting_value,

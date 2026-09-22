@@ -1,188 +1,166 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-73-m7a-cc-toolchain-provider-r1
+Packet: WP-7-74-m7a-configured-attribute-files-r1
 Status: accepted
 
 ## Outcome and demand
 
-Invoke the unchanged rules_cc get_cc_toolchain_provider using genuine rule ctx,
-the authentic FDO subrule, configuration provider and File inputs; publish its
-complete CcToolchainInfo into a separate public compile consumer. Bundle the
-three missing configuration projections and their command/exec ownership.
-This replaces authored constructor arguments at the producer boundary, not the
-full cc_toolchain rule envelope or real compiler execution.
-WP772 at2a097c1b1 accepts pure compile input preparation with54 tests and Core/CLI
-checks; its full receipt/contract remains in Git. M7A remains partial, M8 unproved.
+Provide genuine configured-rule ctx.files and ctx.file projections from prepared
+dependency DefaultInfo Files: stable order/dedup, single-artifact schema eligibility,
+immutable lists and lifecycle enforcement. Consume them in the authentic toolchain
+helper and public compile proof, replacing manual DefaultInfo traversal.
+WP773 at2be82ece2 accepts authentic no-profile provider construction with58 tests
+and Core/CLI checks; receipt remains in Git. M7A partial, M8 unproved.
 
-## Compatibility and source
+Unchanged rules_cc0.2.17 cc/private/rules_impl/cc_toolchain.bzl69–75,96–119
+demands these projections. Full rule also needs PackageSpecificationInfo,
+TemplateVariableInfo, embedded helper binaries and unconditional build-info
+translation. Pinned bazel_cc_build_info.bzl43–62 builds BOTH stamped and redacted
+groups regardless --stamp. Never replace these prerequisites with empty providers
+or default-None tools. This packet removes an attribute-file prerequisite only.
 
-Exact named slice: minimum_os_version nullable string method, public callable
-is_tool_configuration from semantic exec role, restricted stamp_binaries method,
-command conversion/defaults, exec resets, and unchanged default no-profile/
-no-runtime/no-module-map provider helper including opt/default exec configurations.
-Slug-native: structural configuration/artifact/path identity, valid Unicode and
-diagnostics. Full rule attribute extraction/allowlist/TemplateVariableInfo,
-runtime Solib, module maps, profile actions, %package include paths and execution
-remain unsupported/deferred, not silently substituted.
+## Compatibility and sources
 
+Exact admitted dependency kinds: label, label_list and already-supported
+label-bearing dictionaries. ctx.files contains DefaultInfo.files only, not
+runfiles or executable-only Files. Stable nested-set traversal uses the native
+stored graph order and first structural artifact occurrence, not concatenated
+child to_list results. A topological child[a,b] under stable parent yields[b,a];
+adding preorder[a,c] and the repeated topological child yields[b,a,c]. Optional absent dependencies
+expose []; eligible allow_single_file labels expose File or None in ctx.file.
+Missing/nondependency/non-single names are absent, not empty fallbacks. Existing
+dependency type/provider/visibility validation remains unchanged; context
+construction additionally enforces SINGLE_ARTIFACT even when allow_single_file=False.
+Native first-phase NO_FILE validation skips cardinality, but context construction
+still calls getPrerequisiteArtifact. Present zero/multiple Files fail before
+implementation; only absent/filtered prerequisites yield None. ctx.attr remains
+a Target; ctx.executable remains separate.
+Outputs never enter these inputs. Lists are immutable. Check native reflection/
+field presence before claiming dir behavior.
+
+Slug-native: structural artifact/configuration/path identity and diagnostics.
+Deferred: full cc_toolchain, status transforms, package-spec/template providers,
+new transition kinds, filesystem discovery, execution and full cc_library.
 Pinned Bazel9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-CppOptions141–148, CppConfiguration345–353,
-BuildConfigurationValue668–676/747–753, CoreOptions349–356,
-FieldOptionDefinition327–340, Converters69–74,
-builtin_exec_platforms221–227/291–353.
-rules_cc0.2.17 release archive SHA256
-283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a:
-cc_toolchain_provider_helper170–305 (SHA256
-92e52421866fb6fcba103159d17575480439aa0567d362937aca03aebb7372e3);
-fdo/fdo_context23–268/430–473 (SHA256
-91b7b46c515b4773d5a241e699027212f679ab93160cc79218bd687eac51d5b7).
-Native source regressions plus authenticated unchanged producer/consumer proof
-suffice; no new Bazel/compiler/network invocation selected.
+StarlarkAttributesCollection.java383–443; PrerequisiteArtifacts.java39–71;
+PrerequisitesCollection.getPrerequisiteArtifact; StarlarkRuleContextTest file/
+runfiles callers2529–2589; native collection/context lifecycle. Adapt real
+attribute/File semantics from broad upstream tests without their unadmitted action
+families. Pinned-source regression suffices; no Bazel/compiler invocation selected.
+Ordering anchors: NestedSet.java193–198/228–237/497 and
+NestedSetBuilder.java190–198; singleton Directory admission follows
+PrerequisitesCollection.java259–269 (cardinality only, no regular-file predicate).
+The False discriminator follows StarlarkAttrModule.java433–442/127–134 and
+RuleContext.java1964–1969: preserve lower-phase validation, complete the previously
+missing context check. Prior single_false_multi analysis success was not full
+native context parity; its protected expectation must now reject. Independent
+source review requires this correction within the same owner and packet family.
 
-## Semantic ownership
+## Ownership, representation and lifecycle
 
-Existing full SlugConfiguration already retains minimum_os_version=Absent and
-stamp=false. Add typed command enum admissions only; all supplied values flow
-through existing immutable request/configuration/DICE equality and hashing.
-Minimum OS is plain text: empty, arbitrary and literal "null" remain strings,
-not parsed versions or absence. New projection uses existing cpp_text, not the
-profile-only populated-value rejection helper. Validate malformed retained types.
-Stamp uses existing CoreOptions bool conversion, including no-form semantics.
-Both exec conversion paths reset minimum_os_version to Absent and stamp to false.
-is_tool_configuration projects exactly SlugConfigurationKind::Exec; the legacy
-raw native "is exec configuration" descriptor is not the active role owner.
+ConfiguredNodeAnalysisKey dependencies own resolved schema, selected target/exec
+dependency order, filtering and provider data. Project only these values in
+synchronous evaluation: no new DICE key/injection/lock, path lookup, provider owner
+or configuration token. Preserve actual roots/owners and structural equality.
+Use existing AnalysisDepset stable merge, not a second flatten/order engine.
 
-Loading facades borrow/share existing immutable configuration. minimum_os_version
-and is_tool_configuration are unrestricted callable methods; stamp_binaries checks
-the current caller's default allowlist using existing source-provenance machinery.
-No forged struct, trusted-looking receiver or helper handle bypasses that gate.
-No new retained value, DICE key/lock, interner, side cache, filesystem observation
-or independent configuration identity. No hashing/layout or performance change.
-
-## Producer proof and provenance
-
-Use the existing selected-registry compile_context workspace. Add only the11
-required complete rules_cc load bodies: common/cc_helper, common/visibility,
-common/objc_info, rules_impl/cc_toolchain_provider_helper, rules_impl/objc_common,
-rules_impl/objc_compilation_context_info and fdo/{fdo_context,fdo_prefetch_hints,
-fdo_profile,memprof_profile,propeller_optimize}. All are verbatim authenticated
-release members with sources.json/fixture.toml provenance. Review full import
-closure and growth; no copied mutations, stripped body or profile-subrule shim.
-
-Authored caller lives in cc/private/rules_impl to respect private visibility,
-declares fragments=[cpp] and subrules=[create_fdo_context], supplies an explicit
-attributes struct with genuine config info, File depsets and OutputGroupInfo.
-All seven required tool names are supplied, not the old three-tool fixture.
-No-profile fastbuild and opt/default-exec call authentic FDO; no FDO actions.
-Default exec proof uses the production platform-aware transition and asserts opt
-mode explicitly; the role-only to_exec conversion does not imply opt. Exact PIC
-action order is [PIC] in fastbuild and [PIC, non-PIC] in opt for the PIC consumer;
-other consumers emit [non-PIC]. Every action receives complete downstream checks.
-No runtime/module-map inputs. Assert tool/include/sysroot/build-variable producer
-semantics and complete downstream provider/recipe identity. Actual published
-public compile must expand argv, prepare inputs and preserve execution refusals.
+Collection construction is evaluator scratch; plain immutable struct/list values
+use existing frozen heap/materializer ownership. No new retained kind. Reuse
+Buck2-derived SmallMap/CompactString/Arc/Allocative and existing dense depsets,
+without donor import/interner/cache/performance claim. Inherit Stage9 configured
+exec dependency utility decision20bbe8661 (evaluator-local ctx.executable).
+Published structs/File/list data use existing AnalysisValue. Native
+StarlarkRuleContext701–710 guards retrieval through ctx, while the captured
+StarlarkAttributesCollection fileObject/filesObject are ordinary StructImpl data
+(constructor69–99). Do not add a capability token to captured immutable data:
+they may survive/publish after context teardown. Only further ctx access fails.
+Success/error teardown, freeze/GC and forwarding preserve these distinct lifetimes.
 
 ## Scope and routing
 
-Base2a097c1b1; branch codex/wp773-cc-toolchain-provider-review.
-Independent design ACCEPT2026-09-22 before implementation and final actual-diff/evidence
-review before atomic integration. Config worker owns:
-app/slug_configuration_v2/src/command.rs, native/configuration.rs,
-native/cpp_fragment.rs and focused native/configuration/toolchain_provider_tests.rs
-plus module hook. Root owns Loading analysis_fragments.rs and focused child
-toolchain_provider_tests.rs; cc_compile_outputs/configuration.rs and child tests;
-Commands common.rs test table rows only. No production Analysis/Core/REAPI edits.
-Fixture worker owns Analysis tests/rustc_map_each/compile_context/provider.rs
-and provider.bzl, parent hook, sources.rs, the11 listed fixture bodies and
-sources.json/fixture.toml. Existing test factory visibility changes only if needed
-for sibling reuse. Root docs Stage6/bootstrap/canonical/current; other owner docs
-only if the implemented gate changes their architecture.
+Base2be82ece2; branch codex/wp774-ctx-file-projections-review. Independent design
+ACCEPT2026-09-22 before source edits; final actual-diff/evidence review before integration.
+Production worker: app/slug_analysis_v2/src/starlark_rule.rs, new child
+starlark_rule/attribute_files.rs and local tests; context_lifecycle_tests.rs.
+Mechanical AnalysisContext struct-literal updates in existing test children only
+if required. No DICE/BuildAPI/Loading or dependency representation changes without
+root design reassessment.
+Test worker: new tests/attribute_files.rs (or child directory), tests/starlark_rule.rs
+module hook and existing FILE_ADMISSIBILITY fixture/expectations for the newly
+reached False-flag context phase. Root also repairs its stale no-Host precondition:
+base2be82ece2 already supplies action Host facts in test_configuration. Explicitly
+omit those facts for the suffix-policy negative, retaining the required conversion
+path flavor and original analysis error. ANY/NO_FILE positives use populated Host:
+they skip suffix validation but now reach downstream execution-OS fallback.
+No configuration or dependency validation production change.
+The protected exec/executable test also isolates its deliberate cold/warm graph:
+its preceding dependency check already warms :ok now that typed/default fixtures
+share structural Host inputs. Both evaluated and reused assertions remain.
+Root: rustc_map_each/compile_context/provider.bzl and provider.rs
+consume both genuine facades; Stage6/bootstrap docs and scheduling.
+Estimate100–250 production and250–500 test lines. New logic belongs in a child,
+not the large starlark_rule root; parent adds wiring only. No new upstream bodies.
 
-Estimate80–180 production and350–600 authored test lines, excluding necessary
-verbatim import closure. Central files get only cohesive methods/enum/reset hooks;
-focused tests live in children. Growth is a review trigger, not an automatic stop.
-Existing shared configuration/AnalysisValue/Variables/provider owners suffice.
-No donor utility or representation change; inherited Stage9 WP763/764 applies.
+## Evidence and validation
 
-## Validation and stops
+Real configured rules cover source/generated/Directory Files, target/exec owners,
+absence versus missing/ineligible names, distinct ctx.attr/ctx.executable, no
+runfiles leakage, label-bearing kinds, diamond depsets, stable order/dedup.
+Invalid single-file cardinality fails before effects; mutation fails. Published
+File/list data survives same-DICE input/metadata/config changes, A/B/A and missing/
+recreate without fresh graphs. Expired ctx access fails on success/error; captured
+immutable file structs/lists/Files remain usable and publish normally. Protect
+public compile/dependency/exec tests.
 
-Required discriminators:
-- defaults, empty/literal-null/arbitrary minimum OS, malformed retained types,
-  stamp boolean aliases/no-form, full structural distinction/restoration;
-  both exec paths erase target minimum OS/stamp, explicit Exec role only.
-- public methods callable in ordinary provenance, stamp denied there but allowed
-  from authenticated rules_cc source; genuine values, no untracked constants.
-- actual helper producer in main/external target/exec, fastbuild/opt with no-profile
-  FDO; complete output consumed by public compile and immutable projections.
-- same-DICE producer File/metadata/configuration A/B/A, missing/error/restoration,
-  source tool-path rejection and no partial provider/actions; unused full
-  configuration remains structural. No request-global repair or direct filesystem
-  resolver in production.
-- protected existing constructor/public compile/command/preparation/dotd/cache
-  and restriction proofs. Reuse unaffected evidence; do not claim full cc_toolchain.
+Root rebuilds pinned nightly Analysis --lib and --test starlark_rule separately
+with offline/locked Cargo JSON --no-run, exact batched preflight and serial tests.
+No parallel Cargo. Core/CLI checks, rustfmt, diff/archive/status checks.
+Preparation cap60s/operation; tests estimated a few seconds each, not a user hard
+deadline. Reuse unaffected evidence; broad suites only at appropriate checkpoint.
+REPLAN for new ownership/source contradiction/prerequisite outside this family;
+ordinary scoped invocation/test/implementation corrections remain here.
 
-Pinned nightly serial offline/locked Cargo JSON no-run for Configuration,
-Loading and Analysis; exact batched preflight/tests; Commands focused capture,
-Core/CLI checks; source hashes/closure, rustfmt, diff, archive and plan-status.
-Preparation60s/operation; small runtime selectors. These are operation estimates/
-caps, not a reinstated user hard12/15s ceiling. No daemon/Bazel/compiler action.
-REPLAN for unowned state, contradictory source, helper requiring a new semantic
-boundary beyond these projections, unauthenticated replacement or execution
-activation. Ordinary scoped corrections stay in this packet.
+## Acceptance evidence — 2026-09-22
 
-## Review and validation receipt
+Pinned nightly-2025-09-14 tools resolved with rustup; all Cargo commands serial,
+offline/locked, JSON --no-run for tests. Final relevant preparations exit0:
+Analysis lib1.217s, integration6.474s, Core check1.018s, CLI check1.268s.
+Exact nonignored preflights plus actual execution: **49 selected / 49 passed**.
+Library10/10 in0.097s: projection empty structs1, lifecycle success/error2,
+unchanged Cargo-runfiles3, compile-action4. Integration39/39 in5.022s: new
+projection4, authentic helper/provider/public-compile protected29, ordinary
+file/provider/select/exec dependency6. Final receipts under target/wp774:
+compile-slug_analysis_v2-5/-11, check-slug_core_v2-2, check-slug_cli_v2-2;
+tests-1790045731263117150 and tests-1790046260970971749.receipt.json.
+The latter records all exact selectors, commands, statuses and individual logs.
+No compiler action, Bazel/JVM, daemon, network or CLI binary invocation.
 
-Production change is45 net lines plus7 test-hook lines in existing
-Configuration/Loading owners;
-focused tests remain in children, not the large configuration module. Authored
-Config/Loading/provider tests total943 lines, above350–600 estimate: nullable
-option/exec conversion, genuine caller authorization and full producer/consumer
-state restoration are distinct discriminators. The11 mandatory verbatim load
-bodies add2470 lines/100288 bytes, growing corpus54→65; all65 source hashes and
-lengths pass, and each new body is byte-identical to its release archive member.
-Independent review confirmed the complete Objc/FDO load closure is required,
-without admitting unused functions. No new repository or copied mutation.
+Discriminators cover all five label-bearing shapes, mixed depset child orders,
+diamond dedup, generated target/exec roots, singleton Directory, optional absence,
+False-flag absent/zero/one/multiple, pre-implementation rejection, immutable
+capture/forwarding, success/error expiry plus freeze/GC, same-DICE A/B/A source
+and configuration changes, and missing/recreate. Existing lower validator remains
+unchanged. Public helper consumes both real facades; no full-rule claim.
 
-Validation uses pinned nightly2025-09-14, offline/locked serial Cargo JSON no-run,
-batched exact preflight and serial runtime selectors. Local detailed receipts:
-target/wp773/*.receipt.json and test logs. Corrections were limited to test
-setup: CanonicalLabel parse error conversion, genuine .bzl function provenance
-for bound method calls, DefaultInfo.files instead of unadmitted ctx.files,
-source-defined PIC action multiplicity, and platform-aware default exec mode.
-No production design contradiction or relaxed assertion; no REPLAN needed.
+Corrections stayed within this owner: narrowed a leaf-only mutation, accepted the
+runtime's capitalized Immutable diagnostic, completed source-required False-flag
+context cardinality/presence, and repaired the two baseline-stale protected test
+preconditions described above. Missing conversion path flavor was an unsuccessful
+fixture attempt, rejected at construction; it is not the retained action-Host
+boundary. Neither that assertion substitution nor production bypass was retained.
+All failures and superseded receipts remain local. Eleven successful compile
+attempts totaled75.651s; all runtime attempts20.397s. Implementation began02:44Z;
+final validation03:04Z and acceptance03:05Z (about21min, preceded by about6min prerequisite research).
+Independent design and source/correction reviews reused one reviewer; final
+actual-diff/evidence ACCEPT: ordering, presence/cardinality, retrieval-only
+lifecycle, fixture attribution and all49 tests checked. Review was interleaved
+with implementation/corrections, not separately timed. No REPLAN or speedup claim.
 
-Final executed gates (all exit0, selected/pass counts identical):
-
-| Gate | Exact tests | Runtime | Receipt suffix |
-| --- | ---: | ---: | --- |
-| Configuration new6 + protected compile5 | 11 | 0.046s | tests-1790043798015596478 |
-| Loading new3 + protected fragments/outputs13 | 16 | 0.105s | tests-1790044195660172807 |
-| Commands raw minimum/stamp capture tables | 2 | 0.002s | tests-1790044221234214806 |
-| Analysis new producer3 + protected22 + constructor4 | 29 | 4.675s | tests-1790044541154357075 |
-
-Total58 unique tests; new provider matrix covers6 producers/18 consumers/22
-compile recipes. Analysis command is cargo test -p slug_analysis_v2 --test
-starlark_rule --no-run; other owners use --lib, all add --offline --locked and
---message-format=json. Runtime is exact binary --exact SELECTOR --nocapture,
-following v2_test_preflight.py; full selectors and commands are in receipts.
-Final compile times Configuration1.117s, Loading4.121s, Commands3.572s,
-Analysis6.376s. Core/CLI cargo check exit0 in7.626s/8.028s.
-Loading preparation attempts14.237s(exit101),31.672s,4.121s,4.121s; Analysis
-17.204s,1.467s,6.426s,6.376s. All preparation operations stayed below60s.
-Earlier runtime failures are retained alongside the passing receipts; they
-establish test-setup defects, not admitted semantic behavior.
-
-Pinned CppConfigurationStarlarkTest31–45 nullable/arbitrary text and
-CompileBuildVariablesTest405+ minimum-OS propagation are exercised through the
-Rust configuration/projection and unchanged helper proof, without launching Java.
-Rustfmt, git diff --check, v2_archive_status.sh and v2_plan_status.py pass.
-No daemon, Bazel, compiler action, external runtime or remote service invoked.
-
-Independent design and final ACCEPT2026-09-22; final review inspected actual
-source and corrected evidence. Packet elapsed about18 minutes from02:18:43 UTC
-contract activation to02:36:41 acceptance record, plus prior bounded research.
-All compile attempts90.313s, checks15.654s, all recorded runtimes8.958s; final
-unique runtime4.828s. Review ran concurrently; separate review CPU time unavailable.
-Observable gate advanced: authentic no-profile toolchain provider construction
-and complete publication into public compile, not merely new getters. M7A stays
-partial and M8 unproved; full rule construction and discovery/execution remain open.
+Growth reviewed: production logic is a67-line child plus28 net parent wiring;
+the child also has36 test lines. New integration444 lines, lifecycle87 net,
+mechanical context literals14, existing fixture24 net: about605 test lines,
+above the initial500 estimate for distinct mixed-order, phase/cardinality and
+capture/GC discriminators. No new copied upstream bodies or external fixtures;
+WP773's unchanged source provenance remains authoritative. Existing depset and
+frozen-value owners avoid new retained representations or performance claims.
+Rustfmt, diff, archive and plan-status checks exit0.

@@ -361,6 +361,20 @@ fn proof(
         target_label: key.label().clone(),
         package_path: "pkg".into(),
         dependencies: Arc::from([]),
+        attribute_file: module
+            .frozen_heap()
+            .alloc(starlark::values::structs::AllocStruct(Vec::<(
+                &str,
+                FrozenValue,
+            )>::new(
+            ))),
+        attribute_files: module
+            .frozen_heap()
+            .alloc(starlark::values::structs::AllocStruct(Vec::<(
+                &str,
+                FrozenValue,
+            )>::new(
+            ))),
         executables: Arc::from([AnalysisExecutable {
             attribute: "data_runfiles".into(),
             executable: Some(fake),

@@ -424,7 +424,11 @@ the unchanged rules_cc provider helper and authentic no-profile FDO subrule,
 publishing into separate public compile consumers across main/external and
 fastbuild/opt/default exec. It does not yet prove full cc_toolchain attribute/
 allowlist/TemplateVariableInfo construction, runtime Solib, modules, profile
-actions or allocator execution. Generic command/
+actions or allocator execution. WP774 supplies genuine ctx.file/ctx.files from
+configured dependency DefaultInfo, consumed by that same helper/compile proof.
+The full rule's implicit cc_build_info produces both stamped and redacted groups
+regardless --stamp; status transforms and embedded helper dependencies cannot be
+replaced by empty providers to claim construction. Generic command/
 aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/
 path mapping and full cc_library remain deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside

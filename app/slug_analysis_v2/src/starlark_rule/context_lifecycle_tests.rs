@@ -77,6 +77,26 @@ fn check_rule_context_teardown(fail: bool) {
         Arc::from([]),
     );
     let token = evaluation.root_token();
+    let file = AnalysisValue::artifact(AnalysisArtifact::Source(
+        CanonicalLabel::parse("@@//pkg:input.h").unwrap(),
+    ));
+    let (attribute_file, attribute_files) = {
+        let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
+        (
+            materializer
+                .value(&AnalysisValue::strukt([
+                    ("input", file.clone()),
+                    ("optional", AnalysisValue::none()),
+                ]))
+                .unwrap(),
+            materializer
+                .value(&AnalysisValue::strukt([
+                    ("input", AnalysisValue::list(vec![file])),
+                    ("optional", AnalysisValue::list(Vec::new())),
+                ]))
+                .unwrap(),
+        )
+    };
     let ctx = module.heap().alloc(AnalysisContextGen {
         action_sink: sink,
         token: token.clone(),
@@ -92,6 +112,8 @@ fn check_rule_context_teardown(fail: bool) {
         package_path: "pkg".to_owned(),
         dependencies: Arc::from([]),
         executables: Arc::from([]),
+        attribute_file,
+        attribute_files,
         resolved_attributes: Arc::from([]),
         predeclared_outputs: Arc::from([]),
         build_setting_value: None,
@@ -106,7 +128,7 @@ fn check_rule_context_teardown(fail: bool) {
         AstModule::parse(
             "context.bzl",
             format!(
-                "def implementation(ctx):\n    saved.append(ctx.actions)\n    {}\nsaved = []\n",
+                "def implementation(ctx):\n    saved.append(ctx.actions)\n    captured.extend([ctx.file, ctx.files, ctx.files.input])\n    {}\ndef mutate():\n    captured[2].append(None)\nsaved = []\ncaptured = []\n",
                 if fail {
                     "fail('intentional failure')"
                 } else {
@@ -256,6 +278,8 @@ fn check_rule_context_teardown(fail: bool) {
     assert!(token.require_active("label", "rule context").is_err());
     assert!(ctx.get_attr("label", module.heap()).unwrap().is_none());
     assert!(ctx.get_attr("actions", module.heap()).unwrap().is_none());
+    assert!(ctx.get_attr("file", module.heap()).unwrap().is_none());
+    assert!(ctx.get_attr("files", module.heap()).unwrap().is_none());
     assert!(ctx.get_attr("bin_dir", module.heap()).unwrap().is_none());
     assert!(
         ctx.get_attr("genfiles_dir", module.heap())
@@ -276,6 +300,69 @@ fn check_rule_context_teardown(fail: bool) {
     // The old ctx remains the exact object, merely inactive; cleanup must not
     // replace or freeze it to make escaped accesses fail.
     assert!(module.get("original").unwrap().ptr_eq(ctx));
+
+    // Captured file collections are ordinary data, not expired capabilities.
+    let captured = module.get("captured").unwrap();
+    let values = ListRef::from_value(captured).unwrap();
+    let file = values.content()[0]
+        .get_attr("input", module.heap())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        AnalysisArtifactValue::from_starlark(file)
+            .unwrap()
+            .artifact(),
+        &AnalysisArtifact::Source(CanonicalLabel::parse("@@//pkg:input.h").unwrap())
+    );
+    assert!(
+        values.content()[0]
+            .get_attr("optional", module.heap())
+            .unwrap()
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        values.content()[1]
+            .get_attr("input", module.heap())
+            .unwrap()
+            .unwrap()
+            .ptr_eq(values.content()[2])
+    );
+    assert!(
+        eval.eval_function(module.get("mutate").unwrap(), &[], &[])
+            .is_err()
+    );
+    let retained = AnalysisValueLowerer::from_module(&module)
+        .lower(captured, "captured attribute files")
+        .unwrap();
+    drop(eval);
+    // Freeze the producer, then dispose it: the retained publication owns all
+    // Files independently, without retaining the inactive ctx or its token.
+    drop(module.freeze().unwrap());
+    let restored = Module::new();
+    let value = AnalysisValueMaterializer::new(restored.frozen_heap())
+        .value(&retained)
+        .unwrap();
+    restored.set("captured", value.to_value());
+    let frozen = restored.freeze().unwrap();
+    let mut gc = starlark::assert::Assert::new();
+    gc.disable_static_typechecking();
+    gc.module_add("retained", frozen);
+    gc.pass(
+        r#"
+load("retained", "captured")
+garbage_collect()
+assert_eq(type(captured[0]), "struct")
+assert_eq(type(captured[1]), "struct")
+assert_eq(captured[0].input, captured[1].input[0])
+assert_eq(captured[0].input.path, "pkg/input.h")
+assert_eq(captured[0].optional, None)
+assert_eq(captured[1].optional, [])
+assert_eq(captured[2], captured[1].input)
+assert_eq(dir(captured[0]), ["input", "optional"])
+assert_eq(dir(captured[1]), ["input", "optional"])
+"#,
+    );
 }
 
 #[test]

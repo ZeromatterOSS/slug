@@ -155,6 +155,7 @@ use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::path_observation_shards;
 use starlark_map::small_map::SmallMap;
 
+mod attribute_files;
 mod cc_configure_features;
 mod cc_feature_expansion;
 mod directory_args;
@@ -11523,6 +11524,8 @@ nonempty = rule(
 
 def _shape(ctx):
     if ctx.attr.source.label.name != "source.rs": fail("scalar source shape changed")
+    if not hasattr(ctx.file, "single_false") or ctx.file.single_false != ctx.attr.single_false[DefaultInfo].files.to_list()[0]:
+        fail("explicit allow_single_file=False lost SINGLE_ARTIFACT projection")
     if ctx.attr.generated_file.label.name != "generated.rs": fail("generated-file shape changed")
     if ctx.attr.generated_rule.label.name != "good": fail("generated-rule shape changed")
     if ctx.attr.mapped["m"].label.name != "source.rs": fail("string-keyed value changed")
@@ -11593,7 +11596,7 @@ shape(
     no_files_rule = ":multi",
     any_upper = "upper.RS",
     single = ":good",
-    single_false = ":multi",
+    single_false = ":good",
 )
 
 suffix(name = "source_ok", dep = "source.rs")
@@ -11656,7 +11659,6 @@ async fn ordinary_file_admissibility_covers_sources_outputs_platforms_and_dictio
         "nonempty_ok",
         "any_upper",
         "one_single",
-        "single_false_multi",
     ] {
         let result = analyze_request(
             &dice,
@@ -11670,6 +11672,10 @@ async fn ordinary_file_admissibility_covers_sources_outputs_platforms_and_dictio
     }
 
     for (target, expected) in [
+        (
+            "single_false_multi",
+            "ctx.file.dep requires exactly one File",
+        ),
         ("source_bad", "does not match its admitted file types"),
         ("skip_source_bad", "does not match its admitted file types"),
         ("strict_hidden_bad", "does not produce any file matching"),
@@ -11715,12 +11721,27 @@ async fn ordinary_file_admissibility_covers_sources_outputs_platforms_and_dictio
             .is_ok()
     );
 
-    let no_host = test_configuration();
+    // Preserve conversion inputs, but omit the retained action Host facts used
+    // by suffix validation; the shared configuration fixture now supplies both.
+    let no_host = ConfigurationKey::from_slug(
+        SlugConfiguration::default_target(
+            &HostConversionInputs::new(
+                Some(AutoCpuToken::K8),
+                Some(HostPathFlavor::Unix),
+                None,
+                Arc::from([]),
+                Arc::from([]),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+        .with_host_platform_label(&CanonicalLabel::parse("@@//.slug_test_host:host").unwrap()),
+    );
     for target in ["any_upper", "no_files_rule"] {
         let result = analyze_request(
             &dice,
             &workspace,
-            &key(target, no_host.clone()),
+            &key(target, test_configuration()),
             None,
             false,
         )
@@ -12582,6 +12603,9 @@ ok_rule(name = "ok")
         let _ = tracker.take();
     }
 
+    // The dependency checks above already analyze :ok in this configuration.
+    // Start the explicit cold/warm assertion from an independently cold graph.
+    let dice = Dice::builder().build(DetectCycles::Enabled);
     let tracker = Arc::new(RootActivationTracker::default());
     let ok = ConfiguredTargetKey::new(
         CanonicalLabel::parse("@@//:ok").unwrap(),

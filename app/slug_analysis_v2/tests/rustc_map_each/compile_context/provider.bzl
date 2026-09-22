@@ -21,8 +21,8 @@ def _impl(ctx):
         tool_paths = [tool_path(name = n, path = "bin/../bad" if ctx.attr.failure == "unnormalized" else "bin/" + n) for n in tools],
         make_variables = [make_variable(name = "CC_FLAGS", value = "--helper-legacy"), make_variable(name = "PRODUCER", value = ctx.attr.metadata)],
     )
-    files = depset(transitive = [target[DefaultInfo].files for target in ctx.attr.inputs])
-    libc = depset(transitive = [target[DefaultInfo].files for target in ctx.attr.libc])
+    files = depset(ctx.files.inputs)
+    libc = depset([ctx.file.libc])
     attributes = struct(
         cc_toolchain_config_info = info, cc_toolchain_label = ctx.label,
         runtime_solib_dir_base = "_solib_helper", libc_top_label = None,
@@ -49,6 +49,6 @@ def _impl(ctx):
 
 helper_subject = rule(implementation = _impl, fragments = ["cpp"], subrules = [create_fdo_context], attrs = {
     "inputs": attr.label_list(allow_files = True, default = ["@@//:header.h", "@@//:static.a"]),
-    "libc": attr.label_list(allow_files = True, default = ["@@//:include/stdc-predef.h"]),
+    "libc": attr.label(allow_single_file = True, default = "@@//:include/stdc-predef.h"),
     "metadata": attr.string(default = "A"), "failure": attr.string(),
 })
