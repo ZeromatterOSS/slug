@@ -351,6 +351,9 @@ fn proof(
         module.frozen_heap().alloc(AnalysisArtifactValue::new(fake))
     };
     let context = module.heap().alloc(AnalysisContextGen {
+        workspace_status: Arc::new(slug_build_api_v2::WorkspaceStatusArtifacts::new(
+            slug_workspace_v2::NormalizedAbsolutePath::new("/fixture/workspace").unwrap(),
+        )),
         cc_context: CcContextProjection::unconfigured(Arc::new(
             ConfiguredActionOwnerContext::unresolved_default(key.clone()).unwrap(),
         )),

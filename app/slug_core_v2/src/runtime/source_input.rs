@@ -100,7 +100,9 @@ impl SourceArtifactInputObservationKey {
                 workspace,
                 label: label.clone(),
             }),
-            AnalysisArtifact::Derived { .. } => Err(SourceArtifactInputError::NotSource),
+            AnalysisArtifact::Derived { .. } | AnalysisArtifact::WorkspaceStatus(_) => {
+                Err(SourceArtifactInputError::NotSource)
+            }
         }
     }
 }

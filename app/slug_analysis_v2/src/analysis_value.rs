@@ -1250,6 +1250,9 @@ mod cc_features_tests;
 mod template_variable_tests;
 
 #[cfg(test)]
+mod workspace_status_tests;
+
+#[cfg(test)]
 #[path = "analysis_value/cpp_compile_publication_tests.rs"]
 mod cpp_compile_publication_tests;
 

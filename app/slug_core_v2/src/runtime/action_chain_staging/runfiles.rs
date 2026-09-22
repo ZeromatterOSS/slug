@@ -70,6 +70,9 @@ impl PreparedActionChainInputs {
         declared: &paths::DeclaredOutputs<'_>,
     ) -> Result<String, Arc<str>> {
         match artifact {
+            AnalysisArtifact::WorkspaceStatus(_) => {
+                Err(error("workspace-status materialization is unsupported"))
+            }
             AnalysisArtifact::Source(label) => {
                 let source = self
                     .sources()

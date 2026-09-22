@@ -3,6 +3,36 @@ use std::fs;
 use super::*;
 
 #[test]
+fn workspace_status_descriptors_reject_before_source_staging() {
+    let pair = slug_build_api_v2::WorkspaceStatusArtifacts::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    for status in [pair.stable(), pair.volatile()] {
+        let spawn = SpawnSpec::new(
+            RetainedSpawnInvocation::Executable(SpawnExecutable::Artifact(
+                AnalysisArtifact::Source(CanonicalLabel::parse("@@//:tool").unwrap()),
+            )),
+            slug_build_api_v2::RetainedCommandLine::new(vec![]),
+            ArtifactInputs::new(vec![ArtifactInputSource::Direct(
+                AnalysisArtifact::WorkspaceStatus(status.clone()),
+            )]),
+            ArtifactInputs::new(vec![]),
+            vec![],
+            None,
+            Default::default(),
+            Default::default(),
+            "Spawn",
+            None::<String>,
+        );
+        assert!(
+            declared_sources(&spawn)
+                .unwrap_err()
+                .contains("source staging is not admitted")
+        );
+    }
+}
+
+#[test]
 fn build_only_observations_survive_the_narrow_source_certificate() {
     let observation = |name: &str| {
         (

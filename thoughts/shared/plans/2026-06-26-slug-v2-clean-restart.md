@@ -29,8 +29,13 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-76-m7a-template-variable-provider-r1
+Packet: WP-7-77-m7a-workspace-status-artifacts-r1
 Status: accepted
+
+WP777 accepts workspace-global status File descriptors and ctx getters,
+preserving full workspace/role identity, lifetime and constant-metadata policy.
+87 tests, CLI dependency check and independent design/final review pass.
+Execution stays closed; real status production and build-info transforms remain.
 
 WP776 accepts native TemplateVariableInfo with ordered snapshots, occurrence
 identity and complete semantic publication. Authentic make-variable helpers feed

@@ -20,3 +20,4 @@ tonic = { workspace = true, features = ["transport"] }
 serde_json = { workspace = true }
 slug_configuration_v2 = { workspace = true }
 slug_identity_v2 = { workspace = true }
+slug_workspace_v2 = { workspace = true }

@@ -187,8 +187,12 @@ fn plan_roots<'a>(
             .ok_or_else(|| "shared action representative is absent".into())
     };
     let producer = |artifact: &AnalysisArtifact| -> Result<Option<Coordinate>, Arc<str>> {
-        let AnalysisArtifact::Derived { owner, output } = artifact else {
-            return Ok(None);
+        let (owner, output) = match artifact {
+            AnalysisArtifact::Source(_) => return Ok(None),
+            AnalysisArtifact::WorkspaceStatus(_) => {
+                return Err("workspace-status execution is unsupported".into());
+            }
+            AnalysisArtifact::Derived { owner, output } => (owner, output),
         };
         if !matches!(
             output.kind(),

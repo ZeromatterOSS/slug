@@ -98,6 +98,9 @@ fn check_rule_context_teardown(fail: bool) {
         )
     };
     let ctx = module.heap().alloc(AnalysisContextGen {
+        workspace_status: Arc::new(slug_build_api_v2::WorkspaceStatusArtifacts::new(
+            slug_workspace_v2::NormalizedAbsolutePath::new("/fixture/workspace").unwrap(),
+        )),
         action_sink: sink,
         token: token.clone(),
         retained_owner: key.artifact_owner(),
@@ -128,7 +131,7 @@ fn check_rule_context_teardown(fail: bool) {
         AstModule::parse(
             "context.bzl",
             format!(
-                "def implementation(ctx):\n    saved.append(ctx.actions)\n    captured.extend([ctx.file, ctx.files, ctx.files.input])\n    {}\ndef mutate():\n    captured[2].append(None)\nsaved = []\ncaptured = []\n",
+                "def implementation(ctx):\n    saved.append(ctx.actions)\n    captured.extend([ctx.file, ctx.files, ctx.files.input, ctx.info_file, ctx.version_file])\n    {}\ndef mutate():\n    captured[2].append(None)\nsaved = []\ncaptured = []\n",
                 if fail {
                     "fail('intentional failure')"
                 } else {
@@ -248,12 +251,25 @@ fn check_rule_context_teardown(fail: bool) {
     );
     let bin = ctx.get_attr("bin_dir", module.heap()).unwrap().unwrap();
     assert!(slug_loading_v2::artifact_root_value(bin).is_some());
+    for field in ["info_file", "version_file"] {
+        let file = ctx.get_attr(field, module.heap()).unwrap().unwrap();
+        assert!(
+            eval.eval_function(file, &[], &[]).is_err(),
+            "File is not callable"
+        );
+    }
     let result = eval.eval_function(module.get("implementation").unwrap(), &[ctx], &[]);
     assert_eq!(result.is_err(), fail);
     if let Ok(label) = result {
         assert_eq!(label.to_str(), "@@//pkg:subject");
     }
     drop(guard);
+    for field in ["info_file", "version_file"] {
+        assert!(
+            ctx.get_attr(field, module.heap()).unwrap().is_none(),
+            "expired ctx retrieval must fail"
+        );
+    }
     let error = compile
         .prepare_cc_compile(&compile_request)
         .err()
@@ -361,6 +377,13 @@ assert_eq(captured[1].optional, [])
 assert_eq(captured[2], captured[1].input)
 assert_eq(dir(captured[0]), ["input", "optional"])
 assert_eq(dir(captured[1]), ["input", "optional"])
+assert_eq(captured[3].path, "bazel-out/stable-status.txt")
+assert_eq(captured[4].path, "bazel-out/volatile-status.txt")
+assert_eq(captured[3].owner, None)
+assert_eq(captured[4].owner, None)
+assert_eq(captured[3].root, captured[4].root)
+assert_eq(captured[3] == captured[4], False)
+assert_eq(len({captured[3]: 1, captured[4]: 2}), 2)
 "#,
     );
 }

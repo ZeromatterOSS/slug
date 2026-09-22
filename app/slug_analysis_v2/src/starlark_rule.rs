@@ -185,6 +185,8 @@ struct AnalysisContextGen<V> {
     #[trace(unsafe_ignore)]
     output_root: DerivedArtifactRoot,
     #[trace(unsafe_ignore)]
+    workspace_status: Arc<slug_build_api_v2::WorkspaceStatusArtifacts>,
+    #[trace(unsafe_ignore)]
     cc_context: CcContextProjection,
     target_label: slug_identity_v2::CanonicalLabel,
     package_path: String,
@@ -216,6 +218,7 @@ impl<'v> Freeze for AnalysisContext<'v> {
             token: self.token,
             retained_owner: self.retained_owner,
             output_root: self.output_root,
+            workspace_status: self.workspace_status,
             cc_context: self.cc_context,
             target_label: self.target_label,
             package_path: self.package_path,
@@ -256,6 +259,12 @@ where
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         self.token.require_active(attribute, "rule context").ok()?;
         match attribute {
+            "info_file" => Some(heap.alloc_simple(AnalysisArtifactValue::new(
+                AnalysisArtifact::WorkspaceStatus(self.workspace_status.stable().clone()),
+            ))),
+            "version_file" => Some(heap.alloc_simple(AnalysisArtifactValue::new(
+                AnalysisArtifact::WorkspaceStatus(self.workspace_status.volatile().clone()),
+            ))),
             "bin_dir" => Some(slug_loading_v2::alloc_artifact_root(
                 heap,
                 slug_build_api_v2::AnalysisArtifactRoot::Derived(self.output_root.clone()),
@@ -2074,7 +2083,9 @@ fn default_info_files<'v>(
     };
     for value in files.to_list() {
         match value.kind() {
-            AnalysisValueKind::Artifact(AnalysisArtifact::Source(_)) => {}
+            AnalysisValueKind::Artifact(
+                AnalysisArtifact::Source(_) | AnalysisArtifact::WorkspaceStatus(_),
+            ) => {}
             AnalysisValueKind::Artifact(AnalysisArtifact::Derived { output, .. })
                 if matches!(
                     output.kind(),
@@ -2226,6 +2237,7 @@ fn lower_default_info<'v>(
 
 pub(crate) fn evaluate_loaded_rule(
     package: &LoadedPackage,
+    workspace_status: Arc<slug_build_api_v2::WorkspaceStatusArtifacts>,
     target_name: &str,
     key: ConfiguredTargetKey,
     package_path: &str,
@@ -2390,7 +2402,9 @@ pub(crate) fn evaluate_loaded_rule(
                 AnalysisArtifact::Derived { output, .. } => {
                     (output.root_relative_path().to_owned(), output.kind())
                 }
-                AnalysisArtifact::Source(_) => unreachable!("predeclared outputs are derived"),
+                AnalysisArtifact::Source(_) | AnalysisArtifact::WorkspaceStatus(_) => {
+                    unreachable!("predeclared outputs are derived")
+                }
             })
             .collect(),
         ),
@@ -2530,6 +2544,7 @@ pub(crate) fn evaluate_loaded_rule(
         ));
         let context = module.heap().alloc(AnalysisContextGen {
             action_sink,
+            workspace_status,
             cc_context,
             token: analysis_context.root_token(),
             retained_owner: retained_owner.clone(),

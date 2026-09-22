@@ -3599,7 +3599,8 @@ impl BuildCommandEvaluation {
             .ok_or("run DefaultInfo has no executable")?;
         let executable = match executable_artifact {
             slug_build_api_v2::AnalysisArtifact::Derived { output, .. } => output.path(),
-            slug_build_api_v2::AnalysisArtifact::Source(_) => {
+            slug_build_api_v2::AnalysisArtifact::Source(_)
+            | slug_build_api_v2::AnalysisArtifact::WorkspaceStatus(_) => {
                 return Err("run DefaultInfo executable must be a generated File");
             }
         };

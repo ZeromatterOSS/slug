@@ -12,6 +12,20 @@ use slug_workspace_v2::ResolvedPathObservationKey;
 
 use super::*;
 
+#[test]
+fn workspace_status_is_not_an_observable_source() {
+    let pair = slug_build_api_v2::WorkspaceStatusArtifacts::new(path("/workspace"));
+    for status in [pair.stable(), pair.volatile()] {
+        assert_eq!(
+            SourceArtifactInputObservationKey::new(
+                path("/workspace"),
+                &AnalysisArtifact::WorkspaceStatus(status.clone()),
+            ),
+            Err(SourceArtifactInputError::NotSource),
+        );
+    }
+}
+
 fn path(text: &str) -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new(text).unwrap()
 }

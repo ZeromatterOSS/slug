@@ -752,7 +752,9 @@ impl AnalysisArtifactValue {
     ) -> Option<&ActionOutput> {
         match &self.artifact {
             AnalysisArtifact::Derived { owner, output } if owner == expected => Some(output),
-            AnalysisArtifact::Source(_) | AnalysisArtifact::Derived { .. } => None,
+            AnalysisArtifact::Source(_)
+            | AnalysisArtifact::Derived { .. }
+            | AnalysisArtifact::WorkspaceStatus(_) => None,
         }
     }
 
@@ -824,11 +826,19 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
                 self.artifact,
                 AnalysisArtifact::Source(_)
             ))),
+            "is_symlink" => Some(Value::new_bool(matches!(
+                &self.artifact,
+                AnalysisArtifact::Derived { output, .. } if output.kind() == slug_build_api_v2::ActionOutputKind::Symlink
+            ))),
+            "label" | "owner" if matches!(self.artifact, AnalysisArtifact::WorkspaceStatus(_)) => {
+                Some(Value::new_none())
+            }
             "label" | "owner" => Some(alloc_starlark_label(
                 heap,
                 match &self.artifact {
                     AnalysisArtifact::Source(label) => label.clone(),
                     AnalysisArtifact::Derived { owner, .. } => owner.label().clone(),
+                    AnalysisArtifact::WorkspaceStatus(_) => unreachable!("status owner is None"),
                 },
             )),
             _ => None,
@@ -842,6 +852,7 @@ impl<'v> StarlarkValue<'v> for AnalysisArtifactValue {
             "extension",
             "is_source",
             "is_directory",
+            "is_symlink",
             "label",
             "owner",
             "path",
@@ -1366,6 +1377,10 @@ pub(crate) fn actions_to_context<'v>(
 #[cfg(test)]
 #[path = "subrule_invocation/context_lifecycle_tests.rs"]
 mod context_lifecycle_tests;
+
+#[cfg(test)]
+#[path = "subrule_invocation/workspace_status_tests.rs"]
+mod workspace_status_tests;
 
 #[cfg(test)]
 mod native_solib_token_tests {

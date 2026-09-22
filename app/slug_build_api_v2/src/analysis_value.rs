@@ -342,6 +342,7 @@ impl From<AnalysisConfiguredTargetKey> for AnalysisTargetIdentity {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 pub enum AnalysisArtifact {
     Source(CanonicalLabel),
+    WorkspaceStatus(crate::WorkspaceStatusArtifact),
     Derived {
         owner: AnalysisConfiguredTargetKey,
         output: ActionOutput,
@@ -351,6 +352,9 @@ pub enum AnalysisArtifact {
 impl AnalysisArtifact {
     pub fn root(&self) -> crate::AnalysisArtifactRoot {
         match self {
+            Self::WorkspaceStatus(status) => {
+                crate::AnalysisArtifactRoot::WorkspaceStatus(status.root().clone())
+            }
             Self::Source(label) => {
                 crate::AnalysisArtifactRoot::Source(label.package().repo().clone())
             }
@@ -376,6 +380,7 @@ impl AnalysisArtifact {
     /// This is scratch; the canonical label or configured owner remains identity.
     pub fn path(&self) -> Cow<'_, str> {
         match self {
+            Self::WorkspaceStatus(status) => Cow::Borrowed(status.path()),
             Self::Source(label) => Self::source_path(label, "external"),
             Self::Derived { output, .. } => Cow::Borrowed(output.path()),
         }
@@ -384,6 +389,7 @@ impl AnalysisArtifact {
     /// Runfiles path relative to the main repository, independent of root bytes.
     pub fn short_path(&self) -> Cow<'_, str> {
         match self {
+            Self::WorkspaceStatus(status) => Cow::Borrowed(status.short_path()),
             Self::Source(label) => Self::source_path(label, ".."),
             Self::Derived { output, .. } => {
                 let relative = output.root_relative_path();

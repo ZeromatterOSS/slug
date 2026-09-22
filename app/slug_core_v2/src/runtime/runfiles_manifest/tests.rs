@@ -81,6 +81,18 @@ fn generated_targets_require_exact_owner_configuration_and_output_declaration() 
     let exec = key("producer", true);
     let node = producer(target.clone());
     let declared = paths::declared_outputs(std::iter::once(&node)).unwrap();
+    let statuses = slug_build_api_v2::WorkspaceStatusArtifacts::new(workspace.clone());
+    for status in [statuses.stable(), statuses.volatile()] {
+        assert!(
+            paths::generated_target(
+                &workspace,
+                &declared,
+                &AnalysisArtifact::WorkspaceStatus(status.clone()),
+            )
+            .unwrap_err()
+            .contains("requires a derived artifact")
+        );
+    }
     let good = artifact(&target, "out", ActionOutputKind::File);
     let expected = crate::runtime::configured_output_root(
         workspace.as_path(),

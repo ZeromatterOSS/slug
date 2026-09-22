@@ -23,6 +23,34 @@ use super::*;
 
 mod cpp_compile_tests;
 
+#[test]
+fn workspace_status_requires_a_real_producer_before_execution_planning() {
+    let pair = slug_build_api_v2::WorkspaceStatusArtifacts::new(
+        slug_workspace_v2::NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    for status in [pair.stable(), pair.volatile()] {
+        let status = AnalysisArtifact::WorkspaceStatus(status.clone());
+        let owner = key("owner", false);
+        let closure = ValidatedActionClosure::new(Arc::from([node(
+            owner.clone(),
+            vec![spawn(vec![status.clone()], vec![output("done")])],
+        )]))
+        .unwrap();
+        assert_eq!(
+            ActionPrerequisitePlan::new(&closure, &owner, 0)
+                .unwrap_err()
+                .as_ref(),
+            "workspace-status execution is unsupported",
+        );
+        assert_eq!(
+            plan_roots(&closure, PlanRoots::Artifacts(&[status]))
+                .unwrap_err()
+                .as_ref(),
+            "workspace-status execution is unsupported",
+        );
+    }
+}
+
 fn key(name: &str, exec: bool) -> ConfiguredTargetKey {
     let host = HostConversionInputs::new(
         Some(AutoCpuToken::K8),

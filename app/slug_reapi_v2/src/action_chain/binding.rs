@@ -73,7 +73,7 @@ impl Binding {
                             let input = targets.get(artifact).ok_or_else(|| {
                                 protocol("runfiles target has no exact declared input")
                             })?;
-                            Self::leaf(input, path, sources)
+                            Self::leaf(input.artifact(), input.producer(), path, sources)
                         }
                     }
                 })
@@ -85,18 +85,27 @@ impl Binding {
                 entries,
             });
         }
-        Self::leaf(input, input.artifact().path().into_owned(), sources)
+        Self::leaf(
+            input.artifact(),
+            input.producer(),
+            input.artifact().path().into_owned(),
+            sources,
+        )
     }
 
     fn leaf(
-        input: &PlannedActionInput,
+        artifact: &AnalysisArtifact,
+        producer: Option<usize>,
         path: String,
         sources: &HashMap<AnalysisArtifact, (usize, ReapiDigest)>,
     ) -> Result<Self, RemoteExecutionError> {
-        Ok(match input.artifact() {
+        Ok(match artifact {
+            AnalysisArtifact::WorkspaceStatus(_) => {
+                return Err(command_error("workspace-status execution is unsupported"));
+            }
             AnalysisArtifact::Source(_) => {
                 let (index, digest) = sources
-                    .get(input.artifact())
+                    .get(artifact)
                     .ok_or_else(|| protocol("unobserved chain source"))?;
                 Self::Source {
                     path,
@@ -112,8 +121,7 @@ impl Binding {
             {
                 Self::Generated {
                     path,
-                    producer: input
-                        .producer()
+                    producer: producer
                         .ok_or_else(|| protocol("generated input has no planned producer"))?,
                     output: output.clone(),
                 }

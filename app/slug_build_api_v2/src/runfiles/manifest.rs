@@ -18,6 +18,7 @@ use crate::RunfilesSupportActionSpec;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SourceManifestError<E> {
+    WorkspaceStatusUnsupported,
     Diagnostic(RunfilesLayoutDiagnostic),
     UnresolvedSymlink(AnalysisArtifact),
     InvalidTarget(AnalysisArtifact),
@@ -27,6 +28,12 @@ pub enum SourceManifestError<E> {
 impl<E: fmt::Display> fmt::Display for SourceManifestError<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::WorkspaceStatusUnsupported => {
+                write!(
+                    f,
+                    "workspace-status runfiles materialization is not admitted"
+                )
+            }
             Self::Diagnostic(diagnostic) => {
                 write!(f, "source manifest has invalid runfiles: {diagnostic:?}")
             }
@@ -47,6 +54,7 @@ impl<E: fmt::Debug + fmt::Display> std::error::Error for SourceManifestError<E> 
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RunfilesManifestError {
+    WorkspaceStatusUnsupported,
     NotRepositoryMappingAction,
     NonArtifactFile,
     InvalidRootSymlinkPath(CompactString),
@@ -55,6 +63,12 @@ pub enum RunfilesManifestError {
 impl fmt::Display for RunfilesManifestError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::WorkspaceStatusUnsupported => {
+                write!(
+                    f,
+                    "workspace-status runfiles materialization is not admitted"
+                )
+            }
             Self::NotRepositoryMappingAction => write!(
                 f,
                 "repository mapping manifest requires its retained action"
@@ -93,6 +107,12 @@ impl RunfilesLayout<'_> {
         }
         // Unsupported target kinds fail before any resolver callback.
         for entry in self.entries() {
+            if matches!(
+                entry.target(),
+                RunfilesLayoutTarget::Artifact(AnalysisArtifact::WorkspaceStatus(_))
+            ) {
+                return Err(SourceManifestError::WorkspaceStatusUnsupported);
+            }
             if let RunfilesLayoutTarget::Artifact(
                 artifact @ AnalysisArtifact::Derived { output, .. },
             ) = entry.target()
@@ -178,6 +198,9 @@ impl RunfilesSupportActionSpec {
                 return Err(RunfilesManifestError::NonArtifactFile);
             };
             let repo = match artifact {
+                AnalysisArtifact::WorkspaceStatus(_) => {
+                    return Err(RunfilesManifestError::WorkspaceStatusUnsupported);
+                }
                 AnalysisArtifact::Source(label) => label.package().repo(),
                 AnalysisArtifact::Derived { owner, .. } => owner.label().package().repo(),
             };

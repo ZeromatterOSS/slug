@@ -262,6 +262,7 @@ fn native_requested_forest_preserves_membership_and_shares_diamond_and_cooutputs
     );
     for (artifact, producer) in selection.artifacts().iter().zip(plan.artifact_producers()) {
         match artifact {
+            AnalysisArtifact::WorkspaceStatus(_) => panic!("fixture has no status artifacts"),
             AnalysisArtifact::Source(_) => assert_eq!(*producer, None),
             AnalysisArtifact::Derived { owner, output } => {
                 let action = plan.actions()[producer.unwrap()].action();

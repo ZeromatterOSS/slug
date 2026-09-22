@@ -3409,6 +3409,7 @@ dependencies = [
  "sha2",
  "slug_configuration_v2",
  "slug_identity_v2",
+ "slug_workspace_v2",
  "starlark_map",
 ]
 
@@ -3612,6 +3613,7 @@ dependencies = [
  "slug_core_v2",
  "slug_identity_v2",
  "slug_reapi_cache_v2",
+ "slug_workspace_v2",
  "tokio",
  "tonic",
 ]

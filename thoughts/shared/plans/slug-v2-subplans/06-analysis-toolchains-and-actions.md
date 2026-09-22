@@ -332,6 +332,17 @@ make-variable helpers feed genuine construction and Target lookup alongside the
 existing CcToolchainInfo proof; ctx.var merging/expansion and full cc_toolchain
 remain deferred.
 
+WP777 gives configured contexts genuine workspace-global info_file/version_file
+descriptors from one pure DICE key over NormalizedAbsolutePath. BuildAPI owns
+distinct status artifact/root provenance, stable versus constant metadata, and
+full workspace/role equality. Native File fields and DefaultInfo/provider
+publication preserve that identity across target/exec and repositories, freeze,
+GC and context teardown. Loading also supplies the general native is_symlink
+predicate. No status bytes or actions are synthesized; source staging, requested
+prerequisite planning, runfiles encoding, Cpp discovery and REAPI refuse status
+execution. Real tracked status production, volatile execution policy and build-info
+transforms remain prerequisites to the authentic full toolchain envelope.
+
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and
 publication preserve immutable cache seeds, parent aliases, raw binding types,

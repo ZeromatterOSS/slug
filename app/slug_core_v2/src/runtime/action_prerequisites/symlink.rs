@@ -47,6 +47,7 @@ pub(in crate::runtime) fn target<'a>(
             ..
         } if match input {
             AnalysisArtifact::Source(_) => true,
+            AnalysisArtifact::WorkspaceStatus(_) => false,
             AnalysisArtifact::Derived { output, .. } => output.kind() == ActionOutputKind::File,
         } =>
         {

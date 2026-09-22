@@ -260,6 +260,9 @@ fn derived_output<'a>(
             _ => "runfiles manifest has the wrong output kind",
         }),
         AnalysisArtifact::Source(_) => Err("runfiles support artifacts must be derived"),
+        AnalysisArtifact::WorkspaceStatus(_) => {
+            Err("runfiles support artifacts must be configured derived outputs")
+        }
     }
 }
 
@@ -269,5 +272,8 @@ fn derived_owner(
     match artifact {
         AnalysisArtifact::Derived { owner, .. } => Ok(owner),
         AnalysisArtifact::Source(_) => Err("runfiles support artifacts must be derived"),
+        AnalysisArtifact::WorkspaceStatus(_) => {
+            Err("runfiles support artifacts must be configured derived outputs")
+        }
     }
 }

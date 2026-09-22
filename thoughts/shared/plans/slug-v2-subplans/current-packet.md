@@ -1,146 +1,189 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-76-m7a-template-variable-provider-r1
+Packet: WP-7-77-m7a-workspace-status-artifacts-r1
 Status: accepted
 
-## Outcome and compatibility
+## Observable outcome and compatibility
 
-Admit genuine platform_common.TemplateVariableInfo construction, Target lookup,
-direct/nested publication and consumption of authentic rules_cc make-variable
-helper outputs. This removes one full cc_toolchain prerequisite; full rule
-construction, build-info status transforms, embedded helpers and execution remain
-deferred. Predecessor WP775 at833968c36 accepted PackageSpecificationInfo with73
-tests and Core/CLI/Query checks; its complete receipt remains in Git. M7A partial,
-M8 unproved.
+Give real configured rule contexts immutable ctx.info_file / ctx.version_file
+Files from one workspace-global DICE descriptor owner. Preserve status provenance,
+shared root, owner=None, stable/volatile identity and metadata policy through
+provider publication, target/exec and main/external contexts, freeze and GC.
+These are descriptors, NOT produced status bytes or registered rule-owned actions.
+They unblock the next native build-info transform registration owner.
 
-Exact: one required vars dict argument, positional or named; strict string keys
-and values, construction snapshot preserving input order; immutable provider,
-occurrence equality/hash, type TemplateVariableInfo, sole field variables,
-repr struct(variables = {...}). Each variables read returns a fresh mutable dict
-copy, including from frozen providers. Constructor is the native provider key.
-Aliases stay equal and distinct constructors stay unequal even for equal maps.
-Slug-native: structural publication/configuration identity and diagnostic text;
-raw Java identity-hash bytes and source-location diagnostic parity not claimed.
-Deferred: make-variable expansion/merging into ctx.var, full toolchain envelope,
-unrelated provider surfaces and execution. No placeholder provider or bypass.
+Exact NOOP-path File fields: root.path bazel-out; basename/short_path
+stable-status.txt or volatile-status.txt; path bazel-out/name; dirname bazel-out;
+extension txt; owner None; is_source/is_directory/is_symlink false. Stable is
+ordinary derived metadata, volatile constant metadata; the latter is retained
+internal policy, never a fabricated content digest. Live-ctx retrieval guards,
+immutable captured File lifetime and native structural equality/hash are admitted.
+The existing File facade also gains the pinned is_symlink predicate for source
+and configured Files (only declared Symlink outputs are true), not a status-only
+attribute. DefaultInfo.files may publish status descriptors without declaring
+them as rule-owned outputs or granting execution authority.
+Slug-native: workspace-scoped structural identity, diagnostics and output naming
+domain (matching these path strings does not claim Bazel configuration identity).
+Unsupported/deferred: actual workspace-status producer action/bytes, status command,
+host/user/time/environment observation, volatile refresh/cache policy, transform
+callbacks and template actions, bare-provider rule returns, installed module tools,
+full cc_toolchain and execution. Every executable/materialization route for status
+Files must reject explicitly; no fake Source label, per-rule FileWrite or empty
+status fallback. M7A partial; M8 unproved.
 
-## Source and ownership
+WP776 at614594c31 accepted native template providers with86 tests and Core/CLI
+checks; its complete receipt remains in Git. Authentic bazel_cc_build_info.bzl
+unconditionally registers stable/volatile transforms and redacted Symlink even
+under nostamp. Its callbacks and genuine global inputs cannot be replaced by
+eager/default content. This foundational owner is required before registration.
+
+## Source and natural owner
 
 Pinned Bazel9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-TemplateVariableInfo.java43–47,63–75; TemplateVariableInfoApi.java43–69;
-NativeInfo.java58–59,125–137; PlatformCommon.java43–45, BuiltinProvider.java94–96;
-Printer.java239–258 native repr escaping (the generic retained Rust formatter
-escapes Latin-1 differently, so this facade owns its bounded exact quoting).
-Mutable-copy chain Eval.java655–661, MethodDescriptor.java240–246/315,
-Starlark.java216–217, Dict.java456–490. Adapt TemplateVariableInfoTest.java34–149
-producer/forwarding/field tests; its make-variable expansion is a deferred phase.
-rules_cc0.2.17 cc_toolchain.bzl124–146 requires constructor136 after unchanged
-cc_helper make-variable477–515/CC_FLAGS791–812 helpers. Reuse authenticated WP773
-corpus; no new upstream bodies or Java probes.
+SkyframeExecutor.java1473–1496; BlazeDirectories.java223–233,257–258;
+WorkspaceStatusValue.java37–43,55–73; CachingAnalysisEnvironment.java349–364;
+StarlarkRuleContext.java995–1003; Artifact.java294–308,400–406,435–471,
+563–564,618–666,866–894,1251. Pinned stamping_test.sh32–46 supplies path
+regressions; StarlarkRuleContextTest.java4773–4822 supplies metadata distinction.
+execution_phase_tests.sh116–144 is deferred execution/cache evidence, not proved
+by descriptors. No new oracle corpus/body or Java probe required.
+General File.is_symlink is pinned to FileApi.java100–106 and retains source,
+regular File, Directory and declared Symlink discrimination. DICE's existing
+dependency/publication rules are inherited from docs/developers/dice.md; this
+key has no mutable dependencies or injected semantic value.
 
-BuildAPI owns TemplateVariableInfo as one Arc-owned immutable ordered SmallMap
-of CompactString pairs. Arc allocation is native occurrence identity: new always
-allocates, clone/Dupe shares. Native Eq/hash use occurrence only. Publication
-compares complete ordered entries plus a two-way occurrence mapping in existing
-PublicationEqState; same payload with different alias topology is not equivalent.
-Typed ProviderValue and AnalysisValue variants share the same handles through
-direct/nested roots; no generic structural-provider substitution.
-Loading owns constructor/facade and strict binder, fresh evaluator-local mutable
-dict copies. A zero-sized native constructor token replaces only the old generic
-TemplateVariableInfo token: type Provider, native function repr and stable key
-Eq/hash across repeated platform_common accesses. Other constructors are unchanged.
-Analysis only lowers/materializes typed handles and decodes returned
-providers. Existing configured-node/Bzl DICE dependencies own caching/invalidation,
-Need/errors and restoration. No DICE key, lock, counter, registry, interner, cache,
-filesystem discovery or evaluator borrow in retained values.
+BuildAPI owns WorkspaceStatusRoot over existing NormalizedAbsolutePath and
+WorkspaceStatusArtifact(kind Stable/Volatile), plus the immutable descriptor pair.
+Add distinct AnalysisArtifact and AnalysisArtifactRoot variants; do not relax
+configured DerivedArtifactRoot or ActionOutput invariants. Equality/hash includes
+normalized workspace and role, never displayed path alone or requesting config.
+Analysis WorkspaceStatusArtifactsKey is keyed only by normalized workspace and
+computes shared Arc<WorkspaceStatusArtifacts>. This pure descriptor computation
+does no IO, injection, clock/env read or status-content inference; no dependency
+can change these workspace-constant names/policies. Existing configured analysis
+computes that key before synchronous rule evaluation and retains its result.
+No locks, counters, global caches or alternate discovery paths. Future execution
+must add real tracked producer inputs separately; this key cannot certify bytes.
 
-Memory is DICE-retained immutable data; construction/dict copies/bijection maps
-are evaluation/comparison scratch. Existing publication cutoff, graph invalidation,
-cancellation and ownership release apply. Reuse Stage9 Arc/Dupe/CompactString/
-SmallMap/Allocative and occurrence-bijection dispositions (WP758/762/763/765),
-not donor semantic code. No performance or memory-reduction claim.
+Loading reuses the existing native File/root facades; owner/label are None, and
+status Files have no rule declaration authority. Analysis guards getter access
+with its existing context token, but captured values contain no token/heap borrow.
+Existing full artifact publication carries complete workspace/role semantics.
+DICE equality cutoff, cancellation, graph lifetime and Arc ownership bound release.
+No mutable retained state; string projections and validation walks are scratch.
+
+## Utility and dependency decision
+
+Reuse Arc/Dupe/Allocative and the existing normalized Arc<PathBuf> workspace
+primitive, preserving OS-native/non-Unicode identity. Explicitly add acyclic
+BuildAPI -> slug_workspace_v2 internal dependency (Cargo and Bazel metadata),
+rather than duplicate path normalization or weaken its type via opaque IDs.
+This brings an already-used lower DICE-linked crate into BuildAPI's dependency
+closure, but no new external dependency or DICE computation into BuildAPI.
+Stage9 existing shared workspace/observation and structural-artifact dispositions
+apply. No donor semantic code, performance or memory-reduction claim.
 
 ## Scope and routing
 
-Base833968c36; codex/wp776-template-variable-review. Independent design ACCEPT
-before production edits; actual-diff/evidence final review before integration.
-Worker1: app/slug_build_api_v2/src/template_variable_info.rs and child tests;
-lib.rs exports, analysis_value.rs closed variants/bijection, providers/mod.rs
-typed payload; app/slug_loading_v2/src/provider/template_variable_info.rs and
-child tests, provider.rs constructor/key dispatch, lib.rs exports. package.rs
-only if existing platform_common token wiring requires it.
-Worker2: app/slug_analysis_v2/src/analysis_value.rs typed lower/materialize;
-analysis_value/template_variable_tests.rs lifecycle tests; starlark_rule.rs
-returned-provider bridge; tests/rustc_map_each/compile_context/provider.bzl and
-provider.rs authentic helpers/native provider proof.
-Root: tests/template_variable.rs and tests/starlark_rule.rs module hook; Stage4/
-Stage6/bootstrap/Stage9 owner and scheduling documents. Parent production files
-are large: only closed dispatch/wiring there, semantics in cohesive child modules.
-Estimate250–450 production and350–650 test lines. Additional files or growth need
-root reassessment; no dependencies or copied fixture bodies planned.
+Base614594c31; codex/wp777-workspace-status-review. Independent design checkpoint
+before edits, actual-diff/evidence final review before acceptance.
+Worker1:
+- app/slug_build_api_v2/src/workspace_status.rs + child tests; lib.rs;
+  analysis_value.rs, artifact_root.rs; actions/runfiles_support.rs,
+  actions/cpp_compile/input_sets.rs, runfiles/manifest.rs narrowly reject status
+  at unadmitted consumer boundaries.
+- app/slug_build_api_v2/Cargo.toml and BUILD.bazel internal dependency;
+  root owns mechanical Cargo.lock update.
+- app/slug_loading_v2/src/subrule_invocation.rs File/root wiring and
+  subrule_invocation/workspace_status_tests.rs; artifact_root.rs.
+Worker2:
+- app/slug_analysis_v2/src/workspace_status.rs + child tests; lib.rs;
+  dice.rs compute/pass-through only; starlark_rule.rs context getter/field/freeze;
+  starlark_rule/context_lifecycle_tests.rs and cargo_runfiles_tests.rs context
+  initialization; analysis_value.rs test hook and
+  analysis_value/workspace_status_tests.rs.
+Root:
+- Analysis tests/workspace_status.rs and tests/starlark_rule.rs hook.
+- Core runtime/action_prerequisites.rs plus child tests,
+  action_prerequisites/symlink.rs, source_input.rs plus existing child tests,
+  source_staging/tests.rs pure descriptor refusal regression,
+  dice.rs narrow output-only branch, configured_output.rs,
+  runfiles_manifest.rs plus existing child tests,
+  action_chain_staging/runfiles.rs and symlink.rs;
+  REAPI action_chain/binding.rs explicit refusal and focused tests.
+- REAPI Cargo.toml dev-only workspace dependency for the direct no-RPC binding
+  rejection test; no new production dependency. Existing Bazel target does not
+  build library unit tests, so no production Bazel edge is added for this test.
+- Cargo.lock mechanical internal edge; Stage6/Stage9/bootstrap/scheduling.
+Any additional file requires root reassessment. Large parents receive only closed
+variant/wiring/refusal branches; new ownership is in children. Estimate350–650
+production and400–800 test lines, no copied fixture trees.
 
-## Acceptance and validation
+## Gates
 
-Cover constructor ABI/type negatives, empty/Unicode/order/reflection, native
-occurrence equality/hash in dictionary/depset, provider immutability versus fresh
-mutable dict reads, source-dict mutation snapshot, loading/frozen construction.
-Freeze/GC and source-heap disposal/rematerialization preserve direct/nested aliases
-and complete data, including aliases across native and user-provider roots.
-Same-DICE payload/order A/B/A and alias split/merge invalidate consumers; missing
-source/recreate restores through existing owners, not fresh graphs.
-Authentic unchanged make-variable helpers feed native construction and downstream
-Target indexing in existing main/external target/exec toolchain/compile proof.
+Prove descriptor sharing within one DICE across main/external, targets/configs and
+target/exec; different workspaces remain unequal despite equal paths; stable vs
+volatile and internal metadata differ; all public File/root projections and
+native dict/depset equality/hash; real provider forwarding and configuration A/B/A.
+Key repeat/normalized-path equivalence and separate workspace tests must use real
+DICE, not an injected pair. Lifecycle tests distinguish expired ctx retrieval
+from captured File survival, lower/rematerialize/source-heap disposal and GC.
+Refuse status as source input, executable action prerequisite, runfiles/source
+materialization, REAPI input, declared rule output and unsupported Cpp discovery
+input. Verify failures precede writes/RPCs; ordinary source/derived gates remain.
 
-Root serializes freshly resolved pinned nightly offline/locked Cargo JSON
---no-run BuildAPI/Loading/Analysis tests; exact batched nonignored preflight and
-actual counts. Protect WP775 native allowlist, helper/compile tests and existing
-native publication/lifecycle selectors; Core/CLI direct-dependent checks.
-Preparation60s/operation, small runtimes expected seconds (operation caps, not
-user deadlines). Rustfmt, diff/archive/plan-status checks. No daemon, Bazel/JVM,
-compiler action, CLI invocation or network required. REPLAN only if bounded
-ownership or pinned semantics contradict the contract; ordinary corrections stay
-inside the packet.
+Serial freshly-resolved pinned nightly offline/locked Cargo JSON no-run for
+BuildAPI/Loading/Analysis/Core and focused REAPI as needed, exact batched
+nonignored preflight plus actual counts. Protect accepted root/File/action-input
+and lifecycle tests, WP776 native/helper proof, and source/prerequisite/runfiles
+rejections. CLI direct-dependent check includes all exhaustive match consumers.
+No daemon/Bazel/compiler action/network required. Preparation60s/operation;
+runtimes expected seconds, not user deadlines. Rustfmt/diff/archive/status checks.
+REPLAN if descriptor identity requires actual mutable status inputs or retained
+lifetime/execution integrity cannot remain separate; ordinary scoped corrections
+are not REPLAN. Do not claim the real status producer or transform gate completed.
 
-## Acceptance evidence — 2026-09-22
+## Validation receipt
 
-Freshly resolved nightly-2025-09-14 tools; serial offline/locked Cargo JSON
---no-run builds, batched exact nonignored preflights and actual execution:
-86 selected /86 passed in5.832s aggregate. BuildAPI9 (0.009s), Loading10 (0.039s),
-Analysis library18 (0.114s), integration49 (5.670s). Receipts and exact commands
-under target/wp776: tests-1790048502948187022,1790048893466275492,
-1790048927080220404,1790048986139665072.receipt.json. Integration retains all47
-WP775 selectors plus two native template producer/forwarder/invalidation tests;
-the four existing helper tests now also prove genuine template construction.
+Independent design and final reviews ACCEPT. Final review completed04:18Z;
+packet branch started03:58:37Z (~20min elapsed, including overlapping review).
+Review wall time was not separately instrumented. No REPLAN required.
 
-Final no-run receipts: compile-slug_build_api_v2-1 exit0/3.225s;
-compile-slug_loading_v2-3 exit0/7.930s; compile-slug_analysis_v2-4
-exit0/13.084s (library+integration), then -5 exit0/6.327s (integration-only after
-test-only missing-source expectation correction). Core/CLI check1 exit0 in
-16.787s/17.441s. Nine compile attempts101.196s; both checks34.228s;
-all runtime attempts12.544s. Every preparation stayed below60s. No Bazel/JVM,
-daemon, compiler action, CLI invocation or network. Rustfmt, diff/archive/status
-checks pass. Review branch created03:34:57Z; source research preceded that point.
+2026-09-22, base614594c31. Freshly resolved nightly-2025-09-14; serial
+offline/locked Cargo JSON no-run, separate exact nonignored preflight and actual
+execution. All commands exit0 after the documented test-only corrections.
+87/87 final selected tests, summed runtime2.265s:
 
-Discriminators: ordered maps and direct/nested occurrence aliases, equal-map
-distinct construction and native hash/depset behavior, immutable input snapshots
-versus fresh mutable reads, exact type/key/field reflection, all constructor
-binding negatives; freeze/source-heap disposal/GC; same-DICE value/order and alias
-split/merge A/B/A, missing source Need and recreation. Genuine unchanged helper
-composition checks every ordered variable, global-over-additional collision,
-main/external paths and target/exec configuration, downstream lookup and metadata
-restoration. No new upstream copied body or semantic owner.
+| Owner | Selected / passed | Receipt under target/wp777 | Runtime |
+|---|---:|---|---:|
+| BuildAPI |16/16|tests-1790050141783457875.receipt.json|0.067s|
+| Loading |15/15|tests-1790050199954281106.receipt.json|0.061s|
+| Analysis library |7/7|tests-1790050246772747396.receipt.json|0.021s|
+| Analysis integration |18/18|tests-1790050510464319813.receipt.json|1.653s|
+| Core |27/27|tests-1790050385127411937.receipt.json|0.443s|
+| REAPI |4/4|tests-1790050448799197606.receipt.json|0.020s|
 
-Corrections preserve scope: test FreezeError formatting, Dupe import and explicit
-CompactString inference; local native repr quoting fixes a demonstrated generic
-runtime Latin-1 mismatch using Printer.java without altering that runtime.
-Main CROSSTOOLTOP expectation is source-derived '.' rather than empty. The
-same-DICE fixture uses ASCII identifiers to avoid conflating source representation
-with its order/alias proof; native/retention/GC tests retain Unicode coverage.
-Missing .bzl input asserts the existing harness's exact Need outcome rather than
-an invented path-bearing error. All affected evidence was refreshed; no failure
-waived. About320 net production lines in cohesive children/small wiring and775
-test lines; test growth exceeds650 estimate for independent native-key/reflection,
-cross-root/container aliases, GC and exact helper-map discriminators.
-Independent final actual-diff/correction/terminal-evidence review ACCEPT at
-03:51Z, about16min after review-branch creation. Initial research and interleaved
-reviews were not separately timed; no workflow speedup claim or REPLAN.
+Final no-run receipts: BuildAPI1 6.886s; Loading2 4.122s; Analysis2
+(library+integration)8.834s and3 (formatted integration)6.379s; Core2 31.128s;
+REAPI1 52.932s. CLI check1 exit0 20.145s includes Core, REAPI, Commands,
+Query and Server. Nine compile attempts totaled218.362s; no operation exceeded
+60s. Initial Analysis integration lacked an import; initial Core test fixture
+needed the new exhaustive variant. Loading test top-level conditions were moved
+inside functions before final replay. No production redesign or waived failure.
+The earlier integration14 replay is superseded by18, not counted twice.
+
+Source review and semantic tests cover every named gate: real DICE pointer
+sharing, full workspace/role identity including non-Unicode paths, public File
+fields/hash/depsets, main/external target/exec and config A/B/A, DefaultInfo
+forwarding, expired ctx versus captured File lifetime, heap disposal/freeze/GC,
+and refusal before source observation, execution, materialization or RPC.
+Protected genuine roots, template providers and unchanged toolchain helper
+construction/publication remain green. No oracle corpus growth, daemon, Bazel,
+compiler action, CLI invocation or network replay. Rustfmt, diff, archive and
+plan-status checks pass. Skill-guided Arc/Dupe/Allocative reuse adds no interner,
+cache, lock or evaluator borrow. No performance claim.
+
+Observable gate advanced: genuine workspace-global status descriptors in native
+ctx. Remaining: real tracked status producer/bytes, constant-metadata execution
+policy, authenticated transform callback ownership and template actions, bare
+provider returns and installed module tools. M7A remains partial; M8 unproved.

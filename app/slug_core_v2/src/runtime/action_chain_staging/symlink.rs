@@ -76,6 +76,9 @@ impl PreparedActionChainInputs {
             .prepare_artifact_symlink(action)?
             .ok_or_else(|| error("expected an artifact symlink action"))?;
         let path = match alias.input() {
+            AnalysisArtifact::WorkspaceStatus(_) => {
+                return Err(error("workspace-status materialization is unsupported"));
+            }
             AnalysisArtifact::Source(_) => self.target_path(alias.input(), &Default::default())?,
             AnalysisArtifact::Derived { owner, output } => {
                 let input = step

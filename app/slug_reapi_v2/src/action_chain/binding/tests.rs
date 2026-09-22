@@ -1,5 +1,28 @@
 use super::*;
 
+#[test]
+fn workspace_status_cannot_bind_as_source_or_generated_input() {
+    let pair = slug_build_api_v2::WorkspaceStatusArtifacts::new(
+        slug_workspace_v2::NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    for status in [pair.stable(), pair.volatile()] {
+        let artifact = AnalysisArtifact::WorkspaceStatus(status.clone());
+        // Even fabricated source observations and a producer ordinal cannot
+        // confer execution authority on a descriptor-only artifact.
+        let sources = HashMap::from([(artifact.clone(), (0, ReapiDigest::of_bytes(b"")))]);
+        for producer in [None, Some(0)] {
+            let error = Binding::leaf(&artifact, producer, artifact.path().into_owned(), &sources)
+                .err()
+                .expect("status input must fail before remote preparation");
+            assert!(
+                error
+                    .to_string()
+                    .contains("workspace-status execution is unsupported")
+            );
+        }
+    }
+}
+
 fn generated(path: &str, output: &str, kind: ActionOutputKind) -> Binding {
     Binding::Generated {
         path: crate::test_roots::path(path),

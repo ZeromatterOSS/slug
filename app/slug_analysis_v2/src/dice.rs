@@ -2216,6 +2216,7 @@ fn prepare_configured_attributes<T: ComputedAnalysis>(
 
 fn finish_analysis<T>(
     package: &LoadedPackage,
+    workspace_status: Arc<slug_build_api_v2::WorkspaceStatusArtifacts>,
     configured_target: &ConfiguredTargetKey,
     resolved_attributes: Vec<ResolvedRuleAttribute>,
     declared_dependency_keys: &[DeclaredDependencyKey],
@@ -2459,6 +2460,7 @@ where
     .map_err(AnalysisError::message)?;
     let value = evaluate_loaded_rule(
         package,
+        workspace_status,
         label.target().as_str(),
         configured_target.clone(),
         label.package().package().as_str(),
@@ -6455,8 +6457,20 @@ impl ConfiguredNodeAnalysisKey {
             return root_analysis_driver_complete(Err(error));
         }
 
+        let workspace_status = match ctx
+            .compute(&crate::WorkspaceStatusArtifactsKey(self.workspace.dupe()))
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => {
+                return root_analysis_driver_complete(Err(AnalysisError::message(format!(
+                    "computing workspace status descriptors through DICE: {error}"
+                ))));
+            }
+        };
         root_analysis_driver_complete(finish_analysis(
             package,
+            workspace_status,
             configured_target,
             resolved_attributes,
             &declared_dependency_keys,

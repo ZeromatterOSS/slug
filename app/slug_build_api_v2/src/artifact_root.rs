@@ -57,6 +57,7 @@ impl DerivedArtifactRoot {
 pub enum AnalysisArtifactRoot {
     Source(CanonicalRepoName),
     Derived(DerivedArtifactRoot),
+    WorkspaceStatus(crate::WorkspaceStatusRoot),
 }
 
 impl AnalysisArtifactRoot {
@@ -64,6 +65,7 @@ impl AnalysisArtifactRoot {
         match self {
             Self::Source(_) => "",
             Self::Derived(root) => root.path(),
+            Self::WorkspaceStatus(root) => root.path(),
         }
     }
 }

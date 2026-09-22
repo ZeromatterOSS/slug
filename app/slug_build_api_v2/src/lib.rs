@@ -21,6 +21,7 @@ pub mod providers;
 pub mod runfiles;
 pub mod runfiles_packages;
 pub mod template_variable_info;
+pub mod workspace_status;
 
 pub use actions::ActionError;
 pub use actions::ActionInput;
@@ -147,6 +148,10 @@ pub use runfiles_packages::RunfilesPackageDepset;
 pub use runfiles_packages::RunfilesPackageMetadata;
 pub use runfiles_packages::RunfilesRepositoryMapping;
 pub use template_variable_info::TemplateVariableInfo;
+pub use workspace_status::WorkspaceStatusArtifact;
+pub use workspace_status::WorkspaceStatusArtifactKind;
+pub use workspace_status::WorkspaceStatusArtifacts;
+pub use workspace_status::WorkspaceStatusRoot;
 
 mod cc_header_info;
 pub mod cc_toolchain_callable;

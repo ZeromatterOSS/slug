@@ -166,6 +166,7 @@ mod package_specification;
 mod rustc_map_each;
 mod template_variable;
 mod workspace_name;
+mod workspace_status;
 
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
 enum EventKind {

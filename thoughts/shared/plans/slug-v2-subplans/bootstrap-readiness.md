@@ -433,7 +433,11 @@ ordered values and occurrence aliases across configured dependencies. This does
 not admit ctx.var expansion or the full toolchain envelope. The full rule's
 implicit cc_build_info produces both stamped and redacted groups
 regardless --stamp; status transforms and embedded helper dependencies cannot be
-replaced by empty providers to claim construction. Generic command/
+replaced by empty providers to claim construction. WP777 now supplies genuine
+workspace-global status File descriptors through ctx.info_file/version_file,
+with workspace/role identity and constant-metadata policy. It does not produce
+status bytes or register/execute build-info transforms; all execution and
+materialization routes for these descriptors remain closed. Generic command/
 aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/
 path mapping and full cc_library remain deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and unmodeled builtin structures remain outside

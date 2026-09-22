@@ -63,6 +63,9 @@ impl RunfilesManifestInputs {
             .layout()
             .map_err(error)?
             .source_manifest_bytes(|artifact| match artifact {
+                AnalysisArtifact::WorkspaceStatus(_) => {
+                    Err(error("workspace-status materialization is unsupported"))
+                }
                 AnalysisArtifact::Source(label) => {
                     let source = sources.get(label).ok_or_else(|| {
                         error("runfiles source is absent from prepared observations")
@@ -196,6 +199,9 @@ impl RunfilesManifestPreparationKey {
             .chain(std::iter::once(&support.tree))
         {
             match artifact {
+                AnalysisArtifact::WorkspaceStatus(_) => {
+                    return Err(error("workspace-status materialization is unsupported"));
+                }
                 AnalysisArtifact::Source(_) => {
                     artifacts.insert(artifact.clone());
                 }

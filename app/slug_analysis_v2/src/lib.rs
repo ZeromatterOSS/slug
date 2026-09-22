@@ -27,6 +27,7 @@ pub mod starlark_rule;
 mod starlark_transition;
 mod subrule;
 pub mod toolchains;
+mod workspace_status;
 
 pub use command_configuration::CommandConfigurationPreparationKey;
 pub use command_configuration::CommandConfigurationPreparationObservationKey;
@@ -102,3 +103,4 @@ pub use toolchains::ToolchainResolutionError;
 pub use toolchains::ToolchainResolutionRequest;
 pub use toolchains::ToolchainTarget;
 pub use toolchains::ToolchainType;
+pub use workspace_status::WorkspaceStatusArtifactsKey;

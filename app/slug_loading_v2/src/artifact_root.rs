@@ -23,7 +23,9 @@ impl fmt::Display for ArtifactRootValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match &self.0 {
             AnalysisArtifactRoot::Source(_) => "<source root>",
-            AnalysisArtifactRoot::Derived(_) => "<derived root>",
+            AnalysisArtifactRoot::Derived(_) | AnalysisArtifactRoot::WorkspaceStatus(_) => {
+                "<derived root>"
+            }
         })
     }
 }

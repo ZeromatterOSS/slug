@@ -31,6 +31,9 @@ impl CppCompileInputSets {
 }
 
 pub(super) fn require_regular(artifact: &AnalysisArtifact) -> Result<(), String> {
+    if matches!(artifact, AnalysisArtifact::WorkspaceStatus(_)) {
+        return Err("CppCompile workspace-status inputs are not admitted".into());
+    }
     if let AnalysisArtifact::Derived { output, .. } = artifact {
         if output.kind() != ActionOutputKind::File {
             return Err(format!(
@@ -40,6 +43,20 @@ pub(super) fn require_regular(artifact: &AnalysisArtifact) -> Result<(), String>
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+#[test]
+fn workspace_status_cpp_discovery_input_is_rejected() {
+    let pair = crate::WorkspaceStatusArtifacts::new(
+        slug_workspace_v2::NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    for status in [pair.stable(), pair.volatile()] {
+        assert_eq!(
+            require_regular(&AnalysisArtifact::WorkspaceStatus(status.clone())).unwrap_err(),
+            "CppCompile workspace-status inputs are not admitted",
+        );
+    }
 }
 
 fn leaves(inputs: &ArtifactInputs) -> Result<SmallSet<AnalysisArtifact>, String> {

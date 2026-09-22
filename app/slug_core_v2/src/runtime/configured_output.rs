@@ -244,6 +244,7 @@ pub(crate) fn test_root() -> DerivedArtifactRoot {
 pub(crate) fn test_artifact_coordinate(artifact: &slug_build_api_v2::AnalysisArtifact) -> String {
     match artifact {
         slug_build_api_v2::AnalysisArtifact::Source(_) => artifact.path().into_owned(),
+        slug_build_api_v2::AnalysisArtifact::WorkspaceStatus(_) => artifact.path().into_owned(),
         slug_build_api_v2::AnalysisArtifact::Derived { output, .. } => {
             assert_eq!(
                 artifact.path(),
