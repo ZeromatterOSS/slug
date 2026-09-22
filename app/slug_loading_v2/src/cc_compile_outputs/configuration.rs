@@ -5,6 +5,11 @@ use std::fmt;
 use allocative::Allocative;
 use slug_configuration_v2::SlugConfiguration;
 use starlark::any::ProvidesStaticType;
+use starlark::environment::Methods;
+use starlark::environment::MethodsBuilder;
+use starlark::environment::MethodsStatic;
+use starlark::eval::Evaluator;
+use starlark::starlark_module;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
@@ -23,6 +28,10 @@ impl fmt::Display for ConfigurationValue {
 
 #[starlark_value(type = "configuration")]
 impl<'v> StarlarkValue<'v> for ConfigurationValue {
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(configuration_methods)
+    }
     fn get_attr(&self, name: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         match name {
             "coverage_enabled" => self.0.coverage_enabled().ok().map(Value::new_bool),
@@ -31,6 +40,23 @@ impl<'v> StarlarkValue<'v> for ConfigurationValue {
     }
     fn dir_attr(&self) -> Vec<String> {
         vec!["coverage_enabled".to_owned()]
+    }
+}
+
+#[starlark_module]
+fn configuration_methods(builder: &mut MethodsBuilder) {
+    fn is_sibling_repository_layout(
+        this: &ConfigurationValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        let _ = this;
+        crate::builtin_restriction::check_default_allowlist(
+            eval,
+            &crate::builtin_restriction::source_identities_for_evaluator(eval)?,
+        )?;
+        // Slug admits only the nonsibling layout. Bazel's switch belongs to
+        // Starlark semantics, not CoreOptions; no untracked true mode is exposed.
+        Ok(false)
     }
 }
 

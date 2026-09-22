@@ -20,6 +20,8 @@ use super::*;
 use crate::package::loading_globals;
 use crate::provider::BzlEvaluationContext;
 
+mod context_composition;
+
 // Authored capability sentinel only. Real ctx/sink lifetime and registration are
 // tested in Analysis; this isolates the native binder's Host/type gate ordering.
 #[derive(

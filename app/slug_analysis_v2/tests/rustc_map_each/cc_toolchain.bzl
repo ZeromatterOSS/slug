@@ -27,6 +27,7 @@ def _make(ctx):
         artifact_name_patterns = [artifact_name_pattern(category_name = "object_file", prefix = ctx.attr.object_prefix, extension = ctx.attr.object_extension)],
         features = [feature(name = "supports_pic"), feature(name = "static_link_cpp_runtimes"),
             feature(name = "parse_showincludes"), feature(name = "no_dotd_file"),
+            feature(name = "system_include_paths"), feature(name = "external_include_paths"),
             feature(name = "probe_env", enabled = True, env_sets = [env_set(actions = ["c++-link-executable"],
                 env_entries = [env_entry(key = "SYSROOT", value = "%{sysroot}")])])],
         tool_paths = [tool_path(name = n, path = "bin/" + n) for n in ["gcc", "ar", "strip"]])

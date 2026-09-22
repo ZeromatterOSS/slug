@@ -29,10 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-67-m7a-compile-output-declarations-r1
+Packet: WP-7-68-m7a-compile-context-composition-r1
 Status: accepted
 
-WP767 accepts paired compile-output prefix/declaration entrypoints for the
+WP768 accepts unchanged compilation-context initialization and public compile
+composition through the compiler-action frontier, using genuine layout/File-kind
+queries.37 focused tests and Core/CLI checks pass; independent final review ACCEPT.
+Discovery-aware CppCompile remains a later gate.
+WP767 at7016c3c29 accepts paired compile-output prefix/declaration entrypoints for the
 allocator regular-source path, with genuine configuration/location/owner checks.
 31 focused tests and Core/CLI checks pass; independent final review returns ACCEPT.
 Discovery-aware CppCompile remains a later gate.

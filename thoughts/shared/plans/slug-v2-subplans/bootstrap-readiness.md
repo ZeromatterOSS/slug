@@ -401,6 +401,12 @@ with genuine configuration, normalized package containment, distinct naming labe
 and active owner, and main/external target/exec publication/restoration. Existing
 toolchain naming remains independently protected; this is not full public compile()
 traversal or compiler execution. Other context/tree/action natives remain open.
+WP768 now proves unchanged compilation-context initialization for main/external
+target/exec owners and header-only public compile composition. A genuine regular
+.cc reaches the missing compiler-action constructor; this is the next action/
+discovery gate, not successful allocator compilation. Fixed nonsibling layout and
+genuine File-kind queries add no new retained identity. Virtual headers, modules
+and tree templates remain outside this proof.
 Compile action production, execution-time tree/path mapping and full cc_library remain
 deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside

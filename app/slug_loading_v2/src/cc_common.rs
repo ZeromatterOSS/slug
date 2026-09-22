@@ -80,6 +80,19 @@ impl<'v> StarlarkValue<'v> for CcInternalModule {
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn is_tree_artifact<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = pos)] artifact: Value<'v>,
+    ) -> anyhow::Result<bool> {
+        let artifact = crate::subrule_invocation::AnalysisArtifactValue::from_starlark(artifact)
+            .ok_or_else(|| anyhow::anyhow!("is_tree_artifact requires a File"))?;
+        Ok(matches!(
+            artifact.artifact(),
+            slug_build_api_v2::AnalysisArtifact::Derived { output, .. }
+                if output.kind() == slug_build_api_v2::ActionOutputKind::Directory
+        ))
+    }
+
     fn compute_output_name_prefix_dir<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = named)] configuration: Value<'v>,

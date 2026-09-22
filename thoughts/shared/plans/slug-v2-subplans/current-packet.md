@@ -1,141 +1,149 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-67-m7a-compile-output-declarations-r1
+Packet: WP-7-68-m7a-compile-context-composition-r1
 Status: accepted
 
-## Outcome and compatibility
+## Outcome and demand
 
-Admit paired native compile-output prefix/declaration entrypoints demanded by the
-allocator regular-source path. Genuine configured rules obtain regular derived
-Files at supplied-label _objs coordinates, owned by the active ctx and rooted in
-the validated supplied configuration. WP766 at0a1d7d943 accepted coherent roots,
-315 ordinary plus3 fresh NativeLink tests, CLI check and final ACCEPT; receipt in Git.
+Run the unchanged compilation-context initializer with genuine ctx/configuration,
+Files and feature/dependency contexts, then compose the public cc_common.compile
+entrypoint up to the real compiler-action boundary. The allocator regular-source
+path from the accepted Solib inventory requires this initializer before action
+creation: compile.bzl284–314, helper404, then compile1237/1243 and1691. No new
+upstream fixture body or oracle is needed; reuse the existing54-body corpus.
+Predecessor WP767 at7016c3c29 admits configured compile-output declarations;
+31 focused tests, Core/CLI and independent final ACCEPT. Its receipt is in Git.
 
-Exact admitted nonsibling/non-Windows path semantics: purpose suffix selection,
-normalized package-contained declaration, regular File kind, supplied-label versus
-active-owner distinction and argument types. Slug-native: full configuration/root/
-artifact identity, output tokens, observed Rust Host and diagnostics. Deferred:
-alternate-configuration roots, sibling/Windows paths, normalized final paths
-containing backslash or NUL (existing registry rejection), configuration-value provider
-publication, CppCompile/discovery, tree templates, extra compile natives and full
-cc_library/toolchain/Run/bootstrap. Never substitute ctx configuration silently.
+## Compatibility and ownership
 
-## Demand and pinned source
+Exact admitted surface: current-caller restricted configuration method
+is_sibling_repository_layout() for the supported nonsibling layout; genuine File
+is_tree_artifact classification; unchanged initializer include ordering/header/
+define/dependency relationships. Slug-native: fixed nonsibling layout policy,
+structural configuration/root/artifact identity, tokens, Rust Host and diagnostics.
+Sibling layout remains unsupported, not a missing CoreOptions default: Bazel's
+flag belongs to Starlark semantics. Expose false for Slug's existing fixed layout,
+with rejection evidence for the unadmitted flag; do not add a guessed native option
+or an untracked true mode. Preserve the source-sensitive default allowlist.
+
+ConfigurationValue keeps the complete immutable SlugConfiguration handle from
+WP767; add no retained field or identity. File classification reads existing
+AnalysisArtifact kind (Directory true, source/regular false), not a path suffix
+or duck-typed attribute. No new artifact/configuration facade, cache, interner,
+key, lock, filesystem read or semantic side store. Existing observed package/
+configuration dependencies and ConfiguredNodeAnalysisKey own initializer results;
+existing provider/HeaderInfo publication, equality cutoff and DICE lifetimes own
+retention. Read docs/developers/dice.md. All new collection work is test scratch;
+production representation and Stage9 WP766/WP767 dispositions are unchanged.
+
+Deferred: sibling/Windows layout, virtual-header rewriting, module-map generation,
+tree templates, DWO/LTO side outputs, whole compilation-output provider publication
+(its generic temps closure is not admitted), full production toolchain, CppCompile
+action/discovery/execution, Run and bootstrap. No no-op compiler action, fake source,
+test-only production export or rewritten upstream body. A missing-action diagnostic
+proves only the reached frontier; it does not prove compilation or action arguments.
+
+## Pinned source and proof
 
 Bazel9.2 source8220c6198837d5c13d53fea211cf3282aa12408a:
-CcStarlarkInternal.java557–576/994–1008; CppHelper.java69–72/85–93;
-AnalysisUtils.java147–154; RuleContext.java744–752;
-CachingAnalysisEnvironment.java239–266; PathFragment.java254–298;
-ArtifactFactory.java302–338; PackageIdentifier.java182–193.
-ObjcLibraryTest.java184–185/211–227 and CcCommonTest.java1597/1624 provide outcome
-themes; Java allocation assertions are not imported. No direct native-entrypoint
-test was found; use discriminating pinned-source regressions.
+BuildLanguageOptions.java373–393 and skyframe/config/BuildConfigurationFunction.java77–82
+own layout semantics; BuildConfigurationValue.java345–353/530–537 owns equality and
+restricted getter. CcStarlarkInternal.java545–552 and Artifact.java589–591/872–874
+own tree classification. StarlarkCcCommonTest.java5488–5534/5707–5715 provides include/
+dependency-define outcomes;6451–6481 covers tree-input themes, not template admission.
+The unchanged helper394–430/591–650 establishes ordinary/requested-system/external
+include branches and public versus implementation dependencies. Public wrapper
+cc/private/cc_common.bzl451–579 normalizes variables_extension; use it for full calls.
+CcStarlarkInternal.java702–758 and CppCompileAction.java512–516 explain why a real
+action/discovery owner, not generic Spawn, is the subsequent gate.
 
-Accepted Solib inventory identifies allocator cc_library target/exec owners.
-Its BUILD declares allocator_library.cc; cc_library.bzl56–79 calls compile with
-purpose "cc_library-compile". Existing unchanged54-body corpus compile.bzl1229
-computes the prefix; regular branches1554/1564 declare object/dotd outputs through
-private _get_compile_output_file2144–2151. This proves source demand, not new
-observed CppCompile rows. No new upstream body or oracle is needed.
+Required discriminators:
+- Loading native tests: source/derived regular/Directory types; positional-only
+  artifact binder (Param.java defaults named=false); named/forged/missing/extra
+  arguments rejected. Restricted layout method
+  has allowed, denied and missing-source contexts; preserve immutable coverage,
+  genuine receiver and unsupported configuration publication.
+- Genuine main/external target/exec configured initializer with nonempty public,
+  private and textual headers, normal and implementation dependencies; verify
+  include ordering/dedup, defines/local defines and dependency visibility. Exercise
+  ordinary, system-requested and external feature paths without virtual prefixes.
+- Publish full returned contexts/CcInfo to a configured consumer; same-DICE A/B/A
+  for source-defined metadata/dependency and configuration changes, including an
+  unused config input. Preserve hidden HeaderInfo structure, not just a string view.
+- Public header-only compile succeeds with genuine toolchain/headers; inspect
+  returned output fields locally and publish context/observations, not its closure.
+  The same public call with a regular .cc fails at missing create_cc_compile_action.
+  This is explicit prerequisite/frontier evidence, not allocator compile success.
+- Unadmitted sibling flag is rejected by actual option owners. Existing roots,
+  compile-inputs, toolchain, declarations and restricted-native tests stay protected.
 
-Required keyword String purpose: suffix _non_objc_arc maps to non_arc, otherwise
-_objc_arc to arc, otherwise empty. Java null/mnemonic fallback is unreachable from
-this binder; no Bazel mnemonic reproduction. Declaration joins output_name to
-[external/<repo>/]<package>/_objs/<label.name>, normalizes, then checks containment
-in the ACTIVE ctx package. Same-package other targets/descendant packages are
-valid; label equality is not required. Internal .. is allowed, package escape,
-absolute/remaining upward paths rejected. Preserve existing Host path constraints.
+## Scope, routing and validation
 
-## Owners and design checkpoint
+Independent design review ACCEPT on 2026-09-21 freezes this contract; final
+acceptance requires the actual implementation and all named proofs below.
 
-Loading owns thin native dispatch and a genuine immutable configuration facade
-sharing existing Arc-backed SlugConfiguration, replacing Analysis's coverage-only
-facade. Coverage projects from that same configuration. Facade remains phase-local,
-not newly admitted to AnalysisValue publication. A borrowed genuine-context
-capability routes declaration to the actual Analysis ctx/sink. Analysis checks
-liveness/subrule restrictions and full supplied configuration equality BEFORE
-declaration mutation; reuse bin-relative storage, root, active owner, kind conflict
-and dedup checks. No temporary artifact map, fallback root or alternate owner.
+Base7016c3c29; preserve candidate on codex/wp768-compile-context-review.
+Implementation worker: Loading cc_common.rs, cc_compile_outputs/configuration.rs,
+cc_compile_outputs/tests.rs (or its child tests); native option-rejection assertion
+may live in those tests using existing public constructors. Thin methods only:
+existing large cc_common dispatch retains ownership, no new central algorithm.
+Integration worker: new tests/rustc_map_each/compile_context.{bzl,rs}, mod.rs;
+existing authored cc_toolchain fixture may gain narrowly necessary feature inputs.
+Finishing Loading worker: compile_context/registry.rs fixture adapter, reusing
+existing selected-registry metadata/materialization observations for unchanged
+source bodies. Main-origin local-override cross-package loading remains deferred;
+the existing selected-registry route supplies the genuine main ctx proof instead.
+No production loader change, network call, new upstream body or fake ctx.
+Registry metadata and materialization-success inputs are explicitly synthetic
+test transport inputs (including sha256-test); this is not archive-download or
+integrity verification evidence. Corpus bytes still use existing pinned sources.
+Root: app/slug_commands_v2/tests/sibling_layout.rs command-capture rejection proof,
+scheduling and Stage6/bootstrap closure, serial validation; reviewer:
+independent design and final actual-diff/evidence review, no writes. Production
+estimate40–90 lines plus400–650 test lines; growth is review trigger, not partial landing.
 
-Existing ConfiguredNodeAnalysisKey/package/configuration inputs own results;
-read docs/developers/dice.md. No new DICE key, observation, cache, filesystem
-discovery or lock across compute. Facades cheaply share configuration; published
-Files use existing DICE root/provider/action cutoff/invalidation/eviction lifetimes.
-Path buffers are call scratch. Reuse Arc/Dupe/CompactString/Allocative and Stage9's
-WP766 row, no donor/interner or performance claim. Independent design review
-precedes implementation. Independent design ACCEPT on2026-09-21 freezes this
-bounded declaration contract; runtime acceptance still requires the named proofs.
+Resolve pinned nightly tools; serial offline/locked Cargo JSON no-run for Loading
+and Analysis integration, plus the Commands rejection target; batched exact
+preflight and direct selected tests.
+Core/CLI dependent checks, format/diff/archive/status checks and independent final
+ACCEPT precede atomic integration. Preparation bounded60s/operation; runtime
+seconds estimates are not new user deadlines. No remote/daemon/Bazel execution gate.
+REPLAN for unmodeled layout identity, publication/ownership change, or need to
+activate a deferred action branch; correct ordinary fixture/compiler failures
+inside this contract. M7A remains partial and M8 unproved.
 
-## Scope and routing
+## Closure receipt (2026-09-22; accepted)
 
-Implementation worker: Loading cc_common.rs, cc_context.rs, new cc_compile_outputs
-and configuration child modules/tests, lib.rs exports, subrule_invocation.rs only
-for required sink/token adapter; Analysis starlark_rule/cc_context.rs and its tests,
-starlark_rule.rs sink hooks and context_lifecycle_tests.rs. New algorithms live in
-child modules; large dispatch/analysis files receive narrow hooks only.
-Estimate150–350 production lines plus tests; growth triggers review, not partial landing.
-Integration worker: tests/rustc_map_each/compile_outputs.{bzl,rs}, mod.rs scoped
-setup/registration, existing authored naming/toolchain fixtures as needed.
-Loading subrule_invocation/context_lifecycle_tests.rs may extend its existing
-suspended-root token discriminator for the new operation.
-Never modify upstream54 bodies or artificially export private functions.
-Root owns scheduling, Stage6/9/bootstrap notes, serial Cargo and integration.
-Reviewer owns independent design/final actual diff and evidence, no edits.
+Base7016c3c29; candidate on codex/wp768-compile-context-review. Independent design
+ACCEPT and independent final ACCEPT confirm the context-composition contract,
+actual publication/restoration and precise action-frontier evidence.
+Production adds39 lines over unchanged retained representations. Test growth
+exceeds the initial estimate because the selected-registry adapter is251 lines;
+independent review accepted that bounded fixture ownership rather than a new loader.
+All54 upstream bodies remain unchanged. Only authored toolchain features were added.
 
-## Proof and validation
+37/37 exact-selected tests pass: Loading16 (three new boundary tests plus13
+protected), configured20 (four new composition tests plus16 protected), Commands1
+(actual build flag capture rejection). Receipts under target/wp768:
+tests-1790035320535074564 (Loading), tests-1790035843044137272 (configured),
+tests-1790035222373931946 (Commands), all exit0/selected=pass. The configured
+frontier assertion requires the exact missing cc_internal.create_cc_compile_action
+attribute diagnostic, not just an incidental function name in a traceback.
 
-Owner tests: suffix precedence/case/trailing text, required keyword/binder types;
-normalized internal traversal vs escape/absolute/backslash/NUL paths; supplied label other-target/
-descendant/sibling/repo; repeated declarations and File/tree conflict; expired/
-suspended context; foreign configuration rejection before state mutation. Preserve
-coverage projection and root/default ctx behavior.
+Pinned nightly2025-09-14 offline/locked Cargo JSON no-run and Core/CLI checks
+pass. Preparation/check48.673s total, max12.788s per operation; latest successful
+tests2.148s. Packet elapsed
+approximately19 minutes including research/design/review. One compile correction
+removed a duplicate Arc wrapper; one preserved runtime failure identified the
+missing pinned builtin rules_cc0.2.17 metadata request. Only that explicit registry
+version was added; selected1.0 corpus bytes did not change. No assertion waiver,
+new loader surface, network, daemon, Bazel, remote or compiler action invocation.
 
-Configured proof: genuine main/external contexts, target/exec roots, naming label
-different from active owner, regular File/root publication and A/B/A including
-configuration changes. Authored callers use native entrypoints with genuine values
-and preserve public toolchain naming through the existing WP765 protected proof.
-The new authored helper loads only same-package cc_internal: root-origin external
-cross-package loading remains deferred and cannot be expanded to support a test.
-This proves declarations, not new composition with the toolchain naming wrapper.
-Private compile.bzl wrapper is source-
-backed; existing test-only private-module lookup may invoke the unchanged body
-if feasible, with no new production export. Do NOT claim full public compile():
-other context/tree/action/discovery prerequisites remain open.
-
-Protect WP765 context/naming, WP766 roots and compile-input/toolchain integration.
-Resolve pinned nightly; serial offline/locked Cargo JSON no-run for Loading and
-Analysis; batched exact preflight/direct tests and Core/CLI dependent checks.
-Preparation60s per operation; seconds/test estimates are not new user deadlines.
-No remote/daemon/Bazel gate for this declaration-only change. Format/diff/archive/
-status checks, independent final ACCEPT and atomic commit. REPLAN for ownership/
-compatibility contradiction or unavailable prerequisite, not ordinary compiler/
-fixture correction. M7A remains partial; M8 unproved.
-
-## Closure receipt (2026-09-21; accepted)
-
-Base0a1d7d943, candidate on codex/wp767-compile-output-review. Independent design
-ACCEPT and independent final ACCEPT confirm the bounded declaration contract,
-ownership, rejection-before-mutation and publication/restoration evidence.
-31/31 exact-selected tests pass: Loading13 (four new binder/path/Host/configuration
-tests, protected naming/context/root helpers), Analysis4 (real ctx/sink lifecycle
-and protected execution-OS projections), configured14 (three new declaration/
-restoration/configuration-publication cases plus protected roots/naming/compile
-inputs/toolchain). No test-result waiver. Receipts in target/wp767 include:
-tests-1790034449455763461 (Loading), tests-1790034119459316910 (Analysis), and
-tests-1790034338492239099 (configured), all exit0/selected=pass.
-
-Pinned nightly2025-09-14 offline/locked Cargo JSON no-run and Core/CLI checks pass.
-Preparation/check104.657s total, max20.859s per operation; latest successful tests
-1.345s. Packet elapsed approximately26 minutes including research/design/review.
-Initial fixture failures are preserved: unsupported canonical/cross-package load
-routes and analysis-time Label construction were removed from the fixture, not
-enabled in production; test-only exec-platform scaffolds now provide explicit
-Linux Host independent of the tested missing-Host owner. One compile borrow and
-one zero-selection preflight were corrected before execution. Configuration
-publication is explicitly tested unsupported. No Slug/daemon/Bazel/remote action
-was invoked; configured marker FileWrites are registered, not executed.
-
-Formatting, diff, archive and matching packet-status checks pass. No upstream
-body, extra public compile native, action representation, DICE key or cache was
-added. Original private compile.bzl forwarding remains pinned-source evidence;
-the new runtime proof exercises native declarations, not full public compile().
+Genuine main/external target/exec initializer contexts and full CcInfo/HeaderInfo
+publication now pass, including ordinary/implementation visibility, include order,
+dependency edit/restoration and unused-configuration-payload restoration. Root
+BUILD changes only; selected materialized fixture corpora remain immutable.
+Header-only public compile succeeds; regular .cc reaches the real missing action
+boundary. Synthetic transport observations do not prove archive verification.
+Formatting, diff, archive and matched packet-status checks pass. M7A is still
+partial; CppCompile/discovery and M8 remain unproved.

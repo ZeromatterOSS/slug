@@ -8,6 +8,7 @@ mod cc_context_naming;
 mod cc_headers;
 mod cc_linker;
 mod cc_toolchain;
+mod compile_context;
 mod compile_outputs;
 
 const REPOSITORIES: &[(&str, &str)] = &[

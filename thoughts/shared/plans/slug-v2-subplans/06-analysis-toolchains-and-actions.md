@@ -233,6 +233,19 @@ exec configured publication and A/B/A are covered, with naming protected separat
 This is not full compile() or compiler-action execution. Alternate roots, sibling/
 Windows layout and normalized backslash/NUL paths remain unsupported.
 
+WP768 composes the unchanged compilation-context initializer with genuine main/
+external target/exec owners, ordered include branches, ordinary/implementation
+dependencies and full CcInfo/HeaderInfo publication/restoration. The restricted
+configuration query exposes the existing fixed nonsibling layout, not a new
+configuration option; command capture still rejects the sibling-layout flag.
+is_tree_artifact reads genuine File kind, including true for Directory artifacts.
+The unchanged public compile wrapper succeeds for header-only inputs and reaches
+the missing create_cc_compile_action native for a regular .cc source. This admits
+neither compiler actions/discovery nor tree templates, virtual-header rewriting,
+module-map actions or whole compilation-output provider publication. Selected-
+registry test inputs exercise existing main-origin loading; production loading
+and all retained representations are unchanged.
+
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and
 publication preserve immutable cache seeds, parent aliases, raw binding types,
