@@ -35,7 +35,7 @@ def _impl(ctx):
         if_so_builder = None, link_dynamic_library_tool = None, grep_includes = None,
         aggregate_ddi = None, generate_modmap = None,
         supports_param_files = True, supports_header_parsing = False,
-        allowlist_for_layering_check = None, build_info_files = OutputGroupInfo(),
+        allowlist_for_layering_check = ctx.attr.allowlist[PackageSpecificationInfo], build_info_files = OutputGroupInfo(),
     )
     tc = get_cc_toolchain_provider(ctx, attributes)
     return [tc, platform_common.ToolchainInfo(cc = tc, cc_provider_in_toolchain = True),
@@ -50,5 +50,6 @@ def _impl(ctx):
 helper_subject = rule(implementation = _impl, fragments = ["cpp"], subrules = [create_fdo_context], attrs = {
     "inputs": attr.label_list(allow_files = True, default = ["@@//:header.h", "@@//:static.a"]),
     "libc": attr.label(allow_single_file = True, default = "@@//:include/stdc-predef.h"),
+    "allowlist": attr.label(mandatory = True),
     "metadata": attr.string(default = "A"), "failure": attr.string(),
 })

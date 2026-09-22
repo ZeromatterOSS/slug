@@ -1734,7 +1734,7 @@ impl PackageRecorder {
         packages: Vec<String>,
         includes: Arc<[CanonicalLabel]>,
     ) -> anyhow::Result<()> {
-        let contents = Arc::new(PackageGroupContents::from_package_specs(&packages)?);
+        let contents = Arc::new(crate::visibility::parse_package_group_contents(&packages)?);
         self.record_target(
             name,
             PackageTargetKind::PackageGroup { contents, includes },

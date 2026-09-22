@@ -694,6 +694,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
                 fields.insert("files_to_run".into(), self.files_to_run(&info.files_to_run));
             }
             ProviderValue::OutputGroupInfo(info) => return self.output_group_info(info),
+            ProviderValue::PackageSpecificationInfo(info) => {
+                return Ok(crate::package_specification::alloc(self.heap, info.clone()));
+            }
             ProviderValue::RunEnvironmentInfo(info) => {
                 fields.insert(
                     "environment".into(),
@@ -804,6 +807,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
             AnalysisValueKind::CcToolchainVariables(value) => self.cc_variables(value)?,
             AnalysisValueKind::CcHeaderInfo(info) => {
                 slug_loading_v2::alloc_frozen_cc_header_info(self.heap, info.clone())
+            }
+            AnalysisValueKind::PackageSpecificationInfo(info) => {
+                crate::package_specification::alloc(self.heap, info.clone())
             }
             AnalysisValueKind::CcToolchainFeatures(value) => {
                 slug_loading_v2::alloc_frozen_cc_toolchain_features(self.heap, value.clone())
@@ -1116,6 +1122,9 @@ impl<'v> AnalysisValueLowerer<'v> {
     }
 
     fn lower_recursive(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
+        if let Some(info) = crate::package_specification::from_value(value) {
+            return Ok(AnalysisValue::package_specification_info(info));
+        }
         if let Some((model, _)) = slug_loading_v2::cc_toolchain_callable(value) {
             return Ok(AnalysisValue::cc_toolchain_callable(model));
         }

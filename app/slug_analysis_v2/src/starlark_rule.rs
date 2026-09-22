@@ -2579,6 +2579,10 @@ pub(crate) fn evaluate_loaded_rule(
             )?));
         } else {
             let lowered = lowerer.lower(value, &format!("$[{index}]"))?;
+            if let AnalysisValueKind::PackageSpecificationInfo(info) = lowered.kind() {
+                provider_values.push(ProviderValue::PackageSpecificationInfo(info.clone()));
+                continue;
+            }
             let AnalysisValueKind::Provider(provider) = lowered.kind() else {
                 return Err(format!(
                     "rule implementation returned non-provider value `{}`",

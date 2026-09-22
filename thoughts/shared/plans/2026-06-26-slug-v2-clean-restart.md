@@ -29,13 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-74-m7a-configured-attribute-files-r1
+Packet: WP-7-75-m7a-package-specification-provider-r1
 Status: accepted
+
+WP775 accepts genuine package-group provider construction, contains and retained
+allowlist publication into the unchanged toolchain helper. Existing matching and
+tracked include ownership are reused;73 focused tests, Core/CLI/Query checks and
+independent final review pass. Full toolchain construction stays deferred.
 
 WP774 accepts genuine ctx.file/ctx.files projections from configured dependency
 providers, consumed by the authentic toolchain-helper/compile proof, with49 focused
 tests and Core/CLI checks. Full rule
-construction still requires package-spec/template providers and unconditional
+construction still requires template providers and unconditional
 build-info translation; no empty-provider or unstamped bypass is admitted.
 
 WP773 accepts the unchanged no-profile C++ toolchain-provider helper into separate

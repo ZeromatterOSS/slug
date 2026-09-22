@@ -39,6 +39,7 @@ use crate::providers::ProviderId;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub enum AnalysisValueType {
+    PackageSpecificationInfo,
     CcToolchainCallable,
     CppFragment,
     CcHeaderInfo,
@@ -66,6 +67,7 @@ pub enum AnalysisValueType {
 impl AnalysisValueType {
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::PackageSpecificationInfo => "PackageSpecificationInfo",
             Self::CcToolchainCallable => "function",
             Self::CppFragment => "cpp",
             Self::CcHeaderInfo => "HeaderInfo",
@@ -1134,6 +1136,7 @@ pub struct AnalysisValue(Arc<AnalysisValueData>);
 
 #[derive(Debug, Allocative)]
 enum AnalysisValueData {
+    PackageSpecificationInfo(crate::PackageSpecificationInfo),
     CcToolchainCallable(crate::cc_toolchain_callable::CcToolchainCallable),
     CppFragment(crate::RetainedCppFragment),
     CcHeaderInfo(crate::CcHeaderInfo),
@@ -1158,6 +1161,7 @@ enum AnalysisValueData {
 
 #[derive(Debug, Clone, Copy)]
 pub enum AnalysisValueKind<'a> {
+    PackageSpecificationInfo(&'a crate::PackageSpecificationInfo),
     CcToolchainCallable(&'a crate::cc_toolchain_callable::CcToolchainCallable),
     CppFragment(&'a crate::RetainedCppFragment),
     CcHeaderInfo(&'a crate::CcHeaderInfo),
@@ -1183,6 +1187,10 @@ pub enum AnalysisValueKind<'a> {
 impl AnalysisValue {
     fn new(value: AnalysisValueData) -> Self {
         Self(Arc::new(value))
+    }
+
+    pub fn package_specification_info(info: crate::PackageSpecificationInfo) -> Self {
+        Self::new(AnalysisValueData::PackageSpecificationInfo(info))
     }
 
     pub fn cc_header_info(info: crate::CcHeaderInfo) -> Self {
@@ -1299,6 +1307,9 @@ impl AnalysisValue {
 
     pub fn kind(&self) -> AnalysisValueKind<'_> {
         match self.0.as_ref() {
+            AnalysisValueData::PackageSpecificationInfo(value) => {
+                AnalysisValueKind::PackageSpecificationInfo(value)
+            }
             AnalysisValueData::CcToolchainCallable(value) => {
                 AnalysisValueKind::CcToolchainCallable(value)
             }
@@ -1334,6 +1345,9 @@ impl AnalysisValue {
 
     pub fn value_type(&self) -> AnalysisValueType {
         match self.0.as_ref() {
+            AnalysisValueData::PackageSpecificationInfo(_) => {
+                AnalysisValueType::PackageSpecificationInfo
+            }
             AnalysisValueData::CcToolchainCallable(_) => AnalysisValueType::CcToolchainCallable,
             AnalysisValueData::CppFragment(_) => AnalysisValueType::CppFragment,
             AnalysisValueData::CcHeaderInfo(_) => AnalysisValueType::CcHeaderInfo,
@@ -1423,6 +1437,10 @@ impl AnalysisValue {
 
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         match (self.0.as_ref(), other.0.as_ref()) {
+            (
+                AnalysisValueData::PackageSpecificationInfo(left),
+                AnalysisValueData::PackageSpecificationInfo(right),
+            ) => left == right,
             (
                 AnalysisValueData::CcToolchainCallable(left),
                 AnalysisValueData::CcToolchainCallable(right),
@@ -1532,6 +1550,13 @@ fn publication_fields_eq(
 impl PartialEq for AnalysisValue {
     fn eq(&self, other: &Self) -> bool {
         match (self.0.as_ref(), other.0.as_ref()) {
+            // NativeInfo excludes callable fields from equality: contains is
+            // the only field. Hidden group semantics still participate above
+            // in publication equality, including nested containers/depsets.
+            (
+                AnalysisValueData::PackageSpecificationInfo(_),
+                AnalysisValueData::PackageSpecificationInfo(_),
+            ) => true,
             (
                 AnalysisValueData::CcToolchainCallable(left),
                 AnalysisValueData::CcToolchainCallable(right),
@@ -1595,6 +1620,7 @@ impl Eq for AnalysisValue {}
 impl Hash for AnalysisValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self.0.as_ref() {
+            AnalysisValueData::PackageSpecificationInfo(_) => 20u8.hash(state),
             AnalysisValueData::CcToolchainCallable(value) => {
                 17u8.hash(state);
                 value.hash(state);

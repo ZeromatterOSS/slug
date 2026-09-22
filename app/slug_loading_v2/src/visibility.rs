@@ -116,7 +116,12 @@ impl RuleVisibility {
                 .map(project)
                 .collect::<anyhow::Result<Vec<_>>>()?
                 .into(),
-            direct_packages: Arc::new(value.direct_packages.in_repository_context(repo)?),
+            direct_packages: Arc::new(
+                value
+                    .direct_packages
+                    .in_repository_context(repo)
+                    .map_err(anyhow::Error::msg)?,
+            ),
         })))
     }
 
@@ -181,122 +186,16 @@ pub enum VisibilitySource {
     AlwaysPublic,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct PackageGroupContents {
-    exact_positive: SmallSet<PackageIdentifier>,
-    subtree_positive: Arc<[PackageIdentifier]>,
-    positive_all: bool,
-    exact_negative: SmallSet<PackageIdentifier>,
-    subtree_negative: Arc<[PackageIdentifier]>,
-    has_private: bool,
-}
+pub use slug_build_api_v2::PackageGroupContents;
 
-impl Default for PackageGroupContents {
-    fn default() -> Self {
-        Self {
-            exact_positive: SmallSet::new(),
-            subtree_positive: Arc::from([]),
-            positive_all: false,
-            exact_negative: SmallSet::new(),
-            subtree_negative: Arc::from([]),
-            has_private: false,
-        }
+pub(crate) fn parse_package_group_contents(
+    specs: &[String],
+) -> anyhow::Result<PackageGroupContents> {
+    let mut value = MutablePackageGroupContents::default();
+    for spec in specs {
+        value.add(spec)?;
     }
-}
-
-impl PackageGroupContents {
-    pub fn exact_positive(&self) -> &SmallSet<PackageIdentifier> {
-        &self.exact_positive
-    }
-
-    pub fn subtree_positive(&self) -> &[PackageIdentifier] {
-        &self.subtree_positive
-    }
-
-    pub fn positive_all(&self) -> bool {
-        self.positive_all
-    }
-
-    pub fn exact_negative(&self) -> &SmallSet<PackageIdentifier> {
-        &self.exact_negative
-    }
-
-    pub fn subtree_negative(&self) -> &[PackageIdentifier] {
-        &self.subtree_negative
-    }
-
-    pub fn has_private(&self) -> bool {
-        self.has_private
-    }
-
-    pub fn contains_package(&self, package: &PackageIdentifier) -> bool {
-        if self.exact_negative.contains(package)
-            || self
-                .subtree_negative
-                .iter()
-                .any(|prefix| package_is_beneath(package, prefix))
-        {
-            return false;
-        }
-        self.positive_all
-            || self.exact_positive.contains(package)
-            || self
-                .subtree_positive
-                .iter()
-                .any(|prefix| package_is_beneath(package, prefix))
-    }
-
-    pub(crate) fn from_package_specs(specs: &[String]) -> anyhow::Result<Self> {
-        let mut value = MutablePackageGroupContents::default();
-        for spec in specs {
-            value.add(spec)?;
-        }
-        Ok(value.freeze())
-    }
-
-    pub fn in_repository_context(&self, repo: &CanonicalRepoName) -> anyhow::Result<Self> {
-        if repo.is_root() {
-            anyhow::bail!("package specification destination repository must be nonroot");
-        }
-        let project = |package: &PackageIdentifier| {
-            if package.repo() == repo {
-                return Ok(package.clone());
-            }
-            if package.repo().is_root() {
-                return Ok(PackageIdentifier::new(
-                    repo.clone(),
-                    package.package().clone(),
-                ));
-            }
-            anyhow::bail!("package specification is not in repository {repo}: {package}");
-        };
-        Ok(Self {
-            exact_positive: self
-                .exact_positive
-                .iter()
-                .map(project)
-                .collect::<anyhow::Result<SmallSet<_>>>()?,
-            subtree_positive: self
-                .subtree_positive
-                .iter()
-                .map(project)
-                .collect::<anyhow::Result<Vec<_>>>()?
-                .into(),
-            positive_all: self.positive_all,
-            exact_negative: self
-                .exact_negative
-                .iter()
-                .map(project)
-                .collect::<anyhow::Result<SmallSet<_>>>()?,
-            subtree_negative: self
-                .subtree_negative
-                .iter()
-                .map(project)
-                .collect::<anyhow::Result<Vec<_>>>()?
-                .into(),
-            has_private: self.has_private,
-        })
-    }
+    Ok(value.freeze())
 }
 
 #[derive(Default)]
@@ -368,14 +267,14 @@ impl MutablePackageGroupContents {
     }
 
     fn freeze(self) -> PackageGroupContents {
-        PackageGroupContents {
+        PackageGroupContents::new(slug_build_api_v2::PackageGroupContentsInput {
             exact_positive: self.exact_positive,
             subtree_positive: self.subtree_positive.into(),
             positive_all: self.positive_all,
             exact_negative: self.exact_negative,
             subtree_negative: self.subtree_negative.into(),
             has_private: self.has_private,
-        }
+        })
     }
 }
 
@@ -462,7 +361,7 @@ mod tests {
     #[test]
     fn repository_context_preserves_every_package_group_contents_class() {
         let repo = CanonicalRepoName::new("dep+").unwrap();
-        let contents = PackageGroupContents::from_package_specs(&[
+        let contents = parse_package_group_contents(&[
             "//exact".to_owned(),
             "//tree/...".to_owned(),
             "-//tree/exact-blocked".to_owned(),
@@ -482,23 +381,23 @@ mod tests {
         assert_eq!(contents.subtree_negative().len(), 1);
         assert_eq!(contents.in_repository_context(&repo).unwrap(), contents);
 
-        let public = PackageGroupContents::from_package_specs(&["public".to_owned()])
+        let public = parse_package_group_contents(&["public".to_owned()])
             .unwrap()
             .in_repository_context(&repo)
             .unwrap();
         assert!(public.positive_all());
         assert!(public.contains_package(&package("other+", "anywhere")));
-        let private = PackageGroupContents::from_package_specs(&["private".to_owned()])
+        let private = parse_package_group_contents(&["private".to_owned()])
             .unwrap()
             .in_repository_context(&repo)
             .unwrap();
         assert!(private.has_private());
         assert!(!private.contains_package(&package("dep+", "anywhere")));
 
-        let foreign = PackageGroupContents {
+        let foreign = PackageGroupContents::new(slug_build_api_v2::PackageGroupContentsInput {
             exact_positive: [package("other+", "foreign")].into_iter().collect(),
-            ..PackageGroupContents::default()
-        };
+            ..Default::default()
+        });
         assert!(foreign.in_repository_context(&repo).is_err());
         assert!(
             PackageGroupContents::default()
@@ -506,17 +405,4 @@ mod tests {
                 .is_err()
         );
     }
-}
-
-fn package_is_beneath(package: &PackageIdentifier, prefix: &PackageIdentifier) -> bool {
-    if package.repo() != prefix.repo() {
-        return false;
-    }
-    let package = package.package().as_str();
-    let prefix = prefix.package().as_str();
-    prefix.is_empty()
-        || package == prefix
-        || package
-            .strip_prefix(prefix)
-            .is_some_and(|suffix| suffix.starts_with('/'))
 }

@@ -21,7 +21,7 @@ fn workspace() -> PathBuf {
         } else {
             retained
         };
-        fs::write(path, format!("{retained}\nload('@rules_cc//cc/private/rules_impl:provider_proof.bzl','helper_subject')\nhelper_subject(name='producer',metadata='A',visibility=['//visibility:public'])\n{}",
+        fs::write(path, format!("{retained}\nload('@rules_cc//cc/private/rules_impl:provider_proof.bzl','helper_subject')\npackage_group(name='layering_allowlist',packages=['//allowed/...'])\nhelper_subject(name='producer',metadata='A',allowlist=':layering_allowlist',visibility=['//visibility:public'])\n{}",
             if main { "exports_files(['include/stdc-predef.h'])\n" } else { "" })).unwrap();
     }
     root
@@ -64,6 +64,24 @@ fn check_provider(
         "no-profile helper must register no actions"
     );
     let tc = field(result, "toolchain");
+    let AnalysisValueKind::PackageSpecificationInfo(allowlist) =
+        member(tc, "_allowlist_for_layering_check").kind()
+    else {
+        panic!("authentic helper must retain the genuine native allowlist")
+    };
+    let admitted = if main {
+        "@@//allowed:target"
+    } else {
+        "@@rules_rust+//allowed:target"
+    };
+    assert!(allowlist.contains_package(CanonicalLabel::parse(admitted).unwrap().package()));
+    assert!(
+        !allowlist.contains_package(
+            CanonicalLabel::parse("@@other+//allowed:target")
+                .unwrap()
+                .package()
+        )
+    );
     assert_eq!(member(tc, "_build_variables"), field(result, "variables"));
     assert_eq!(member(tc, "_cpp_configuration"), field(result, "cpp"));
     assert_eq!(member(tc, "_fdo_context"), field(result, "fdo"));
@@ -348,6 +366,45 @@ async fn unchanged_toolchain_helper_rejects_source_tools_and_missing_inputs_then
             .unwrap();
         assert_eq!(baseline, restored);
         check_compile(&restored, true, false, false, "typed_compile");
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn unchanged_toolchain_helper_retains_changed_allowlist_despite_native_equality() {
+    let root = workspace();
+    let dice = registry::dice(&root);
+    for (main, path) in [(true, "BUILD.bazel"), (false, "rules_rust/BUILD.bazel")] {
+        let producer = label(main, "producer");
+        let first = request(&dice, &root, &producer, config(&[])).await.unwrap();
+        let build = root.join(path);
+        let original = fs::read_to_string(&build).unwrap();
+        fs::write(
+            &build,
+            original.replace(
+                "packages=['//allowed/...']",
+                "packages=['//allowed/...','//extra']",
+            ),
+        )
+        .unwrap();
+        let changed = request(&dice, &root, &producer, config(&[])).await.unwrap();
+        let first_allowlist = member(field(&first, "toolchain"), "_allowlist_for_layering_check");
+        let changed_allowlist = member(
+            field(&changed, "toolchain"),
+            "_allowlist_for_layering_check",
+        );
+        assert_eq!(
+            first_allowlist, changed_allowlist,
+            "native equality deliberately ignores membership"
+        );
+        assert!(!first_allowlist.publication_eq(changed_allowlist));
+        assert_ne!(first, changed);
+        check_provider(&changed, main, false, false, None, false, "A");
+        fs::write(&build, &original).unwrap();
+        assert_eq!(
+            first,
+            request(&dice, &root, &producer, config(&[])).await.unwrap()
+        );
     }
     fs::remove_dir_all(root).unwrap();
 }

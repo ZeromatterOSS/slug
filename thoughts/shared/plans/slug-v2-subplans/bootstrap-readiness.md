@@ -426,7 +426,8 @@ fastbuild/opt/default exec. It does not yet prove full cc_toolchain attribute/
 allowlist/TemplateVariableInfo construction, runtime Solib, modules, profile
 actions or allocator execution. WP774 supplies genuine ctx.file/ctx.files from
 configured dependency DefaultInfo, consumed by that same helper/compile proof.
-The full rule's implicit cc_build_info produces both stamped and redacted groups
+WP775 adds the genuine native package-group allowlist and preserves its hidden
+membership through that helper's publication. The full rule's implicit cc_build_info produces both stamped and redacted groups
 regardless --stamp; status transforms and embedded helper dependencies cannot be
 replaced by empty providers to claim construction. Generic command/
 aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/

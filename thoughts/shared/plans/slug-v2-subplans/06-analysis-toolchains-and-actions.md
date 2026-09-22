@@ -311,8 +311,17 @@ and nondependency attributes. Immutable captured structs/lists are ordinary
 publishable data, while retrieving them through an expired ctx remains forbidden.
 No new DICE owner, graph value kind, filesystem lookup or ordering engine exists.
 The authentic helper/compile proof now consumes both facades. Full cc_toolchain
-still requires genuine package-spec/template providers and implicit dependency
+still requires genuine template providers and implicit dependency
 construction, notably both build-info status transforms even when stamping is off.
+
+WP775 supplies native package-group PackageSpecificationInfo through the existing
+configured-node include graph, including canonical external groups. Loading and
+Query share the BuildAPI membership value; group-local negatives remain separate
+through stable transitive composition. Native method-only equality is constant,
+but provider publication compares the full membership graph for invalidation.
+The authentic toolchain helper retains a genuine allowlist. This does not admit
+external declaring visibility, broader package-spec syntax, TemplateVariableInfo,
+status transforms or full toolchain construction.
 
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and

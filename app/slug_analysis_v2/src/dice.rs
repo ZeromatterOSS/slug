@@ -827,8 +827,12 @@ async fn prepare_configured_node_analysis_driver_with_source_admission(
         .iter()
         .find(|target| target.name == requested.target().as_str());
     let node = if (target.is_none() && source_admitted)
-        || target.is_some_and(|target| matches!(target.kind, PackageTargetKind::ExportedFile))
-    {
+        || target.is_some_and(|target| {
+            matches!(
+                target.kind,
+                PackageTargetKind::ExportedFile | PackageTargetKind::PackageGroup { .. }
+            )
+        }) {
         ConfiguredNodeKey::null(requested)
     } else if target.is_none() {
         return analysis_semantic_complete(Err(AnalysisError::target_not_found(
@@ -2904,7 +2908,8 @@ fn require_supported_canonical_configured_target(
             (node, target.map(|target| &target.kind)),
             (
                 ConfiguredNodeKey::Null(_),
-                Some(PackageTargetKind::ExportedFile) | None
+                Some(PackageTargetKind::ExportedFile | PackageTargetKind::PackageGroup { .. })
+                    | None
             )
         );
     if supported {
@@ -5000,7 +5005,7 @@ mod tests {
         let external = CanonicalLabel::parse("@@external//visibility:group").unwrap();
 
         assert!(require_root_delegating_reference(&root, "declaring visibility").is_ok());
-        for role in ["declaring visibility", "package-group include"] {
+        for role in ["declaring visibility"] {
             let error = require_root_delegating_reference(&external, role).unwrap_err();
             assert_eq!(
                 error.to_string(),
@@ -5257,15 +5262,8 @@ impl ConfiguredNodeAnalysisKey {
             }
             (
                 ConfiguredNodeKey::Null(_),
-                Some(PackageTargetKind::PackageGroup { includes, .. }),
+                Some(PackageTargetKind::PackageGroup { includes, contents }),
             ) => {
-                for include in includes.iter() {
-                    if let Err(error) =
-                        require_root_delegating_reference(include, "package-group include")
-                    {
-                        return root_analysis_driver_complete(Err(error));
-                    }
-                }
                 let inputs = includes
                     .iter()
                     .cloned()
@@ -5317,6 +5315,16 @@ impl ConfiguredNodeAnalysisKey {
                 for (_, outcome) in outcomes {
                     children.push(root_value!(outcome));
                 }
+                let providers = match crate::package_specification::providers(
+                    contents,
+                    label.package().repo(),
+                    &children,
+                ) {
+                    Ok(providers) => providers,
+                    Err(error) => {
+                        return root_analysis_driver_complete(Err(AnalysisError::message(error)));
+                    }
+                };
                 let edges = children
                     .iter()
                     .enumerate()
@@ -5334,7 +5342,7 @@ impl ConfiguredNodeAnalysisKey {
                     package,
                     self.node.clone(),
                     ConfiguredNodeKind::PackageGroup,
-                    native_empty_providers(),
+                    providers,
                     None,
                     edges,
                     &children,

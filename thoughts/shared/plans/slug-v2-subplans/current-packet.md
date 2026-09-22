@@ -1,166 +1,168 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-74-m7a-configured-attribute-files-r1
+Packet: WP-7-75-m7a-package-specification-provider-r1
 Status: accepted
 
 ## Outcome and demand
 
-Provide genuine configured-rule ctx.files and ctx.file projections from prepared
-dependency DefaultInfo Files: stable order/dedup, single-artifact schema eligibility,
-immutable lists and lifecycle enforcement. Consume them in the authentic toolchain
-helper and public compile proof, replacing manual DefaultInfo traversal.
-WP773 at2be82ece2 accepts authentic no-profile provider construction with58 tests
-and Core/CLI checks; receipt remains in Git. M7A partial, M8 unproved.
-
-Unchanged rules_cc0.2.17 cc/private/rules_impl/cc_toolchain.bzl69–75,96–119
-demands these projections. Full rule also needs PackageSpecificationInfo,
-TemplateVariableInfo, embedded helper binaries and unconditional build-info
-translation. Pinned bazel_cc_build_info.bzl43–62 builds BOTH stamped and redacted
-groups regardless --stamp. Never replace these prerequisites with empty providers
-or default-None tools. This packet removes an attribute-file prerequisite only.
+Publish genuine PackageSpecificationInfo from native package_group analysis,
+including external groups and tracked includes. Expose contains and preserve full
+semantics through provider publication into the unchanged rules_cc toolchain
+helper, replacing its authored None allowlist with a real group provider.
+This removes a full cc_toolchain prerequisite, not a full-construction or execution
+claim. WP774 at421bb60f1 accepts ctx.file/files with49 tests and Core/CLI checks;
+its receipt remains in Git. M7A partial, M8 unproved.
 
 ## Compatibility and sources
 
-Exact admitted dependency kinds: label, label_list and already-supported
-label-bearing dictionaries. ctx.files contains DefaultInfo.files only, not
-runfiles or executable-only Files. Stable nested-set traversal uses the native
-stored graph order and first structural artifact occurrence, not concatenated
-child to_list results. A topological child[a,b] under stable parent yields[b,a];
-adding preorder[a,c] and the repeated topological child yields[b,a,c]. Optional absent dependencies
-expose []; eligible allow_single_file labels expose File or None in ctx.file.
-Missing/nondependency/non-single names are absent, not empty fallbacks. Existing
-dependency type/provider/visibility validation remains unchanged; context
-construction additionally enforces SINGLE_ARTIFACT even when allow_single_file=False.
-Native first-phase NO_FILE validation skips cardinality, but context construction
-still calls getPrerequisiteArtifact. Present zero/multiple Files fail before
-implementation; only absent/filtered prerequisites yield None. ctx.attr remains
-a Target; ctx.executable remains separate.
-Outputs never enter these inputs. Lists are immutable. Check native reflection/
-field presence before claiming dir behavior.
+Exact within already-admitted package-spec syntax: native-only provider creation,
+Target membership/indexing, stable transitive group composition and per-group
+negative exclusions; repository-aware exact/subtree/public/private membership.
+contains is positional-only, Label or string. Strings parse canonical labels
+(// means main; @repo and @@repo are canonical), never caller mapping; Label
+arguments carry already-resolved mapping. Relative strings and bad types fail.
+dir exposes contains; type PackageSpecificationInfo, repr struct(). NativeInfo
+ignores callable fields: distinct instances have equal Starlark equality/hash
+despite differing membership. DICE/publication equality MUST compare all group
+semantics. Global builtin key stays nonconstructible. Immutable captured provider
+data survives context teardown, freeze/GC and downstream publication.
 
-Slug-native: structural artifact/configuration/path identity and diagnostics.
-Deferred: full cc_toolchain, status transforms, package-spec/template providers,
-new transition kinds, filesystem discovery, execution and full cc_library.
+Slug-native: structural publication/configuration identity, diagnostics and current
+error transport. Raw Java hash bytes are not claimed. Deferred: Loading's rejected
+explicit repository package-spec syntax, external declaring visibility,
+TemplateVariableInfo, status transforms, embedded tools, full cc_toolchain and
+execution. No empty-provider fallback or untracked repository inference.
+
 Pinned Bazel9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-StarlarkAttributesCollection.java383–443; PrerequisiteArtifacts.java39–71;
-PrerequisitesCollection.getPrerequisiteArtifact; StarlarkRuleContextTest file/
-runfiles callers2529–2589; native collection/context lifecycle. Adapt real
-attribute/File semantics from broad upstream tests without their unadmitted action
-families. Pinned-source regression suffices; no Bazel/compiler invocation selected.
-Ordering anchors: NestedSet.java193–198/228–237/497 and
-NestedSetBuilder.java190–198; singleton Directory admission follows
-PrerequisitesCollection.java259–269 (cardinality only, no regular-file predicate).
-The False discriminator follows StarlarkAttrModule.java433–442/127–134 and
-RuleContext.java1964–1969: preserve lower-phase validation, complete the previously
-missing context check. Prior single_false_multi analysis success was not full
-native context parity; its protected expectation must now reject. Independent
-source review requires this correction within the same owner and packet family.
+PackageSpecificationProvider.java40–60,73–113 (checked includes/stable union/
+canonical contains); PackageSpecificationProviderApi.java31–49;
+NativeInfo.java58–137 (method-excluding equality/hash/repr); Allowlist.java94–98;
+PackageSpecification.java464–596 (unordered exact sets, ordered subtree lists,
+local negatives); Label.java150–165. Adapt AllowlistTest.java120–149,155–230,
+286–321 as authored BUILD/Starlark regressions, not Java probes.
+rules_cc0.2.17 cc_toolchain.bzl60–67,117,350–353 indexes the provider; unchanged
+cc_toolchain_provider_helper.bzl295 retains it. Membership is an API regression,
+not observed allocator execution. Reuse WP773 provenance; no new upstream bodies.
 
-## Ownership, representation and lifecycle
+## Ownership and representation
 
-ConfiguredNodeAnalysisKey dependencies own resolved schema, selected target/exec
-dependency order, filtering and provider data. Project only these values in
-synchronous evaluation: no new DICE key/injection/lock, path lookup, provider owner
-or configuration token. Preserve actual roots/owners and structural equality.
-Use existing AnalysisDepset stable merge, not a second flatten/order engine.
+Move sole PackageGroupContents value/matcher below Loading into BuildAPI. Keep
+Loading's parser and RuleVisibility adapters, reexport the type for Query users.
+Preserve parsing/rebinding. SmallSet exact members, immutable Arc subtree slices,
+Allocative; hash exact sets unordered and subtree lists ordered, consistently with
+Eq. Reuse Stage9 visibility dispositions f9ae7337/76025ede and existing dense
+Depset utilities; no donor semantic code, duplicate matcher or V1/global registry.
 
-Collection construction is evaluator scratch; plain immutable struct/list values
-use existing frozen heap/materializer ownership. No new retained kind. Reuse
-Buck2-derived SmallMap/CompactString/Arc/Allocative and existing dense depsets,
-without donor import/interner/cache/performance claim. Inherit Stage9 configured
-exec dependency utility decision20bbe8661 (evaluator-local ctx.executable).
-Published structs/File/list data use existing AnalysisValue. Native
-StarlarkRuleContext701–710 guards retrieval through ctx, while the captured
-StarlarkAttributesCollection fileObject/filesObject are ordinary StructImpl data
-(constructor69–99). Do not add a capability token to captured immutable data:
-they may survive/publish after context teardown. Only further ctx access fails.
-Success/error teardown, freeze/GC and forwarding preserve these distinct lifetimes.
+PackageSpecificationInfo wraps shared stable Depset<Arc<PackageGroupContents>>.
+Groups remain separate leaves: OR whole groups, never combine negative buckets.
+Includes are transitive children followed by direct local contents. Existing
+ConfiguredNodeAnalysisKey package-group compute_join/cycle guard supplies tracked
+includes, Need/errors and ordered edges. Reject missing/wrong-kind includes;
+retain analysis cycle errors, not Query's different cycle suppression.
+External groups use canonical tracked package loading and contents rebinding.
+Admit only external null PackageGroup and include references, not unrelated
+declaring visibility or target kinds.
+
+One typed ProviderValue and AnalysisValue payload supports direct forwarding and
+nested publication. Starlark equality is deliberately separate from complete
+semantic publication equality, including depset/map-containing payloads. No new
+DICE key, injection, cache, lock, interner, occurrence counter, filesystem scan or
+evaluator borrow. Immutable data is DICE-retained; builders/traversal/comparison
+buffers are scratch. Existing invalidation, publication cutoff, cancellation and
+graph lifetime own release. Dense graph sharing/cheap handles, no performance claim.
 
 ## Scope and routing
 
-Base2be82ece2; branch codex/wp774-ctx-file-projections-review. Independent design
-ACCEPT2026-09-22 before source edits; final actual-diff/evidence review before integration.
-Production worker: app/slug_analysis_v2/src/starlark_rule.rs, new child
-starlark_rule/attribute_files.rs and local tests; context_lifecycle_tests.rs.
-Mechanical AnalysisContext struct-literal updates in existing test children only
-if required. No DICE/BuildAPI/Loading or dependency representation changes without
-root design reassessment.
-Test worker: new tests/attribute_files.rs (or child directory), tests/starlark_rule.rs
-module hook and existing FILE_ADMISSIBILITY fixture/expectations for the newly
-reached False-flag context phase. Root also repairs its stale no-Host precondition:
-base2be82ece2 already supplies action Host facts in test_configuration. Explicitly
-omit those facts for the suffix-policy negative, retaining the required conversion
-path flavor and original analysis error. ANY/NO_FILE positives use populated Host:
-they skip suffix validation but now reach downstream execution-OS fallback.
-No configuration or dependency validation production change.
-The protected exec/executable test also isolates its deliberate cold/warm graph:
-its preceding dependency check already warms :ok now that typed/default fixtures
-share structural Host inputs. Both evaluated and reused assertions remain.
-Root: rustc_map_each/compile_context/provider.bzl and provider.rs
-consume both genuine facades; Stage6/bootstrap docs and scheduling.
-Estimate100–250 production and250–500 test lines. New logic belongs in a child,
-not the large starlark_rule root; parent adds wiring only. No new upstream bodies.
+Base421bb60f1; codex/wp775-package-specification-review. Independent design ACCEPT
+2026-09-22 before production edits; final actual-diff/evidence review before integration.
+Worker1: BuildAPI new package_specification.rs child/tests, lib.rs exports,
+analysis_value.rs closed-kind wiring, providers/mod.rs typed payload/lookup;
+Loading visibility.rs matcher extraction/adapters/tests and reexport if needed;
+package.rs single parser-call adapter since the moved type cannot own Loading parsing.
+Worker2: Analysis dice.rs minimal native branch/gate wiring, new cohesive
+package_specification.rs child/module hook; analysis_value.rs materialize/lower
+wiring and child facade/tests; starlark_rule.rs native return decoding. key.rs
+comment only if needed. A Loading facade/hook may replace the Analysis-local facade
+if required by existing ownership; root must approve before crossing worker scopes.
+Root: new tests/package_specification.rs; tests/starlark_rule.rs hook and obsolete
+package-group predicate expectation; protected delegating fixture's baseline-stale
+source DefaultInfo assertion now checks the exact singleton source File (base
+421bb60f1 already publishes it; production unchanged). rustc_map_each/compile_context/provider.bzl
+and provider.rs genuine allowlist proof; Stage6/bootstrap/Stage9 and scheduling.
+Other edits need root reassessment. Large parents add only closed dispatch/wiring;
+new semantics belong in children. Estimate350–650 net production and350–650 test
+lines plus matcher relocation; no new copied fixtures or crate dependencies.
 
 ## Evidence and validation
 
-Real configured rules cover source/generated/Directory Files, target/exec owners,
-absence versus missing/ineligible names, distinct ctx.attr/ctx.executable, no
-runfiles leakage, label-bearing kinds, diamond depsets, stable order/dedup.
-Invalid single-file cardinality fails before effects; mutation fails. Published
-File/list data survives same-DICE input/metadata/config changes, A/B/A and missing/
-recreate without fresh graphs. Expired ctx access fails on success/error; captured
-immutable file structs/lists/Files remain usable and publish normally. Protect
-public compile/dependency/exec tests.
+Cover empty/public/private, exact/subtree boundaries, repository mismatch;
+diamond includes and local-negative versus included-positive; missing/wrong-kind/
+cycles; external groups and mapped Label versus canonical string; binding/type/
+relative-string rejection; key nonconstructibility; type/repr/dir/equal-hash and
+different contains results; immutable freeze/GC, direct/nested forwarding.
+Same-DICE group/include A/B/A, missing/recreate, external restoration and unchanged
+helper publication must discriminate complete semantic cutoff despite constant
+Starlark equality. No fresh graph replaces invalidation proof.
 
-Root rebuilds pinned nightly Analysis --lib and --test starlark_rule separately
-with offline/locked Cargo JSON --no-run, exact batched preflight and serial tests.
-No parallel Cargo. Core/CLI checks, rustfmt, diff/archive/status checks.
-Preparation cap60s/operation; tests estimated a few seconds each, not a user hard
-deadline. Reuse unaffected evidence; broad suites only at appropriate checkpoint.
-REPLAN for new ownership/source contradiction/prerequisite outside this family;
-ordinary scoped invocation/test/implementation corrections remain here.
+Protect Loading visibility/group invalidation, repository rebinding and global
+partition; Query shared matcher compile; Analysis delegating nodes/runfiles/
+ruleclass-bypass and WP774 helper/compile selectors. Root serializes pinned nightly
+offline/locked Cargo JSON --no-run BuildAPI/Loading/Analysis builds and batches
+exact nonignored preflight before test execution. Core/CLI/Query checks.
+Preparation60s/operation; focused runtimes estimated seconds, not user deadlines.
+Rustfmt, diff/archive/status checks. No daemon/Bazel/compiler action/network.
+REPLAN only for new ownership/source contradiction needing broader activation;
+ordinary scoped implementation/invocation/test corrections stay in packet.
 
 ## Acceptance evidence — 2026-09-22
 
-Pinned nightly-2025-09-14 tools resolved with rustup; all Cargo commands serial,
-offline/locked, JSON --no-run for tests. Final relevant preparations exit0:
-Analysis lib1.217s, integration6.474s, Core check1.018s, CLI check1.268s.
-Exact nonignored preflights plus actual execution: **49 selected / 49 passed**.
-Library10/10 in0.097s: projection empty structs1, lifecycle success/error2,
-unchanged Cargo-runfiles3, compile-action4. Integration39/39 in5.022s: new
-projection4, authentic helper/provider/public-compile protected29, ordinary
-file/provider/select/exec dependency6. Final receipts under target/wp774:
-compile-slug_analysis_v2-5/-11, check-slug_core_v2-2, check-slug_cli_v2-2;
-tests-1790045731263117150 and tests-1790046260970971749.receipt.json.
-The latter records all exact selectors, commands, statuses and individual logs.
-No compiler action, Bazel/JVM, daemon, network or CLI binary invocation.
+Pinned nightly-2025-09-14 tools resolved via rustup. Serial offline/locked Cargo
+JSON --no-run builds, then exact nonignored preflight and actual execution:
+**73 selected / 73 passed**,5.610s aggregate runtime. BuildAPI5 in0.005s; Loading
+library4 in0.012s, bzl_invalidation1 in0.008s, build_file_loading2 in0.011s;
+Analysis library14 in0.108s and starlark_rule47 in5.466s. The latter includes all
+WP774 integration39 plus new package-group4, helper allowlist1, protected
+delegating/runfiles/ruleclass3. Analysis library includes new facade/GC2,
+protected bypass/external-visibility2 and WP774 library10.
 
-Discriminators cover all five label-bearing shapes, mixed depset child orders,
-diamond dedup, generated target/exec roots, singleton Directory, optional absence,
-False-flag absent/zero/one/multiple, pre-implementation rejection, immutable
-capture/forwarding, success/error expiry plus freeze/GC, same-DICE A/B/A source
-and configuration changes, and missing/recreate. Existing lower validator remains
-unchanged. Public helper consumes both real facades; no full-rule claim.
+Receipts/logs under target/wp775: tests-1790047148323337319,
+1790047148410699623,1790047189512316365,1790047189557584844,
+1790047605522647252 and1790047605700833066.receipt.json record commands,
+exact selectors, exit0 and counts. Final relevant build receipts all exit0:
+compile-slug_build_api_v2-2 (2.268s), compile-slug_loading_v2-1/-2
+(32.576s/21.764s), compile-slug_analysis_v2-4 (lib+integration7.734s).
+Query check1 exit0 in18.641s; fresh Core/CLI check2 after parser correction exit0
+in1.017s/1.268s. Eight compile attempts117.512s, five checks57.959s, all runtime
+attempts11.153s including superseded failures. Preparation stayed under60s each.
+No Bazel/JVM, daemon, compiler action, CLI invocation or network operation.
+Rustfmt/diff/archive/plan-status checks exit0.
 
-Corrections stayed within this owner: narrowed a leaf-only mutation, accepted the
-runtime's capitalized Immutable diagnostic, completed source-required False-flag
-context cardinality/presence, and repaired the two baseline-stale protected test
-preconditions described above. Missing conversion path flavor was an unsuccessful
-fixture attempt, rejected at construction; it is not the retained action-Host
-boundary. Neither that assertion substitution nor production bypass was retained.
-All failures and superseded receipts remain local. Eleven successful compile
-attempts totaled75.651s; all runtime attempts20.397s. Implementation began02:44Z;
-final validation03:04Z and acceptance03:05Z (about21min, preceded by about6min prerequisite research).
-Independent design and source/correction reviews reused one reviewer; final
-actual-diff/evidence ACCEPT: ordering, presence/cardinality, retrieval-only
-lifecycle, fixture attribution and all49 tests checked. Review was interleaved
-with implementation/corrections, not separately timed. No REPLAN or speedup claim.
+Distinct proof: whole-group OR restores a locally excluded package through a
+diamond include; canonical strings differ from BUILD-mapped Label arguments;
+main/external group and included-leaf A/B/A plus missing/recreate retain semantics
+through direct native provider forwarding, structs/lists/dictionary keys/depsets
+and unchanged toolchain-helper publication. Native equality/hash remains constant
+while full publication differs. Freeze, source-heap disposal/rematerialization and
+supported forced GC retain membership. Invalid includes/cycles and binding reject.
 
-Growth reviewed: production logic is a67-line child plus28 net parent wiring;
-the child also has36 test lines. New integration444 lines, lifecycle87 net,
-mechanical context literals14, existing fixture24 net: about605 test lines,
-above the initial500 estimate for distinct mixed-order, phase/cardinality and
-capture/GC discriminators. No new copied upstream bodies or external fixtures;
-WP773's unchanged source provenance remains authoritative. Existing depset and
-frozen-value owners avoid new retained representations or performance claims.
-Rustfmt, diff, archive and plan-status checks exit0.
+Corrections: root-repository test helper uses root(), not empty-name constructor;
+Loading test names required bzl_module prefix (failed preflight executed zero);
+equal-key dictionary literals correctly reject, so replacement/hash proofs use
+sequential assignment. Root .bzl global mapping is not admitted: the integration
+proof instead resolves a genuine BUILD attr Label and publishes it. One production
+correction replaces insufficient canonical-string normalization with the existing
+validated FirstRoundCanonical parser after an absolute-input guard; this rejects
+recursive patterns while admitting native no-colon/repository shorthand. The
+baseline-stale source DefaultInfo assertion was corrected as scoped above.
+All relevant gates were rebuilt/rerun; no failure waived or owner broadened.
+
+Growth: roughly330 net production lines plus matcher relocation; cohesive new
+BuildAPI/Analysis children and small parent dispatch/branch wiring. About780
+test lines exceed the650 estimate for separate immutable native/semantic equality
+container proofs, GC and main/external/helper invalidation; no copied upstream
+body or new external fixture. Utility reuse preserves the sole matcher and dense
+graph ownership, with no interner/cache/performance claim. Independent design and
+final source/correction reviews reused one reviewer; terminal evidence ACCEPT
+at03:28Z confirms73/73 and Core/CLI/Query checks, separate equality domains and
+tracked invalidation. About22min from research through acceptance; reviews were
+interleaved, not separately timed. No REPLAN or claimed workflow speedup.

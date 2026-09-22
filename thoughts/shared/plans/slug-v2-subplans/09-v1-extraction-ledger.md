@@ -1952,6 +1952,17 @@ ownership were sufficient. The exact 25-row one-shot/daemon gate, ordered
 singleton-delivery regression, no-topology assertion, and cross-package
 format/restrict/delete/recreate lifecycle passed; independent final review
 returned `ACCEPT` after one evidence-only test strengthening.
+WP775 reuses that sole PackageGroupContents model below Loading in BuildAPI,
+retaining the parser adapter and Query reexport. SmallSet exact members keep
+unordered Eq/hash, subtree Arc slices keep ordered payload equality; the new
+PackageSpecificationInfo shares existing dense Depset storage and Arc/Dupe/
+Allocative lifetimes. Constant native Starlark equality never replaces complete
+publication equality, including nested containers. Configured-node tracked
+include/cycle ownership supplies native providers; no duplicate matcher, global
+visibility registry, interner, donor semantic code, new DICE key or cache.
+Membership/repository/local-negative, structural cutoff, sharing and same-DICE
+restoration regressions cover reuse. No performance or memory-reduction claim.
+
 ### Stage 8 TestRunner semantic prerequisite decision (2026-08-11)
 
 Source inspected: Bazel 9.2 `RuleConfiguredTargetBuilder`,

@@ -162,6 +162,7 @@ mod directory_args;
 mod effective_output_groups;
 mod file_output_providers;
 mod output_group_info;
+mod package_specification;
 mod rustc_map_each;
 mod workspace_name;
 
@@ -8552,7 +8553,13 @@ ordinary_rule(
     .await
     .unwrap();
     assert_eq!(source.kind(), &ConfiguredNodeKind::SourceFile);
-    assert!(source.providers().default_info().is_none());
+    let files = source.providers().default_info().unwrap().files().to_list();
+    assert_eq!(files.len(), 1);
+    assert!(matches!(
+        files[0].kind(),
+        AnalysisValueKind::Artifact(slug_build_api_v2::AnalysisArtifact::Source(label))
+            if label.to_string() == "@@//:source.txt"
+    ));
     assert!(source.edges().is_empty());
 
     let source_path = workspace.join("source.txt");
@@ -12207,13 +12214,8 @@ async fn rule_class_restrictions_cover_shapes_aliases_providers_silent_views_and
     }
     let package_group = analyze_request(&dice, &workspace, &key("package_group_ok"), None, false)
         .await
-        .unwrap_err();
-    assert!(
-        package_group.contains("target `@@//:visibility_group` is not a Starlark rule")
-            && !package_group.contains("rule class expected")
-            && !package_group.contains("providers expected"),
-        "{package_group}"
-    );
+        .unwrap();
+    assert_eq!(provider_value(&package_group, &seen), "visibility_group");
     let generated_alias = analyze_request(&dice, &workspace, &key("generated_alias"), None, false)
         .await
         .unwrap();
