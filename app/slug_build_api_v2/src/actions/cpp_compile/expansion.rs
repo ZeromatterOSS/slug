@@ -60,4 +60,4 @@ impl CppCompileSpec {
 }
 
 #[cfg(test)]
-mod tests;
+pub(in crate::actions::cpp_compile) mod tests;

@@ -4,7 +4,7 @@ use crate::AnalysisValue;
 use crate::cc_features::*;
 use crate::cc_variables::*;
 
-fn group(flags: &[&str]) -> CcFlagGroup {
+pub(in crate::actions::cpp_compile) fn group(flags: &[&str]) -> CcFlagGroup {
     CcFlagGroup {
         expandables: flags
             .iter()
@@ -18,7 +18,10 @@ fn group(flags: &[&str]) -> CcFlagGroup {
         expand_if_equal: None,
     }
 }
-fn configuration(groups: Vec<CcFlagGroup>, env: &[(&str, &str)]) -> CcFeatureConfiguration {
+pub(in crate::actions::cpp_compile) fn configuration(
+    groups: Vec<CcFlagGroup>,
+    env: &[(&str, &str)],
+) -> CcFeatureConfiguration {
     let set = |groups: Vec<CcFlagGroup>| CcFlagSet {
         actions: ["c++-compile".into()].into_iter().collect(),
         with_features: CcSet::new(),

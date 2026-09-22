@@ -7,6 +7,7 @@ use super::*;
 
 mod command_expansion;
 mod dependencies;
+mod input_preparation;
 mod registration;
 mod registry;
 

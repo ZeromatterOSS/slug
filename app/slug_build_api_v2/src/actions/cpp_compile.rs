@@ -23,9 +23,11 @@ use crate::cc_variables::CcToolchainVariables;
 
 mod dependencies;
 mod expansion;
+mod input_preparation;
 mod input_sets;
 
 pub use dependencies::CppCompileDependencies;
+pub use input_preparation::CppCompileInputPreparation;
 pub use input_sets::CppCompileInputSets;
 
 /// Immutable eagerly consumed constructor inputs, not an action or a recipe.

@@ -43,7 +43,8 @@ resolver is an explicit caller capability, not a filesystem fallback. A future
 Core consumer must acquire verified dotd bytes even on remote-cache hits, resolve
 source/generated identities through their semantic owners, own discovered-input
 replay and invalidation under DICE, and revalidate complete frontiers before
-publication. Pre-execution include-path validation also remains required. Do not
+publication. WP772 provides pure pre-execution include-path validation and input
+preparation; execution must consume it, not bypass it via raw input_sets. Do not
 treat fixed-input Spawn transport or attempt-local results as discovery state.
 
 The CLI rules_rust Rustc and cargo build-script `Args.use_param_file` calls

@@ -416,7 +416,10 @@ restoration; they do not establish production allocator commands. WP771 supplies
 regular-file input sets and pure supplied-dotd reconciliation with explicit source
 resolution and action-configuration inclusion policy. Synthetic dependency bytes
 over real published recipes are not compiler-output evidence. Core discovery
-ownership, verified dotd acquisition and cache replay still gate execution. Generic command/
+ownership, verified dotd acquisition and cache replay still gate execution. WP772
+adds pure preparation with source-defined include-path checks and original-cache
+compiler options; this does not establish actual allocator flags or full production
+toolchain construction. Generic command/
 aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/
 path mapping and full cc_library remain deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside

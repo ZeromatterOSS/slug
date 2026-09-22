@@ -32,7 +32,7 @@ fn normalize(path: &str) -> Result<CompactString, String> {
 }
 
 /// PathFragment component prefix, including the empty relative fragment.
-fn beneath(path: &str, prefix: &str) -> bool {
+pub(super) fn beneath(path: &str, prefix: &str) -> bool {
     if prefix.is_empty() {
         return !path.starts_with('/');
     }
@@ -43,7 +43,10 @@ fn beneath(path: &str, prefix: &str) -> bool {
             .is_some_and(|rest| rest.starts_with('/'))
 }
 
-fn context_directories(spec: &CppCompileSpec, field: &str) -> Result<Vec<CompactString>, String> {
+pub(super) fn context_directories(
+    spec: &CppCompileSpec,
+    field: &str,
+) -> Result<Vec<CompactString>, String> {
     let AnalysisValueKind::Provider(context) = spec.data().compilation_context.kind() else {
         return Err("CppCompile requires a compilation context provider".into());
     };

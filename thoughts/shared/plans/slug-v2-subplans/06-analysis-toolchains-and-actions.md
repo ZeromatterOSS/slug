@@ -282,6 +282,15 @@ and resolution algorithms operate on Slug-native valid UTF-8 and structural path
 invalid bytes, tree inputs and unmodeled platform policies fail closed. The pure
 resolver seam does not supply Core observation or execution authority.
 
+WP772 adds pure pre-execution input preparation: original-cache compiler options
+supply system include paths, while raw user flags and context supply ordinary/
+quote paths. Checks preserve native combined/split flag classification and POSIX
+normalization. Pre-execution exemptions always include builtin, context system
+and external directories, independent of the stricter post-dotd policy. Success
+returns the existing input-role sets and caller-owned dangling-option warnings;
+it is not an execution certificate. Neither warnings nor results mutate DICE
+recipes, and failure publishes no partial result.
+
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and
 publication preserve immutable cache seeds, parent aliases, raw binding types,

@@ -29,10 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-71-m7a-cpp-dependency-reconciliation-r1
+Packet: WP-7-72-m7a-cpp-input-preparation-r1
 Status: accepted
 
-WP771 accepts pure CppCompile input-role projection and supplied-dotd dependency
+WP772 accepts pure CppCompile pre-execution input preparation with original-cache
+compiler options and source-defined include-path validation. Independent design/
+final ACCEPT;54 focused tests and Core/CLI checks pass. Tracked discovery,
+cache replay, full production toolchain construction and execution remain deferred.
+
+WP771 at5c94981ec accepts pure CppCompile input-role projection and supplied-dotd dependency
 reconciliation with explicit source-artifact resolution. Independent design/final
 ACCEPT;49 focused tests and Core/CLI checks pass. Core discovery ownership,
 verified dotd acquisition, cache replay and execution remain deferred.
