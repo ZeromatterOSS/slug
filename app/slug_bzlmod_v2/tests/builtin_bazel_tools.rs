@@ -119,6 +119,56 @@ const FILES: &[(&str, &str, bool)] = &[
         false,
     ),
     (
+        "tools/build_defs/build_info/BUILD",
+        "91db40a0a2ecc4eb8aaed489dd4ce117af5a0e5d64ed7d9d6f21417e4873bb1a",
+        false,
+    ),
+    (
+        "tools/build_defs/build_info/bazel_cc_build_info.bzl",
+        "72cc98ddc39e4c7c66d23541c7b18e10b70fde6008e2883144554b7487e97514",
+        false,
+    ),
+    (
+        "tools/build_defs/build_info/bazel_java_build_info.bzl",
+        "2ca911d9ab6b426cd120294a09148de8b641d14ebf6d9b3faaeaa86b3f4fc6bb",
+        false,
+    ),
+    (
+        "tools/build_defs/build_info/templates/BUILD",
+        "569d06599fc494e6c7385a110f9f2c1c7806f471f66dda60c66969b95456f470",
+        false,
+    ),
+    (
+        "tools/build_defs/build_info/templates/non_volatile_file.h.template",
+        "4d014ba8408a9a1e5cc9aca57183dee8bda0561ee92d4732bf174d0392218269",
+        false,
+    ),
+    (
+        "tools/build_defs/build_info/templates/non_volatile_file.properties.template",
+        "c0ca85d3db416d3be5c68662b893e720bd817fb60c2b8405b41ecd51909a8f53",
+        false,
+    ),
+    (
+        "tools/build_defs/build_info/templates/redacted_file.h.template",
+        "2e00a18d90e804f52af2079fdcdad7d78ec7e04790f9173c20dc2cb7a4092db0",
+        false,
+    ),
+    (
+        "tools/build_defs/build_info/templates/redacted_file.properties.template",
+        "6ae3ee07bd3c4686ec4086678ce999cbc1720929ed1fa0ddeff605e96d01160a",
+        false,
+    ),
+    (
+        "tools/build_defs/build_info/templates/volatile_file.h.template",
+        "83f47681c317f7b1249b6dcc9fa23a089233cf2f3a3801fedaca82869def8807",
+        false,
+    ),
+    (
+        "tools/build_defs/build_info/templates/volatile_file.properties.template",
+        "0dd90374e26f9c19b9ade0de574a64733dac9c9371bb9feda2ebcab66948b483",
+        false,
+    ),
+    (
         "tools/build_defs/cc/BUILD",
         "a24f1afcd5bfaaf9fc88ae3455213c83d61988bac5a80e58dd9f954281f6009d",
         false,
@@ -339,7 +389,7 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
     assert_eq!(identity.snapshot(), BuiltinBazelToolsSnapshot::Bazel9_2);
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
-        "3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc"
+        "e45427b34b6d4cb171c4d4440282a80045f79d37b836cf6c3ddefa05f02ea8af"
     );
 }
 
@@ -356,6 +406,8 @@ fn embedded_catalog_paths_remain_exact_with_bazel_input_metadata() {
         "src/tools/launcher/BUILD.bazel",
         "src/tools/launcher/util/BUILD.bazel",
         "tools/BUILD.bazel",
+        "tools/build_defs/build_info/BUILD.bazel",
+        "tools/build_defs/build_info/templates/BUILD.bazel",
         "tools/build_defs/cc/BUILD.bazel",
         "tools/build_defs/repo/BUILD.bazel",
         "tools/launcher/BUILD.bazel",

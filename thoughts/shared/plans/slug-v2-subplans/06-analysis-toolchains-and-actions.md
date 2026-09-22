@@ -340,8 +340,34 @@ publication preserve that identity across target/exec and repositories, freeze,
 GC and context teardown. Loading also supplies the general native is_symlink
 predicate. No status bytes or actions are synthesized; source staging, requested
 prerequisite planning, runfiles encoding, Cpp discovery and REAPI refuse status
-execution. Real tracked status production, volatile execution policy and build-info
-transforms remain prerequisites to the authentic full toolchain envelope.
+execution. At the WP777 boundary, real tracked status production, volatile
+execution policy and build-info transforms remained prerequisites to the authentic
+full toolchain envelope.
+
+WP778 accepts construction: the installed verbatim C++
+build-info rule registers volatile and stable TranslateBuildInfo actions followed
+by the redacted Symlink. Its genuine bare OutputGroupInfo uses the existing
+provider lowerer; arbitrary structs are not promoted to providers. The authentic
+toolchain-helper/public-compile proof now consumes this real dependency rather
+than an empty envelope. The two capture-free callbacks are represented by finite
+recipes authenticated against canonical source, complete source digest and native
+callsite; no callback executes or evaluator heap survives in the action.
+BuildAPI's shared immutable spec retains full workspace/status, template,
+configuration/root/output and recipe identity. Orthogonal Ordinary/Constant output
+metadata participates in structural Eq/Hash/Ord and declaration conflicts; only a
+typed matching transform may own a constant output. Ordered input deduplication
+does not erase the distinct status/template roles. These are exact admitted
+construction semantics with Slug-native structural identity, not an ActionKey
+claim. Core and raw projection/materialization entrypoints fail closed before
+execution effects. Status bytes/production, rendering, arbitrary or Java callbacks,
+execution/cache policy, installed module tools and full cc_toolchain remain deferred.
+Source-target analysis now classifies builtin catalog Files through the tracked
+repository route and existing immutable source key, propagating catalog/type/hash
+errors. This is distinct from filesystem acquisition: no host path or metadata is
+invented, and runtime source acquisition remains refused for the builtin catalog.
+Root-origin loading of this zero-import C++ module uses the same tracked canonical
+builtin mapping owner as installed-target loading; unrelated zero-import modules
+are not promoted. The existing single-import promotion remains unchanged.
 
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and

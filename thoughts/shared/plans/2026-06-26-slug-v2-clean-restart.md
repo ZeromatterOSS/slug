@@ -29,8 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-77-m7a-workspace-status-artifacts-r1
+Packet: WP-7-78-m7a-build-info-transform-registration-r1
 Status: accepted
+
+WP778 accepts authentic build-info transform registration and bare OutputGroupInfo,
+retaining source-authenticated recipes, constant output metadata and genuine builtin
+source/mapping owners. The real groups feed the unchanged toolchain-helper proof;
+120 tests, CLI check and independent design/final review pass. Real status
+production, rendering/execution and full toolchain construction remain separate gates.
 
 WP777 accepts workspace-global status File descriptors and ctx getters,
 preserving full workspace/role identity, lifetime and constant-metadata policy.

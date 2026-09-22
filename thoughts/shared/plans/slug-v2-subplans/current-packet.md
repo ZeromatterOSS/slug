@@ -1,189 +1,218 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-77-m7a-workspace-status-artifacts-r1
+Packet: WP-7-78-m7a-build-info-transform-registration-r1
 Status: accepted
 
-## Observable outcome and compatibility
+## Outcome and compatibility
 
-Give real configured rule contexts immutable ctx.info_file / ctx.version_file
-Files from one workspace-global DICE descriptor owner. Preserve status provenance,
-shared root, owner=None, stable/volatile identity and metadata policy through
-provider publication, target/exec and main/external contexts, freeze and GC.
-These are descriptors, NOT produced status bytes or registered rule-owned actions.
-They unblock the next native build-info transform registration owner.
+Construct the unchanged pinned bazel_cc_build_info rule with genuine status
+inputs, native typed TranslateBuildInfo actions and its bare OutputGroupInfo.
+Prove volatile-transform, stable-transform, redacted-Symlink registration order,
+non_redacted=[stable,volatile] and redacted=[redacted] provider order. Feed that
+real OutputGroupInfo into the existing authentic toolchain-helper/public compile
+proof; no empty-provider or nostamp shortcut.
 
-Exact NOOP-path File fields: root.path bazel-out; basename/short_path
-stable-status.txt or volatile-status.txt; path bazel-out/name; dirname bazel-out;
-extension txt; owner None; is_source/is_directory/is_symlink false. Stable is
-ordinary derived metadata, volatile constant metadata; the latter is retained
-internal policy, never a fabricated content digest. Live-ctx retrieval guards,
-immutable captured File lifetime and native structural equality/hash are admitted.
-The existing File facade also gains the pinned is_symlink predicate for source
-and configured Files (only declared Symlink outputs are true), not a status-only
-attribute. DefaultInfo.files may publish status descriptors without declaring
-them as rule-owned outputs or granting execution authority.
-Slug-native: workspace-scoped structural identity, diagnostics and output naming
-domain (matching these path strings does not claim Bazel configuration identity).
-Unsupported/deferred: actual workspace-status producer action/bytes, status command,
-host/user/time/environment observation, volatile refresh/cache policy, transform
-callbacks and template actions, bare-provider rule returns, installed module tools,
-full cc_toolchain and execution. Every executable/materialization route for status
-Files must reject explicitly; no fake Source label, per-rule FileWrite or empty
-status fallback. M7A partial; M8 unproved.
+Exact admitted slice: both private three-required-named-argument binders, current
+caller allowlist and live actions guard, genuine template File and package/root
+output ownership, ordered status/template inputs, singleton output, mnemonic,
+stable ordinary versus volatile constant metadata, unconditional-volatile policy,
+genuine bare Info provider returns through existing lowering/publication.
+Only the two unchanged capture-free C++ callbacks are admitted, authenticated
+from complete pinned source and native callsite. No callback runs in analysis.
+Slug-native: full structural configuration/root/action identity and diagnostics.
+Deferred: arbitrary callbacks, Java build-info semantics, actual status bytes/
+producer/command/host/time/env, rendering/execution/cache policy, ActionKey/aquery,
+installed module tools, full cc_toolchain and bootstrap. Execution must fail
+before source acquisition, writes or RPC. M7A partial; M8 unproved.
 
-WP776 at614594c31 accepted native template providers with86 tests and Core/CLI
-checks; its complete receipt remains in Git. Authentic bazel_cc_build_info.bzl
-unconditionally registers stable/volatile transforms and redacted Symlink even
-under nostamp. Its callbacks and genuine global inputs cannot be replaced by
-eager/default content. This foundational owner is required before registration.
+Immediate predecessor WP777 at788c153ce owns workspace-global immutable status
+descriptors under a pure workspace-only DICE key;87 tests/CLI/design+final review
+passed. Those descriptors confer no production/execution authority.
 
-## Source and natural owner
+## Evidence and decisions
 
 Pinned Bazel9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-SkyframeExecutor.java1473–1496; BlazeDirectories.java223–233,257–258;
-WorkspaceStatusValue.java37–43,55–73; CachingAnalysisEnvironment.java349–364;
-StarlarkRuleContext.java995–1003; Artifact.java294–308,400–406,435–471,
-563–564,618–666,866–894,1251. Pinned stamping_test.sh32–46 supplies path
-regressions; StarlarkRuleContextTest.java4773–4822 supplies metadata distinction.
-execution_phase_tests.sh116–144 is deferred execution/cache evidence, not proved
-by descriptors. No new oracle corpus/body or Java probe required.
-General File.is_symlink is pinned to FileApi.java100–106 and retains source,
-regular File, Directory and declared Symlink discrimination. DICE's existing
-dependency/publication rules are inherited from docs/developers/dice.md; this
-key has no mutable dependencies or injected semantic value.
+StarlarkActionFactoryApi.java1135–1211; StarlarkActionFactory.java475–529;
+BuildInfoFileWriteAction.java72–94,118–220; BuiltinRestriction.java34–44,170–180;
+StarlarkRuleContextTest.java4773–4855; BuildInfoFileWriteActionTest.java199–358.
+Authentic tools/build_defs/build_info/bazel_cc_build_info.bzl17–79 SHA256
+72cc98ddc39e4c7c66d23541c7b18e10b70fde6008e2883144554b7487e97514.
+Its imports are empty and both callbacks have no captures. Calls36/37 directly
+select their own immutable module-global defs. rules_cc cc_toolchain.bzl119,
+339–342 demands its OutputGroupInfo. Rule return classification follows
+StarlarkRuleConfiguredTargetUtil.java247–278; None/tuple sequence breadth may
+remain deferred, but genuine bare native/user Info is not an arbitrary struct.
 
-BuildAPI owns WorkspaceStatusRoot over existing NormalizedAbsolutePath and
-WorkspaceStatusArtifact(kind Stable/Volatile), plus the immutable descriptor pair.
-Add distinct AnalysisArtifact and AnalysisArtifactRoot variants; do not relax
-configured DerivedArtifactRoot or ActionOutput invariants. Equality/hash includes
-normalized workspace and role, never displayed path alone or requesting config.
-Analysis WorkspaceStatusArtifactsKey is keyed only by normalized workspace and
-computes shared Arc<WorkspaceStatusArtifacts>. This pure descriptor computation
-does no IO, injection, clock/env read or status-content inference; no dependency
-can change these workspace-constant names/policies. Existing configured analysis
-computes that key before synchronous rule evaluation and retains its result.
-No locks, counters, global caches or alternate discovery paths. Future execution
-must add real tracked producer inputs separately; this key cannot certify bytes.
+Reuse Loading cc_toolchain_auth's canonical identity + observed source digest +
+evaluated complete source digest + exact source callsite authentication.
+Normal caller allowlist remains separate. Require genuine Starlark function type,
+but never authenticate by name/repr/hash alone. The unchanged complete source
+fixes the actual callback expression, module globals, zero captures and applicable
+fixed evaluator semantics. Only @@bazel_tools//tools/build_defs/build_info:
+bazel_cc_build_info.bzl calls36/37 are admitted. Modified/copied source, other
+callsites and arbitrary functions fail closed. Retain finite Info/Version recipe
+plus authenticated canonical source/digest; do not serialize callback values,
+retain frozen heaps, mint callable identities or evaluate substitutions early.
+This is a bounded exact source adapter, not a fallback implementation.
 
-Loading reuses the existing native File/root facades; owner/label are None, and
-status Files have no rule declaration authority. Analysis guards getter access
-with its existing context token, but captured values contain no token/heap borrow.
-Existing full artifact publication carries complete workspace/role semantics.
-DICE equality cutoff, cancellation, graph lifetime and Arc ownership bound release.
-No mutable retained state; string projections and validation walks are scratch.
+Integration exposed an existing missing owner dispatch for source File targets
+in builtin repositories. Design delta independently accepted: analysis-only
+source classification selects Builtin from the tracked repository route and
+computes the existing BuiltinBazelToolsSourceFileKey with its snapshot and exact
+relative path. Propagate catalog/kind/integrity errors; preserve declaration and
+visibility checks plus canonical Source labels. Reuse route dependencies; no
+new DICE key or fabricated ResolvedPath/host metadata. Public runtime observed
+path resolution and materialization remain unchanged and fail closed.
 
-## Utility and dependency decision
+Direct root/external instantiation also exposed the existing root-origin builtin
+module route's empty mapping for zero-import files. Design delta2 independently
+accepted: promote only the genuine builtin C++ build-info source with zero imports
+through the existing canonical route owner. Preserve the existing single-import
+promotion and observation/Need/error flow. No self-only map injection or blanket
+zero-import promotion; unrelated, Java and copied source identities stay excluded.
 
-Reuse Arc/Dupe/Allocative and the existing normalized Arc<PathBuf> workspace
-primitive, preserving OS-native/non-Unicode identity. Explicitly add acyclic
-BuildAPI -> slug_workspace_v2 internal dependency (Cargo and Bazel metadata),
-rather than duplicate path normalization or weaken its type via opaque IDs.
-This brings an already-used lower DICE-linked crate into BuildAPI's dependency
-closure, but no new external dependency or DICE computation into BuildAPI.
-Stage9 existing shared workspace/observation and structural-artifact dispositions
-apply. No donor semantic code, performance or memory-reduction claim.
+BuildAPI owns immutable Arc/Dupe/Allocative BuildInfoTransformSpec: status,
+template, rooted output, finite callback source/role, volatility. Equality
+compares every structural input through existing ActionSpec publication; status
+root retains workspace and output root full configuration. Add orthogonal
+ActionOutputMetadata::{Ordinary,Constant}; regular constructor remains Ordinary,
+constant constructor only regular File. Full Eq/Hash/Ord include metadata.
+Declaration registry retains metadata with kind, refuses incompatible
+redeclarations, and does not reconstruct ordinary policy from path/kind.
+Registry permits constant output only in typed matching BuildInfo transforms;
+legacy marker-only actions and other families cannot claim it. No weakening of
+existing root/declaration/conflict checks. No exact key claim from source digest.
+
+Analysis uses existing per-evaluation sink/registry to register immutable specs
+in source order. The sink shares the real WP777 descriptor pair. No new DICE key,
+global cache, interner, evaluator borrow, pending callable buffer or lock across
+compute. Existing configured-node dependencies track modules/templates/config;
+DICE publication/cancellation/lifetime and Arc owners bound retention. Short path
+construction, authentication hashing and return normalization are phase scratch.
+Retained utility policy inherits Stage9 structural artifact and finite callable
+rows; reuse existing SmallMap, Arc/Dupe/Allocative, no dependency/donor import or
+performance claim. Read docs/developers/dice.md before ownership edits.
+
+Port installed build_info package and templates verbatim from upstream
+BUILD.tools (as BUILD), both .bzl files and all six template files. The Java .bzl
+is required by unchanged package loading but its transform callsites remain
+unsupported. Extend builtin catalog/provenance through its normal owner; no
+authored replacement BUILD or duplicate oracle corpus. Focused tests use those
+same checked-in bytes. No JVM/Java semantic runtime or probe.
 
 ## Scope and routing
 
-Base614594c31; codex/wp777-workspace-status-review. Independent design checkpoint
-before edits, actual-diff/evidence final review before acceptance.
-Worker1:
-- app/slug_build_api_v2/src/workspace_status.rs + child tests; lib.rs;
-  analysis_value.rs, artifact_root.rs; actions/runfiles_support.rs,
-  actions/cpp_compile/input_sets.rs, runfiles/manifest.rs narrowly reject status
-  at unadmitted consumer boundaries.
-- app/slug_build_api_v2/Cargo.toml and BUILD.bazel internal dependency;
-  root owns mechanical Cargo.lock update.
-- app/slug_loading_v2/src/subrule_invocation.rs File/root wiring and
-  subrule_invocation/workspace_status_tests.rs; artifact_root.rs.
-Worker2:
-- app/slug_analysis_v2/src/workspace_status.rs + child tests; lib.rs;
-  dice.rs compute/pass-through only; starlark_rule.rs context getter/field/freeze;
-  starlark_rule/context_lifecycle_tests.rs and cargo_runfiles_tests.rs context
-  initialization; analysis_value.rs test hook and
-  analysis_value/workspace_status_tests.rs.
+Base788c153ce, codex/wp778-build-info-transforms-review. Independent design before
+production edits and actual-diff/evidence final review. Large parent files get
+closed variant/wiring hooks only; new semantics and tests in child modules.
+Estimate500–950 production,500–1000 tests, plus verbatim upstream files.
+Any additional file or ownership choice requires root reassessment.
+
+Worker1 (Loading):
+- src/build_info_transform.rs + child tests; lib.rs.
+- src/bzl_module.rs finite existing-route promotion hook for the pinned source.
+- src/subrule_invocation.rs trait/default + two thin method hooks only.
+- existing builtin_restriction/source identity APIs reused unchanged.
+- Root adds Loading BUILD.bazel test compile_data for the single shared upstream
+  C++ callback source; no duplicate source fixture.
+Worker2 (BuildAPI + Analysis):
+- BuildAPI src/actions/build_info_transform.rs + child tests;
+  actions/{mod,spec,registry,ctx_actions,reapi_projection}.rs plus existing
+  projection tests; lib.rs.
+- Analysis src/starlark_rule/build_info_transform.rs + child tests;
+  starlark_rule.rs sink field/declaration metadata/bare-provider normalization;
+  context_lifecycle_tests.rs/cargo_runfiles_tests.rs fixture initialization;
+  solib_tests.rs fixture field initialization only;
+  result.rs typed accessor and Ordinary-only FileWrite view guard.
+- Analysis src/dice/source_file.rs existing route helper reuse and private
+  analysis classification; dice.rs thin source-target dispatch. Focused source
+  route/catalog negatives in a child test module or existing integration child.
 Root:
-- Analysis tests/workspace_status.rs and tests/starlark_rule.rs hook.
-- Core runtime/action_prerequisites.rs plus child tests,
-  action_prerequisites/symlink.rs, source_input.rs plus existing child tests,
-  source_staging/tests.rs pure descriptor refusal regression,
-  dice.rs narrow output-only branch, configured_output.rs,
-  runfiles_manifest.rs plus existing child tests,
-  action_chain_staging/runfiles.rs and symlink.rs;
-  REAPI action_chain/binding.rs explicit refusal and focused tests.
-- REAPI Cargo.toml dev-only workspace dependency for the direct no-RPC binding
-  rejection test; no new production dependency. Existing Bazel target does not
-  build library unit tests, so no production Bazel edge is added for this test.
-- Cargo.lock mechanical internal edge; Stage6/Stage9/bootstrap/scheduling.
-Any additional file requires root reassessment. Large parents receive only closed
-variant/wiring/refusal branches; new ownership is in children. Estimate350–650
-production and400–800 test lines, no copied fixture trees.
+- Bzlmod builtin/bazel_tools/tools/build_defs/build_info files named above,
+  src/builtin_repository.rs, tests/builtin_bazel_tools.rs, builtin provenance
+  metadata; BUILD.bazel compile_data and the two normal catalog BUILD.bazel
+  sidecars (excluded from installed bytes).
+- Analysis tests/rustc_map_each/compile_context/provider/build_info_transform.rs included by existing provider proof
+  module to reuse its genuine selected-registry harness without duplicating it;
+  tests/rustc_map_each/compile_context/provider.{rs,bzl} genuine dependency proof.
+- Core runtime/action_prerequisites.rs plus focused child test; relevant resolved
+  action/formatter narrow refusal branch only if exhaustive match requires it.
+- Core runtime/configured_action_closure.rs Ordinary-only scalar FileWrite guard.
+- REAPI input_tree.rs/command.rs/executor.rs plus focused tests; generic command refuses
+  typed transform. CLI dependent check covers every new enum consumer.
+  Public raw projection/input-tree and configured-output materialization APIs
+  independently reject constant metadata; they cannot rely on registry checks.
+- Stage6/9/bootstrap and scheduling records.
 
-## Gates
+## Gates and validation
 
-Prove descriptor sharing within one DICE across main/external, targets/configs and
-target/exec; different workspaces remain unequal despite equal paths; stable vs
-volatile and internal metadata differ; all public File/root projections and
-native dict/depset equality/hash; real provider forwarding and configuration A/B/A.
-Key repeat/normalized-path equivalence and separate workspace tests must use real
-DICE, not an injected pair. Lifecycle tests distinguish expired ctx retrieval
-from captured File survival, lower/rematerialize/source-heap disposal and GC.
-Refuse status as source input, executable action prerequisite, runfiles/source
-materialization, REAPI input, declared rule output and unsupported Cpp discovery
-input. Verify failures precede writes/RPCs; ordinary source/derived gates remain.
+Prove genuine installed rule action/group contents with real status/template
+artifacts, ordinary/constant output policy and publication identity; bare-provider
+native/user success versus struct/nonprovider rejection; cross-role/workspace/
+template/output/source/config equality, path/conflict and ordered atomic
+registration. Main/external target/exec and A/B/A in one DICE; authentication
+accepts unchanged authority and rejects modified/copied/missing provenance in
+the Loading harness. Installed builtin source is immutable catalog content, not
+a mutable DICE input. Escaped action expiry and post-evaluation/GC
+publication, no eager callback. Protected WP777 status/root/lifecycle gates and
+authentic helper compile/template-provider proof. Negative binders include
+positional/missing/unknown args, nonfunction/template, nonallowlisted caller,
+wrong source/callsite and invalid output. Execution/REAPI refuse before side
+effects; existing ordinary action families and constant-policy rejection remain.
 
-Serial freshly-resolved pinned nightly offline/locked Cargo JSON no-run for
-BuildAPI/Loading/Analysis/Core and focused REAPI as needed, exact batched
-nonignored preflight plus actual counts. Protect accepted root/File/action-input
-and lifecycle tests, WP776 native/helper proof, and source/prerequisite/runfiles
-rejections. CLI direct-dependent check includes all exhaustive match consumers.
-No daemon/Bazel/compiler action/network required. Preparation60s/operation;
-runtimes expected seconds, not user deadlines. Rustfmt/diff/archive/status checks.
-REPLAN if descriptor identity requires actual mutable status inputs or retained
-lifetime/execution integrity cannot remain separate; ordinary scoped corrections
-are not REPLAN. Do not claim the real status producer or transform gate completed.
+Pinned-source regressions suffice; no new Bazel corpus unless a demonstrated
+gap needs an oracle. Reuse installed bytes, no copied proof bodies. Serial
+freshly-resolved pinned offline/locked Cargo JSON no-run for owner crates and
+Bzlmod integration; batched exact preflight + actual passes; CLI check; rustfmt,
+diff/archive/status checks. Preparation60s/op, runtime seconds expected. No
+daemon/Bazel/network/compiler action required. REPLAN only if source authority,
+metadata/declaration integrity or complete semantic publication cannot be owned
+under this finite construction boundary; ordinary implementation corrections
+remain in packet. Do not claim real status production or bootstrap completion.
 
-## Validation receipt
+## Acceptance receipt
 
-Independent design and final reviews ACCEPT. Final review completed04:18Z;
-packet branch started03:58:37Z (~20min elapsed, including overlapping review).
-Review wall time was not separately instrumented. No REPLAN required.
+Independent design, both route-design addenda, and actual-diff final review:
+ACCEPT (/root/bazel_solib). Root integrated disjoint Loading, BuildAPI/Analysis,
+integration and documentation work using existing Arc/SmallMap/DICE owners.
+No new retained callback owner, heap, cache, interner or execution capability.
 
-2026-09-22, base614594c31. Freshly resolved nightly-2025-09-14; serial
-offline/locked Cargo JSON no-run, separate exact nonignored preflight and actual
-execution. All commands exit0 after the documented test-only corrections.
-87/87 final selected tests, summed runtime2.265s:
+120/120 unique exact nonignored tests selected and passed, all exit0:
 
-| Owner | Selected / passed | Receipt under target/wp777 | Runtime |
-|---|---:|---|---:|
-| BuildAPI |16/16|tests-1790050141783457875.receipt.json|0.067s|
-| Loading |15/15|tests-1790050199954281106.receipt.json|0.061s|
-| Analysis library |7/7|tests-1790050246772747396.receipt.json|0.021s|
-| Analysis integration |18/18|tests-1790050510464319813.receipt.json|1.653s|
-| Core |27/27|tests-1790050385127411937.receipt.json|0.443s|
-| REAPI |4/4|tests-1790050448799197606.receipt.json|0.020s|
+| Gate | Passes | Local receipt IDs under target/wp778/tests-*.receipt.json |
+| --- | ---: | --- |
+| Bzlmod catalog/provenance | 11 | 1790051558332208743,1790051567980455540,1790051586523299613 |
+| BuildAPI identity/registry/status | 19 | 1790051735792093978,1790051758720337038 |
+| Loading binders/auth/callsite/GC/routes | 24 | 1790052512712799482 |
+| Analysis publication/sink/lifecycle | 10 | 1790052553353632963 |
+| Configured installed/helper/main/external/target/exec | 22 | 1790052543337867363 |
+| Core prerequisites/source/closure refusals | 28 | 1790052588532392529 |
+| REAPI binding/projection/materialization refusals | 6 | 1790052640757010775 |
 
-Final no-run receipts: BuildAPI1 6.886s; Loading2 4.122s; Analysis2
-(library+integration)8.834s and3 (formatted integration)6.379s; Core2 31.128s;
-REAPI1 52.932s. CLI check1 exit0 20.145s includes Core, REAPI, Commands,
-Query and Server. Nine compile attempts totaled218.362s; no operation exceeded
-60s. Initial Analysis integration lacked an import; initial Core test fixture
-needed the new exhaustive variant. Loading test top-level conditions were moved
-inside functions before final replay. No production redesign or waived failure.
-The earlier integration14 replay is superseded by18, not counted twice.
+Fresh pinned nightly-2025-09-14 tools; serial offline/locked Cargo JSON no-run,
+batched exact preflight then individual execution. Final compile receipts:
+slug_build_api_v2-2, slug_bzlmod_v2-1, slug_loading_v2-5,
+slug_analysis_v2-6 (--lib --test starlark_rule), slug_core_v2-3,
+slug_reapi_v2-2. check-slug_cli_v2-2 exit0/10.129s. Commands use
+`cargo test --offline --locked -p <crate> --lib --no-run --message-format=json`
+(Bzlmod also --test builtin_bazel_tools), and `cargo check --offline --locked
+-p slug_cli_v2 --message-format=json`. No CLI execution or daemon smoke required.
 
-Source review and semantic tests cover every named gate: real DICE pointer
-sharing, full workspace/role identity including non-Unicode paths, public File
-fields/hash/depsets, main/external target/exec and config A/B/A, DefaultInfo
-forwarding, expired ctx versus captured File lifetime, heap disposal/freeze/GC,
-and refusal before source observation, execution, materialization or RPC.
-Protected genuine roots, template providers and unchanged toolchain helper
-construction/publication remain green. No oracle corpus growth, daemon, Bazel,
-compiler action, CLI invocation or network replay. Rustfmt, diff, archive and
-plan-status checks pass. Skill-guided Arc/Dupe/Allocative reuse adds no interner,
-cache, lock or evaluator borrow. No performance claim.
+All 10 installed files byte-match pinned upstream; 59-entry manifest digest
+e45427b34b6d4cb171c4d4440282a80045f79d37b836cf6c3ddefa05f02ea8af.
+Named rustfmt check, diff check, archive check and plan-status check pass.
+Two invocation corrections (integration target name and selecting a fixture child
+as a standalone target) and test-fixture mapping/diagnostic corrections retained
+their failed receipts. Actual integration exposed the two owner-route gaps above;
+both were corrected under independent design review, not bypassed. Input-set
+deduplication and stronger callsite/GC/bare-return discriminators completed the
+original invariants. No REPLAN or ceiling increase.
 
-Observable gate advanced: genuine workspace-global status descriptors in native
-ctx. Remaining: real tracked status producer/bytes, constant-metadata execution
-policy, authenticated transform callback ownership and template actions, bare
-provider returns and installed module tools. M7A remains partial; M8 unproved.
+Branch creation to final acceptance about30min; 21 preparation operations total
+388.983s, maximum56.779s (60s preparation cap); final selected runtime2.767s,
+slowest0.484s. Review ran concurrently and was not separately timed.
+Observable gate advanced: unchanged installed C++ build-info construction feeds
+real output groups into the authentic toolchain-helper/public-compile proof.
+M7A remains partial and M8 unproved. Next selection must address a remaining
+authentic full-toolchain/bootstrap prerequisite; status producer/rendering and
+execution/cache-policy admission remain separate work, not implied by this receipt.

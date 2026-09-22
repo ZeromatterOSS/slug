@@ -9,7 +9,7 @@ use starlark::syntax::Dialect;
 
 use super::*;
 
-fn configuration() -> crate::ConfigurationKey {
+pub(super) fn configuration() -> crate::ConfigurationKey {
     let host = HostConversionInputs::new(
         Some(AutoCpuToken::K8),
         Some(HostPathFlavor::Unix),
@@ -26,7 +26,7 @@ fn configuration() -> crate::ConfigurationKey {
     crate::ConfigurationKey::from_slug(SlugConfiguration::default_target(&host).unwrap())
 }
 
-fn declaration_sink(key: &ConfiguredTargetKey) -> Arc<SynchronousAnalysisActionSink> {
+pub(super) fn declaration_sink(key: &ConfiguredTargetKey) -> Arc<SynchronousAnalysisActionSink> {
     let root = DerivedArtifactRoot::bin(key.configuration().slug_configuration().unwrap().clone())
         .unwrap();
     let context = Arc::new(ConfiguredActionOwnerContext::unresolved_default(key.clone()).unwrap());
@@ -38,6 +38,9 @@ fn declaration_sink(key: &ConfiguredTargetKey) -> Arc<SynchronousAnalysisActionS
     )
     .unwrap();
     Arc::new(SynchronousAnalysisActionSink {
+        workspace_status: Arc::new(slug_build_api_v2::WorkspaceStatusArtifacts::new(
+            slug_workspace_v2::NormalizedAbsolutePath::new("/fixture/workspace").unwrap(),
+        )),
         root: root.clone(),
         actions: Arc::new(Mutex::new(CtxActions::new(root))),
         declared_outputs: Mutex::new(SmallMap::new()),

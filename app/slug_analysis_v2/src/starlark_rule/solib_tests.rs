@@ -31,6 +31,9 @@ fn sink() -> Arc<SynchronousAnalysisActionSink> {
     )
     .unwrap();
     Arc::new(SynchronousAnalysisActionSink {
+        workspace_status: Arc::new(slug_build_api_v2::WorkspaceStatusArtifacts::new(
+            slug_workspace_v2::NormalizedAbsolutePath::new("/fixture/workspace").unwrap(),
+        )),
         root: DerivedArtifactRoot::bin(key.configuration().slug_configuration().unwrap().clone())
             .unwrap(),
         actions: Arc::new(Mutex::new(CtxActions::new(

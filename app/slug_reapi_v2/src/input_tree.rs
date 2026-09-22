@@ -86,6 +86,16 @@ pub struct ReapiInputTree {
 
 impl ReapiInputTree {
     pub fn from_action(action: &ActionSpec) -> Result<Self, InputTreeError> {
+        if action.kind() == &slug_build_api_v2::ActionKind::BuildInfoTransform {
+            return Err(InputTreeError::BuildInfoTransformUnsupported);
+        }
+        if action
+            .outputs()
+            .iter()
+            .any(|output| output.metadata() == slug_build_api_v2::ActionOutputMetadata::Constant)
+        {
+            return Err(InputTreeError::ConstantMetadataUnsupported);
+        }
         if action.kind() == &slug_build_api_v2::ActionKind::CppCompile {
             return Err(InputTreeError::CppCompileUnsupported);
         }
@@ -255,6 +265,8 @@ impl ReapiInputTree {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum InputTreeError {
+    BuildInfoTransformUnsupported,
+    ConstantMetadataUnsupported,
     CppCompileUnsupported,
     TypedActionUnsupported,
     MissingDigest { path: String },
@@ -266,6 +278,12 @@ pub enum InputTreeError {
 impl fmt::Display for InputTreeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::BuildInfoTransformUnsupported => {
+                f.write_str("BuildInfoTransform REAPI inputs are not admitted")
+            }
+            Self::ConstantMetadataUnsupported => {
+                f.write_str("constant-metadata REAPI outputs are not admitted")
+            }
             Self::CppCompileUnsupported => {
                 write!(
                     f,

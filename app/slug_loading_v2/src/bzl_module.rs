@@ -4790,8 +4790,12 @@ async fn compute_external_bzl_effective_route(
     if !route.is_builtin_bazel_tools() {
         return ControlFlow::Continue((key.route.clone(), observations));
     }
-    let Some(load) = admitted_builtin_external_repository_load(loads) else {
-        return ControlFlow::Continue((key.route.clone(), observations));
+    let load = match admitted_builtin_external_repository_load(loads) {
+        Some(load) => load,
+        None if crate::build_info_transform::needs_builtin_mapping(&source, loads) => {
+            slug_build_api_v2::BuildInfoCallbackRecipe::SOURCE_LABEL
+        }
+        None => return ControlFlow::Continue((key.route.clone(), observations)),
     };
     let (input, observations) = match compute_canonical_external_child_input(
         ctx,

@@ -220,6 +220,82 @@ const CATALOG: &[CatalogEntry] = &[
         executable: false,
     },
     CatalogEntry {
+        path: "tools/build_defs/build_info/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/build_info/BUILD"),
+        expected_sha256: "91db40a0a2ecc4eb8aaed489dd4ce117af5a0e5d64ed7d9d6f21417e4873bb1a",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/build_info/bazel_cc_build_info.bzl",
+        bytes: include_bytes!(
+            "../builtin/bazel_tools/tools/build_defs/build_info/bazel_cc_build_info.bzl"
+        ),
+        expected_sha256: "72cc98ddc39e4c7c66d23541c7b18e10b70fde6008e2883144554b7487e97514",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/build_info/bazel_java_build_info.bzl",
+        bytes: include_bytes!(
+            "../builtin/bazel_tools/tools/build_defs/build_info/bazel_java_build_info.bzl"
+        ),
+        expected_sha256: "2ca911d9ab6b426cd120294a09148de8b641d14ebf6d9b3faaeaa86b3f4fc6bb",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/build_info/templates/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/build_info/templates/BUILD"),
+        expected_sha256: "569d06599fc494e6c7385a110f9f2c1c7806f471f66dda60c66969b95456f470",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/build_info/templates/non_volatile_file.h.template",
+        bytes: include_bytes!(
+            "../builtin/bazel_tools/tools/build_defs/build_info/templates/non_volatile_file.h.template"
+        ),
+        expected_sha256: "4d014ba8408a9a1e5cc9aca57183dee8bda0561ee92d4732bf174d0392218269",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/build_info/templates/non_volatile_file.properties.template",
+        bytes: include_bytes!(
+            "../builtin/bazel_tools/tools/build_defs/build_info/templates/non_volatile_file.properties.template"
+        ),
+        expected_sha256: "c0ca85d3db416d3be5c68662b893e720bd817fb60c2b8405b41ecd51909a8f53",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/build_info/templates/redacted_file.h.template",
+        bytes: include_bytes!(
+            "../builtin/bazel_tools/tools/build_defs/build_info/templates/redacted_file.h.template"
+        ),
+        expected_sha256: "2e00a18d90e804f52af2079fdcdad7d78ec7e04790f9173c20dc2cb7a4092db0",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/build_info/templates/redacted_file.properties.template",
+        bytes: include_bytes!(
+            "../builtin/bazel_tools/tools/build_defs/build_info/templates/redacted_file.properties.template"
+        ),
+        expected_sha256: "6ae3ee07bd3c4686ec4086678ce999cbc1720929ed1fa0ddeff605e96d01160a",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/build_info/templates/volatile_file.h.template",
+        bytes: include_bytes!(
+            "../builtin/bazel_tools/tools/build_defs/build_info/templates/volatile_file.h.template"
+        ),
+        expected_sha256: "83f47681c317f7b1249b6dcc9fa23a089233cf2f3a3801fedaca82869def8807",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/build_defs/build_info/templates/volatile_file.properties.template",
+        bytes: include_bytes!(
+            "../builtin/bazel_tools/tools/build_defs/build_info/templates/volatile_file.properties.template"
+        ),
+        expected_sha256: "0dd90374e26f9c19b9ade0de574a64733dac9c9371bb9feda2ebcab66948b483",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/build_defs/cc/BUILD",
         bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs/cc/BUILD"),
         expected_sha256: "a24f1afcd5bfaaf9fc88ae3455213c83d61988bac5a80e58dd9f954281f6009d",
@@ -1129,7 +1205,7 @@ mod tests {
             evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &source).unwrap();
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
-            "3927ae2a3d8a6ec40f9dac0ef9f3833424ae4cbd6c56dcc9ab1d7d8ecee8abfc"
+            "e45427b34b6d4cb171c4d4440282a80045f79d37b836cf6c3ddefa05f02ea8af"
         );
         assert_eq!(value.module_sha256, source.sha256());
         assert_eq!(

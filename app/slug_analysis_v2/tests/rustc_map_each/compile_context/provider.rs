@@ -1,6 +1,8 @@
 //! Unchanged helper + genuine FDO subrule, not the full cc_toolchain rule.
 use super::*;
 
+mod build_info_transform;
+
 const CALLER: &str = "rules_cc/cc/private/rules_impl/provider_proof.bzl";
 
 fn workspace() -> PathBuf {
@@ -86,6 +88,41 @@ fn check_provider(
     assert_eq!(member(tc, "_build_variables"), field(result, "variables"));
     assert_eq!(member(tc, "_cpp_configuration"), field(result, "cpp"));
     assert_eq!(member(tc, "_fdo_context"), field(result, "fdo"));
+    let build_info = member(tc, "_build_info_files");
+    for (name, expected) in [
+        (
+            "non_redacted_build_info_files",
+            vec![("non_volatile_file.h", false), ("volatile_file.h", true)],
+        ),
+        (
+            "redacted_build_info_files",
+            vec![("redacted_file.h", false)],
+        ),
+    ] {
+        let files = values(member(build_info, name));
+        assert_eq!(files.len(), expected.len());
+        for (file, (basename, constant)) in files.iter().zip(expected) {
+            let AnalysisValueKind::Artifact(slug_build_api_v2::AnalysisArtifact::Derived {
+                owner,
+                output,
+            }) = file.kind()
+            else {
+                panic!("actual translator output artifact")
+            };
+            assert_eq!(
+                owner.label().to_string(),
+                "@@bazel_tools//tools/build_defs/build_info:cc_build_info"
+            );
+            assert_eq!(
+                output.root_relative_path(),
+                format!("external/bazel_tools/tools/build_defs/build_info/{basename}")
+            );
+            assert_eq!(
+                output.metadata() == slug_build_api_v2::ActionOutputMetadata::Constant,
+                constant
+            );
+        }
+    }
     assert_eq!(member(tc, "all_files"), field(result, "files"));
     assert!(
         matches!(member(tc, "_is_tool_configuration").kind(), AnalysisValueKind::Boolean(v) if v == exec)

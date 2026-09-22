@@ -263,6 +263,14 @@ fn walk_prerequisites<'a>(
                 }
                 states.insert(coordinate, None);
                 let action = &owners[coordinate.0].actions()[coordinate.1];
+                if action.kind() == &slug_build_api_v2::ActionKind::BuildInfoTransform {
+                    return Err("BuildInfoTransform execution is not admitted".into());
+                }
+                if action.outputs().iter().any(|output| {
+                    output.metadata() == slug_build_api_v2::ActionOutputMetadata::Constant
+                }) {
+                    return Err("constant-metadata output execution is not admitted".into());
+                }
                 // A reachable public MANIFEST also completes its physical tree. This
                 // is a deferred root, never an input edge (the tree needs MANIFEST).
                 if complete_trees

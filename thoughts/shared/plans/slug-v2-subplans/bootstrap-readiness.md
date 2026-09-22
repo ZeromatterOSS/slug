@@ -435,9 +435,19 @@ implicit cc_build_info produces both stamped and redacted groups
 regardless --stamp; status transforms and embedded helper dependencies cannot be
 replaced by empty providers to claim construction. WP777 now supplies genuine
 workspace-global status File descriptors through ctx.info_file/version_file,
-with workspace/role identity and constant-metadata policy. It does not produce
-status bytes or register/execute build-info transforms; all execution and
-materialization routes for these descriptors remain closed. Generic command/
+with workspace/role identity and constant-metadata policy. WP777 itself does not
+produce status bytes or register/execute build-info transforms.
+WP778 accepts unchanged installed C++ build-info construction, which
+registers volatile/stable typed transforms and a redacted Symlink,
+publishes bare OutputGroupInfo in native group order, and feeds that real provider
+into the existing authentic toolchain-helper/public-compile proof. Finite recipes
+authenticate the complete pinned callback source and callsite; no callbacks run
+in analysis. Full structural action identity includes workspace/status, template,
+configuration/root and orthogonal output metadata. This removes a construction
+prerequisite, not a production execution gate: actual status bytes/producer,
+rendering, volatile execution/cache policy, module tools and full cc_toolchain
+remain unproved. Execution and raw projection/materialization paths for these
+descriptors/transforms remain closed. Generic command/
 aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/
 path mapping and full cc_library remain deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and unmodeled builtin structures remain outside

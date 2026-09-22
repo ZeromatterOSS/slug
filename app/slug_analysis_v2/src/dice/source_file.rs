@@ -3,8 +3,10 @@
 use allocative::Allocative;
 use dice::DiceComputations;
 use dupe::Dupe;
+use slug_bzlmod_v2::BuiltinBazelToolsSourceFileKey;
 use slug_bzlmod_v2::HostRepositoryPathKey;
 use slug_bzlmod_v2::HostRepositoryPathObservationKey;
+use slug_bzlmod_v2::HostRepositorySourceInputDispositionView;
 use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::HostCanonicalRepositoryLoadRouteKey;
@@ -42,14 +44,30 @@ impl ObservedSourcePath {
     }
 }
 
+enum SourceResolution {
+    Filesystem(ResolvedPath),
+    CatalogFile,
+}
+
+struct ObservedSourceResolution {
+    result: Result<SourceResolution, AnalysisError>,
+    observations: PathObservationEpoch,
+}
+
 type SourcePathOutcome =
-    LoadingPreparationOutcome<Result<ObservedSourcePath, ObservedPathFrontierError>>;
+    LoadingPreparationOutcome<Result<ObservedSourceResolution, ObservedPathFrontierError>>;
+
+pub(super) enum SourceFileState {
+    RegularFile,
+    Missing,
+    Unsupported(slug_workspace_v2::PathNodeKind),
+}
 
 fn complete(
-    result: Result<ResolvedPath, AnalysisError>,
+    result: Result<SourceResolution, AnalysisError>,
     observations: PathObservationEpoch,
 ) -> SourcePathOutcome {
-    LoadingPreparationOutcome::Complete(Ok(ObservedSourcePath {
+    LoadingPreparationOutcome::Complete(Ok(ObservedSourceResolution {
         result,
         observations,
     }))
@@ -62,8 +80,26 @@ pub async fn resolve_source_input_observed(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
     label: &CanonicalLabel,
-) -> SourcePathOutcome {
-    resolve_source_with_observations(ctx, ConfiguredAnalysisMode::Observed, workspace, label).await
+) -> LoadingPreparationOutcome<Result<ObservedSourcePath, ObservedPathFrontierError>> {
+    resolve_source_with_observations(
+        ctx,
+        ConfiguredAnalysisMode::Observed,
+        workspace,
+        label,
+        false,
+    )
+    .await
+    .map(|result| {
+        result.map(|observed| ObservedSourcePath {
+            result: observed.result.and_then(|source| match source {
+                SourceResolution::Filesystem(path) => Ok(path),
+                SourceResolution::CatalogFile => Err(AnalysisError::message(
+                    "catalog source has no filesystem acquisition path",
+                )),
+            }),
+            observations: observed.observations,
+        })
+    })
 }
 
 pub(super) async fn resolve_source_input(
@@ -71,10 +107,26 @@ pub(super) async fn resolve_source_input(
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
     label: &CanonicalLabel,
-) -> AnalysisSemanticOutcome<ResolvedPath> {
-    resolve_source_with_observations(ctx, mode, workspace, label)
+) -> AnalysisSemanticOutcome<SourceFileState> {
+    resolve_source_with_observations(ctx, mode, workspace, label, true)
         .await
-        .map(|result| result.map(|observed| observed.result))
+        .map(|result| {
+            result.map(|observed| {
+                observed.result.map(|source| match source {
+                    SourceResolution::CatalogFile => SourceFileState::RegularFile,
+                    SourceResolution::Filesystem(path) => match path.state() {
+                        slug_workspace_v2::ResolvedPathState::Missing => SourceFileState::Missing,
+                        slug_workspace_v2::ResolvedPathState::Present(metadata) => {
+                            if metadata.kind() == slug_workspace_v2::PathNodeKind::RegularFile {
+                                SourceFileState::RegularFile
+                            } else {
+                                SourceFileState::Unsupported(metadata.kind())
+                            }
+                        }
+                    },
+                })
+            })
+        })
 }
 
 async fn resolve_source_with_observations(
@@ -82,6 +134,7 @@ async fn resolve_source_with_observations(
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
     label: &CanonicalLabel,
+    admit_catalog: bool,
 ) -> SourcePathOutcome {
     if label.package().repo().is_root() {
         return resolve_root_source_input(ctx, mode, source_path(workspace, label), label).await;
@@ -142,7 +195,7 @@ async fn resolve_source_with_observations(
         },
     };
     let route = match route.as_ref() {
-        Ok(route) => HostRepositorySourceRoute::canonical(route.input().clone()),
+        Ok(route) => route,
         Err(error) => {
             return complete(
                 Err(AnalysisError::message(format!(
@@ -154,6 +207,42 @@ async fn resolve_source_with_observations(
     };
     let relative =
         std::path::PathBuf::from(label.package().package().as_str()).join(label.target().as_str());
+    if admit_catalog {
+        if let HostRepositorySourceInputDispositionView::Builtin(identity) =
+            route.input().view().disposition()
+        {
+            // The tracked route selects the immutable catalog owner. Never
+            // invent a physical path or broaden ordinary source reads to bytes.
+            let package = label.package().package().as_str();
+            let relative = if package.is_empty() {
+                label.target().as_str().to_owned()
+            } else {
+                format!("{package}/{}", label.target().as_str())
+            };
+            let result = match ctx
+                .compute(&BuiltinBazelToolsSourceFileKey::new(
+                    identity.snapshot(),
+                    relative,
+                ))
+                .await
+            {
+                Ok(value) => value
+                    .as_ref()
+                    .as_ref()
+                    .map(|_| SourceResolution::CatalogFile)
+                    .map_err(|error| {
+                        AnalysisError::message(format!(
+                            "resolving catalog source file {label}: {error}"
+                        ))
+                    }),
+                Err(error) => Err(AnalysisError::message(format!(
+                    "resolving catalog source file {label} through DICE: {error}"
+                ))),
+            };
+            return complete(result, observations);
+        }
+    }
+    let route = HostRepositorySourceRoute::canonical(route.input().clone());
     let resolved = match mode {
         ConfiguredAnalysisMode::Legacy => match ctx
             .compute(&HostRepositoryPathKey::from_source_route(route, relative))
@@ -209,7 +298,7 @@ async fn resolve_source_with_observations(
     };
     complete(
         resolved
-            .map(|value| value.resolved().dupe())
+            .map(|value| SourceResolution::Filesystem(value.resolved().dupe()))
             .map_err(|error| {
                 AnalysisError::message(format!("resolving source file {label}: {error:?}"))
             }),
@@ -245,9 +334,10 @@ async fn resolve_root_source_input(
                 Ok(PathOutcome::Need(need)) => {
                     LoadingPreparationOutcome::Need(LoadingPreparationNeeds::path(need))
                 }
-                Ok(PathOutcome::Complete(Ok(resolved))) => {
-                    complete(Ok(resolved), PathObservationEpoch::empty())
-                }
+                Ok(PathOutcome::Complete(Ok(resolved))) => complete(
+                    Ok(SourceResolution::Filesystem(resolved)),
+                    PathObservationEpoch::empty(),
+                ),
                 Ok(PathOutcome::Complete(Err(error))) => complete(
                     Err(AnalysisError::new(format!(
                         "resolving source file {label}: {error:?}"
@@ -277,7 +367,10 @@ async fn resolve_root_source_input(
                     LoadingPreparationOutcome::Complete(Err(error))
                 }
                 Ok(PathOutcome::Complete(Ok(observed))) => match observed.result() {
-                    Ok(resolved) => complete(Ok(resolved.dupe()), observed.observations().dupe()),
+                    Ok(resolved) => complete(
+                        Ok(SourceResolution::Filesystem(resolved.dupe())),
+                        observed.observations().dupe(),
+                    ),
                     Err(error) => complete(
                         Err(AnalysisError::new(format!(
                             "resolving source file {label}: {error:?}"

@@ -24,6 +24,14 @@ pub struct ReapiCommandProjection {
 
 impl ReapiCommandProjection {
     pub fn from_action(action: &ActionSpec) -> Result<Self, &'static str> {
+        if action.kind() == &crate::ActionKind::BuildInfoTransform
+            || action
+                .outputs()
+                .iter()
+                .any(|output| output.metadata() == crate::ActionOutputMetadata::Constant)
+        {
+            return Err("BuildInfoTransform/constant-metadata REAPI projection is not admitted");
+        }
         if action.kind() == &crate::ActionKind::CppCompile {
             return Err("CppCompile REAPI projection is not admitted");
         }

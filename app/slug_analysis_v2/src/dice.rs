@@ -64,10 +64,8 @@ use slug_loading_v2::package::StarlarkRuleImplementation;
 use slug_loading_v2::package::ToolchainTypeRequirement;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
-use slug_workspace_v2::PathNodeKind;
 #[cfg(test)]
 use slug_workspace_v2::PathObservationNamespace;
-use slug_workspace_v2::ResolvedPathState;
 use starlark::PrintHandler;
 use starlark::PrintLocation;
 use starlark_map::small_map::SmallMap;
@@ -5225,10 +5223,8 @@ impl ConfiguredNodeAnalysisKey {
                     }
                     LoadingPreparationOutcome::Complete(Ok(Ok(resolved))) => resolved,
                 };
-                match resolved.state() {
-                    ResolvedPathState::Present(metadata)
-                        if metadata.kind() == PathNodeKind::RegularFile =>
-                    {
+                match resolved {
+                    source_file::SourceFileState::RegularFile => {
                         return root_analysis_driver_complete(native_configured_result(
                             package,
                             self.node.clone(),
@@ -5240,7 +5236,7 @@ impl ConfiguredNodeAnalysisKey {
                             &[],
                         ));
                     }
-                    ResolvedPathState::Missing => {
+                    source_file::SourceFileState::Missing => {
                         return root_analysis_driver_complete(Err(
                             AnalysisError::target_not_found(
                                 label.clone(),
@@ -5248,10 +5244,10 @@ impl ConfiguredNodeAnalysisKey {
                             ),
                         ));
                     }
-                    ResolvedPathState::Present(metadata) => {
+                    source_file::SourceFileState::Unsupported(kind) => {
                         return root_analysis_driver_complete(Err(AnalysisError::new(format!(
                             "source file {label} has unsupported filesystem kind {:?}",
-                            metadata.kind()
+                            kind
                         ))));
                     }
                 }

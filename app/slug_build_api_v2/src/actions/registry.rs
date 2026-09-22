@@ -137,6 +137,17 @@ impl ActionRegistry {
 }
 
 fn validate_action(action: &ActionSpec) -> Result<(), ActionError> {
+    if (action.kind() == &crate::ActionKind::BuildInfoTransform
+        || action
+            .outputs()
+            .iter()
+            .any(|output| output.metadata() == crate::ActionOutputMetadata::Constant))
+        && action.build_info_transform_spec().is_none()
+    {
+        return Err(ActionError::InvalidActionPayload {
+            mnemonic: action.mnemonic().to_owned(),
+        });
+    }
     if action.kind() == &crate::ActionKind::CppCompile && action.cpp_compile_spec().is_none() {
         return Err(ActionError::InvalidActionPayload {
             mnemonic: action.mnemonic().to_owned(),

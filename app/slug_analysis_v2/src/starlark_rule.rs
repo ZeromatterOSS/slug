@@ -1115,11 +1115,12 @@ mod toolchain_materialization_tests {
 
 #[derive(Debug)]
 struct SynchronousAnalysisActionSink {
+    workspace_status: Arc<slug_build_api_v2::WorkspaceStatusArtifacts>,
     root: DerivedArtifactRoot,
     actions: Arc<Mutex<CtxActions>>,
     // Evaluation-scoped declarations, including predeclared outputs. Subrule
     // calls share this sink; only the resulting Derived artifacts survive it.
-    declared_outputs: Mutex<SmallMap<String, ActionOutputKind>>,
+    declared_outputs: Mutex<SmallMap<String, ActionOutput>>,
     package_path: String,
     owner: AnalysisConfiguredTargetKey,
     typed_configuration: Result<Option<(HostPathFlavor, RetainedActionEnvironment)>, String>,
@@ -1162,11 +1163,17 @@ impl SynchronousAnalysisActionSink {
             .lock()
             .map_err(|_| anyhow::anyhow!("ctx.actions declaration lock is poisoned"))?;
         if let Some(previous) = declarations.get(&path) {
-            if *previous != kind {
-                anyhow::bail!("output '{path}' has already been declared with a different type");
+            if previous != &output {
+                anyhow::bail!(
+                    "output '{path}' has already been declared with a different type or metadata"
+                );
             }
+            return Ok(AnalysisArtifactValue::new(AnalysisArtifact::Derived {
+                owner: self.owner.clone(),
+                output: previous.clone(),
+            }));
         } else {
-            declarations.insert(path, kind);
+            declarations.insert(path, output.clone());
         }
         Ok(AnalysisArtifactValue::new(AnalysisArtifact::Derived {
             owner: self.owner.clone(),
@@ -1392,6 +1399,12 @@ impl SynchronousAnalysisActionSink {
 }
 
 impl AnalysisActionSink for SynchronousAnalysisActionSink {
+    fn transform_build_info(
+        &self,
+        request: slug_loading_v2::build_info_transform::BuildInfoTransformRequest<'_>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        self.register_build_info_transform(request)
+    }
     fn prepare_cc_compile<'v>(
         &self,
         request: &slug_loading_v2::cc_compile_action::CcCompileRequest<'v>,
@@ -2387,6 +2400,7 @@ pub(crate) fn evaluate_loaded_rule(
     let resolved_attributes: Arc<[ResolvedRuleAttribute]> = resolved_attributes.into();
     let predeclared_outputs = implementation.predeclared_outputs.clone();
     let action_sink: Arc<dyn AnalysisActionSink> = Arc::new(SynchronousAnalysisActionSink {
+        workspace_status: workspace_status.clone(),
         root: output_root.clone(),
         actions: actions.clone(),
         declared_outputs: Mutex::new(
@@ -2400,7 +2414,7 @@ pub(crate) fn evaluate_loaded_rule(
             .into_iter()
             .map(|artifact| match artifact {
                 AnalysisArtifact::Derived { output, .. } => {
-                    (output.root_relative_path().to_owned(), output.kind())
+                    (output.root_relative_path().to_owned(), output)
                 }
                 AnalysisArtifact::Source(_) | AnalysisArtifact::WorkspaceStatus(_) => {
                     unreachable!("predeclared outputs are derived")
@@ -2573,11 +2587,10 @@ pub(crate) fn evaluate_loaded_rule(
     }
     .map_err(|error| error.to_string())?;
 
-    let returned = ListRef::from_value(returned)
-        .ok_or_else(|| "rule implementation must return a list of providers".to_owned())?;
+    let returned = build_info_transform::returned_providers(returned);
     let mut lowerer = AnalysisValueLowerer::from_module(&module);
     let mut provider_values = Vec::with_capacity(returned.len());
-    for (index, value) in returned.iter().enumerate() {
+    for (index, value) in returned.into_iter().enumerate() {
         if let Some(fields) = StarlarkDefaultInfo::fields_from_value(value) {
             let test_rule = rule_capability.as_ref().is_some_and(|capability| {
                 capability.test_kind == Some(slug_loading_v2::package::TestRuleKind::Test)
@@ -2713,6 +2726,7 @@ mod integer_list_projection_tests {
     }
 }
 
+mod build_info_transform;
 mod cargo_runfiles;
 
 #[cfg(test)]

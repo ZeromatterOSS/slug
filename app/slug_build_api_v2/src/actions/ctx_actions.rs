@@ -166,6 +166,13 @@ impl CtxActions {
     pub fn register_spawn(&mut self, spec: SpawnSpec) -> Result<usize, ActionError> {
         self.registry.register(ActionSpec::spawn(spec))
     }
+    pub fn register_build_info_transform(
+        &mut self,
+        spec: crate::BuildInfoTransformSpec,
+    ) -> Result<usize, ActionError> {
+        self.registry
+            .register(ActionSpec::build_info_transform(spec))
+    }
 
     pub fn register_args_write(&mut self, spec: ArgsWriteSpec) -> Result<usize, ActionError> {
         self.registry.register(ActionSpec::args_write(spec))

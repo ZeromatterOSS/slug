@@ -127,6 +127,12 @@ pub struct AnalysisSpawnRequest<'v> {
 }
 
 pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
+    fn transform_build_info(
+        &self,
+        _request: crate::build_info_transform::BuildInfoTransformRequest<'_>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        anyhow::bail!("build-info transforms are unavailable in this analysis context")
+    }
     fn prepare_cc_compile<'v>(
         &self,
         _request: &crate::cc_compile_action::CcCompileRequest<'v>,
@@ -1732,6 +1738,50 @@ fn bind_run_shell_request<'v>(
 
 #[starlark_module]
 fn analysis_actions_methods(builder: &mut MethodsBuilder) {
+    fn transform_info_file<'v>(
+        this: Value<'v>,
+        #[starlark(require = named)] transform_func: Value<'v>,
+        #[starlark(require = named)] template: Value<'v>,
+        #[starlark(require = named)] output_file_name: &'v str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        let actions = AnalysisActions::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
+        actions
+            .token
+            .require_active("transform_info_file", actions.context_name)?;
+        let request = crate::build_info_transform::prepare(
+            slug_build_api_v2::BuildInfoTransformKind::Info,
+            transform_func,
+            template,
+            output_file_name,
+            eval,
+        )?;
+        actions.action_sink.transform_build_info(request)
+    }
+
+    fn transform_version_file<'v>(
+        this: Value<'v>,
+        #[starlark(require = named)] transform_func: Value<'v>,
+        #[starlark(require = named)] template: Value<'v>,
+        #[starlark(require = named)] output_file_name: &'v str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        let actions = AnalysisActions::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
+        actions
+            .token
+            .require_active("transform_version_file", actions.context_name)?;
+        let request = crate::build_info_transform::prepare(
+            slug_build_api_v2::BuildInfoTransformKind::Version,
+            transform_func,
+            template,
+            output_file_name,
+            eval,
+        )?;
+        actions.action_sink.transform_build_info(request)
+    }
+
     fn declare_file(this: Value, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
         let actions = AnalysisActions::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;

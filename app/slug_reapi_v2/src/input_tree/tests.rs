@@ -1,5 +1,31 @@
 use super::*;
 
+#[test]
+fn build_info_marker_and_constant_outputs_fail_before_digest_projection() {
+    use slug_build_api_v2::ActionKind;
+    use slug_build_api_v2::ActionOutput;
+    let marker = ActionSpec::new(ActionKind::BuildInfoTransform, "TranslateBuildInfo", vec![]);
+    assert_eq!(
+        ReapiInputTree::from_action(&marker),
+        Err(InputTreeError::BuildInfoTransformUnsupported)
+    );
+    let forged = ActionSpec::new(
+        ActionKind::Write {
+            content: "not observed".into(),
+            is_executable: false,
+        },
+        "FileWrite",
+        vec![ActionOutput::new_constant(
+            crate::test_roots::root(),
+            "volatile.h",
+        )],
+    );
+    assert_eq!(
+        ReapiInputTree::from_action(&forged),
+        Err(InputTreeError::ConstantMetadataUnsupported)
+    );
+}
+
 fn file(path: &str, executable: bool) -> ReapiInputTreeEntry {
     ReapiInputTreeEntry::new(
         path,

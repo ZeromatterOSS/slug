@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+mod build_info_transform;
 mod cargo_runfiles_args;
 mod cpp_compile;
 pub mod ctx_actions;
@@ -20,6 +21,9 @@ mod solib_symlink;
 mod spawn_command_line;
 pub mod spec;
 
+pub use build_info_transform::BuildInfoCallbackRecipe;
+pub use build_info_transform::BuildInfoTransformKind;
+pub use build_info_transform::BuildInfoTransformSpec;
 pub use cargo_runfiles_args::CargoRunfilesArgsError;
 pub use cargo_runfiles_args::RetainedCargoRunfilesArgs;
 pub use cpp_compile::CppCompileConstruction;
@@ -49,6 +53,7 @@ pub use spec::ActionInput;
 pub use spec::ActionKind;
 pub use spec::ActionOutput;
 pub use spec::ActionOutputKind;
+pub use spec::ActionOutputMetadata;
 pub use spec::ActionSpec;
 pub use spec::ArgsWriteSpec;
 pub use spec::ArtifactInputSource;

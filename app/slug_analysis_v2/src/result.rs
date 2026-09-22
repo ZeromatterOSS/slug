@@ -959,6 +959,11 @@ impl ConfiguredNodeResult {
             if !matches!(spec.outputs(), [output] if output.kind() == ActionOutputKind::File) {
                 return Err("configured FileWrite action requires exactly one file output");
             }
+            if spec.outputs().iter().any(|output| {
+                output.metadata() != slug_build_api_v2::ActionOutputMetadata::Ordinary
+            }) {
+                return Err("configured FileWrite action does not support constant metadata");
+            }
             if !spec.argv().is_empty()
                 || !spec.inputs().is_empty()
                 || !spec.tools().is_empty()

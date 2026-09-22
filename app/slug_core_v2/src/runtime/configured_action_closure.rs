@@ -248,7 +248,8 @@ fn native_solib_metadata(action: &ConfiguredAction) -> bool {
 
 pub(super) fn scalar_file_write(action: &ConfiguredAction) -> bool {
     matches!(action.kind(), ActionKind::Write { .. })
-        && matches!(action.outputs(), [output] if output.kind() == ActionOutputKind::File)
+        && matches!(action.outputs(), [output] if output.kind() == ActionOutputKind::File
+            && output.metadata() == slug_build_api_v2::ActionOutputMetadata::Ordinary)
         && action.argv().is_empty()
         && action.inputs().is_empty()
         && action.tools().is_empty()

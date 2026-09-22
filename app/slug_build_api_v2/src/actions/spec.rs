@@ -23,6 +23,7 @@ use slug_configuration_v2::NormalizedAbsoluteBazelPath;
 use slug_configuration_v2::NormalizedBazelPath;
 use slug_configuration_v2::RetainedActionEnvironment;
 
+use crate::actions::BuildInfoTransformSpec;
 use crate::actions::cargo_runfiles_args::RetainedCargoRunfilesArgs;
 use crate::actions::cpp_compile::CppCompileSpec;
 use crate::actions::runfiles_support::RunfilesSupportActionSpec;
@@ -44,11 +45,18 @@ pub enum ActionOutputKind {
     RunfilesTree,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub enum ActionOutputMetadata {
+    Ordinary,
+    Constant,
+}
+
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 struct ActionOutputData {
     root: crate::DerivedArtifactRoot,
     path: CompactString,
     kind: ActionOutputKind,
+    metadata: ActionOutputMetadata,
 }
 
 #[derive(Debug, Clone, Dupe, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -61,7 +69,26 @@ impl ActionOutput {
         kind: ActionOutputKind,
     ) -> Self {
         let path = format!("{}/{}", root.path(), relative.into()).into();
-        Self(Arc::new(ActionOutputData { root, path, kind }))
+        Self(Arc::new(ActionOutputData {
+            root,
+            path,
+            kind,
+            metadata: ActionOutputMetadata::Ordinary,
+        }))
+    }
+
+    pub fn new_constant(root: crate::DerivedArtifactRoot, relative: impl Into<String>) -> Self {
+        let path = format!("{}/{}", root.path(), relative.into()).into();
+        Self(Arc::new(ActionOutputData {
+            root,
+            path,
+            kind: ActionOutputKind::File,
+            metadata: ActionOutputMetadata::Constant,
+        }))
+    }
+
+    pub fn metadata(&self) -> ActionOutputMetadata {
+        self.0.metadata
     }
 
     pub fn root(&self) -> &crate::DerivedArtifactRoot {
@@ -1165,6 +1192,7 @@ pub enum ActionKind {
     AbsoluteSymlink,
     SolibSymlink,
     CppCompile,
+    BuildInfoTransform,
     ArgsWrite,
     RepoMappingManifest,
     SourceSymlinkManifest,
@@ -1193,6 +1221,7 @@ enum ActionPayload {
     Symlink(SymlinkSpec),
     SolibSymlink(SolibSymlinkSpec),
     CppCompile(CppCompileSpec),
+    BuildInfoTransform(BuildInfoTransformSpec),
     ArgsWrite(ArgsWriteSpec),
     RunfilesSupport(RunfilesSupportActionSpec),
 }
@@ -1209,6 +1238,7 @@ static ARTIFACT_SYMLINK_KIND: ActionKind = ActionKind::ArtifactSymlink;
 static ABSOLUTE_SYMLINK_KIND: ActionKind = ActionKind::AbsoluteSymlink;
 static SOLIB_SYMLINK_KIND: ActionKind = ActionKind::SolibSymlink;
 static CPP_COMPILE_KIND: ActionKind = ActionKind::CppCompile;
+static BUILD_INFO_TRANSFORM_KIND: ActionKind = ActionKind::BuildInfoTransform;
 static ARGS_WRITE_KIND: ActionKind = ActionKind::ArgsWrite;
 static REPO_MAPPING_MANIFEST_KIND: ActionKind = ActionKind::RepoMappingManifest;
 static SOURCE_SYMLINK_MANIFEST_KIND: ActionKind = ActionKind::SourceSymlinkManifest;
@@ -1252,6 +1282,9 @@ impl ActionSpec {
     pub fn cpp_compile(spec: CppCompileSpec) -> Self {
         Self::typed(ActionPayload::CppCompile(spec))
     }
+    pub fn build_info_transform(spec: BuildInfoTransformSpec) -> Self {
+        Self::typed(ActionPayload::BuildInfoTransform(spec))
+    }
 
     pub fn args_write(spec: ArgsWriteSpec) -> Self {
         Self::typed(ActionPayload::ArgsWrite(spec))
@@ -1279,6 +1312,7 @@ impl ActionSpec {
             },
             ActionPayload::SolibSymlink(_) => &SOLIB_SYMLINK_KIND,
             ActionPayload::CppCompile(_) => &CPP_COMPILE_KIND,
+            ActionPayload::BuildInfoTransform(_) => &BUILD_INFO_TRANSFORM_KIND,
             ActionPayload::ArgsWrite(_) => &ARGS_WRITE_KIND,
             ActionPayload::RunfilesSupport(spec) => match spec {
                 RunfilesSupportActionSpec::RepoMappingManifest { .. } => {
@@ -1300,6 +1334,7 @@ impl ActionSpec {
             ActionPayload::Symlink(_) => "Symlink",
             ActionPayload::SolibSymlink(_) => "SolibSymlink",
             ActionPayload::CppCompile(_) => "CppCompile",
+            ActionPayload::BuildInfoTransform(_) => "TranslateBuildInfo",
             ActionPayload::ArgsWrite(_) => "FileWrite",
             ActionPayload::RunfilesSupport(spec) => spec.mnemonic(),
         }
@@ -1347,6 +1382,7 @@ impl ActionSpec {
             ActionPayload::Symlink(spec) => std::slice::from_ref(spec.output()),
             ActionPayload::SolibSymlink(spec) => std::slice::from_ref(spec.output()),
             ActionPayload::CppCompile(spec) => spec.outputs(),
+            ActionPayload::BuildInfoTransform(spec) => std::slice::from_ref(spec.output()),
             ActionPayload::ArgsWrite(spec) => std::slice::from_ref(spec.output()),
             ActionPayload::RunfilesSupport(spec) => std::slice::from_ref(spec.output()),
         }
@@ -1366,6 +1402,7 @@ impl ActionSpec {
             ActionPayload::Symlink(spec) => spec.progress_message(),
             ActionPayload::SolibSymlink(_) => None,
             ActionPayload::CppCompile(_) => None,
+            ActionPayload::BuildInfoTransform(spec) => Some(spec.progress_message()),
             ActionPayload::ArgsWrite(_) => None,
             ActionPayload::RunfilesSupport(_) => None,
         }
@@ -1472,9 +1509,18 @@ impl ActionSpec {
             _ => None,
         }
     }
+    pub fn build_info_transform_spec(&self) -> Option<&BuildInfoTransformSpec> {
+        match &self.payload {
+            ActionPayload::BuildInfoTransform(spec) => Some(spec),
+            _ => None,
+        }
+    }
 
     /// Legacy/Spawn preview. CppCompile has a separate fallible typed expansion.
     pub fn render_argv(&self) -> Result<Vec<String>, &'static str> {
+        if self.kind() == &ActionKind::BuildInfoTransform {
+            return Err("BuildInfoTransform execution is not admitted");
+        }
         if self.kind() == &ActionKind::CppCompile {
             return Err("CppCompile generic argv preview is not admitted");
         }

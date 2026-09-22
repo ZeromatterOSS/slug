@@ -525,6 +525,11 @@ pub fn materialize_configured_outputs(
     };
     let mut expected = BTreeMap::new();
     for output in declarations {
+        if output.metadata() == slug_build_api_v2::ActionOutputMetadata::Constant {
+            return Err(RemoteExecutionError::Protocol(
+                "constant-metadata output materialization is not admitted".into(),
+            ));
+        }
         slug_build_api_v2::actions::registry::validate_output(output).map_err(|_| {
             RemoteExecutionError::OutputPath {
                 path: output.root_relative_path().to_owned(),
@@ -872,6 +877,28 @@ mod tests {
     use slug_build_api_v2::ActionOutput;
 
     use super::*;
+
+    #[test]
+    fn configured_materialization_rejects_constant_metadata_before_writes() {
+        let output = ActionOutput::new_constant(crate::test_roots::root(), "volatile.h");
+        let execution = RemoteExecutionResult {
+            action_digest: ReapiDigest::of_bytes(b"action"),
+            platform_properties: Default::default(),
+            result: ActionResult::new(vec![]),
+            output_blobs: Default::default(),
+            evidence: ExecutionEvidence::reapi("synthetic refusal input"),
+        };
+        // No directory may be opened or created: the descriptor is rejected
+        // before examining remote content or mapping output paths.
+        let error =
+            materialize_configured_outputs(Path::new("/not-an-output-root"), &[output], &execution)
+                .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("constant-metadata output materialization")
+        );
+    }
 
     fn write_action(content: &str, executable: bool, output: &str) -> ActionSpec {
         ActionSpec::new(

@@ -24,6 +24,80 @@ use super::*;
 mod cpp_compile_tests;
 
 #[test]
+fn build_info_transforms_and_constant_outputs_refuse_before_prerequisite_traversal() {
+    use slug_build_api_v2::BuildInfoCallbackRecipe;
+    use slug_build_api_v2::BuildInfoTransformKind;
+    use slug_build_api_v2::BuildInfoTransformSpec;
+    use slug_build_api_v2::WorkspaceStatusArtifacts;
+    let statuses = WorkspaceStatusArtifacts::new(
+        slug_workspace_v2::NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    let owner = key("translator", false);
+    for (kind, status, output) in [
+        (
+            BuildInfoTransformKind::Info,
+            statuses.stable(),
+            output("stable.h"),
+        ),
+        (
+            BuildInfoTransformKind::Version,
+            statuses.volatile(),
+            ActionOutput::new_constant(
+                crate::runtime::configured_output::test_root(),
+                "volatile.h",
+            ),
+        ),
+    ] {
+        let spec = BuildInfoTransformSpec::new(
+            status.clone(),
+            AnalysisArtifact::Source(CanonicalLabel::parse("@@//:unobserved.template").unwrap()),
+            output.clone(),
+            BuildInfoCallbackRecipe::new(
+                kind,
+                CanonicalLabel::parse(BuildInfoCallbackRecipe::SOURCE_LABEL).unwrap(),
+                BuildInfoCallbackRecipe::SOURCE_DIGEST,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let closure = ValidatedActionClosure::new(Arc::from([node(
+            owner.clone(),
+            vec![ActionSpec::build_info_transform(spec)],
+        )]))
+        .unwrap();
+        assert_eq!(
+            ActionPrerequisitePlan::new(&closure, &owner, 0)
+                .unwrap_err()
+                .as_ref(),
+            "BuildInfoTransform execution is not admitted"
+        );
+    }
+    let forged = ActionSpec::new(
+        ActionKind::Write {
+            content: "forged".into(),
+            is_executable: false,
+        },
+        "FileWrite",
+        vec![ActionOutput::new_constant(
+            crate::runtime::configured_output::test_root(),
+            "forged",
+        )],
+    );
+    let closure =
+        ValidatedActionClosure::new(Arc::from([node(owner.clone(), vec![forged])])).unwrap();
+    assert!(
+        !crate::runtime::configured_action_closure::scalar_file_write(
+            &closure.owners()[0].actions()[0]
+        )
+    );
+    assert!(
+        ActionPrerequisitePlan::new(&closure, &owner, 0)
+            .unwrap_err()
+            .contains("constant-metadata")
+    );
+}
+
+#[test]
 fn workspace_status_requires_a_real_producer_before_execution_planning() {
     let pair = slug_build_api_v2::WorkspaceStatusArtifacts::new(
         slug_workspace_v2::NormalizedAbsolutePath::new("/workspace").unwrap(),
