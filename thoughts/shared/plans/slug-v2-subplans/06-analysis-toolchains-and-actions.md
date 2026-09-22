@@ -255,9 +255,21 @@ One publication alias bijection covers the full recipe and distinct mandatory,
 cache-only, declared-header, builtin and additional-prunable input roles. Existing
 configured-node DICE ownership supplies invalidation and cutoff; no discovery
 cache or new key is introduced. Structural identity and paths remain Slug-native.
-CppCompile command/aquery/ActionKey projection, header discovery and execution
-are explicitly unsupported in BuildAPI/Core/REAPI. Inert constructor fixtures
+CppCompile generic command/aquery/ActionKey projection, header discovery and execution
+remain explicitly unsupported in BuildAPI/Core/REAPI. Inert constructor fixtures
 do not establish allocator toolchain/argv or compiler execution parity.
+
+WP770 adds pure typed argv and effective-environment projections over these
+immutable recipes. The retained Variables adapter mirrors admitted native lookup
+and lazy conversion using per-call scratch: argv uses a fresh empty child cache,
+while environment uses original cache seeds. Tool-first ordered feature expansion
+does not imply shell processing or implicit compiler flags. Explicit client values
+resolve only declared inherited environment names; PWD is synthesized unless
+requires-darwin is present, then feature entries override. NOOP path mapping,
+no paramfile and always-pass filtering are the exact admitted source slice;
+paths/identity and diagnostics remain Slug-native. No new DICE owner or execution
+admission is introduced. Published C/C++ PIC/main/external/target/exec command
+regressions use inert toolchains, not production allocator argv evidence.
 
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and

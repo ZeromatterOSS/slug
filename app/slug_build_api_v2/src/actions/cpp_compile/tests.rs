@@ -86,7 +86,7 @@ fn features_requested(unused: &str, requested: Vec<CompactString>) -> CcFeatureC
     .configure_features(requested)
     .unwrap()
 }
-fn data() -> CppCompileData {
+pub(super) fn data() -> CppCompileData {
     let root = roots::root();
     CppCompileData {
         construction: CppCompileConstruction {
@@ -149,7 +149,7 @@ fn cpp_compile_retains_input_roles_outputs_and_rejects_command_projection() {
     assert_eq!(action.outputs().len(), 2);
     assert_eq!(
         action.render_argv().unwrap_err(),
-        "CppCompile command expansion is not admitted"
+        "CppCompile generic argv preview is not admitted"
     );
     assert_eq!(
         ReapiCommandProjection::from_action(&action).unwrap_err(),
@@ -332,7 +332,7 @@ fn cpp_compile_cannot_be_forged_through_legacy_action_constructor() {
     assert!(forged.cpp_compile_spec().is_none());
     assert_eq!(
         forged.render_argv().unwrap_err(),
-        "CppCompile command expansion is not admitted"
+        "CppCompile generic argv preview is not admitted"
     );
     assert_eq!(
         ReapiCommandProjection::from_action(&forged).unwrap_err(),

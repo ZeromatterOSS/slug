@@ -1473,14 +1473,15 @@ impl ActionSpec {
         }
     }
 
+    /// Legacy/Spawn preview. CppCompile has a separate fallible typed expansion.
     pub fn render_argv(&self) -> Result<Vec<String>, &'static str> {
         if self.kind() == &ActionKind::CppCompile {
-            return Err("CppCompile command expansion is not admitted");
+            return Err("CppCompile generic argv preview is not admitted");
         }
         match &self.payload {
             ActionPayload::Legacy(spec) => Ok(spec.argv.clone()),
             ActionPayload::Spawn(spec) => Ok(spec.render_argv()),
-            ActionPayload::CppCompile(_) => Err("CppCompile command expansion is not admitted"),
+            ActionPayload::CppCompile(_) => Err("CppCompile generic argv preview is not admitted"),
             _ => Ok(Vec::new()),
         }
     }

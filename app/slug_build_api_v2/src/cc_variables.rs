@@ -11,6 +11,9 @@ use dupe::Dupe;
 use crate::AnalysisValue;
 use crate::analysis_value::PublicationEqState;
 
+mod owned_access;
+pub(crate) use owned_access::OwnedCcVariableAccess;
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub enum CcVariablesKind {
     Map,

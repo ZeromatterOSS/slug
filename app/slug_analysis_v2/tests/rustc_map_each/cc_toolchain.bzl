@@ -14,7 +14,7 @@ Proof = provider(fields = ["toolchain", "pic_alias", "static_alias", "dynamic_al
 def _file(target):
     return target[DefaultInfo].files.to_list()[0]
 
-def _make(ctx, compile_requirements = [], compile_inputs = {}):
+def _make(ctx, compile_requirements = [], compile_inputs = {}, compile_features = []):
     header = _file(ctx.attr.header)
     static_file = _file(ctx.attr.static_file)
     dynamic_file = _file(ctx.attr.dynamic_file)
@@ -31,7 +31,7 @@ def _make(ctx, compile_requirements = [], compile_inputs = {}):
             feature(name = "parse_showincludes"), feature(name = "no_dotd_file"),
             feature(name = "system_include_paths"), feature(name = "external_include_paths"),
             feature(name = "probe_env", enabled = True, env_sets = [env_set(actions = ["c++-link-executable"],
-                env_entries = [env_entry(key = "SYSROOT", value = "%{sysroot}")])])],
+                env_entries = [env_entry(key = "SYSROOT", value = "%{sysroot}")])])] + compile_features,
         tool_paths = [tool_path(name = n, path = "bin/" + n) for n in ["gcc", "ar", "strip"]])
     model = cc_internal.cc_toolchain_features(toolchain_config_info = info, tools_directory = "toolchain")
     bindings = {"legacy_link_flags": ["--legacy"], "sysroot": "/sysroot"}

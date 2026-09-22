@@ -3,8 +3,9 @@ load("//cc/common:cc_common.bzl", "cc_common")
 load("//cc/private:cc_internal.bzl", "cc_internal")
 load("//cc/private:cc_info.bzl", "CcCompilationContextInfo")
 load("//cc/private:toolchain_proof.bzl", "make_compile_toolchain")
+load("//cc:cc_toolchain_config_lib.bzl", "feature", "flag_set", "flag_group", "env_set", "env_entry")
 
-RegistrationProof = provider(fields = ["variables", "context", "builtin_after", "dirs_after"])
+RegistrationProof = provider(fields = ["variables", "context", "builtin_after", "dirs_after", "seeded", "original_argv"])
 ForeignOutput = provider(fields = ["file"])
 # Deliberately authored forgeries, not alternate native provider definitions.
 CcToolchainInfo = provider(fields = ["unused"])
@@ -33,7 +34,19 @@ def _impl(ctx):
         compile_inputs["without"] = 17
     elif mode == "malformed_fallback":
         compile_inputs = {"without": depset(), "compiler": 17}
-    tc = make_compile_toolchain(ctx, compile_requirements = ["custom-compile-tool"], compile_inputs = compile_inputs)
+    compile_features = []
+    if mode == "command_cache":
+        compile_features = [feature(name = "cache_probe", enabled = True,
+            flag_sets = [flag_set(actions = ["c++-compile"], flag_groups = [
+                flag_group(iterate_over = "obj.items", flags = ["--cached=%{obj.items}"]),
+                flag_group(iterate_over = "live", flags = ["--direct=%{live}"]),
+            ])],
+            env_sets = [env_set(actions = ["c++-compile"], env_entries = [env_entry(key = "SOURCE", value = "%{env_file}")])])]
+    elif mode == "command_error":
+        compile_features = [feature(name = "lazy_error", enabled = True,
+            flag_sets = [flag_set(actions = ["c++-compile"], flag_groups = [flag_group(flags = ["%{malformed_unused}"])])],
+            env_sets = [env_set(actions = ["c++-compile"], env_entries = [env_entry(key = "BAD", value = "%{malformed_unused}")])])]
+    tc = make_compile_toolchain(ctx, compile_requirements = ["custom-compile-tool"], compile_inputs = compile_inputs, compile_features = compile_features)
     features = cc_common.configure_features(ctx = ctx, cc_toolchain = tc,
         requested_features = ["cc_include_scanning"] if mode == "scan_requested_default" else [], unsupported_features = [])
     source = _file(ctx.attr.source)
@@ -46,11 +59,22 @@ def _impl(ctx):
     context_fields["direct_headers"] = context_headers
     context = CcCompilationContextInfo(**context_fields)
     live = ["before"]
-    variables = cc_internal.cc_toolchain_variables(vars = {
+    bindings = {
         "live": live,
         # Lazy native conversion would reject this if an expansion queried it.
         "malformed_unused": 17,
-    })
+    }
+    if mode in ["command_cache", "command_error"]:
+        bindings.update({"obj": struct(items = live), "env_file": source,
+            "preprocessor_defines": [], "quote_include_paths": [], "include_paths": [],
+            "system_include_paths": [], "framework_include_paths": []})
+    variables = cc_internal.cc_toolchain_variables(vars = bindings)
+    seeded = None
+    if mode == "command_cache":
+        # Do not add source_file: legacy compiler_input_flags would add -c. The
+        # env query's File variable lives in a separate unused-by-flags binding.
+        seeded = cc_common.get_memory_inefficient_command_line(feature_configuration = features,
+            action_name = "c++-compile", variables = variables)
     before = ctx.actions.declare_file(ctx.label.name + ".before")
     middle = ctx.actions.declare_file(ctx.label.name + ".middle")
     after = ctx.actions.declare_file(ctx.label.name + ".after")
@@ -128,8 +152,13 @@ def _impl(ctx):
     if ctx.attr.failure == "conflict_dotd":
         ctx.actions.write(dotd, "conflicting dotd ordinary action")
     ctx.actions.write(after, "after")
+    original_argv = None
+    if mode == "command_cache":
+        original_argv = cc_common.get_memory_inefficient_command_line(feature_configuration = features,
+            action_name = "c++-compile", variables = variables)
     return [RegistrationProof(variables = variables, context = context,
-        builtin_after = tc._builtin_include_files, dirs_after = tc.built_in_include_directories)]
+        builtin_after = tc._builtin_include_files, dirs_after = tc.built_in_include_directories,
+        seeded = seeded, original_argv = original_argv)]
 
 registration_subject = rule(implementation = _impl, fragments = ["cpp"], subrules = [suspended], attrs = {
     "failure": attr.string(), "runtime": attr.string(default = "files"),

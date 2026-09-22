@@ -21,6 +21,8 @@ use crate::actions::registry::validate_output;
 use crate::analysis_value::PublicationEqState;
 use crate::cc_variables::CcToolchainVariables;
 
+mod expansion;
+
 /// Immutable eagerly consumed constructor inputs, not an action or a recipe.
 #[derive(Debug, Clone, Allocative)]
 pub struct CppCompileConstruction {

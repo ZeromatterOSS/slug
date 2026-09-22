@@ -25,6 +25,8 @@ pub(super) const NATIVE_MODES: &[&str] = &[
     "scan_false",
     "scan_requested_default",
     "suspended",
+    "command_cache",
+    "command_error",
 ];
 
 #[tokio::test]

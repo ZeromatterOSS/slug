@@ -408,9 +408,13 @@ and tree templates remain outside this proof.
 WP769 adds regular C/C++ construction-only CppCompile registration with object/dotd,
 separate input roles and traced end-of-analysis recipe publication. The unchanged
 public caller uses an inert authored toolchain; this does not establish production
-allocator compiler arguments or execution. Command expansion/aquery/ActionKey,
-discovery-aware input selection/cache hits, execution-time tree/path mapping and
-full cc_library remain deferred. Variables reject cyclic/foreign publication;
+allocator compiler arguments or execution. WP770 adds pure typed command/environment
+expansion from published recipes, including fresh argv versus original environment
+cache scopes and explicit client-environment resolution. Complete command tests
+cover inert public C/C++ PIC/main/external/target/exec recipes and same-DICE
+restoration; they do not establish production allocator commands. Generic command/
+aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/
+path mapping and full cc_library remain deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside
 the admitted boundary. See the current packet for exact/native/deferred classes.
 The existing full Rustc argument proof's None C++ fields still do not establish
