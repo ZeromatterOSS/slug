@@ -140,6 +140,7 @@ use crate::result::ConfiguredActionOwnerContext;
 use crate::result::ConfiguredNodeResult;
 use crate::runfiles_support::complete_runfiles_support;
 
+mod cc_compile_action;
 mod cc_context;
 use cc_context::CcContextProjection;
 
@@ -243,6 +244,7 @@ where
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
         demand.provide_value::<&dyn slug_loading_v2::cc_context::CcExecutionContext>(self);
         demand.provide_value::<&dyn slug_loading_v2::cc_context::CcCompileOutputContext>(self);
+        demand.provide_value::<&dyn slug_loading_v2::cc_context::CcCompileActionContext>(self);
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
@@ -1373,6 +1375,12 @@ impl SynchronousAnalysisActionSink {
 }
 
 impl AnalysisActionSink for SynchronousAnalysisActionSink {
+    fn prepare_cc_compile<'v>(
+        &self,
+        request: &slug_loading_v2::cc_compile_action::CcCompileRequest<'v>,
+    ) -> anyhow::Result<slug_loading_v2::cc_compile_action::PreparedCcCompile<'v>> {
+        self.prepare_native_cc_compile(request)
+    }
     fn dynamic_library_symlink(
         &self,
         library: Value<'_>,
@@ -2610,6 +2618,8 @@ pub(crate) fn evaluate_loaded_rule(
     let mut actions = actions
         .lock()
         .map_err(|_| "ctx.actions state lock is poisoned".to_owned())?;
+    cc_compile_action::finalize(&module, &mut lowerer, &mut actions)
+        .map_err(|error| error.to_string())?;
     let providers = complete_runfiles_support(
         providers,
         &mut actions,

@@ -124,6 +124,42 @@ fn check_rule_context_teardown(fail: bool) {
         .request_value::<&dyn slug_loading_v2::cc_context::CcCompileOutputContext>()
         .unwrap();
     let config = key.configuration().slug_configuration().unwrap();
+    let compile = ctx
+        .request_value::<&dyn slug_loading_v2::cc_context::CcCompileActionContext>()
+        .unwrap();
+    let foreign = config.to_exec().unwrap();
+    // These deliberately invalid later fields must never be inspected: the
+    // genuine capability validates its active token and supplied root first.
+    let mut compile_request = slug_loading_v2::cc_compile_action::CcCompileRequest {
+        configuration: &foreign,
+        compilation_context: Value::new_none(),
+        toolchain: Value::new_none(),
+        features: Value::new_none(),
+        variables: Value::new_none(),
+        source: Value::new_none(),
+        output: Value::new_none(),
+        dotd: Value::new_none(),
+        additional_inputs: None,
+        additional_inputs_set: None,
+        cache_key_inputs: None,
+        build_info_headers: None,
+        action_name: None,
+        should_scan_includes: None,
+        use_pic: false,
+        needs_include_validation: true,
+        toolchain_type: "//tools:cpp",
+    };
+    let error = compile
+        .prepare_cc_compile(&compile_request)
+        .err()
+        .expect("foreign root rejected");
+    assert!(
+        error
+            .to_string()
+            .contains("must equal the active ctx output root configuration"),
+        "{error}"
+    );
+    compile_request.configuration = config;
     let location = CanonicalLabel::parse("@@//pkg/child:other/part").unwrap();
     // A supplied configuration is not silently replaced by the active root.
     // Rejection precedes all declaration state, including directory conflicts.
@@ -196,6 +232,16 @@ fn check_rule_context_teardown(fail: bool) {
         assert_eq!(label.to_str(), "@@//pkg:subject");
     }
     drop(guard);
+    let error = compile
+        .prepare_cc_compile(&compile_request)
+        .err()
+        .expect("expired context rejected");
+    assert!(
+        error
+            .to_string()
+            .contains("outside of its own implementation function"),
+        "{error}"
+    );
     let before = declarations.declared_outputs.lock().unwrap().len();
     let error = capability
         .declare_compile_output(&location, "expired.o", config)

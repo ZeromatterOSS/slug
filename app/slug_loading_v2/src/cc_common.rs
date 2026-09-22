@@ -93,6 +93,109 @@ fn cc_internal_methods(builder: &mut MethodsBuilder) {
         ))
     }
 
+    fn create_cc_compile_action<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = named)] action_construction_context: Value<'v>,
+        #[starlark(require = named)] cc_compilation_context: Value<'v>,
+        #[starlark(require = named)] cc_toolchain: Value<'v>,
+        #[starlark(require = named)] configuration: Value<'v>,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] source: Value<'v>,
+        #[starlark(require = named)] compile_build_variables: Value<'v>,
+        #[starlark(require = named)] toolchain_type: &'v str,
+        #[starlark(require = named)] copts_filter: Option<Value<'v>>,
+        #[starlark(require = named)] additional_compilation_inputs: Option<Value<'v>>,
+        #[starlark(require = named)] additional_compilation_inputs_set: Option<Value<'v>>,
+        #[starlark(require = named)] additional_include_scanning_roots: Option<Value<'v>>,
+        #[starlark(require = named, default = NoneType)] output_file: Value<'v>,
+        #[starlark(require = named, default = NoneType)] dotd_file: Value<'v>,
+        #[starlark(require = named)] diagnostics_file: Option<Value<'v>>,
+        #[starlark(require = named)] gcno_file: Option<Value<'v>>,
+        #[starlark(require = named)] dwo_file: Option<Value<'v>>,
+        #[starlark(require = named)] lto_indexing_file: Option<Value<'v>>,
+        #[starlark(require = named, default = false)] use_pic: bool,
+        #[starlark(require = named)] cache_key_inputs: Option<Value<'v>>,
+        #[starlark(require = named)] build_info_header_files: Option<Value<'v>>,
+        #[starlark(require = named)] action_name: Option<Value<'v>>,
+        #[starlark(require = named)] should_scan_includes: Option<Value<'v>>,
+        #[starlark(require = named)] shareable: Option<Value<'v>>,
+        #[starlark(require = named)] module_files: Option<Value<'v>>,
+        #[starlark(require = named)] modmap_file: Option<Value<'v>>,
+        #[starlark(require = named)] modmap_input_file: Option<Value<'v>>,
+        #[starlark(require = named)] additional_outputs: Option<Value<'v>>,
+        #[starlark(require = named, default = false)] needs_include_validation: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        use crate::cc_compile_action::CcCompileRequest;
+        use crate::cc_compile_action::empty_sequence;
+        use crate::cc_compile_action::none;
+        let copts_filter = crate::cc_compile_action::optional_string(copts_filter, "copts_filter")?;
+        let action_name = crate::cc_compile_action::optional_string(action_name, "action_name")?;
+        let should_scan_includes =
+            crate::cc_compile_action::optional_bool(should_scan_includes, "should_scan_includes")?;
+        let shareable = crate::cc_compile_action::optional_bool(shareable, "shareable")?;
+        anyhow::ensure!(
+            copts_filter.is_none_or(str::is_empty),
+            "CppCompile nonempty copts_filter is unsupported"
+        );
+        anyhow::ensure!(
+            shareable != Some(true),
+            "CppCompile shareable actions are unsupported"
+        );
+        for (value, name) in [
+            (diagnostics_file, "diagnostics_file"),
+            (gcno_file, "gcno_file"),
+            (dwo_file, "dwo_file"),
+            (lto_indexing_file, "lto_indexing_file"),
+            (module_files, "module_files"),
+            (modmap_file, "modmap_file"),
+            (modmap_input_file, "modmap_input_file"),
+        ] {
+            none(value, name)?;
+        }
+        empty_sequence(
+            additional_include_scanning_roots,
+            "additional_include_scanning_roots",
+        )?;
+        empty_sequence(additional_outputs, "additional_outputs")?;
+        anyhow::ensure!(
+            crate::cc_variables::cc_variables_value(compile_build_variables).is_some(),
+            "compile_build_variables requires native CcToolchainVariables"
+        );
+        let context = action_construction_context
+            .request_value::<&dyn crate::cc_context::CcCompileActionContext>()
+            .ok_or_else(|| {
+                anyhow::anyhow!("create_cc_compile_action requires a genuine rule ctx")
+            })?;
+        let request = CcCompileRequest {
+            configuration: crate::cc_compile_outputs::configuration::unpack(configuration)?,
+            compilation_context: cc_compilation_context,
+            toolchain: cc_toolchain,
+            features: feature_configuration,
+            variables: compile_build_variables,
+            source,
+            output: output_file,
+            dotd: dotd_file,
+            additional_inputs: additional_compilation_inputs,
+            additional_inputs_set: additional_compilation_inputs_set,
+            cache_key_inputs,
+            build_info_headers: build_info_header_files,
+            action_name,
+            should_scan_includes,
+            use_pic,
+            needs_include_validation,
+            toolchain_type,
+        };
+        let pending = context.prepare_cc_compile(&request)?;
+        crate::cc_compile_action::record(
+            eval.module(),
+            pending,
+            compile_build_variables,
+            cc_compilation_context,
+        );
+        Ok(NoneType)
+    }
+
     fn compute_output_name_prefix_dir<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = named)] configuration: Value<'v>,

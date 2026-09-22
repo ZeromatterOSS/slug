@@ -6,6 +6,7 @@ package(default_visibility = ["//visibility:public"])
 rust_library(
     name = "slug_core_v2",
     srcs = glob(["src/**/*.rs"]),
+    compile_data = ["//app/slug_build_api_v2:tests/cpp_compile_support/mod.rs"],
     aliases = aliases(),
     crate_features = ["default"],
     edition = crate_edition(),

@@ -300,6 +300,8 @@ fn walk_prerequisites<'a>(
                     artifacts
                 } else if let Some(spec) = action.symlink_spec() {
                     SmallSet::from_iter([symlink::target(action, spec)?.clone()])
+                } else if action.cpp_compile_spec().is_some() {
+                    return Err("CppCompile discovery-aware prerequisites are not admitted".into());
                 } else if scalar_file_write(action) {
                     Default::default()
                 } else {

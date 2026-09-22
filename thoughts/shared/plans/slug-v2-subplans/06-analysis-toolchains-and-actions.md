@@ -239,12 +239,25 @@ dependencies and full CcInfo/HeaderInfo publication/restoration. The restricted
 configuration query exposes the existing fixed nonsibling layout, not a new
 configuration option; command capture still rejects the sibling-layout flag.
 is_tree_artifact reads genuine File kind, including true for Directory artifacts.
-The unchanged public compile wrapper succeeds for header-only inputs and reaches
-the missing create_cc_compile_action native for a regular .cc source. This admits
-neither compiler actions/discovery nor tree templates, virtual-header rewriting,
-module-map actions or whole compilation-output provider publication. Selected-
+The unchanged public compile wrapper succeeds for header-only inputs. Context
+composition does not admit tree templates, virtual-header rewriting, module-map
+actions or whole compilation-output provider publication. Selected-
 registry test inputs exercise existing main-origin loading; production loading
 and all retained representations are unchanged.
+
+WP769 adds construction-only typed CppCompile recipes for regular C/C++ sources
+with object and default dotd outputs. Eager toolchain/input snapshots remain
+separate from evaluator-live Variables and compilation context. Loading traces
+pending recipes and their original role depsets through module roots; Analysis
+lowers them with returned providers, preserves completed depset memo entries,
+then atomically merges actions in registration order before runfiles completion.
+One publication alias bijection covers the full recipe and distinct mandatory,
+cache-only, declared-header, builtin and additional-prunable input roles. Existing
+configured-node DICE ownership supplies invalidation and cutoff; no discovery
+cache or new key is introduced. Structural identity and paths remain Slug-native.
+CppCompile command/aquery/ActionKey projection, header discovery and execution
+are explicitly unsupported in BuildAPI/Core/REAPI. Inert constructor fixtures
+do not establish allocator toolchain/argv or compiler execution parity.
 
 WP760 retains C++ Variables through the existing AnalysisValue publication owner.
 Loading owns traced evaluator-live bindings and dotted lookup caches; freeze and

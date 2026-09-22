@@ -3,7 +3,7 @@
 # rule, FDO production, real tool execution, or compile/link action support.
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
-load("@rules_cc//cc:cc_toolchain_config_lib.bzl", "artifact_name_pattern", "env_entry", "env_set", "feature", "tool_path")
+load("@rules_cc//cc:cc_toolchain_config_lib.bzl", "action_config", "artifact_name_pattern", "env_entry", "env_set", "feature", "tool", "tool_path")
 load("@rules_cc//cc/private:cc_internal.bzl", "cc_internal")
 load("@rules_cc//cc/private/rules_impl:cc_toolchain_info.bzl", "CcToolchainInfo")
 load("@rules_cc//cc/private/toolchain_config:cc_toolchain_config_info.bzl", "create_cc_toolchain_config_info")
@@ -14,7 +14,7 @@ Proof = provider(fields = ["toolchain", "pic_alias", "static_alias", "dynamic_al
 def _file(target):
     return target[DefaultInfo].files.to_list()[0]
 
-def _make(ctx):
+def _make(ctx, compile_requirements = [], compile_inputs = {}):
     header = _file(ctx.attr.header)
     static_file = _file(ctx.attr.static_file)
     dynamic_file = _file(ctx.attr.dynamic_file)
@@ -25,6 +25,8 @@ def _make(ctx):
         compiler = "gcc", target_cpu = "k8", target_libc = "local", target_system_name = "proof-system",
         abi_version = "proof-abi", abi_libc_version = "proof-libc",
         artifact_name_patterns = [artifact_name_pattern(category_name = "object_file", prefix = ctx.attr.object_prefix, extension = ctx.attr.object_extension)],
+        action_configs = [action_config(action_name = "c++-compile", enabled = True,
+            tools = [tool(path = "bin/gcc", execution_requirements = compile_requirements)])] if compile_requirements else [],
         features = [feature(name = "supports_pic"), feature(name = "static_link_cpp_runtimes"),
             feature(name = "parse_showincludes"), feature(name = "no_dotd_file"),
             feature(name = "system_include_paths"), feature(name = "external_include_paths"),
@@ -52,7 +54,8 @@ def _make(ctx):
         builtin_include_files = [header], build_variables_dict = bindings, build_variables = variables,
         cc_info = CcInfo(compilation_context = compilation),
         all_files = all_files, all_files_including_libc = all_files,
-        compiler_files = all_files, compiler_files_without_includes = all_files,
+        compiler_files = compile_inputs.get("compiler", all_files),
+        compiler_files_without_includes = compile_inputs.get("without", all_files),
         strip_files = all_files, as_files = all_files, ar_files = all_files,
         linker_files = all_files, if_so_builder = header, dwp_files = all_files,
         coverage_files = all_files, supports_param_files = True, supports_header_parsing = False,
@@ -60,6 +63,10 @@ def _make(ctx):
         build_info_files = OutputGroupInfo(), objcopy_files = all_files,
         aggregate_ddi = None, generate_modmap = None,
     )
+
+# Authored fixture hook: the genuine rule ctx constructs fresh mutable input lists
+# so native constructor snapshot timing can be tested without mutating a dependency.
+make_compile_toolchain = _make
 
 def _check_mixed(received, fresh):
     left = received.needs_pic_for_dynamic_libraries

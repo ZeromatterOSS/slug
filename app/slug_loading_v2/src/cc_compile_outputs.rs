@@ -4,7 +4,7 @@ use slug_identity_v2::CanonicalLabel;
 use starlark::eval::Evaluator;
 use starlark::values::Value;
 
-mod configuration;
+pub(crate) mod configuration;
 pub use configuration::alloc_configuration;
 
 use crate::cc_context::CcCompileOutputContext;

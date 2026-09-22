@@ -31,6 +31,15 @@ pub struct CtxActions {
 }
 
 impl CtxActions {
+    /// End-of-analysis publication checkpoint. No pending recipes enter this
+    /// owner: validate the complete, ordered action batch before replacing state.
+    pub fn replace_actions(&mut self, actions: Vec<ActionSpec>) -> Result<(), ActionError> {
+        let mut registry = ActionRegistry::new();
+        registry.register_batch(actions)?;
+        self.registry = registry;
+        Ok(())
+    }
+
     pub fn new(root: crate::DerivedArtifactRoot) -> Self {
         Self {
             root,

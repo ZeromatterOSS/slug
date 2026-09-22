@@ -14,6 +14,20 @@ use crate::runtime::ObservedSourceArtifactInput;
 use crate::runtime::SourceArtifactInput;
 use crate::runtime::SourceArtifactInputObservationKey;
 
+/// The same typed-family gate used before any input content observation.
+pub(in crate::runtime) fn source_spawn(
+    action: &slug_analysis_v2::ConfiguredAction,
+) -> Result<&SpawnSpec, Arc<str>> {
+    if action.cpp_compile_spec().is_some() {
+        return Err(error(
+            "CppCompile discovery-aware source staging is not admitted",
+        ));
+    }
+    action
+        .spawn_spec()
+        .ok_or_else(|| error("source staging requires a typed Spawn"))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(super) struct SourceStagingKey {
     build: BuildCommandRootKey,
@@ -295,9 +309,7 @@ impl SourceStagingKey {
             .actions()
             .get(self.action)
             .ok_or_else(|| error("selected action ordinal is absent from the validated closure"))?;
-        let spawn = action
-            .spawn_spec()
-            .ok_or_else(|| error("source staging requires a typed Spawn"))?;
+        let spawn = source_spawn(action)?;
         // Validate the entire declared set before any content observation.
         let artifacts = declared_sources(spawn)?;
         let mut sources = Vec::with_capacity(artifacts.len());

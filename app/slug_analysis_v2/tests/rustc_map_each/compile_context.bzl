@@ -33,6 +33,10 @@ def _impl(ctx):
         return [Proof(context = context, info = CcInfo(compilation_context = context), alias = context._header_info)]
     tc = ctx.attr.toolchain[CcToolchainInfo]
     features = tc._toolchain_features.configure_features(ctx.attr.requested)
+    if ctx.attr.configured_compile:
+        features = cc_common.configure_features(ctx = ctx, cc_toolchain = tc,
+            requested_features = ctx.features + ctx.attr.requested,
+            unsupported_features = ctx.disabled_features)
     deps = [dep[Proof].context for dep in ctx.attr.deps]
     implementation_deps = [dep[Proof].context for dep in ctx.attr.implementation_deps]
     public = _files(ctx.attr.public)
@@ -48,6 +52,7 @@ def _impl(ctx):
             defines = ["own-define"], local_defines = ["own-local"],
             compilation_contexts = deps, implementation_compilation_contexts = implementation_deps,
             purpose = "cc_library-compile",
+            user_compile_flags = ctx.attr.compile_flags,
         )
         # The whole outputs provider contains a generic temps closure. Inspect
         # it here; do not expand callable-publication admission for this proof.
@@ -81,6 +86,7 @@ subject = rule(implementation = _impl, fragments = ["cpp"], attrs = {
     "textual": attr.label_list(allow_files = True), "sources": attr.label_list(allow_files = True),
     "deps": attr.label_list(), "implementation_deps": attr.label_list(),
     "public_compile": attr.bool(),
+    "configured_compile": attr.bool(), "compile_flags": attr.string_list(),
 })
 
 def _exec_impl(ctx):

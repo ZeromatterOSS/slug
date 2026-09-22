@@ -24,6 +24,9 @@ pub struct ReapiCommandProjection {
 
 impl ReapiCommandProjection {
     pub fn from_action(action: &ActionSpec) -> Result<Self, &'static str> {
+        if action.kind() == &crate::ActionKind::CppCompile {
+            return Err("CppCompile REAPI projection is not admitted");
+        }
         if action.solib_symlink_spec().is_some() {
             return Err("native SolibSymlink REAPI projection is not admitted");
         }

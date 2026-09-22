@@ -1034,7 +1034,9 @@ impl<'v> AnalysisValueLowerer<'v> {
         while let Some((value, path, exiting)) = stack.pop() {
             let identity = value.identity();
             if !exiting {
-                if local_ids.contains_key(&identity) {
+                // Completed nodes may already be retained by an earlier provider.
+                // Rebuilding them would split aliases across publication roots.
+                if local_ids.contains_key(&identity) || self.memo.contains_key(&identity) {
                     continue;
                 }
                 let (_, _, _, retained, _, successors) = StarlarkDepset::parts_from_value(value)
@@ -1222,6 +1224,10 @@ impl<'v> AnalysisValueLowerer<'v> {
 #[cfg(test)]
 #[path = "analysis_value/cc_features_tests.rs"]
 mod cc_features_tests;
+
+#[cfg(test)]
+#[path = "analysis_value/cpp_compile_publication_tests.rs"]
+mod cpp_compile_publication_tests;
 
 #[cfg(test)]
 mod cc_header_info_tests;

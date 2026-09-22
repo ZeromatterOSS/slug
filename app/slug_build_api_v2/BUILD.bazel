@@ -3,6 +3,15 @@ load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files(
+    ["tests/cpp_compile_support/mod.rs"],
+    visibility = [
+        "//app/slug_core_v2:__pkg__",
+        "//app/slug_loading_v2:__pkg__",
+        "//app/slug_reapi_v2:__pkg__",
+    ],
+)
+
 rust_library(
     name = "slug_build_api_v2",
     srcs = glob(["src/**/*.rs"]),

@@ -9,6 +9,7 @@
  */
 
 mod cargo_runfiles_args;
+mod cpp_compile;
 pub mod ctx_actions;
 pub mod reapi_projection;
 pub mod registry;
@@ -21,6 +22,9 @@ pub mod spec;
 
 pub use cargo_runfiles_args::CargoRunfilesArgsError;
 pub use cargo_runfiles_args::RetainedCargoRunfilesArgs;
+pub use cpp_compile::CppCompileConstruction;
+pub use cpp_compile::CppCompileData;
+pub use cpp_compile::CppCompileSpec;
 pub use ctx_actions::CtxActions;
 pub use reapi_projection::ReapiCommandProjection;
 pub use registry::ActionError;

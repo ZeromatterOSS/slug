@@ -86,6 +86,9 @@ pub struct ReapiInputTree {
 
 impl ReapiInputTree {
     pub fn from_action(action: &ActionSpec) -> Result<Self, InputTreeError> {
+        if action.kind() == &slug_build_api_v2::ActionKind::CppCompile {
+            return Err(InputTreeError::CppCompileUnsupported);
+        }
         if action.is_typed_payload() {
             return Err(InputTreeError::TypedActionUnsupported);
         }
@@ -252,6 +255,7 @@ impl ReapiInputTree {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum InputTreeError {
+    CppCompileUnsupported,
     TypedActionUnsupported,
     MissingDigest { path: String },
     InvalidDigest { path: String, error: String },
@@ -262,6 +266,12 @@ pub enum InputTreeError {
 impl fmt::Display for InputTreeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::CppCompileUnsupported => {
+                write!(
+                    f,
+                    "CppCompile discovery-aware REAPI input trees are not admitted"
+                )
+            }
             Self::TypedActionUnsupported => {
                 f.write_str("typed Spawn/Symlink/ArgsWrite REAPI input trees are not admitted")
             }

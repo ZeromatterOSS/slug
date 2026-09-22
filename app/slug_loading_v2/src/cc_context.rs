@@ -2,6 +2,19 @@
 
 use starlark::any::ProvidesStaticType;
 
+pub trait CcCompileActionContext {
+    /// Synchronous capability: validate the active token and snapshot only the
+    /// constructor-consumed fields. Live recipes remain on the evaluator heap.
+    fn prepare_cc_compile<'v>(
+        &self,
+        request: &crate::cc_compile_action::CcCompileRequest<'v>,
+    ) -> anyhow::Result<crate::cc_compile_action::PreparedCcCompile<'v>>;
+}
+
+unsafe impl<'v> ProvidesStaticType<'v> for &'v dyn CcCompileActionContext {
+    type StaticType = &'static dyn CcCompileActionContext;
+}
+
 pub trait CcCompileOutputContext {
     /// Validate the live ctx and complete supplied configuration before touching
     /// the existing declaration sink. The label locates; ctx remains the owner.

@@ -643,7 +643,7 @@ fn typed_spawn_retains_one_recipe_and_publication_equal_depsets() {
     assert_eq!(left.mnemonic(), "Compile");
     assert_eq!(left.progress_message(), Some("building output"));
     assert_eq!(
-        left.render_argv(),
+        left.render_argv().unwrap(),
         [
             "tools/runner",
             "--literal",
@@ -810,7 +810,10 @@ fn files_to_run_spawn_equality_shares_one_alias_state_across_invocation_and_tool
 
     assert_eq!(aliased, independently_aliased);
     assert_ne!(aliased, split);
-    assert_eq!(aliased.render_argv(), [root_support::exec_path("pkg/tool")]);
+    assert_eq!(
+        aliased.render_argv().unwrap(),
+        [root_support::exec_path("pkg/tool")]
+    );
 }
 
 #[test]

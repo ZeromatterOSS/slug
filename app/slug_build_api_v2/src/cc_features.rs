@@ -16,6 +16,10 @@ use starlark_map::small_set::SmallSet;
 mod artifact_naming;
 mod metadata;
 pub use metadata::*;
+/// Normalize eagerly consumed C++ toolchain paths under the admitted POSIX policy.
+pub fn normalize_cc_path_posix(path: &str) -> Result<CompactString, CcFeatureError> {
+    metadata::normalize_posix_path(path)
+}
 mod expansion;
 pub use expansion::CcVariableAccess;
 #[cfg(test)]

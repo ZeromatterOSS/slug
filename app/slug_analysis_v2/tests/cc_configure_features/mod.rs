@@ -164,9 +164,6 @@ pub(super) async fn request(
         cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
     });
-    updater
-        .changed_to(slug_workspace_v2::path_observation_shards(&epoch))
-        .unwrap();
     // Bootstrap's generic route still demands platforms+; selected canonical
     // inventory demands platforms. Supply both actual request identities for
     // the declared local override without rewriting configured constraint labels.

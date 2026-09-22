@@ -228,7 +228,12 @@ pub(super) async fn request(
     let key = match slug_analysis_v2::prepare_configured_node_analysis_observed(
         &mut transaction,
         workspace,
-        CanonicalLabel::parse(&format!("@@rules_rust+//:{target}")).unwrap(),
+        CanonicalLabel::parse(&if target.starts_with("@@") {
+            target.to_owned()
+        } else {
+            format!("@@rules_rust+//:{target}")
+        })
+        .unwrap(),
         configuration,
     )
     .await

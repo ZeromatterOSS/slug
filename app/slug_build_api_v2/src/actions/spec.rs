@@ -24,6 +24,7 @@ use slug_configuration_v2::NormalizedBazelPath;
 use slug_configuration_v2::RetainedActionEnvironment;
 
 use crate::actions::cargo_runfiles_args::RetainedCargoRunfilesArgs;
+use crate::actions::cpp_compile::CppCompileSpec;
 use crate::actions::runfiles_support::RunfilesSupportActionSpec;
 use crate::actions::rust_crate_args::RetainedRustCrateArgs;
 use crate::actions::rust_native_link_args::RetainedRustNativeLinkArgs;
@@ -1163,6 +1164,7 @@ pub enum ActionKind {
     ArtifactSymlink,
     AbsoluteSymlink,
     SolibSymlink,
+    CppCompile,
     ArgsWrite,
     RepoMappingManifest,
     SourceSymlinkManifest,
@@ -1190,6 +1192,7 @@ enum ActionPayload {
     Spawn(SpawnSpec),
     Symlink(SymlinkSpec),
     SolibSymlink(SolibSymlinkSpec),
+    CppCompile(CppCompileSpec),
     ArgsWrite(ArgsWriteSpec),
     RunfilesSupport(RunfilesSupportActionSpec),
 }
@@ -1205,6 +1208,7 @@ static SPAWN_KIND: ActionKind = ActionKind::Spawn;
 static ARTIFACT_SYMLINK_KIND: ActionKind = ActionKind::ArtifactSymlink;
 static ABSOLUTE_SYMLINK_KIND: ActionKind = ActionKind::AbsoluteSymlink;
 static SOLIB_SYMLINK_KIND: ActionKind = ActionKind::SolibSymlink;
+static CPP_COMPILE_KIND: ActionKind = ActionKind::CppCompile;
 static ARGS_WRITE_KIND: ActionKind = ActionKind::ArgsWrite;
 static REPO_MAPPING_MANIFEST_KIND: ActionKind = ActionKind::RepoMappingManifest;
 static SOURCE_SYMLINK_MANIFEST_KIND: ActionKind = ActionKind::SourceSymlinkManifest;
@@ -1245,6 +1249,10 @@ impl ActionSpec {
         Self::typed(ActionPayload::SolibSymlink(spec))
     }
 
+    pub fn cpp_compile(spec: CppCompileSpec) -> Self {
+        Self::typed(ActionPayload::CppCompile(spec))
+    }
+
     pub fn args_write(spec: ArgsWriteSpec) -> Self {
         Self::typed(ActionPayload::ArgsWrite(spec))
     }
@@ -1270,6 +1278,7 @@ impl ActionSpec {
                 SymlinkTarget::AbsolutePath { .. } => &ABSOLUTE_SYMLINK_KIND,
             },
             ActionPayload::SolibSymlink(_) => &SOLIB_SYMLINK_KIND,
+            ActionPayload::CppCompile(_) => &CPP_COMPILE_KIND,
             ActionPayload::ArgsWrite(_) => &ARGS_WRITE_KIND,
             ActionPayload::RunfilesSupport(spec) => match spec {
                 RunfilesSupportActionSpec::RepoMappingManifest { .. } => {
@@ -1290,6 +1299,7 @@ impl ActionSpec {
             ActionPayload::Spawn(spec) => spec.mnemonic(),
             ActionPayload::Symlink(_) => "Symlink",
             ActionPayload::SolibSymlink(_) => "SolibSymlink",
+            ActionPayload::CppCompile(_) => "CppCompile",
             ActionPayload::ArgsWrite(_) => "FileWrite",
             ActionPayload::RunfilesSupport(spec) => spec.mnemonic(),
         }
@@ -1336,6 +1346,7 @@ impl ActionSpec {
             ActionPayload::Spawn(spec) => spec.outputs(),
             ActionPayload::Symlink(spec) => std::slice::from_ref(spec.output()),
             ActionPayload::SolibSymlink(spec) => std::slice::from_ref(spec.output()),
+            ActionPayload::CppCompile(spec) => spec.outputs(),
             ActionPayload::ArgsWrite(spec) => std::slice::from_ref(spec.output()),
             ActionPayload::RunfilesSupport(spec) => std::slice::from_ref(spec.output()),
         }
@@ -1354,6 +1365,7 @@ impl ActionSpec {
             ActionPayload::Spawn(spec) => spec.progress_message(),
             ActionPayload::Symlink(spec) => spec.progress_message(),
             ActionPayload::SolibSymlink(_) => None,
+            ActionPayload::CppCompile(_) => None,
             ActionPayload::ArgsWrite(_) => None,
             ActionPayload::RunfilesSupport(_) => None,
         }
@@ -1454,11 +1466,22 @@ impl ActionSpec {
         !matches!(&self.payload, ActionPayload::Legacy(_))
     }
 
-    pub fn render_argv(&self) -> Vec<String> {
+    pub fn cpp_compile_spec(&self) -> Option<&CppCompileSpec> {
         match &self.payload {
-            ActionPayload::Legacy(spec) => spec.argv.clone(),
-            ActionPayload::Spawn(spec) => spec.render_argv(),
-            _ => Vec::new(),
+            ActionPayload::CppCompile(spec) => Some(spec),
+            _ => None,
+        }
+    }
+
+    pub fn render_argv(&self) -> Result<Vec<String>, &'static str> {
+        if self.kind() == &ActionKind::CppCompile {
+            return Err("CppCompile command expansion is not admitted");
+        }
+        match &self.payload {
+            ActionPayload::Legacy(spec) => Ok(spec.argv.clone()),
+            ActionPayload::Spawn(spec) => Ok(spec.render_argv()),
+            ActionPayload::CppCompile(_) => Err("CppCompile command expansion is not admitted"),
+            _ => Ok(Vec::new()),
         }
     }
 

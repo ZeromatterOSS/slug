@@ -21,6 +21,8 @@ use slug_identity_v2::CanonicalLabel;
 
 use super::*;
 
+mod cpp_compile_tests;
+
 fn key(name: &str, exec: bool) -> ConfiguredTargetKey {
     let host = HostConversionInputs::new(
         Some(AutoCpuToken::K8),

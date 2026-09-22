@@ -68,7 +68,7 @@ pub fn alloc_configuration<'v>(
     Ok(heap.alloc_simple(ConfigurationValue(configuration)))
 }
 
-pub(super) fn unpack(value: Value<'_>) -> anyhow::Result<&SlugConfiguration> {
+pub(crate) fn unpack(value: Value<'_>) -> anyhow::Result<&SlugConfiguration> {
     ConfigurationValue::from_value(value)
         .map(|value| &value.0)
         .ok_or_else(|| anyhow::anyhow!("requires a genuine configuration"))

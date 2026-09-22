@@ -401,14 +401,16 @@ with genuine configuration, normalized package containment, distinct naming labe
 and active owner, and main/external target/exec publication/restoration. Existing
 toolchain naming remains independently protected; this is not full public compile()
 traversal or compiler execution. Other context/tree/action natives remain open.
-WP768 now proves unchanged compilation-context initialization for main/external
-target/exec owners and header-only public compile composition. A genuine regular
-.cc reaches the missing compiler-action constructor; this is the next action/
-discovery gate, not successful allocator compilation. Fixed nonsibling layout and
+WP768 proves unchanged compilation-context initialization for main/external
+target/exec owners and header-only public compile composition. Fixed nonsibling layout and
 genuine File-kind queries add no new retained identity. Virtual headers, modules
 and tree templates remain outside this proof.
-Compile action production, execution-time tree/path mapping and full cc_library remain
-deferred. Variables reject cyclic/foreign publication;
+WP769 adds regular C/C++ construction-only CppCompile registration with object/dotd,
+separate input roles and traced end-of-analysis recipe publication. The unchanged
+public caller uses an inert authored toolchain; this does not establish production
+allocator compiler arguments or execution. Command expansion/aquery/ActionKey,
+discovery-aware input selection/cache hits, execution-time tree/path mapping and
+full cc_library remain deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and non-ToolchainInfo builtin structures remain outside
 the admitted boundary. See the current packet for exact/native/deferred classes.
 The existing full Rustc argument proof's None C++ fields still do not establish

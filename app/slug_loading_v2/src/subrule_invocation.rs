@@ -127,6 +127,12 @@ pub struct AnalysisSpawnRequest<'v> {
 }
 
 pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
+    fn prepare_cc_compile<'v>(
+        &self,
+        _request: &crate::cc_compile_action::CcCompileRequest<'v>,
+    ) -> anyhow::Result<crate::cc_compile_action::PreparedCcCompile<'v>> {
+        anyhow::bail!("native CppCompile construction is unavailable in this analysis context")
+    }
     fn declare_compile_output(
         &self,
         _bin_relative_path: String,

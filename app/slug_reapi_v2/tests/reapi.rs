@@ -1,3 +1,4 @@
+mod cpp_compile;
 mod root_support;
 
 #[test]

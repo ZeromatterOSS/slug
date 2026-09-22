@@ -481,6 +481,8 @@ impl<'a> NativeStringListOption<'a> {
     }
 }
 
+mod cpp_compile;
+
 impl SlugConfiguration {
     pub fn new_default(
         kind: SlugConfigurationKind,

@@ -29,13 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-68-m7a-compile-context-composition-r1
+Packet: WP-7-69-m7a-cpp-compile-registration-r1
 Status: accepted
 
-WP768 accepts unchanged compilation-context initialization and public compile
-composition through the compiler-action frontier, using genuine layout/File-kind
-queries.37 focused tests and Core/CLI checks pass; independent final review ACCEPT.
-Discovery-aware CppCompile remains a later gate.
+WP769 accepts construction-only typed CppCompile registration with distinct input
+roles and default dotd policy. Traced pending recipes preserve live Variables/context
+and provider aliases through GC and atomic ordered publication. Independent design/
+final ACCEPT,70 focused tests and Core/CLI checks pass. Command expansion/aquery,
+ActionKey projection and discovery execution stay deferred.
+WP768 at d5c4364ec accepted context composition with37 focused tests and Core/CLI
+checks. M7A remains partial; M8 unproved.
 WP767 at7016c3c29 accepts paired compile-output prefix/declaration entrypoints for the
 allocator regular-source path, with genuine configuration/location/owner checks.
 31 focused tests and Core/CLI checks pass; independent final review returns ACCEPT.

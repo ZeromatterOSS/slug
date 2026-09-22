@@ -18,6 +18,7 @@ use crate::actions::spec::ActionSpec;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ActionError {
+    InvalidActionPayload { mnemonic: String },
     InvalidOutputPath { path: String },
     ConflictingOutput { path: String },
     MissingOutputs { mnemonic: String },
@@ -27,6 +28,9 @@ pub enum ActionError {
 impl fmt::Display for ActionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidActionPayload { mnemonic } => {
+                write!(f, "action {mnemonic} requires its native typed payload")
+            }
             Self::InvalidOutputPath { path } => write!(f, "invalid action output path: {path}"),
             Self::ConflictingOutput { path } => {
                 write!(f, "action output declared more than once: {path}")
@@ -133,6 +137,11 @@ impl ActionRegistry {
 }
 
 fn validate_action(action: &ActionSpec) -> Result<(), ActionError> {
+    if action.kind() == &crate::ActionKind::CppCompile && action.cpp_compile_spec().is_none() {
+        return Err(ActionError::InvalidActionPayload {
+            mnemonic: action.mnemonic().to_owned(),
+        });
+    }
     if action.outputs().is_empty() {
         return Err(ActionError::MissingOutputs {
             mnemonic: action.mnemonic().to_owned(),
@@ -144,7 +153,10 @@ fn validate_action(action: &ActionSpec) -> Result<(), ActionError> {
             | crate::actions::spec::ActionKind::RunShell { .. }
             | crate::actions::spec::ActionKind::Spawn
     ) && action.argv().is_empty()
-        && action.render_argv().is_empty()
+        && action
+            .render_argv()
+            .expect("Run/RunShell/Spawn command projection is admitted")
+            .is_empty()
     {
         return Err(ActionError::MissingArgv {
             mnemonic: action.mnemonic().to_owned(),

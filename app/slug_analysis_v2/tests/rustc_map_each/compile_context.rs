@@ -5,6 +5,7 @@ use super::super::cc_configure_features::config;
 use super::super::cc_configure_features::field;
 use super::*;
 
+mod registration;
 mod registry;
 
 const PROOF: &str = "rules_cc/cc/private/compile_context_proof.bzl";
@@ -16,6 +17,7 @@ const FILES: &[&str] = &[
     "implementation.h",
     "changed.h",
     "allocator_library.cc",
+    "allocator_library.c",
 ];
 
 fn declarations(main: bool) -> String {
@@ -37,13 +39,21 @@ fn declarations(main: bool) -> String {
          exec_subject(name='exec_init',dep=':init',visibility=['//visibility:public'])\n\
          composition(name='matrix',rows=[':init',':system',':external',':exec_init'],visibility=['//visibility:public'])\n\
          composition(name='header_compile',{common},public_compile=True)\n\
-         composition(name='source_compile',{common},public_compile=True,sources=['@@//:allocator_library.cc'])\n"
+         composition(name='source_compile',{common},public_compile=True,sources=['@@//:allocator_library.cc'])\n\
+         composition(name='typed_compile',{common},public_compile=True,configured_compile=True,sources=['@@//:allocator_library.cc'],compile_flags=['-DRECIPE_A'])\n\
+         composition(name='typed_c',{common},public_compile=True,configured_compile=True,sources=['@@//:allocator_library.c'])\n\
+         composition(name='typed_pic',{common},public_compile=True,configured_compile=True,requested=['supports_pic'],sources=['@@//:allocator_library.cc'])\n"
     )
 }
 
 fn workspace() -> PathBuf {
     let root = super::cc_toolchain::workspace();
     fs::write(root.join(PROOF), include_str!("compile_context.bzl")).unwrap();
+    fs::write(
+        root.join("rules_cc/cc/private/compile_registration_proof.bzl"),
+        include_str!("compile_context/lifecycle.bzl"),
+    )
+    .unwrap();
     for name in FILES {
         fs::write(
             root.join(name),
@@ -62,11 +72,26 @@ fn workspace() -> PathBuf {
     fs::write(
         build,
         format!(
-            "{existing}\nexports_files({FILES:?})\n{}",
+            "{existing}\nexports_files({FILES:?})\n{}\n\
+             load('@rules_cc//cc/private:compile_registration_proof.bzl','registration_subject','foreign_output')\n\
+             foreign_output(name='registration_foreign')\n\
+             registration_subject(name='registration_lifecycle',tags=['no-sandbox','ordinary-tag'])\n\
+             registration_subject(name='registration_conflict_before',failure='conflict_before')\n\
+             registration_subject(name='registration_conflict_after',failure='conflict_after')\n\
+             registration_subject(name='registration_conflict_dotd',failure='conflict_dotd')\n\
+             registration_subject(name='registration_conflict_pending',failure='conflict_pending')\n",
             declarations(true)
         ),
     )
     .unwrap();
+    let build = root.join("BUILD.bazel");
+    let mut contents = fs::read_to_string(&build).unwrap();
+    for mode in registration::NATIVE_MODES {
+        contents.push_str(&format!(
+            "registration_subject(name='native_{mode}',failure='{mode}')\n"
+        ));
+    }
+    fs::write(build, contents).unwrap();
     registry::prepare_workspace(&root);
     root
 }
@@ -340,8 +365,7 @@ async fn initializer_context_dependency_and_configuration_restore_in_same_dice()
 }
 
 #[tokio::test]
-async fn unchanged_public_compile_header_only_succeeds_and_regular_source_reaches_action_frontier()
-{
+async fn unchanged_public_compile_header_only_succeeds_and_unconfigured_source_is_rejected() {
     let root = workspace();
     let dice = registry::dice(&root);
     let header = request(&dice, &root, "header_compile", config(&[]))
@@ -370,9 +394,9 @@ async fn unchanged_public_compile_header_only_succeeds_and_regular_source_reache
     let error = request(&dice, &root, "source_compile", config(&[]))
         .await
         .err()
-        .expect("real compiler action remains unsupported");
+        .expect("empty feature selection has no configured compiler action");
     assert!(
-        error.contains("Object of type `cc_internal` has no attribute `create_cc_compile_action`"),
+        error.contains("Expected action_config for 'c++-compile' to be configured"),
         "{error}"
     );
     fs::remove_dir_all(root).unwrap();

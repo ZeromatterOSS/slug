@@ -1763,7 +1763,7 @@ impl PublicationEqState {
         Ok(true)
     }
 
-    fn enter_cc_feature_pair(&mut self, left: usize, right: usize) -> bool {
+    pub(crate) fn enter_cc_feature_pair(&mut self, left: usize, right: usize) -> bool {
         if let Some(previous) = self.left_cc_features.get(&left) {
             return *previous == right;
         }
