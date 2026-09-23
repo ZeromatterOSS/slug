@@ -168,7 +168,9 @@ use crate::provider::loading_provider_id;
 use crate::provider::starlark_provider_identity;
 use crate::provider::starlark_user_provider_fields;
 use crate::starlark_label::StarlarkLabel;
+use crate::subrule::ConfiguredDependencyDefault;
 use crate::visibility::RuleVisibility;
+use crate::visibility::VisibilitySource;
 
 fn provider_identity_text(identity: &ProviderIdentity) -> String {
     match identity {
@@ -38420,7 +38422,7 @@ async fn repository_package_policy_projection_shares_success_and_inventory_event
 }
 
 #[tokio::test]
-async fn repository_package_inventory_retains_targets_rejected_by_old_policy() {
+async fn repository_package_inventory_retains_targets_rejected_by_loaded_policy() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     for (variant, files, expected_target, expected_error) in [
         (
@@ -38445,17 +38447,17 @@ async fn repository_package_inventory_retains_targets_rejected_by_old_policy() {
             vec![
                 (
                     "BUILD.bazel",
-                    b"load(\":defs.bzl\", \"probe\")\nfilegroup(name = \"dep\")\nprobe(name = \"probe\", dep = \":dep\", visibility = [\"//visibility:public\"])\n"
+                    b"load(\":defs.bzl\", \"probe\")\nfilegroup(name = \"dep\")\nprobe(name = \"probe\", out = \"out.txt\", visibility = [\"//visibility:public\"])\n"
                         .as_slice(),
                 ),
                 (
                     "defs.bzl",
-                    b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"dep\": attr.label()})\n"
+                    b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"out\": attr.output()})\n"
                         .as_slice(),
                 ),
             ],
             "probe",
-            "ordinary dependencies are deferred",
+            "attribute `out` contains a reachable label",
         ),
     ] {
         let mut tx = transaction(
@@ -38565,32 +38567,264 @@ async fn repository_package_load_accepts_dependency_free_public_starlark_rule_sh
 }
 
 #[tokio::test]
+async fn repository_package_load_accepts_mixed_public_starlark_rules_and_typed_dependencies() {
+    // Bazel 9.2 tools/cpp/BUILD.tools:16,56-75 has package-default public
+    // cc_library rules, a sibling label_flag, and a real deps edge.
+    let files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(\":defs.bzl\", \"probe\")\npackage(default_visibility = [\"//visibility:public\"])\nfilegroup(name = \"seed\", srcs = [])\nlabel_flag(name = \"flag\", build_setting_default = \":seed\")\nprobe(name = \"declared\", deps = [\":flag\", \"@@//main:target\", \":seed\"], visibility = [\"//visibility:public\"])\nprobe(name = \"inherited\", deps = [\":seed\", \":flag\"])\n",
+        ),
+        (
+            "defs.bzl",
+            b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"deps\": attr.label_list()})\n",
+        ),
+    ];
+    let loaded = load_repository_package_fixture(files, 783).await;
+    let loaded = repository_package_terminal(&loaded);
+    assert_eq!(
+        loaded
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["seed", "flag", "declared", "inherited"]
+    );
+    assert!(matches!(
+        loaded.targets[1].kind,
+        PackageTargetKind::LabelFlag(_)
+    ));
+    assert!(matches!(
+        &loaded.targets[2].visibility,
+        VisibilitySource::Declared(RuleVisibility::Public)
+    ));
+    assert!(matches!(
+        &loaded.targets[3].visibility,
+        VisibilitySource::PackageDefault
+    ));
+    for target in &loaded.targets[2..] {
+        assert_eq!(
+            loaded.effective_visibility(target),
+            Some(RuleVisibility::Public)
+        );
+    }
+    let PackageTargetKind::StarlarkRule(declared) = &loaded.targets[2].kind else {
+        panic!("declared target should retain its Starlark rule")
+    };
+    assert_eq!(
+        declared.dependencies(),
+        [
+            CanonicalLabel::parse("@@dep+//:flag").unwrap(),
+            CanonicalLabel::parse("@@//main:target").unwrap(),
+            CanonicalLabel::parse("@@dep+//:seed").unwrap(),
+        ]
+    );
+    let PackageTargetKind::StarlarkRule(inherited) = &loaded.targets[3].kind else {
+        panic!("inherited target should retain its Starlark rule")
+    };
+    assert_eq!(
+        inherited.dependencies(),
+        [
+            CanonicalLabel::parse("@@dep+//:seed").unwrap(),
+            CanonicalLabel::parse("@@dep+//:flag").unwrap(),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn repository_package_public_starlark_rules_replay_source_need_and_policy_a_b_a() {
+    const BUILD_A: &[u8] = b"load(\":defs.bzl\", \"probe\")\npackage(default_visibility = [\"//visibility:public\"])\nfilegroup(name = \"seed\", srcs = [])\nprobe(name = \"declared\", visibility = [\"//visibility:public\"])\nprobe(name = \"inherited\")\n";
+    const BUILD_PRIVATE: &[u8] = b"load(\":defs.bzl\", \"probe\")\npackage(default_visibility = [\"//visibility:private\"])\nfilegroup(name = \"seed\", srcs = [])\nprobe(name = \"declared\", visibility = [\"//visibility:public\"])\nprobe(name = \"inherited\")\n";
+    const DEFS_A: &[u8] = b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"deps\": attr.label_list(default = [])})\n";
+    const DEFS_B: &[u8] = b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"deps\": attr.label_list(default = [\":seed\"])})\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let a = load_repository_package_fixture_on(
+        &dice,
+        &[("BUILD.bazel", BUILD_A), ("defs.bzl", DEFS_A)],
+        784,
+    )
+    .await;
+    assert_eq!(repository_package_terminal(&a).targets.len(), 3);
+
+    let edited = load_repository_package_fixture_on(
+        &dice,
+        &[("BUILD.bazel", BUILD_A), ("defs.bzl", DEFS_B)],
+        785,
+    )
+    .await;
+    let PackageTargetKind::StarlarkRule(rule) =
+        &repository_package_terminal(&edited).targets[2].kind
+    else {
+        panic!("edited inherited rule should be retained")
+    };
+    assert_eq!(
+        rule.dependencies(),
+        [CanonicalLabel::parse("@@dep+//:seed").unwrap()]
+    );
+    assert!(!RepositoryPackageLoadKey::equality(&a, &edited));
+
+    let mut private = transaction(
+        &dice,
+        EpochBuilder::external_sources(
+            &[("BUILD.bazel", BUILD_PRIVATE), ("defs.bzl", DEFS_A)],
+            786,
+        )
+        .build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut private).await;
+    let package = PackagePath::parse("").unwrap();
+    let inventory = private
+        .compute(&RepositoryPackageInventoryKey::new(
+            HostRepositorySourceRoute::root(route.clone()),
+            package.clone(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        repository_package_inventory_terminal(&inventory)
+            .targets
+            .len(),
+        3
+    );
+    let rejected = private
+        .compute(&RepositoryPackageLoadKey::new(route, package))
+        .await
+        .unwrap();
+    let error = repository_package_error(&rejected);
+    assert!(error.contains("inherited"), "{error}");
+    assert!(
+        error.contains("effective visibility is not public"),
+        "{error}"
+    );
+
+    let mut need = transaction(
+        &dice,
+        EpochBuilder::external_sources(&[("BUILD.bazel", BUILD_A)], 787).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut need).await;
+    let need = need
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert!(matches!(need, LoadingPreparationOutcome::Need(_)));
+    assert!(!RepositoryPackageLoadKey::validity(&need));
+
+    let restored = load_repository_package_fixture_on(
+        &dice,
+        &[("BUILD.bazel", BUILD_A), ("defs.bzl", DEFS_A)],
+        788,
+    )
+    .await;
+    assert!(RepositoryPackageLoadKey::equality(&a, &restored));
+}
+
+#[tokio::test]
+async fn repository_package_load_defers_hidden_configuration_field_but_keeps_literal_default() {
+    const BUILD: &[u8] = b"load(\":defs.bzl\", \"probe\")\nprobe(name = \"subject\", visibility = [\"//visibility:public\"])\n";
+    const LITERAL: &[u8] = b"def _sub(ctx, **kwargs): pass\nhelper = subrule(implementation = _sub, attrs = {\"_dep\": attr.label(default = \":hidden.txt\", allow_files = True)})\nprobe = rule(implementation = lambda ctx: [], subrules = [helper])\n";
+    const LATE_BOUND: &[u8] = b"def _sub(ctx, **kwargs): pass\nhelper = subrule(implementation = _sub, attrs = {\"_dep\": attr.label(default = configuration_field(fragment = \"cpp\", name = \"fdo_profile\"))})\nprobe = rule(implementation = lambda ctx: [], subrules = [helper])\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let accepted = load_repository_package_fixture_on(
+        &dice,
+        &[("BUILD.bazel", BUILD), ("defs.bzl", LITERAL)],
+        789,
+    )
+    .await;
+    let PackageTargetKind::StarlarkRule(literal) =
+        &repository_package_terminal(&accepted).targets[0].kind
+    else {
+        panic!("literal hidden default should retain its rule")
+    };
+    assert!(literal.configured_dependency_attributes().any(|attribute| {
+        attribute.is_hidden()
+            && matches!(attribute.default(), ConfiguredDependencyDefault::Literal(_))
+    }));
+
+    let mut late_bound = transaction(
+        &dice,
+        EpochBuilder::external_sources(&[("BUILD.bazel", BUILD), ("defs.bzl", LATE_BOUND)], 790)
+            .build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut late_bound).await;
+    let package = PackagePath::parse("").unwrap();
+    let inventory = late_bound
+        .compute(&RepositoryPackageInventoryKey::new(
+            HostRepositorySourceRoute::root(route.clone()),
+            package.clone(),
+        ))
+        .await
+        .unwrap();
+    let PackageTargetKind::StarlarkRule(hidden) =
+        &repository_package_inventory_terminal(&inventory).targets[0].kind
+    else {
+        panic!("inventory should retain the late-bound hidden rule")
+    };
+    assert!(hidden.configured_dependency_attributes().any(|attribute| {
+        attribute.is_hidden()
+            && matches!(
+                attribute.default(),
+                ConfiguredDependencyDefault::ConfigurationField(_)
+            )
+    }));
+    let rejected = late_bound
+        .compute(&RepositoryPackageLoadKey::new(route, package))
+        .await
+        .unwrap();
+    let error = repository_package_error(&rejected);
+    assert!(error.contains("subject"), "{error}");
+    assert!(
+        error.contains("configuration-dependent hidden attribute"),
+        "{error}"
+    );
+
+    let restored = load_repository_package_fixture_on(
+        &dice,
+        &[("BUILD.bazel", BUILD), ("defs.bzl", LITERAL)],
+        791,
+    )
+    .await;
+    assert!(RepositoryPackageLoadKey::equality(&accepted, &restored));
+}
+
+#[tokio::test]
 async fn repository_package_load_rejects_unadmitted_starlark_rule_attributes() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let cases = [
         (
             "probe(name = \"bad\")",
-            "visibility is not explicitly public",
+            "effective visibility is not public",
         ),
         (
             "probe(name = \"bad\", visibility = [\"//visibility:private\"])",
-            "visibility is not explicitly public",
+            "effective visibility is not public",
         ),
         (
             "probe(name = \"bad\", visibility = [\"//pkg:__pkg__\"])",
-            "visibility is not explicitly public",
+            "effective visibility is not public",
         ),
         (
-            "probe(name = \"bad\", dep = \":dep.txt\", visibility = [\"//visibility:public\"])",
-            "ordinary dependencies are deferred",
+            "config_setting(name = \"condition\", values = {\"compilation_mode\": \"dbg\"})\nprobe(name = \"bad\", dep = select({\":condition\": \"dep.txt\"}), visibility = [\"//visibility:public\"])",
+            "attribute `$config_dependencies` contains a reachable label",
         ),
         (
             "probe(name = \"bad\", out = \"out.txt\", visibility = [\"//visibility:public\"])",
             "attribute `out` contains a reachable label",
         ),
         (
-            "exports_files([\"extra.txt\"])\nprobe(name = \"bad\", visibility = [\"//visibility:public\"])",
-            "package contains 2 targets",
+            "probe(name = \"good\", visibility = [\"//visibility:public\"])\nprobe(name = \"bad\", visibility = [\"//visibility:private\"])",
+            "effective visibility is not public",
         ),
     ];
     for (index, (invocation, expected)) in cases.into_iter().enumerate() {

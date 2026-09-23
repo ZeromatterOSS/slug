@@ -149,8 +149,8 @@ use crate::package::loading_globals;
 use crate::package::prepare_module_extension_tag_attributes;
 use crate::package::validate_module_extension_tag_schema;
 use crate::provider::BzlEvaluationContext;
+use crate::subrule::ConfiguredDependencyDefault;
 use crate::visibility::RuleVisibility;
-use crate::visibility::VisibilitySource;
 
 /// Local-root loading operations over a caller-owned DICE transaction.
 ///
@@ -2229,26 +2229,29 @@ enum RepositoryPackageLoadErrorInner {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 enum LoadedStarlarkRuleReason {
-    AdditionalTargets(usize),
     Visibility,
     Test,
     Executable,
-    OrdinaryDependencies,
     SchemaValues,
     ReachableLabels(Arc<str>),
+    HiddenConfigurationField(Arc<str>),
 }
 
 impl fmt::Display for LoadedStarlarkRuleReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::AdditionalTargets(count) => write!(f, "package contains {count} targets"),
-            Self::Visibility => f.write_str("visibility is not explicitly public"),
+            Self::Visibility => f.write_str("effective visibility is not public"),
             Self::Test => f.write_str("test rules are deferred"),
             Self::Executable => f.write_str("executable rules are deferred"),
-            Self::OrdinaryDependencies => f.write_str("ordinary dependencies are deferred"),
             Self::SchemaValues => f.write_str("schema/value relationship is malformed"),
             Self::ReachableLabels(attribute) => {
                 write!(f, "attribute `{attribute}` contains a reachable label")
+            }
+            Self::HiddenConfigurationField(attribute) => {
+                write!(
+                    f,
+                    "configuration-dependent hidden attribute `{attribute}` is deferred"
+                )
             }
         }
     }
@@ -6145,66 +6148,87 @@ fn loaded_external_target_kind(
                 && matches!(target.kind, PackageTargetKind::Genrule(_))
         }))
         .then_some("generated file"),
-        PackageTargetKind::StarlarkRule(_) => Some("Starlark rule"),
+        PackageTargetKind::StarlarkRule(_) => None,
     }
 }
 
 fn loaded_external_starlark_rule_reason(
-    targets: &[crate::package::PackageTarget],
+    loaded: &LoadedPackage,
 ) -> Option<(&str, LoadedStarlarkRuleReason)> {
-    let target = targets
-        .iter()
-        .find(|target| matches!(target.kind, PackageTargetKind::StarlarkRule(_)))?;
-    let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
-        unreachable!()
-    };
-    let reason = if !matches!(
-        &target.visibility,
-        VisibilitySource::Declared(RuleVisibility::Public)
-    ) {
-        Some(LoadedStarlarkRuleReason::Visibility)
-    } else if target
-        .rule_capability()
-        .is_some_and(|capability| capability.test_kind.is_some())
-    {
-        Some(LoadedStarlarkRuleReason::Test)
-    } else if target
-        .rule_capability()
-        .is_some_and(|capability| capability.executable)
-    {
-        Some(LoadedStarlarkRuleReason::Executable)
-    } else if !implementation.dependencies().is_empty() {
-        Some(LoadedStarlarkRuleReason::OrdinaryDependencies)
-    } else if implementation.schema().len() != implementation.values().len()
-        || implementation
-            .schema()
-            .iter()
-            .zip(implementation.values())
-            .any(|(schema, value)| schema.declaration_name() != value.declaration_name)
-    {
-        Some(LoadedStarlarkRuleReason::SchemaValues)
-    } else {
-        implementation
-            .schema()
-            .iter()
-            .zip(implementation.values())
-            .filter(|(schema, _)| {
-                schema.dependency_reachable()
-                    && (!schema.is_builtin() || schema.ordinary_dependency())
-            })
-            .find_map(|(schema, value)| {
-                let mut labels = Vec::new();
-                value.value.labels(&mut labels);
-                (!labels.is_empty()).then(|| {
-                    LoadedStarlarkRuleReason::ReachableLabels(Arc::from(schema.query_name()))
+    loaded.targets.iter().find_map(|target| {
+        let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
+            return None;
+        };
+        let reason = if !matches!(
+            loaded.effective_visibility(target),
+            Some(RuleVisibility::Public)
+        ) {
+            Some(LoadedStarlarkRuleReason::Visibility)
+        } else if target
+            .rule_capability()
+            .is_some_and(|capability| capability.test_kind.is_some())
+        {
+            Some(LoadedStarlarkRuleReason::Test)
+        } else if target
+            .rule_capability()
+            .is_some_and(|capability| capability.executable)
+        {
+            Some(LoadedStarlarkRuleReason::Executable)
+        } else if implementation.schema().len() != implementation.values().len()
+            || implementation
+                .schema()
+                .iter()
+                .zip(implementation.values())
+                .any(|(schema, value)| schema.declaration_name() != value.declaration_name)
+        {
+            Some(LoadedStarlarkRuleReason::SchemaValues)
+        } else {
+            implementation
+                .schema()
+                .iter()
+                .zip(implementation.values())
+                .find_map(|(schema, value)| {
+                    if !schema.dependency_reachable() {
+                        return None;
+                    }
+                    let mut labels = Vec::new();
+                    value.value.labels(&mut labels);
+                    if labels.is_empty()
+                        || (schema.is_builtin()
+                            && matches!(
+                                schema.declaration_name(),
+                                "visibility" | "transitive_configs"
+                            ))
+                    {
+                        return None;
+                    }
+                    // Selector keys live in this builtin aggregate, but an
+                    // ordinary external edge would give them the wrong class.
+                    (schema.declaration_name() == "$config_dependencies"
+                        || !schema.ordinary_dependency())
+                    .then(|| {
+                        LoadedStarlarkRuleReason::ReachableLabels(Arc::from(schema.query_name()))
+                    })
                 })
-            })
-    };
-    reason
-        .or_else(|| {
-            (targets.len() != 1).then(|| LoadedStarlarkRuleReason::AdditionalTargets(targets.len()))
-        })
-        .map(|reason| (target.name.as_str(), reason))
+                .or_else(|| {
+                    implementation
+                        .configured_dependency_attributes()
+                        .find(|attribute| {
+                            attribute.is_hidden()
+                                && matches!(
+                                    attribute.default(),
+                                    ConfiguredDependencyDefault::ConfigurationField(_)
+                                )
+                        })
+                        .map(|attribute| {
+                            LoadedStarlarkRuleReason::HiddenConfigurationField(Arc::from(
+                                attribute.name(),
+                            ))
+                        })
+                })
+        };
+        reason.map(|reason| (target.name.as_str(), reason))
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -6810,7 +6834,7 @@ fn validate_loaded_repository_package(
     if loaded.direct_load_roots.is_empty() {
         return Ok(());
     }
-    if let Some((target, reason)) = loaded_external_starlark_rule_reason(&loaded.targets) {
+    if let Some((target, reason)) = loaded_external_starlark_rule_reason(loaded) {
         return Err(RepositoryPackageLoadError::new(
             RepositoryPackageLoadErrorInner::LoadedStarlarkRule {
                 canonical_repo: CompactString::new(key.route.canonical_repo().as_str()),
@@ -6819,15 +6843,6 @@ fn validate_loaded_repository_package(
                 reason,
             },
         ));
-    }
-    if matches!(
-        loaded.targets.as_slice(),
-        [crate::package::PackageTarget {
-            kind: PackageTargetKind::StarlarkRule(_),
-            ..
-        }]
-    ) {
-        return Ok(());
     }
     if let Some((target, kind)) = loaded.targets.iter().find_map(|target| {
         loaded_external_target_kind(target, &loaded.targets)

@@ -4101,6 +4101,26 @@ impl RootQueryEpochBuilder {
         builder
     }
 
+    fn external_starlark_edges_package(variant: i64) -> Self {
+        let mut builder = Self::external_starlark_package(variant);
+        builder.package(
+            "main",
+            "filegroup(name = \"target\", visibility = [\"//visibility:public\"])\n",
+            variant,
+        );
+        builder.file(
+            "/workspace/dep/rule/BUILD.bazel",
+            "load(\":defs.bzl\", \"probe\")\npackage(default_visibility = [\"//visibility:public\"])\nfilegroup(name = \"sibling\")\nprobe(name = \"first\", deps = [\":sibling\", \"@@//main:target\", \":source.txt\"], ref = \":sibling\", visibility = [\"//visibility:public\"])\nprobe(name = \"second\", deps = [\":first\"])\n",
+            variant,
+        );
+        builder.file(
+            "/workspace/dep/rule/defs.bzl",
+            "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"deps\": attr.label_list(), \"ref\": attr.label()})\n",
+            variant,
+        );
+        builder
+    }
+
     fn package(&mut self, name: &str, source: &str, variant: i64) {
         self.package_at("/workspace", name, "BUILD.bazel", source, variant);
     }
@@ -5220,6 +5240,350 @@ async fn external_dependency_free_starlark_rule_projects_all_enabled_consumers_a
             "digraph mygraph {\n  node [shape=box];\n  \"@dep//rule:probe\"\n}\n"
         );
     }
+}
+
+#[tokio::test]
+async fn external_starlark_rules_project_mixed_ordinary_edges_and_preserve_label_identity() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut transaction = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_starlark_edges_package(16).build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    for (source, expected) in [
+        (
+            "deps(@dep//rule:first)",
+            &[
+                "//main:target",
+                "@dep//rule:first",
+                "@dep//rule:sibling",
+                "@dep//rule:source.txt",
+            ][..],
+        ),
+        (
+            "labels(deps, @dep//rule:first)",
+            &[
+                "//main:target",
+                "@dep//rule:sibling",
+                "@dep//rule:source.txt",
+            ][..],
+        ),
+        ("labels(ref, @dep//rule:first)", &["@dep//rule:sibling"]),
+        (
+            "same_pkg_direct_rdeps(@dep//rule:sibling)",
+            &["@dep//rule:first"],
+        ),
+        (
+            "allpaths(@dep//rule:second, //main:target)",
+            &["//main:target", "@dep//rule:first", "@dep//rule:second"],
+        ),
+        (
+            "attr(deps, 'main:target', @dep//rule:first)",
+            &["@dep//rule:first"],
+        ),
+        (
+            "visible(//main:target, @dep//rule:second)",
+            &["@dep//rule:second"],
+        ),
+        ("labels(visibility, @dep//rule:second)", &[]),
+    ] {
+        let QueryPreparationOutcome::Complete(result) =
+            transaction.compute(&root_query_key(source)).await.unwrap()
+        else {
+            panic!("{source} requested preparation")
+        };
+        let mut actual = result
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .labels
+            .iter()
+            .map(|label| label.as_str())
+            .collect::<Vec<_>>();
+        actual.sort_unstable();
+        let mut expected = expected.to_vec();
+        expected.sort_unstable();
+        assert_eq!(actual, expected, "{source}");
+    }
+    let QueryPreparationOutcome::Complete(result) = transaction
+        .compute(&root_query_key("deps(@dep//rule:second)"))
+        .await
+        .unwrap()
+    else {
+        panic!("graph requested preparation")
+    };
+    let result = result.as_ref().as_ref().unwrap();
+    let graph = result.graph_stdout(false, true);
+    for edge in [
+        "\"@dep//rule:second\" -> \"@dep//rule:first\"",
+        "\"@dep//rule:first\" -> \"@dep//rule:sibling\"",
+        "\"@dep//rule:first\" -> \"//main:target\"",
+        "\"@dep//rule:first\" -> \"@dep//rule:source.txt\"",
+    ] {
+        assert!(graph.contains(edge), "missing {edge}: {graph}");
+    }
+    assert_eq!(result.package_stdout(), "@dep//rule\nmain\n");
+}
+
+#[tokio::test]
+async fn external_starlark_dependency_edits_invalidate_and_restore_same_dice_query_graph() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let key = root_query_key("deps(@dep//rule:first)");
+    let mut first = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_starlark_edges_package(24).build(),
+        tracker.clone(),
+    )
+    .await;
+    let initial = first.compute(&key).await.unwrap();
+    let QueryPreparationOutcome::Complete(initial_result) = &initial else {
+        panic!("initial dependency graph requested preparation")
+    };
+    let initial_result = initial_result.as_ref().as_ref().unwrap();
+    let initial_graph = initial_result.graph_stdout(false, true);
+    assert!(
+        initial_result
+            .labels
+            .iter()
+            .any(|label| label.as_str() == "@dep//rule:source.txt")
+    );
+
+    let mut changed_builder = RootQueryEpochBuilder::external_starlark_edges_package(25);
+    changed_builder.file(
+        "/workspace/dep/rule/BUILD.bazel",
+        "load(\":defs.bzl\", \"probe\")\npackage(default_visibility = [\"//visibility:public\"])\nfilegroup(name = \"sibling\")\nprobe(name = \"first\", deps = [\":sibling\", \"@@//main:target\", \":alternate.txt\"], ref = \":sibling\", visibility = [\"//visibility:public\"])\nprobe(name = \"second\", deps = [\":first\"])\n",
+        25,
+    );
+    let mut changed = root_query_transaction(&dice, changed_builder.build(), tracker.clone()).await;
+    let changed = changed.compute(&key).await.unwrap();
+    let QueryPreparationOutcome::Complete(changed_result) = &changed else {
+        panic!("changed dependency graph requested preparation")
+    };
+    let changed_result = changed_result.as_ref().as_ref().unwrap();
+    assert!(
+        changed_result
+            .labels
+            .iter()
+            .any(|label| label.as_str() == "@dep//rule:alternate.txt")
+    );
+    assert!(
+        !changed_result
+            .labels
+            .iter()
+            .any(|label| label.as_str() == "@dep//rule:source.txt")
+    );
+    assert_ne!(changed_result.graph_stdout(false, true), initial_graph);
+
+    let mut restored = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_starlark_edges_package(26).build(),
+        tracker,
+    )
+    .await;
+    let restored = restored.compute(&key).await.unwrap();
+    let QueryPreparationOutcome::Complete(restored_result) = &restored else {
+        panic!("restored dependency graph requested preparation")
+    };
+    assert_eq!(
+        restored_result
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .graph_stdout(false, true),
+        initial_graph
+    );
+    assert!(RootQueryCommandKey::equality(&initial, &restored));
+}
+
+#[tokio::test]
+async fn external_starlark_second_rule_invalidity_rejects_the_whole_package() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut builder = RootQueryEpochBuilder::external_starlark_edges_package(17);
+    builder.file(
+        "/workspace/dep/rule/BUILD.bazel",
+        "load(\":defs.bzl\", \"probe\")\npackage(default_visibility = [\"//visibility:public\"])\nprobe(name = \"first\", deps = [])\nprobe(name = \"second\", deps = [], visibility = [\"//visibility:private\"])\n",
+        17,
+    );
+    let mut transaction = root_query_transaction(
+        &dice,
+        builder.build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    let QueryPreparationOutcome::Complete(result) = transaction
+        .compute(&root_query_key("@dep//rule:first"))
+        .await
+        .unwrap()
+    else {
+        panic!("invalid package requested preparation")
+    };
+    let error = result.as_ref().as_ref().unwrap_err().to_string();
+    assert!(error.contains("second"), "{error}");
+    assert!(
+        error.contains("visibility") || error.contains("public"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn external_starlark_literal_hidden_default_is_an_implicit_dependency() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut builder = RootQueryEpochBuilder::external_starlark_package(18);
+    builder.file(
+        "/workspace/dep/rule/BUILD.bazel",
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"hidden\", visibility = [\"//visibility:public\"])\n",
+        18,
+    );
+    builder.file(
+        "/workspace/dep/rule/defs.bzl",
+        "def _sub(ctx, **kwargs): pass\nhelper = subrule(implementation = _sub, attrs = {\"_literal\": attr.label(default = \":hidden.txt\", allow_files = True)})\nprobe = rule(implementation = lambda ctx: [], subrules = [helper])\n",
+        18,
+    );
+    let mut transaction = root_query_transaction(
+        &dice,
+        builder.build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    let QueryPreparationOutcome::Complete(result) = transaction
+        .compute(&root_query_key("deps(@dep//rule:hidden)"))
+        .await
+        .unwrap()
+    else {
+        panic!("hidden dependency requested preparation")
+    };
+    let result = result.as_ref().as_ref().unwrap();
+    assert_eq!(
+        result.labels.as_ref(),
+        ["@dep//rule:hidden", "@dep//rule:hidden.txt"]
+    );
+    assert!(
+        result
+            .graph_stdout(false, true)
+            .contains("\"@dep//rule:hidden\" -> \"@dep//rule:hidden.txt\"")
+    );
+    let QueryPreparationOutcome::Complete(attribute) = transaction
+        .compute(&root_query_key(
+            "labels('$@@dep+//rule:defs.bzl%helper%_literal', @dep//rule:hidden)",
+        ))
+        .await
+        .unwrap()
+    else {
+        panic!("hidden attribute requested preparation")
+    };
+    assert_eq!(
+        attribute.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["@dep//rule:hidden.txt"]
+    );
+}
+
+#[tokio::test]
+async fn external_starlark_selector_keys_do_not_become_ordinary_edges() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut builder = RootQueryEpochBuilder::external_starlark_package(19);
+    builder.file(
+        "/workspace/dep/rule/BUILD.bazel",
+        "load(\":defs.bzl\", \"probe\")\nconfig_setting(name = \"cfg\", values = {\"compilation_mode\": \"dbg\"})\nprobe(name = \"selected\", empty = select({\":cfg\": [], \"//conditions:default\": []}), visibility = [\"//visibility:public\"])\n",
+        19,
+    );
+    let mut transaction = root_query_transaction(
+        &dice,
+        builder.build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    let QueryPreparationOutcome::Complete(result) = transaction
+        .compute(&root_query_key("deps(@dep//rule:selected)"))
+        .await
+        .unwrap()
+    else {
+        panic!("selector package requested preparation")
+    };
+    let error = result.as_ref().as_ref().unwrap_err().to_string();
+    assert!(error.contains("$config_dependencies"), "{error}");
+}
+
+#[tokio::test]
+async fn external_starlark_transitive_configs_are_visible_nodep_edges() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut builder = RootQueryEpochBuilder::external_starlark_package(23);
+    builder.file(
+        "/workspace/dep/rule/BUILD.bazel",
+        "load(\":defs.bzl\", \"probe\")\nfilegroup(name = \"first_cfg\")\nfilegroup(name = \"second_cfg\")\nprobe(name = \"nodep\", transitive_configs = [\":first_cfg\", \":second_cfg\"], visibility = [\"//visibility:public\"])\n",
+        23,
+    );
+    let mut transaction = root_query_transaction(
+        &dice,
+        builder.build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    for (source, expected) in [
+        (
+            "labels(transitive_configs, @dep//rule:nodep)",
+            &["@dep//rule:first_cfg", "@dep//rule:second_cfg"][..],
+        ),
+        (
+            "deps(@dep//rule:nodep)",
+            &[
+                "@dep//rule:nodep",
+                "@dep//rule:first_cfg",
+                "@dep//rule:second_cfg",
+            ][..],
+        ),
+    ] {
+        let QueryPreparationOutcome::Complete(result) =
+            transaction.compute(&root_query_key(source)).await.unwrap()
+        else {
+            panic!("{source} requested preparation")
+        };
+        let actual = result.as_ref().as_ref().unwrap();
+        let mut labels = actual
+            .labels
+            .iter()
+            .map(|label| label.as_str())
+            .collect::<Vec<_>>();
+        labels.sort_unstable();
+        let mut expected = expected.to_vec();
+        expected.sort_unstable();
+        assert_eq!(labels, expected, "{source}");
+    }
+}
+
+#[tokio::test]
+async fn external_starlark_configured_hidden_default_is_deferred() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut builder = RootQueryEpochBuilder::external_starlark_package(20);
+    builder.file(
+        "/workspace/dep/rule/BUILD.bazel",
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"late\", visibility = [\"//visibility:public\"])\n",
+        20,
+    );
+    builder.file(
+        "/workspace/dep/rule/defs.bzl",
+        "def _sub(ctx, **kwargs): pass\nhelper = subrule(implementation = _sub, attrs = {\"_late\": attr.label(default = configuration_field(fragment = \"cpp\", name = \"fdo_profile\"))})\nprobe = rule(implementation = lambda ctx: [], subrules = [helper])\n",
+        20,
+    );
+    let mut transaction = root_query_transaction(
+        &dice,
+        builder.build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    let QueryPreparationOutcome::Complete(result) = transaction
+        .compute(&root_query_key("@dep//rule:late"))
+        .await
+        .unwrap()
+    else {
+        panic!("configured hidden dependency requested preparation")
+    };
+    let error = result.as_ref().as_ref().unwrap_err().to_string();
+    assert!(
+        error.contains("hidden") && error.contains("deferred"),
+        "{error}"
+    );
 }
 
 #[tokio::test]

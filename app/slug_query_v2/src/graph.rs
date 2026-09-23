@@ -1082,6 +1082,9 @@ fn package_graph_from_loaded(
                 )
             }
             PackageTargetKind::StarlarkRule(implementation) => {
+                let mut attributes =
+                    project_attributes(implementation, raw_visibility(&target.visibility), None)?
+                        .to_vec();
                 let ordinary = implementation
                     .dependencies()
                     .iter()
@@ -1093,16 +1096,9 @@ fn package_graph_from_loaded(
                     kind: QueryEdgeKind::Ordinary,
                     target,
                 }));
-                let hidden = project_literal_hidden_attributes(implementation);
-                edges.extend(hidden.iter().flat_map(|attribute| {
-                    attribute.labels.iter().cloned().map(|target| QueryEdge {
-                        kind: QueryEdgeKind::Implicit,
-                        target,
-                    })
-                }));
-                let mut attributes =
-                    project_attributes(implementation, raw_visibility(&target.visibility), None)?
-                        .to_vec();
+                edges.extend(starlark_nodep_edges(&attributes));
+                let hidden = project_literal_hidden_attributes(implementation, None)?;
+                edges.extend(hidden_dependency_edges(&hidden));
                 attributes.extend(hidden);
                 (
                     QueryNodeKind::Rule(CompactString::new("rule")),
@@ -1254,7 +1250,7 @@ fn external_package_graph_from_targets(
     let build_file = CompactString::new(build_path.to_string_lossy());
     let mut nodes = SmallMap::with_capacity(targets.len() + 1);
 
-    validate_external_starlark_rule(targets)?;
+    validate_external_starlark_rule(default_visibility, targets)?;
     // Validate native test-suite membership before the generic same-package
     // source synthesis below. A test_suite may name only another loaded native
     // test_suite in this external slice, so it never causes a source node to
@@ -1583,15 +1579,36 @@ fn external_package_graph_from_targets(
                 )
             }
             PackageTargetKind::StarlarkRule(implementation) => {
-                let attributes = project_attributes(
+                let mut attributes = project_attributes(
                     implementation,
                     raw_visibility(&target.visibility),
                     Some((canonical_repo, apparent_repo)),
+                )?
+                .to_vec();
+                let ordinary = implementation
+                    .dependencies()
+                    .iter()
+                    .cloned()
+                    .map(|dependency| {
+                        external_starlark_label(dependency, canonical_repo, apparent_repo)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let hidden = project_literal_hidden_attributes(
+                    implementation,
+                    Some((canonical_repo, apparent_repo)),
                 )?;
+                let mut edges = visibility_query_edges(&effective_visibility).to_vec();
+                edges.extend(ordinary.into_iter().map(|target| QueryEdge {
+                    kind: QueryEdgeKind::Ordinary,
+                    target,
+                }));
+                edges.extend(starlark_nodep_edges(&attributes));
+                edges.extend(hidden_dependency_edges(&hidden));
+                attributes.extend(hidden);
                 (
                     QueryNodeKind::Rule(CompactString::new("rule")),
-                    Arc::from([]),
-                    attributes,
+                    edges.into(),
+                    attributes.into(),
                 )
             }
             _ => {
@@ -1678,7 +1695,7 @@ fn external_package_graph_from_targets(
         .flat_map(|node| {
             node.edges.iter().filter(move |edge| {
                 edge.kind == QueryEdgeKind::Ordinary
-                    || (matches!(&node.kind, QueryNodeKind::Rule(rule) if rule == "label_flag rule")
+                    || (matches!(&node.kind, QueryNodeKind::Rule(rule) if rule == "label_flag rule" || rule == "rule")
                         && edge.kind == QueryEdgeKind::Implicit)
             })
         })
@@ -1747,60 +1764,74 @@ fn external_package_graph_from_targets(
 }
 
 fn validate_external_starlark_rule(
+    default_visibility: &RuleVisibility,
     targets: &[slug_loading_v2::PackageTarget],
 ) -> Result<(), QueryError> {
-    let Some(target) = targets
-        .iter()
-        .find(|target| matches!(target.kind, PackageTargetKind::StarlarkRule(_)))
-    else {
-        return Ok(());
-    };
-    let fail = |reason| {
-        QueryError::evaluation(format!(
-            "external Starlark rule graph is deferred for '{}': {reason}",
-            target.name
-        ))
-    };
-    let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
-        unreachable!()
-    };
-    if !matches!(
-        &target.visibility,
-        VisibilitySource::Declared(RuleVisibility::Public)
-    ) {
-        return Err(fail("visibility is not explicitly public"));
-    }
-    let capability = target
-        .rule_capability()
-        .expect("Starlark rule retains its exported capability");
-    if capability.test_kind.is_some() || capability.executable {
-        return Err(fail("test or executable capability is deferred"));
-    }
-    if !implementation.dependencies().is_empty() {
-        return Err(fail("ordinary dependencies are deferred"));
-    }
-    if implementation.schema().len() != implementation.values().len()
-        || implementation
-            .schema()
-            .iter()
-            .zip(implementation.values())
-            .any(|(schema, value)| schema.declaration_name() != value.declaration_name)
-    {
-        return Err(fail("schema/value relationship is malformed"));
-    }
-    for (schema, value) in implementation.schema().iter().zip(implementation.values()) {
-        if !schema.dependency_reachable() || (schema.is_builtin() && !schema.ordinary_dependency())
-        {
+    for target in targets {
+        let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
             continue;
+        };
+        let fail = |reason| {
+            QueryError::evaluation(format!(
+                "external Starlark rule graph is deferred for '{}': {reason}",
+                target.name
+            ))
+        };
+        let effective_visibility = match &target.visibility {
+            VisibilitySource::Declared(visibility) => visibility,
+            VisibilitySource::PackageDefault => default_visibility,
+            VisibilitySource::GeneratingRule | VisibilitySource::AlwaysPublic => {
+                return Err(fail("visibility provenance is invalid"));
+            }
+        };
+        if !matches!(effective_visibility, RuleVisibility::Public) {
+            return Err(fail("effective visibility is not public"));
         }
-        let mut labels = Vec::new();
-        value.value.labels(&mut labels);
-        if !labels.is_empty() {
-            return Err(fail("dependency-reachable attribute contains a label"));
+        let capability = target
+            .rule_capability()
+            .expect("Starlark rule retains its exported capability");
+        if capability.test_kind.is_some() || capability.executable {
+            return Err(fail("test or executable capability is deferred"));
         }
-    }
-    if targets.len() != 1 {
-        return Err(fail("package contains additional targets"));
+        if implementation.schema().len() != implementation.values().len()
+            || implementation
+                .schema()
+                .iter()
+                .zip(implementation.values())
+                .any(|(schema, value)| schema.declaration_name() != value.declaration_name)
+        {
+            return Err(fail("schema/value relationship is malformed"));
+        }
+        for (schema, value) in implementation.schema().iter().zip(implementation.values()) {
+            if !schema.dependency_reachable() {
+                continue;
+            }
+            let mut labels = Vec::new();
+            value.value.labels(&mut labels);
+            if labels.is_empty() {
+                continue;
+            }
+            if schema.query_name() == "$config_dependencies" {
+                return Err(fail("$config_dependencies selector edges are deferred"));
+            }
+            if !schema.ordinary_dependency()
+                && !(schema.is_builtin()
+                    && matches!(schema.query_name(), "visibility" | "transitive_configs"))
+            {
+                return Err(fail("nonordinary label attribute is deferred"));
+            }
+        }
+        for attribute in implementation.configured_dependency_attributes() {
+            if !attribute.is_hidden() {
+                continue;
+            }
+            if matches!(
+                attribute.default(),
+                ConfiguredDependencyDefault::ConfigurationField(_)
+            ) {
+                return Err(fail("configuration-dependent hidden attribute is deferred"));
+            }
+        }
     }
     Ok(())
 }
@@ -2144,13 +2175,11 @@ fn project_attributes(
         .iter()
         .zip(implementation.values())
         .map(|(schema, value)| {
-            let projected_value = match external_route {
-                Some((canonical_repo, _)) => value
-                    .value
-                    .rebind_provisional_root_labels(canonical_repo)
-                    .map_err(QueryError::evaluation)?,
-                None => (*value.value).clone(),
-            };
+            // Loading has already resolved labels against the owning package.
+            // In particular, an explicit @@// label is main-repository while
+            // :sibling is the external owner; rebinding root labels loses that
+            // distinction in both attr() values and dependency edges.
+            let projected_value = (*value.value).clone();
             debug_assert_eq!(value.declaration_name, schema.declaration_name());
             let mut labels = Vec::new();
             if schema.query_name() == "visibility" {
@@ -2162,11 +2191,7 @@ fn project_attributes(
                 .into_iter()
                 .map(|label| match external_route {
                     Some((canonical_repo, apparent_repo)) => {
-                        Ok(QueryLabel::from_canonical_for_external_owner(
-                            label,
-                            canonical_repo,
-                            apparent_repo,
-                        ))
+                        external_starlark_label(label, canonical_repo, apparent_repo)
                     }
                     None => Ok(QueryLabel::from_canonical(label)),
                 })
@@ -2188,32 +2213,78 @@ fn project_attributes(
 
 fn project_literal_hidden_attributes(
     implementation: &StarlarkRuleImplementation,
-) -> Vec<QueryAttribute> {
-    implementation
+    external_route: Option<(&CanonicalRepoName, &ApparentRepoName)>,
+) -> Result<Vec<QueryAttribute>, QueryError> {
+    let mut projected = Vec::new();
+    for attribute in implementation
         .configured_dependency_attributes()
         .filter(|attribute| attribute.is_hidden())
-        .filter_map(|attribute| {
-            let ConfiguredDependencyDefault::Literal(value) = attribute.default() else {
-                return None;
-            };
-            let mut labels = Vec::new();
-            value.labels(&mut labels);
-            Some(QueryAttribute {
-                name: attribute.name().into(),
-                labels: labels
-                    .into_iter()
-                    .map(QueryLabel::from_canonical)
-                    .collect::<Vec<_>>()
-                    .into(),
-                explicit: false,
-                value: Some(AttributeQueryValue {
-                    kind: attribute.kind(),
-                    provenance: AttributeProvenance::Implicit,
-                    value: value.clone(),
-                }),
+    {
+        let ConfiguredDependencyDefault::Literal(value) = attribute.default() else {
+            continue;
+        };
+        let mut labels = Vec::new();
+        value.labels(&mut labels);
+        let labels = labels
+            .into_iter()
+            .map(|label| match external_route {
+                Some((canonical_repo, apparent_repo)) => {
+                    external_starlark_label(label, canonical_repo, apparent_repo)
+                }
+                None => Ok(QueryLabel::from_canonical(label)),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        projected.push(QueryAttribute {
+            name: attribute.name().into(),
+            labels: labels.into(),
+            explicit: false,
+            value: Some(AttributeQueryValue {
+                kind: attribute.kind(),
+                provenance: AttributeProvenance::Implicit,
+                value: value.clone(),
+            }),
+        });
+    }
+    Ok(projected)
+}
+
+fn hidden_dependency_edges(hidden: &[QueryAttribute]) -> impl Iterator<Item = QueryEdge> + '_ {
+    hidden.iter().flat_map(|attribute| {
+        attribute.labels.iter().cloned().map(|target| QueryEdge {
+            kind: QueryEdgeKind::Implicit,
+            target,
+        })
+    })
+}
+
+fn starlark_nodep_edges(attributes: &[QueryAttribute]) -> impl Iterator<Item = QueryEdge> + '_ {
+    attributes
+        .iter()
+        .filter(|attribute| attribute.name == "transitive_configs")
+        .flat_map(|attribute| {
+            attribute.labels.iter().cloned().map(|target| QueryEdge {
+                kind: QueryEdgeKind::Nodep,
+                target,
             })
         })
-        .collect()
+}
+
+fn external_starlark_label(
+    label: CanonicalLabel,
+    canonical_repo: &CanonicalRepoName,
+    apparent_repo: &ApparentRepoName,
+) -> Result<QueryLabel, QueryError> {
+    let repo = label.package().repo();
+    if !repo.is_root() && repo != canonical_repo {
+        return Err(QueryError::evaluation(format!(
+            "external Starlark label '{label}' has no observed apparent repository mapping"
+        )));
+    }
+    Ok(QueryLabel::from_canonical_for_external_owner(
+        label,
+        canonical_repo,
+        apparent_repo,
+    ))
 }
 
 fn project_native_attributes(
@@ -2457,6 +2528,64 @@ mod graph_tests {
         assert_eq!(alias.to_string(), "@@dep+//pkg:target");
         assert_eq!(dep.output_label(), "@dep//pkg:target");
         assert_eq!(alias.output_label(), "@alias//pkg:target");
+    }
+
+    #[test]
+    fn external_starlark_projection_keeps_explicit_main_and_classifies_hidden_edges() {
+        let canonical = CanonicalRepoName::new("dep+").unwrap();
+        let apparent = ApparentRepoName::new("dep").unwrap();
+        let sibling = super::external_starlark_label(
+            CanonicalLabel::parse("@@dep+//pkg:sibling").unwrap(),
+            &canonical,
+            &apparent,
+        )
+        .unwrap();
+        let main = super::external_starlark_label(
+            CanonicalLabel::parse("@@//main:target").unwrap(),
+            &canonical,
+            &apparent,
+        )
+        .unwrap();
+        assert_eq!(sibling.output_label(), "@dep//pkg:sibling");
+        assert_eq!(main.output_label(), "//main:target");
+        let nodep = super::QueryAttribute {
+            name: "transitive_configs".into(),
+            labels: Arc::from([sibling.clone(), main]),
+            explicit: true,
+            value: None,
+        };
+        let nodep_edges = super::starlark_nodep_edges(&[nodep]).collect::<Vec<_>>();
+        assert_eq!(
+            nodep_edges
+                .iter()
+                .map(|edge| (edge.kind, edge.target.output_label()))
+                .collect::<Vec<_>>(),
+            [
+                (QueryEdgeKind::Nodep, "@dep//pkg:sibling".into()),
+                (QueryEdgeKind::Nodep, "//main:target".into()),
+            ]
+        );
+        let hidden = super::QueryAttribute {
+            name: "$hidden".into(),
+            labels: Arc::from([sibling]),
+            explicit: false,
+            value: None,
+        };
+        let edges = super::hidden_dependency_edges(&[hidden]).collect::<Vec<_>>();
+        assert_eq!(edges.len(), 1);
+        assert_eq!(edges[0].kind, QueryEdgeKind::Implicit);
+        assert_eq!(edges[0].target.output_label(), "@dep//pkg:sibling");
+        let unmapped = super::external_starlark_label(
+            CanonicalLabel::parse("@@other+//pkg:target").unwrap(),
+            &canonical,
+            &apparent,
+        )
+        .unwrap_err();
+        assert!(
+            unmapped
+                .to_string()
+                .contains("no observed apparent repository mapping")
+        );
     }
 
     #[test]

@@ -29,8 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-81-m7a-builtin-cpp-source-catalog-r1
+Packet: WP-7-82-m7a-external-starlark-package-edges-r1
 Status: accepted (independent design and final ACCEPT)
+
+WP782 accepts the modeled external Starlark-rule Loading and unconfigured-query
+edges needed by the authentic `tools/cpp` declarations: package-default public
+visibility, multiple targets, ordinary `deps`, builtin NODEP and literal-hidden
+Implicit edges. Independent design/final review ACCEPT; 9 Loading and 9 Query
+focused tests and direct Analysis/Core checks pass. Optional broader-suite
+failures reproduce on the clean base and are not counted as passing gates.
+Complete `tools/cpp` Loading still awaits the recursive `rules_cc`/generated-
+proxy source closure; configured `cc_library`, module binaries and M8 remain
+deferred. M7A remains partial.
 
 WP781 accepts the exact Bazel 9.2 embedded source/catalog ingress for
 `@bazel_tools//tools/cpp` and `modules_tools`: seven verbatim source files,

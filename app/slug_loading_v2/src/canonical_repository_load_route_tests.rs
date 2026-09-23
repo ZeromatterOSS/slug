@@ -1831,7 +1831,7 @@ compatibility=module_extension(implementation=impl)
         assert!(res.observations().observations().is_empty());
         let error = res.result().as_ref().as_ref().unwrap_err().to_string();
         assert!(error.contains("@@bazel_tools//tools/res:empty"));
-        assert!(error.contains("visibility is not explicitly public"));
+        assert!(error.contains("effective visibility is not public"));
         assert!(!error.contains("BUILD globs are deferred"));
         let res_keys = tracker.all_keys();
         assert!(res_keys.iter().all(|key| {
