@@ -720,6 +720,31 @@ native_schema!(ALIAS_SCHEMA = [
     "actual": Label, Ordered, Callable;
 ]);
 
+// Bazel 9.2 LabelBuildSettings.buildRuleClass and RuleClass.Builder.build:
+// inherited NativeBuildRule attributes, then :alias/scope/default/help.
+native_schema!(LABEL_FLAG_SCHEMA = [
+    "name": String, Ordered, Callable;
+    "visibility": LabelList, OrderIndependent, Callable;
+    "transitive_configs": LabelList, OrderIndependent, Callable;
+    "deprecation": String, Ordered, Callable;
+    "tags": StringList, OrderIndependent, Callable;
+    "generator_name": String, Ordered, Callable;
+    "generator_function": String, Ordered, Callable;
+    "generator_location": String, Ordered, Callable;
+    "testonly": Boolean, Ordered, Callable;
+    "features": StringList, OrderIndependent, Callable;
+    "compatible_with": LabelList, Ordered, Callable;
+    "restricted_to": LabelList, Ordered, Callable;
+    "$config_dependencies": LabelList, Ordered, Implicit;
+    "package_metadata": LabelList, Ordered, Callable;
+    "aspect_hints": LabelList, Ordered, Callable;
+    "target_compatible_with": LabelList, Ordered, Callable;
+    ":alias": Label, Ordered, Implicit;
+    "scope": String, Ordered, Callable;
+    "build_setting_default": Label, Ordered, Callable;
+    "help": String, Ordered, Callable;
+]);
+
 native_schema!(CONFIG_SETTING_SCHEMA = [
     "name": String, Ordered, Callable;
     "visibility": LabelList, OrderIndependent, Callable;
@@ -880,6 +905,7 @@ native_schema!(TOOLCHAIN_SCHEMA = [
 pub enum NativeRuleClass {
     Filegroup,
     Alias,
+    LabelFlag,
     ConfigSetting,
     TestSuite,
     ConstraintSetting,
@@ -894,6 +920,7 @@ impl NativeRuleClass {
         match self {
             Self::Filegroup => FILEGROUP_SCHEMA,
             Self::Alias => ALIAS_SCHEMA,
+            Self::LabelFlag => LABEL_FLAG_SCHEMA,
             Self::ConfigSetting => CONFIG_SETTING_SCHEMA,
             Self::TestSuite => TEST_SUITE_SCHEMA,
             Self::ConstraintSetting => CONSTRAINT_SETTING_SCHEMA,
@@ -1724,6 +1751,7 @@ mod tests {
         let classes = [
             (NativeRuleClass::Filegroup, 23),
             (NativeRuleClass::Alias, 17),
+            (NativeRuleClass::LabelFlag, 20),
             (NativeRuleClass::ConfigSetting, 21),
             (NativeRuleClass::TestSuite, 21),
             (NativeRuleClass::ConstraintSetting, 16),

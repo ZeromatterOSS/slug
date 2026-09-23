@@ -29,7 +29,6 @@ use slug_loading_v2::HostPackageInventoryKey;
 use slug_loading_v2::HostPackageInventoryObservationError;
 use slug_loading_v2::HostPackageInventoryObservationKey;
 use slug_loading_v2::LoadingPreparationOutcome;
-use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::package::BuildSettingDeclaration;
 use slug_loading_v2::package::BuildSettingScope;
 use slug_workspace_v2::NormalizedAbsolutePath;
@@ -38,6 +37,8 @@ use slug_workspace_v2::PathObservationEpoch;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::build_setting::BuildSettingLookupStep;
+use crate::build_setting::build_setting_lookup_step;
 use crate::build_setting::convert_command_occurrence;
 use crate::build_setting::merge_command_occurrences;
 use crate::build_setting::resolve_candidate;
@@ -251,13 +252,14 @@ struct ResolvedOccurrence {
     negated: bool,
 }
 
-struct DeclarationInput {
-    result: Result<BuildSettingDeclaration, AnalysisError>,
+struct DeclarationInput<T = (CanonicalLabel, BuildSettingDeclaration)> {
+    result: Result<T, AnalysisError>,
     observations: PathObservationEpoch,
 }
 
-type DeclarationOutcome =
-    SourcePreparationOutcome<Result<DeclarationInput, CommandConfigurationPreparationOuterError>>;
+type DeclarationOutcome<T = (CanonicalLabel, BuildSettingDeclaration)> = SourcePreparationOutcome<
+    Result<DeclarationInput<T>, CommandConfigurationPreparationOuterError>,
+>;
 
 async fn declaration_input(
     ctx: &mut DiceComputations<'_>,
@@ -265,6 +267,50 @@ async fn declaration_input(
     label: &CanonicalLabel,
     mode: PreparationMode,
 ) -> DeclarationOutcome {
+    let mut current = label.clone();
+    let mut seen = SmallSet::new();
+    let mut observations = PathObservationEpoch::empty();
+    loop {
+        if !seen.insert(current.clone()) {
+            return SourcePreparationOutcome::Complete(Ok(DeclarationInput {
+                result: Err(AnalysisError::message(format!(
+                    "build-setting alias cycle at {current}"
+                ))),
+                observations,
+            }));
+        }
+        let input = match declaration_step_input(ctx, workspace, &current, mode).await {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            SourcePreparationOutcome::Complete(Ok(input)) => input,
+        };
+        observations = match union_observations(&observations, &input.observations) {
+            Ok(observations) => observations,
+            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        };
+        match input.result {
+            Ok(BuildSettingLookupStep::Alias(next)) => current = next,
+            result => {
+                return SourcePreparationOutcome::Complete(Ok(DeclarationInput {
+                    result: result.map(|step| match step {
+                        BuildSettingLookupStep::Setting(declaration) => (current, declaration),
+                        BuildSettingLookupStep::Alias(_) => unreachable!(),
+                    }),
+                    observations,
+                }));
+            }
+        }
+    }
+}
+
+async fn declaration_step_input(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    label: &CanonicalLabel,
+    mode: PreparationMode,
+) -> DeclarationOutcome<BuildSettingLookupStep> {
     let (inventory, observations) = match mode {
         PreparationMode::Legacy => match ctx
             .compute(&HostPackageInventoryKey::new(
@@ -333,7 +379,7 @@ async fn declaration_input(
 fn extract_declaration(
     label: &CanonicalLabel,
     inventory: &HostPackageInventory,
-) -> Result<BuildSettingDeclaration, AnalysisError> {
+) -> Result<BuildSettingLookupStep, AnalysisError> {
     let package = inventory.loaded().map_err(|error| {
         let message = match error {
             HostPackageInventoryErrorRef::Root(error) => error.to_string(),
@@ -342,32 +388,14 @@ fn extract_declaration(
         };
         AnalysisError::message(message)
     })?;
-    let target = package
-        .targets
-        .iter()
-        .find(|target| target.name == label.target().as_str())
-        .ok_or_else(|| AnalysisError::message(format!("build setting {label} is missing")))?;
-    let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
-        return Err(AnalysisError::message(format!(
-            "target {label} is not a Starlark build setting"
-        )));
-    };
-    let declaration = rule
-        .build_setting_declaration()
-        .map_err(|error| {
-            AnalysisError::message(format!(
-                "invalid build-setting declaration for {label}: {error}"
-            ))
-        })?
-        .ok_or_else(|| {
-            AnalysisError::message(format!("target {label} is not a Starlark build setting"))
-        })?;
-    if declaration.scope() == BuildSettingScope::Project {
+    let step = build_setting_lookup_step(package, label).map_err(AnalysisError::message)?;
+    if matches!(&step, BuildSettingLookupStep::Setting(declaration) if declaration.scope() == BuildSettingScope::Project)
+    {
         return Err(AnalysisError::message(format!(
             "project-scoped build setting {label} is unsupported"
         )));
     }
-    Ok(declaration)
+    Ok(step)
 }
 
 fn union_needs(
@@ -597,18 +625,60 @@ async fn prepare_driver(
     }
 
     let mut groups: SmallMap<CanonicalLabel, Vec<StarlarkOptionValue>> = SmallMap::new();
+    // A label VALUE can require the root mapping even when its flag name does
+    // not. Discover this only after typing declarations, so ordinary strings
+    // beginning with @ retain their existing dependency behavior.
+    if option_mapping.is_none()
+        && resolved_rows.iter().flatten().any(|row| {
+            declarations
+                .get(&row.label)
+                .is_some_and(|(_, declaration)| {
+                    matches!(
+                        declaration.definition(),
+                        slug_loading_v2::package::BuildSettingDefinition::Label { .. }
+                    ) && row.raw_value.as_deref().is_some_and(|value| {
+                        value.starts_with('@')
+                            && !value.starts_with("@@")
+                            && !value.starts_with("@//")
+                    })
+                })
+        })
+    {
+        match mapping_input(ctx, key, mode).await {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            SourcePreparationOutcome::Complete(Ok(input)) => {
+                observations = match union_observations(&observations, &input.observations) {
+                    Ok(observations) => observations,
+                    Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+                };
+                option_mapping = match input
+                    .result
+                    .and_then(|mapping| root_option_mapping(&mapping))
+                {
+                    Ok(mapping) => Some(mapping),
+                    Err(error) => return prepared_complete(Err(error), observations),
+                };
+            }
+        }
+    }
     let mut first_conversion = None;
     for row in resolved_rows.iter().flatten() {
-        let declaration = declarations
+        let (setting_label, declaration) = declarations
             .get(&row.label)
             .expect("complete declaration batch contains every resolved label");
         match convert_command_occurrence(
-            &row.label,
+            setting_label,
             declaration,
             row.raw_value.as_deref(),
             row.negated,
+            OptionLabelContext::MainRepository {
+                mapping: option_mapping.as_ref().unwrap_or(&root_mapping),
+            },
         ) {
-            Ok(value) => groups.entry(row.label.clone()).or_default().push(value),
+            Ok(value) => groups.entry(setting_label.clone()).or_default().push(value),
             Err(error) => {
                 first_conversion.get_or_insert_with(|| AnalysisError::message(error));
             }
@@ -621,7 +691,8 @@ async fn prepare_driver(
     let mut final_entries = base.starlark_options().iter().cloned().collect::<Vec<_>>();
     for (label, values) in groups.iter() {
         let declaration = declarations
-            .get(label)
+            .values()
+            .find_map(|(setting, declaration)| (setting == label).then_some(declaration))
             .expect("group label has a loaded declaration");
         let merged = match merge_command_occurrences(declaration, values) {
             Ok(value) => value,

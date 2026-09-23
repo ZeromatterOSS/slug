@@ -14,6 +14,9 @@ use slug_configuration_v2::StarlarkOption;
 use slug_configuration_v2::StarlarkOptionScope;
 use slug_configuration_v2::StarlarkOptionValue;
 use slug_identity_v2::CanonicalLabel;
+use slug_loading_v2::CoercedAttributeValue;
+use slug_loading_v2::LoadedPackage;
+use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::package::BuildSettingDeclaration;
 use slug_loading_v2::package::BuildSettingDefault;
 use slug_loading_v2::package::BuildSettingDefinition;
@@ -28,8 +31,59 @@ use starlark::values::Value;
 use starlark::values::list::ListRef;
 use starlark::values::set::SetRef;
 
+pub(crate) enum BuildSettingLookupStep {
+    Setting(BuildSettingDeclaration),
+    Alias(CanonicalLabel),
+}
+
+/// Pure declaration classification; callers own tracked loading and alias cycles.
+/// A native label flag is a terminal setting, never its selected alias target.
+pub(crate) fn build_setting_lookup_step(
+    package: &LoadedPackage,
+    label: &CanonicalLabel,
+) -> Result<BuildSettingLookupStep, String> {
+    let target = package
+        .targets
+        .iter()
+        .find(|target| target.name == label.target().as_str())
+        .ok_or_else(|| format!("build setting {label} is missing"))?;
+    if let PackageTargetKind::Alias { actual } = &target.kind {
+        return match actual {
+            CoercedAttributeValue::Label(actual) => Ok(BuildSettingLookupStep::Alias(
+                slug_identity_v2::ResolvedOptionLabel::from_canonical(actual)
+                    .canonical()
+                    .expect("visible canonical label"),
+            )),
+            _ => Err(format!(
+                "configurable alias to build setting {label} is unsupported"
+            )),
+        };
+    }
+    let declaration = target
+        .kind
+        .build_setting_declaration()
+        .map_err(|error| format!("invalid build-setting declaration for {label}: {error}"))?
+        .ok_or_else(|| format!("target {label} is not a Starlark build setting"))?;
+    if matches!(
+        declaration.definition(),
+        BuildSettingDefinition::Label { .. }
+    ) && !matches!(
+        declaration.scope(),
+        BuildSettingScope::Default | BuildSettingScope::Universal
+    ) {
+        return Err(format!(
+            "native label_flag scope {:?} is unsupported",
+            declaration.scope()
+        ));
+    }
+    Ok(BuildSettingLookupStep::Setting(declaration))
+}
+
 pub(crate) fn effective_default(declaration: &BuildSettingDeclaration) -> StarlarkOptionValue {
     match (declaration.definition(), declaration.default()) {
+        (BuildSettingDefinition::Label { .. }, BuildSettingDefault::Label(value)) => {
+            StarlarkOptionValue::Label(value.clone())
+        }
         (BuildSettingDefinition::Integer { .. }, BuildSettingDefault::Integer(value)) => {
             StarlarkOptionValue::Integer(BigInt::from(*value))
         }
@@ -67,6 +121,7 @@ fn resolved_scope(declaration: &BuildSettingDeclaration) -> StarlarkOptionScope 
 
 fn expected_kind(declaration: &BuildSettingDeclaration) -> &'static str {
     match declaration.definition() {
+        BuildSettingDefinition::Label { .. } => "label",
         BuildSettingDefinition::Integer { .. } => "integer",
         BuildSettingDefinition::Boolean { .. } => "Boolean",
         BuildSettingDefinition::String {
@@ -84,6 +139,7 @@ fn expected_kind(declaration: &BuildSettingDeclaration) -> &'static str {
 
 fn value_kind(value: &StarlarkOptionValue) -> &'static str {
     match value {
+        StarlarkOptionValue::Label(_) => "label",
         StarlarkOptionValue::Integer(_) => "integer",
         StarlarkOptionValue::Boolean(_) => "Boolean",
         StarlarkOptionValue::String(_) => "string",
@@ -99,6 +155,9 @@ fn value_matches_declaration(
     matches!(
         (declaration.definition(), value),
         (
+            BuildSettingDefinition::Label { .. },
+            StarlarkOptionValue::Label(_)
+        ) | (
             BuildSettingDefinition::Integer { .. },
             StarlarkOptionValue::Integer(_)
         ) | (
@@ -188,6 +247,10 @@ pub(crate) fn matches_expected_text(
 ) -> Result<bool, String> {
     let actual = effective_value(label, declaration, configured)?;
     match (declaration.definition(), actual) {
+        (BuildSettingDefinition::Label { .. }, StarlarkOptionValue::Label(actual)) => Ok(actual
+            == CanonicalLabel::parse(expected).map_err(|error| {
+                format!("'{expected}' cannot be converted to label build setting {label}: {error}")
+            })?),
         (BuildSettingDefinition::Integer { .. }, StarlarkOptionValue::Integer(actual)) => {
             Ok(actual
                 == parse_starlark_integer(expected).ok_or_else(|| {
@@ -279,9 +342,20 @@ pub(crate) fn convert_command_occurrence(
     declaration: &BuildSettingDeclaration,
     raw_value: Option<&str>,
     negated: bool,
+    label_context: slug_identity_v2::OptionLabelContext<'_>,
 ) -> Result<StarlarkOptionValue, String> {
     let required = || raw_value.ok_or_else(|| format!("expected a value after --{label}"));
     let value = match declaration.definition() {
+        BuildSettingDefinition::Label { flag: true } => {
+            if negated {
+                return Err(format!(
+                    "illegal no-form for non-Boolean build setting {label}"
+                ));
+            }
+            StarlarkOptionValue::Label(label_context.parse(required()?)?.canonical().ok_or_else(
+                || format!("label value for {label} refers to an invisible repository"),
+            )?)
+        }
         BuildSettingDefinition::Integer { flag: true } => {
             let raw = required()?;
             StarlarkOptionValue::Integer(parse_starlark_integer(raw).ok_or_else(|| {
@@ -502,6 +576,11 @@ pub(crate) fn alloc_value<'v>(
     evaluator: &mut Evaluator<'v, '_, '_>,
 ) -> starlark::Result<Value<'v>> {
     Ok(match value {
+        StarlarkOptionValue::Label(_) => {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "label-valued build-setting transitions are unsupported"
+            )));
+        }
         StarlarkOptionValue::Integer(value) => heap.alloc(value.clone()),
         StarlarkOptionValue::Boolean(value) => Value::new_bool(*value),
         StarlarkOptionValue::String(value) => heap.alloc_str(value).to_value(),

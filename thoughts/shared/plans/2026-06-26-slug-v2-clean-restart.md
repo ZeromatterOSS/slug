@@ -29,8 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-79-m7a-native-filegroup-forwarding-r1
-Status: accepted
+Packet: WP-7-80-m7a-native-label-flag-r1
+Status: accepted (independent final ACCEPT)
+
+WP780 accepts native label_flag declaration, typed canonical command overrides
+and configured provider/condition forwarding, demanded by the authentic tools/cpp
+package. Independent design/final ACCEPT;20 focused tests and Core/Query/CLI
+dependent checks pass. Selected-prerequisite validation, own declaring visibility,
+normalized predicates and condition/configured-node cycle detection are tracked.
+Authentic tools-package loading, full cc_toolchain and execution remain deferred;
+M7A is partial and M8 unproved.
 
 WP779 accepts native configurable-srcs filegroup analysis with genuine file,
 runfiles and singleton executable providers. It is demanded by all four implicit

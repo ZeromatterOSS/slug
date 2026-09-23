@@ -1,0 +1,14 @@
+[fixture]
+name = "native-label-flag-configured-forwarding"
+description = "Authored native label_flag consumers, command preparation and source-derived condition regressions. Companion Loading unit and Query native_label_flag tests cover the same source family."
+comparison = "structured_semantic"
+oracle_notes = "Pinned-source regressions, not generated Bazel invocation evidence. Native label_flag and aliases perform forwarding; authored rules originate artifacts/providers or inspect public ctx projections. Diagnostic assertions use message_shape."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = ["src/main/java/com/google/devtools/build/lib/rules/LabelBuildSettings.java:58-99", "src/main/java/com/google/devtools/build/lib/rules/LateBoundAlias.java:48-80", "src/main/java/com/google/devtools/build/lib/rules/config/ConfigSetting.java:650-700,764-789,816-827", "src/main/java/com/google/devtools/build/lib/analysis/config/ConfigMatchingProvider.java:208-225", "src/main/java/com/google/devtools/build/lib/runtime/StarlarkOptionsParser.java:186-274,348-410", "src/test/java/com/google/devtools/build/lib/rules/LabelBuildSettingTest.java:94-344"]
+migrated_tests = ["LabelBuildSettingTest.testLabelFlag_default", "LabelBuildSettingTest.testLabelFlag_set", "LabelBuildSettingTest.withSelectThroughAlias", "LabelBuildSettingTest.withSelect", "LabelBuildSettingTest.selectWithRelativeLabel", "LabelBuildSettingTest.selectOnInvalidLabel"]
+generation_command = "Authored source-derived expectations; no upstream body copy or generated JSON."
+verification_command = "Compile slug_analysis_v2 --test starlark_rule; v2_test_preflight.py exact native_label_flag selectors then serial execution. Companion Loading package::label_flag::tests and Query loading_query native_label_flag selectors."
+translation_notes = "Full Slug structural configuration/artifact identities. Universal/omitted scope only; transitions reject before invocation. Query edge classification is covered, CLI nodep/implicit filtering stays unsupported. No installed tools, full cc_toolchain or execution claim."

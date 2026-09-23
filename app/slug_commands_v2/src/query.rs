@@ -206,6 +206,27 @@ fn validate_query_flags(
     Ok((order, graph_factored, policy))
 }
 
+#[cfg(test)]
+mod label_flag_boundary_tests {
+    use super::*;
+
+    #[test]
+    fn nodep_and_implicit_query_filters_remain_unsupported() {
+        for flag in [
+            "--implicit_deps",
+            "--noimplicit_deps",
+            "--nodep_deps",
+            "--nonodep_deps",
+        ] {
+            let error = QueryRequest::parse(&[flag, "deps(//:flag)"]).unwrap_err();
+            assert!(
+                error.to_string().contains("not supported by loading query"),
+                "{error}"
+            );
+        }
+    }
+}
+
 fn required_query_flag_value<'a>(
     flag: &'a ParsedFlag,
     expected: &str,

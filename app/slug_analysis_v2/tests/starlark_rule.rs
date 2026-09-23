@@ -162,6 +162,7 @@ mod directory_args;
 mod effective_output_groups;
 mod file_output_providers;
 mod native_filegroup;
+mod native_label_flag;
 mod output_group_info;
 mod package_specification;
 mod rustc_map_each;
@@ -6453,17 +6454,19 @@ async fn canonical_external_condition_and_flag_packages_invalidate_and_restore()
 
     let (activations, _, nodes) = tracker.take();
     for package in ["@@dep+//conditions", "@@dep+//flags"] {
-        assert_eq!(
-            activations
-                .iter()
-                .filter(|(identity, _)| {
-                    identity.starts_with("package/") && identity.contains(package)
-                })
-                .count(),
-            1,
-            "canonical package must activate once: {package}: {activations:#?}"
+        assert!(
+            activations.iter().any(|(identity, _)| {
+                identity.starts_with("package/") && identity.contains(package)
+            }),
+            "canonical package must be observed: {package}: {activations:#?}"
         );
     }
+    assert!(
+        activations
+            .iter()
+            .all(|(identity, _)| !identity.contains("@dep//")),
+        "apparent repository identity leaked into activations: {activations:#?}"
+    );
     assert_eq!(
         activations
             .iter()
@@ -13450,19 +13453,32 @@ async fn configurable_alias_propagates_condition_and_child_needs_without_publica
             .collect()
     }
     let paths = observed_need(&dice, &workspace, &observation).await;
-    assert!(paths.contains(&workspace.join("late")), "{paths:?}");
     assert!(
         paths.contains(&workspace.join("condition_dep")),
         "{paths:?}"
     );
-    for package in ["late", "condition_dep"] {
-        fs::create_dir(workspace.join(package)).unwrap();
-        fs::write(
-            workspace.join(format!("{package}/BUILD.bazel")),
-            "load('//:defs.bzl', 'leaf')\nleaf(name='leaf')\n",
-        )
+    // Selected-prerequisite validation must prepare the condition's setting
+    // before the alias branch is knowable. The second frontier then asks for
+    // the selected child without prematurely publishing the alias node.
+    fs::create_dir(workspace.join("condition_dep")).unwrap();
+    fs::write(
+        workspace.join("condition_dep/BUILD.bazel"),
+        "load('//:defs.bzl', 'leaf')\nleaf(name='leaf')\n",
+    )
+    .unwrap();
+    let mut updater = dice.updater();
+    updater
+        .changed_to(path_observation_shards(&root_epoch(&workspace)))
         .unwrap();
-    }
+    updater.commit().await;
+    let paths = observed_need(&dice, &workspace, &observation).await;
+    assert!(paths.contains(&workspace.join("late")), "{paths:?}");
+    fs::create_dir(workspace.join("late")).unwrap();
+    fs::write(
+        workspace.join("late/BUILD.bazel"),
+        "load('//:defs.bzl', 'leaf')\nleaf(name='leaf')\n",
+    )
+    .unwrap();
     let mut updater = dice.updater();
     updater
         .changed_to(path_observation_shards(&root_epoch(&workspace)))

@@ -15,6 +15,7 @@
 //! module only combines those borrowed inputs for one analysis attempt.
 
 use std::fmt;
+use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
@@ -28,6 +29,7 @@ pub(crate) struct ConfiguredAttributeCondition {
     pub(crate) label: CanonicalLabel,
     pub(crate) declaration: ConfigSettingTarget,
     pub(crate) matches: bool,
+    pub(crate) normalized_flags: Arc<[(CanonicalLabel, CompactString)]>,
 }
 
 /// One request-local value aligned with the loading declaration. It may be
@@ -108,6 +110,8 @@ pub(crate) fn resolve_configured_attribute(
                                 && config_setting_refines(
                                     &other.declaration,
                                     &candidate.declaration,
+                                    &other.normalized_flags,
+                                    &candidate.normalized_flags,
                                 )
                         })
                 })
@@ -148,6 +152,8 @@ pub(crate) fn resolve_configured_attribute(
 pub(crate) fn config_setting_refines(
     candidate: &ConfigSettingTarget,
     other: &ConfigSettingTarget,
+    candidate_flags: &[(CanonicalLabel, CompactString)],
+    other_flags: &[(CanonicalLabel, CompactString)],
 ) -> bool {
     fn native_contains(declaration: &ConfigSettingTarget, key: &str, value: &str) -> bool {
         declaration
@@ -187,11 +193,9 @@ pub(crate) fn config_setting_refines(
         .value()
         .iter()
         .all(|(key, value)| contains_define(candidate, key, value));
-    let flags_subset = other
-        .flag_values()
-        .value()
+    let flags_subset = other_flags
         .iter()
-        .all(|pair| candidate.flag_values().value().contains(pair));
+        .all(|pair| candidate_flags.contains(pair));
     if !(native_subset && define_subset && flags_subset) {
         return false;
     }
@@ -206,9 +210,7 @@ pub(crate) fn config_setting_refines(
             .value()
             .iter()
             .any(|(key, value)| !contains_define(other, key, value))
-        || candidate
-            .flag_values()
-            .value()
+        || candidate_flags
             .iter()
-            .any(|pair| !other.flag_values().value().contains(pair))
+            .any(|pair| !other_flags.contains(pair))
 }

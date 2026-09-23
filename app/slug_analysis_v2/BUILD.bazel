@@ -78,12 +78,14 @@ rust_test(
 
 rust_test(
     name = "starlark_rule_test",
-    srcs = ["tests/starlark_rule.rs"] + glob(["tests/rustc_map_each/**/*.rs", "tests/cc_configure_features/*.rs", "tests/cc_feature_expansion/*.rs", "tests/native_filegroup/**/*.rs"]),
+    srcs = ["tests/starlark_rule.rs"] + glob(["tests/rustc_map_each/**/*.rs", "tests/cc_configure_features/*.rs", "tests/cc_feature_expansion/*.rs", "tests/native_filegroup/**/*.rs", "tests/native_label_flag/**/*.rs"]),
     compile_data = glob([
         "tests/fixtures/rustc-map-each/**/*.bzl",
         "tests/rustc_map_each/**/*.bzl",
         "tests/native_filegroup/*.bzl",
         "tests/native_filegroup/BUILD.fixture",
+        "tests/native_label_flag/*.bzl",
+        "tests/native_label_flag/BUILD.fixture",
     ]),
     edition = crate_edition(),
     size = "small",

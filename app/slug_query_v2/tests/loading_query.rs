@@ -97,7 +97,10 @@ use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
+use slug_workspace_v2::path_observation_shards;
 use starlark_map::small_map::SmallMap;
+
+mod native_label_flag;
 
 fn scratch() -> PathBuf {
     static NEXT_SCRATCH: AtomicU64 = AtomicU64::new(0);
@@ -4316,6 +4319,7 @@ async fn root_query_transaction_with_policy(
             legacy_raw_files,
         )])
         .unwrap();
+    updater.changed_to(path_observation_shards(&epoch)).unwrap();
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();

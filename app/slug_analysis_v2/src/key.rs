@@ -211,6 +211,7 @@ impl ConfigurationKey {
             bytes(&mut out, option.label().stable_serialize().as_bytes());
             out.push(match option.scope() { StarlarkOptionScope::Default => 0, StarlarkOptionScope::Universal => 1, StarlarkOptionScope::Target => 2, StarlarkOptionScope::Project => 3 });
             match option.value() {
+                StarlarkOptionValue::Label(value) => { out.push(5); bytes(&mut out, value.stable_serialize().as_bytes()); }
                 StarlarkOptionValue::Integer(value) => { out.push(0); bytes(&mut out, &value.to_signed_bytes_be()); }
                 StarlarkOptionValue::Boolean(value) => out.extend_from_slice(&[1, u8::from(*value)]),
                 StarlarkOptionValue::String(value) => { out.push(2); bytes(&mut out, value.as_bytes()); }

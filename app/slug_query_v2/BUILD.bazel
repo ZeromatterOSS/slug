@@ -43,6 +43,7 @@ rust_test(
     name = "loading_query_fixture_test",
     srcs = [
         "tests/loading_query.rs",
+        "tests/native_label_flag/mod.rs",
         "//tests/v2_fixture_support:src/lib.rs",
     ],
     compile_data = ["//tests/v2_fixture_payload:fixtures.payload"],

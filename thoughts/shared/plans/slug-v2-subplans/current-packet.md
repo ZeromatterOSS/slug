@@ -1,215 +1,207 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-79-m7a-native-filegroup-forwarding-r1
-Status: accepted
+Packet: WP-7-80-m7a-native-label-flag-r1
+Status: accepted (independent final ACCEPT)
 
 ## Outcome and compatibility
 
-Analyze genuine native filegroup targets with configurable srcs through the
-existing configured graph. Publish ordered files, distinct default/data runfiles
-and a FilesToRun executable iff flattened files are singleton. Prove nested
-filegroups and aliases feed real ctx.file/ctx.files/ctx.executable consumers in
-target and exec configurations, without an authored forwarding rule.
+Implement genuine native label_flag through Loading, typed command preparation,
+configured analysis and config_setting. Bazel9.2 tools/cpp/BUILD.tools63–66
+declares link_extra_libs with :empty_lib default. This is a prerequisite to the
+authentic full cc_toolchain tools package, not a replacement for it.
+Default-only forwarding is insufficient: real command overrides must select
+providers under canonical typed configuration identity.
 
-Exact admitted slice: configurable srcs, empty data and output_group, no coverage,
-both incompatible_filegroup_runfiles_for_data policies. Files are a stable-order
-transitive union of selected srcs DefaultInfo.files. Default runfiles merge srcs
-default runfiles; data runfiles include files and, under true policy, srcs data
-runfiles. Preserve all admitted runfiles contents and source-defined ordering;
-singleton source/derived executable; no own actions or RunfilesSupport. Publish
-genuine empty InstrumentedFilesInfo under disabled coverage using existing native
-provider identity and fields. Arbitrary child providers are not forwarded.
-Reuse complete_rule_output_groups for hidden default-runfiles artifacts and
-eligible srcs validation propagation (RuleConfiguredTargetBuilder.java145–176);
-do not omit native rule completion or substitute data runfiles.
-Slug-native: structural configuration/artifact identity and diagnostics.
-Deferred: nonempty data/output_group and coverage (explicit configured rejection,
-preserving accepted Loading/query declarations); installed module-tool binaries,
-label_flag, complete tools/cpp loading closure, full cc_toolchain, status production,
-action execution and bootstrap. M7A partial; M8 unproved.
+Exact slice: native label_flag with mandatory nonconfigurable label default,
+help, omitted/explicit universal scope, target/exec forwarding,
+canonical command overrides/default elision/last-wins, label-valued config_setting
+predicates and literal BUILD aliases to settings. Schema scope default is
+universal, but omitted command scope is Default and explicit universal is
+Universal. Broader scopes and label transitions explicitly reject before evaluator
+invocation; existing scalar/list/set settings/transitions remain unchanged.
+Slug-native: structural configuration/output identity and diagnostic text.
+Deferred: label_setting, configurable BUILD aliases in setting lookup, nonneutral
+extra native attributes, registration aliases, project/exclude exec policies,
+loading-query CLI implicit/nodep filtering (already unsupported), complete
+tools-package load closure, installed binaries, full cc_toolchain,
+execution and bootstrap. M7A partial; M8 unproved.
 
-Predecessor WP778 at b56eaf634 accepts genuine C++ build-info registration and
-OutputGroupInfo consumed by the authentic helper;120 tests, CLI check and
-independent design/final review passed. It does not construct full cc_toolchain.
+Predecessor WP779 at993483562 accepts native configurable-srcs filegroup providers,
+with39 tests, Core/Query/CLI checks and independent design/final ACCEPT.
 
-## Research and semantic owners
+## Research and ownership
 
-Pinned Bazel9.2 commit8220c6198837d5c13d53fea211cf3282aa12408a:
-rules/filegroup/Filegroup.java51–136 and FilegroupRule.java40–88;
-analysis/PrerequisiteArtifacts.java64–71; analysis/Runfiles.java499–506,638–659,
-669–715,738–774; analysis/config/CoreOptions.java66–75;
-analysis/test/InstrumentedFilesCollector.java107–108. Paths relative to
-src/main/java/com/google/devtools/build/lib. Source regressions adapt
-src/test/java/.../rules/filegroup/FilegroupConfiguredTargetTest.java131–155,
-225–305 (single/multi/diamond and distinct files/default/data runfiles). Tests for
-coverage and nonempty data/output_group are outside this admitted phase and
-replaced only by explicit rejection tests, not a parity claim.
+Pinned Bazel9.2 commit8220c6198837d5c13d53fea211cf3282aa12408a. Paths under
+src/main/java/com/google/devtools/build/lib:
+rules/LabelBuildSettings.java58–99; packages/RuleClass.java896–905;
+rules/LateBoundAlias.java48–80; rules/AliasConfiguredTarget.java91–114,178;
+analysis/CommonPrerequisiteValidator.java156–160,730–741;
+runtime/StarlarkOptionsParser.java186–274,348–410;
+analysis/config/CoreOptionConverters.java331–359;
+rules/config/ConfigSetting.java650–700,764–789,816–827;
+packages/AggregatingAttributeMapper.java131–165 and DependencyFilter.java31–46.
+Adapt LabelBuildSettingTest.java94–344 (default/override/direct/relative/invalid
+select and alias). Its345–498 transition cases remain deferred with negative
+tests. BuildConfigurationValueTest.labelFlagExecScopes587–629 establishes scope
+provenance; nondefault exec-exclusion remains closed.
 
-Demand: rules_cc0.2.17 semantics.bzl142–155 unconditionally declares executable
-exec aggregate-ddi/generate-modmap attrs. Bazel tools/cpp/BUILD.tools83–90 and
-modules_tools/BUILD.tools8–22 use nested native filegroups and platform select.
-Interface/link tools also use aliases and filegroups. Full-rule audit found
-label_flag and authentic compatibility-proxy/protobuf loading prerequisites too;
-those remain separate, not bypassed. Module binaries are installed release
-artifacts, not actions rebuilt during analysis; later catalog work must choose
-explicit release-platform provenance.
+Loading owns a native LabelFlag target with BuildSettingDeclaration and new Label
+variants in existing BuildSettingDefinition/Default. Share a PackageTargetKind
+declaration projection for native/Starlark settings. Expose BUILD/global and
+native.label_flag through existing coercion/native schema/package-default and
+macro-origin owners. Retain default/help/scope provenance and genuine class.
+Reject select on default/scope, invalid types and unknown attrs. Query's hidden
+:alias implicit default dependency and NODEP default attribute retain distinct
+edge classifications. Add QueryEdgeKind::Nodep alongside VisibilityNodep and
+Implicit; ordinary unfiltered traversal still visits both. Do not activate the
+existing unsupported CLI filters or model these as ordinary alias dependencies.
+Use the actual attribute name help (RuleClass.java660), not build_setting_help;
+preserve source schema order: inherited attrs, :alias, scope, default, help.
 
-Loading already retains complete configurable srcs in native attribute overrides
-and flattened candidate labels for unconfigured query. Borrow native_attributes
-and use existing configured condition resolver; never analyze flattened all-branch
-PackageTargetKind::Filegroup.srcs as selected dependencies. Preserve native schema
-and Loading/query behavior. Reject selected nonempty data/output_group and enabled
-coverage before node/provider publication; no silently ignored semantic input.
-Final-diff design correction: resolve selectors in all retained native attributes,
-including package-default values. Apart from handled srcs/visibility/config-deps
-and name/generator provenance, require neutral false/empty values; nonneutral
-features/tags/deprecation/testonly/constraints/aspect hints/transitive configs/
-package metadata/licenses remain explicitly unsupported. Preserve their existing
-Loading/query declarations, not silent configured activation. Direct package_group
-srcs reject; aliases to package groups are explicitly unsupported (upstream has
-alias-specific ambiguity). Testonly actual prerequisites, including aliases and
-generated-file owners, are explicitly unsupported regardless of the separate
-native output-file/experimental-package policies. Tracked actual-target package
-checks do not replace requested alias edges or visibility. Source authority:
-CommonPrerequisiteValidator.java343–375,730–777. Independent correction ACCEPT.
+Configuration owns StarlarkOptionValue::Label(CanonicalLabel), distinct canonical
+framing and legacy-key tag. Compare canonical value labels for default elision,
+never ultimate alias targets. Reuse Arc-backed sorted options and structural
+equality/hash; omitted/explicit-universal scope survives admitted exec policy.
+No second label store/map/cache/interner.
 
-ConfiguredNodeAnalysisKey/observed driver owns native analysis. Reuse package and
-source observations, condition keys, child preparation with source admission,
-cycle guard and configured attribute edges. Existing analysis tracks visibility
-declarations but does not provide a generic enforcement owner. This packet adds
-a bounded srcs-edge admission gate using tracked LoadedPackage.effective_visibility:
-public prerequisites are admitted; ordinary same-package prerequisites are admitted
-only when neither consumer nor prerequisite (or generated file's generating rule)
-has a symbolic-macro origin. Reject ordinary cross-package private references;
-restricted and nonpublic macro visibility remain explicitly unsupported. Inspect
-requested alias label/visibility, not its actual-target visibility. Reuse tracked
-package inputs; no new graph or visibility evaluator. Source authority:
-CommonPrerequisiteValidator.java152–154,252–288,304–327. Honor existing full-config
-check_visibility=false by skipping this gate through a checked bool projection;
-default true follows the bounded admission above. Only selected
-children contribute srcs edges; condition packages use existing runfiles-package
-closure behavior. Preserve Need/outer/semantic error aggregation and events.
-Failed/cancelled attempts publish no partial node. Existing structural equality,
-publication_eq, tracked source/package/configuration dependencies own cutoff,
-invalidation/restoration and overlapping request sharing. No filesystem scan,
-key injection, new DICE key/lock or global state. Read docs/developers/dice.md.
+CommandConfigurationPreparationKey owns tracked conversion. Three contexts:
+default uses declaration package/mapping; CLI value uses root option context
+(bare pkg:target means //pkg:target and :target means root); config_setting
+expected value uses condition package/mapping. A root flag with external VALUE
+must demand observed root mapping after declaration-kind discovery, without new
+dependencies for unrelated scalar strings. Union observations and Needs before
+publication. Preserve existing native --flag_alias plumbing. Missing/negated/
+malformed/invisible label values fail; repeated scalar flags are last-wins.
 
-Use ConfiguredNodeKind::Rule and genuine FILEGROUP_RULE_CAPABILITY, subject to
-checking existing consumers. The native-node constructor rejects Rule: use existing
-collect_runfiles_packages then new_rule(...).with_edges(...), preserving that
-constructor invariant without a new kind or weakened assertion.
-Reuse ProviderCollection, DefaultInfo::from_effective
-(not from_executable, which adds executable to default runfiles), FilesToRunProvider,
-dense AnalysisDepset, Runfiles and RunfilesPackageCollector. Preserve mixed child
-orders with source-defined stable files / compile-order runfiles roots; inspect
-existing builders before choosing a narrow source-exact builder hook.
-Freeze a private builder in dice/filegroup.rs over existing public fields:
-Postorder files, Default symlink/root/empty-filename roots; conflict policy is
-merged before skipping empty child contents, nonempty prefixes must agree with
-the existing _main workspace convention, and incompatible orders error rather
-than flatten. No BuildAPI public constructor change.
-Existing Arc/Dupe/Allocative and compact ordered scratch collections suffice.
-Published providers/edges follow configured-node DICE lifetime; joins/builders
-are phase scratch and retain no evaluator heap or command borrow. Stage9 existing
-Stage6 FilesToRun/runfiles/provider utility dispositions apply. No donor import,
-interner/cache, new retained representation or performance claim.
+ConfiguredNodeAnalysisKey owns selected-target preparation, source admission,
+observed package inputs, cycle guards, Need/error aggregation and provider
+forwarding. Preserve own flag label/class/visibility while actual_target and
+Target.label follow selected child. No own action or empty-provider substitute.
+Reuse ConfiguredNodeKind::Alias, AliasActual and runfiles-package closure where
+semantically appropriate; preserve hidden :alias attribute identity where exposed.
+Do NOT reuse filegroup visibility/testonly guards: source skips these checks on
+the late-bound any-provider edge. Nonneutral unsupported attrs reject before
+publication, not silently disappear.
+Final-review correction: the flag's OWN declaring-visibility package-group
+dependencies still require tracked preparation and kind validation, independent
+of the skipped selected-edge check. Join them under the existing guard, publish
+DeclaringVisibility edges and package closure; prove valid/missing/wrong-kind
+groups and same-DICE change/restoration. No ignored restricted-visibility input.
 
-## Scope and routing
+Shared tracked literal-alias declaration lookup stops at the native flag, never
+its selected actual. Own label/type/default supply internal BuildSettingProvider
+facts; no new public provider facade. Preserve cycle/Need behavior and explicitly
+reject configurable aliases. Config_setting must also validate selected configured
+prerequisites, use own setting label for option lookup, reject duplicate actual
+labels per source and normalize expected labels in condition context. Selection
+specialization uses source-normalized predicate identity rather than raw spelling.
 
-Base b56eaf634; codex/wp779-native-filegroup-review. Independent design checkpoint
-before edits; final actual-diff/evidence review. Large dice.rs gets thin hooks;
-new semantics in child module. Estimate300–650 production and400–700 test lines;
-size is a review trigger, not an automatic stop.
-The private async prepare function exceeds150 lines: it remains one native-rule
-transaction over selector preparation, guarded child join and Need/error precedence.
-Provider/runfiles construction and prerequisite policy are separate helpers; no
-command, transport, persistence or new key family enters this function. Added
-negative/provider-publication gates exceed the initial test estimate; retain those
-discriminators rather than splitting their shared fixture into duplicate corpora.
+DICE contract: docs/developers/dice.md and existing observed command/package/node
+owners. No new key/lock, direct filesystem scan, injected semantic state or
+retained evaluator borrow. Failed/cancelled attempts publish no partial node.
+Package/default/provider/mapping changes invalidate tracked computations and
+restore by structural/publication equality. Existing CanonicalLabel, Arc/Dupe,
+Allocative and compact ordered scratch collections suffice. Retained declarations
+and options follow package/configured-node lifetimes; conversion/joins are scratch.
+Stage9 contextual command-configuration and native-provider utility decisions
+apply. No donor import or performance claim.
 
-Worker1: Analysis src/dice/filegroup.rs, src/dice.rs module/dispatch/external shape
-hooks; src/result.rs small encapsulation hook only if needed. No Loading storage
-or broad dispatch changes. Root reviews any additional owner/public API first.
-Worker2: Analysis tests/native_filegroup/ child sources and fixture.toml;
-tests/starlark_rule.rs module hook. Reuse existing selected-registry/main-external
-fixture helpers and exact source-derived regressions; no copied upstream corpus.
-Protected tests/effective_output_groups/mod.rs has baseline pre-WP766 path
-assertions: compare its package-local expected strings with root_relative_path
-and explicitly assert full result configuration roots. Keep shared helpers and
-all group membership/order/kind/exclusion/restoration checks. This is test-coordinate
-repair, not a production identity change or failure waiver; rerun all four tests.
-Reviewer: source/runfiles design and final diff.
-Root: integration, serial Cargo, protected tests; Analysis BUILD.bazel test-source
-metadata if needed; stage6/9/bootstrap and scheduling. No BuildAPI builder hook.
-Root also owns Configuration src/native/configuration.rs checked
-filegroup_runfiles_for_data/check_visibility getters and focused native tests.
-Configuration src/command.rs admits these two existing CoreOptions booleans through
-the normal typed command overlay (parse/name/negation/descriptor), not a test-only
-setter. Preserve complete structural identity and native exec inheritance; prove
-default/false/negated/restored policies and target-to-exec/default-exec behavior.
-Root extends the existing Commands src/common.rs boolean-parser test table with
-both flags; no Commands production change. Execute that direct wrapper test.
-Root owns Analysis src/analysis_value/empty_instrumented_files.rs plus thin analysis_value.rs
-materialize/lower hooks. The empty-only facade uses existing builtin occurrence
-identity, exactly two empty depsets, native type/fields/repr/hash/equality, and
-rematerializes nested/direct occurrences without activating a constructor or
-coverage_common. No new retained provider model.
+Selected-prerequisite validation introduces Condition -> configured node ->
+Condition cycles. Extend the EXISTING configured_analysis_cycle_detector CycleNode
+to recognize ConfiguredConditionKey (workspace and full configured target), with
+diagnostic display for this key family. Guard the condition computation's
+dependency awaits once at its owner boundary, preserving existing single-use
+guards; add no key/lock/task or separate detector. Existing synchronous receiver
+lock must be released before awaits. Genuine flag -> configurable alias ->
+condition -> flag regression must terminate with cycle error, and restoration
+after breaking the cycle must succeed. Pure alias and filegroup cycles stay tested.
 
-## Acceptance and validation
+## Scope, routing and checkpoint
 
-Empty/singleton/multiple, duplicate transitive files and stable diamond/mixed-order
-DAGs; singleton after dedup; source/derived identity; zero own actions. Distinct
-default/data runfiles with both policy values, including existing symlinks/root
-symlinks/empty filenames; no executable insertion in default runfiles. Empty
-InstrumentedFilesInfo fields and no arbitrary provider forwarding. Genuine
-DefaultInfo and ctx.file/files/executable consumers; exec transition retains
-derived owner configuration. No host executable-bit inference.
+Base993483562; codex/wp780-label-flag-review. Estimated production600–1000 and
+tests500–900 lines, a review trigger not a cap. Large package.rs/dice.rs receive
+thin binding/dispatch hooks; cohesive native semantics go in child modules.
 
-Nested/alias/main/external paths, select match/no-match/error, selected missing
-versus unselected unavailable source, visibility and cycles.
-Visibility discriminators include cross-package private and same-physical-package
-symbolic-macro private rejection; public aliases use alias declaration visibility.
-Same-DICE BUILD/provider/source A/B/A and missing/recreate; configuration switching must not leak
-files/executable/runfiles/provider/package closure. Explicit unsupported-attribute
-and coverage rejection, with no partial provider publication.
+Worker1: Loading src/package/label_flag.rs, src/package.rs, src/attrs.rs,
+src/bzl_module.rs and focused tests; Query src/graph.rs native projections/tests.
+Publish shared declaration API before integration.
+Worker2: Analysis src/dice/label_flag.rs, thin src/dice.rs hooks, condition matching
+and src/configured_attribute.rs only for normalized predicate handling; new
+tests/native_label_flag and starlark_rule.rs module hook; existing
+src/configured_analysis_cycle_detector.rs condition-family extension.
+Root: Configuration src/native/configuration.rs/tests; Analysis src/build_setting.rs,
+src/command_configuration.rs, src/key.rs, label transition fail-closed hook and
+command preparation tests; Core src/runtime/build_requested_target.rs normal
+analysis dispatch/wrapper test; BUILD metadata, docs, serial Cargo and integration.
+Root also owns the test-only Commands src/query.rs unsupported-filter guard;
+no Commands production behavior is activated.
+Reviewer: independent design and final actual diff/evidence.
 
-Tier DICE/cross-crate: focused new tests plus protected alias/source/visibility/
-conditions/runfiles/executable and authentic toolchain-helper/public compile gates.
-Compile Analysis and named direct Core/CLI dependents; Query check protects rule
-kind/native graph consumers. Resolve pinned rust-toolchain binaries freshly.
-Cargo offline/locked JSON --no-run preparation<=60s per operation; serial shared
-target. Batch exact preflight on final test executable, then execute and report
-selected/pass and elapsed. Tests stay small; >30s requires concrete justification.
-No CLI binary/Bazel/daemon run planned. Format changed Rust; diff/archive/status
-and fixture provenance checks. Source-derived regressions establish deterministic
-parity; fresh Bazel replay is unnecessary without an evidence gap.
+Checkpoint resolutions: one pure Analysis lookup-step classifier returns terminal
+setting declaration or literal alias label, using the shared Loading declaration
+projection. Owner-local command/configured loops retain their own existing tracked
+inventory/observation modes and compact visited sets; both return terminal setting
+label plus declaration. Command grouping/default elision uses terminal setting
+identity; configured prerequisite validation remains separate.
 
-Fixture records use Stage1 fixture.toml provenance and structured comparison.
-Authored source/provider input rules are allowed; forwarding filegroup is native.
-No invented installed-tool source files or empty toolchain providers.
+Keep public ConfiguredConditionMatch unchanged. One shared async tracked helper
+supplies normalized predicates to truth computation AND selector preparation.
+The latter must directly depend on normalization inputs: a same-truth change of
+actual label/mapping must invalidate specialization. Add mandatory normalized_flags
+Arc<[(CanonicalLabel, CompactString)]> only to scratch ConfiguredAttributeCondition;
+duplicate/refinement keys use actual selected prerequisite label, own setting
+label remains separate for option lookup. Normalize all admitted flag rows while
+preserving nonlabel expected text and original Loading declarations (also used
+by existing transition filtering). No retained condition-value or new key.
 
-REPLAN only for a required untracked input, no bounded source-correct provider/
-runfiles construction, or new semantic identity/ownership decision. Routine
-compiler/invocation/test corrections stay in packet. Full-rule/loading/binary
-gates remain separate; this prerequisite does not prove bootstrap.
+The small public QueryEdgeKind::Nodep discriminant is the sole new query
+representation; downstream classification checks do not claim CLI filter support.
+Independent design ACCEPT includes these resolutions and the condition-cycle
+correction. Final review must inspect actual implementation and executed evidence.
+
+## Acceptance
+
+Loading: default required/type/nonconfigurable, BUILD/native, help/scope/provenance
+and equality, external mapping, unknown attrs; query class/attrs/default-edge
+classifications and unchanged rejection of unsupported CLI filters.
+Configuration/command: Label vs same-text String encoding, repo/target differences,
+last-wins/default elision/A-B-A, negation/missing/malformed, external VALUE under root
+flag name, literal aliases/cycles, mapping A-B-A and three distinct contexts.
+Analysis: default/override real ctx provider/files/executable consumers, nested
+aliases, source/generated targets, selected missing versus unused default,
+target/exec owner identity, zero own actions, private/testonly actual admission;
+condition direct/relative/mapped/invalid labels, aliases, duplicate actual label
+and specialization. Alias labels sharing an actual remain distinct option values.
+Scope/transition/attr negatives reject before publication. Same-DICE declaration,
+selected provider/source edit/delete/recreate/A-B-A and configuration switching
+preserve package closure and invalidate correctly.
+
+Tier DICE/cross-crate: focused owners plus protected native filegroup, aliases,
+conditions, commands, transitions and providers; Core/Query/CLI direct checks.
+Resolve pinned toolchain freshly; serial offline/locked Cargo JSON --no-run,
+each preparation capped60s. Batch exact preflight then execute unchanged binaries;
+zero tests prove nothing. Source-derived regressions; no fresh oracle absent a
+specific gap. No CLI/Bazel/daemon/transport run planned; any later binary invocation
+requires rebuild. Fixture.toml provenance, format/diff/archive/status checks,
+independent final ACCEPT and measured preparation/runtime/packet elapsed receipt.
+
+REPLAN only for a source contradiction or new unbounded owner/identity prerequisite;
+routine compiler/invocation/test corrections remain in this packet.
 
 ## Acceptance receipt
 
-Accepted against b56eaf634 after independent design and final ACCEPT. Native
-filegroup configured analysis now supplies genuine providers to the existing
-graph and public ctx consumers within the exact slice above. No new retained
-representation, graph key or execution path; full cc_toolchain remains unproved.
-
-Pinned nightly-2025-09-14, offline/locked serial preparation: Configuration
-0.95s, Analysis lib4.02s, integration7.55s, Commands4.46s; Core/Query/CLI
-dependent check18.09s. Each final Cargo JSON receipt reports build-finished
-success. Final exact preflight/runtime receipt:39 passed (Configuration2,
-Analysis unit7, integration/protected29 including7 native-filegroup tests,
-Commands1),3.558s aggregate runtime, slowest0.627s. Receipt and executable
-hashes: target/wp779/final-runtime.log; compile receipts alongside it (ignored
-local artifacts). Earlier compile/assertion corrections were superseded by
-these final runs, with no waived gate. Independent final review verified receipt
-hashes and accepted the actual diff. Formatting, fixture provenance inspection,
-diff, archive and plan-status checks pass. No CLI/Bazel/daemon or transport run
-is claimed. Branch-to-accept elapsed approximately37 minutes, including user
-installation follow-up and review; no performance improvement claim.
+Independent design and final reviews: ACCEPT. Focused exact tests: Configuration
+2/2, Loading 5/5, Analysis 9/9, Query 2/2, Commands 1/1 and Core 1/1.
+`cargo check -p slug_core_v2 -p slug_query_v2 -p slug_cli_v2` passed.
+The broad Analysis integration run passed 208/210; both residual artifact-path
+expectation failures reproduce in a pre-WP780 test executable. The broad Query
+run passed 58/59; its sole generic relative-label diagnostic expectation
+reproduces at accepted HEAD `993483562` in a detached worktree. These are
+pre-existing baseline defects, not waived WP780 behavior. The changed query
+fixture's path shards are injected; focused reruns emit no background panic.
+`cargo fmt --all --check` reports only pre-existing
+`app/slug_bzlmod_v2/src/host_package.rs` formatting drift; changed Rust files
+are formatted. Diff, plan-status and archive checks passed. Packet elapsed
+approximately 43 minutes across continuation; direct-dependent check 17.6s,
+final Analysis/Query focused runtimes below 0.3s each. No Slug binary, daemon,
+Bazel, NativeLink transport or BuildBuddy run belongs to this packet.

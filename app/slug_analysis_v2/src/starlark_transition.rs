@@ -259,6 +259,12 @@ pub(crate) fn evaluate(
     attributes: &[ResolvedRuleAttribute],
     configuration: &ConfigurationKey,
 ) -> Result<Vec<ConfigurationKey>, String> {
+    if rows.iter().any(|row| matches!(row,
+        PreparedTransitionSetting::BuildSetting { declaration, .. }
+        if matches!(declaration.definition(), slug_loading_v2::package::BuildSettingDefinition::Label { .. })
+    )) {
+        return Err("label-valued build-setting transitions are unsupported".into());
+    }
     let module = Module::new();
     let context = TransitionEvaluationContext::new(
         transition.definition_source().as_ref().clone(),

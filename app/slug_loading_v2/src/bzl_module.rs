@@ -6129,6 +6129,7 @@ fn loaded_external_target_kind(
         PackageTargetKind::ExportedFile
         | PackageTargetKind::Filegroup { .. }
         | PackageTargetKind::Alias { .. }
+        | PackageTargetKind::LabelFlag(_)
         | PackageTargetKind::ConfigSetting { .. } => None,
         // Native toolchain targets are retained as typed native targets even
         // when the external BUILD uses `load()`. The load gate only protects

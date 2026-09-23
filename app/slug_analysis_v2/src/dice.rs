@@ -512,7 +512,21 @@ impl Key for ConfiguredConditionKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        match compute_configured_condition(ctx, self).await {
+        let guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
+        let future = compute_configured_condition(ctx, self);
+        let result = match guard {
+            Ok(Some(guard)) => match guard.guard_this(future).await {
+                Ok(value) => value,
+                Err(error) => {
+                    analysis_semantic_complete(Err(AnalysisError::message(error.to_string())))
+                }
+            },
+            Ok(None) => future.await,
+            Err(error) => {
+                analysis_semantic_complete(Err(AnalysisError::message(error.to_string())))
+            }
+        };
+        match result {
             LoadingPreparationOutcome::Need(need) => LoadingPreparationOutcome::Need(need),
             LoadingPreparationOutcome::Complete(Err(error)) => {
                 LoadingPreparationOutcome::Complete(Err(error))
@@ -843,57 +857,35 @@ async fn prepare_configured_node_analysis_driver_with_source_admission(
     analysis_semantic_complete(ConfiguredNodeAnalysisKey::new(workspace, node))
 }
 
+macro_rules! semantic_value {
+    ($outcome:expr) => {
+        match $outcome {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error))
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return analysis_semantic_complete(Err(error))
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
+        }
+    };
+}
+
 async fn build_setting_declaration(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
     setting: &CanonicalLabel,
 ) -> AnalysisSemanticOutcome<BuildSettingDeclaration> {
-    let package_inventory = match compute_configured_package_input(
-        ctx,
-        mode,
-        workspace.dupe(),
-        setting.package().clone(),
-        "loading Starlark build-setting declaration through DICE",
-    )
-    .await
-    {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
-        LoadingPreparationOutcome::Complete(Err(error)) => {
-            return LoadingPreparationOutcome::Complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-            return analysis_semantic_complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
-    };
-    let package = match package_inventory.loaded() {
-        Ok(package) => package,
-        Err(error) => return analysis_semantic_complete(Err(package_inventory_error(error))),
-    };
-    let Some(target) = package
-        .targets
-        .iter()
-        .find(|target| target.name == setting.target().as_str())
-    else {
-        return analysis_semantic_complete(Err(AnalysisError::message(format!(
-            "build setting {setting} is missing"
-        ))));
-    };
-    let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
-        return analysis_semantic_complete(Err(AnalysisError::message(format!(
-            "target {setting} is not a Starlark build setting"
-        ))));
-    };
-    match rule.build_setting_declaration() {
-        Ok(Some(declaration)) => analysis_semantic_complete(Ok(declaration)),
-        Ok(None) => analysis_semantic_complete(Err(AnalysisError::message(format!(
-            "target {setting} is not a Starlark build setting"
-        )))),
-        Err(error) => analysis_semantic_complete(Err(AnalysisError::message(format!(
-            "invalid build-setting declaration for {setting}: {error}"
-        )))),
+    let (terminal, declaration) =
+        semantic_value!(label_flag::declaration(ctx, mode, workspace, setting).await);
+    if &terminal != setting {
+        return analysis_semantic_complete(Err(AnalysisError::message(
+            "build-setting aliases in transitions are unsupported",
+        )));
     }
+    analysis_semantic_complete(Ok(declaration))
 }
 
 async fn compute_configured_condition(
@@ -968,46 +960,25 @@ async fn compute_configured_condition(
         ),
     };
 
-    let mut flag_match = true;
+    let flags = label_flag::predicates(
+        ctx,
+        ConfiguredAnalysisMode::Observed,
+        &key.workspace,
+        key.target.configuration(),
+        package,
+        &declaration,
+    )
+    .await;
+    let mut flag_match = false;
     let mut all_need: Option<LoadingPreparationNeeds> = None;
     let mut first_outer = None;
-    for (flag, expected) in declaration.flag_values().value().iter() {
-        match build_setting_declaration(ctx, ConfiguredAnalysisMode::Observed, &key.workspace, flag)
-            .await
-        {
-            LoadingPreparationOutcome::Need(need) => {
-                all_need = Some(match all_need {
-                    Some(current) => current.try_union(&need).unwrap_or_else(|error| {
-                        panic!("configured-condition Needs must agree: {error:?}")
-                    }),
-                    None => need,
-                });
-            }
-            LoadingPreparationOutcome::Complete(Err(error)) => {
-                if first_outer.is_none() {
-                    first_outer = Some(error);
-                }
-            }
-            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-                if first_error.is_none() {
-                    first_error = Some(error);
-                }
-            }
-            LoadingPreparationOutcome::Complete(Ok(Ok(flag_declaration))) => {
-                match matches_expected_text(
-                    flag,
-                    &flag_declaration,
-                    key.target.configuration().starlark_option(flag),
-                    expected,
-                ) {
-                    Ok(matches) => flag_match &= matches,
-                    Err(error) if first_error.is_none() => {
-                        first_error = Some(AnalysisError::message(error));
-                    }
-                    Err(_) => {}
-                }
-            }
+    match flags {
+        LoadingPreparationOutcome::Need(need) => all_need = Some(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => first_outer = Some(error),
+        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+            first_error.get_or_insert(error);
         }
+        LoadingPreparationOutcome::Complete(Ok(Ok(flags))) => flag_match = flags.matches,
     }
     let mut constraint_match = true;
     if !declaration.constraint_values().value().is_empty() {
@@ -1150,22 +1121,8 @@ macro_rules! root_value {
     };
 }
 
-macro_rules! semantic_value {
-    ($outcome:expr) => {
-        match $outcome {
-            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
-            LoadingPreparationOutcome::Complete(Err(error)) => {
-                return LoadingPreparationOutcome::Complete(Err(error))
-            }
-            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-                return analysis_semantic_complete(Err(error))
-            }
-            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
-        }
-    };
-}
-
 mod filegroup;
+mod label_flag;
 
 #[derive(Default)]
 struct AnalysisPrintCapture {
@@ -1398,12 +1355,16 @@ async fn load_configured_condition_declarations(
                 "target {label} is not a config_setting"
             ))));
         };
+        let predicates = semantic_value!(
+            label_flag::predicates(ctx, mode, workspace, configuration, loaded, declaration).await
+        );
         conditions.push(ConfiguredAttributeCondition {
             matches: *truth
                 .get(&label)
                 .expect("every completed condition stores truth"),
             label,
             declaration: declaration.clone(),
+            normalized_flags: predicates.normalized,
         });
     }
 
@@ -2593,6 +2554,7 @@ fn package_declares_source_label(package: &LoadedPackage, label: &CanonicalLabel
     package.targets.iter().any(|target| match &target.kind {
         PackageTargetKind::StarlarkRule(rule) => rule.dependencies().contains(label),
         PackageTargetKind::Filegroup { srcs, .. } => srcs.contains(label),
+        PackageTargetKind::LabelFlag(flag) => flag.default() == label,
         _ => false,
     })
 }
@@ -2889,6 +2851,7 @@ fn require_supported_canonical_configured_target(
             ConfiguredNodeKey::Configured(_),
             Some(slug_loading_v2::PackageTarget {
                 kind: PackageTargetKind::Alias { .. }
+                    | PackageTargetKind::LabelFlag(_)
                     | PackageTargetKind::Filegroup { .. }
                     | PackageTargetKind::ConfigSetting { .. }
                     | PackageTargetKind::NativeToolchain(_),
@@ -5755,6 +5718,13 @@ impl ConfiguredNodeAnalysisKey {
                 Some(PackageTargetKind::Filegroup { .. }),
             ) => {
                 return filegroup::analyze(ctx, mode, &self.workspace, package, configured_target)
+                    .await;
+            }
+            (
+                ConfiguredNodeKey::Configured(configured_target),
+                Some(PackageTargetKind::LabelFlag(_)),
+            ) => {
+                return label_flag::analyze(ctx, mode, &self.workspace, package, configured_target)
                     .await;
             }
             (

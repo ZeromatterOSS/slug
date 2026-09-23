@@ -114,6 +114,7 @@ impl StarlarkOptionScope {
 pub enum StarlarkOptionValue {
     Integer(BigInt),
     Boolean(bool),
+    Label(CanonicalLabel),
     String(CompactString),
     StringList(Arc<[CompactString]>),
     StringSet(Arc<[CompactString]>),
@@ -257,6 +258,15 @@ impl StarlarkOptions {
 }
 
 fn normalize_starlark_option(entry: &mut StarlarkOption) {
+    if let StarlarkOptionValue::Label(label) = &entry.value {
+        // Mapping provenance belongs to observed resolution, not the resolved
+        // Bazel Label value or its configuration identity.
+        entry.value = StarlarkOptionValue::Label(
+            slug_identity_v2::ResolvedOptionLabel::from_canonical(label)
+                .canonical()
+                .expect("visible canonical label"),
+        );
+    }
     if let StarlarkOptionValue::StringSet(values) = &entry.value {
         entry.value = StarlarkOptionValue::string_set(values.iter().cloned());
     }
@@ -1741,6 +1751,9 @@ impl Encoder {
 
     fn starlark_option_value(&mut self, value: &StarlarkOptionValue) {
         match value {
+            StarlarkOptionValue::Label(value) => {
+                self.field(0x0625, |field| field.raw_text(&value.stable_serialize()))
+            }
             StarlarkOptionValue::Integer(value) => {
                 self.field(0x0620, |field| field.bytes(&value.to_signed_bytes_be()))
             }
@@ -2229,6 +2242,7 @@ mod tests {
                 BigInt::parse_bytes(b"1234567890123456789012345678901234567890", 10).unwrap(),
             ),
             StarlarkOptionValue::Boolean(false),
+            StarlarkOptionValue::Label(CanonicalLabel::parse("@@//pkg:target").unwrap()),
             StarlarkOptionValue::string(""),
             StarlarkOptionValue::string_list(std::iter::empty::<&str>()),
             StarlarkOptionValue::string_set(std::iter::empty::<&str>()),
@@ -2298,6 +2312,72 @@ mod tests {
                 .starlark_options()
                 .get(&label)
                 .is_some()
+        );
+    }
+
+    #[test]
+    fn label_options_preserve_typed_identity_and_exec_restoration() {
+        let base = SlugConfiguration::default_target(
+            &host(AutoCpuToken::K8, HostPathFlavor::Unix).with_action_environment_host(
+                ActionEnvironmentHost::without_environment(ActionEnvironmentHostOs::Linux),
+            ),
+        )
+        .unwrap();
+        let flag = CanonicalLabel::parse("@@//settings:flag").unwrap();
+        let value = CanonicalLabel::parse("@@repo+//pkg:tool").unwrap();
+        let make = |value, scope| {
+            base.with_starlark_option(StarlarkOption::new(flag.clone(), value, scope))
+        };
+        let label = make(
+            StarlarkOptionValue::Label(value.clone()),
+            StarlarkOptionScope::Default,
+        );
+        let same_text = make(
+            StarlarkOptionValue::string(value.stable_serialize()),
+            StarlarkOptionScope::Default,
+        );
+        assert_ne!(label, same_text);
+        assert_ne!(label.canonical_bytes(), same_text.canonical_bytes());
+        for other in ["@@repo+//pkg:other", "@@other+//pkg:tool"] {
+            let other = make(
+                StarlarkOptionValue::Label(CanonicalLabel::parse(other).unwrap()),
+                StarlarkOptionScope::Default,
+            );
+            assert_ne!(label, other);
+            assert_ne!(label.canonical_bytes(), other.canonical_bytes());
+        }
+        for scope in [StarlarkOptionScope::Default, StarlarkOptionScope::Universal] {
+            let configured = make(StarlarkOptionValue::Label(value.clone()), scope);
+            for exec in [
+                configured.to_exec().unwrap(),
+                configured
+                    .to_exec_for_platform(&configured.host_platform_label().unwrap())
+                    .unwrap(),
+            ] {
+                assert_eq!(
+                    exec.starlark_options().get(&flag),
+                    configured.starlark_options().get(&flag)
+                );
+            }
+            assert_eq!(configured.without_starlark_option(&flag), base);
+        }
+        let mut mapping = slug_identity_v2::RepositoryMapping::new(
+            slug_identity_v2::RepositoryMappingId::new("label-option-provenance").unwrap(),
+        );
+        mapping.insert(
+            slug_identity_v2::ApparentRepoName::parse("@visible").unwrap(),
+            slug_identity_v2::CanonicalRepoName::parse("@@repo+").unwrap(),
+        );
+        let mapped = slug_identity_v2::ApparentLabel::parse("@visible//pkg:tool")
+            .unwrap()
+            .resolve(&mapping);
+        assert!(mapped.mapping_id().is_some());
+        assert_eq!(
+            make(
+                StarlarkOptionValue::Label(mapped),
+                StarlarkOptionScope::Default
+            ),
+            label
         );
     }
 

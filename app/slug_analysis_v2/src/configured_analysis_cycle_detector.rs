@@ -25,7 +25,7 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
-use crate::ConfiguredNodeKey;
+use crate::dice::ConfiguredConditionKey;
 use crate::dice::ConfiguredNodeAnalysisKey;
 use crate::dice::ConfiguredNodeAnalysisObservationKey;
 
@@ -62,12 +62,14 @@ impl UserCycleDetector for CombinedCycleDetector {
 enum CycleNode {
     Legacy(ConfiguredNodeAnalysisKey),
     Observed(ConfiguredNodeAnalysisKey),
+    Condition(ConfiguredConditionKey),
 }
 
-impl CycleNode {
-    fn configured(&self) -> &ConfiguredNodeKey {
+impl fmt::Display for CycleNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Legacy(key) | Self::Observed(key) => key.node(),
+            Self::Legacy(key) | Self::Observed(key) => write!(f, "{}", key.node()),
+            Self::Condition(key) => write!(f, "condition {}", key.target()),
         }
     }
 }
@@ -78,7 +80,7 @@ pub(crate) struct ConfiguredAnalysisCycle(Arc<[CycleNode]>);
 impl fmt::Display for ConfiguredAnalysisCycle {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("configured alias cycle")?;
-        for node in self.0.iter().map(CycleNode::configured) {
+        for node in self.0.iter() {
             write!(formatter, " -> {node}")?;
         }
         Ok(())
@@ -201,6 +203,11 @@ fn cycle_node(key: &DynKey) -> Option<CycleNode> {
                             .expect("observed configured key retains structural identity"),
                     )
                 })
+        })
+        .or_else(|| {
+            key.downcast_ref::<ConfiguredConditionKey>()
+                .cloned()
+                .map(CycleNode::Condition)
         })
 }
 

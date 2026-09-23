@@ -76,6 +76,9 @@ use starlark::values::typing::StarlarkCallable;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+mod label_flag;
+pub use label_flag::LabelFlagDeclaration;
+
 use crate::apple_common::apple_common_globals;
 use crate::attrs::AllowedAttributeValues;
 use crate::attrs::AttributeDependencyConfiguration;
@@ -382,6 +385,11 @@ static ALIAS_RULE_CAPABILITY: RuleCapability = RuleCapability {
     executable: false,
     test_kind: None,
 };
+static LABEL_FLAG_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("label_flag"),
+    executable: false,
+    test_kind: None,
+};
 static CONFIG_SETTING_RULE_CAPABILITY: RuleCapability = RuleCapability {
     rule_class: CompactString::const_new("config_setting"),
     executable: false,
@@ -548,6 +556,7 @@ pub enum PackageTargetKind {
     Alias {
         actual: CoercedAttributeValue,
     },
+    LabelFlag(LabelFlagDeclaration),
     /// Loading-owned declaration of Bazel's `config_setting`. Configuration
     /// matching is intentionally owned by a later configured-analysis stage.
     ConfigSetting {
@@ -577,12 +586,23 @@ pub enum PackageTargetKind {
 }
 
 impl PackageTargetKind {
+    /// The declaration belongs to the setting itself, not its selected target.
+    /// Tracked alias traversal remains owned by configured analysis.
+    pub fn build_setting_declaration(&self) -> anyhow::Result<Option<BuildSettingDeclaration>> {
+        match self {
+            Self::StarlarkRule(rule) => rule.build_setting_declaration(),
+            Self::LabelFlag(flag) => Ok(Some(flag.declaration().clone())),
+            _ => Ok(None),
+        }
+    }
+
     /// Stage 8's future projection boundary. `alias` remains a fixed native
     /// rule capability and never inherits the actual target's capability.
     fn rule_capability(&self) -> Option<&RuleCapability> {
         match self {
             Self::Filegroup { .. } => Some(&FILEGROUP_RULE_CAPABILITY),
             Self::Alias { .. } => Some(&ALIAS_RULE_CAPABILITY),
+            Self::LabelFlag(_) => Some(&LABEL_FLAG_RULE_CAPABILITY),
             Self::ConfigSetting { .. } => Some(&CONFIG_SETTING_RULE_CAPABILITY),
             Self::NativeToolchain(target) => Some(target.rule_capability()),
             Self::TestSuite { .. } => Some(&TEST_SUITE_RULE_CAPABILITY),
@@ -735,6 +755,7 @@ impl NativeToolchainTarget {
 /// The containing package keeps its source `.bzl` module alive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
 pub enum BuildSettingDefinition {
+    Label { flag: bool },
     Integer { flag: bool },
     String { flag: bool, allow_multiple: bool },
     Boolean { flag: bool },
@@ -744,6 +765,7 @@ pub enum BuildSettingDefinition {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum BuildSettingDefault {
+    Label(CanonicalLabel),
     Integer(i32),
     Boolean(bool),
     String(CompactString),
@@ -868,6 +890,7 @@ impl PartialEq<CanonicalLabel> for ToolchainTypeRequirement {
 impl BuildSettingDefinition {
     fn attribute_kind(self) -> AttributeKind {
         match self {
+            Self::Label { .. } => AttributeKind::Label,
             Self::Integer { .. } => AttributeKind::Integer,
             Self::String { .. } => AttributeKind::String,
             Self::Boolean { .. } => AttributeKind::Boolean,
@@ -2424,6 +2447,7 @@ fn native_rule_class(kind: &PackageTargetKind) -> Option<NativeRuleClass> {
     Some(match kind {
         PackageTargetKind::Filegroup { .. } => NativeRuleClass::Filegroup,
         PackageTargetKind::Alias { .. } => NativeRuleClass::Alias,
+        PackageTargetKind::LabelFlag(_) => NativeRuleClass::LabelFlag,
         PackageTargetKind::ConfigSetting { .. } => NativeRuleClass::ConfigSetting,
         PackageTargetKind::TestSuite { .. } => NativeRuleClass::TestSuite,
         PackageTargetKind::NativeToolchain(native) => match native {
@@ -2609,6 +2633,7 @@ fn native_rule_attributes(
             AttributeProvenance::Explicit,
             actual.clone(),
         ),
+        PackageTargetKind::LabelFlag(flag) => flag.populate_native_attributes(&mut values),
         PackageTargetKind::ConfigSetting {
             declaration: setting,
         } => {
@@ -9293,6 +9318,26 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
+    fn label_flag<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] build_setting_default: Value<'v>,
+        #[starlark(require = named)] help: Option<Value<'v>>,
+        #[starlark(require = named)] scope: Option<Value<'v>>,
+        #[starlark(require = named)] visibility: Option<UnpackVisibility>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        label_flag::declare(
+            name,
+            build_setting_default,
+            help,
+            scope,
+            visibility,
+            kwargs,
+            eval,
+        )
+    }
+
     // Bazel 9.2 `ConfigRuleClasses.ConfigSettingRule` declares `values` as
     // the nonconfigurable string dictionary that records flag bindings.
     // Configuration matching remains owned by the configured-analysis stage.
@@ -9973,6 +10018,27 @@ fn native_methods(builder: &mut MethodsBuilder) {
         alias_global(name, actual, visibility, eval)?;
         PackageRecorder::from_evaluator(eval)?.set_native_overrides(name, kwargs)?;
         Ok(NoneType)
+    }
+
+    fn label_flag<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] build_setting_default: Value<'v>,
+        #[starlark(require = named)] help: Option<Value<'v>>,
+        #[starlark(require = named)] scope: Option<Value<'v>>,
+        #[starlark(require = named)] visibility: Option<UnpackVisibility>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        label_flag::declare(
+            name,
+            build_setting_default,
+            help,
+            scope,
+            visibility,
+            kwargs,
+            eval,
+        )
     }
 
     fn config_setting<'v>(

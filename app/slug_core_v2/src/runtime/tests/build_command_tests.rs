@@ -648,6 +648,30 @@ async fn build_action_closure_traverses_alias_and_generated_nodes_but_excludes_n
 }
 
 #[tokio::test]
+async fn top_level_native_label_flag_enters_configured_analysis() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = BuildCommandRootKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        &[TargetPattern::parse("//:flag").unwrap()],
+        build_test_configuration("target"),
+    )
+    .unwrap();
+    let mut epoch = BuildRootEpoch::base(1);
+    epoch.package("", "filegroup(name = \"actual\")\nlabel_flag(name = \"flag\", build_setting_default = \":actual\")\n", 1);
+    let mut transaction = build_root_transaction(&dice, epoch.build()).await;
+    let outcome = transaction.compute(&key).await.unwrap();
+    let evaluation = complete_build_evaluation(&outcome);
+    assert_eq!(evaluation.analyzed_target_count(), 1);
+    assert_eq!(evaluation.declared_action_count(), 0);
+    assert!(evaluation.targets[0].analysis.is_some());
+    assert!(
+        evaluation
+            .analyses()
+            .any(|result| result.key().label().to_string() == "@@//:actual")
+    );
+}
+
+#[tokio::test]
 async fn build_action_closure_is_roots_first_breadth_first_and_deduplicates_diamonds() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let key = BuildCommandRootKey::new(

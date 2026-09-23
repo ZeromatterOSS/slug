@@ -298,6 +298,8 @@ pub struct QueryNode {
 pub enum QueryEdgeKind {
     GeneratingRule,
     VisibilityNodep,
+    /// A native NONDEP_REFERENCE attribute, distinct from its late-bound edge.
+    Nodep,
     Ordinary,
     Implicit,
     PackageGroupInclude,
@@ -952,6 +954,16 @@ fn package_graph_from_loaded(
                     attributes,
                 )
             }
+            PackageTargetKind::LabelFlag(flag) => {
+                let default = QueryLabel::from_canonical(flag.default().clone());
+                let mut edges = visibility_edges;
+                edges.extend(label_flag_edges(default));
+                (
+                    QueryNodeKind::Rule("label_flag rule".into()),
+                    edges,
+                    Vec::new(),
+                )
+            }
             PackageTargetKind::Alias { actual } => {
                 let mut actual_labels = Vec::new();
                 actual.labels(&mut actual_labels);
@@ -1372,6 +1384,20 @@ fn external_package_graph_from_targets(
                     attributes.into(),
                 )
             }
+            PackageTargetKind::LabelFlag(flag) => {
+                let default = QueryLabel::from_canonical_for_external_owner(
+                    flag.default().clone(),
+                    canonical_repo,
+                    apparent_repo,
+                );
+                let mut edges = visibility_query_edges(&effective_visibility).to_vec();
+                edges.extend(label_flag_edges(default));
+                (
+                    QueryNodeKind::Rule("label_flag rule".into()),
+                    edges.into(),
+                    Arc::from([]),
+                )
+            }
             PackageTargetKind::Alias { actual } => {
                 let actual_value = actual
                     .rebind_provisional_root_labels(canonical_repo)
@@ -1649,8 +1675,13 @@ fn external_package_graph_from_targets(
     // filegroup `srcs` and alias `actual` without observing the source path.
     let referenced_sources = nodes
         .values()
-        .flat_map(|node| node.edges.iter())
-        .filter(|edge| edge.kind == QueryEdgeKind::Ordinary)
+        .flat_map(|node| {
+            node.edges.iter().filter(move |edge| {
+                edge.kind == QueryEdgeKind::Ordinary
+                    || (matches!(&node.kind, QueryNodeKind::Rule(rule) if rule == "label_flag rule")
+                        && edge.kind == QueryEdgeKind::Implicit)
+            })
+        })
         .map(|edge| &edge.target)
         .filter(|label| {
             external_package_deferred_kind(label.canonical.package(), canonical_repo, package)
@@ -2054,6 +2085,23 @@ fn visibility_query_edges(visibility: &RuleVisibility) -> Arc<[QueryEdge]> {
         .into()
 }
 
+fn label_flag_edges(default: QueryLabel) -> [QueryEdge; 2] {
+    // LabelBuildSettings.java58–99 / AggregatingAttributeMapper.java153–165:
+    // loading resolves :alias to its rule-based default. The separately stored
+    // mandatory default is NODEP, not a second ordinary dependency. Retain both
+    // rows, in schema order, even though unfiltered traversal sees one target.
+    [
+        QueryEdge {
+            kind: QueryEdgeKind::Implicit,
+            target: default.clone(),
+        },
+        QueryEdge {
+            kind: QueryEdgeKind::Nodep,
+            target: default,
+        },
+    ]
+}
+
 fn project_visibility_attribute(target: &slug_loading_v2::PackageTarget) -> QueryAttribute {
     let (labels, explicit) = match &target.visibility {
         VisibilitySource::Declared(visibility) => (
@@ -2177,11 +2225,17 @@ fn project_native_attributes(
         .iter()
         .map(|(schema, attribute)| {
             let value = match external_route {
-                Some((canonical_repo, _)) => attribute
-                    .value
-                    .rebind_provisional_root_labels(canonical_repo)
-                    .map_err(QueryError::evaluation)?,
-                None => attribute.value.clone(),
+                Some((canonical_repo, _))
+                    if attributes.class != slug_loading_v2::attrs::NativeRuleClass::LabelFlag =>
+                {
+                    attribute
+                        .value
+                        .rebind_provisional_root_labels(canonical_repo)
+                        .map_err(QueryError::evaluation)?
+                }
+                // Native label_flag defaults are canonical at declaration time,
+                // including an explicit main-repository label in an external rule.
+                _ => attribute.value.clone(),
             };
             let mut labels = Vec::new();
             if schema.query_name() == "visibility" {
