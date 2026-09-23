@@ -247,6 +247,7 @@ pub use module_extension_repository_validation::ObservedHostSelectedExtensionOwn
 #[doc(hidden)]
 pub use module_extension_repository_validation::ObservedHostValidatedGeneratedRepositorySpecs;
 #[doc(hidden)]
+pub use package::AliasActual;
 pub use package::LegacyLoadedPackage;
 pub use package::LoadedPackage;
 pub use package::NativeTargetAttributes;

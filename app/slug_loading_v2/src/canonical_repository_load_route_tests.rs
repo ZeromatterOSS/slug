@@ -1657,7 +1657,7 @@ compatibility=module_extension(implementation=impl)
                 .find(|target| target.name == "host_platform")
             .unwrap()
             .kind,
-            PackageTargetKind::Alias { actual }
+            PackageTargetKind::Alias { actual: crate::AliasActual::Visible(actual) }
                 if actual == &CoercedAttributeValue::Label(
                     CanonicalLabel::parse("@@platforms//host:host").unwrap()
                 )

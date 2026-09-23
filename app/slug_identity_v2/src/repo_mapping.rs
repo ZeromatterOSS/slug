@@ -98,9 +98,30 @@ impl RepositoryMapping {
     }
 }
 
+/// Resolve against the complete caller-owned package mapping without copying
+/// it into a second mapping owner. Duplicate apparent names remain an error.
+pub(crate) fn option_lookup_borrowed(
+    entries: &[(ApparentRepoName, CanonicalRepoName)],
+    apparent: &str,
+) -> Result<OptionMappingLookup, String> {
+    let mut matches = entries.iter().filter(|(name, _)| name.as_str() == apparent);
+    if let Some((_, canonical)) = matches.next() {
+        if matches.next().is_some() {
+            return Err(format!("repository mapping for '@{apparent}' is ambiguous"));
+        }
+        return Ok(OptionMappingLookup::Visible(canonical.clone()));
+    }
+    Ok(OptionMappingLookup::NonVisible {
+        did_you_mean_suffix: spellcheck(apparent, entries.iter().map(|(name, _)| name)),
+    })
+}
+
 // Repository names are ASCII under Bazel's grammar, so ASCII lowercasing is
 // Java-compatible for the source SpellChecker path.
-fn spellcheck(input: &str, candidates: &[ApparentRepoName]) -> String {
+fn spellcheck<'a>(
+    input: &str,
+    candidates: impl IntoIterator<Item = &'a ApparentRepoName>,
+) -> String {
     let input = input.to_ascii_lowercase();
     let mut best_distance = std::cmp::min(5, (input.encode_utf16().count() + 1) / 2);
     let mut best = None;

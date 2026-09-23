@@ -17,6 +17,7 @@ use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::package::AliasActual;
 use slug_loading_v2::package::BuildSettingDeclaration;
 use slug_loading_v2::package::BuildSettingDefault;
 use slug_loading_v2::package::BuildSettingDefinition;
@@ -49,10 +50,15 @@ pub(crate) fn build_setting_lookup_step(
         .ok_or_else(|| format!("build setting {label} is missing"))?;
     if let PackageTargetKind::Alias { actual } = &target.kind {
         return match actual {
-            CoercedAttributeValue::Label(actual) => Ok(BuildSettingLookupStep::Alias(
-                slug_identity_v2::ResolvedOptionLabel::from_canonical(actual)
-                    .canonical()
-                    .expect("visible canonical label"),
+            AliasActual::Visible(CoercedAttributeValue::Label(actual)) => {
+                Ok(BuildSettingLookupStep::Alias(
+                    slug_identity_v2::ResolvedOptionLabel::from_canonical(actual)
+                        .canonical()
+                        .expect("visible canonical label"),
+                ))
+            }
+            AliasActual::NonVisible(actual) => Err(format!(
+                "alias to build setting {label} has a nonvisible actual: {actual}"
             )),
             _ => Err(format!(
                 "configurable alias to build setting {label} is unsupported"

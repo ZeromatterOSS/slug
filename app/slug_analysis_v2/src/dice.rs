@@ -5731,6 +5731,14 @@ impl ConfiguredNodeAnalysisKey {
                 ConfiguredNodeKey::Configured(configured_target),
                 Some(PackageTargetKind::Alias { actual }),
             ) => {
+                let actual = match actual {
+                    slug_loading_v2::package::AliasActual::Visible(actual) => actual,
+                    slug_loading_v2::package::AliasActual::NonVisible(actual) => {
+                        return root_analysis_driver_complete(Err(AnalysisError::message(
+                            format!("native alias actual repository is not visible: {actual}"),
+                        )));
+                    }
+                };
                 let selector_labels = actual
                     .selector_key_labels()
                     .into_iter()

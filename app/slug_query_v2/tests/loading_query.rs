@@ -4452,6 +4452,210 @@ async fn root_query_labels(
 }
 
 #[tokio::test]
+async fn external_unselected_nonvisible_alias_is_deferred_per_selected_query_and_restores() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let deferred_build = concat!(
+        "filegroup(name = \"independent\")\n",
+        "filegroup(name = \"guarded\", visibility = [\"//viewer:__pkg__\"])\n",
+        "filegroup(name = \"cross\", srcs = [\"//sibling:source.txt\"])\n",
+        "alias(name = \"latent\", actual = \"@missing//:toolchain\")\n",
+    );
+    let visible_build = deferred_build.replace("@missing//:toolchain", ":independent");
+
+    let mut first =
+        external_visibility_transaction(&dice, tracker.clone(), 200, "dep", deferred_build).await;
+    assert_eq!(
+        root_query_labels(&mut first, "deps(@dep//:independent, 1)")
+            .await
+            .unwrap(),
+        ["@dep//:independent"]
+    );
+    assert_eq!(
+        root_query_labels(&mut first, "same_pkg_direct_rdeps(@dep//:independent)")
+            .await
+            .unwrap(),
+        [] as [&str; 0]
+    );
+    assert_eq!(
+        root_query_labels(&mut first, "visible(@dep//viewer:caller, @dep//:guarded)",)
+            .await
+            .unwrap(),
+        ["@dep//:guarded"]
+    );
+    let QueryPreparationOutcome::Complete(kind) = first
+        .compute(&root_query_key("@dep//:latent"))
+        .await
+        .unwrap()
+    else {
+        panic!("direct alias lookup requested preparation")
+    };
+    assert_eq!(
+        kind.as_ref().as_ref().unwrap().label_kind_stdout(),
+        "alias rule @dep//:latent\n"
+    );
+    for query in [
+        "deps(@dep//:latent, 1)",
+        "same_pkg_direct_rdeps(@dep//:latent)",
+        "labels(actual, @dep//:latent)",
+        "attr(actual, 'missing', @dep//:latent)",
+    ] {
+        let error = root_query_labels(&mut first, query).await.unwrap_err();
+        assert!(
+            error.contains("unknown repo 'missing' requested from @@dep+"),
+            "{query}: {error}"
+        );
+    }
+    for query in ["deps(@dep//:cross, 1)", "labels(srcs, @dep//:cross)"] {
+        let error = root_query_labels(&mut first, query).await.unwrap_err();
+        assert!(
+            error.contains("cross-package filegroup source traversal is deferred"),
+            "{query}: {error}"
+        );
+    }
+    let original = root_query_labels(&mut first, "deps(@dep//:latent, 1)")
+        .await
+        .unwrap_err();
+
+    let mut visible =
+        external_visibility_transaction(&dice, tracker.clone(), 201, "dep", &visible_build).await;
+    assert_eq!(
+        root_query_labels(&mut visible, "deps(@dep//:latent, 1)")
+            .await
+            .unwrap(),
+        ["@dep//:independent", "@dep//:latent"]
+    );
+
+    let mut restored =
+        external_visibility_transaction(&dice, tracker, 202, "dep", deferred_build).await;
+    assert_eq!(
+        root_query_labels(&mut restored, "deps(@dep//:latent, 1)")
+            .await
+            .unwrap_err(),
+        original
+    );
+}
+
+#[tokio::test]
+async fn root_wildcard_does_not_publish_deferred_alias_as_dependency_free() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut epoch = RootQueryEpochBuilder::base(203);
+    epoch.package(
+        "latent",
+        "filegroup(name = \"independent\")\nalias(name = \"missing\", actual = \"@unmapped//:target\", visibility = [\"//viewer:__pkg__\"])\n",
+        203,
+    );
+    let mut transaction =
+        root_query_transaction(&dice, epoch.build(), Arc::new(RootAnchorTracker::default())).await;
+    assert_eq!(
+        root_query_labels(&mut transaction, "//latent:independent")
+            .await
+            .unwrap(),
+        ["//latent:independent"]
+    );
+    assert_eq!(
+        root_query_labels(&mut transaction, "//latent:missing")
+            .await
+            .unwrap(),
+        ["//latent:missing"]
+    );
+    let QueryPreparationOutcome::Complete(kind) = transaction
+        .compute(&root_query_key("//latent:missing"))
+        .await
+        .unwrap()
+    else {
+        panic!("direct alias lookup requested preparation")
+    };
+    assert_eq!(
+        kind.as_ref().as_ref().unwrap().label_kind_stdout(),
+        "alias rule //latent:missing\n"
+    );
+    for query in [
+        "labels(visibility, //latent:missing)",
+        "attr(name, '^missing$', //latent:missing)",
+        "attr(tags, 'tag', //latent:missing)",
+    ] {
+        let error = root_query_labels(&mut transaction, query)
+            .await
+            .unwrap_err();
+        assert!(
+            error.contains("unknown repo 'unmapped' requested from @@"),
+            "{query}: {error}"
+        );
+    }
+    let error = root_query_labels(&mut transaction, "//latent:all")
+        .await
+        .unwrap_err();
+    assert!(
+        error.contains("unknown repo 'unmapped' requested from @@"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn external_default_rule_toolchain_is_an_implicit_edge_not_an_attribute_or_source() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let defs = "probe = rule(implementation = lambda ctx: [], attrs = {\"dep\": attr.label()}, toolchains = [\":toolchain_type\"])\n";
+    let build = "load(\":defs.bzl\", \"probe\")\npackage(default_visibility = [\"//visibility:public\"])\nfilegroup(name = \"source\")\ntoolchain_type(name = \"toolchain_type\")\nprobe(name = \"subject\", dep = \":source\")\n";
+    let mut present_epoch = RootQueryEpochBuilder::external_visibility_package(210, "dep", build);
+    present_epoch.file("/workspace/dep/defs.bzl", defs, 210);
+    let mut present = root_query_transaction(&dice, present_epoch.build(), tracker.clone()).await;
+    assert_eq!(
+        root_query_labels(&mut present, "deps(@dep//:subject, 1)")
+            .await
+            .unwrap(),
+        ["@dep//:source", "@dep//:subject", "@dep//:toolchain_type"]
+    );
+    assert_eq!(
+        root_query_labels(&mut present, "same_pkg_direct_rdeps(@dep//:toolchain_type)")
+            .await
+            .unwrap(),
+        ["@dep//:subject"]
+    );
+    assert_eq!(
+        root_query_labels(&mut present, "labels(dep, @dep//:subject)")
+            .await
+            .unwrap(),
+        ["@dep//:source"]
+    );
+    assert_eq!(
+        root_query_labels(&mut present, "labels(toolchains, @dep//:subject)")
+            .await
+            .unwrap(),
+        [] as [&str; 0]
+    );
+
+    let missing_build = build.replace("toolchain_type(name = \"toolchain_type\")\n", "");
+    assert!(!missing_build.contains("toolchain_type(name"));
+    let mut missing_epoch =
+        RootQueryEpochBuilder::external_visibility_package(211, "dep", &missing_build);
+    missing_epoch.file("/workspace/dep/defs.bzl", defs, 211);
+    let mut missing = root_query_transaction(&dice, missing_epoch.build(), tracker).await;
+    let direct = root_query_labels(&mut missing, "@dep//:toolchain_type").await;
+    if direct.is_ok() {
+        let QueryPreparationOutcome::Complete(kind) = missing
+            .compute(&root_query_key("@dep//:toolchain_type"))
+            .await
+            .unwrap()
+        else {
+            panic!("direct missing target requested preparation: {direct:?}")
+        };
+        panic!(
+            "missing declaration was still projected: {direct:?}; kind = {:?}",
+            kind.as_ref().as_ref().unwrap().label_kind_stdout()
+        );
+    }
+    // Depth one reports direct edge labels; depth two resolves the missing
+    // toolchain target and must not discover a synthetic source node.
+    let error = root_query_labels(&mut missing, "deps(@dep//:subject, 2)")
+        .await
+        .unwrap_err();
+    assert!(error.contains("toolchain_type"), "{error}");
+    assert!(error.contains("no such target"), "{error}");
+}
+
+#[tokio::test]
 async fn external_owner_dispatches_siblings_rdeps_and_loading_files_without_root_fallback() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(RootAnchorTracker::default());
@@ -4801,7 +5005,7 @@ async fn external_restricted_visibility_rejections_precede_competing_synthesis_f
             "deferred for non-filegroup",
         ),
         (
-            "filegroup(name = \"restricted\", srcs = [\"//other:source\"], visibility = [\"//viewer:__pkg__\"])\n",
+            "filegroup(name = \"restricted\", srcs = [\"//other:source\"], visibility = [\"//viewer:__subpackages__\"])\n",
             "direct package visibility",
         ),
         (

@@ -24,6 +24,7 @@ use slug_events_v2::EventBatch;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
+use slug_loading_v2::AliasActual;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::BzlModuleEvaluator;
@@ -1307,7 +1308,7 @@ native_emit()
     };
     assert!(matches!(
         &target("alias").kind,
-        PackageTargetKind::Alias { actual }
+        PackageTargetKind::Alias { actual: AliasActual::Visible(actual) }
             if actual == &CoercedAttributeValue::Label(
                 CanonicalLabel::parse("@@//pkg:typed").unwrap()
             )
@@ -1409,7 +1410,7 @@ def emit():
         try_load_package_with_extra_bzl(&workspace, &package, &[owner.join("defs.bzl")]).unwrap();
     assert!(matches!(
         &loaded.targets[0].kind,
-        PackageTargetKind::Alias { actual }
+        PackageTargetKind::Alias { actual: AliasActual::Visible(actual) }
             if actual == &CoercedAttributeValue::Label(
                 CanonicalLabel::parse("@@//owner:typed").unwrap()
             )
@@ -1767,7 +1768,7 @@ filegroup(name = "metadata")
             .unwrap()
     };
     assert!(
-        matches!(&target("alias").kind, PackageTargetKind::Alias { actual }
+        matches!(&target("alias").kind, PackageTargetKind::Alias { actual: AliasActual::Visible(actual) }
         if actual == &CoercedAttributeValue::Label(
             CanonicalLabel::parse("@@//pkg:typed").unwrap()
         ))
@@ -2427,9 +2428,9 @@ fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
             PackageTarget {
                 name: "alias_fg".to_owned(),
                 kind: PackageTargetKind::Alias {
-                    actual: CoercedAttributeValue::Label(
+                    actual: AliasActual::Visible(CoercedAttributeValue::Label(
                         CanonicalLabel::parse("@@//pkg:fg").unwrap(),
-                    ),
+                    )),
                 },
                 visibility: VisibilitySource::PackageDefault,
             },
@@ -2492,7 +2493,7 @@ fn native_labels_canonicalize_spelling_preserve_order_and_reject_duplicates() {
     );
     assert!(matches!(
         &equivalent.targets[1].kind,
-        PackageTargetKind::Alias { actual }
+        PackageTargetKind::Alias { actual: AliasActual::Visible(actual) }
             if actual == &CoercedAttributeValue::Label(
                 CanonicalLabel::parse("@@//pkg:group").unwrap()
             )
@@ -5134,12 +5135,15 @@ alias(name = "selected", actual = select({":a": ":left", ":b": ":right", "//cond
     };
     assert!(matches!(
         &target("literal").kind,
-        PackageTargetKind::Alias { actual }
+        PackageTargetKind::Alias { actual: AliasActual::Visible(actual) }
             if actual == &CoercedAttributeValue::Label(
                 CanonicalLabel::parse("@@//pkg:left").unwrap()
             )
     ));
-    let PackageTargetKind::Alias { actual } = &target("selected").kind else {
+    let PackageTargetKind::Alias {
+        actual: AliasActual::Visible(actual),
+    } = &target("selected").kind
+    else {
         panic!("selected target must remain an alias")
     };
     let CoercedAttributeValue::Selector { branches, default } = actual else {

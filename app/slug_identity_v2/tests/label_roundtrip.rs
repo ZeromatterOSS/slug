@@ -811,6 +811,118 @@ fn package_context_label_parser_covers_complete_bazel_spelling_table() {
 }
 
 #[test]
+fn borrowed_package_mapping_retains_nonvisible_alias_identity_and_restores_a_b_a() {
+    let base = PackageIdentifier::new(
+        CanonicalRepoName::new("bazel_tools").unwrap(),
+        PackagePath::parse("tools/cpp").unwrap(),
+    );
+    let candidate = (
+        ApparentRepoName::new("local_config_xcode").unwrap(),
+        CanonicalRepoName::new("local_config_xcode+").unwrap(),
+    );
+    let missing_a = [candidate.clone()];
+    let present = [
+        candidate.clone(),
+        (
+            ApparentRepoName::new("local_config_cc").unwrap(),
+            CanonicalRepoName::new("rules_cc++cc_configure_extension+local_config_cc").unwrap(),
+        ),
+    ];
+    let missing_c = [candidate];
+    let actual = "@local_config_cc//:toolchain";
+    let first = ResolvedOptionLabel::parse_with_package_context(actual, &base, &missing_a).unwrap();
+    let visible = ResolvedOptionLabel::parse_with_package_context(actual, &base, &present).unwrap();
+    let restored =
+        ResolvedOptionLabel::parse_with_package_context(actual, &base, &missing_c).unwrap();
+
+    assert!(first.canonical().is_none());
+    assert_eq!(
+        first.to_string(),
+        "@@[unknown repo 'local_config_cc' requested from @@bazel_tools (did you mean 'local_config_xcode'?)]//:toolchain"
+    );
+    assert_eq!(first, restored);
+    assert_eq!(value_hash(&first), value_hash(&restored));
+    assert_ne!(first, visible);
+    assert_eq!(
+        visible.canonical(),
+        Some(
+            CanonicalLabel::parse("@@rules_cc++cc_configure_extension+local_config_cc//:toolchain")
+                .unwrap()
+        )
+    );
+
+    let other_owner = PackageIdentifier::new(
+        CanonicalRepoName::new("other_owner+").unwrap(),
+        PackagePath::parse("tools/cpp").unwrap(),
+    );
+    let changed_owner =
+        ResolvedOptionLabel::parse_with_package_context(actual, &other_owner, &missing_a).unwrap();
+    let changed_target = ResolvedOptionLabel::parse_with_package_context(
+        "@local_config_cc//:different",
+        &base,
+        &missing_a,
+    )
+    .unwrap();
+    let changed_suggestion =
+        ResolvedOptionLabel::parse_with_package_context(actual, &base, &[]).unwrap();
+    assert_ne!(first, changed_owner);
+    assert_ne!(first, changed_target);
+    assert_ne!(first, changed_suggestion);
+    assert!(
+        changed_suggestion
+            .to_string()
+            .contains("requested from @@bazel_tools")
+    );
+}
+
+#[test]
+fn borrowed_package_mapping_preserves_visible_grammar_and_rejects_ambiguity() {
+    let base = PackageIdentifier::new(
+        CanonicalRepoName::new("owner+").unwrap(),
+        PackagePath::parse("base/pkg").unwrap(),
+    );
+    let mapping = [
+        (
+            ApparentRepoName::new("dep").unwrap(),
+            CanonicalRepoName::new("dep+").unwrap(),
+        ),
+        (
+            ApparentRepoName::root(),
+            CanonicalRepoName::new("explicit+").unwrap(),
+        ),
+    ];
+    for (spelling, canonical) in [
+        (":local", "@@owner+//base/pkg:local"),
+        ("file", "@@owner+//base/pkg:file"),
+        ("//elsewhere:t", "@@owner+//elsewhere:t"),
+        ("@dep//pkg:t", "@@dep+//pkg:t"),
+        ("@//pkg:t", "@@explicit+//pkg:t"),
+        ("@@direct+//pkg:t", "@@direct+//pkg:t"),
+        ("//conditions:default", "@@//conditions:default"),
+    ] {
+        assert_eq!(
+            ResolvedOptionLabel::parse_with_package_context(spelling, &base, &mapping)
+                .unwrap()
+                .canonical(),
+            Some(CanonicalLabel::parse(canonical).unwrap()),
+            "{spelling}"
+        );
+    }
+    for spelling in ["pkg:t", "/bad:t", "@bad!//pkg:t"] {
+        assert!(
+            ResolvedOptionLabel::parse_with_package_context(spelling, &base, &mapping).is_err(),
+            "{spelling}"
+        );
+    }
+    let duplicate = [mapping[0].clone(), mapping[0].clone()];
+    assert_eq!(
+        ResolvedOptionLabel::parse_with_package_context("@dep//pkg:t", &base, &duplicate)
+            .unwrap_err(),
+        "repository mapping for '@dep' is ambiguous"
+    );
+}
+
+#[test]
 fn option_label_private_bazel_validators_cover_option_only_spellings() {
     let mapping = RepositoryMapping::new(RepositoryMappingId::new("validator").unwrap());
     let base = PackageIdentifier::new(

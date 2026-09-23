@@ -21,6 +21,7 @@ use crate::repo::CanonicalRepoName;
 use crate::repo_mapping::OptionMappingLookup;
 use crate::repo_mapping::RepositoryMapping;
 use crate::repo_mapping::RepositoryMappingId;
+use crate::repo_mapping::option_lookup_borrowed;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
 enum OptionRepository {
@@ -147,6 +148,36 @@ impl ResolvedOptionLabel {
         })
     }
 
+    /// Parse a package-context label against a complete, caller-owned mapping.
+    /// A missing apparent repository remains a typed nonvisible label; callers
+    /// must not project it to a canonical label until visibility is required.
+    pub fn parse_with_package_context(
+        value: &str,
+        base_package: &PackageIdentifier,
+        mapping: &[(ApparentRepoName, CanonicalRepoName)],
+    ) -> Result<Self, String> {
+        let (spelling, package, target, relative) = parse_label_spelling(value)?;
+        let repository = match spelling {
+            LabelRepoSpelling::None => {
+                if !relative && matches!(package.as_str(), "conditions" | "visibility") {
+                    OptionRepository::Visible(CanonicalRepoName::root())
+                } else {
+                    OptionRepository::Visible(base_package.repo().clone())
+                }
+            }
+            spelling => spelling.resolve_borrowed(mapping, base_package.repo())?,
+        };
+        Ok(Self {
+            repository,
+            package: if relative {
+                base_package.package().clone()
+            } else {
+                package
+            },
+            target,
+        })
+    }
+
     pub fn unambiguous_form(&self) -> String {
         match &self.repository {
             OptionRepository::Visible(repository) if repository.is_root() => {
@@ -232,6 +263,27 @@ impl LabelRepoSpelling<'_> {
                     owner: owner.clone(),
                     did_you_mean_suffix,
                 },
+            },
+        }
+    }
+
+    fn resolve_borrowed(
+        self,
+        mapping: &[(ApparentRepoName, CanonicalRepoName)],
+        owner: &CanonicalRepoName,
+    ) -> Result<OptionRepository, String> {
+        match self {
+            Self::None => Ok(OptionRepository::Visible(CanonicalRepoName::root())),
+            Self::Canonical(canonical) => Ok(OptionRepository::Visible(canonical)),
+            Self::Apparent(requested) => match option_lookup_borrowed(mapping, requested)? {
+                OptionMappingLookup::Visible(canonical) => Ok(OptionRepository::Visible(canonical)),
+                OptionMappingLookup::NonVisible {
+                    did_you_mean_suffix,
+                } => Ok(OptionRepository::NonVisible {
+                    requested: requested.to_owned(),
+                    owner: owner.clone(),
+                    did_you_mean_suffix,
+                }),
             },
         }
     }

@@ -32,6 +32,8 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
+use slug_identity_v2::ResolvedOptionLabel;
+use slug_loading_v2::AliasActual;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::AttributeQueryValue;
@@ -270,11 +272,36 @@ pub enum QueryNodeKind {
     GeneratedFile,
     PackageGroup,
     Rule(CompactString),
+    /// An alias rule whose `actual` cannot be traversed by this graph. The
+    /// typed payload prevents edge consumers from treating an empty edge list
+    /// as a dependency-free alias.
+    DeferredAlias(QueryDeferredAliasActual),
 }
 
 impl QueryNodeKind {
     pub fn is_rule(&self) -> bool {
-        matches!(self, Self::Rule(_))
+        matches!(self, Self::Rule(_) | Self::DeferredAlias(_))
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub enum QueryDeferredAliasActual {
+    NonVisible(Arc<ResolvedOptionLabel>),
+    VisibleExternal(CanonicalLabel),
+}
+
+impl QueryDeferredAliasActual {
+    pub(crate) fn error(&self, alias: &QueryLabel) -> QueryError {
+        match self {
+            Self::NonVisible(actual) => QueryError::evaluation(format!(
+                "in 'actual' of alias {}: repository in {} is not visible",
+                alias, actual
+            )),
+            Self::VisibleExternal(actual) => QueryError::unsupported_feature(format!(
+                "external repository alias actual traversal is deferred: {} -> {}",
+                alias, actual
+            )),
+        }
     }
 }
 
@@ -302,6 +329,8 @@ pub enum QueryEdgeKind {
     Nodep,
     Ordinary,
     Implicit,
+    /// Default rule-class toolchain requirement, distinct from attributes.
+    RuleToolchain,
     PackageGroupInclude,
 }
 
@@ -964,50 +993,59 @@ fn package_graph_from_loaded(
                     Vec::new(),
                 )
             }
-            PackageTargetKind::Alias { actual } => {
-                let mut actual_labels = Vec::new();
-                actual.labels(&mut actual_labels);
-                let actual_labels = actual_labels
-                    .into_iter()
-                    .map(QueryLabel::from_canonical)
-                    .collect::<Vec<_>>();
-                let condition_labels = actual
-                    .selector_key_labels()
-                    .into_iter()
-                    .map(QueryLabel::from_canonical)
-                    .collect::<Vec<_>>();
-                let mut edges = visibility_edges;
-                edges.extend(actual_labels.iter().cloned().map(|target| QueryEdge {
-                    kind: QueryEdgeKind::Ordinary,
-                    target,
-                }));
-                edges.extend(condition_labels.iter().cloned().map(|target| QueryEdge {
-                    kind: QueryEdgeKind::Implicit,
-                    target,
-                }));
-                (
-                    QueryNodeKind::Rule(CompactString::new("alias rule")),
-                    edges,
-                    vec![
-                        QueryAttribute {
-                            name: CompactString::new("actual"),
-                            labels: actual_labels.into(),
-                            explicit: true,
-                            value: Some(AttributeQueryValue {
-                                kind: AttributeKind::Label,
-                                provenance: AttributeProvenance::Explicit,
-                                value: actual.clone(),
-                            }),
-                        },
-                        QueryAttribute {
-                            name: CompactString::new("$config_dependencies"),
-                            labels: condition_labels.into(),
-                            explicit: false,
-                            value: None,
-                        },
-                    ],
-                )
-            }
+            PackageTargetKind::Alias { actual } => match actual {
+                AliasActual::NonVisible(actual) => (
+                    QueryNodeKind::DeferredAlias(QueryDeferredAliasActual::NonVisible(
+                        actual.clone(),
+                    )),
+                    visibility_edges,
+                    Vec::new(),
+                ),
+                AliasActual::Visible(actual) => {
+                    let mut actual_labels = Vec::new();
+                    actual.labels(&mut actual_labels);
+                    let actual_labels = actual_labels
+                        .into_iter()
+                        .map(QueryLabel::from_canonical)
+                        .collect::<Vec<_>>();
+                    let condition_labels = actual
+                        .selector_key_labels()
+                        .into_iter()
+                        .map(QueryLabel::from_canonical)
+                        .collect::<Vec<_>>();
+                    let mut edges = visibility_edges;
+                    edges.extend(actual_labels.iter().cloned().map(|target| QueryEdge {
+                        kind: QueryEdgeKind::Ordinary,
+                        target,
+                    }));
+                    edges.extend(condition_labels.iter().cloned().map(|target| QueryEdge {
+                        kind: QueryEdgeKind::Implicit,
+                        target,
+                    }));
+                    (
+                        QueryNodeKind::Rule(CompactString::new("alias rule")),
+                        edges,
+                        vec![
+                            QueryAttribute {
+                                name: CompactString::new("actual"),
+                                labels: actual_labels.into(),
+                                explicit: true,
+                                value: Some(AttributeQueryValue {
+                                    kind: AttributeKind::Label,
+                                    provenance: AttributeProvenance::Explicit,
+                                    value: actual.clone(),
+                                }),
+                            },
+                            QueryAttribute {
+                                name: CompactString::new("$config_dependencies"),
+                                labels: condition_labels.into(),
+                                explicit: false,
+                                value: None,
+                            },
+                        ],
+                    )
+                }
+            },
             PackageTargetKind::ConfigSetting { declaration } => {
                 let mut seen = SmallSet::new();
                 let ordinary = declaration
@@ -1099,6 +1137,13 @@ fn package_graph_from_loaded(
                 edges.extend(starlark_nodep_edges(&attributes));
                 let hidden = project_literal_hidden_attributes(implementation, None)?;
                 edges.extend(hidden_dependency_edges(&hidden));
+                edges.extend(
+                    implementation
+                        .required_toolchains()
+                        .iter()
+                        .map(|requirement| root_rule_toolchain_edge(requirement.label()))
+                        .collect::<Result<Vec<_>, _>>()?,
+                );
                 attributes.extend(hidden);
                 (
                     QueryNodeKind::Rule(CompactString::new("rule")),
@@ -1129,7 +1174,9 @@ fn package_graph_from_loaded(
                 Vec::new(),
             ),
         };
-        if let Some(native_attributes) = native_attributes {
+        if matches!(kind, QueryNodeKind::DeferredAlias(_)) {
+            attributes.push(project_visibility_attribute(target));
+        } else if let Some(native_attributes) = native_attributes {
             attributes =
                 project_native_attributes(native_attributes, target.raw_visibility_labels(), None)?
                     .to_vec();
@@ -1318,12 +1365,7 @@ fn external_package_graph_from_targets(
                 let labels = srcs
                     .iter()
                     .map(|source| {
-                        external_filegroup_source_label(
-                            canonical_repo,
-                            apparent_repo,
-                            package,
-                            source,
-                        )
+                        external_filegroup_source_label(canonical_repo, apparent_repo, source)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 let mut seen = SmallSet::new();
@@ -1394,66 +1436,93 @@ fn external_package_graph_from_targets(
                     Arc::from([]),
                 )
             }
-            PackageTargetKind::Alias { actual } => {
-                let actual_value = actual
-                    .rebind_provisional_root_labels(canonical_repo)
-                    .map_err(QueryError::evaluation)?;
-                let mut actual_labels = Vec::new();
-                actual_value.labels(&mut actual_labels);
-                let actual_labels = actual_labels
-                    .iter()
-                    .map(|actual| {
-                        external_alias_actual_label(canonical_repo, apparent_repo, package, actual)
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                let condition_labels = actual_value
-                    .selector_key_labels()
-                    .iter()
-                    .map(|condition| {
-                        external_alias_actual_label(
-                            canonical_repo,
-                            apparent_repo,
-                            package,
-                            condition,
+            PackageTargetKind::Alias { actual } => match actual {
+                AliasActual::NonVisible(actual) => (
+                    QueryNodeKind::DeferredAlias(QueryDeferredAliasActual::NonVisible(
+                        actual.clone(),
+                    )),
+                    Arc::from([]),
+                    Arc::from([]),
+                ),
+                AliasActual::Visible(actual) => {
+                    let actual_value = actual
+                        .rebind_provisional_root_labels(canonical_repo)
+                        .map_err(QueryError::evaluation)?;
+                    let mut actual_labels = Vec::new();
+                    actual_value.labels(&mut actual_labels);
+                    let selector_keys = actual_value.selector_key_labels();
+                    if actual_labels.len() == 1
+                        && selector_keys.is_empty()
+                        && actual_labels[0].package().repo() != canonical_repo
+                    {
+                        (
+                            QueryNodeKind::DeferredAlias(
+                                QueryDeferredAliasActual::VisibleExternal(actual_labels[0].clone()),
+                            ),
+                            Arc::from([]),
+                            Arc::from([]),
                         )
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                (
-                    QueryNodeKind::Rule(CompactString::new("alias rule")),
-                    actual_labels
-                        .iter()
-                        .cloned()
-                        .map(|target| QueryEdge {
-                            kind: QueryEdgeKind::Ordinary,
-                            target,
-                        })
-                        .chain(condition_labels.iter().cloned().map(|target| QueryEdge {
-                            kind: QueryEdgeKind::Implicit,
-                            target,
-                        }))
-                        .collect::<Vec<_>>()
-                        .into(),
-                    vec![
-                        QueryAttribute {
-                            name: CompactString::new("actual"),
-                            labels: actual_labels.into(),
-                            explicit: true,
-                            value: Some(AttributeQueryValue {
-                                kind: AttributeKind::Label,
-                                provenance: AttributeProvenance::Explicit,
-                                value: actual_value,
-                            }),
-                        },
-                        QueryAttribute {
-                            name: CompactString::new("$config_dependencies"),
-                            labels: condition_labels.into(),
-                            explicit: false,
-                            value: None,
-                        },
-                    ]
-                    .into(),
-                )
-            }
+                    } else {
+                        let actual_labels = actual_labels
+                            .iter()
+                            .map(|actual| {
+                                external_alias_actual_label(
+                                    canonical_repo,
+                                    apparent_repo,
+                                    package,
+                                    actual,
+                                )
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        let condition_labels = selector_keys
+                            .iter()
+                            .map(|condition| {
+                                external_alias_actual_label(
+                                    canonical_repo,
+                                    apparent_repo,
+                                    package,
+                                    condition,
+                                )
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        (
+                            QueryNodeKind::Rule(CompactString::new("alias rule")),
+                            actual_labels
+                                .iter()
+                                .cloned()
+                                .map(|target| QueryEdge {
+                                    kind: QueryEdgeKind::Ordinary,
+                                    target,
+                                })
+                                .chain(condition_labels.iter().cloned().map(|target| QueryEdge {
+                                    kind: QueryEdgeKind::Implicit,
+                                    target,
+                                }))
+                                .collect::<Vec<_>>()
+                                .into(),
+                            vec![
+                                QueryAttribute {
+                                    name: CompactString::new("actual"),
+                                    labels: actual_labels.into(),
+                                    explicit: true,
+                                    value: Some(AttributeQueryValue {
+                                        kind: AttributeKind::Label,
+                                        provenance: AttributeProvenance::Explicit,
+                                        value: actual_value,
+                                    }),
+                                },
+                                QueryAttribute {
+                                    name: CompactString::new("$config_dependencies"),
+                                    labels: condition_labels.into(),
+                                    explicit: false,
+                                    value: None,
+                                },
+                            ]
+                            .into(),
+                        )
+                    }
+                }
+            },
             PackageTargetKind::ConfigSetting { declaration } => {
                 let mut seen = SmallSet::new();
                 let edges = declaration
@@ -1604,6 +1673,19 @@ fn external_package_graph_from_targets(
                 }));
                 edges.extend(starlark_nodep_edges(&attributes));
                 edges.extend(hidden_dependency_edges(&hidden));
+                edges.extend(
+                    implementation
+                        .required_toolchains()
+                        .iter()
+                        .map(|requirement| {
+                            external_rule_toolchain_edge(
+                                requirement.label(),
+                                canonical_repo,
+                                apparent_repo,
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
+                );
                 attributes.extend(hidden);
                 (
                     QueryNodeKind::Rule(CompactString::new("rule")),
@@ -1618,7 +1700,9 @@ fn external_package_graph_from_targets(
                 )));
             }
         };
-        let attributes = if let Some(native) = native_attributes {
+        let attributes = if matches!(kind, QueryNodeKind::DeferredAlias(_)) {
+            attributes
+        } else if let Some(native) = native_attributes {
             let raw_visibility = match &visibility_source {
                 VisibilitySource::Declared(visibility) => visibility.raw_declared_labels(),
                 _ => &[],
@@ -1922,9 +2006,21 @@ fn validate_external_restricted_visibility(
                 target.name
             )));
         }
-        if visibility.package_groups().is_empty()
-            || visibility.declared_labels().len() != visibility.package_groups().len()
-        {
+        if visibility.package_groups().is_empty() {
+            // The authentic tools/cpp BUILD uses `//tools:__pkg__` on one
+            // filegroup. This is a direct package predicate, not a graph edge.
+            // Keep other restricted forms behind the existing validator.
+            let direct_package_only = matches!(visibility.declared_labels(), [label]
+                if label.package().repo() == canonical_repo && label.target().as_str() == "__pkg__");
+            if direct_package_only {
+                continue;
+            }
+            return Err(QueryError::evaluation(format!(
+                "external repository direct package visibility is deferred: {}",
+                target.name
+            )));
+        }
+        if visibility.declared_labels().len() != visibility.package_groups().len() {
             return Err(QueryError::evaluation(format!(
                 "external repository direct package visibility is deferred: {}",
                 target.name
@@ -2050,22 +2146,17 @@ fn external_test_suite_member_label(
 fn external_filegroup_source_label(
     canonical_repo: &CanonicalRepoName,
     apparent_repo: &ApparentRepoName,
-    package: &PackagePath,
     source: &CanonicalLabel,
 ) -> Result<QueryLabel, QueryError> {
-    let source_package = source.package();
-    if external_package_deferred_kind(source_package, canonical_repo, package).is_none() {
-        return QueryLabel::in_external_package(
+    if source.package().repo() == canonical_repo {
+        return Ok(QueryLabel::from_canonical_for_external_owner(
+            source.clone(),
             canonical_repo,
             apparent_repo,
-            package,
-            source.target().as_str(),
-        );
+        ));
     }
-    let deferred = external_package_deferred_kind(source_package, canonical_repo, package)
-        .expect("nonmatching external filegroup source has a deferred class");
     Err(QueryError::evaluation(format!(
-        "external repository filegroup {deferred} srcs are deferred: {source}"
+        "external repository filegroup named-repository srcs are deferred: {source}"
     )))
 }
 
@@ -2287,6 +2378,34 @@ fn external_starlark_label(
     ))
 }
 
+fn root_rule_toolchain_edge(label: &CanonicalLabel) -> Result<QueryEdge, QueryError> {
+    if !label.package().repo().is_root() {
+        return Err(QueryError::unsupported_feature(format!(
+            "root rule-class toolchain foreign repository route is deferred: {label}"
+        )));
+    }
+    Ok(QueryEdge {
+        kind: QueryEdgeKind::RuleToolchain,
+        target: QueryLabel::from_canonical(label.clone()),
+    })
+}
+
+fn external_rule_toolchain_edge(
+    label: &CanonicalLabel,
+    canonical_repo: &CanonicalRepoName,
+    apparent_repo: &ApparentRepoName,
+) -> Result<QueryEdge, QueryError> {
+    if label.package().repo() != canonical_repo {
+        return Err(QueryError::unsupported_feature(format!(
+            "external rule-class toolchain foreign repository route is deferred: {label}"
+        )));
+    }
+    Ok(QueryEdge {
+        kind: QueryEdgeKind::RuleToolchain,
+        target: external_starlark_label(label.clone(), canonical_repo, apparent_repo)?,
+    })
+}
+
 fn project_native_attributes(
     attributes: &slug_loading_v2::NativeRuleAttributes,
     raw_visibility: &[CanonicalLabel],
@@ -2447,7 +2566,10 @@ mod graph_tests {
     use slug_identity_v2::ApparentRepoName;
     use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
+    use slug_identity_v2::PackageIdentifier;
     use slug_identity_v2::PackagePath;
+    use slug_identity_v2::ResolvedOptionLabel;
+    use slug_loading_v2::AliasActual;
     use slug_loading_v2::AttributeKind;
     use slug_loading_v2::AttributeProvenance;
     use slug_loading_v2::AttributeQueryValue;
@@ -2471,6 +2593,7 @@ mod graph_tests {
     use slug_workspace_v2::WorkspaceSnapshot;
     use slug_workspace_v2::WorkspaceSnapshotKey;
 
+    use super::QueryDeferredAliasActual;
     use super::QueryEdgeKind;
     use super::QueryError;
     use super::QueryLabel;
@@ -2665,7 +2788,7 @@ probe = subrule(
         "_late": attr.label(default = configuration_field(fragment = "cpp", name = "fdo_profile")),
     },
 )
-subject = rule(implementation = lambda ctx: [], subrules = [probe])
+subject = rule(implementation = lambda ctx: [], subrules = [probe], toolchains = [":missing_toolchain"])
 "#;
         fs::write(&module, module_source).unwrap();
         fs::write(&build, build_source).unwrap();
@@ -2764,6 +2887,20 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
             .nodes
             .get(&QueryLabel::parse_root("//:subject").unwrap())
             .unwrap();
+        assert_eq!(
+            subject
+                .edges
+                .last()
+                .map(|edge| (edge.kind, edge.target.output_label())),
+            Some((QueryEdgeKind::RuleToolchain, "//:missing_toolchain".into()))
+        );
+        assert!(
+            graph
+                .nodes
+                .get(&QueryLabel::parse_root("//:missing_toolchain").unwrap())
+                .is_none(),
+            "rule-class toolchain requirement must not synthesize a source node"
+        );
         let implicit = subject
             .edges
             .iter()
@@ -2809,11 +2946,45 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
     }
 
     #[test]
+    fn rule_class_toolchain_route_helpers_preserve_owner_and_reject_foreign_repos() {
+        let root = CanonicalLabel::parse("@@//pkg:toolchain_type").unwrap();
+        let root_edge = super::root_rule_toolchain_edge(&root).unwrap();
+        assert_eq!(root_edge.kind, QueryEdgeKind::RuleToolchain);
+        assert_eq!(root_edge.target.output_label(), "//pkg:toolchain_type");
+
+        let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
+        let apparent_repo = ApparentRepoName::new("dep").unwrap();
+        let same_owner = CanonicalLabel::parse("@@dep+//pkg:toolchain_type").unwrap();
+        let external =
+            super::external_rule_toolchain_edge(&same_owner, &canonical_repo, &apparent_repo)
+                .unwrap();
+        assert_eq!(external.kind, QueryEdgeKind::RuleToolchain);
+        assert_eq!(external.target.output_label(), "@dep//pkg:toolchain_type");
+
+        let foreign = CanonicalLabel::parse("@@foreign+//pkg:toolchain_type").unwrap();
+        for error in [
+            super::root_rule_toolchain_edge(&foreign).unwrap_err(),
+            super::external_rule_toolchain_edge(&foreign, &canonical_repo, &apparent_repo)
+                .unwrap_err(),
+            super::external_rule_toolchain_edge(&root, &canonical_repo, &apparent_repo)
+                .unwrap_err(),
+        ] {
+            assert_eq!(error.error_kind(), "unsupported_feature");
+            assert!(
+                error
+                    .to_string()
+                    .contains("foreign repository route is deferred")
+            );
+        }
+    }
+
+    #[test]
     fn external_filegroup_projection_retains_srcs_and_synthesizes_sources() {
         let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
         let apparent_repo = ApparentRepoName::new("dep").unwrap();
         let package = PackagePath::parse("").unwrap();
         let source = |target| CanonicalLabel::parse(&format!("@@dep+//:{target}")).unwrap();
+        let cross_package = CanonicalLabel::parse("@@dep+//other:cross.txt").unwrap();
         let targets = vec![
             PackageTarget {
                 name: "existing.txt".to_owned(),
@@ -2827,6 +2998,7 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
                         source("z.txt"),
                         source("existing.txt"),
                         source("absent.txt"),
+                        cross_package.clone(),
                     ]),
                     srcs_explicit: true,
                 },
@@ -2843,7 +3015,7 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
             PackageTarget {
                 name: "files_alias".to_owned(),
                 kind: PackageTargetKind::Alias {
-                    actual: CoercedAttributeValue::Label(source("files")),
+                    actual: AliasActual::Visible(CoercedAttributeValue::Label(source("files"))),
                 },
                 visibility: VisibilitySource::PackageDefault,
             },
@@ -2874,7 +3046,12 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
                 .iter()
                 .map(QueryLabel::output_label)
                 .collect::<Vec<_>>(),
-            ["@dep//:z.txt", "@dep//:existing.txt", "@dep//:absent.txt"]
+            [
+                "@dep//:z.txt",
+                "@dep//:existing.txt",
+                "@dep//:absent.txt",
+                "@dep//other:cross.txt",
+            ]
         );
         assert_eq!(
             files
@@ -2886,8 +3063,15 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
                 (QueryEdgeKind::Ordinary, "@dep//:z.txt".into()),
                 (QueryEdgeKind::Ordinary, "@dep//:existing.txt".into()),
                 (QueryEdgeKind::Ordinary, "@dep//:absent.txt".into()),
+                (QueryEdgeKind::Ordinary, "@dep//other:cross.txt".into()),
             ]
         );
+        let cross_label = QueryLabel::from_canonical_for_external_owner(
+            cross_package,
+            &canonical_repo,
+            &apparent_repo,
+        );
+        assert!(graph.nodes.get(&cross_label).is_none());
         assert!(
             files
                 .attributes
@@ -2953,6 +3137,87 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
         assert_eq!(absent.visibility_source, VisibilitySource::PackageDefault);
         assert!(absent.edges.is_empty());
         assert!(absent.attributes.is_empty());
+    }
+
+    #[test]
+    fn external_deferred_aliases_keep_typed_actuals_without_fabricated_edges() {
+        let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
+        let apparent_repo = ApparentRepoName::new("dep").unwrap();
+        let package = PackagePath::parse("").unwrap();
+        let owner = PackageIdentifier::new(canonical_repo.clone(), package.clone());
+        let missing =
+            ResolvedOptionLabel::parse_with_package_context("@missing//:toolchain", &owner, &[])
+                .unwrap();
+        assert!(missing.canonical().is_none());
+        let foreign = CanonicalLabel::parse("@@foreign+//:real").unwrap();
+        let targets = [
+            PackageTarget {
+                name: "independent".to_owned(),
+                kind: PackageTargetKind::Filegroup {
+                    srcs: Arc::from([]),
+                    srcs_explicit: false,
+                },
+                visibility: VisibilitySource::PackageDefault,
+            },
+            PackageTarget {
+                name: "latent".to_owned(),
+                kind: PackageTargetKind::Alias {
+                    actual: AliasActual::NonVisible(Arc::new(missing.clone())),
+                },
+                visibility: VisibilitySource::PackageDefault,
+            },
+            PackageTarget {
+                name: "foreign".to_owned(),
+                kind: PackageTargetKind::Alias {
+                    actual: AliasActual::Visible(CoercedAttributeValue::Label(foreign.clone())),
+                },
+                visibility: VisibilitySource::PackageDefault,
+            },
+        ];
+        let graph = external_package_graph_from_targets(
+            &canonical_repo,
+            &apparent_repo,
+            &package,
+            Path::new("/external/dep+/BUILD.bazel"),
+            &RuleVisibility::Private,
+            &targets,
+            None,
+        )
+        .unwrap();
+        let label = |name| {
+            QueryLabel::in_external_package(&canonical_repo, &apparent_repo, &package, name)
+                .unwrap()
+        };
+        let independent = graph.nodes.get(&label("independent")).unwrap();
+        assert_eq!(
+            independent.kind,
+            QueryNodeKind::Rule("filegroup rule".into())
+        );
+
+        let latent = graph.nodes.get(&label("latent")).unwrap();
+        assert_eq!(
+            latent.kind,
+            QueryNodeKind::DeferredAlias(QueryDeferredAliasActual::NonVisible(Arc::new(missing)))
+        );
+        assert!(latent.kind.is_rule());
+        assert!(latent.edges.is_empty());
+        assert!(latent.attributes.is_empty());
+        assert_eq!(latent.rule_capability.as_ref().unwrap().rule_class, "alias");
+        assert!(
+            match &latent.kind {
+                QueryNodeKind::DeferredAlias(actual) => actual.error(&latent.label).to_string(),
+                _ => unreachable!(),
+            }
+            .contains("unknown repo 'missing' requested from @@dep+")
+        );
+
+        let foreign_alias = graph.nodes.get(&label("foreign")).unwrap();
+        assert_eq!(
+            foreign_alias.kind,
+            QueryNodeKind::DeferredAlias(QueryDeferredAliasActual::VisibleExternal(foreign))
+        );
+        assert!(foreign_alias.edges.is_empty());
+        assert!(foreign_alias.attributes.is_empty());
     }
 
     #[test]
@@ -3327,7 +3592,9 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
         let alias = project(
             source("@@dep+//:member"),
             PackageTargetKind::Alias {
-                actual: CoercedAttributeValue::Label(source("@@dep+//:source.txt")),
+                actual: AliasActual::Visible(CoercedAttributeValue::Label(source(
+                    "@@dep+//:source.txt",
+                ))),
             },
         )
         .unwrap_err();
@@ -3573,14 +3840,16 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
             PackageTarget {
                 name: "first".to_owned(),
                 kind: PackageTargetKind::Alias {
-                    actual: CoercedAttributeValue::Label(source("second")),
+                    actual: AliasActual::Visible(CoercedAttributeValue::Label(source("second"))),
                 },
                 visibility: VisibilitySource::PackageDefault,
             },
             PackageTarget {
                 name: "second".to_owned(),
                 kind: PackageTargetKind::Alias {
-                    actual: CoercedAttributeValue::Label(source("source.txt")),
+                    actual: AliasActual::Visible(CoercedAttributeValue::Label(source(
+                        "source.txt",
+                    ))),
                 },
                 visibility: VisibilitySource::PackageDefault,
             },
@@ -3596,7 +3865,7 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
         let build_destination = project(vec![PackageTarget {
             name: "to_build".to_owned(),
             kind: PackageTargetKind::Alias {
-                actual: CoercedAttributeValue::Label(source("BUILD.bazel")),
+                actual: AliasActual::Visible(CoercedAttributeValue::Label(source("BUILD.bazel"))),
             },
             visibility: VisibilitySource::PackageDefault,
         }])
@@ -3626,13 +3895,13 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe])
         targets.push(PackageTarget {
             name: "selected".to_owned(),
             kind: PackageTargetKind::Alias {
-                actual: CoercedAttributeValue::Selector {
+                actual: AliasActual::Visible(CoercedAttributeValue::Selector {
                     branches: Arc::from([(
                         provisional("condition"),
                         Arc::new(CoercedAttributeValue::Label(provisional("left"))),
                     )]),
                     default: Some(Arc::new(CoercedAttributeValue::Label(provisional("right")))),
-                },
+                }),
             },
             visibility: VisibilitySource::AlwaysPublic,
         });

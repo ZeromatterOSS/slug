@@ -29,8 +29,21 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-83-m7a-builtin-canonical-load-route-r1
-Status: accepted (independent design and final ACCEPT)
+Packet: WP-7-84-m7a-nonvisible-alias-query-r2
+Status: accepted (independent r2 design and final ACCEPT; r1 REPLAN retained)
+
+WP784 targets the next authentic M7A Loading/Query frontier: Bazel 9.2 loads
+`@bazel_tools//tools/cpp:empty_lib` despite the package's `:toolchain` alias
+to nonvisible `@local_config_cc`, and errors only when traversing that alias.
+At WP783/base `9ca39910f`, Slug rejected the alias at BUILD evaluation.
+WP784 retains a typed nonvisible alias actual and fail-closed per-alias Query
+marker, and admits the same BUILD's cross-package filegroup source edges and
+direct-package visibility. The r1 CLI then missed `:empty_lib`'s
+`:toolchain_type` dependency; r2 projects retained rule-class toolchain
+requirements as source-derived implicit Query edges with a distinct kind
+that cannot fabricate a source target. Independent r2 design review accepted the bounded
+same-owner route and foreign-root fail-closed boundary. The rebuilt CLI now
+matches the three Bazel 9.2 outcomes; independent final review ACCEPT.
 
 WP783 routes ordinary root-visible `@bazel_tools` Loading/Query through the
 existing canonical immutable source owner, preserving root apparent identity,

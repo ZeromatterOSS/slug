@@ -133,6 +133,7 @@ use super::merge_root_package_observations;
 use super::resolve_external_load_label;
 use super::resolve_host_load_label;
 use super::resolve_root_package_direct_load;
+use crate::AliasActual;
 use crate::AttributeKind;
 use crate::CoercedAttributeValue;
 use crate::FileAdmissibility;
@@ -39076,6 +39077,99 @@ async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_
         repository_package_terminal(&unloaded).targets[0].name,
         "accepted"
     );
+}
+
+#[test]
+fn host_alias_retains_only_nonvisible_scalar_actual_and_restores_mapping_a_b_a() {
+    let build = "filegroup(name = 'independent', srcs = [])\nalias(name = 'latent', actual = '@missing//:target')\n";
+    let evaluate = |mapping: Arc<RunfilesRepositoryMapping>| {
+        let module = Module::new();
+        let recorder = PackageRecorder::new_host(
+            Arc::new(SmallMap::new()),
+            PackageIdentifier::new(CanonicalRepoName::new("dep+").unwrap(), PackagePath::root()),
+            mapping,
+        );
+        let ast = AstModule::parse(
+            "/workspace/dep/BUILD.bazel",
+            build.to_owned(),
+            &Dialect::Bazel,
+        )
+        .unwrap();
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&recorder);
+        evaluator
+            .eval_module(ast, &build_file_loading_globals())
+            .unwrap();
+        drop(evaluator);
+        recorder.finish(
+            PathBuf::from("/workspace/dep"),
+            PathBuf::from("/workspace/dep/BUILD.bazel"),
+            Arc::from([]),
+            Arc::from([]),
+            [0; 32],
+            Arc::from([]),
+        )
+    };
+
+    let missing = Arc::new(RunfilesRepositoryMapping::empty());
+    let visible = Arc::new(RunfilesRepositoryMapping::new(
+        Arc::from([(
+            ApparentRepoName::new("missing").unwrap(),
+            CanonicalRepoName::new("mapped+").unwrap(),
+        )]),
+        None,
+    ));
+    let first = evaluate(missing.clone());
+    assert_eq!(first.targets.len(), 2);
+    assert!(first.native_attributes("independent").is_some());
+    assert!(first.native_attributes("latent").is_none());
+    let PackageTargetKind::Alias {
+        actual: AliasActual::NonVisible(actual),
+    } = &first.targets[1].kind
+    else {
+        panic!("missing mapping must retain a typed nonvisible alias")
+    };
+    assert!(actual.canonical().is_none());
+    let diagnostic = actual.to_string();
+    assert!(diagnostic.contains("unknown repo 'missing' requested from @@dep+"));
+    assert!(diagnostic.contains("//:target"));
+
+    let mapped = evaluate(visible);
+    let PackageTargetKind::Alias {
+        actual: AliasActual::Visible(CoercedAttributeValue::Label(actual)),
+    } = &mapped.targets[1].kind
+    else {
+        panic!("visible mapping must use the existing canonical label path")
+    };
+    assert_eq!(actual.to_string(), "@@mapped+//:target");
+    assert!(mapped.native_attributes("latent").is_some());
+    assert_ne!(first.targets[1], mapped.targets[1]);
+    assert_ne!(first, mapped);
+
+    let restored = evaluate(missing);
+    assert_eq!(first, restored);
+}
+
+#[tokio::test]
+async fn repository_package_load_keeps_unselected_nonvisible_alias() {
+    let outcome = load_repository_package_fixture(
+        &[(
+            "BUILD.bazel",
+            b"filegroup(name = 'independent', srcs = [])\nalias(name = 'latent', actual = '@local_config_cc//:toolchain')\n",
+        )],
+        733,
+    )
+    .await;
+    let package = repository_package_terminal(&outcome);
+    assert_eq!(package.targets.len(), 2);
+    assert!(package.native_attributes("independent").is_some());
+    assert!(package.native_attributes("latent").is_none());
+    assert!(matches!(
+        &package.targets[1].kind,
+        PackageTargetKind::Alias {
+            actual: AliasActual::NonVisible(actual)
+        } if actual.to_string().contains("unknown repo 'local_config_cc' requested from @@dep+")
+    ));
 }
 
 #[tokio::test]

@@ -31,6 +31,7 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
+use slug_identity_v2::ResolvedOptionLabel;
 use slug_starlark_v2::populate_universe;
 use starlark::any::ProvidesStaticType;
 use starlark::docs::DocItem;
@@ -546,6 +547,15 @@ impl ConfigSettingTarget {
     }
 }
 
+/// An alias declaration can retain a nonvisible apparent repository until an
+/// edge consumer selects `actual`. This state is not a canonical label and has
+/// no native-attribute projection.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum AliasActual {
+    Visible(CoercedAttributeValue),
+    NonVisible(Arc<ResolvedOptionLabel>),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum PackageTargetKind {
     ExportedFile,
@@ -554,7 +564,7 @@ pub enum PackageTargetKind {
         srcs_explicit: bool,
     },
     Alias {
-        actual: CoercedAttributeValue,
+        actual: AliasActual,
     },
     LabelFlag(LabelFlagDeclaration),
     /// Loading-owned declaration of Bazel's `config_setting`. Configuration
@@ -1626,7 +1636,7 @@ impl PackageRecorder {
     fn alias(
         &self,
         name: String,
-        actual: CoercedAttributeValue,
+        actual: AliasActual,
         visibility: Option<Vec<VisibilityArgument>>,
     ) -> anyhow::Result<()> {
         self.record_target(
@@ -2544,6 +2554,14 @@ fn native_rule_attributes(
     visibility_source: &VisibilitySource,
     package: &PackageState,
 ) -> Option<NativeRuleAttributes> {
+    if matches!(
+        kind,
+        PackageTargetKind::Alias {
+            actual: AliasActual::NonVisible(_)
+        }
+    ) {
+        return None;
+    }
     let class = native_rule_class(kind)?;
     let mut values = class
         .schema()
@@ -2626,13 +2644,18 @@ fn native_rule_attributes(
             },
             CoercedAttributeValue::LabelList(srcs.clone()),
         ),
-        PackageTargetKind::Alias { actual } => set_native_value(
+        PackageTargetKind::Alias {
+            actual: AliasActual::Visible(actual),
+        } => set_native_value(
             class,
             &mut values,
             "actual",
             AttributeProvenance::Explicit,
             actual.clone(),
         ),
+        PackageTargetKind::Alias {
+            actual: AliasActual::NonVisible(_),
+        } => unreachable!("nonvisible alias has no canonical native attribute row"),
         PackageTargetKind::LabelFlag(flag) => flag.populate_native_attributes(&mut values),
         PackageTargetKind::ConfigSetting {
             declaration: setting,
@@ -2838,7 +2861,10 @@ fn native_rule_attributes(
         _ => unreachable!("native class was selected above"),
     }
 
-    if let PackageTargetKind::Alias { actual } = kind {
+    if let PackageTargetKind::Alias {
+        actual: AliasActual::Visible(actual),
+    } = kind
+    {
         let config_dependencies = actual.selector_key_labels();
         if !config_dependencies.is_empty() {
             set_native_value(
@@ -3341,6 +3367,28 @@ fn alias_global<'v>(
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<NoneType> {
     let recorder = PackageRecorder::from_evaluator(eval)?;
+    let nonvisible = match (&recorder.repository_mapping, actual.unpack_str()) {
+        (PackageRecorderRepositoryMapping::Complete(mapping), Some(raw)) => {
+            ResolvedOptionLabel::parse_with_package_context(
+                raw,
+                &recorder.package_identifier,
+                mapping.entries(),
+            )
+            .ok()
+            .filter(|label| label.canonical().is_none())
+            .map(Arc::new)
+        }
+        _ => None,
+    };
+    if let Some(nonvisible) = nonvisible {
+        recorder.alias(
+            name.to_owned(),
+            AliasActual::NonVisible(nonvisible),
+            visibility.map(|value| value.items),
+        )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        return Ok(NoneType);
+    }
     let actual = coerce_starlark_value(recorder, AttributeKind::Label, "actual", true, actual)?;
     match &actual {
         CoercedAttributeValue::Label(_) | CoercedAttributeValue::Selector { .. } => {}
@@ -3352,7 +3400,11 @@ fn alias_global<'v>(
         CoercedAttributeValue::None => anyhow::bail!("attribute `actual` is mandatory"),
         _ => anyhow::bail!("attribute `actual` must be a label"),
     }
-    recorder.alias(name.to_owned(), actual, visibility.map(|value| value.items))?;
+    recorder.alias(
+        name.to_owned(),
+        AliasActual::Visible(actual),
+        visibility.map(|value| value.items),
+    )?;
     recorder.set_native_generator_from_evaluator(name, eval)?;
     Ok(NoneType)
 }

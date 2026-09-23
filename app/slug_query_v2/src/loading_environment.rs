@@ -665,10 +665,13 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         &mut self,
         graph: &UnconfiguredPackageGraph,
         selected: &TargetSet<QueryLabel>,
-    ) {
+    ) -> Result<(), QueryError> {
         for node in graph.nodes.values() {
             if !selected.contains(&node.label) {
                 continue;
+            }
+            if let Some(error) = deferred_alias_error(node) {
+                return Err(error);
             }
             self.record_node(node);
             for edge in node
@@ -680,6 +683,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                     .record_edge(node.label.clone(), edge.target.clone());
             }
         }
+        Ok(())
     }
 
     async fn resolve_recursive(
@@ -757,7 +761,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             )));
         }
         for graph in graphs {
-            self.record_pattern_graph(&graph, &result);
+            self.record_pattern_graph(&graph, &result)?;
         }
         Ok(result)
     }
@@ -1055,7 +1059,7 @@ fn selected_node_kind(node: &QueryNode) -> CompactString {
         }
         crate::QueryNodeKind::GeneratedFile => CompactString::const_new("generated file"),
         crate::QueryNodeKind::PackageGroup => CompactString::const_new("package group"),
-        crate::QueryNodeKind::Rule(_) => {
+        crate::QueryNodeKind::Rule(_) | crate::QueryNodeKind::DeferredAlias(_) => {
             let capability = node
                 .rule_capability
                 .as_ref()
@@ -1065,6 +1069,54 @@ fn selected_node_kind(node: &QueryNode) -> CompactString {
     }
 }
 
+fn deferred_alias_error(node: &QueryNode) -> Option<QueryError> {
+    match &node.kind {
+        crate::QueryNodeKind::DeferredAlias(actual) => Some(actual.error(&node.label)),
+        _ => None,
+    }
+}
+
+fn deferred_external_filegroup_source_error(
+    node: &QueryNode,
+) -> Result<Option<QueryError>, QueryError> {
+    if !matches!(&node.kind, crate::QueryNodeKind::Rule(rule) if rule == "filegroup rule") {
+        return Ok(None);
+    }
+    let owner = node.label.owner_identity()?;
+    if owner.canonical_repo().is_none() {
+        return Ok(None);
+    }
+    for edge in node
+        .edges
+        .iter()
+        .filter(|edge| edge.kind == crate::QueryEdgeKind::Ordinary)
+    {
+        if edge.target.owner_identity()? != owner {
+            return Ok(Some(QueryError::unsupported_feature(format!(
+                "external repository cross-package filegroup source traversal is deferred: {} -> {}",
+                node.label, edge.target
+            ))));
+        }
+    }
+    Ok(None)
+}
+
+fn deferred_edge_error(
+    node: &QueryNode,
+    attribute: Option<&str>,
+) -> Result<Option<QueryError>, QueryError> {
+    // Deferred aliases do not retain a complete native-attribute row. Even a
+    // query for an attribute other than `actual` must not mistake that absence
+    // for an empty value.
+    if let Some(error) = deferred_alias_error(node) {
+        return Ok(Some(error));
+    }
+    if attribute.is_none_or(|name| name == "srcs") {
+        return deferred_external_filegroup_source_error(node);
+    }
+    Ok(None)
+}
+
 fn attr_matches_node(
     node: &QueryNode,
     attribute_name: &str,
@@ -1072,6 +1124,9 @@ fn attr_matches_node(
 ) -> Result<bool, QueryError> {
     if !node.kind.is_rule() {
         return Ok(false);
+    }
+    if let Some(error) = deferred_edge_error(node, Some(attribute_name))? {
+        return Err(error);
     }
     let Some(attribute) = node
         .attributes
@@ -1189,7 +1244,7 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                         result.insert(label.clone());
                     }
                 }
-                self.record_pattern_graph(&graph, &result);
+                self.record_pattern_graph(&graph, &result)?;
                 Ok(self.real_delivery(result.iter().cloned()))
             }
             TargetPattern::Recursive {
@@ -1222,6 +1277,9 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
             return Ok(Arc::from([]));
         };
         let node = self.resolve_single(label.clone()).await?;
+        if let Some(error) = deferred_edge_error(&node, None)? {
+            return Err(error);
+        }
         let mut dependencies = Vec::with_capacity(node.edges.len());
         for edge in node.edges.iter() {
             self.evaluation_graph
@@ -1255,6 +1313,14 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         let mut result = TargetSet::default();
         for (package, package_targets) in by_package {
             let graph = self.package_graph_for_owner(&package).await?;
+            for target in package_targets.iter() {
+                let node = graph.nodes.get(target).ok_or_else(|| {
+                    QueryError::target_missing(format!("target not found: {target}"))
+                })?;
+                if let Some(error) = deferred_alias_error(node) {
+                    return Err(error);
+                }
+            }
             for node in graph.nodes.values() {
                 self.record_node(node);
                 for edge in node.edges.iter() {
@@ -1384,6 +1450,9 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
             let node = self.resolve_single(label.clone()).await?;
             if !node.kind.is_rule() {
                 continue;
+            }
+            if let Some(error) = deferred_edge_error(&node, Some(attribute))? {
+                return Err(error);
             }
             let Some(attribute) = node
                 .attributes
