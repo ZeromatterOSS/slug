@@ -50,6 +50,7 @@ const PROJECTION_VERSION: u16 = 2;
 const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
 const CPP_OPTIONS: &str = "com.google.devtools.build.lib.rules.cpp.CppOptions";
 const CORE_OPTIONS: &str = "com.google.devtools.build.lib.analysis.config.CoreOptions";
+const SHELL_OPTIONS: &str = "com.google.devtools.build.lib.analysis.ShellConfiguration.Options";
 const COVERAGE_OPTIONS: &str =
     "com.google.devtools.build.lib.analysis.test.CoverageConfiguration.CoverageOptions";
 const STRICT_ACTION_ENV_OPTIONS: &str =
@@ -1171,6 +1172,31 @@ impl SlugConfiguration {
             .as_ref()
             .map(ActionEnvironmentHost::os)
             .ok_or(SlugConfigurationError::MissingExecutionHostOs)
+    }
+
+    /// Admit only the selected platform's default shell. Bazel's shell option
+    /// and process-latched BAZEL_SH both override that default, so neither can
+    /// be silently ignored when retaining a configured shell action.
+    pub fn require_unoverridden_shell(&self) -> Result<(), SlugConfigurationError> {
+        if !matches!(
+            self.option_value(SHELL_OPTIONS, "shell_executable")?,
+            OptionValue::Native(NativeOccurrence::Absent)
+        ) {
+            return Err(SlugConfigurationError::ActionEnvironment {
+                reason: "explicit shell_executable is deferred",
+            });
+        }
+        let host = self.0.action_environment_host.as_ref().ok_or(
+            SlugConfigurationError::ActionEnvironment {
+                reason: "missing retained Host facts",
+            },
+        )?;
+        if host.bazel_sh().is_some() {
+            return Err(SlugConfigurationError::ActionEnvironment {
+                reason: "BAZEL_SH shell override is deferred",
+            });
+        }
+        Ok(())
     }
 
     pub fn cpp_custom_malloc_label(
@@ -2510,5 +2536,48 @@ mod tests {
                 reason: "explicit shell_executable is deferred",
             })
         );
+        assert_eq!(base.require_unoverridden_shell(), Ok(()));
+        assert_eq!(
+            shell.require_unoverridden_shell(),
+            Err(SlugConfigurationError::ActionEnvironment {
+                reason: "explicit shell_executable is deferred",
+            })
+        );
+    }
+
+    #[test]
+    fn process_latched_bazel_sh_is_structural_and_default_shell_requires_absence() {
+        use super::super::host::ActionEnvironmentHost;
+        use super::super::host::ActionEnvironmentHostOs;
+
+        let base_host = host(AutoCpuToken::K8, HostPathFlavor::Unix);
+        let make = |bazel_sh| {
+            SlugConfiguration::default_target(&base_host.with_action_environment_host(
+                ActionEnvironmentHost::non_windows(ActionEnvironmentHostOs::Linux, bazel_sh),
+            ))
+            .unwrap()
+        };
+        let absent_a = make(None);
+        let present = make(Some("/bin/bash"));
+        let empty = make(Some(""));
+        let absent_c = make(None);
+
+        assert_eq!(absent_a, absent_c);
+        assert_eq!(absent_a.canonical_bytes(), absent_c.canonical_bytes());
+        assert_eq!(absent_a.projection(), absent_c.projection());
+        assert_ne!(absent_a, present);
+        assert_ne!(absent_a.canonical_bytes(), present.canonical_bytes());
+        assert_ne!(absent_a.projection(), present.projection());
+        assert_ne!(absent_a, empty);
+        assert_ne!(present, empty);
+        assert_eq!(absent_a.require_unoverridden_shell(), Ok(()));
+        for configuration in [&present, &empty] {
+            assert_eq!(
+                configuration.require_unoverridden_shell(),
+                Err(SlugConfigurationError::ActionEnvironment {
+                    reason: "BAZEL_SH shell override is deferred",
+                })
+            );
+        }
     }
 }

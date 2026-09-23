@@ -46,6 +46,18 @@ impl ActionEnvironmentHost {
         }))
     }
 
+    /// Retain the process-latched shell override on non-Windows hosts without
+    /// adding Windows-only PATH or SYSTEMROOT observations.
+    pub fn non_windows(os: ActionEnvironmentHostOs, bazel_sh: Option<&str>) -> Self {
+        assert_ne!(os, ActionEnvironmentHostOs::Windows);
+        Self(Arc::new(ActionEnvironmentHostData {
+            os,
+            bazel_sh: bazel_sh.map(CompactString::new),
+            path: None,
+            system_root: None,
+        }))
+    }
+
     pub fn os(&self) -> ActionEnvironmentHostOs {
         self.0.os
     }

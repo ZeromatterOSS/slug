@@ -347,6 +347,64 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
 }
 
 #[test]
+fn linux_shell_source_plan_uses_bazel_argv_without_a_shell_input() {
+    let workspace = Workspace::new();
+    let defs = r#"def _impl(ctx):
+    out = ctx.actions.declare_file('shared.out')
+    ctx.actions.run_shell(outputs = [out], command = 'printf shell > $1', arguments = [out.path])
+    return [DefaultInfo(files = depset([out]))]
+stage = rule(implementation = _impl, attrs = {'input': attr.label(allow_single_file = True), 'tool': attr.label(allow_single_file = True)})
+"#;
+    workspace.write("defs.bzl", defs);
+    let plan = workspace.plan().unwrap();
+    let output = crate::test_roots::owner_path(&workspace.owner, "shared.out");
+    assert_eq!(
+        plan.command().argv,
+        ["/bin/bash", "-c", "printf shell > $1", "", output.as_str()]
+    );
+    assert!(plan.inputs().input_tree().entries().is_empty());
+    assert!(plan.inputs().input_tree().inline_blobs().is_empty());
+    assert_eq!(
+        plan.inputs().input_tree().root_digest(),
+        &ReapiDigest::of_bytes(&proto::Directory::default().encode_to_vec())
+    );
+    let serialized = proto::Command::decode(plan.command().serialized().as_slice()).unwrap();
+    assert_eq!(serialized.arguments, plan.command().argv);
+    assert_eq!(
+        plan.identity().command_digest,
+        ReapiDigest::of_bytes(&serialized.encode_to_vec())
+    );
+
+    workspace.write("defs.bzl", defs.replace("[out.path]", "[]"));
+    let no_args = workspace.plan().unwrap();
+    assert_eq!(
+        no_args.command().argv,
+        ["/bin/bash", "-c", "printf shell > $1"]
+    );
+    assert_eq!(
+        no_args.inputs().input_tree().root_digest(),
+        plan.inputs().input_tree().root_digest()
+    );
+    assert_ne!(
+        no_args.identity().command_digest,
+        plan.identity().command_digest
+    );
+
+    workspace.write("defs.bzl", defs.replace("printf shell", "printf changed"));
+    let changed = workspace.plan().unwrap();
+    assert_ne!(
+        changed.identity().action_digest,
+        plan.identity().action_digest
+    );
+    assert_eq!(
+        changed.inputs().input_tree().root_digest(),
+        plan.inputs().input_tree().root_digest()
+    );
+    workspace.write("defs.bzl", defs);
+    assert_eq!(workspace.plan().unwrap().identity(), plan.identity());
+}
+
+#[test]
 fn native_spawn_plan_rejects_unmodeled_policy_and_output_collisions() {
     let workspace = Workspace::new();
     for (changed, expected) in [

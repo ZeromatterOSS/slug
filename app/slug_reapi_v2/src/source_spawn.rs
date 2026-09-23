@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
+use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::actions::registry::validate_output;
 use slug_core_v2::runtime::PreparedSourceActionInputs;
 
@@ -87,6 +88,13 @@ pub(crate) fn spawn_command(
     let spawn = action
         .spawn_spec()
         .ok_or("Spawn REAPI plan requires typed Spawn")?;
+    if let RetainedSpawnInvocation::Shell {
+        shell_executable, ..
+    } = spawn.invocation()
+        && shell_executable.as_str() != "/bin/bash"
+    {
+        return Err("Spawn REAPI Shell requires the admitted /bin/bash executable".to_owned());
+    }
     if spawn.environment().inherited().iter().next().is_some() {
         return Err("Spawn REAPI plan requires resolved inherited environment".to_owned());
     }

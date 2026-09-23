@@ -149,6 +149,21 @@ impl ConfiguredOutputOwner {
         self.claim_sidecar(projection, configuration.canonical_bytes())
     }
 
+    /// Establish the output marker directory before a build's source frontier
+    /// is observed. Otherwise the first claim changes the workspace root's
+    /// directory metadata between source validation and Execute.
+    pub(super) fn prepare_marker_dir(&self) -> Result<(), ConfiguredOutputError> {
+        let marker_dir = self
+            .workspace
+            .join("bazel-out")
+            .join(".slug-configurations");
+        fs::create_dir_all(&marker_dir).map_err(|source| ConfiguredOutputError::Io {
+            operation: "creating configuration marker directory",
+            path: marker_dir,
+            source,
+        })
+    }
+
     fn register(
         &self,
         projection: SlugConfigurationProjection,
@@ -178,13 +193,7 @@ impl ConfiguredOutputOwner {
             .workspace
             .join("bazel-out")
             .join(".slug-configurations");
-        fs::create_dir_all(&marker_dir).map_err(|source| {
-            io_error(
-                "creating configuration marker directory",
-                &marker_dir,
-                source,
-            )
-        })?;
+        self.prepare_marker_dir()?;
         let marker = marker_dir.join(format!("{}.canonical", projection.path_component()));
 
         let mut temporary = NamedTempFile::new_in(&marker_dir).map_err(|source| {
@@ -367,6 +376,29 @@ mod tests {
             .unwrap(),
             c0.canonical_bytes()
         );
+    }
+
+    #[test]
+    fn marker_root_is_stable_across_the_first_claim() {
+        let workspace = tempfile::tempdir().unwrap();
+        let owner = ConfiguredOutputOwner::new(workspace.path().to_path_buf());
+        let (configuration, _) = configurations();
+
+        owner.prepare_marker_dir().unwrap();
+        let before = fs::symlink_metadata(workspace.path()).unwrap();
+        let entries_before = fs::read_dir(workspace.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect::<Vec<_>>();
+        owner.claim(&configuration).unwrap();
+        let after = fs::symlink_metadata(workspace.path()).unwrap();
+        let entries_after = fs::read_dir(workspace.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect::<Vec<_>>();
+
+        assert_eq!(entries_before, entries_after);
+        assert_eq!(before.modified().unwrap(), after.modified().unwrap());
     }
 
     #[test]

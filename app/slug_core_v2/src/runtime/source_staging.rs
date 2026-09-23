@@ -241,7 +241,10 @@ pub(in crate::runtime) fn declared_artifacts(
                 return Err(error("source staging requires a declared executable"));
             }
         }
-        _ => {
+        // The selected execution platform supplies the typed Shell executable.
+        // It is not a declared source artifact or a CAS input.
+        RetainedSpawnInvocation::Shell { .. } => {}
+        RetainedSpawnInvocation::Executable(SpawnExecutable::Path(_)) => {
             return Err(error(
                 "source staging requires an artifact-backed executable",
             ));

@@ -29,21 +29,27 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-84-m7a-nonvisible-alias-query-r2
-Status: accepted (independent r2 design and final ACCEPT; r1 REPLAN retained)
+Packet: WP-7-85-m7a-linux-runshell-transport-restoration-r1
+Status: accepted; independent final ACCEPT
 
-WP784 targets the next authentic M7A Loading/Query frontier: Bazel 9.2 loads
-`@bazel_tools//tools/cpp:empty_lib` despite the package's `:toolchain` alias
-to nonvisible `@local_config_cc`, and errors only when traversing that alias.
-At WP783/base `9ca39910f`, Slug rejected the alias at BUILD evaluation.
-WP784 retains a typed nonvisible alias actual and fail-closed per-alias Query
-marker, and admits the same BUILD's cross-package filegroup source edges and
-direct-package visibility. The r1 CLI then missed `:empty_lib`'s
-`:toolchain_type` dependency; r2 projects retained rule-class toolchain
-requirements as source-derived implicit Query edges with a distinct kind
-that cannot fabricate a source target. Independent r2 design review accepted the bounded
-same-owner route and foreign-root fail-closed boundary. The rebuilt CLI now
-matches the three Bazel 9.2 outcomes; independent final review ACCEPT.
+WP785 restores the earlier accepted Linux `shell-action-reapi` execution
+slice through fresh supervised NativeLink 1.7.1: one REAPI action, zero
+direct-local actions, and the exact 5-byte output digest/mode under Slug's
+native configured root. Typed `run_shell` now retains the selected
+`/bin/bash -c` prefix; source staging admits that typed platform executable,
+and requested execution pre-creates its output marker directory before the
+source-freshness observation. Process-latched `BAZEL_SH`, explicit shell
+overrides and non-Linux platforms remain closed. The raw Bazel fixture still
+reports a manifest-only difference at deferred `bazel-bin` versus Slug-native
+output roots; expected bytes were not changed. Independent final review
+ACCEPTED the bounded restoration. A
+separate direct FileWrite real-transport test passes CAS/Execute/output/AC
+against NativeLink 1.7.1.
+
+WP784 at `8fd6e0601` independently accepted authentic
+`@bazel_tools//tools/cpp` nonvisible-alias Loading and rule-toolchain Query
+edges. Its three selected Slug outcomes match Bazel 9.2; the next Query
+frontier remains the authentic cross-package configurable filegroups.
 
 WP783 routes ordinary root-visible `@bazel_tools` Loading/Query through the
 existing canonical immutable source owner, preserving root apparent identity,

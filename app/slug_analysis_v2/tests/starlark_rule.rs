@@ -10607,21 +10607,23 @@ async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
     assert!(matches!(
         shell.invocation(),
         RetainedSpawnInvocation::Shell {
+            shell_executable,
             command,
             pad_dollar_zero: true,
-        } if command == "echo shell"
+        } if shell_executable == "/bin/bash" && command == "echo shell"
     ));
-    assert_eq!(shell.render_argv(), ["echo shell", ""]);
+    assert_eq!(shell.render_argv(), ["/bin/bash", "-c", "echo shell", ""]);
 
     let shell_empty = result.actions()[4].spawn_spec().unwrap();
     assert!(matches!(
         shell_empty.invocation(),
         RetainedSpawnInvocation::Shell {
+            shell_executable,
             command,
             pad_dollar_zero: false,
-        } if command == "echo empty"
+        } if shell_executable == "/bin/bash" && command == "echo empty"
     ));
-    assert_eq!(shell_empty.render_argv(), ["echo empty"]);
+    assert_eq!(shell_empty.render_argv(), ["/bin/bash", "-c", "echo empty"]);
 
     let link = result.actions()[5].symlink_spec().unwrap();
     assert_eq!(link.progress_message(), Some("link source"));
@@ -10664,6 +10666,34 @@ async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
         .await
         .unwrap();
     assert_eq!(result.actions()[1], restored.actions()[1]);
+}
+
+#[tokio::test]
+async fn configured_run_shell_rejects_non_linux_selected_platforms() {
+    let workspace = scratch();
+    write_spawn_envelope_fixture(&workspace);
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for host_os in [
+        ActionEnvironmentHostOs::Macos,
+        ActionEnvironmentHostOs::Unknown,
+    ] {
+        let error = analyze_request(
+            &dice,
+            &workspace,
+            &ConfiguredTargetKey::new(
+                CanonicalLabel::parse("@@//pkg:subject").unwrap(),
+                typed_action_test_configuration_for(HostPathFlavor::Unix, host_os),
+            ),
+            None,
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            error.contains("selected Linux execution platform"),
+            "{host_os:?}: {error}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -10975,6 +11005,8 @@ def _impl(ctx):
         ctx.actions.run(outputs = [out], executable = "tool", tools = None)
     elif mode == "shell_list":
         ctx.actions.run_shell(outputs = [out], command = ["echo", "bad"])
+    elif mode == "shell_too_long":
+        ctx.actions.run_shell(outputs = [out], command = "x" * 64001)
     elif mode == "resource_dict":
         ctx.actions.run(outputs = [out], executable = "tool", resource_set = {})
     elif mode == "resource_callable":
@@ -11006,6 +11038,7 @@ probe = rule(implementation = _impl, attrs = {"mode": attr.string()})
         "inputs_none",
         "tools_none",
         "shell_list",
+        "shell_too_long",
         "resource_dict",
         "resource_callable",
         "exec_group",
@@ -11035,6 +11068,7 @@ probe = rule(implementation = _impl, attrs = {"mode": attr.string()})
         ("inputs_none", "inputs must be a sequence or depset"),
         ("tools_none", "tools must be a sequence or depset"),
         ("shell_list", "command must be a string"),
+        ("shell_too_long", "deferred long-command helper script"),
         ("resource_dict", "resource_set"),
         (
             "resource_callable",

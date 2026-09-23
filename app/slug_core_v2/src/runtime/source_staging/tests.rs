@@ -298,16 +298,61 @@ fn assert_unsupported_shapes(spawn: &SpawnSpec) {
     }
     let shell = replacement(
         RetainedSpawnInvocation::Shell {
+            shell_executable: "/bin/bash".into(),
             command: "shell command".into(),
             pad_dollar_zero: false,
         },
         spawn.inputs().clone(),
         None,
     );
+    let shell_sources = declared_sources(&shell).unwrap();
+    let original_sources = declared_sources(spawn).unwrap();
+    assert_eq!(shell_sources.len(), 2, "the input and tool remain declared");
+    assert_eq!(shell_sources.len(), original_sources.len());
+    for artifact in &original_sources {
+        assert!(shell_sources.contains(artifact));
+    }
+    let path = replacement(
+        RetainedSpawnInvocation::Executable(SpawnExecutable::Path(
+            slug_configuration_v2::NormalizedBazelPath::new(
+                slug_configuration_v2::HostPathFlavor::Unix,
+                "unowned-tool",
+            )
+            .unwrap(),
+        )),
+        spawn.inputs().clone(),
+        None,
+    );
     assert!(
-        declared_sources(&shell)
+        declared_sources(&path)
             .unwrap_err()
             .contains("artifact-backed")
+    );
+    let derived = AnalysisArtifact::Derived {
+        owner: AnalysisConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:generated").unwrap(),
+            b"cfg".as_slice(),
+        ),
+        output: ActionOutput::new(
+            crate::runtime::configured_output::test_root(),
+            "generated",
+            ActionOutputKind::File,
+        ),
+    };
+    let generated_shell = replacement(
+        shell.invocation().clone(),
+        ArtifactInputs::new(vec![ArtifactInputSource::Direct(derived.clone())]),
+        None,
+    );
+    assert!(
+        declared_artifacts(&generated_shell)
+            .unwrap()
+            .contains(&derived)
+    );
+    assert!(
+        declared_sources(&generated_shell)
+            .unwrap_err()
+            .contains("generated")
     );
     let pruning = replacement(
         spawn.invocation().clone(),

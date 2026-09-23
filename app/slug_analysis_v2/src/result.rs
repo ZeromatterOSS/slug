@@ -22,6 +22,7 @@ use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderOccurrence;
+use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::RunfilesPackageDepset;
 use slug_build_api_v2::RunfilesPackageMetadata;
 use slug_identity_v2::CanonicalLabel;
@@ -1051,15 +1052,10 @@ impl ConfiguredNodeResult {
         if contexts.iter().any(|context| context.owner() != owner) {
             return Err("configured action context has mismatched owner".to_owned());
         }
-        let root = slug_build_api_v2::DerivedArtifactRoot::bin(
-            owner
-                .configuration()
-                .slug_configuration()
-                .ok_or_else(|| {
-                    "configured action outputs require structural configuration".to_owned()
-                })?
-                .clone(),
-        )?;
+        let configuration = owner.configuration().slug_configuration().ok_or_else(|| {
+            "configured action outputs require structural configuration".to_owned()
+        })?;
+        let root = slug_build_api_v2::DerivedArtifactRoot::bin(configuration.clone())?;
         if specs
             .iter()
             .flat_map(|spec| spec.outputs())
@@ -1094,6 +1090,34 @@ impl ConfiguredNodeResult {
                 }
                 .cloned()
                 .ok_or_else(|| "configured action has no matching exec-group context".to_owned())?;
+                if let Some(spawn) = spec.spawn_spec()
+                    && let RetainedSpawnInvocation::Shell {
+                        shell_executable,
+                        command,
+                        ..
+                    } = spawn.invocation()
+                {
+                    if crate::starlark_rule::selected_execution_os(&context, Some(configuration))?
+                        != "LINUX"
+                    {
+                        return Err(
+                            "configured run_shell requires a selected Linux execution platform"
+                                .to_owned(),
+                        );
+                    }
+                    configuration
+                        .require_unoverridden_shell()
+                        .map_err(|error| error.to_string())?;
+                    if shell_executable != "/bin/bash" {
+                        return Err("configured run_shell has unsupported shell executable".to_owned());
+                    }
+                    if command.encode_utf16().count() > 64_000 {
+                        return Err(
+                            "configured run_shell requires Bazel's deferred long-command helper script"
+                                .to_owned(),
+                        );
+                    }
+                }
                 Ok(ConfiguredAction { spec, context })
             })
             .collect::<Result<Vec<_>, String>>()?

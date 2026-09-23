@@ -145,6 +145,7 @@ mod attribute_files;
 mod cc_compile_action;
 mod cc_context;
 use cc_context::CcContextProjection;
+pub(crate) use cc_context::selected_execution_os;
 
 /// Errors produced while synchronously evaluating a loaded rule after DICE has
 /// prepared its inputs. The executable-rule case remains distinct so command

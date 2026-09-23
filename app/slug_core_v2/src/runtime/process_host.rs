@@ -909,9 +909,6 @@ impl ProcessHostOwner {
                     HostOs::Openbsd => ActionEnvironmentHostOs::Openbsd,
                     HostOs::Unknown => ActionEnvironmentHostOs::Unknown,
                 };
-                if os != HostOs::Windows {
-                    return Ok(ActionEnvironmentHost::without_environment(configuration_os));
-                }
                 let read = |property| match self.source.property(property) {
                     PropertyRead::Present(value) => String::from_utf16(&value)
                         .map(Some)
@@ -920,6 +917,12 @@ impl ProcessHostOwner {
                     PropertyRead::ReadError(error) => Err(ClassInitFailure::Source(error)),
                 };
                 let bazel_sh = read(Property::BazelSh)?;
+                if os != HostOs::Windows {
+                    return Ok(ActionEnvironmentHost::non_windows(
+                        configuration_os,
+                        bazel_sh.as_deref(),
+                    ));
+                }
                 let path = read(Property::Path)?;
                 let system_root = read(Property::SystemRoot)?;
                 Ok(ActionEnvironmentHost::windows(
@@ -1507,12 +1510,13 @@ mod tests {
     }
 
     #[test]
-    fn default_configuration_inputs_demand_only_auto_cpu_and_path_flavor() {
+    fn default_configuration_inputs_demand_cpu_path_and_latched_shell_host() {
         let (source, owner) = FakeSource::owner(FakeState {
             properties: VecDeque::from([
                 PropertyRead::Absent,
                 property("Linux"),
                 property("x86_64"),
+                PropertyRead::Absent,
             ]),
             ..Default::default()
         });
@@ -1532,11 +1536,54 @@ mod tests {
             inputs.action_environment_host().unwrap().os(),
             slug_configuration_v2::native::host::ActionEnvironmentHostOs::Linux
         );
+        assert_eq!(inputs.action_environment_host().unwrap().bazel_sh(), None);
         assert_eq!(
             source.calls(),
-            vec![Property::BlazeOs, Property::OsName, Property::OsArch]
+            vec![
+                Property::BlazeOs,
+                Property::OsName,
+                Property::OsArch,
+                Property::BazelSh,
+            ]
         );
         assert!(source.0.lock().unwrap().resource_calls.is_empty());
+    }
+
+    #[test]
+    fn non_windows_bazel_sh_is_process_latched_without_windows_environment_reads() {
+        let (source, owner) = FakeSource::owner(FakeState {
+            properties: VecDeque::from([
+                PropertyRead::Absent,
+                property("Linux"),
+                property("x86_64"),
+                property("/opt/custom/bash"),
+            ]),
+            ..Default::default()
+        });
+        let first = owner.default_configuration_inputs().unwrap();
+        let host = first.action_environment_host().unwrap();
+        assert_eq!(host.bazel_sh(), Some("/opt/custom/bash"));
+        assert_eq!(host.path(), None);
+        assert_eq!(host.system_root(), None);
+
+        source
+            .0
+            .lock()
+            .unwrap()
+            .properties
+            .push_back(PropertyRead::Absent);
+        let again = owner.default_configuration_inputs().unwrap();
+        assert_eq!(again.action_environment_host(), Some(host));
+        assert_eq!(source.0.lock().unwrap().properties.len(), 1);
+        assert_eq!(
+            source.calls(),
+            vec![
+                Property::BlazeOs,
+                Property::OsName,
+                Property::OsArch,
+                Property::BazelSh,
+            ]
+        );
     }
 
     #[test]

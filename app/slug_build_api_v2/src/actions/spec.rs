@@ -749,6 +749,7 @@ pub enum SpawnExecutable {
 pub enum RetainedSpawnInvocation {
     Executable(SpawnExecutable),
     Shell {
+        shell_executable: CompactString,
         command: CompactString,
         pad_dollar_zero: bool,
     },
@@ -759,10 +760,15 @@ impl RetainedSpawnInvocation {
         match self {
             Self::Executable(executable) => vec![executable.render()],
             Self::Shell {
+                shell_executable,
                 command,
                 pad_dollar_zero,
             } => {
-                let mut prefix = vec![command.to_string()];
+                let mut prefix = vec![
+                    shell_executable.to_string(),
+                    "-c".to_owned(),
+                    command.to_string(),
+                ];
                 if *pad_dollar_zero {
                     prefix.push(String::new());
                 }
@@ -778,14 +784,18 @@ impl RetainedSpawnInvocation {
             }
             (
                 Self::Shell {
+                    shell_executable: left_shell,
                     command: left_command,
                     pad_dollar_zero: left_pad,
                 },
                 Self::Shell {
+                    shell_executable: right_shell,
                     command: right_command,
                     pad_dollar_zero: right_pad,
                 },
-            ) => left_command == right_command && left_pad == right_pad,
+            ) => {
+                left_shell == right_shell && left_command == right_command && left_pad == right_pad
+            }
             _ => false,
         }
     }

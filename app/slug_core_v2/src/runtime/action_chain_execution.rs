@@ -426,6 +426,11 @@ impl WorkspaceRuntime {
         AcceptedCommand<Result<RequestedActionResult<T::Output>, BuildCommandError>>,
         BuildCommandError,
     > {
+        // The first output claim must not change workspace-root metadata after
+        // that root enters the source certificate.
+        self.configured_output
+            .prepare_marker_dir()
+            .map_err(BuildCommandError::infrastructure)?;
         let (build, request) = self.prepare_build_request(
             targets,
             command_policy,
@@ -534,6 +539,11 @@ impl WorkspaceRuntime {
         transport: &T,
         publication: P,
     ) -> Result<AcceptedCommand<ActionChainResult<T::Output>>, BuildCommandError> {
+        // Claiming the first configured output must not mutate the workspace
+        // root after its source certificate has been observed.
+        self.configured_output
+            .prepare_marker_dir()
+            .map_err(BuildCommandError::infrastructure)?;
         let (build, request) = self.prepare_build_request(
             targets,
             command_policy,

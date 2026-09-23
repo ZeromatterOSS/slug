@@ -96,46 +96,52 @@ impl CcContextProjection {
     }
 
     fn execution_os(&self) -> anyhow::Result<&'static str> {
-        if self.default_execution.execution_platform().is_none() {
-            anyhow::bail!("exec_os requires a resolved default execution platform");
-        }
-        let standard = self
-            .default_execution
-            .platform_constraints()
-            .iter()
-            .find(|constraint| standard_os_label(constraint.constraint_setting().label(), "os"));
-        if let Some(constraint) = standard {
-            let value = constraint.constraint_value().label();
-            for (name, os) in [
-                ("linux", "LINUX"),
-                ("osx", "DARWIN"),
-                ("macos", "DARWIN"),
-                ("windows", "WINDOWS"),
-                ("freebsd", "FREEBSD"),
-                ("openbsd", "OPENBSD"),
-            ] {
-                if standard_os_label(value, name) {
-                    return Ok(os);
-                }
-            }
-            return Ok("UNKNOWN");
-        }
-        let host = self
-            .configuration
-            .as_ref()
-            .ok_or_else(|| {
-                anyhow::anyhow!("exec_os Host fallback requires structural configuration")
-            })?
-            .execution_host_os()?;
-        Ok(match host {
-            ActionEnvironmentHostOs::Linux => "LINUX",
-            ActionEnvironmentHostOs::Windows => "WINDOWS",
-            ActionEnvironmentHostOs::Macos => "DARWIN",
-            ActionEnvironmentHostOs::Freebsd => "FREEBSD",
-            ActionEnvironmentHostOs::Openbsd => "OPENBSD",
-            ActionEnvironmentHostOs::Unknown => "UNKNOWN",
-        })
+        selected_execution_os(&self.default_execution, self.configuration.as_ref())
+            .map_err(anyhow::Error::msg)
     }
+}
+
+/// Bazel's selected-platform OS constraint, falling back to the retained Host
+/// only when that platform has no standard OS constraint.
+pub(crate) fn selected_execution_os(
+    context: &ConfiguredActionOwnerContext,
+    configuration: Option<&SlugConfiguration>,
+) -> Result<&'static str, String> {
+    if context.execution_platform().is_none() {
+        return Err("exec_os requires a resolved default execution platform".to_owned());
+    }
+    let standard = context
+        .platform_constraints()
+        .iter()
+        .find(|constraint| standard_os_label(constraint.constraint_setting().label(), "os"));
+    if let Some(constraint) = standard {
+        let value = constraint.constraint_value().label();
+        for (name, os) in [
+            ("linux", "LINUX"),
+            ("osx", "DARWIN"),
+            ("macos", "DARWIN"),
+            ("windows", "WINDOWS"),
+            ("freebsd", "FREEBSD"),
+            ("openbsd", "OPENBSD"),
+        ] {
+            if standard_os_label(value, name) {
+                return Ok(os);
+            }
+        }
+        return Ok("UNKNOWN");
+    }
+    let host = configuration
+        .ok_or_else(|| "exec_os Host fallback requires structural configuration".to_owned())?
+        .execution_host_os()
+        .map_err(|error| error.to_string())?;
+    Ok(match host {
+        ActionEnvironmentHostOs::Linux => "LINUX",
+        ActionEnvironmentHostOs::Windows => "WINDOWS",
+        ActionEnvironmentHostOs::Macos => "DARWIN",
+        ActionEnvironmentHostOs::Freebsd => "FREEBSD",
+        ActionEnvironmentHostOs::Openbsd => "OPENBSD",
+        ActionEnvironmentHostOs::Unknown => "UNKNOWN",
+    })
 }
 
 fn standard_os_label(label: &slug_identity_v2::CanonicalLabel, target: &str) -> bool {

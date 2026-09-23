@@ -171,6 +171,7 @@ pub(crate) fn retained_invocation(
         AnalysisSpawnInvocation::Shell(value) => value
             .unpack_str()
             .map(|command| RetainedSpawnInvocation::Shell {
+                shell_executable: "/bin/bash".into(),
                 command: command.into(),
                 pad_dollar_zero,
             })

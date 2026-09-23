@@ -740,6 +740,7 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
         envelope(executable(), None),
         envelope(
             RetainedSpawnInvocation::Shell {
+                shell_executable: "/bin/bash".into(),
                 command: "tool".into(),
                 pad_dollar_zero: false,
             },
@@ -753,6 +754,7 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
     assert_ne!(
         envelope(
             RetainedSpawnInvocation::Shell {
+                shell_executable: "/bin/bash".into(),
                 command: "command".into(),
                 pad_dollar_zero: false,
             },
@@ -760,11 +762,42 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
         ),
         envelope(
             RetainedSpawnInvocation::Shell {
+                shell_executable: "/bin/bash".into(),
                 command: "command".into(),
                 pad_dollar_zero: true,
             },
             None,
         )
+    );
+    assert_ne!(
+        envelope(
+            RetainedSpawnInvocation::Shell {
+                shell_executable: "/bin/bash".into(),
+                command: "command".into(),
+                pad_dollar_zero: false,
+            },
+            None,
+        ),
+        envelope(
+            RetainedSpawnInvocation::Shell {
+                shell_executable: "/usr/bin/bash".into(),
+                command: "command".into(),
+                pad_dollar_zero: false,
+            },
+            None,
+        )
+    );
+    let shell = envelope(
+        RetainedSpawnInvocation::Shell {
+            shell_executable: "/bin/bash".into(),
+            command: "command".into(),
+            pad_dollar_zero: true,
+        },
+        None,
+    );
+    assert_eq!(
+        shell.spawn_spec().unwrap().render_argv(),
+        ["/bin/bash", "-c", "command", ""]
     );
 }
 
