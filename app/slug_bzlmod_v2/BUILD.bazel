@@ -15,6 +15,8 @@ filegroup(
         "//app/slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs/build_info/templates:slug_builtin_catalog_files",
         "//app/slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs/cc:slug_builtin_catalog_files",
         "//app/slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs/repo:slug_builtin_catalog_files",
+        "//app/slug_bzlmod_v2/builtin/bazel_tools/tools/cpp:slug_builtin_catalog_files",
+        "//app/slug_bzlmod_v2/builtin/bazel_tools/tools/cpp/modules_tools:slug_builtin_catalog_files",
         "//app/slug_bzlmod_v2/builtin/bazel_tools/tools/launcher:slug_builtin_catalog_files",
         "//app/slug_bzlmod_v2/builtin/bazel_tools/tools/res:slug_builtin_catalog_files",
         "//app/slug_bzlmod_v2/builtin/bazel_tools/tools/test:slug_builtin_catalog_files",

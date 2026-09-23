@@ -229,13 +229,48 @@ const FILES: &[(&str, &str, bool)] = &[
         false,
     ),
     (
+        "tools/cpp/BUILD",
+        "0e3fdd3293d39a64f3fbda755d8a3c0bbd3b6ffd5fb0717ab594bc1f1e29a535",
+        false,
+    ),
+    (
         "tools/cpp/cc_configure.bzl",
         "f1264cd4a6552eba7368729212aba64031ecd4330923d2bef61a20791ee2b4c5",
         false,
     ),
     (
+        "tools/cpp/cc_flags_supplier.bzl",
+        "e0150e4e012bbc2a6464d04ca7893c5da22fbf628c3e043e5d0bfb57a0baa1c9",
+        false,
+    ),
+    (
+        "tools/cpp/cc_toolchain_config_lib.bzl",
+        "8df69d2032049acaafedd3feab3c5dbd36335de2ff76013e99c0815611a0c5d5",
+        false,
+    ),
+    (
+        "tools/cpp/compiler_flag.bzl",
+        "23c0c595ff86daf7e4b7a9ffaff88ec4b79f060ee6db8d1121112e60c4efee75",
+        false,
+    ),
+    (
         "tools/cpp/lib_cc_configure.bzl",
         "da7e4ae162120582a7a703b5657286dffe61fdf37cc489a4fc7625608517370c",
+        false,
+    ),
+    (
+        "tools/cpp/modules_tools/BUILD",
+        "6f0727f09faaee782e8cf2219586243f767c7c4cb6dc3b9024f8c4c3aba9dad3",
+        false,
+    ),
+    (
+        "tools/cpp/toolchain_utils.bzl",
+        "feedbafb1be793c3e7710ece67e1ffb349d55ed726a358ee8d1dd8a68118cb7a",
+        false,
+    ),
+    (
+        "tools/cpp/unix_cc_toolchain_config.bzl",
+        "1226e7f37ff91b55a3cf8eaddb60343cef7c71fc9bdd04ef6d372b27314bce37",
         false,
     ),
     (
@@ -361,25 +396,40 @@ async fn invalid_wrong_kind_and_unsupported_catalog_are_distinct() {
         read(&dice, "tools/test/extensions.bzl").await,
         Err(BuiltinBazelToolsSourceFileError::UnsupportedCatalog { .. })
     ));
+    assert!(matches!(
+        read(&dice, "tools/cpp/modules_tools").await,
+        Err(BuiltinBazelToolsSourceFileError::WrongKind {
+            actual: BuiltinBazelToolsSourceKind::Directory,
+            ..
+        })
+    ));
+    for path in [
+        "tools/cpp/modules_tools/aggregate-ddi",
+        "tools/cpp/modules_tools/aggregate-ddi.exe",
+        "tools/cpp/modules_tools/generate-modmap",
+        "tools/cpp/modules_tools/generate-modmap.exe",
+    ] {
+        assert!(
+            matches!(
+                read(&dice, path).await,
+                Err(BuiltinBazelToolsSourceFileError::UnsupportedCatalog { .. })
+            ),
+            "generated binary must remain outside the source catalog: {path}"
+        );
+    }
 }
 
 #[tokio::test]
 async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions() {
     let first_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let second_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let first = read(&first_dice, "tools/build_defs/repo/utils.bzl")
-        .await
-        .unwrap();
+    let first = read(&first_dice, "tools/cpp/BUILD").await.unwrap();
     let middle = read(&first_dice, "MODULE.bazel").await.unwrap();
-    let sibling = read(&first_dice, "tools/build_defs/repo/http.bzl")
+    let sibling = read(&first_dice, "tools/cpp/modules_tools/BUILD")
         .await
         .unwrap();
-    let restored = read(&first_dice, "tools/build_defs/repo/utils.bzl")
-        .await
-        .unwrap();
-    let independent_graph = read(&second_dice, "tools/build_defs/repo/utils.bzl")
-        .await
-        .unwrap();
+    let restored = read(&first_dice, "tools/cpp/BUILD").await.unwrap();
+    let independent_graph = read(&second_dice, "tools/cpp/BUILD").await.unwrap();
     assert_eq!(first, restored);
     assert_eq!(first, independent_graph);
     assert_ne!(first.sha256(), middle.sha256());
@@ -389,7 +439,7 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
     assert_eq!(identity.snapshot(), BuiltinBazelToolsSnapshot::Bazel9_2);
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
-        "e45427b34b6d4cb171c4d4440282a80045f79d37b836cf6c3ddefa05f02ea8af"
+        "d614eabb9f52bb03a0c51a96cc942c8dadb669929b18a9338ae7286d23d6fa40"
     );
 }
 
@@ -410,6 +460,8 @@ fn embedded_catalog_paths_remain_exact_with_bazel_input_metadata() {
         "tools/build_defs/build_info/templates/BUILD.bazel",
         "tools/build_defs/cc/BUILD.bazel",
         "tools/build_defs/repo/BUILD.bazel",
+        "tools/cpp/BUILD.bazel",
+        "tools/cpp/modules_tools/BUILD.bazel",
         "tools/launcher/BUILD.bazel",
         "tools/res/BUILD.bazel",
         "tools/test/BUILD.bazel",

@@ -29,8 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-80-m7a-native-label-flag-r1
-Status: accepted (independent final ACCEPT)
+Packet: WP-7-81-m7a-builtin-cpp-source-catalog-r1
+Status: accepted (independent design and final ACCEPT)
+
+WP781 accepts the exact Bazel 9.2 embedded source/catalog ingress for
+`@bazel_tools//tools/cpp` and `modules_tools`: seven verbatim source files,
+the two package markers and the changed structural catalog identity. The full
+Bzlmod library suite passes 626/626, catalog integration 4/4, and direct
+Loading compile check passes; independent design/final review ACCEPT. It removes
+the missing BUILD source-route boundary but does not claim complete package
+Loading: authentic `rules_cc` generated-proxy imports and repository Starlark
+`deps` remain separate prerequisites. Installed module binaries, full
+cc_toolchain, execution and M8 remain deferred. M7A remains partial.
 
 WP780 accepts native label_flag declaration, typed canonical command overrides
 and configured provider/condition forwarding, demanded by the authentic tools/cpp

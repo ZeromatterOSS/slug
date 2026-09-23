@@ -22,8 +22,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use compact_str::CompactString;
 use async_trait::async_trait;
+use compact_str::CompactString;
 use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
@@ -2967,6 +2967,14 @@ mod tests {
                 ExternalRepositoryPackageLookup::Package(HostBuildFileName::Build),
             ),
             (
+                "tools/cpp",
+                ExternalRepositoryPackageLookup::Package(HostBuildFileName::Build),
+            ),
+            (
+                "tools/cpp/modules_tools",
+                ExternalRepositoryPackageLookup::Package(HostBuildFileName::Build),
+            ),
+            (
                 "missing/package",
                 ExternalRepositoryPackageLookup::NoBuildFile,
             ),
@@ -3002,22 +3010,27 @@ mod tests {
         assert!(observed_ignore.result().as_ref().is_ok());
         assert!(observed_ignore.observations().observations().is_empty());
 
-        let SourcePreparationOutcome::Complete(Ok(observed_package)) = transaction
-            .compute(&ExternalRepositoryPackageLookupObservationKey(
-                builtin_external_key("tools/test"),
-            ))
-            .await
-            .unwrap()
-        else {
-            panic!("observed built-in package marker must be complete");
-        };
-        assert!(matches!(
-            observed_package.result().as_ref(),
-            Ok(ExternalRepositoryPackageLookup::Package(
-                HostBuildFileName::Build
-            ))
-        ));
-        assert!(observed_package.observations().observations().is_empty());
+        for package in ["tools/test", "tools/cpp", "tools/cpp/modules_tools"] {
+            let SourcePreparationOutcome::Complete(Ok(observed_package)) = transaction
+                .compute(&ExternalRepositoryPackageLookupObservationKey(
+                    builtin_external_key(package),
+                ))
+                .await
+                .unwrap()
+            else {
+                panic!("observed built-in package marker must be complete for {package}");
+            };
+            assert!(matches!(
+                observed_package.result().as_ref(),
+                Ok(ExternalRepositoryPackageLookup::Package(
+                    HostBuildFileName::Build
+                ))
+            ));
+            assert!(
+                observed_package.observations().observations().is_empty(),
+                "package {package:?}"
+            );
+        }
     }
 
     #[cfg(unix)]

@@ -368,15 +368,57 @@ const CATALOG: &[CatalogEntry] = &[
         executable: false,
     },
     CatalogEntry {
+        path: "tools/cpp/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/BUILD"),
+        expected_sha256: "0e3fdd3293d39a64f3fbda755d8a3c0bbd3b6ffd5fb0717ab594bc1f1e29a535",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/cpp/cc_configure.bzl",
         bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/cc_configure.bzl"),
         expected_sha256: "f1264cd4a6552eba7368729212aba64031ecd4330923d2bef61a20791ee2b4c5",
         executable: false,
     },
     CatalogEntry {
+        path: "tools/cpp/cc_flags_supplier.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/cc_flags_supplier.bzl"),
+        expected_sha256: "e0150e4e012bbc2a6464d04ca7893c5da22fbf628c3e043e5d0bfb57a0baa1c9",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/cpp/cc_toolchain_config_lib.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/cc_toolchain_config_lib.bzl"),
+        expected_sha256: "8df69d2032049acaafedd3feab3c5dbd36335de2ff76013e99c0815611a0c5d5",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/cpp/compiler_flag.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/compiler_flag.bzl"),
+        expected_sha256: "23c0c595ff86daf7e4b7a9ffaff88ec4b79f060ee6db8d1121112e60c4efee75",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/cpp/lib_cc_configure.bzl",
         bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/lib_cc_configure.bzl"),
         expected_sha256: "da7e4ae162120582a7a703b5657286dffe61fdf37cc489a4fc7625608517370c",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/cpp/modules_tools/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/modules_tools/BUILD"),
+        expected_sha256: "6f0727f09faaee782e8cf2219586243f767c7c4cb6dc3b9024f8c4c3aba9dad3",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/cpp/toolchain_utils.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/toolchain_utils.bzl"),
+        expected_sha256: "feedbafb1be793c3e7710ece67e1ffb349d55ed726a358ee8d1dd8a68118cb7a",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/cpp/unix_cc_toolchain_config.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/unix_cc_toolchain_config.bzl"),
+        expected_sha256: "1226e7f37ff91b55a3cf8eaddb60343cef7c71fc9bdd04ef6d372b27314bce37",
         executable: false,
     },
     CatalogEntry {
@@ -1019,9 +1061,31 @@ mod tests {
         assert_eq!(
             listing_rows("tools/cpp"),
             [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
                 ("cc_configure.bzl".to_owned(), PathDirectoryEntryKind::File,),
                 (
+                    "cc_flags_supplier.bzl".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+                (
+                    "cc_toolchain_config_lib.bzl".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+                ("compiler_flag.bzl".to_owned(), PathDirectoryEntryKind::File),
+                (
                     "lib_cc_configure.bzl".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+                (
+                    "modules_tools".to_owned(),
+                    PathDirectoryEntryKind::Directory
+                ),
+                (
+                    "toolchain_utils.bzl".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+                (
+                    "unix_cc_toolchain_config.bzl".to_owned(),
                     PathDirectoryEntryKind::File,
                 ),
                 (
@@ -1029,6 +1093,10 @@ mod tests {
                     PathDirectoryEntryKind::File,
                 ),
             ]
+        );
+        assert_eq!(
+            listing_rows("tools/cpp/modules_tools"),
+            [("BUILD".to_owned(), PathDirectoryEntryKind::File)]
         );
         assert_eq!(
             listing_rows("tools/launcher"),
@@ -1205,7 +1273,7 @@ mod tests {
             evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &source).unwrap();
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
-            "e45427b34b6d4cb171c4d4440282a80045f79d37b836cf6c3ddefa05f02ea8af"
+            "d614eabb9f52bb03a0c51a96cc942c8dadb669929b18a9338ae7286d23d6fa40"
         );
         assert_eq!(value.module_sha256, source.sha256());
         assert_eq!(

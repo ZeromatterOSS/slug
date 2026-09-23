@@ -451,10 +451,14 @@ descriptors/transforms remain closed.
 Native filegroup forwarding supplies the nested configured srcs/FilesToRun
 prerequisite used by the four implicit tool dependencies, preserving real file,
 runfiles and output-group providers and selected target/exec ownership. It does
-not install module binaries or load the complete tools/cpp package. That unchanged
-package still requires label_flag and the genuine compatibility-proxy/rules/protobuf
-load closure; binary catalog admission also needs explicit release-platform
-provenance. None may be replaced with an authored tool/provider envelope.
+not install module binaries or load the complete tools/cpp package. WP780 adds
+native label_flag; WP781 installs the exact Bazel 9.2 tools/cpp BUILD and sibling
+source entries through the built-in catalog, making both cpp package markers
+available without claiming package Loading. Authentic Loading still requires
+the genuine compatibility-proxy/rules/protobuf load closure and ordinary
+repository-package Starlark deps; binary catalog admission also needs explicit
+release-platform provenance. None may be replaced with an authored tool/provider
+envelope.
 Generic command/aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/
 path mapping and full cc_library remain deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and unmodeled builtin structures remain outside
