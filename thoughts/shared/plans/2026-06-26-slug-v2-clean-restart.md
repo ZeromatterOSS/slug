@@ -29,21 +29,21 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-87-m7a-linux-module-tool-filegroups-r1
-Status: accepted; independent final ACCEPT
+Packet: WP-7-88-m7a-module-tag-file-admissibility-r1
+Status: accepted; independent design and final ACCEPT
 
-WP787 selects the authentic Bazel 9.2 Linux x86-64 release-embedded
-`aggregate-ddi` and `generate-modmap` binaries for the immutable
-`@bazel_tools` catalog, then the direct observed configured child filegroups
-that select and forward them as singleton executable Files. A fresh Bazel 9.2
-`cquery` proves both Linux branches and providers; release archive SHA-256,
-entry bytes and mode establish the binary provenance. The public external
-`cquery` route, parent `tools/cpp`/rules_cc closure, source transfer and
-execution remain separate gates. WP786 at `438135765` accepted the preceding
-unconfigured Query traversal of these filegroups. Independent design and final
-reviews ACCEPTED this host-gated configured child boundary. Focused Bzlmod
-catalog and Analysis tests pass; runtime source transfer and execution remain
-open, so M7A is still partial.
+WP788 targets the fresh real-root cquery Loading stop in rules_rust 0.73.0:
+`tag_class` rejects the `crate.from_cargo` `manifests` label-list descriptor's
+`allow_files=["Cargo.toml"]`. Bazel 9.2 accepts this descriptor and type-checks
+module-tag values without target/file resolution. Admit that declaration and
+retain its ordered policy in Slug's existing immutable tag schema; verify the
+root request passes the original stop and record its next terminal. This does
+not claim full configured root coverage, module-tag file resolution or M7A
+closure. WP787 at `17786a9d0` accepted the preceding Linux module-tool
+binary/catalog and direct configured child-filegroup boundary.
+Focused Loading tests (3/3), direct Bzlmod compilation and fresh CLI rebuild
+passed; the root request advanced to the separate unsupported extension-factors
+boundary. Independent design and final reviews ACCEPTED this slice.
 
 WP785 at `9931f6a2d` accepted bounded Linux `run_shell` execution through
 fresh NativeLink 1.7.1: one REAPI action, zero direct-local actions and exact

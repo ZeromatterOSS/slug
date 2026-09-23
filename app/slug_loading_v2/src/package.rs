@@ -9222,11 +9222,6 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             if definition.late_bound_default.is_some() || definition.computed_default.is_some() {
                 anyhow::bail!("tag attribute `{name}` does not support deferred defaults");
             }
-            if !definition.file_admissibility.is_no_files()
-                && !definition.file_admissibility.single_artifact()
-            {
-                anyhow::bail!("tag attribute `{name}` does not support allow_files");
-            }
             if definition.flags.has_any_except(&[
                 AttributePropertyFlag::StarlarkDefined,
                 AttributePropertyFlag::StrictLabelChecking,
@@ -12295,6 +12290,75 @@ ext = module_extension(
         let restored = projection(&source(false, "a", 1));
         assert_ne!(a, b);
         assert_eq!(a, restored);
+    }
+
+    #[test]
+    fn tag_class_allow_files_retains_ordered_policy_and_structural_identity() {
+        let source = |suffixes: &str| {
+            format!(
+                "def _impl(ctx):\n    pass\n\
+                 tag = tag_class(attrs = {{'manifests': attr.label_list(allow_files = {suffixes}), 'scalar': attr.label(allow_files = True)}})\n\
+                 ext = module_extension(implementation = _impl, tag_classes = {{'from_cargo': tag}})\n"
+            )
+        };
+        let a = projection(&source("['Cargo.toml', '.manifest', 'Cargo.toml']"));
+        let b = projection(&source("['.manifest', 'Cargo.toml', 'Cargo.toml']"));
+        let restored = projection(&source("['Cargo.toml', '.manifest', 'Cargo.toml']"));
+        let attributes = &a.tag_classes[0].1;
+        assert_eq!(attributes[0].name, "manifests");
+        assert_eq!(
+            attributes[0].file_admissibility.suffixes().unwrap(),
+            ["Cargo.toml", ".manifest", "Cargo.toml"]
+        );
+        assert!(attributes[1].file_admissibility.is_any_file());
+        assert!(!attributes[1].file_admissibility.single_artifact());
+        assert_ne!(a, b);
+        assert_eq!(a, restored);
+    }
+
+    #[test]
+    fn tag_class_manifest_values_prepare_without_file_resolution() {
+        let value = projection(
+            "def _impl(ctx):\n    pass\n\
+             tag = tag_class(attrs = {'manifests': attr.label_list(allow_files = ['Cargo.toml'])})\n\
+             ext = module_extension(implementation = _impl, tag_classes = {'from_cargo': tag})\n",
+        );
+        let schema = &value.tag_classes[0].1;
+        let (context, mapping) = root_context();
+        for filename in ["Cargo.toml", "bad.txt"] {
+            let raw = SmallMap::from_iter([(
+                CompactString::from("manifests"),
+                NonrootAttributeValue::List(Arc::from([NonrootAttributeValue::String(
+                    format!("//:{filename}").into(),
+                )])),
+            )]);
+            let prepared =
+                prepare_module_extension_tag_attributes(schema, &raw, &context, &mapping).unwrap();
+            assert_eq!(
+                prepared[0].1,
+                CoercedAttributeValue::LabelList(Arc::from([CanonicalLabel::parse(&format!(
+                    "@@//:{filename}"
+                ))
+                .unwrap()]))
+            );
+        }
+        let omitted =
+            prepare_module_extension_tag_attributes(schema, &SmallMap::new(), &context, &mapping)
+                .unwrap();
+        assert_eq!(
+            omitted[0].1,
+            CoercedAttributeValue::LabelList(Arc::from([]))
+        );
+        let wrong_type = SmallMap::from_iter([(
+            CompactString::from("manifests"),
+            NonrootAttributeValue::List(Arc::from([NonrootAttributeValue::Int(
+                NonrootAttributeInt::from_decimal("123").unwrap(),
+            )])),
+        )]);
+        assert!(
+            prepare_module_extension_tag_attributes(schema, &wrong_type, &context, &mapping)
+                .is_err()
+        );
     }
 
     #[test]
