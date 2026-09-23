@@ -29,27 +29,21 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-86-m7a-external-filegroup-query-r1
+Packet: WP-7-87-m7a-linux-module-tool-filegroups-r1
 Status: accepted; independent final ACCEPT
 
-WP786 selects the authentic `@bazel_tools//tools/cpp` cross-package
-configurable filegroup Query frontier left by WP784. Bazel 9.2 reaches the
-`modules_tools` child filegroups, both `select()` source arms and the
-`:windows` condition; Slug presently retains the source edge but refuses
-selected cross-package traversal. This packet admits only the observed
-unconfigured Query graph/commands through existing Loading, route and DICE
-owners. Configured module-tool binaries/providers, actions and M7A closure
-remain separate gates. A later Bazel 9.2 negative probe corrected the first
-design review: an undeclared same-package selector key is synthesized as a
-source file in `deps`, while an undeclared cross-package target errors.
-Independent rereview ACCEPTED the revised edge policy. The rebuilt Slug CLI
-now matches all five named Bazel 9.2 Query outcomes. Focused Query and direct
-Core tests pass; a broad Query integration run has one unrelated pre-existing
-Loading-label diagnostic expectation failure, with 73/74 passing. Final
-review found two cross-package selector-boundary gaps outside the named
-authentic chain; both were corrected and focused tests, a new Bazel 9.2
-negative, direct Core and the rebuilt CLI were revalidated. Independent
-final rereview ACCEPTED the bounded Query admission.
+WP787 selects the authentic Bazel 9.2 Linux x86-64 release-embedded
+`aggregate-ddi` and `generate-modmap` binaries for the immutable
+`@bazel_tools` catalog, then the direct observed configured child filegroups
+that select and forward them as singleton executable Files. A fresh Bazel 9.2
+`cquery` proves both Linux branches and providers; release archive SHA-256,
+entry bytes and mode establish the binary provenance. The public external
+`cquery` route, parent `tools/cpp`/rules_cc closure, source transfer and
+execution remain separate gates. WP786 at `438135765` accepted the preceding
+unconfigured Query traversal of these filegroups. Independent design and final
+reviews ACCEPTED this host-gated configured child boundary. Focused Bzlmod
+catalog and Analysis tests pass; runtime source transfer and execution remain
+open, so M7A is still partial.
 
 WP785 at `9931f6a2d` accepted bounded Linux `run_shell` execution through
 fresh NativeLink 1.7.1: one REAPI action, zero direct-local actions and exact

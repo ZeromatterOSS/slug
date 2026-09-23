@@ -3107,7 +3107,11 @@ mod tests {
         }
         assert_eq!(
             hex::encode(identity.manifest_sha256()),
-            "d614eabb9f52bb03a0c51a96cc942c8dadb669929b18a9338ae7286d23d6fa40"
+            if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+                "77d037eb62f01ada4046310894bd00bd784480a0c8bebbcfeb46127e469711a7"
+            } else {
+                "d614eabb9f52bb03a0c51a96cc942c8dadb669929b18a9338ae7286d23d6fa40"
+            }
         );
 
         let unknown = observed_route(&dice, EpochBuilder::root(source, 1).build(), "missing").await;

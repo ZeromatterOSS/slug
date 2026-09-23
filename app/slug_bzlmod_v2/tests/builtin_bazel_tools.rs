@@ -263,6 +263,18 @@ const FILES: &[(&str, &str, bool)] = &[
         "6f0727f09faaee782e8cf2219586243f767c7c4cb6dc3b9024f8c4c3aba9dad3",
         false,
     ),
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    (
+        "tools/cpp/modules_tools/aggregate-ddi",
+        "f12eb5bb2b0d8634745ff88deeed1c038f903e4d6058caf8c60db1de126c1f28",
+        true,
+    ),
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    (
+        "tools/cpp/modules_tools/generate-modmap",
+        "222b381da1faf69abf68f5763ad0531aa7aef110d3b16917ddb27e7f57165f70",
+        true,
+    ),
     (
         "tools/cpp/toolchain_utils.bzl",
         "feedbafb1be793c3e7710ece67e1ffb349d55ed726a358ee8d1dd8a68118cb7a",
@@ -404,9 +416,7 @@ async fn invalid_wrong_kind_and_unsupported_catalog_are_distinct() {
         })
     ));
     for path in [
-        "tools/cpp/modules_tools/aggregate-ddi",
         "tools/cpp/modules_tools/aggregate-ddi.exe",
-        "tools/cpp/modules_tools/generate-modmap",
         "tools/cpp/modules_tools/generate-modmap.exe",
     ] {
         assert!(
@@ -414,7 +424,20 @@ async fn invalid_wrong_kind_and_unsupported_catalog_are_distinct() {
                 read(&dice, path).await,
                 Err(BuiltinBazelToolsSourceFileError::UnsupportedCatalog { .. })
             ),
-            "generated binary must remain outside the source catalog: {path}"
+            "Windows binary must remain outside the source catalog: {path}"
+        );
+    }
+    #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+    for path in [
+        "tools/cpp/modules_tools/aggregate-ddi",
+        "tools/cpp/modules_tools/generate-modmap",
+    ] {
+        assert!(
+            matches!(
+                read(&dice, path).await,
+                Err(BuiltinBazelToolsSourceFileError::UnsupportedCatalog { .. })
+            ),
+            "Linux release binary must remain absent on this host: {path}"
         );
     }
 }
@@ -439,7 +462,11 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
     assert_eq!(identity.snapshot(), BuiltinBazelToolsSnapshot::Bazel9_2);
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
-        "d614eabb9f52bb03a0c51a96cc942c8dadb669929b18a9338ae7286d23d6fa40"
+        if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+            "77d037eb62f01ada4046310894bd00bd784480a0c8bebbcfeb46127e469711a7"
+        } else {
+            "d614eabb9f52bb03a0c51a96cc942c8dadb669929b18a9338ae7286d23d6fa40"
+        }
     );
 }
 
@@ -467,6 +494,20 @@ fn embedded_catalog_paths_remain_exact_with_bazel_input_metadata() {
         "tools/test/BUILD.bazel",
     ];
     paths.retain(|path| !bazel_input_sidecars.contains(&path.as_str()));
+    #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+    {
+        let linux_release_assets = [
+            "tools/cpp/modules_tools/aggregate-ddi",
+            "tools/cpp/modules_tools/generate-modmap",
+        ];
+        for asset in linux_release_assets {
+            assert!(
+                paths.iter().any(|path| path == asset),
+                "checked-in release asset missing from Bazel inputs: {asset}"
+            );
+        }
+        paths.retain(|path| !linux_release_assets.contains(&path.as_str()));
+    }
     paths.sort();
     assert_eq!(
         paths,

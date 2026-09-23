@@ -1,240 +1,174 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-86-m7a-external-filegroup-query-r1
+Packet: WP-7-87-m7a-linux-module-tool-filegroups-r1
 Status: accepted; independent final ACCEPT
 
 ## Outcome and compatibility
 
-Make ordinary root-visible Query traverse the authentic Bazel 9.2 built-in
-filegroup chain `@bazel_tools//tools/cpp:aggregate-ddi` →
-`@bazel_tools//tools/cpp/modules_tools:aggregate-ddi-bin`, and the analogous
-`generate-modmap` chain. The child `srcs = select(...)` must expose both
-source arms and its `:windows` condition to unconfigured `deps`, while
-`labels(srcs, child)` exposes only the two source arms. This is a finite
-preparation for the configured module-tool dependencies named in
-[bootstrap readiness](./bootstrap-readiness.md); it does **not** close that
-M7A row or claim the module binaries and actions are available.
+Admit the two Linux x86-64 Bazel 9.2 release-embedded module-tool binaries as
+immutable `@bazel_tools` source Files, then prove that observed configured
+analysis of the authentic child filegroups
+`@@bazel_tools//tools/cpp/modules_tools:{aggregate-ddi-bin,generate-modmap-bin}`
+selects those Files and forwards each singleton as its executable. This is the
+direct configured child boundary, not the `tools/cpp` parent or a public
+`cquery` command.
 
-Exact: the named Bazel 9.2 Query labels and ordering for the two authentic
-same-repository cross-package filegroup chains, all-branch `srcs`
-dependencies and nondefault selector-key dependency, and label-attribute
-separation for those native filegroups; the observed same-package missing
-selector-key source and cross-package missing-destination negatives, including
-a cross-package selector key. Slug-native: immutable graph and
-repository-route identity, Host-observed DICE invalidation and publication
-equality; other source-derived same-repository traversals have only their
-existing typed Slug-native graph coverage, with exact parity unclaimed.
-Unsupported/deferred: foreign-repository filegroup `srcs` and selector keys, a
-general `--noimplicit_deps` Slug flag, configured C++/module-tool providers and selected
-binary content, execution, REAPI, Bazel ActionKeys and exact output paths.
-Do not infer general Query or configured-graph parity from this slice.
+Exact: Bazel 9.2 Linux x86-64 release bytes, SHA-256, executable archive mode,
+the two selected non-`.exe` source labels and singleton File/executable
+forwarding demonstrated by Bazel 9.2 `cquery`. Slug-native: immutable catalog
+manifest/route identity, DICE publication and artifact representation/path
+tokens; no Bazel configuration checksum or output-path byte claim.
+Unsupported/deferred: `.exe` sources and Windows selection, parent
+`tools/cpp` package/rules_cc closure, public external-label `cquery`, runtime
+catalog source acquisition, action construction/execution, REAPI/BuildBuddy,
+ActionKeys and full M7A/M8 closure. A configured provider is not proof that
+the embedded executable can be transferred to a remote worker.
 
-## Evidence and source basis
+## Evidence and provenance
 
-Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-owns the exact declarations at `tools/cpp/BUILD.tools:83-90` and
-`tools/cpp/modules_tools/BUILD.tools:3-22`; the checked-in Slug catalog
-contains those BUILD bytes verbatim. `Rule.java:453-457` invokes
-`AggregatingAttributeMapper.visitLabels`; its `:95-107,182-219` visit
-includes nondefault selector keys and all branch values for `deps`.
-`BlazeTargetAccessor.java:67-84` uses `getReachableLabels(attr, false)`
-for `labels(srcs)`, excluding selector keys. The internal Query edge kind
-is not a claim about Bazel's `--noimplicit_deps`: a fresh control confirmed
-that Bazel retains `:windows` even under that flag.
+Pinned Bazel 9.2 source commit `8220c6198837d5c13d53fea211cf3282aa12408a`:
+`tools/cpp/modules_tools/BUILD.tools:3-22` defines the platform selector;
+`tools/cpp/modules_tools/BUILD:58-87` builds the tools and includes them in
+`embedded_tools`; `src/create_embedded_tools.py` maps the built outputs into
+the self-extracting release archive and preserves executable mode;
+`Filegroup.java:58-61,103-119` constructs the source File and singleton
+executable providers. The installed `BUILD` matches the existing Slug catalog
+SHA-256 `6f0727f09faaee782e8cf2219586243f767c7c4cb6dc3b9024f8c4c3aba9dad3`.
 
-Fresh Bazel 9.2 probes in an isolated copy of the existing
-`rules-cc-basic` workspace returned exit 0. `deps(aggregate-ddi, 2)`
-emitted, in order: parent, `modules_tools:aggregate-ddi`,
-`modules_tools:aggregate-ddi-bin`, `modules_tools:aggregate-ddi.exe`,
-`modules_tools:windows`. `deps(generate-modmap, 2)` emitted the analogous
-five labels. `labels(srcs, aggregate-ddi-bin)` emitted only
-`aggregate-ddi` and `aggregate-ddi.exe`; `deps(aggregate-ddi-bin, 1)`
-also emitted `:windows`. `same_pkg_direct_rdeps(:windows)` emitted both
-child filegroups. The Linux `cquery` selected the default `aggregate-ddi`
-source and omitted `.exe`; that configured observation is a discriminator,
-not this Query packet's admission. Ordinary Bazel RC discovery was used;
-no RC contents or authentication bytes were inspected or copied.
+The official Bazel 9.2.0 Linux x86-64 release checksum asset
+`https://github.com/bazelbuild/bazel/releases/download/9.2.0/bazel-9.2.0-linux-x86_64.sha256`
+identifies the Bazelisk-cached release executable with SHA-256
+`7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694`.
+Its embedded ZIP entries are mode 0755 and match the extracted install-base
+files: `aggregate-ddi`, 104888 bytes,
+`f12eb5bb2b0d8634745ff88deeed1c038f903e4d6058caf8c60db1de126c1f28`;
+`generate-modmap`, 105576 bytes,
+`222b381da1faf69abf68f5763ad0531aa7aef110d3b16917ddb27e7f57165f70`.
+They are release-generated ELF64 x86-64 assets, not present as binaries in the
+pinned source checkout. Import only these exact release bytes; do not build or
+invent replacements. The pinned tool-specific C++ sources carry Apache-2.0
+headers and depend only on their first-party module-tool libraries plus the
+dynamic C++ runtime; the repository's `LICENSE-APACHE` covers source checkout
+redistribution. A future standalone Slug bundle containing these bytes must
+also ship that license text; do not infer MIT licensing from Slug's dual license.
 
-A fresh Bazel 9.2 negative probe also found that
-`deps(//:missing_selector, 1)` includes undeclared same-package
-`:missing_condition` as a **source file**, with or without
-`--noimplicit_deps`; `labels(srcs, //:missing_selector)` excludes it.
-`deps(//:cross_missing, 1)` instead errors for an absent target in a
-different package, and a declared `package_group` in filegroup `srcs` is a
-valid Query dependency. Pinned `Package.java:873-955` synthesizes undeclared
-same-package input files from rule labels; `TargetRecorder.java:230-231`
-delegates to `Rule.getLabels`. These outcomes supersede the earlier
-no-synthesis design assumption. The exact negative for this packet is the
-cross-package missing destination; an unsupported wrong-kind guard is
-Slug-native, not a Bazel parity claim.
+An isolated copy of the existing `rules-cc-basic` fixture, ordinary Bazel RC
+discovery and `--lockfile_mode=off` returned exit 0 for Linux `cquery` on both
+child filegroups. `--output=build` selected `aggregate-ddi` and
+`generate-modmap`, not `.exe`; a Starlark provider projection returned exactly
+one source File per `DefaultInfo.files`, the same File for
+`DefaultInfo.files_to_run.executable` and `FilesToRunProvider.executable`, and
+the expected `DefaultInfo`, `FileProvider`, `FilesToRunProvider`,
+`InstrumentedFilesInfo`, `OutputGroupInfo` provider names. The two short paths
+were `../bazel_tools/tools/cpp/modules_tools/{aggregate-ddi,generate-modmap}`.
+This extends WP786's accepted unconfigured Query child-edge evidence; no new
+fixture is needed. The oracle's isolated Bazel server was shut down. Normal RC
+discovery may use the user's authentication; never inspect, print or copy RC
+contents or credential bytes.
 
-A further isolated Bazel 9.2 probe with
-`srcs = select({"//other:absent": ["local.txt"],
-"//conditions:default": []})` and an existing `other` package returned
-exit 0 for direct target lookup and `labels(srcs, target)` (only
-`//:local.txt`), but exit 7 for `deps(target, 1)` with a missing
-`//other:absent` target. This distinguishes selected cross-package
-selector traversal from package loading and label-attribute projection.
+## Owners and design
 
-## Owner and decision
+`app/slug_bzlmod_v2/src/builtin_repository.rs` owns immutable catalog bytes,
+expected digests, executable bits, directory listing and the structural
+manifest SHA-256 in `BuiltinBazelToolsRouteIdentity`. Gate the two catalog rows
+at compile time to Linux x86-64; other host builds must retain the current
+unsupported result for both non-`.exe` and `.exe` paths. This is a
+host-release-content boundary, not target-configuration selection. The
+manifest SHA-256 must differ on the Linux host while remaining the prior value
+on other hosts, so no version-only identity collision occurs. Reuse its existing
+`BuiltinBazelToolsSourceFileKey`, validation and deterministic sorted catalog
+order. Do not add a host path, fallback read, second binary store, new hash
+algorithm or DICE key. The two static include-bytes assets add about 211 KiB to
+the Linux binary; catalog lookup also copies each requested byte slice into an
+existing DICE-owned `Arc<[u8]>`, so at most one further copy per distinct
+source-key result is retained per DICE instance. Existing Arc/Dupe/Allocative
+value ownership and publication remain unchanged. Hashing remains exact
+SHA-256 over the catalog's actual bytes and
+metadata, separate from Slug configuration/action identity and REAPI digests.
 
-Loading already owns the complete native filegroup fact: flattened branch
-labels in `PackageTargetKind::Filegroup.srcs`, the original
-`CoercedAttributeValue::Selector` and `$config_dependencies` in native
-attributes (`package.rs:1547-1597`). Do not reparse BUILD text or infer a
-condition from source filenames. The existing root and external
-unconfigured package-graph DICE keys own the immutable Query nodes and
-edges; external destination lookup uses the existing verified repository
-route and independently loaded destination package. Query result sets and
-traversal worklists remain request-local. Do not add a key, lock, cache,
-interner, cross-package fallback source node in the caller package, or ambient
-filesystem read. Preserve Need/error propagation, source observation and A/B/A
-restoration through the existing graph/route dependencies.
+Analysis already owns source classification through the canonical observed
+repository route and catalog source key (`dice/source_file.rs:210-237`), and
+native filegroup selected-source/provider projection (`dice/filegroup.rs`).
+`HostPackageInventoryObservationKey` and
+`ConfiguredNodeAnalysisObservationKey` retain the existing dependencies,
+Need/error behavior and source/package observations. A built-in source has no
+filesystem acquisition path: preserve that runtime refusal. The observed
+configured test must request the real canonical `@@bazel_tools` child with the
+actual built-in route, not a local override or authored provider envelope.
+Use a Linux platform constraint fixture through existing test helpers and
+assert selected label, File short path, `DefaultInfo.files`, executable,
+files-to-run and zero actions for both children. An explicit Windows target
+platform must select `.exe` and fail closed while that source remains absent;
+this negative has only Slug-native diagnostic classification. Assert the
+unselected `.exe` paths remain unsupported in the Linux catalog. On other host
+builds both binary names remain absent from the catalog despite the Bazel
+source-input filegroup glob seeing their checked-in paths. Include a separate
+catalog SHA/mode/listing/host-conditional manifest identity regression and an observed-route negative
+that fails closed for unsupported source or platform state; do not weaken an
+existing catalog assertion without replacing it with the precise new boundary.
 
-Project selector keys from the Loading-owned native attribute into a
-dedicated `QueryEdgeKind::SelectorCondition` after the authored `srcs` arms.
-Both root and external same-package graph synthesis must treat an undeclared
-condition label as an input source file, matching Bazel's package loading;
-an existing declared condition resolves to its actual node. The separate
-kind preserves key provenance and leaves `labels(srcs)` with only authored
-arm values. Bazel's `--noimplicit_deps` still includes the key, so do not
-equate this kind with a filtered implicit dependency or claim the
-unimplemented Slug CLI flag. Preserve branch/source order,
-stable deduplication and the typed attribute value. Cover both root and
-external native-filegroup graph producers so the same selected family has
-one rule, but claim exact CLI results only for the named Bazel-observed
-external commands. A selected external same-repository cross-package edge
-must ask the destination package graph for the real target. Remove the
-current blanket selected-filegroup refusal only for source-derived paths
-whose repository route and target lookup are observed. Missing
-cross-package destinations and unmodeled foreign repositories fail closed;
-do not synthesize a target in the caller package for either.
+The Stage 9 compact-utility row is reuse-only: no retained representation,
+interner, collection, clone-cost or hashing algorithm changes. The existing
+catalog source file is under the 2,000-line production review trigger and
+adds only two entries, not a dispatcher.
 
-No new retained struct or per-node field is authorized: the new edge-kind
-variant fits the existing enum layout and uses the existing
-`Arc<[QueryEdge]>`, compact labels, `SmallSet` deduplication and
-`Allocative` graph owner. The extra retained edges are proportional only to
-real selector keys. Scratch label vectors and traversal sets die with their
-compute/request. The Stage 9 compact-utility row is reuse-only; no donor
-code, memory-reduction or throughput claim. `graph.rs` is already large,
-but this stays in its existing native filegroup projection and one small
-shared selector helper, not a new central dispatcher.
+## Scope, stops and validation
 
-## Scope and stops
+Base `438135765` on clean main. Root owns source import, serial Cargo,
+integration, documentation and commit. Production allowlist:
+`app/slug_bzlmod_v2/src/builtin_repository.rs` and the two verbatim binary
+assets under `app/slug_bzlmod_v2/builtin/bazel_tools/tools/cpp/modules_tools/`.
+Test allowlist: `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs`, the existing
+manifest-digest assertion in `app/slug_bzlmod_v2/src/host_module.rs`'s test
+module, and a focused existing `app/slug_analysis_v2/tests/starlark_rule.rs`
+submodule/test. The root may add a provenance attribution to repository
+`NOTICE`; no catalog-local notice or unverified upstream content. No
+Loading/Analysis production, Core/CLI, transport, root MODULE/lockfile or
+oracle expected-byte edits. Independent design and final review gate the
+release-content/public catalog admission.
 
-Base `9931f6a2d` on main; review branch
-`codex/wp786-external-filegroup-query-review`. Root owns scheduling,
-Bazel/Slug CLI evidence, serial Cargo, integration and commit. Production
-allowlist: `app/slug_query_v2/src/{graph,loading_environment}.rs`.
-Focused tests may change `app/slug_query_v2/tests/loading_query.rs` and
-existing `graph.rs` tests; `app/slug_core_v2/src/runtime/tests/query_command_tests.rs`
-may change only for a demonstrated command integration regression or stale
-direct-dependent expectation exposed by it. No
-Loading/Bzlmod/catalog, analysis/configuration, transport, root MODULE,
-lockfile or oracle expected-byte edits. Independent design and final review
-are mandatory for public graph semantics. Avoid synthetic fixture growth:
-reuse the authentic Bazel observations and existing Query test scaffolding;
-add a fixture only if a demonstrated comparator gap cannot be covered by
-these commands and focused tests.
+Stop and REPLAN if the release executable cannot be independently authenticated,
+the embedded entries differ from the installed bytes or declared modes, direct
+child configured analysis requires parent `rules_cc` or a new semantic owner,
+or Linux selection cannot be proved without widening public cquery or runtime
+source acquisition. Diagnose ordinary fixture/invocation or implementation
+failures within this packet first.
 
-Stop and REPLAN if the destination package cannot be reached through the
-existing observed route, a selected child requires an unowned foreign
-repository edge within the named depth-two outcome, same-package selector
-source synthesis cannot be distinguished from missing cross-package target
-errors, or the authentic package has a new whole-package blocker. Do not
-pass by hard-coding the two target names,
-skipping child lookup, inventing binaries, or widening foreign-repo support.
-
-## Acceptance and validation
-
-After a rebuilt `slug_cli_v2`, the five named authentic Bazel Query outcomes
-above must match on Slug, including label order, source arms, condition,
-`labels(srcs)` exclusion and same-package reverse dependencies. Selected
-child lookup must yield real external filegroup/source/config_setting nodes,
-not parent-package synthetic files. Focused root/external tests cover
-same-repository cross-package present/missing and wrong-kind destinations,
-selector branch/condition order and deduplication, a native literal-srcs
-control, missing same-package selector condition synthesized as a source
-only in `deps` and not `labels(srcs)`, a missing cross-package destination
-error, foreign-repo refusal, unselected unrelated target success and
-observed destination edit/delete/recreate A/B/A with Need/error recovery.
-Retain WP784's nonvisible-alias and rule-toolchain Query outcomes and the
-prior typed deferred behavior for unrelated unsupported shapes. A negative
-without an accepted Bazel counterpart is a fail-closed Slug-native guard,
-not an exact diagnostic claim.
-
-Resolve the pinned nightly before Rust validation. Compile offline/locked
-with Cargo JSON `--no-run`; preflight exact nonignored test selectors and
-record counted execution for Query owner, integration and one direct Core
-dependent. Rebuild the CLI before binary comparison; check for stale
-`slugd` before/after. Run `cargo fmt --all -- --check`, `git diff --check`,
-plan/archive status and independent final review. A broad Query suite may
-be run once if its baseline failure is separately attributed. No NativeLink,
-BuildBuddy or credential-bearing command is needed for this packet.
+Resolve the pinned nightly before Rust validation. Compile offline/locked with
+Cargo JSON `--no-run`, preflight exact nonignored selectors, then execute focused
+Bzlmod catalog tests, the observed configured child test and one direct
+Analysis dependent. Run `cargo fmt --all -- --check`, `git diff --check`,
+`scripts/v2_archive_status.sh`, plan status and independent final review.
+No NativeLink or BuildBuddy service is needed for this analysis-only packet.
 
 ## Immediate predecessor
 
-WP785 at `9931f6a2d` independently accepted bounded Linux `run_shell`
-remote execution through NativeLink 1.7.1: one REAPI action, zero direct
-local actions, exact output content/mode under Slug-native roots, with a
-raw manifest-only Bazel path difference. Its FileWrite direct transport
-regression passed and no backend process remained. WP784 at `8fd6e0601`
-accepted the authentic `tools/cpp:empty_lib` and nonvisible alias Query
-outcomes, retaining cross-package filegroup source edges but deliberately
-deferring selected traversal. This packet selects that next frontier only.
-The baseline rebuilt Slug CLI in the same copied workspace exits 7 for
-`deps(@bazel_tools//tools/cpp:aggregate-ddi, 2)` at the named typed
-cross-package filegroup guard. The first independent design review ACCEPT
-was superseded by the missing-condition Bazel oracle above; independent
-rereview ACCEPTED the corrected same-package synthesis rule.
+WP786 at `438135765` independently accepted the authentic unconfigured
+`@bazel_tools` cross-package module-tool filegroup Query edges and selected
+traversal. It explicitly left configured providers and missing binaries open.
+Independent design review ACCEPTED the host-guarded, release-backed packet;
+independent final review ACCEPTED the implementation.
 
-## Implementation and validation receipt
+## Acceptance receipt
 
-Root and external native-filegroup graph producers now append distinct
-selector-condition edges after authored source arms, retaining Loading's
-typed `srcs` attribute. Existing same-package graph synthesis turns an
-undeclared condition into a source node; cross-package labels remain edges
-to real destinations. The selected external filegroup path uses the
-existing repository route and `resolve_single` to verify same-repository
-cross-package sources before publishing them. Foreign repositories remain
-guarded. No new DICE key, lock, interner, retained field or repository
-source observation was added.
+The two checked-in 0755 assets match the authenticated Bazel 9.2 release ZIP
+entries byte-for-byte. The Linux catalog adds exactly their SHA-256-validated
+rows, while non-Linux hosts omit them and retain their prior manifest digest.
+The Linux manifest digest is
+`77d037eb62f01ada4046310894bd00bd784480a0c8bebbcfeb46127e469711a7`.
+The authentic observed configured test passed for both filegroups: selected
+source File/short path, singleton executable and files-to-run, zero actions,
+Windows `.exe` refusal, and Linux restoration on the same DICE instance.
 
-Offline/locked pinned-nightly JSON `--no-run` compiled the Query library,
-Query integration and direct Core dependent. Exact nonignored preflight
-passed for the new graph and integration selectors and one Core selector.
-Counted tests passed: 60/60 Query library, the six selected Query
-integration tests, and the direct Core command test. The broad Query
-integration run passed 73/74: its only failure is the pre-existing
-`invalid_relative_package_target_fails_in_loading_label_conversion`
-expectation for a Loading/Starlark diagnostic prefix (`invalid label`)
-that current Loading omits; no changed producer owns that conversion.
-The direct Core test's obsolete cross-package filegroup refusal was removed;
-its selected nonvisible-alias check now uses the actual alias and observes
-the stop gate before restoration. Two already-stale external BUILD-load and
-glob refusal blocks were removed after independent source review confirmed
-those paths are admitted and covered by focused Loading tests. The remaining
-Core lifecycle and UTF-8 checks pass.
-
-After `cargo build -p slug_cli_v2`, an isolated copy of `rules-cc-basic`
-produced exit-zero Slug output matching all five named Bazel 9.2 oracle
-results in order: both depth-two parent chains, the child `labels(srcs)`,
-child depth-one `deps`, and `same_pkg_direct_rdeps(:windows)`. No `slugd`
-remained before or after these CLI checks. Full-workspace Rust formatting,
-`git diff --check` and plan status passed. No NativeLink or BuildBuddy
-backend was used for this unconfigured Query packet, and no RC credential
-material was inspected.
-
-Independent final review found two further boundary obligations: canonical
-root selector keys authored in an external BUILD must not be rebound to the
-external repository, and same-repository cross-package selector-condition
-edges must resolve a real destination before `deps(..., 1)` publishes them.
-The selector helper now checks Loading's canonical repository identity
-without rebinding, and selected traversal verifies both ordinary source
-and selector-condition cross-package edges through the existing route.
-Focused root-key refusal and missing cross-package condition tests pass;
-the latter is backed by the fresh Bazel 9.2 probe above. Generic native
-attribute projection was not widened. Query library, direct Core and all
-five named authentic CLI outcomes were rerun after correction and retain
-the results above; no `slugd` remained. Independent final rereview returned
-ACCEPT for the bounded Query admission and its explicit deferred boundaries.
+Pinned-nightly offline/locked Cargo JSON `--no-run` compiled the Bzlmod library
+and catalog integration test plus the Analysis `starlark_rule` test. Exact
+nonignored preflight and execution passed for four focused Bzlmod library
+tests, all four catalog integration tests, and one authentic Analysis test.
+The first Analysis invocation failed because the scratch fixture omitted the
+built-in MODULE's local dependency overrides; adding the existing host-platform
+override pattern corrected that fixture, and the recompiled selector passed.
+`cargo fmt --all -- --check`, `git diff --check`, archive status and plan status
+passed. Review-requested cross-host metadata filtering was corrected and its
+four-test integration executable reran 4/4; the strengthened Analysis test
+reran 1/1. Packet elapsed about 15 minutes, with serial compilation and
+subsecond focused executions; no architectural replan or remote service use.

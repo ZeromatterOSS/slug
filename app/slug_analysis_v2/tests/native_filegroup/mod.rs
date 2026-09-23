@@ -7,6 +7,8 @@ use slug_configuration_v2::NativeCommandOption;
 
 use super::*;
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+mod authentic_builtin;
 mod lifecycle;
 mod rejection;
 

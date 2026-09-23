@@ -14,3 +14,7 @@ The code in `shed/completion_verify/src/runtime` is adapted from `complete_pty`
 (https://crates.io/crates/completest_pty).
 
 The code in `shed/setsketch/src` is adapted from `probminhash` (https://github.com/jean-pierreBoth/probminhash).
+
+The Linux x86-64 executables `aggregate-ddi` and `generate-modmap` in the
+`@bazel_tools` catalog are redistributed verbatim from the Bazel 9.2.0 release.
+Copyright The Bazel Authors; licensed under Apache-2.0 (see LICENSE-APACHE).

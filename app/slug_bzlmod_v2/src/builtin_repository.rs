@@ -409,6 +409,20 @@ const CATALOG: &[CatalogEntry] = &[
         expected_sha256: "6f0727f09faaee782e8cf2219586243f767c7c4cb6dc3b9024f8c4c3aba9dad3",
         executable: false,
     },
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    CatalogEntry {
+        path: "tools/cpp/modules_tools/aggregate-ddi",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/modules_tools/aggregate-ddi"),
+        expected_sha256: "f12eb5bb2b0d8634745ff88deeed1c038f903e4d6058caf8c60db1de126c1f28",
+        executable: true,
+    },
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    CatalogEntry {
+        path: "tools/cpp/modules_tools/generate-modmap",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/modules_tools/generate-modmap"),
+        expected_sha256: "222b381da1faf69abf68f5763ad0531aa7aef110d3b16917ddb27e7f57165f70",
+        executable: true,
+    },
     CatalogEntry {
         path: "tools/cpp/toolchain_utils.bzl",
         bytes: include_bytes!("../builtin/bazel_tools/tools/cpp/toolchain_utils.bzl"),
@@ -1015,6 +1029,12 @@ mod tests {
 
     #[test]
     fn builtin_directory_listing_is_sorted_unique_and_direct() {
+        assert!(
+            CATALOG
+                .windows(2)
+                .all(|entries| entries[0].path < entries[1].path),
+            "built-in catalog paths must be sorted and unique"
+        );
         assert_eq!(
             listing_rows(""),
             [
@@ -1094,6 +1114,16 @@ mod tests {
                 ),
             ]
         );
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        assert_eq!(
+            listing_rows("tools/cpp/modules_tools"),
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("aggregate-ddi".to_owned(), PathDirectoryEntryKind::File),
+                ("generate-modmap".to_owned(), PathDirectoryEntryKind::File),
+            ]
+        );
+        #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
         assert_eq!(
             listing_rows("tools/cpp/modules_tools"),
             [("BUILD".to_owned(), PathDirectoryEntryKind::File)]
@@ -1273,7 +1303,11 @@ mod tests {
             evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &source).unwrap();
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
-            "d614eabb9f52bb03a0c51a96cc942c8dadb669929b18a9338ae7286d23d6fa40"
+            if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+                "77d037eb62f01ada4046310894bd00bd784480a0c8bebbcfeb46127e469711a7"
+            } else {
+                "d614eabb9f52bb03a0c51a96cc942c8dadb669929b18a9338ae7286d23d6fa40"
+            }
         );
         assert_eq!(value.module_sha256, source.sha256());
         assert_eq!(
