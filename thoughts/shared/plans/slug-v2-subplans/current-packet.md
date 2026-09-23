@@ -1,136 +1,152 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-88-m7a-module-tag-file-admissibility-r1
+Packet: WP-7-89-m7a-selected-extension-declared-host-environment-r1
 Status: accepted; independent design and final ACCEPT
 
 ## Outcome and compatibility
 
-Admit Bazel 9.2 module-extension `tag_class` declarations whose existing
-label-bearing `attr.*` descriptors specify `allow_files`, including the real
-rules_rust 0.73.0 `crate.from_cargo` `manifests` label list with the ordered
-`["Cargo.toml"]` file suffix policy. Preserve that policy in the immutable tag
-schema and its structural identity, coerce the supplied `//:Cargo.toml` as a
-label list in the calling module's mapping, and rerun the real root cquery to
-record its next honest terminal. Passing the declaration is not acceptance of
-the full root configured graph.
+Admit the real rules_rust 0.73.0 `crate` module extension's declared
+`environ` factor in the selected-owner path. Before invoking its implementation,
+observe every declared environment name (including absence) and Rust Host
+platform through existing repository Host DICE cells; supply a bounded
+`module_ctx.os` view for `name`, `arch`, and declared-name `environ` membership
+and `.get`. The authentic root cquery must pass the factor guard, consume these
+tracked facts and report its next honest terminal. It need not complete the
+extension or configured root graph.
 
-Exact: Bazel 9.2 tag-class descriptor acceptance, ordered `allow_files` policy
-retention and module-tag value type/label conversion. Bazel's tag type-check
-path does not resolve labels into targets or apply the file predicate; Slug
-must not add a filename-only rejection or claim resolved-file validation here.
-Slug-native: immutable projected schema/semantic DICE equality, canonical
-label representation and error presentation. Unsupported/deferred: target or
-file resolution from a module tag, repository-effect execution beyond its
-previously admitted boundary, configured root actions, generated inputs,
-public external-label cquery, Bazel configuration/output bytes and M7A/M8
-closure.
+Exact: Bazel 9.2 declared-name environment change/restore re-evaluation,
+absent versus present-empty distinction, and selected declared-name
+`module_ctx.os.environ` membership/get results. Slug-native: Rust Host
+`module_ctx.os` name/arch values and structural DICE invalidation; an undeclared
+`os.environ` lookup fails closed rather than reproducing Bazel's visible but
+untracked whole-process dictionary. Unsupported/deferred: other environment
+map operations, dynamic `module_ctx.getenv`, declarations with
+`os_dependent=True`, `arch_dependent=True` or nonzero `facts_version`,
+repository path/watch/download/execute effects, lockfile facts lifecycle,
+configured root actions and full M7A/M8 closure. Do not infer support for all
+module extensions from this selected-owner admission.
 
 ## Evidence and semantic owner
 
-Fresh Slug root smoke on base `17786a9d0` (`slug cquery
-'//app/slug_cli_v2:slug' --noimplicit_deps --lockfile_mode=off --output=label`)
-reaches `@@rules_rust+//crate_universe:extensions.bzl` and stops at
-`tag attribute 'manifests' does not support allow_files`. The repo's
-`MODULE.bazel` pins rules_rust 0.73.0 and supplies
-`crate.from_cargo(manifests=["//:Cargo.toml"])`. Its BCR-resolved
-`crate_universe/extensions.bzl:1277-1287` reuses
-`CRATES_VENDOR_ATTRS["manifests"]`; `private/crates_vendor.bzl:545-548`
-declares `attr.label_list(allow_files=["Cargo.toml"])`. These are the
-unchanged source bytes actually loaded by the root request.
+WP788 at `66d29e2fe` rebuilt Slug and moved the real
+`//app/slug_cli_v2:slug` cquery from the rules_rust `manifests` declaration
+failure to `selected module extension has unsupported factors`. The root
+`MODULE.bazel` uses `@rules_rust//crate_universe:extensions.bzl%crate`.
+The BCR-resolved rules_rust 0.73.0 `extensions.bzl:1657-1684` declares only
+`environ=CRATES_REPOSITORY_ENVIRON`; `private/generate_utils.bzl:16-26`
+assembles the ordered eight names `CARGO_BAZEL_GENERATOR_URL`,
+`CARGO_BAZEL_GENERATOR_SHA256`, `CARGO_BAZEL_REPIN`, `REPIN`,
+`CARGO_BAZEL_REPIN_ONLY`, `CARGO_BAZEL_ISOLATED`, `CARGO_BAZEL_DEBUG`, and
+`CARGO_BAZEL_TIMEOUT`. Its `_crate_impl` calls `get_host_triple(module_ctx)`
+and `_get_generator`; the latter tests membership and `.get` for the two
+declared generator names, and reads `module_ctx.os.name`. The host-triple
+helper reads OS and architecture. No ambient environment read may be added.
 
-Pinned Bazel 9.2 source commit `8220c6198837d5c13d53fea211cf3282aa12408a`:
-`StarlarkRepositoryModule.java:241-257` builds tag attributes from descriptors
-without a file-admissibility ban; `StarlarkAttrModule.java:127-139,431-445`
-parses and retains Boolean/list `allow_files`; `TypeCheckedTag.java:96-114`
-delegates to `AttributeUtils.java:47-130`, whose checks cover type, allowed
-values, mandatory/default and repository visibility but not target/file
-resolution. An isolated Bazel 9.2.0 oracle (`/tmp/slug-tag-allow-files.YjLvN3`,
-server shut down) queried a repository generated by an extension using the
-authentic `attr.label_list(allow_files=["Cargo.toml"])` tag descriptor.
-`manifests=["//:Cargo.toml"]` succeeded and produced proof `@@//:Cargo.toml`;
-an existing `//:bad.txt` also succeeded, proving no suffix check at tag
-preparation; omission succeeded with an empty list; `manifests=[123]` failed
-with a typed element-0 error. Existing Slug tests already prove
-`allow_single_file` retention and module-tag label mapping; extend them for the
-previously rejected policy.
+Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`:
+`RegularRunnableExtension.java:182-205` observes declared names and OS/arch
+factors; `ModuleExtensionContext.java:91-94` records static environment
+inputs; `StarlarkBaseExternalContext.java:194,1513-1543` supplies `os` and
+dynamically records `getenv`; `StarlarkOS.java:31-79` exposes the complete
+environment while warning that lookup alone creates no dependency. An
+isolated Bazel 9.2 same-server oracle at `/tmp/slug-extension-factors.jzJPBe`
+proved declared `--repo_env=SLUG_ORACLE_FACTOR` A→B→A re-evaluations and
+proof bytes, absent versus present-empty, and no re-evaluation for an
+unrelated changed name. That unrelated name was nevertheless visible through
+`os.environ`; `getenv` dynamically tracked its name in a separate probe.
+The isolated server was shut down. Slug must explicitly classify and reject
+the untracked Bazel behavior rather than silently omit a visible input.
 
-`slug_loading_v2::package::tag_class` is the only declaration gate to change:
-remove its broad non-single-file prohibition while preserving every other
-rejection. `ModuleExtensionTagAttribute.file_admissibility` already retains the
-ordered policy and derives structural equality/Allocative, then enters frozen
-`ModuleExtensionDefinitionProjection`. `prepare_module_extension_tag_attributes`
-remains the type, allowed-value and label-mapping owner; it must not discard or
-pretend to enforce file resolution. Existing observed Loading/Bzlmod DICE
-source and module dependencies remain authoritative; no key, lock, alternate
-filesystem read, cache, or publication path changes. The existing retained
-schema carries no new field or clone class, and no new asynchronous memory is
-introduced. This is call-flow work over an unchanged representation, not a
-Stage 9 compact-utility change.
+`slug_loading_v2::module_extension::HostSelectedExtensionOwnerPureKey` owns the
+selected invocation and its DICE dependencies. Reuse the already injected
+`RepositoryEnvironmentCellKey` per declared name,
+`RepositoryPlatformKey`, `RepositoryHostInputTransaction`, and
+`SourcePreparationNeeds::environment` frontier protocol; Core already
+captures the command repository environment once and retries Needs. Check
+frontier authorization before cell reads, then verify each observed cell
+against the immutable request snapshot. Never read `std::env` or bypass the
+cell. A missing authorization returns Need without invocation or publication;
+a mismatched/unauthorized cell is an error without leaking its value. Stable
+declared cells and platform become real DICE dependencies; unrelated names do
+not. Declaration order/duplicates remain in the frozen projection identity;
+deduplicate only the observation frontier. Preserve first/second Bzl manifest
+and projection drift checks, event ownership, cancellation and error/Need
+behavior. Existing `RepositoryEnvironmentCell` equality distinguishes absent,
+empty and nonempty, so A→B→A restores the prior semantic result.
 
-## Scope and validation
+The Starlark `module_ctx.os` value is invocation-heap scratch, not a new
+service or DICE cache. It owns only the verified platform and declared
+name/value projection. Its `environ` view supports membership and `.get` for
+declared names, returning false/`None` for declared-absent and true/empty
+string for declared-present-empty; any undeclared name and unsupported map
+operation must error, never appear absent by default. It must not expose the
+full untracked transaction snapshot or print secret values in diagnostics.
+Existing per-name DICE cells retain the values; only a bounded `Arc` projection
+is held through this one invocation and released on completion/cancellation.
+No new DICE key, global state, lock or hashing algorithm is authorized.
 
-Base clean `main` at `17786a9d0`. Root owns packet, integration, serial Cargo,
-fresh CLI rebuild/smoke, final review and commit. Production allowlist:
-`app/slug_loading_v2/src/package.rs`. Test allowlist:
-`app/slug_loading_v2/src/package.rs`'s existing unit module and
-`app/slug_loading_v2/src/host_package_load_tests.rs`. Scheduling allowlist:
-this manifest and the canonical Current packet paragraph. No Bzlmod/Analysis,
-Core/CLI, root MODULE, lockfile, fixture, transport or identity algorithm edits.
-The 12k-line `package.rs` is an existing cohesive Loading owner; change only
-the short `tag_class` guard and colocated tests, not its dispatcher or schema.
+## Scope, stops and validation
 
-Before implementation, obtain independent design review of this public
-declaration boundary. Replace the stale `tag_class(attr.label(allow_files=True))`
-rejection assertion with positive acceptance and retain adjacent cfg,
-providers and allow_rules negatives. Assert ordered suffixes/AnyFile and
-changed/restored structural projection identity, correct prepared
-`manifests=["//:Cargo.toml"]`, acceptance of an existing wrong-suffix label at
-the no-resolution tag stage, omission as an empty list, and rejection of a
-wrongly typed raw tag value.
-The root smoke must pass the original `manifests` declaration and record the
-next terminal; it need not complete the root cquery. Preserve existing exact
-tests rather than adding a new fixture if source and focused checks discriminate
-the change. Stop and REPLAN if source/oracle rejects these declarations, the
-policy is lost from the retained schema, or correct behavior requires a new
-resolution/ownership phase. Diagnose ordinary compile/invocation failures
-within this contract.
+Base clean `main` at `66d29e2fe`. Root owns integration, serial Cargo,
+fresh CLI rebuild/smoke, reviews and commit. Production and test allowlist:
+`app/slug_loading_v2/src/module_extension.rs` and its existing unit tests.
+Scheduling allowlist: this manifest and the canonical Current packet paragraph.
+No Core/CLI/Bzlmod production, repository-rule-context, root MODULE/lockfile,
+fixture, REAPI, or transport edits. `module_extension.rs` is an existing
+roughly 3.5k-line cohesive selected/legacy invocation owner; keep the new Host
+observation and context value localized rather than adding a dispatcher or
+duplicating repository-rule effect plumbing. Existing environment cell/Arc
+representations and clone behavior are reused, not changed.
 
-Resolve the pinned nightly, compile Loading tests with offline/locked Cargo
-JSON `--no-run`, preflight exact nonignored selectors and run focused owner
-tests plus one direct dependent. Rebuild `slug_cli_v2` before the root smoke;
-clean stale `slugd` before and after. Run `cargo fmt --all -- --check`,
-`git diff --check`, `scripts/v2_archive_status.sh`, `v2_plan_status.py` and
-independent final review. No NativeLink or BuildBuddy service is needed for
-this Loading-only packet; the user's `~/.bazelrc` may supply BuildBuddy auth
-to ordinary Bazel oracles and must never be inspected, copied or printed.
+Obtain independent design review before Rust implementation and independent
+final review of the diff. At least one focused dynamic test must compute
+`HostSelectedExtensionOwnerPureObservationKey` over a real selected external
+`.bzl` route, not merely assert source shape. Focused tests must prove
+declared-present A→B→A,
+absent→empty→absent, unrelated-variable non-invalidation, declaration-order
+identity, platform change/restoration, Need with zero selected-owner invocation
+events (earlier route/Bzl observations may already exist),
+cell/request mismatch error with redacted diagnostics, declared membership/get,
+and undeclared lookup rejection. Preserve rejection of OS/arch/facts factor
+declarations. Reuse existing DICE test helpers and the isolated Bazel oracle;
+no new repository fixture unless a demonstrated gap requires one. The fresh
+root cquery must pass the factor guard and record the next terminal, not claim
+root success. Stop and REPLAN if the selected source requires an undeclared
+environment lookup, the Host cells/platform cannot own invalidation, the
+Starlark proxy cannot reject unsupported access, or the implementation needs
+a broader public/identity/lockfile owner. Diagnose ordinary test/compiler
+failures within the accepted contract.
 
-Independent design review ACCEPTED the unchanged Loading schema owner and
-no-resolution boundary; its residual risk is a later root cquery stop.
+Resolve the pinned nightly, compile Loading tests offline/locked with Cargo
+JSON `--no-run`, preflight exact nonignored selectors, run focused owner tests
+plus one direct dependent. Rebuild `slug_cli_v2` before smoke and clean stale
+`slugd` before/after. Run `cargo fmt --all -- --check`, `git diff --check`,
+`scripts/v2_archive_status.sh`, `python3 scripts/v2_plan_status.py`, and
+independent final review. A root smoke may use ordinary request environment;
+never inspect or copy `~/.bazelrc` authentication. NativeLink/BuildBuddy are
+not needed for this Loading-only packet.
 
 ## Immediate predecessor
 
-WP787 at `17786a9d0` accepted authentic Linux x86-64 Bazel 9.2 module-tool
-binary bytes and directly configured child filegroups; runtime source transfer,
-parent `tools/cpp` closure and public external-label cquery remain separate.
+WP788 at `66d29e2fe` admitted `tag_class` `allow_files` descriptors and
+advanced the authentic root to this declared-environment factor stop.
 
-## Acceptance receipt
+## Validation receipt
 
-The one guard was removed; all other `tag_class` rejection checks remain.
-Focused tests prove ordered suffix/AnyFile retention, changed/restored frozen
-projection identity, valid and wrong-suffix `manifests` labels, omitted empty
-list and wrong-type rejection. The prior scalar `allow_files=True` rejection
-assertion is now a positive; adjacent providers/rules/cfg negatives remain.
-
-Pinned-nightly offline/locked Loading test compilation passed; exact
-nonignored preflight selected the three affected tests, and all 3/3 passed.
-The direct Bzlmod dependent `cargo test -p slug_bzlmod_v2 --offline --locked
---no-run -q` passed. The V2 CLI rebuilt successfully with `cargo build -p
-slug_cli_v2 --offline --locked -q`. With no stale `slugd` before or after,
-the fresh root cquery passed the original `manifests` declaration and reached
-the next bounded terminal, `selected module extension has unsupported factors`
-(exit 2 in 8.7 seconds). That is not claimed as a root-cquery pass.
-`cargo fmt --all -- --check`, `git diff --check`, archive status and plan
-status passed. Bazel oracle's isolated server was shut down. No remote
-execution or cache service was used.
-Independent final review ACCEPTED the declaration-only contract and focused
-proof; the unsupported extension-factors terminal remains a separate M7A gate.
+Independent design and final reviews ACCEPTED the narrowed declared-name
+proxy and Slug-native OS/architecture classification. The selected external-registry
+owner test passed (1/1) through cold Need, declared A→B→A,
+absent→empty→absent, unrelated-name reuse, platform change/restoration,
+declaration-order identity and cell/request mismatch/unauthorized redaction.
+A separate selected external-route test passed (1/1) for rejection of
+`os_dependent=True`, `arch_dependent=True` and `facts_version=1` before
+invocation. The direct `module_ctx.os` proxy test and one existing
+Host-dependent test passed (1/1 each). Pinned-nightly offline/locked Loading
+JSON no-run compile, exact-selector preflight for all four focused tests,
+`cargo fmt --all -- --check`,
+`git diff --check`, archive status and plan status passed. A fresh
+`cargo build -p slug_cli_v2 --offline --locked -q` passed. The fresh
+`target/debug/slug cquery '//app/slug_cli_v2:slug' --noimplicit_deps
+--lockfile_mode=off --output=label` passed the old factor guard and stopped
+at rules_rust 0.73.0 `extensions.bzl:851`: `module_ctx` has no `path`
+attribute. No `slugd` remained before or after the smoke. This is a new
+deferred repository-path effect, not configured-root success.

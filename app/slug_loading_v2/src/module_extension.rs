@@ -34,9 +34,16 @@ use slug_bzlmod_v2::HostSelectedExtensionOwnerInputsObservationError;
 use slug_bzlmod_v2::HostSelectedExtensionOwnerInputsObservationKey;
 use slug_bzlmod_v2::ModuleExtensionMetadata;
 use slug_bzlmod_v2::ModuleExtensionRepositorySelection;
+use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
+use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
+use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
+use slug_bzlmod_v2::RepositoryHostInputTransaction;
+use slug_bzlmod_v2::RepositoryPlatform;
+use slug_bzlmod_v2::RepositoryPlatformKey;
 use slug_bzlmod_v2::RootModuleExtensionUsage;
 use slug_bzlmod_v2::RootPackageBzlTarget;
 use slug_bzlmod_v2::RootRepositoryRoute;
+use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
@@ -680,10 +687,91 @@ fn owner_projection(module: &FrozenBzlModule, request: &HostSelectedExtensionDef
     let (export, _visibility) = module.module.get_assigned(request.parts().1).map_err(|error| CompactString::from(error.to_string()))?;
     let definition = export.downcast::<FrozenModuleExtensionDefinition>().map_err(|_| CompactString::from("selected export is not module_extension"))?;
     let projection = definition.projection();
-    if !projection.environment.is_empty() || projection.os_dependent || projection.arch_dependent || projection.facts_version != 0 {
+    if projection.os_dependent || projection.arch_dependent || projection.facts_version != 0 {
         return Err("selected module extension has unsupported factors".into());
     }
     Ok(OwnerProjection { manifest: module.manifest.clone(), definition: projection })
+}
+
+type SelectedHostObservation = SourcePreparationOutcome<Result<ModuleExtensionOs, CompactString>>;
+
+async fn observe_selected_host(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    declared: &[CompactString],
+) -> SelectedHostObservation {
+    let transaction = match ctx
+        .per_transaction_data()
+        .data
+        .get::<RepositoryHostInputTransaction>()
+    {
+        Ok(transaction) => transaction.clone(),
+        Err(_) => {
+            return SourcePreparationOutcome::Complete(Err(
+                "selected module extension Host inputs unavailable".into(),
+            ));
+        }
+    };
+    let names = RepositoryEnvironmentNameFrontier::from_unsorted(declared.iter().cloned());
+    let unknown = names
+        .difference(transaction.frontier())
+        .cloned()
+        .collect::<Vec<_>>();
+    if !unknown.is_empty() {
+        return SourcePreparationOutcome::Need(SourcePreparationNeeds::environment(
+            NeedRepositoryEnvironmentNames::new(
+                workspace.dupe(),
+                RepositoryEnvironmentNameFrontier::from_unsorted(unknown),
+            )
+            .expect("selected extension has nonempty unobserved environment names"),
+        ));
+    }
+    let platform = match ctx
+        .compute(&RepositoryPlatformKey::new(workspace.dupe()))
+        .await
+    {
+        Ok(platform) => platform,
+        Err(_) => {
+            return SourcePreparationOutcome::Complete(Err(
+                "selected module extension Host platform unavailable".into(),
+            ));
+        }
+    };
+    let mut environment = Vec::with_capacity(names.iter().count());
+    for name in names.iter() {
+        let cell = match ctx
+            .compute(&RepositoryEnvironmentCellKey::new(
+                workspace.dupe(),
+                name.clone(),
+            ))
+            .await
+        {
+            Ok(cell) => cell,
+            Err(_) => {
+                return SourcePreparationOutcome::Complete(Err(format!(
+                    "selected module extension environment name {name:?} unavailable"
+                )
+                .into()));
+            }
+        };
+        let Some(value) = cell.value() else {
+            return SourcePreparationOutcome::Complete(Err(format!(
+                "selected module extension environment name {name:?} unauthorized"
+            )
+            .into()));
+        };
+        if value != &transaction.snapshot().get(name).cloned() {
+            return SourcePreparationOutcome::Complete(Err(format!(
+                "selected module extension environment name {name:?} differs from request"
+            )
+            .into()));
+        }
+        environment.push((name.clone(), value.clone()));
+    }
+    SourcePreparationOutcome::Complete(Ok(ModuleExtensionOs {
+        platform,
+        environment: environment.into(),
+    }))
 }
 
 #[rustfmt::skip]
@@ -768,6 +856,11 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
     };
     drop(first_module.0);
+    let host = match observe_selected_host(ctx, &key.workspace, &first.definition.environment).await {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
+        SourcePreparationOutcome::Complete(Ok(host)) => host,
+    };
     let owner = Arc::new(());
     let modules = match owner_invocation_modules(&inputs, &first, &owner) {
         Ok(value) => value,
@@ -793,7 +886,7 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         proxies.iter().any(|proxy| !proxy.dev_dependency),
         proxies.iter().any(|proxy| proxy.dev_dependency),
     ));
-    let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage));
+    let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage, Some(host)));
     let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);
     let repository_rules = RepositoryRuleInvocationState::new();
     let returned = {
@@ -1057,10 +1150,112 @@ fn returned_metadata(value: Value<'_>) -> anyhow::Result<ModuleExtensionMetadata
         })
 }
 
+#[derive(Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct ModuleExtensionOs {
+    platform: RepositoryPlatform,
+    environment: Arc<[(CompactString, Option<Arc<str>>)]>,
+}
+
+impl fmt::Debug for ModuleExtensionOs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ModuleExtensionOs")
+            .field("platform", &self.platform)
+            .field("declared_environment_names", &self.environment.len())
+            .finish()
+    }
+}
+
+impl fmt::Display for ModuleExtensionOs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<module_extension_os>")
+    }
+}
+starlark::starlark_simple_value!(ModuleExtensionOs);
+
+#[starlark_value(type = "repository_os")]
+impl<'v> StarlarkValue<'v> for ModuleExtensionOs {
+    fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match name {
+            "name" => Some(heap.alloc(self.platform.os_name())),
+            "arch" => Some(heap.alloc(self.platform.arch())),
+            "environ" => {
+                Some(heap.alloc_simple(ModuleExtensionOsEnviron(self.environment.clone())))
+            }
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct ModuleExtensionOsEnviron(Arc<[(CompactString, Option<Arc<str>>)]>);
+
+impl fmt::Debug for ModuleExtensionOsEnviron {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ModuleExtensionOsEnviron")
+            .field("declared_names", &self.0.len())
+            .finish()
+    }
+}
+
+impl ModuleExtensionOsEnviron {
+    fn declared(&self, name: &str) -> anyhow::Result<Option<&str>> {
+        self.0
+            .iter()
+            .find(|(declared, _)| declared == name)
+            .map(|(_, value)| value.as_deref())
+            .ok_or_else(|| anyhow::anyhow!("undeclared module extension environment name {name:?}"))
+    }
+}
+
+impl fmt::Display for ModuleExtensionOsEnviron {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<declared_module_extension_environ>")
+    }
+}
+starlark::starlark_simple_value!(ModuleExtensionOsEnviron);
+
+#[starlark_value(type = "declared_module_extension_environ")]
+impl<'v> StarlarkValue<'v> for ModuleExtensionOsEnviron {
+    fn is_in(&self, index: Value<'v>) -> starlark::Result<bool> {
+        let name = index.unpack_str().ok_or_else(|| {
+            starlark::Error::new_other(anyhow::anyhow!(
+                "module extension environment names must be strings"
+            ))
+        })?;
+        Ok(self
+            .declared(name)
+            .map_err(starlark::Error::new_other)?
+            .is_some())
+    }
+
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(module_extension_os_environ_methods)
+    }
+}
+
+#[starlark_module]
+fn module_extension_os_environ_methods(builder: &mut MethodsBuilder) {
+    fn get<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] name: &str,
+        #[starlark(require = pos)] default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let environ = ModuleExtensionOsEnviron::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid module extension environment receiver"))?;
+        Ok(match environ.declared(name)? {
+            Some(value) => eval.heap().alloc_str(value).to_value(),
+            None => default.unwrap_or_else(Value::new_none),
+        })
+    }
+}
+
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct InvocationContext {
     modules: Arc<[InvocationModule]>,
     root_usage: Option<RootModuleExtensionUsage>,
+    os: Option<ModuleExtensionOs>,
     #[allocative(skip)]
     owner: Arc<()>,
 }
@@ -1100,6 +1295,7 @@ impl InvocationContext {
                     .iter()
                     .any(|proxy| proxy.dev_dependency),
             )),
+            None,
         )
     }
 
@@ -1107,10 +1303,12 @@ impl InvocationContext {
         modules: Arc<[InvocationModule]>,
         owner: &Arc<()>,
         root_usage: Option<RootModuleExtensionUsage>,
+        os: Option<ModuleExtensionOs>,
     ) -> Self {
         Self {
             modules,
             root_usage,
+            os,
             owner: owner.clone(),
         }
     }
@@ -1134,6 +1332,7 @@ impl<'v> StarlarkValue<'v> for InvocationContext {
                         .is_some_and(RootModuleExtensionUsage::has_non_dev_dependency),
                 ),
             ),
+            "os" => self.os.clone().map(|os| heap.alloc_simple(os)),
             _ => None,
         }
     }
@@ -1613,6 +1812,7 @@ pub(crate) mod test_support {
 mod tests {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::Hasher;
+    use std::path::PathBuf;
     use std::sync::Mutex;
 
     use dice::ActivationData;
@@ -1625,24 +1825,43 @@ mod tests {
     use dice::UserComputationData;
     use slug_bzlmod_v2::BzlmodCommandPolicyKey;
     use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+    use slug_bzlmod_v2::HostRepositoryMaterializationDisposition;
+    use slug_bzlmod_v2::HostRootRepositoryMappingKey;
+    use slug_bzlmod_v2::HostSelectedExtensionDemandKey;
     use slug_bzlmod_v2::LockfileMode;
+    use slug_bzlmod_v2::RegistryFileUrl;
+    use slug_bzlmod_v2::RegistryIo;
+    use slug_bzlmod_v2::RegistryIoOutcome;
     use slug_bzlmod_v2::RegistryRequestGeneration;
+    use slug_bzlmod_v2::RegistryTransportError;
     use slug_bzlmod_v2::RegistryUrls;
+    use slug_bzlmod_v2::RepositoryEnvironmentCell;
+    use slug_bzlmod_v2::RepositoryEnvironmentEntry;
+    use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
+    use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
+    use slug_bzlmod_v2::RepositoryMaterializationResult;
     use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
     use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+    use slug_bzlmod_v2::RepositoryMaterializationSuccess;
     use slug_bzlmod_v2::RootPackagePolicyInputs;
+    use slug_bzlmod_v2::RootRepositoryRouteObservationKey;
+    use slug_bzlmod_v2::host_repository_materialization_request;
+    use slug_bzlmod_v2::install_registry_io;
+    use slug_identity_v2::ApparentRepoName;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
     use slug_workspace_v2::PathObservationEpoch;
     use slug_workspace_v2::PathObservationEpochError;
     use slug_workspace_v2::PathObservationEpochKey;
+    use slug_workspace_v2::PathObservationInstanceId;
     use slug_workspace_v2::PathObservationNamespace;
     use slug_workspace_v2::PathObservationOperation;
     use slug_workspace_v2::PathObservationResult;
     use slug_workspace_v2::PathOperationResult;
     use slug_workspace_v2::WorkspaceFileValue;
     use slug_workspace_v2::WorkspaceRawFileValue;
+    use slug_workspace_v2::path_observation_shards;
     use starlark::environment::Globals;
     use starlark::syntax::AstModule;
     use starlark::syntax::Dialect;
@@ -1768,6 +1987,7 @@ mod tests {
         let context = InvocationContext {
             modules: Arc::from([empty_module(&owner)]),
             root_usage: None,
+            os: None,
             owner: owner.clone(),
         };
         let modules = call("def f(ctx):\n  ctx.modules.append(1)\n", |module| {
@@ -1816,6 +2036,7 @@ mod tests {
                 ..empty_module(&owner)
             }]),
             root_usage: None,
+            os: None,
             owner: owner.clone(),
         };
         let foreign_heap = FrozenHeap::new();
@@ -1875,6 +2096,7 @@ mod tests {
                 ..empty_module(&owner)
             }]),
             root_usage: None,
+            os: None,
             owner: owner.clone(),
         };
         let value = call(
@@ -1895,6 +2117,7 @@ mod tests {
                 ..empty_module(&owner)
             }]),
             root_usage: None,
+            os: None,
             owner,
         };
         for name in [
@@ -1945,6 +2168,7 @@ mod tests {
                 ..empty_module(&other_owner)
             }]),
             root_usage: None,
+            os: None,
             owner: other_owner,
         };
         for method in ["is_dev_dependency", "tag_sort_key"] {
@@ -1978,6 +2202,7 @@ mod tests {
         let context = InvocationContext {
             modules: Arc::from([empty_module(&owner)]),
             root_usage: Some(RootModuleExtensionUsage::new(true, true)),
+            os: None,
             owner,
         };
         let none = metadata_call("def f(ctx):\n  return None\n", context.clone()).unwrap();
@@ -2100,6 +2325,7 @@ mod tests {
             let context = InvocationContext {
                 modules: Arc::from([empty_module(&owner)]),
                 root_usage: usage,
+                os: None,
                 owner: owner.clone(),
             };
             assert_eq!(
@@ -2109,6 +2335,61 @@ mod tests {
                 )
                 .unwrap(),
                 expected
+            );
+        }
+    }
+
+    #[test]
+    fn selected_module_os_exposes_only_declared_membership_and_get() {
+        let owner = Arc::new(());
+        let context = InvocationContext::new_modules(
+            Arc::from([empty_module(&owner)]),
+            &owner,
+            None,
+            Some(ModuleExtensionOs {
+                platform: RepositoryPlatform::new("linux", "x86_64"),
+                environment: Arc::from([
+                    (CompactString::new("ABSENT"), None),
+                    (CompactString::new("EMPTY"), Some(Arc::from(""))),
+                    (
+                        CompactString::new("PRESENT"),
+                        Some(Arc::from("secret-marker")),
+                    ),
+                ]),
+            }),
+        );
+        assert_eq!(
+            call(
+                "def f(ctx):\n  e=ctx.os.environ\n  return [ctx.os.name, ctx.os.arch, 'ABSENT' in e, 'EMPTY' in e, 'PRESENT' in e, e.get('ABSENT'), e.get('ABSENT', 'fallback'), e.get('EMPTY'), e.get('PRESENT')]\n",
+                |module| vec![module.heap().alloc_simple(context.clone())],
+            )
+            .unwrap(),
+            "[\"linux\", \"x86_64\", False, True, True, None, \"fallback\", \"\", \"secret-marker\"]"
+        );
+        for source in [
+            "def f(ctx):\n  return 'UNDECLARED' in ctx.os.environ\n",
+            "def f(ctx):\n  return ctx.os.environ.get('UNDECLARED')\n",
+        ] {
+            let error = call(source, |module| {
+                vec![module.heap().alloc_simple(context.clone())]
+            })
+            .unwrap_err();
+            assert!(
+                error.contains("undeclared module extension environment name"),
+                "{error}"
+            );
+            assert!(!error.contains("secret-marker"), "{error}");
+        }
+        for source in [
+            "def f(ctx):\n  return ctx.os.environ['PRESENT']\n",
+            "def f(ctx):\n  return len(ctx.os.environ)\n",
+            "def f(ctx):\n  return ctx.os.environ.keys()\n",
+        ] {
+            assert!(
+                call(source, |module| {
+                    vec![module.heap().alloc_simple(context.clone())]
+                })
+                .is_err()
             );
         }
     }
@@ -2151,6 +2432,7 @@ mod tests {
                 tags: Arc::from([]),
             }]),
             root_usage: Some(RootModuleExtensionUsage::new(true, false)),
+            os: None,
             owner,
         };
         let value = call("def f(ctx, tag):\n  label=tag.target\n  return [len(ctx.modules), ctx.modules[0].name, ctx.modules[0].version, ctx.modules[0].is_root, ctx.is_dev_dependency(tag), label.name, label.package, label.repo_name, label.workspace_name, str(label), repr(label), '%s' % label, '%r' % label, '{}'.format(label), '{!s}'.format(label), '{!r}'.format(label), label.same_package_label('other').name, {label: 1}[label], label == label]\n", |module| vec![module.heap().alloc_simple(context), module.heap().alloc_simple(tag)]).unwrap();
@@ -3146,6 +3428,552 @@ mod tests {
         };
         assert_eq!(completed[0].repository_rule_calls[0].name, "first");
         assert_eq!(current_calls[0].name, "second");
+    }
+
+    struct SelectedFactorRegistryIo;
+
+    #[async_trait]
+    impl RegistryIo for SelectedFactorRegistryIo {
+        async fn read_exact(
+            &self,
+            url: &RegistryFileUrl,
+        ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+            let bytes: Option<&'static [u8]> = match url.as_str() {
+                "https://registry.invalid/modules/dep/1/MODULE.bazel" => {
+                    Some(b"module(name='dep', version='1', repo_name='dep_alias')\n")
+                }
+                "https://registry.invalid/modules/dep/1/source.json" => {
+                    Some(br#"{"url":"https://origin.invalid/dep.tgz","integrity":"sha256-test"}"#)
+                }
+                _ => None,
+            };
+            Ok(bytes.map_or(RegistryIoOutcome::NotFound, |bytes| {
+                RegistryIoOutcome::Found(Arc::from(bytes))
+            }))
+        }
+    }
+
+    fn selected_factor_epoch(module_source: &str, extension_source: &str) -> PathObservationEpoch {
+        fn add_lstat(
+            rows: &mut Vec<(PathObservationDemand, Arc<PathObservationResult>)>,
+            namespace: &PathObservationNamespace,
+            path: &str,
+            result: PathOperationResult<PathLstat>,
+        ) {
+            rows.push((
+                PathObservationDemand::new(
+                    namespace.clone(),
+                    NormalizedAbsolutePath::new(path).unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                Arc::new(PathObservationResult::Lstat(result)),
+            ));
+        }
+        let instance = PathObservationInstanceId::new(77);
+        let namespace = PathObservationNamespace::Materialization(instance);
+        let mut rows = repository_rule_epoch(module_source, &[], 0)
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .collect::<Vec<_>>();
+        let node =
+            |kind, id| PathOperationResult::Present(PathLstat::new(kind, id, 1, 1, 1, 0o755));
+        add_lstat(
+            &mut rows,
+            &namespace,
+            "/",
+            node(PathNodeKind::Directory, 80),
+        );
+        add_lstat(
+            &mut rows,
+            &namespace,
+            "/registry-dep",
+            node(PathNodeKind::Directory, 81),
+        );
+        add_lstat(
+            &mut rows,
+            &namespace,
+            "/registry-dep/REPO.bazel",
+            PathOperationResult::Missing,
+        );
+        add_lstat(
+            &mut rows,
+            &namespace,
+            "/registry-dep/.bazelignore",
+            PathOperationResult::Missing,
+        );
+        for (index, (path, bytes)) in [
+            (
+                "/registry-dep/MODULE.bazel",
+                "module(name='dep', version='1', repo_name='dep_alias')\n",
+            ),
+            ("/registry-dep/BUILD.bazel", ""),
+            ("/registry-dep/ext.bzl", extension_source),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            add_lstat(
+                &mut rows,
+                &namespace,
+                path,
+                node(PathNodeKind::RegularFile, 82 + index as i64),
+            );
+            rows.push((
+                PathObservationDemand::new(
+                    namespace.clone(),
+                    NormalizedAbsolutePath::new(path).unwrap(),
+                    PathObservationOperation::FileBytes,
+                ),
+                Arc::new(PathObservationResult::FileBytes(
+                    PathOperationResult::Present(Arc::from(bytes.as_bytes())),
+                )),
+            ));
+        }
+        PathObservationEpoch::from_shared(rows).unwrap()
+    }
+
+    async fn selected_factor_transaction(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        tracker: Arc<RepositoryRuleActivationTracker>,
+        expect_supported: bool,
+    ) -> (dice::DiceTransaction, Arc<HostSelectedExtensionOwner>) {
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let transaction =
+            repository_rule_sources_transaction(dice, module_source, &[], 0, Some(tracker)).await;
+        let epoch = selected_factor_epoch(module_source, extension_source);
+        let mut updater = transaction.into_updater();
+        updater.changed_to(path_observation_shards(&epoch)).unwrap();
+        updater
+            .changed_to([(PathObservationEpochKey, epoch)])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let route = transaction
+            .compute(
+                &RootRepositoryRouteObservationKey::for_root_build(
+                    workspace.dupe(),
+                    ApparentRepoName::new("dep_alias").unwrap(),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(route)) = route else {
+            panic!("selected registry route did not complete: {route:?}")
+        };
+        let route = route
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap_or_else(|error| panic!("selected registry route failed: {error}"));
+        let HostRepositoryMaterializationDisposition::Request(request) =
+            host_repository_materialization_request(&route.source_capability()).unwrap()
+        else {
+            panic!("selected registry route did not request materialization")
+        };
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to([(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.dupe(),
+                },
+                RepositoryMaterializationResultEpoch::new(
+                    workspace.dupe(),
+                    [RepositoryMaterializationEpochEntry {
+                        request,
+                        result: RepositoryMaterializationResult::Success(
+                            RepositoryMaterializationSuccess::Immutable {
+                                source_identity: Arc::from("sha256-test"),
+                                generation_root: PathBuf::from("/registry-dep"),
+                                observation_instance: PathObservationInstanceId::new(77),
+                            },
+                        ),
+                    }],
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let mapping = transaction
+            .compute(&HostRootRepositoryMappingKey::new(workspace.dupe()))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(mapping) = mapping else {
+            panic!("selected mapping returned Need")
+        };
+        let requested = mapping
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .view()
+            .unwrap()
+            .mapping()
+            .find(|(name, _)| name.as_str() == "proof")
+            .unwrap()
+            .1
+            .clone();
+        let demand = transaction
+            .compute(&HostSelectedExtensionDemandKey::new(
+                workspace.dupe(),
+                requested,
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(demand) = demand else {
+            panic!("selected demand returned Need")
+        };
+        let owner = demand.as_ref().as_ref().unwrap().owner().clone();
+        let inputs = transaction
+            .compute(&HostSelectedExtensionOwnerInputsKey::new(
+                workspace.dupe(),
+                owner.clone(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(inputs) = inputs else {
+            panic!("selected owner inputs returned Need")
+        };
+        let inputs = inputs.as_ref().as_ref().unwrap();
+        let route = RootRepositoryRoute::for_selected_extension_definition(
+            workspace.dupe(),
+            inputs.request().source(),
+        )
+        .expect("fixture must use the selected external registry route");
+        let target =
+            RootPackageBzlTarget::parse(inputs.request().parts().0.target().as_str()).unwrap();
+        let label = RepositoryBzlLabel::new(
+            inputs.request().parts().0.package().package().clone(),
+            target,
+        )
+        .unwrap();
+        let bzl = transaction
+            .compute(&ExternalBzlModuleEvalKey::new_bzlmod(route, label))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(bzl) = bzl else {
+            panic!("selected external Bzl returned Need")
+        };
+        if expect_supported {
+            let projection =
+                owner_projection(bzl.as_ref().as_ref().unwrap(), inputs.request()).unwrap();
+            assert_eq!(
+                projection.definition.environment.as_ref(),
+                ["FACTOR", "MISSING", "FACTOR"]
+            );
+            let mut reordered = projection.clone();
+            reordered.definition.environment = Arc::from([
+                CompactString::new("MISSING"),
+                CompactString::new("FACTOR"),
+                CompactString::new("FACTOR"),
+            ]);
+            assert_ne!(projection, reordered);
+            reordered.definition.environment = projection.definition.environment.clone();
+            assert_eq!(projection, reordered);
+        } else {
+            assert_eq!(
+                owner_projection(bzl.as_ref().as_ref().unwrap(), inputs.request()).unwrap_err(),
+                "selected module extension has unsupported factors"
+            );
+        }
+        (transaction, owner)
+    }
+
+    async fn selected_factor_host_inputs(
+        transaction: dice::DiceTransaction,
+        tracker: Arc<RepositoryRuleActivationTracker>,
+        platform: RepositoryPlatform,
+        snapshot: RepositoryEnvironmentSnapshot,
+        frontier: RepositoryEnvironmentNameFrontier,
+    ) -> dice::DiceTransaction {
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let mut data = UserComputationData {
+            cycle_detector: Some(crate::cycle_detector::bzl_load_cycle_detector()),
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        data.data.set(RepositoryHostInputTransaction::new(
+            snapshot.clone(),
+            frontier.clone(),
+        ));
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to([(RepositoryPlatformKey::new(workspace.dupe()), platform)])
+            .unwrap();
+        updater
+            .changed_to(
+                frontier
+                    .iter()
+                    .map(|name| {
+                        (
+                            RepositoryEnvironmentCellKey::new(workspace.dupe(), name.clone()),
+                            RepositoryEnvironmentCell::observed(snapshot.get(name).cloned()),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap();
+        updater.commit_with_data(data).await
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_tracks_declared_host_inputs_and_fails_closed() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None, attrs = {'value': attr.string()})
+def impl(ctx):
+    print('selected-invoked')
+    environ = ctx.os.environ
+    value = 'absent'
+    if 'FACTOR' in environ:
+        value = 'empty' if environ.get('FACTOR') == '' else environ.get('FACTOR')
+    repo(name = 'proof', value = ctx.os.name + '|' + ctx.os.arch + '|' + value)
+ext = module_extension(implementation = impl, environ = ['FACTOR', 'MISSING', 'FACTOR'])
+"#;
+        fn snapshot(entries: &[(&str, &str)]) -> RepositoryEnvironmentSnapshot {
+            RepositoryEnvironmentSnapshot::from_canonical(
+                entries
+                    .iter()
+                    .map(|(name, value)| RepositoryEnvironmentEntry::new(*name, *value))
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap()
+        }
+        fn value(
+            outcome: &<HostSelectedExtensionOwnerPureObservationKey as Key>::Value,
+        ) -> CompactString {
+            let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                panic!("selected owner did not complete: {outcome:?}")
+            };
+            let result = observed.result().as_ref().as_ref().unwrap();
+            let call = &result.receipt.repository_rule_calls[0];
+            let (
+                _,
+                crate::module_extension_repository_rule::RepositoryRuleCallValue::String(value),
+            ) = call
+                .kwargs
+                .iter()
+                .find(|(name, _)| name == "value")
+                .unwrap()
+            else {
+                panic!("repository call did not retain string value")
+            };
+            value.clone()
+        }
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (base, owner) =
+            selected_factor_transaction(&dice, MODULE, EXTENSION, tracker.clone(), true).await;
+        tracker.take();
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let key = HostSelectedExtensionOwnerPureObservationKey::new(workspace.dupe(), owner);
+        let empty_frontier = RepositoryEnvironmentNameFrontier::empty();
+        let declared_frontier = RepositoryEnvironmentNameFrontier::from_unsorted([
+            CompactString::new("FACTOR"),
+            CompactString::new("MISSING"),
+        ]);
+        let mut transaction = selected_factor_host_inputs(
+            base,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(&[("FACTOR", "A"), ("UNRELATED", "one")]),
+            empty_frontier,
+        )
+        .await;
+        let SourcePreparationOutcome::Need(need) = transaction.compute(&key).await.unwrap() else {
+            panic!("cold declared environment names must return Need")
+        };
+        assert_eq!(
+            need.repository_environment()
+                .unwrap()
+                .names()
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            ["FACTOR", "MISSING"]
+        );
+        let need_rows = tracker.take();
+        assert!(
+            need_rows
+                .iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+        assert!(
+            need_rows
+                .iter()
+                .flat_map(|row| row.batch.as_ref())
+                .flat_map(EventBatch::events)
+                .all(|event| !format!("{event:?}").contains("selected-invoked"))
+        );
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(&[("FACTOR", "A"), ("UNRELATED", "one")]),
+            declared_frontier.clone(),
+        )
+        .await;
+        let a = transaction.compute(&key).await.unwrap();
+        assert_eq!(value(&a), "linux|x86_64|A");
+        tracker.take();
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(&[("FACTOR", "A"), ("UNRELATED", "two")]),
+            declared_frontier.clone(),
+        )
+        .await;
+        assert_eq!(value(&transaction.compute(&key).await.unwrap()), value(&a));
+        assert!(tracker.take().iter().any(|row| {
+            row.key == key.to_string() && row.kind == ActivationKind::Reused && row.batch.is_none()
+        }));
+
+        for (entry, expected) in [
+            (Some("B"), "linux|x86_64|B"),
+            (Some("A"), "linux|x86_64|A"),
+            (None, "linux|x86_64|absent"),
+            (Some(""), "linux|x86_64|empty"),
+            (None, "linux|x86_64|absent"),
+        ] {
+            let snapshot = snapshot(&entry.map_or(Vec::new(), |entry| vec![("FACTOR", entry)]));
+            transaction = selected_factor_host_inputs(
+                transaction,
+                tracker.clone(),
+                RepositoryPlatform::new("linux", "x86_64"),
+                snapshot,
+                declared_frontier.clone(),
+            )
+            .await;
+            assert_eq!(value(&transaction.compute(&key).await.unwrap()), expected);
+            tracker.take();
+        }
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("mac os x", "aarch64"),
+            snapshot(&[]),
+            declared_frontier.clone(),
+        )
+        .await;
+        assert_eq!(
+            value(&transaction.compute(&key).await.unwrap()),
+            "mac os x|aarch64|absent"
+        );
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(&[]),
+            declared_frontier.clone(),
+        )
+        .await;
+        assert_eq!(
+            value(&transaction.compute(&key).await.unwrap()),
+            "linux|x86_64|absent"
+        );
+
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to([(
+                RepositoryEnvironmentCellKey::new(workspace.dupe(), "FACTOR"),
+                RepositoryEnvironmentCell::observed(Some(Arc::from("secret-marker"))),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let error = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = error else {
+            panic!("mismatched cell must be a complete semantic error")
+        };
+        let error = observed.result().as_ref().as_ref().unwrap_err();
+        let diagnostic = format!("{error:?}");
+        assert!(diagnostic.contains("differs from request"), "{diagnostic}");
+        assert!(!diagnostic.contains("secret-marker"), "{diagnostic}");
+
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to([(
+                RepositoryEnvironmentCellKey::new(workspace, "FACTOR"),
+                RepositoryEnvironmentCell::Unauthorized,
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let unauthorized = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = unauthorized else {
+            panic!("unauthorized cell must be a complete semantic error")
+        };
+        let error = observed.result().as_ref().as_ref().unwrap_err();
+        let diagnostic = format!("{error:?}");
+        assert!(diagnostic.contains("unauthorized"), "{diagnostic}");
+        assert!(!diagnostic.contains("secret-marker"), "{diagnostic}");
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_rejects_unsupported_factors_before_invocation() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
+        for factor in [
+            "os_dependent=True",
+            "arch_dependent=True",
+            "facts_version=1",
+        ] {
+            let extension = format!(
+                "def impl(ctx):\n    print('selected-invoked')\next = module_extension(implementation=impl, environ=['FACTOR'], {factor})\n"
+            );
+            let mut builder = Dice::builder();
+            install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+            let dice = Arc::new(builder.build(DetectCycles::Enabled));
+            let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+            let (transaction, owner) =
+                selected_factor_transaction(&dice, MODULE, &extension, tracker.clone(), false)
+                    .await;
+            tracker.take();
+            let mut transaction = selected_factor_host_inputs(
+                transaction,
+                tracker.clone(),
+                RepositoryPlatform::new("linux", "x86_64"),
+                RepositoryEnvironmentSnapshot::empty(),
+                RepositoryEnvironmentNameFrontier::empty(),
+            )
+            .await;
+            let key = HostSelectedExtensionOwnerPureObservationKey::new(
+                NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap(),
+                owner,
+            );
+            let result = transaction.compute(&key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(observed)) = result else {
+                panic!("{factor} did not produce a selected-owner terminal: {result:?}")
+            };
+            let error = observed.result().as_ref().as_ref().unwrap_err();
+            assert!(
+                format!("{error:?}").contains("unsupported factors"),
+                "{factor}: {error:?}"
+            );
+            let rows = tracker.take();
+            assert!(
+                rows.iter().any(|row| row.key == key.to_string()),
+                "{factor}: selected owner did not activate"
+            );
+            assert!(
+                rows.iter()
+                    .filter(|row| row.key == key.to_string())
+                    .all(|row| row.batch.is_none()),
+                "{factor}: selected owner published invocation events"
+            );
+            assert!(
+                rows.iter()
+                    .flat_map(|row| row.batch.as_ref())
+                    .flat_map(EventBatch::events)
+                    .all(|event| !format!("{event:?}").contains("selected-invoked")),
+                "{factor}: selected implementation ran"
+            );
+        }
     }
 
     #[test]

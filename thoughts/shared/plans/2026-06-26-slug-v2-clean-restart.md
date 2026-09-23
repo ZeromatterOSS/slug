@@ -29,21 +29,24 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-88-m7a-module-tag-file-admissibility-r1
+Packet: WP-7-89-m7a-selected-extension-declared-host-environment-r1
 Status: accepted; independent design and final ACCEPT
 
-WP788 targets the fresh real-root cquery Loading stop in rules_rust 0.73.0:
-`tag_class` rejects the `crate.from_cargo` `manifests` label-list descriptor's
-`allow_files=["Cargo.toml"]`. Bazel 9.2 accepts this descriptor and type-checks
-module-tag values without target/file resolution. Admit that declaration and
-retain its ordered policy in Slug's existing immutable tag schema; verify the
-root request passes the original stop and record its next terminal. This does
-not claim full configured root coverage, module-tag file resolution or M7A
-closure. WP787 at `17786a9d0` accepted the preceding Linux module-tool
-binary/catalog and direct configured child-filegroup boundary.
-Focused Loading tests (3/3), direct Bzlmod compilation and fresh CLI rebuild
-passed; the root request advanced to the separate unsupported extension-factors
-boundary. Independent design and final reviews ACCEPTED this slice.
+WP789 targets the fresh authentic root cquery Loading stop in rules_rust 0.73.0:
+the selected `crate` module extension declares an ordered `environ` factor,
+which Slug currently rejects. Observe those declared names and Host platform
+through existing repository Host DICE cells, then admit the bounded
+`module_ctx.os` name/arch and declared-name environment membership/get view
+needed by the selected implementation. Undeclared environment lookups and
+other unmodeled factors remain fail-closed; this does not claim complete
+extension execution, configured root coverage or M7A closure. WP788 at
+`66d29e2fe` accepted module-tag `allow_files` descriptors and moved the root
+request to this factor boundary. Focused selected-owner and Host-view tests,
+direct dependent, fresh CLI build and root smoke pass the factor guard; the
+root now stops at the separate unsupported `module_ctx.path` effect in
+rules_rust `extensions.bzl:851`. A selected external-route negative test proves
+OS/arch/facts declarations still fail before invocation; independent design
+and final reviews ACCEPTED the packet.
 
 WP785 at `9931f6a2d` accepted bounded Linux `run_shell` execution through
 fresh NativeLink 1.7.1: one REAPI action, zero direct-local actions and exact
