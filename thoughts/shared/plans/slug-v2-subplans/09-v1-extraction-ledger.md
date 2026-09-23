@@ -2190,6 +2190,19 @@ added. Focused R4 review returned `ACCEPT`; the corrected candidate passes the
 full serial gates within the unchanged caps. Terminal implementation review
 also returned `ACCEPT`; no V1, Buck2, or Zabel semantic owner was introduced.
 
+### Native filegroup provider utility decision
+
+Native filegroup forwarding adds no extraction or retained representation. Its
+private native builder composes existing dense AnalysisDepset/Depset roots,
+RetainedRunfiles, DefaultInfo, FilesToRunProvider and ProviderOccurrence; Arc/Dupe
+and Allocative lifetimes remain configured-node owned. Selector/child joins and
+neutral-attribute/visibility checks are phase scratch, using existing tracked
+package owners. Runfiles preserves compile-order files, stable auxiliary DAGs,
+empty-child conflict policy and nonempty prefix checks without flattening into a
+second retained union. Empty InstrumentedFilesInfo's facade owns only frozen
+evaluator fields and lowers into the existing occurrence; no heap crosses DICE
+publication. No cache/interner/key/lock or performance claim is introduced.
+
 ### Stage 6 FilesToRun Spawn expansion utility decision (2026-08-31)
 
 Status: implementation terminally `ACCEPTED` in commit `21db5d7b8`; the

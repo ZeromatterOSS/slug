@@ -1139,6 +1139,15 @@ impl SlugConfiguration {
         self.core_bool("collect_code_coverage")
     }
 
+    /// CoreOptions policy consumed by native filegroup's data-runfiles builder.
+    pub fn filegroup_runfiles_for_data(&self) -> Result<bool, SlugConfigurationError> {
+        self.core_bool("incompatible_filegroup_runfiles_for_data")
+    }
+
+    pub fn check_visibility(&self) -> Result<bool, SlugConfigurationError> {
+        self.core_bool("check_visibility")
+    }
+
     /// The admitted artifact layout merges genfiles into the bin root.
     pub fn merge_genfiles_directory(&self) -> Result<bool, SlugConfigurationError> {
         self.native_bool(CORE_OPTIONS, "incompatible_merge_genfiles_directory")
@@ -1326,6 +1335,8 @@ fn typed_native_command_descriptor(
 ) -> Result<(usize, &'static NativeOptionDescriptor), SlugConfigurationError> {
     let class_name = match option {
         NativeCommandOption::CollectCodeCoverage
+        | NativeCommandOption::CheckVisibility
+        | NativeCommandOption::IncompatibleFilegroupRunfilesForData
         | NativeCommandOption::CompilationMode
         | NativeCommandOption::HostCompilationMode
         | NativeCommandOption::Features

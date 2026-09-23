@@ -49,11 +49,30 @@ fn artifacts(result: &ConfiguredNodeResult, name: &str) -> Vec<AnalysisArtifact>
         .collect()
 }
 
-fn paths(result: &ConfiguredNodeResult, name: &str) -> Vec<String> {
-    artifacts(result, name)
+fn local_paths(
+    result: &ConfiguredNodeResult,
+    artifacts: impl IntoIterator<Item = AnalysisArtifact>,
+) -> Vec<String> {
+    let configuration = result
+        .configured_target_key()
+        .unwrap()
+        .configuration()
+        .slug_configuration()
+        .unwrap();
+    artifacts
         .into_iter()
-        .map(|artifact| artifact.path().into_owned())
+        .map(|artifact| {
+            let AnalysisArtifact::Derived { output, .. } = artifact else {
+                panic!("expected generated artifact")
+            };
+            assert_eq!(output.root().configuration(), configuration);
+            output.root_relative_path().to_owned()
+        })
         .collect()
+}
+
+fn paths(result: &ConfiguredNodeResult, name: &str) -> Vec<String> {
+    local_paths(result, artifacts(result, name))
 }
 
 #[tokio::test]
@@ -95,7 +114,10 @@ empty = rule(implementation = _empty)
             .into()
     );
     assert_eq!(
-        default_file_paths(result.providers().default_info().unwrap()),
+        local_paths(
+            &result,
+            result.providers().default_info().unwrap().file_artifacts()
+        ),
         ["default"]
     );
     for artifact in artifacts(&result, HIDDEN) {
@@ -143,11 +165,14 @@ binary = rule(implementation = _binary, executable = True)
     let hidden = artifacts(&result, HIDDEN);
     assert_eq!(hidden.len(), 2);
     assert!(hidden.contains(&support.tree));
-    assert!(hidden.iter().any(|artifact| matches!(artifact, AnalysisArtifact::Derived { output, .. } if output.path() == "binary.extra" && output.kind() == ActionOutputKind::File)));
+    assert!(hidden.iter().any(|artifact| matches!(artifact, AnalysisArtifact::Derived { output, .. } if output.root_relative_path() == "binary.extra" && output.kind() == ActionOutputKind::File)));
     assert!(
         matches!(&support.tree, AnalysisArtifact::Derived { output, .. } if output.kind() == ActionOutputKind::RunfilesTree)
     );
-    assert_eq!(default_file_paths(default), ["binary.bin"]);
+    assert_eq!(
+        local_paths(&result, default.file_artifacts()),
+        ["binary.bin"]
+    );
     assert!(
         !paths(&result, HIDDEN)
             .iter()

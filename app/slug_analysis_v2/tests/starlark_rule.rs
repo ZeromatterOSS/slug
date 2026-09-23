@@ -161,6 +161,7 @@ mod cc_feature_expansion;
 mod directory_args;
 mod effective_output_groups;
 mod file_output_providers;
+mod native_filegroup;
 mod output_group_info;
 mod package_specification;
 mod rustc_map_each;

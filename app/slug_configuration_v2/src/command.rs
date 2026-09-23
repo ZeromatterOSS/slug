@@ -51,6 +51,8 @@ pub enum NativeCommandOption {
     FdoInstrument,
     CsFdoInstrument,
     CollectCodeCoverage,
+    CheckVisibility,
+    IncompatibleFilegroupRunfilesForData,
     CoverageOutputGenerator,
     Copt,
     Conlyopt,
@@ -100,6 +102,10 @@ impl NativeCommandOption {
             "fdo_instrument" => Self::FdoInstrument,
             "cs_fdo_instrument" => Self::CsFdoInstrument,
             "collect_code_coverage" => Self::CollectCodeCoverage,
+            "check_visibility" => Self::CheckVisibility,
+            "incompatible_filegroup_runfiles_for_data" => {
+                Self::IncompatibleFilegroupRunfilesForData
+            }
             "coverage_output_generator" => Self::CoverageOutputGenerator,
             "copt" => Self::Copt,
             "conlyopt" => Self::Conlyopt,
@@ -152,6 +158,10 @@ impl NativeCommandOption {
             Self::FdoInstrument => "fdo_instrument",
             Self::CsFdoInstrument => "cs_fdo_instrument",
             Self::CollectCodeCoverage => "collect_code_coverage",
+            Self::CheckVisibility => "check_visibility",
+            Self::IncompatibleFilegroupRunfilesForData => {
+                "incompatible_filegroup_runfiles_for_data"
+            }
             Self::CoverageOutputGenerator => "coverage_output_generator",
             Self::Copt => "copt",
             Self::Conlyopt => "conlyopt",
@@ -175,6 +185,8 @@ impl NativeCommandOption {
         matches!(
             self,
             Self::CollectCodeCoverage
+                | Self::CheckVisibility
+                | Self::IncompatibleFilegroupRunfilesForData
                 | Self::CcDotdFiles
                 | Self::SaveTemps
                 | Self::ProcessHeadersInDependencies

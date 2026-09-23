@@ -1165,6 +1165,8 @@ macro_rules! semantic_value {
     };
 }
 
+mod filegroup;
+
 #[derive(Default)]
 struct AnalysisPrintCapture {
     events: RefCell<Vec<EvaluationEvent>>,
@@ -2588,11 +2590,10 @@ fn platform_semantic_fact(
 }
 
 fn package_declares_source_label(package: &LoadedPackage, label: &CanonicalLabel) -> bool {
-    package.targets.iter().any(|target| {
-        matches!(
-            &target.kind,
-            PackageTargetKind::StarlarkRule(rule) if rule.dependencies().contains(label)
-        )
+    package.targets.iter().any(|target| match &target.kind {
+        PackageTargetKind::StarlarkRule(rule) => rule.dependencies().contains(label),
+        PackageTargetKind::Filegroup { srcs, .. } => srcs.contains(label),
+        _ => false,
     })
 }
 
@@ -2888,6 +2889,7 @@ fn require_supported_canonical_configured_target(
             ConfiguredNodeKey::Configured(_),
             Some(slug_loading_v2::PackageTarget {
                 kind: PackageTargetKind::Alias { .. }
+                    | PackageTargetKind::Filegroup { .. }
                     | PackageTargetKind::ConfigSetting { .. }
                     | PackageTargetKind::NativeToolchain(_),
                 ..
@@ -5747,6 +5749,13 @@ impl ConfiguredNodeAnalysisKey {
                     native.rule_class(),
                     configured_target.configuration().kind(),
                 ))));
+            }
+            (
+                ConfiguredNodeKey::Configured(configured_target),
+                Some(PackageTargetKind::Filegroup { .. }),
+            ) => {
+                return filegroup::analyze(ctx, mode, &self.workspace, package, configured_target)
+                    .await;
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),

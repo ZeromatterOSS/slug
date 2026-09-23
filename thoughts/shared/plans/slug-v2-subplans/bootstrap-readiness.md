@@ -447,8 +447,15 @@ configuration/root and orthogonal output metadata. This removes a construction
 prerequisite, not a production execution gate: actual status bytes/producer,
 rendering, volatile execution/cache policy, module tools and full cc_toolchain
 remain unproved. Execution and raw projection/materialization paths for these
-descriptors/transforms remain closed. Generic command/
-aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/
+descriptors/transforms remain closed.
+Native filegroup forwarding supplies the nested configured srcs/FilesToRun
+prerequisite used by the four implicit tool dependencies, preserving real file,
+runfiles and output-group providers and selected target/exec ownership. It does
+not install module binaries or load the complete tools/cpp package. That unchanged
+package still requires label_flag and the genuine compatibility-proxy/rules/protobuf
+load closure; binary catalog admission also needs explicit release-platform
+provenance. None may be replaced with an authored tool/provider envelope.
+Generic command/aquery/ActionKey, discovery-aware input selection/cache hits, execution-time tree/
 path mapping and full cc_library remain deferred. Variables reject cyclic/foreign publication;
 raw set/range publication and unmodeled builtin structures remain outside
 the admitted boundary. See the current packet for exact/native/deferred classes.

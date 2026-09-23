@@ -29,8 +29,14 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-78-m7a-build-info-transform-registration-r1
+Packet: WP-7-79-m7a-native-filegroup-forwarding-r1
 Status: accepted
+
+WP779 accepts native configurable-srcs filegroup analysis with genuine file,
+runfiles and singleton executable providers. It is demanded by all four implicit
+full-cc_toolchain tools; label_flag, authentic tools-package loading and installed
+module-binary provenance remain separate prerequisites.39 focused/protected tests,
+Core/Query/CLI checks and independent design/final review pass. No full-rule claim yet.
 
 WP778 accepts authentic build-info transform registration and bare OutputGroupInfo,
 retaining source-authenticated recipes, constant output metadata and genuine builtin

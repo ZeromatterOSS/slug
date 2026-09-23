@@ -728,6 +728,11 @@ mod tests {
     #[test]
     fn cpp_compile_boolean_options_preserve_no_forms_and_defer_conversion() {
         for (name, option) in [
+            ("check_visibility", NativeCommandOption::CheckVisibility),
+            (
+                "incompatible_filegroup_runfiles_for_data",
+                NativeCommandOption::IncompatibleFilegroupRunfilesForData,
+            ),
             ("cc_dotd_files", NativeCommandOption::CcDotdFiles),
             ("save_temps", NativeCommandOption::SaveTemps),
             ("stamp", NativeCommandOption::Stamp),

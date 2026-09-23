@@ -1,0 +1,12 @@
+[fixture]
+name = "native-filegroup-configured-forwarding"
+description = "Genuine native filegroups over authored source/generated File and runfiles origins."
+comparison = "structured_semantic"
+oracle_notes = "Pinned-source regressions. Native filegroup and aliases perform forwarding; authored rules only originate data or inspect production ctx projections. No compiler, installed module binary, or execution claim."
+
+[provenance]
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = ["src/main/java/com/google/devtools/build/lib/rules/filegroup/Filegroup.java:51-136", "src/main/java/com/google/devtools/build/lib/analysis/PrerequisiteArtifacts.java:64-71", "src/main/java/com/google/devtools/build/lib/analysis/Runfiles.java:638-774", "src/test/java/com/google/devtools/build/lib/rules/filegroup/FilegroupConfiguredTargetTest.java:131-155,225-305"]
+generation_command = "Authored small source-derived fixtures; no upstream body copy."
+verification_command = "Compile slug_analysis_v2 --test starlark_rule; preflight and execute exact native_filegroup selectors serially."
+translation_notes = "Full Slug structural artifact/configuration identity; default/data runfiles policies, native files-to-run singleton, output groups, selected dependencies and observed restoration. Empty-filename preservation is covered in the native owner builder because public ctx.runfiles cannot originate those entries."

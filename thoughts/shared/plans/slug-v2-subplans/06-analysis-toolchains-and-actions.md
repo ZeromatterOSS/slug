@@ -9,6 +9,20 @@ configuration transitions, toolchain resolution, and action declarations.
 
 ### Current state
 
+Native filegroup analysis reuses configured condition/child observations and
+retained native srcs, never Loading's flattened branch candidates. The admitted
+no-data/default-output-group/no-coverage slice forwards stable files and distinct
+compile-order default/data runfiles, honors the native data-runfiles flag, and
+publishes singleton FilesToRun without RunfilesSupport or own actions. Empty
+InstrumentedFilesInfo uses the existing builtin occurrence owner and an empty-only
+native facade; hidden/validation groups use ordinary rule completion. Source and
+derived artifacts preserve their original owners. Bounded visibility honors public
+and ordinary same-package edges (or check_visibility=false); requested aliases own
+visibility, actual targets own testonly checks. Restricted/macro-nonpublic visibility,
+testonly prerequisites, package-group aliases and nonneutral unmodeled native
+attributes fail closed. Loading/query declarations remain unchanged. This is a
+full-toolchain prerequisite, not installed-tool or full cc_toolchain acceptance.
+
 M2 configured analysis is accepted with Slug-native configuration/path identity.
 WP-7-35 adds `ctx.actions.declare_directory(filename, sibling=None)` through the
 active analysis token and existing artifact owner. A phase-local declaration map

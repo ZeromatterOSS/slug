@@ -119,6 +119,9 @@ pub(crate) fn test_artifact_root() -> slug_build_api_v2::DerivedArtifactRoot {
 #[path = "analysis_value/artifact_root_tests.rs"]
 mod artifact_root_tests;
 
+mod empty_instrumented_files;
+use empty_instrumented_files::EmptyInstrumentedFiles;
+
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct BuiltinProviderView {
     identity: ProviderIdentity,
@@ -526,6 +529,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
     }
 
     fn provider(&mut self, occurrence: &ProviderOccurrence) -> Result<FrozenValue, String> {
+        if occurrence.identity().is_builtin("InstrumentedFilesInfo") {
+            EmptyInstrumentedFiles::validate(occurrence)?;
+        }
         if occurrence.identity().is_builtin("OutputGroupInfo") {
             let info =
                 OutputGroupInfo::from_occurrence(occurrence).map_err(|error| error.to_string())?;
@@ -539,16 +545,20 @@ impl<'a> AnalysisValueMaterializer<'a> {
             .iter()
             .map(|(name, value)| Ok((name.clone(), self.value(value)?)))
             .collect::<Result<Vec<_>, String>>()?;
-        Ok(if occurrence.identity().is_builtin("ToolchainInfo") {
-            StarlarkToolchainInfo::alloc(self.heap, fields)
-        } else if let Some(id) = occurrence.identity().user_id() {
-            alloc_starlark_user_provider(self.heap, id.dupe(), occurrence.has_schema(), fields)
-        } else {
-            self.heap.alloc(BuiltinProviderView {
-                identity: occurrence.identity().clone(),
-                fields: fields.into_iter().collect(),
-            })
-        })
+        Ok(
+            if occurrence.identity().is_builtin("InstrumentedFilesInfo") {
+                EmptyInstrumentedFiles::alloc(self.heap, fields)
+            } else if occurrence.identity().is_builtin("ToolchainInfo") {
+                StarlarkToolchainInfo::alloc(self.heap, fields)
+            } else if let Some(id) = occurrence.identity().user_id() {
+                alloc_starlark_user_provider(self.heap, id.dupe(), occurrence.has_schema(), fields)
+            } else {
+                self.heap.alloc(BuiltinProviderView {
+                    identity: occurrence.identity().clone(),
+                    fields: fields.into_iter().collect(),
+                })
+            },
+        )
     }
 
     fn artifact_option(&self, value: Option<&AnalysisArtifact>) -> FrozenValue {
@@ -1010,6 +1020,8 @@ impl<'v> AnalysisValueLowerer<'v> {
                     Some(fields)
                 } else if let Some(fields) = StarlarkToolchainInfo::fields_from_value(value) {
                     Some(fields)
+                } else if let Some(fields) = EmptyInstrumentedFiles::fields_from_value(value) {
+                    Some(fields)
                 } else if let Some((_, fields)) = BuiltinProviderView::fields_from_value(value) {
                     Some(fields)
                 } else {
@@ -1175,6 +1187,8 @@ impl<'v> AnalysisValueLowerer<'v> {
             Some((ProviderIdentity::builtin("OutputGroupInfo"), fields))
         } else if let Some(fields) = StarlarkToolchainInfo::fields_from_value(value) {
             Some((ProviderIdentity::builtin("ToolchainInfo"), fields))
+        } else if let Some(fields) = EmptyInstrumentedFiles::fields_from_value(value) {
+            Some((ProviderIdentity::builtin("InstrumentedFilesInfo"), fields))
         } else if let Some((identity, fields)) = BuiltinProviderView::fields_from_value(value) {
             Some((identity, fields))
         } else {
@@ -1587,7 +1601,21 @@ mod tests {
         ];
         let mut values = vec![ProviderValue::DefaultInfo(DefaultInfo::empty())];
         values.extend(names.into_iter().map(|name| {
-            ProviderValue::Occurrence(ProviderOccurrence::empty(ProviderIdentity::builtin(name)))
+            ProviderValue::Occurrence(if name == "InstrumentedFilesInfo" {
+                ProviderOccurrence::new(
+                    ProviderIdentity::builtin(name),
+                    ["instrumented_files", "metadata_files"].map(|field| {
+                        (
+                            field,
+                            AnalysisValue::depset(AnalysisDepset::empty(
+                                slug_build_api_v2::DepsetOrder::Default,
+                            )),
+                        )
+                    }),
+                )
+            } else {
+                ProviderOccurrence::empty(ProviderIdentity::builtin(name))
+            })
         }));
         let providers = ProviderCollection::new(values).unwrap();
         let retained = ConfiguredTargetValue::new(

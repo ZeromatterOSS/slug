@@ -76,6 +76,86 @@ mod command_configuration_tests {
         assert_eq!(enabled.with_incompatible_auto_exec_groups(false), base);
     }
 
+    #[test]
+    fn filegroup_policies_are_typed_structural_and_inherited_by_exec() {
+        let base = SlugConfiguration::default_target(
+            &HostConversionInputs::new(
+                Some(AutoCpuToken::K8),
+                Some(HostPathFlavor::Unix),
+                None,
+                Arc::from([]),
+                Arc::from([]),
+            )
+            .unwrap()
+            .with_action_environment_host(
+                super::super::host::ActionEnvironmentHost::without_environment(
+                    super::super::host::ActionEnvironmentHostOs::Linux,
+                ),
+            ),
+        )
+        .unwrap();
+        assert!(base.check_visibility().unwrap());
+        assert!(base.filegroup_runfiles_for_data().unwrap());
+        for option in [
+            NativeCommandOption::CheckVisibility,
+            NativeCommandOption::IncompatibleFilegroupRunfilesForData,
+        ] {
+            assert_eq!(
+                NativeCommandOption::from_name(option.canonical_name()),
+                Some(option)
+            );
+            assert!(option.is_boolean());
+            let project = |configuration: &SlugConfiguration| {
+                if option == NativeCommandOption::CheckVisibility {
+                    configuration.check_visibility().unwrap()
+                } else {
+                    configuration.filegroup_runfiles_for_data().unwrap()
+                }
+            };
+            let changed = base
+                .with_command_configuration(
+                    base.starlark_options().clone(),
+                    &vec![native(option, "false")].into(),
+                )
+                .unwrap();
+            assert!(!project(&changed));
+            assert_ne!(base, changed);
+            assert_ne!(base.canonical_bytes(), changed.canonical_bytes());
+            assert!(!project(&changed.to_exec().unwrap()));
+            assert!(!project(
+                &changed
+                    .to_exec_for_platform(&changed.host_platform_label().unwrap())
+                    .unwrap()
+            ));
+            let negated = base
+                .with_command_configuration(
+                    base.starlark_options().clone(),
+                    &vec![CommandConfigurationOccurrence::native(
+                        option,
+                        None::<String>,
+                        true,
+                    )]
+                    .into(),
+                )
+                .unwrap();
+            assert_eq!(negated, changed);
+            let restored = changed
+                .with_command_configuration(
+                    changed.starlark_options().clone(),
+                    &vec![native(option, "true")].into(),
+                )
+                .unwrap();
+            assert_eq!(restored, base);
+            assert!(
+                base.with_command_configuration(
+                    base.starlark_options().clone(),
+                    &vec![native(option, "invalid")].into()
+                )
+                .is_err()
+            );
+        }
+    }
+
     fn mapping() -> RepositoryMapping {
         let mut mapping = RepositoryMapping::new(RepositoryMappingId::new("command-test").unwrap());
         mapping.insert(
