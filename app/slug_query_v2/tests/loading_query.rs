@@ -4451,6 +4451,351 @@ async fn root_query_labels(
         .map_err(ToString::to_string)
 }
 
+fn external_module_filegroups_epoch(
+    child_build: Option<&str>,
+    child_variant: i64,
+) -> PathObservationEpoch {
+    let mut builder = RootQueryEpochBuilder::external_visibility_package(
+        220,
+        "dep",
+        concat!(
+            "package(default_visibility = [\"//visibility:public\"])\n",
+            "filegroup(name = \"ddi\", srcs = [\"//modules:ddi_bin\"])\n",
+            "filegroup(name = \"modmap\", srcs = [\"//modules:modmap_bin\"])\n",
+            "filegroup(name = \"independent\")\n",
+            "filegroup(name = \"literal\", srcs = [\"literal.txt\"])\n",
+        ),
+    );
+    builder.package_at(
+        "/workspace/dep",
+        "modules",
+        "BUILD.bazel",
+        child_build.unwrap_or(""),
+        child_variant,
+    );
+    if child_build.is_none() {
+        builder.missing("/workspace/dep/modules/BUILD.bazel");
+        builder.missing("/workspace/dep/modules/BUILD");
+    }
+    builder.build()
+}
+
+const MODULE_FILEGROUPS_BUILD: &str = concat!(
+    "package(default_visibility = [\"//visibility:public\"])\n",
+    "config_setting(name = \"windows\", values = {\"cpu\": \"k8\"})\n",
+    "filegroup(name = \"ddi_bin\", srcs = select({\":windows\": [\"ddi.exe\"], \"//conditions:default\": [\"ddi\"]}))\n",
+    "filegroup(name = \"modmap_bin\", srcs = select({\":windows\": [\"modmap.exe\"], \"//conditions:default\": [\"modmap\"]}))\n",
+);
+
+#[tokio::test]
+async fn external_cross_package_filegroups_traverse_both_selector_arms_and_condition() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let mut transaction = root_query_transaction(
+        &dice,
+        external_module_filegroups_epoch(Some(MODULE_FILEGROUPS_BUILD), 220),
+        tracker,
+    )
+    .await;
+
+    for (query, expected) in [
+        (
+            "deps(@dep//:ddi, 2)",
+            &[
+                "@dep//:ddi",
+                "@dep//modules:ddi",
+                "@dep//modules:ddi.exe",
+                "@dep//modules:ddi_bin",
+                "@dep//modules:windows",
+            ][..],
+        ),
+        (
+            "deps(@dep//:modmap, 2)",
+            &[
+                "@dep//:modmap",
+                "@dep//modules:modmap",
+                "@dep//modules:modmap.exe",
+                "@dep//modules:modmap_bin",
+                "@dep//modules:windows",
+            ],
+        ),
+        (
+            "labels(srcs, @dep//modules:ddi_bin)",
+            &["@dep//modules:ddi", "@dep//modules:ddi.exe"],
+        ),
+        (
+            "same_pkg_direct_rdeps(@dep//modules:windows)",
+            &["@dep//modules:ddi_bin", "@dep//modules:modmap_bin"],
+        ),
+        (
+            "attr(srcs, 'ddi\\.exe', @dep//modules:ddi_bin)",
+            &["@dep//modules:ddi_bin"],
+        ),
+        ("attr(srcs, '^windows$', @dep//modules:ddi_bin)", &[]),
+        (
+            "deps(@dep//:literal, 1)",
+            &["@dep//:literal", "@dep//:literal.txt"],
+        ),
+    ] {
+        let actual = root_query_labels(&mut transaction, query).await.unwrap();
+        assert_eq!(actual, expected, "{query}");
+    }
+}
+
+#[tokio::test]
+async fn external_cross_package_filegroup_destination_edits_delete_and_restore() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let query = "deps(@dep//:ddi, 2)";
+    let independent = "deps(@dep//:independent, 1)";
+    let mut first = root_query_transaction(
+        &dice,
+        external_module_filegroups_epoch(Some(MODULE_FILEGROUPS_BUILD), 220),
+        tracker.clone(),
+    )
+    .await;
+    let initial = root_query_labels(&mut first, query).await.unwrap();
+    assert!(initial.contains(&"@dep//modules:ddi.exe".to_owned()));
+
+    let changed_build = concat!(
+        "package(default_visibility = [\"//visibility:public\"])\n",
+        "config_setting(name = \"windows\", values = {\"cpu\": \"k8\"})\n",
+        "filegroup(name = \"ddi_bin\", srcs = select({\":windows\": [\"changed.exe\"], \"//conditions:default\": [\"changed\"]}))\n",
+    );
+    let mut edited = root_query_transaction(
+        &dice,
+        external_module_filegroups_epoch(Some(changed_build), 221),
+        tracker.clone(),
+    )
+    .await;
+    let changed = root_query_labels(&mut edited, query).await.unwrap();
+    assert!(changed.contains(&"@dep//modules:changed.exe".to_owned()));
+    assert!(!changed.contains(&"@dep//modules:ddi.exe".to_owned()));
+    assert_eq!(
+        root_query_labels(&mut edited, independent).await.unwrap(),
+        ["@dep//:independent"]
+    );
+
+    let mut deleted = root_query_transaction(
+        &dice,
+        external_module_filegroups_epoch(None, 222),
+        tracker.clone(),
+    )
+    .await;
+    let error = root_query_labels(&mut deleted, query).await.unwrap_err();
+    assert!(
+        error.contains("modules") && error.contains("BUILD"),
+        "{error}"
+    );
+    assert_eq!(
+        root_query_labels(&mut deleted, independent).await.unwrap(),
+        ["@dep//:independent"]
+    );
+
+    let mut restored = root_query_transaction(
+        &dice,
+        external_module_filegroups_epoch(Some(MODULE_FILEGROUPS_BUILD), 220),
+        tracker,
+    )
+    .await;
+    assert_eq!(
+        root_query_labels(&mut restored, query).await.unwrap(),
+        initial
+    );
+}
+
+#[tokio::test]
+async fn external_cross_package_filegroup_missing_and_other_kind_destinations_are_real() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let mut missing = root_query_transaction(
+        &dice,
+        external_module_filegroups_epoch(Some("filegroup(name = \"unrelated\")\n"), 230),
+        tracker.clone(),
+    )
+    .await;
+    for query in ["deps(@dep//:ddi, 2)", "labels(srcs, @dep//:ddi)"] {
+        let error = root_query_labels(&mut missing, query).await.unwrap_err();
+        assert!(
+            error.contains("ddi_bin") && error.contains("no such target"),
+            "{query}: {error}"
+        );
+    }
+    assert_eq!(
+        root_query_labels(&mut missing, "@dep//:independent")
+            .await
+            .unwrap(),
+        ["@dep//:independent"]
+    );
+
+    let mut other_kind = root_query_transaction(
+        &dice,
+        external_module_filegroups_epoch(
+            Some("config_setting(name = \"ddi_bin\", values = {\"cpu\": \"k8\"})\n"),
+            231,
+        ),
+        tracker.clone(),
+    )
+    .await;
+    assert_eq!(
+        root_query_labels(&mut other_kind, "deps(@dep//:ddi, 2)")
+            .await
+            .unwrap(),
+        ["@dep//:ddi", "@dep//modules:ddi_bin"]
+    );
+    let QueryPreparationOutcome::Complete(kind) = other_kind
+        .compute(&root_query_key("@dep//modules:ddi_bin"))
+        .await
+        .unwrap()
+    else {
+        panic!("other-kind destination requested preparation")
+    };
+    assert_eq!(
+        kind.as_ref().as_ref().unwrap().label_kind_stdout(),
+        "config_setting rule @dep//modules:ddi_bin\n"
+    );
+
+    let mut missing_condition = root_query_transaction(
+        &dice,
+        external_module_filegroups_epoch(
+            Some("filegroup(name = \"ddi_bin\", srcs = select({\":missing\": [\"ddi.exe\"], \"//conditions:default\": [\"ddi\"]}))\n"),
+            232,
+        ),
+        tracker.clone(),
+    )
+    .await;
+    let deps = root_query_labels(&mut missing_condition, "deps(@dep//modules:ddi_bin, 1)")
+        .await
+        .unwrap();
+    assert_eq!(deps.len(), 4, "{deps:?}");
+    for label in [
+        "@dep//modules:ddi_bin",
+        "@dep//modules:ddi",
+        "@dep//modules:ddi.exe",
+        "@dep//modules:missing",
+    ] {
+        assert!(
+            deps.iter().any(|actual| actual == label),
+            "{label}: {deps:?}"
+        );
+    }
+    assert_eq!(
+        root_query_labels(
+            &mut missing_condition,
+            "labels(srcs, @dep//modules:ddi_bin)"
+        )
+        .await
+        .unwrap(),
+        ["@dep//modules:ddi", "@dep//modules:ddi.exe"]
+    );
+    let QueryPreparationOutcome::Complete(kind) = missing_condition
+        .compute(&root_query_key("@dep//modules:missing"))
+        .await
+        .unwrap()
+    else {
+        panic!("undeclared selector key requested preparation")
+    };
+    assert_eq!(
+        kind.as_ref().as_ref().unwrap().label_kind_stdout(),
+        "source file @dep//modules:missing\n"
+    );
+
+    let mut foreign = external_visibility_transaction(
+        &dice,
+        tracker,
+        233,
+        "dep",
+        "filegroup(name = \"foreign\", srcs = [\"@@//main:target\"])\n",
+    )
+    .await;
+    let error = root_query_labels(&mut foreign, "deps(@dep//:foreign, 1)")
+        .await
+        .unwrap_err();
+    assert!(
+        error.contains("filegroup") && error.contains("deferred"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn external_filegroup_foreign_selector_key_fails_only_when_child_is_selected() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let mut transaction = root_query_transaction(
+        &dice,
+        external_module_filegroups_epoch(
+            Some("filegroup(name = \"ddi_bin\", srcs = select({\"@@//main:condition\": [\"local.txt\"], \"//conditions:default\": []}))\n"),
+            234,
+        ),
+        tracker,
+    )
+    .await;
+    assert_eq!(
+        root_query_labels(&mut transaction, "deps(@dep//:independent, 1)")
+            .await
+            .unwrap(),
+        ["@dep//:independent"]
+    );
+    let error = root_query_labels(&mut transaction, "deps(@dep//:ddi, 2)")
+        .await
+        .unwrap_err();
+    assert!(
+        error.contains("foreign") && error.contains("selector condition"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
+async fn external_filegroup_cross_package_selector_key_requires_real_destination() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let mut builder = RootQueryEpochBuilder::external_visibility_package(
+        235,
+        "dep",
+        "filegroup(name = \"independent\")\n",
+    );
+    builder.package_at(
+        "/workspace/dep",
+        "modules",
+        "BUILD.bazel",
+        "filegroup(name = \"ddi_bin\", srcs = select({\"//other:absent\": [\"local.txt\"], \"//conditions:default\": []}))\n",
+        235,
+    );
+    builder.package_at(
+        "/workspace/dep",
+        "other",
+        "BUILD.bazel",
+        "filegroup(name = \"unrelated\")\n",
+        235,
+    );
+    let mut transaction = root_query_transaction(&dice, builder.build(), tracker).await;
+    assert_eq!(
+        root_query_labels(&mut transaction, "@dep//modules:ddi_bin")
+            .await
+            .unwrap(),
+        ["@dep//modules:ddi_bin"]
+    );
+    assert_eq!(
+        root_query_labels(&mut transaction, "labels(srcs, @dep//modules:ddi_bin)")
+            .await
+            .unwrap(),
+        ["@dep//modules:local.txt"]
+    );
+    let error = root_query_labels(&mut transaction, "deps(@dep//modules:ddi_bin, 1)")
+        .await
+        .unwrap_err();
+    assert!(
+        error.contains("@@dep+//other:absent") && error.contains("no such target"),
+        "{error}"
+    );
+    assert_eq!(
+        root_query_labels(&mut transaction, "@dep//:independent")
+            .await
+            .unwrap(),
+        ["@dep//:independent"]
+    );
+}
+
 #[tokio::test]
 async fn external_unselected_nonvisible_alias_is_deferred_per_selected_query_and_restores() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -4506,11 +4851,17 @@ async fn external_unselected_nonvisible_alias_is_deferred_per_selected_query_and
             "{query}: {error}"
         );
     }
-    for query in ["deps(@dep//:cross, 1)", "labels(srcs, @dep//:cross)"] {
-        let error = root_query_labels(&mut first, query).await.unwrap_err();
+    // The cross-package label is retained, but selected traversal must load
+    // the absent destination rather than publishing an unverified source.
+    for query in [
+        "deps(@dep//:cross, 1)",
+        "deps(@dep//:cross, 2)",
+        "labels(srcs, @dep//:cross)",
+    ] {
+        let value = first.compute(&root_query_key(query)).await.unwrap();
         assert!(
-            error.contains("cross-package filegroup source traversal is deferred"),
-            "{query}: {error}"
+            matches!(value, QueryPreparationOutcome::Need(_)),
+            "{query}: {value:?}"
         );
     }
     let original = root_query_labels(&mut first, "deps(@dep//:latent, 1)")

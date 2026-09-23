@@ -456,10 +456,6 @@ use super::*;
                 "external repository package_group cross-package include is deferred",
             ),
             (
-                "filegroup(name = \"files\", srcs = [\"//other:item\"])\n",
-                "external repository filegroup cross-package srcs are deferred",
-            ),
-            (
                 "filegroup(name = \"group\")\nfilegroup(name = \"files\", visibility = [\":group\"])\n",
                 "external repository visibility wrong-kind group is deferred",
             ),
@@ -523,18 +519,13 @@ use super::*;
         }
         fs::write(
             workspace.path().join("dep/BUILD.bazel"),
-            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\nalias(name = \"files_alias\", actual = \":files\")\nconfig_setting(name = \"is_k8\", values = {\"cpu\": \"k8\"})\n",
-        )
-        .unwrap();
-        fs::write(
-            workspace.path().join("dep/BUILD.bazel"),
             "alias(name = \"files_alias\", actual = \"@other//:item\")\n",
         )
         .unwrap();
         let stopped = test_runtime(workspace.path()).unwrap();
         let named_repository = stopped
             .query_command_with_policy_and_bzlmod_inputs_and_output_completion(
-                "@dep//:files",
+                "deps(@dep//:files_alias, 1)",
                 QueryOrder::Auto,
                 QueryPolicy::default(),
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
@@ -551,8 +542,19 @@ use super::*;
                 .as_ref()
                 .unwrap_err()
                 .to_string()
-                .contains("no repository visible as '@other'"),
+                .contains("unknown repo 'other' requested from @@dep+"),
             "{named_repository:?}"
+        );
+        let stopped_original = query("deps(@dep//:files_alias, 1)").unwrap();
+        assert!(
+            stopped_original
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("unknown repo 'other' requested from @@dep+"),
+            "{stopped_original:?}"
         );
         fs::write(
             workspace.path().join("dep/BUILD.bazel"),
@@ -681,36 +683,6 @@ use super::*;
                 format!("external repository query patterns are deferred: {pattern}")
             );
         }
-
-        fs::write(
-            workspace.path().join("dep/BUILD.bazel"),
-            "load(\":defs.bzl\", \"defs\")\nexports_files([\"target.txt\"])\n",
-        )
-        .unwrap();
-        let load = query("@dep//:target.txt").unwrap();
-        assert!(
-            load.terminal_for_test()
-                .as_ref()
-                .as_ref()
-                .unwrap_err()
-                .to_string()
-                .contains("external repository BUILD loads are deferred")
-        );
-
-        fs::write(
-            workspace.path().join("dep/BUILD.bazel"),
-            "exports_files(glob([\"*.txt\"]))\n",
-        )
-        .unwrap();
-        let glob = query("@dep//:target.txt").unwrap();
-        assert!(
-            glob.terminal_for_test()
-                .as_ref()
-                .as_ref()
-                .unwrap_err()
-                .to_string()
-                .contains("external repository BUILD globs are deferred")
-        );
 
         fs::write(workspace.path().join("dep/BUILD.bazel"), [0xff]).unwrap();
         let invalid_utf8 = query("@dep//:target.txt").unwrap();

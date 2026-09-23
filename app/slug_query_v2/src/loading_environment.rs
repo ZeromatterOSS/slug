@@ -1091,9 +1091,13 @@ fn deferred_external_filegroup_source_error(
         .iter()
         .filter(|edge| edge.kind == crate::QueryEdgeKind::Ordinary)
     {
-        if edge.target.owner_identity()? != owner {
+        // A filegroup may point into another package of its own repository.
+        // That destination is resolved through its independently loaded package
+        // graph when selected. A different repository still lacks an admitted
+        // source route for this native-filegroup slice.
+        if edge.target.owner_identity()?.canonical_repo() != owner.canonical_repo() {
             return Ok(Some(QueryError::unsupported_feature(format!(
-                "external repository cross-package filegroup source traversal is deferred: {} -> {}",
+                "external repository foreign-repository filegroup source traversal is deferred: {} -> {}",
                 node.label, edge.target
             ))));
         }
@@ -1280,8 +1284,34 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         if let Some(error) = deferred_edge_error(&node, None)? {
             return Err(error);
         }
+        let external_filegroup_owner = if matches!(&node.kind, crate::QueryNodeKind::Rule(rule) if rule == "filegroup rule")
+        {
+            let owner = node.label.owner_identity()?;
+            owner.canonical_repo().is_some().then_some(owner)
+        } else {
+            None
+        };
         let mut dependencies = Vec::with_capacity(node.edges.len());
         for edge in node.edges.iter() {
+            if matches!(
+                edge.kind,
+                crate::QueryEdgeKind::Ordinary | crate::QueryEdgeKind::SelectorCondition
+            ) {
+                if let Some(owner) = &external_filegroup_owner {
+                    let target_owner = edge.target.owner_identity()?;
+                    if &target_owner != owner {
+                        self.resolve_single(edge.target.clone())
+                            .await
+                            .map_err(|error| {
+                                if error.is_preparation_restart() {
+                                    return error;
+                                }
+                                let message = format!("in 'srcs' of rule {}: {error}", node.label);
+                                error.with_message(message)
+                            })?;
+                    }
+                }
+            }
             self.evaluation_graph
                 .record_edge(label.clone(), edge.target.clone());
             dependencies.push(

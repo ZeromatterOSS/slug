@@ -29,22 +29,33 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-85-m7a-linux-runshell-transport-restoration-r1
+Packet: WP-7-86-m7a-external-filegroup-query-r1
 Status: accepted; independent final ACCEPT
 
-WP785 restores the earlier accepted Linux `shell-action-reapi` execution
-slice through fresh supervised NativeLink 1.7.1: one REAPI action, zero
-direct-local actions, and the exact 5-byte output digest/mode under Slug's
-native configured root. Typed `run_shell` now retains the selected
-`/bin/bash -c` prefix; source staging admits that typed platform executable,
-and requested execution pre-creates its output marker directory before the
-source-freshness observation. Process-latched `BAZEL_SH`, explicit shell
-overrides and non-Linux platforms remain closed. The raw Bazel fixture still
-reports a manifest-only difference at deferred `bazel-bin` versus Slug-native
-output roots; expected bytes were not changed. Independent final review
-ACCEPTED the bounded restoration. A
-separate direct FileWrite real-transport test passes CAS/Execute/output/AC
-against NativeLink 1.7.1.
+WP786 selects the authentic `@bazel_tools//tools/cpp` cross-package
+configurable filegroup Query frontier left by WP784. Bazel 9.2 reaches the
+`modules_tools` child filegroups, both `select()` source arms and the
+`:windows` condition; Slug presently retains the source edge but refuses
+selected cross-package traversal. This packet admits only the observed
+unconfigured Query graph/commands through existing Loading, route and DICE
+owners. Configured module-tool binaries/providers, actions and M7A closure
+remain separate gates. A later Bazel 9.2 negative probe corrected the first
+design review: an undeclared same-package selector key is synthesized as a
+source file in `deps`, while an undeclared cross-package target errors.
+Independent rereview ACCEPTED the revised edge policy. The rebuilt Slug CLI
+now matches all five named Bazel 9.2 Query outcomes. Focused Query and direct
+Core tests pass; a broad Query integration run has one unrelated pre-existing
+Loading-label diagnostic expectation failure, with 73/74 passing. Final
+review found two cross-package selector-boundary gaps outside the named
+authentic chain; both were corrected and focused tests, a new Bazel 9.2
+negative, direct Core and the rebuilt CLI were revalidated. Independent
+final rereview ACCEPTED the bounded Query admission.
+
+WP785 at `9931f6a2d` accepted bounded Linux `run_shell` execution through
+fresh NativeLink 1.7.1: one REAPI action, zero direct-local actions and exact
+five-byte output content/mode under Slug-native roots. The raw fixture's
+remaining `bazel-bin` manifest-path difference is deferred output identity,
+not a parity claim. Independent final review ACCEPTED that classification.
 
 WP784 at `8fd6e0601` independently accepted authentic
 `@bazel_tools//tools/cpp` nonvisible-alias Loading and rule-toolchain Query

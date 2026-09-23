@@ -37,6 +37,7 @@ use slug_loading_v2::AliasActual;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::AttributeQueryValue;
+use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::ConfiguredDependencyDefault;
 use slug_loading_v2::HostRootRepositoryLoadRoute;
 use slug_loading_v2::LoadedPackage;
@@ -329,6 +330,8 @@ pub enum QueryEdgeKind {
     Nodep,
     Ordinary,
     Implicit,
+    /// A native filegroup select key, distinct from a generic implicit edge.
+    SelectorCondition,
     /// Default rule-class toolchain requirement, distinct from attributes.
     RuleToolchain,
     PackageGroupInclude,
@@ -977,6 +980,7 @@ fn package_graph_from_loaded(
                     kind: QueryEdgeKind::Ordinary,
                     target,
                 }));
+                edges.extend(filegroup_selector_condition_edges(native_attributes, None)?);
                 (
                     QueryNodeKind::Rule(CompactString::new("filegroup rule")),
                     edges,
@@ -1225,13 +1229,20 @@ fn package_graph_from_loaded(
         );
     }
 
-    // Attribute-created source nodes are owned by the package containing the
-    // attribute. Cross-package labels remain edges: their destination package
-    // graph is loaded only if traversal demands it.
+    // Attribute-created source nodes, including missing same-package select
+    // conditions, belong to the package containing the attribute. Cross-package
+    // labels remain edges: traversal loads their destination package graph.
     let referenced_sources = nodes
         .values()
         .flat_map(|node| node.edges.iter())
-        .filter(|edge| matches!(edge.kind, QueryEdgeKind::Ordinary | QueryEdgeKind::Implicit))
+        .filter(|edge| {
+            matches!(
+                edge.kind,
+                QueryEdgeKind::Ordinary
+                    | QueryEdgeKind::Implicit
+                    | QueryEdgeKind::SelectorCondition
+            )
+        })
         .map(|edge| &edge.target)
         .filter(|label| label.is_root_repository() && label.package() == package_name)
         .filter(|label| nodes.get(*label).is_none())
@@ -1399,6 +1410,10 @@ fn external_package_graph_from_targets(
                     })
                     .collect::<Vec<_>>();
                 edges.extend(ordinary);
+                edges.extend(filegroup_selector_condition_edges(
+                    native_attributes,
+                    Some((canonical_repo, apparent_repo)),
+                )?);
                 let mut attributes = vec![QueryAttribute {
                     name: CompactString::new("srcs"),
                     labels: labels.into(),
@@ -1771,14 +1786,16 @@ fn external_package_graph_from_targets(
         );
     }
 
-    // Accepted native label attributes create same-package source targets
-    // during loading. This query projection retains that semantic result for
-    // filegroup `srcs` and alias `actual` without observing the source path.
+    // Native labels and missing same-package selector conditions create source
+    // targets during loading. Retain them without observing the source path.
     let referenced_sources = nodes
         .values()
         .flat_map(|node| {
             node.edges.iter().filter(move |edge| {
-                edge.kind == QueryEdgeKind::Ordinary
+                matches!(
+                    edge.kind,
+                    QueryEdgeKind::Ordinary | QueryEdgeKind::SelectorCondition
+                )
                     || (matches!(&node.kind, QueryNodeKind::Rule(rule) if rule == "label_flag rule" || rule == "rule")
                         && edge.kind == QueryEdgeKind::Implicit)
             })
@@ -2406,6 +2423,54 @@ fn external_rule_toolchain_edge(
     })
 }
 
+fn filegroup_selector_condition_edges(
+    attributes: Option<&slug_loading_v2::NativeRuleAttributes>,
+    external_route: Option<(&CanonicalRepoName, &ApparentRepoName)>,
+) -> Result<Vec<QueryEdge>, QueryError> {
+    let Some((_, attribute)) = attributes.and_then(|value| value.get("$config_dependencies"))
+    else {
+        return Ok(Vec::new());
+    };
+    let CoercedAttributeValue::LabelList(conditions) = &attribute.value else {
+        return Err(QueryError::evaluation(
+            "native filegroup selector conditions are not a label list",
+        ));
+    };
+    let mut seen = SmallSet::new();
+    let mut edges = Vec::with_capacity(conditions.len());
+    for condition in conditions.iter() {
+        let target = match external_route {
+            Some((canonical_repo, apparent_repo)) => {
+                if condition.package().repo() != canonical_repo {
+                    return Err(QueryError::unsupported_feature(format!(
+                        "external filegroup foreign repository selector condition is deferred: {condition}"
+                    )));
+                }
+                QueryLabel::from_canonical_for_external_owner(
+                    condition.clone(),
+                    canonical_repo,
+                    apparent_repo,
+                )
+            }
+            None => {
+                if !condition.package().repo().is_root() {
+                    return Err(QueryError::unsupported_feature(format!(
+                        "root filegroup foreign repository selector condition is deferred: {condition}"
+                    )));
+                }
+                QueryLabel::from_canonical(condition.clone())
+            }
+        };
+        if seen.insert(target.dupe()) {
+            edges.push(QueryEdge {
+                kind: QueryEdgeKind::SelectorCondition,
+                target,
+            });
+        }
+    }
+    Ok(edges)
+}
+
 fn project_native_attributes(
     attributes: &slug_loading_v2::NativeRuleAttributes,
     raw_visibility: &[CanonicalLabel],
@@ -2575,6 +2640,9 @@ mod graph_tests {
     use slug_loading_v2::AttributeQueryValue;
     use slug_loading_v2::BzlModuleEvaluator;
     use slug_loading_v2::CoercedAttributeValue;
+    use slug_loading_v2::NativeAttributeValue;
+    use slug_loading_v2::NativeRuleAttributes;
+    use slug_loading_v2::NativeTargetAttributes;
     use slug_loading_v2::PackageTarget;
     use slug_loading_v2::PackageTargetKind;
     use slug_loading_v2::RuleVisibility;
@@ -3137,6 +3205,318 @@ subject = rule(implementation = lambda ctx: [], subrules = [probe], toolchains =
         assert_eq!(absent.visibility_source, VisibilitySource::PackageDefault);
         assert!(absent.edges.is_empty());
         assert!(absent.attributes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn native_filegroup_selector_conditions_project_in_root_and_external_graphs() {
+        static SERIAL: AtomicU64 = AtomicU64::new(0);
+        let nanos = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let serial = SERIAL.fetch_add(1, Ordering::Relaxed);
+        let workspace =
+            std::env::temp_dir().join(format!("slug-query-filegroup-select-{nanos}-{serial}"));
+        fs::create_dir_all(&workspace).unwrap();
+        let module = workspace.join("MODULE.bazel");
+        let build = workspace.join("BUILD.bazel");
+        let module_source = "module(name = 'root')\n";
+        let build_source = concat!(
+            "config_setting(name = 'present', values = {'cpu': 'k8'})\n",
+            "filegroup(name = 'selected', srcs = ['shared.txt', '//child:cross.txt'] + select({",
+            "':present': ['first.txt', 'shared.txt'], ",
+            "':missing': ['second.txt'], ",
+            "'//child:cross_condition': [], ",
+            "'//conditions:default': ['default.txt']}) + ",
+            "select({':present': ['last.txt'], '//conditions:default': []}))\n",
+            "filegroup(name = 'literal', srcs = ['literal.txt'])\n",
+        );
+        fs::write(&module, module_source).unwrap();
+        fs::write(&build, build_source).unwrap();
+        let files = [
+            (module.clone(), module_source),
+            (build.clone(), build_source),
+        ];
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: workspace.clone(),
+                },
+                Arc::new(WorkspaceSnapshot {
+                    files: Arc::new(
+                        files
+                            .iter()
+                            .map(|(path, source)| {
+                                (
+                                    path.clone(),
+                                    WorkspaceFileValue::Present(Arc::new((*source).to_owned())),
+                                )
+                            })
+                            .collect(),
+                    ),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceRawSnapshotKey {
+                    workspace: workspace.clone(),
+                },
+                Arc::new(WorkspaceRawSnapshot {
+                    files: Arc::new(
+                        files
+                            .iter()
+                            .map(|(path, source)| {
+                                (
+                                    path.clone(),
+                                    WorkspaceRawFileValue::Present(Arc::from(source.as_bytes())),
+                                )
+                            })
+                            .collect(),
+                    ),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceDirectorySnapshotKey {
+                    workspace: workspace.clone(),
+                },
+                Arc::new(WorkspaceDirectorySnapshot {
+                    directories: Arc::new(
+                        [(
+                            workspace.clone(),
+                            WorkspaceDirectoryValue::present(
+                                ["MODULE.bazel", "BUILD.bazel"]
+                                    .into_iter()
+                                    .map(|name| WorkspaceDirectoryEntry {
+                                        name: name.into(),
+                                        kind: WorkspaceDirectoryEntryKind::RegularFile,
+                                    })
+                                    .collect(),
+                            ),
+                        )]
+                        .into_iter()
+                        .collect(),
+                    ),
+                }),
+            )])
+            .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            &workspace,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        let loaded = BzlModuleEvaluator::new(&workspace)
+            .unwrap()
+            .evaluate_package(&mut transaction, &workspace)
+            .await
+            .unwrap();
+        let root = super::package_graph_from_loaded(&workspace, Path::new(""), &loaded).unwrap();
+        let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
+        let apparent_repo = ApparentRepoName::new("dep").unwrap();
+        let package = PackagePath::parse("").unwrap();
+        let mut external_targets = loaded.targets.clone();
+        for target in &mut external_targets {
+            if let PackageTargetKind::Filegroup { srcs, .. } = &mut target.kind {
+                *srcs = srcs
+                    .iter()
+                    .map(|source| {
+                        source
+                            .rebind_provisional_root_repository(&canonical_repo)
+                            .unwrap()
+                    })
+                    .collect::<Vec<_>>()
+                    .into();
+            }
+        }
+        // This root-loaded fixture is reused under an external graph owner.
+        // Supply the canonical native rows that real external Loading produces.
+        let external_native_attributes = loaded
+            .native_attributes
+            .iter()
+            .map(|entry| NativeTargetAttributes {
+                target_index: entry.target_index,
+                attributes: NativeRuleAttributes::new(
+                    entry.attributes.class,
+                    entry
+                        .attributes
+                        .iter()
+                        .map(|(_, attribute)| NativeAttributeValue {
+                            provenance: attribute.provenance,
+                            value: attribute
+                                .value
+                                .rebind_provisional_root_labels(&canonical_repo)
+                                .unwrap(),
+                        })
+                        .collect(),
+                ),
+            })
+            .collect::<Vec<_>>();
+        let external = external_package_graph_from_targets(
+            &canonical_repo,
+            &apparent_repo,
+            &package,
+            &loaded.build_file,
+            &loaded.default_visibility,
+            &external_targets,
+            Some(&external_native_attributes),
+        )
+        .unwrap();
+
+        for (graph, label, prefix) in [
+            (&root, QueryLabel::parse_root("//:selected").unwrap(), "//"),
+            (
+                &external,
+                QueryLabel::in_external_package(
+                    &canonical_repo,
+                    &apparent_repo,
+                    &package,
+                    "selected",
+                )
+                .unwrap(),
+                "@dep//",
+            ),
+        ] {
+            let selected = graph.nodes.get(&label).unwrap();
+            let edge_rows = selected
+                .edges
+                .iter()
+                .map(|edge| (edge.kind, edge.target.output_label().to_string()))
+                .collect::<Vec<_>>();
+            assert_eq!(
+                edge_rows,
+                [
+                    (QueryEdgeKind::Ordinary, format!("{prefix}:shared.txt")),
+                    (QueryEdgeKind::Ordinary, format!("{prefix}child:cross.txt")),
+                    (QueryEdgeKind::Ordinary, format!("{prefix}:first.txt")),
+                    (QueryEdgeKind::Ordinary, format!("{prefix}:second.txt")),
+                    (QueryEdgeKind::Ordinary, format!("{prefix}:default.txt")),
+                    (QueryEdgeKind::Ordinary, format!("{prefix}:last.txt")),
+                    (
+                        QueryEdgeKind::SelectorCondition,
+                        format!("{prefix}:present")
+                    ),
+                    (
+                        QueryEdgeKind::SelectorCondition,
+                        format!("{prefix}:missing")
+                    ),
+                    (
+                        QueryEdgeKind::SelectorCondition,
+                        format!("{prefix}child:cross_condition"),
+                    ),
+                ]
+            );
+            let srcs = selected
+                .attributes
+                .iter()
+                .find(|attribute| attribute.name == "srcs")
+                .unwrap();
+            assert!(srcs.explicit);
+            assert_eq!(
+                srcs.labels
+                    .iter()
+                    .map(|source| source.output_label().to_string())
+                    .collect::<Vec<_>>(),
+                [
+                    format!("{prefix}:shared.txt"),
+                    format!("{prefix}child:cross.txt"),
+                    format!("{prefix}:first.txt"),
+                    format!("{prefix}:shared.txt"),
+                    format!("{prefix}:second.txt"),
+                    format!("{prefix}:default.txt"),
+                    format!("{prefix}:last.txt"),
+                ]
+            );
+            assert!(matches!(
+                srcs.value.as_ref().map(|value| &value.value),
+                Some(CoercedAttributeValue::Concatenation(_, _))
+            ));
+            assert_eq!(
+                graph
+                    .nodes
+                    .get(
+                        &QueryLabel::in_owner_package(&label.owner_identity().unwrap(), "missing")
+                            .unwrap()
+                    )
+                    .unwrap()
+                    .kind,
+                QueryNodeKind::SourceFile
+            );
+            assert!(
+                graph
+                    .nodes
+                    .get(&selected.edges.last().unwrap().target)
+                    .is_none()
+            );
+            let literal = graph
+                .nodes
+                .values()
+                .find(|node| node.label.target() == "literal")
+                .unwrap();
+            assert!(
+                literal
+                    .edges
+                    .iter()
+                    .all(|edge| edge.kind == QueryEdgeKind::Ordinary)
+            );
+        }
+
+        let selected_index = external_targets
+            .iter()
+            .position(|target| target.name == "selected")
+            .unwrap() as u32;
+        let foreign_native_attributes = external_native_attributes
+            .iter()
+            .cloned()
+            .map(|mut entry| {
+                if entry.target_index == selected_index {
+                    entry.attributes = NativeRuleAttributes::new(
+                        entry.attributes.class,
+                        entry
+                            .attributes
+                            .iter()
+                            .map(|(schema, attribute)| {
+                                if schema.query_name() == "$config_dependencies" {
+                                    NativeAttributeValue {
+                                        provenance: AttributeProvenance::Explicit,
+                                        value: CoercedAttributeValue::LabelList(Arc::from([
+                                            CanonicalLabel::parse("@@//main:condition").unwrap(),
+                                        ])),
+                                    }
+                                } else {
+                                    attribute.clone()
+                                }
+                            })
+                            .collect(),
+                    );
+                }
+                entry
+            })
+            .collect::<Vec<_>>();
+        let error = external_package_graph_from_targets(
+            &canonical_repo,
+            &apparent_repo,
+            &package,
+            &loaded.build_file,
+            &loaded.default_visibility,
+            &external_targets,
+            Some(&foreign_native_attributes),
+        )
+        .unwrap_err();
+        assert_eq!(error.error_kind(), "unsupported_feature");
+        assert!(
+            error
+                .to_string()
+                .contains("foreign repository selector condition is deferred")
+        );
+        assert!(error.to_string().contains("@@//main:condition"));
     }
 
     #[test]
