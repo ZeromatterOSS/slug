@@ -29,8 +29,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-82-m7a-external-starlark-package-edges-r1
+Packet: WP-7-83-m7a-builtin-canonical-load-route-r1
 Status: accepted (independent design and final ACCEPT)
+
+WP783 routes ordinary root-visible `@bazel_tools` Loading/Query through the
+existing canonical immutable source owner, preserving root apparent identity,
+observations and Need/error behavior. The separate root-build route remains
+unchanged. Exact pinned `tools/cpp/BUILD` catalog bytes are read through the
+new route; seven route tests, catalog-owner, Query nonfallback and inherited
+event-owner regressions pass, with direct Analysis/Core checks and independent
+design/final ACCEPT. A rebuilt CLI query now reaches BUILD:119 and stops at
+missing `@local_config_cc`, rather than the previous generic direct-local
+MODULE/materialization error. This does not admit complete `tools/cpp`
+Loading, `rules_cc` source closure or configured C++; M7A remains partial.
 
 WP782 accepts the modeled external Starlark-rule Loading and unconfigured-query
 edges needed by the authentic `tools/cpp` declarations: package-default public

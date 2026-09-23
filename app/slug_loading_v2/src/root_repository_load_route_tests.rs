@@ -10,6 +10,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::ops::ControlFlow;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -21,11 +22,14 @@ use dice::DynKey;
 use dice::Key;
 use slug_bzlmod_v2::HostCanonicalRepositoryRouteKind;
 use slug_bzlmod_v2::HostRepositoryLocalPathPolicy;
+use slug_bzlmod_v2::HostRepositorySourceObservationEpochKey;
+use slug_bzlmod_v2::HostRepositorySourceObservationView;
 use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::HostSelectedObservationFrontier;
 use slug_bzlmod_v2::RootRepositoryRouteKey;
 use slug_bzlmod_v2::RootRepositoryRouteObservationError;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_bzlmod_v2::host_repository_relative_path;
 use slug_identity_v2::ApparentRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathLstat;
@@ -47,6 +51,8 @@ use crate::canonical_repository_load_route_tests::tests::registry_dice;
 use crate::canonical_repository_route_tests::tests::EXTENSION_A;
 use crate::canonical_repository_route_tests::tests::MODULE;
 use crate::canonical_repository_route_tests::tests::WORKSPACE;
+use crate::canonical_repository_route_tests::tests::builtin_graph_dice;
+use crate::canonical_repository_route_tests::tests::builtin_graph_module;
 use crate::canonical_repository_route_tests::tests::transaction;
 
 #[derive(Default)]
@@ -83,6 +89,14 @@ impl RouteTrace {
             .unwrap()
             .iter()
             .any(|(candidate, _)| candidate == key)
+    }
+
+    fn contains_fragment(&self, fragment: &str) -> bool {
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(candidate, _)| candidate.contains(fragment))
     }
 }
 
@@ -193,11 +207,14 @@ async fn shared_route_preserves_root_success_and_missing_diagnostic() {
 
     let builtin = ApparentRepoName::new("bazel_tools").unwrap();
     let SourcePreparationOutcome::Complete(builtin_route) = tx
-        .compute(&HostRootRepositoryLoadRouteKey::new(workspace.clone(), builtin.clone()).unwrap())
+        .compute(
+            &HostRootRepositoryLoadRouteKey::for_root_build(workspace.clone(), builtin.clone())
+                .unwrap(),
+        )
         .await
         .unwrap()
     else {
-        panic!("built-in route must complete")
+        panic!("root-build built-in route must complete")
     };
     assert!(matches!(
         builtin_route.as_ref(),
@@ -223,6 +240,145 @@ async fn shared_route_preserves_root_success_and_missing_diagnostic() {
         shared.as_ref().as_ref().unwrap_err().to_string(),
         original.as_ref().as_ref().unwrap_err().to_string()
     );
+}
+
+#[tokio::test]
+async fn ordinary_builtin_route_uses_canonical_owner_but_root_build_keeps_root_bootstrap() {
+    let dice = builtin_graph_dice();
+    let module = builtin_graph_module();
+    let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+    let apparent = ApparentRepoName::new("bazel_tools").unwrap();
+    let ordinary_key =
+        HostRootRepositoryLoadRouteKey::new(workspace.clone(), apparent.clone()).unwrap();
+    let observed_key =
+        HostRootRepositoryLoadRouteObservationKey::new(workspace.clone(), apparent.clone())
+            .unwrap();
+    let root_build_key =
+        HostRootRepositoryLoadRouteKey::for_root_build(workspace.clone(), apparent.clone())
+            .unwrap();
+    let trace = Arc::new(RouteTrace::default());
+    let mut tx = transaction(
+        &dice,
+        &module,
+        EXTENSION_A,
+        true,
+        Some(trace.clone() as Arc<dyn ActivationTracker>),
+    )
+    .await;
+
+    let SourcePreparationOutcome::Complete(ordinary) = tx.compute(&ordinary_key).await.unwrap()
+    else {
+        panic!("ordinary built-in route must complete")
+    };
+    let ordinary_route = ordinary.as_ref().as_ref().unwrap();
+    assert_eq!(ordinary_route.apparent_repo(), &apparent);
+    assert_eq!(ordinary_route.canonical_repo().as_str(), "bazel_tools");
+    let HostRepositorySourceRoute::Canonical(input) = ordinary_route.source() else {
+        panic!("ordinary built-in route must retain canonical source input")
+    };
+    assert_eq!(
+        input.view().route().view().kind(),
+        HostCanonicalRepositoryRouteKind::Builtin
+    );
+    let dependencies = trace.dependencies(&ordinary_key.to_string());
+    assert_eq!(dependencies.len(), 2);
+    assert!(dependencies[0].starts_with("root-repository-route:"));
+    assert!(dependencies[1].starts_with("host-canonical-repository-load-route:"));
+
+    let source_key = HostRepositorySourceObservationEpochKey::new_canonical(
+        input.clone(),
+        host_repository_relative_path(PathBuf::from("tools/cpp/BUILD")).unwrap(),
+    );
+    let SourcePreparationOutcome::Complete(Ok(source)) = tx.compute(&source_key).await.unwrap()
+    else {
+        panic!("root-visible canonical built-in BUILD source must complete")
+    };
+    let source_value = source.result().as_ref().as_ref().unwrap();
+    let HostRepositorySourceObservationView::Builtin(catalog_file) = source_value.view() else {
+        panic!("root-visible built-in BUILD source must use the catalog")
+    };
+    assert_eq!(catalog_file.path(), "tools/cpp/BUILD");
+    assert_eq!(
+        catalog_file.bytes(),
+        include_bytes!("../../slug_bzlmod_v2/builtin/bazel_tools/tools/cpp/BUILD")
+    );
+    assert!(source.observations().observations().is_empty());
+    assert_eq!(
+        trace.dependencies(&source_key.to_string()),
+        ["builtin-bazel-tools-source-file:tools/cpp/BUILD"]
+    );
+
+    let observed_value = tx.compute(&observed_key).await.unwrap();
+    let observed = observed_route(&observed_value);
+    assert_eq!(observed.result(), &ordinary);
+    let observed_dependencies = trace.dependencies(&observed_key.to_string());
+    assert_eq!(observed_dependencies.len(), 2);
+    assert!(observed_dependencies[0].starts_with("observed-root-repository-route:"));
+    assert!(observed_dependencies[1].starts_with("observed-host-canonical-repository-load-route:"));
+    let SourcePreparationOutcome::Complete(Ok(root)) = tx
+        .compute(
+            &RootRepositoryRouteObservationKey::new(workspace.clone(), apparent.clone()).unwrap(),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("observed root predecessor must complete")
+    };
+    let SourcePreparationOutcome::Complete(Ok(canonical)) = tx
+        .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+            workspace.clone(),
+            CanonicalRepoName::new("bazel_tools").unwrap(),
+        ))
+        .await
+        .unwrap()
+    else {
+        panic!("observed canonical predecessor must complete")
+    };
+    assert_eq!(
+        observed.observations(),
+        &merge_observations(root.observations(), canonical.observations()).unwrap()
+    );
+
+    let SourcePreparationOutcome::Complete(root_build) = tx.compute(&root_build_key).await.unwrap()
+    else {
+        panic!("root-build built-in route must complete")
+    };
+    assert!(matches!(
+        root_build.as_ref(),
+        Ok(route) if route.apparent_repo() == &apparent
+            && matches!(route.source(), HostRepositorySourceRoute::Root(root) if root.is_builtin_bazel_tools())
+    ));
+    let root_build_dependencies = trace.dependencies(&root_build_key.to_string());
+    assert_eq!(root_build_dependencies.len(), 1);
+    assert!(root_build_dependencies[0].starts_with("root-build-repository-route:"));
+    assert!(!trace.contains_fragment("host-repository-source-file:@@bazel_tools:"));
+    assert!(!trace.contains_fragment("repository-materialization-result:@@bazel_tools"));
+
+    let warm = tx.compute(&observed_key).await.unwrap();
+    assert!(HostRootRepositoryLoadRouteObservationKey::equality(
+        &observed_value,
+        &warm
+    ));
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::empty(),
+        )])
+        .unwrap();
+    let mut missing = updater.commit().await;
+    let need = missing.compute(&observed_key).await.unwrap();
+    assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+    assert!(!HostRootRepositoryLoadRouteObservationKey::validity(&need));
+    assert!(!HostRootRepositoryLoadRouteObservationKey::equality(
+        &need, &need
+    ));
+    let mut restored = transaction(&dice, &module, EXTENSION_A, true, None).await;
+    let restored_value = restored.compute(&observed_key).await.unwrap();
+    assert!(HostRootRepositoryLoadRouteObservationKey::equality(
+        &observed_value,
+        &restored_value
+    ));
 }
 
 #[tokio::test]

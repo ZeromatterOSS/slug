@@ -1,174 +1,138 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-82-m7a-external-starlark-package-edges-r1
+Packet: WP-7-83-m7a-builtin-canonical-load-route-r1
 Status: accepted (independent design and final ACCEPT)
 
 ## Outcome and compatibility
 
-Admit the modeled Loading and unconfigured-query graph of ordinary non-test,
-non-executable Starlark rules in a multi-target external repository package.
-The bounded M7A demand is the genuine `@@bazel_tools//tools/cpp/BUILD`: its
-`empty_lib` inherits public package visibility, `link_extra_lib` has a real
-ordinary `deps` edge to `:link_extra_libs`, and both coexist with native flags,
-filegroups, aliases and toolchain types. WP781 installed its exact BUILD source;
-this packet removes the generic post-evaluation policy rejection, not the
-separate recursive `rules_cc`/generated-proxy source prerequisite.
+Make root-visible `@bazel_tools` Loading and Query use the existing canonical
+immutable built-in source route. A fresh WP782 `slug` one-shot query of
+`@bazel_tools//tools/cpp:empty_lib` currently stops before BUILD evaluation:
+`failed to inspect direct-local MODULE ... built-in bazel_tools source requires
+its immutable source owner`. The root-visible route presents the built-in as a
+generic root source even though canonical Loading already owns its catalog
+bytes. This packet removes that first real bootstrap frontier without claiming
+the later `rules_cc` wrapper/proxy closure.
 
-Exact: accepted Bazel 9.2 Loading semantics for effective public visibility,
-stable target declaration order, ordinary typed label dependencies and
-unconfigured query edges/attributes on the selected external Starlark-rule
-shape. Slug-native: existing structurally compared DICE source/mapping/load
-identity and Host observations, not HotSpot or Bazel checksum bytes.
-Unsupported/deferred: private/restricted external Starlark rules, test and
-executable rule capabilities, unmodeled label-reachable attributes, complete
-authentic `tools/cpp` Loading, configured `cc_library`, module-tool binaries,
-actions/REAPI and M8. No stub `cc_library`, trimmed compatibility proxy or
-post-hoc command graph repair may claim the deferred surface.
+Exact: Bazel 9.2's special embedded `bazel_tools` source, its pinned catalog
+bytes, canonical repository identity and root apparent spelling for admitted
+Loading/Query source selection. Slug-native: existing Host observation epochs
+and structural DICE route equality. Unsupported/deferred: authentic complete
+`tools/cpp` package evaluation, the 96-file/320-import recursive `rules_cc`
+0.2.17/generated compatibility-proxy source graph, configured C++ rules,
+module-tool binaries, execution/REAPI and M8. A typed child-source Need/error
+is progress evidence, not a successful package-load claim.
 
-Pinned Bazel 9.2 `tools/cpp/BUILD.tools:14-95` owns the demanded declaration
-shape. `PackageFactoryTest.testImplicitVisibility_worksWithPackageDefaultVisibility`
-and `AbstractQueryTest.testAttrOnPackageDefaultVisibility`, `testDeps` and
-`testNoImplicitDeps` provide source-pinned visibility/query anchors. The
-already accepted `rustc-map-each` source inventory authenticates selected
-`rules_cc` proxy/helper children; it does not prove the complete eager public
-`cc_library.bzl` wrapper closure. Its generated proxy loads 14 private rules
-eagerly. Existing canonical built-in load tests prove route/mapping selection,
-and the accepted one-rule external policy/query tests provide the base slice.
+Bazel 9.2 `NonRegistryOverride.java:40-53` treats `bazel_tools` as an embedded
+sentinel whose ordinary repository spec must not be inspected;
+`ModuleFileFunction.java:969` selects the built-in module. The pinned
+`src/create_embedded_tools.py:46,67-71` installs `tools/cpp/BUILD.tools` as
+`tools/cpp/BUILD`; WP781 verifies exact catalog bytes and markers. WP782
+accepts external ordinary Starlark edges. A source-authenticated audit of the
+0.2.17 archive/proxy identifies the remaining full closure, not an admitted
+Slug load; `tools/cpp/BUILD:14` first imports the public `cc_library.bzl`.
 
-## Semantic owners and invariants
+## Owner, decision and invariants
 
-`RepositoryPackageInventoryKey` remains the producer of a complete
-`LoadedPackage`: exact BUILD and recursive `.bzl` source dependencies, observed
-epochs, default visibility, ordered targets, retained schemas/values, ordinary
-dependency labels, module lifetimes and load fingerprint. Its existing Need,
-error, event and cancellation behavior remains unchanged. The public
-`RepositoryPackageLoadKey` is a pure policy projection of that inventory; it
-must validate **every** Starlark target before publishing success, not only
-the first one. Use `LoadedPackage::effective_visibility` so declared public and
-package-default public are equivalent at the permission boundary; keep the
-source provenance distinct. For each rule, check capability and schema/value
-integrity. Admit user and supported builtin ordinary dependency labels through
-their retained typed schema. Preserve the existing builtin NODEP handling for
-`visibility` and `transitive_configs`; a nonempty label in an unsupported
-nonordinary user or hidden attribute still fails closed. Keep unsupported
-target kinds and malformed schemas typed errors. A nonempty builtin
-`$config_dependencies` remains deferred in this packet: it contains selector
-keys in the retained aggregate but cannot be silently emitted as an ordinary
-query edge. Preserve the existing exact root-repository selector slice.
+`HostRootRepositoryLoadRouteKey` is the existing DICE producer of the
+root-apparent to canonical source route used by Loading and Query. For its
+ordinary admission only, select `HostRepositorySourceRoute::Canonical` for
+the successful built-in root predecessor, deriving its
+`HostCanonicalRepositorySourceInput` through the existing
+`HostCanonicalRepositoryLoadRouteKey`. Retain the selected root
+apparent name, root-route/mapping observations, and canonical source identity;
+do not synthesize a host path or rebind to a command-local cache. Preserve
+the existing Root route for direct-local and selected-registry sources and
+the generated-repository canonical fallback. Keep the separate
+`for_root_build` admission's built-in Root route unchanged: root BUILD `.bzl`
+Loading already performs its deliberately narrow canonical child promotion
+after a single admissible public load. Eager canonicalization there would add
+selected-graph dependencies to bootstrap and risks a cycle. No new key,
+lock, registry, hash, process cache or source owner is chosen.
 
-`PackageEvaluation` already derives and deduplicates ordinary labels from
-retained typed attribute values; do not add a second graph registry. The
-existing `ExternalUnconfiguredPackageGraphKey` owns the DICE-retained semantic
-package graph projection of those ordered labels and supported literal
-hidden/visibility edges, with canonical repository binding and apparent-label
-display kept distinct. Explicit canonical-main `@@//...` labels must remain
-main-repository labels; package-relative `:...` labels resolve against the
-external owner. Do not blindly rebind every root label in attribute or edge
-projection. Query command result sets remain request-local. `deps`, `rdeps`,
-`labels`, path queries and `attr` must not observe a missing edge, a synthetic
-dependency or a wrong edge class. The CLI `--noimplicit_deps` option remains
-unsupported; preserve its existing rejection, while retaining typed edge
-classes internally. Source-file synthesis is allowed only under the existing
-same-package rule; cross-package
-traversal must use its tracked package route or remain a typed deferred error.
-Named-repository edges without an observed apparent mapping fail closed rather
-than displaying a guessed repository spelling. The Query validator must also
-inspect every Starlark rule, so direct graph
-construction cannot bypass the Loading policy.
+The canonical source route already owns immutable catalog MODULE/BUILD/`.bzl`
+bytes and repository mapping. Its downstream `RepositoryPackageSourceKey`,
+`RepositoryPackageLoadKey` and `ExternalUnconfiguredPackageGraphKey` must
+consume that route unchanged. Built-ins must not enter direct-local MODULE
+support or generic host materialization; direct-local repositories retain
+their include-cycle preflight. Canonical route Need/error and observation
+frontiers propagate atomically, without a root-source fallback. DICE equality
+and validity continue to use their existing complete/Need policy; root input,
+mapping and source changes remain tracked dependencies. Command result sets
+remain request-local. No lock spans a DICE compute; see
+`docs/developers/dice.md`.
 
-No new DICE key, lock, cache, interner or long-lived side store is selected.
-The inventory/module values and package graphs remain DICE-retained under
-their existing keys; only command result sets are request-local. Changes to
-BUILD bytes, repository mapping, default visibility, any dependency value or a second
-target's validity must invalidate/recompute through existing dependencies and
-restore on A/B/A. No lock may span a DICE compute. See `docs/developers/dice.md`.
+## Scope and stops
 
-## Scope, routing and stops
+Base `b719a9dc3`; review branch
+`codex/wp783-builtin-canonical-route-review`. Worker1 owns only
+`app/slug_loading_v2/src/root_repository_load_route.rs` and
+`app/slug_loading_v2/src/root_repository_load_route_tests.rs`. Worker2 may
+add a focused consumer regression only in
+`app/slug_query_v2/tests/loading_query.rs` once the design is accepted and
+the route shape is fixed. Root owns these plan files, integration, serial
+Cargo, a freshly built CLI diagnostic and the commit. Independent design and
+final review are required because the DICE-retained source route changes.
+The route module is under the 2,000-line complexity trigger; reuse its existing
+root/canonical predecessor scaffold. The large Query integration file keeps
+its already-owned epoch/fixture harness rather than duplicating it elsewhere.
+Review triggers are >180 production or >300 new test lines, not caps.
 
-Base `03c9910fe`; branch `codex/wp782-external-starlark-edges-review`.
-Worker1 owns `app/slug_loading_v2/src/bzl_module.rs` and the relevant section
-of `app/slug_loading_v2/src/host_package_load_tests.rs`. Worker2 owns
-`app/slug_query_v2/src/graph.rs` and
-`app/slug_query_v2/tests/loading_query.rs`. Root owns the packet/canonical
-docs, integration, serial Cargo, and final commit. Independent reviewer checks
-the design before edits and the actual final diff/evidence. Existing large
-owner/test modules are retained for small policy and scaffold-local edits;
-splitting their DICE/epoch harness here would duplicate ownership. Review
-triggers: over 180 Rust production lines, over 300 new test lines, or any new
-public retained type. These are estimates, not caps.
-
-Do not edit `@bazel_tools` source bytes, generated proxy content, repository
-materialization, parser/coercion, configured Analysis, binary acquisition or
-action execution. Reuse existing source-authenticated in-memory tests; no new
-Stage 1 fixture is selected. A later packet must authenticate and evaluate the
-public `rules_cc` wrapper, complete eager proxy descendants and their
-repository materializations before claiming authentic `tools/cpp` Loading.
-REPLAN if modeled ordinary labels cannot be projected without a new semantic
-owner, if a nonempty hidden label would be silently omitted or misclassified,
-or if the accepted external package route cannot preserve observed Need and
-atomic multi-target validation.
+Do not change the immutable catalog bytes, root MODULE/lock, generic host
+materialization's intentional built-in rejection, module extension/repository
+execution, `rules_cc` proxy bytes, parser/coercion, configured Analysis or
+action execution. Do not special-case Query commands or skip the whole
+repository route. REPLAN if the canonical route cannot retain the root
+apparent identity and observed frontier, if it requires an unmodeled source
+owner, or if avoiding direct-local preflight would hide a needed built-in
+MODULE semantic input.
 
 ## Acceptance
 
-Loading: a multi-target external BUILD with a declared-public and a
-package-default-public non-executable rule, a sibling label flag and an
-ordinary `deps` list retains source-backed labels and stable order. A private
-rule, test/executable rule, malformed schema or unsupported nonordinary label in **any**
-target still rejects the whole public package; inventory may retain the
-unvalidated declarations. Demonstrate missing/edited/restored BUILD or `.bzl`
-source, mapping and default-visibility changes in the same DICE graph,
-including Need/error and event-batch ownership without partial publication.
+The ordinary root-visible built-in route projects to canonical immutable source with
+`@bazel_tools` display and `@@bazel_tools` semantic identity. A selected
+`tools/cpp/BUILD` source read returns the exact WP781 catalog bytes through
+the existing canonical owner with no generic host materialization. Show
+ordinary and observed route equality/Need behavior, plus direct-local,
+selected-registry, generated-route and `for_root_build` nonregression. The
+adapter remains event-carrierless; existing selected-graph and canonical
+predecessor owners retain their event replay contract, checked by
+`observed_canonical_repository_route_real_order_events_and_parity`. A missing catalog child
+or unresolved later import remains typed Need/error and cannot publish a
+partial package. Preserve source/mapping A/B/A coverage from the existing
+route suite; add only a discriminator the accepted tests lack.
 
-Query: the same loaded package exposes ordered ordinary edges, label-attribute
-values and effective public visibility in `deps`, reverse/path, `labels`, and
-`attr` queries and at least one admitted output format. Verify distinct internal
-implicit versus ordinary edge kinds, `:sibling` versus explicit `@@//main:target`
-identity, apparent/canonical display, same-package source synthesis and a
-negative unmodeled or unmapped edge. Preserve the accepted dependency-free
-external rule and native target cases. The genuine `modules_tools/BUILD` can be a pinned
-source smoke for unchanged built-in package routing, but missing binary leaves
-are not success fixtures. A `tools/cpp` query still requires the unadmitted
-authentic proxy closure and must not be recorded as a passed gate.
-An admitted nonempty literal hidden default must appear as an `Implicit` edge
-and attribute with the selected external apparent display; otherwise reject
-it before semantic graph publication. A nonempty `$config_dependencies` must
-produce the packet's typed deferred result, not an ordinary query edge.
+Rebuild `slug_cli_v2` before one-shot CLI diagnosis. The fresh query of
+`@bazel_tools//tools/cpp:empty_lib` must no longer fail at the built-in
+direct-local MODULE/materialization error; record its next exact typed
+terminal, not a success claim. The portable unit/consumer regressions, not
+the local cache, are the acceptance gate. Prepare owner tests with pinned
+nightly, offline/locked Cargo JSON `--no-run` under 60 seconds, exact
+nonignored preflight and counted execution. Check direct Query and Core
+dependents, changed-file rustfmt, diff/plan/archive checks, and independent
+final review. Do not run Bazel or remote transport for this source-route
+packet; WP783 has pinned-source evidence and no fresh oracle gap.
 
-Resolve pinned nightly tools, prepare Loading/Query Rust tests serially with
-offline/locked Cargo JSON `--no-run` within 60 seconds each, preflight exact
-nonignored selectors and execute counted focused tests. Check direct
-`slug_analysis_v2` and `slug_core_v2` compile dependents; use a fresh binary
-build before any Slug CLI smoke. Run changed-file rustfmt, `git diff --check`,
-archive/plan-status checks and independent final review. Every exact claim
-must map to the pinned Bazel source tests or existing accepted oracle evidence.
-
-Independent design review ACCEPT confirms the bounded effective-public,
-all-target policy and existing DICE owners; it specifically requires the
-ordinary/NODEP/hidden/selector classification and explicit-main versus
-external-relative label discriminator before final acceptance.
+Independent design review ACCEPT: the Ordinary-only built-in canonical route
+uses existing DICE owners without an identified bootstrap cycle. Final
+evidence must trace Root plus canonical predecessors for Ordinary and a single
+Root predecessor for `for_root_build`.
 
 ## Acceptance receipt
 
-The public Loading projection validates every retained Starlark target before
-publication. Declared and package-default public rules coexist with native
-targets and preserve ordered typed ordinary dependencies. Query projects those
-dependencies, builtin `transitive_configs` NODEP labels, visibility NODEP
-labels and supported hidden literal Implicit labels through the existing
-DICE-retained package graph. Explicit canonical-main and external-relative
-labels retain distinct identities; unobserved named-repository mappings,
-selector keys and configuration-dependent hidden defaults fail closed. Same-
-DICE dependency edits invalidate and restore the Query graph on A/B/A.
+Independent design and final review ACCEPT. The pinned nightly offline/locked
+Loading test executable compiled in 5.60 seconds after the final test edit;
+exact nonignored preflight selected eight tests, and seven root-load-route
+tests plus the catalog-owner test passed. The inherited event-owner test also
+passed after exact preflight, and the existing Query nonfallback regression
+passed 1/1 after exact preflight. Direct Analysis/Core checks passed. The
+rebuilt CLI one-shot query moved from the old built-in direct-local MODULE
+materialization failure to `@@bazel_tools//tools/cpp:BUILD:119`, where
+`@local_config_cc` is not visible (exit 7); no full package success is claimed.
+Changed-file rustfmt, plan/archive status and `git diff --check` passed; no
+`slugd` remained after the smoke. The route adapter adds no event owner.
 
-Pinned-nightly offline/locked Cargo `--no-run` preparations succeeded for
-Loading and Query. Exact preflight and execution passed 9 focused Loading and
-9 focused Query tests. Direct `slug_analysis_v2` and `slug_core_v2` checks,
-changed-file rustfmt, diff, plan-status and archive-status checks passed.
-Independent final review ACCEPT audited the final diff and the bounded claim.
-An optional full Loading run had 664 passed, 5 failed and 1 ignored; a clean
-`03c9910fe` worktree reproduced the same five failures (661 passed, 5 failed,
-1 ignored). An optional full Query integration run had one malformed-label
-diagnostic assertion failure among 64 tests; that exact failure also
-reproduced on the clean base. These preexisting failures are not counted as
-passing gates. Complete authentic `tools/cpp` Loading remains deferred pending
-the eager `rules_cc`/generated-proxy closure; no Bazel or remote-transport
-execution claim is made by this packet.
+WP782 is the immediate predecessor at `b719a9dc3`: multi-target external
+Starlark Loading/Query edges accepted with independent design/final review,
+18 focused tests and direct Analysis/Core checks; authentic tools/cpp Loading
+remains deferred.

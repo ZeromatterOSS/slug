@@ -264,6 +264,23 @@ struct FallbackState {
     observations: PathObservationEpoch,
 }
 
+enum RootPredecessor {
+    Builtin {
+        canonical_repo: CanonicalRepoName,
+        observations: PathObservationEpoch,
+    },
+    GeneratedFallback(FallbackState),
+}
+
+impl RootPredecessor {
+    fn observations(&self) -> &PathObservationEpoch {
+        match self {
+            Self::Builtin { observations, .. } => observations,
+            Self::GeneratedFallback(fallback) => &fallback.observations,
+        }
+    }
+}
+
 type Driver = SourcePreparationOutcome<
     Result<(LoadRouteResult, PathObservationEpoch), HostRootRepositoryLoadRouteObservationError>,
 >;
@@ -301,7 +318,7 @@ async fn root_predecessor(
     ctx: &mut DiceComputations<'_>,
     key: &HostRootRepositoryLoadRouteKey,
     mode: LoadRouteMode,
-) -> Result<ControlFlow<Driver, FallbackState>, Driver> {
+) -> Result<ControlFlow<Driver, RootPredecessor>, Driver> {
     let (result, observations) = match mode {
         LoadRouteMode::Legacy => match ctx.compute(&key.root_key()).await {
             Ok(SourcePreparationOutcome::Need(need)) => {
@@ -344,6 +361,15 @@ async fn root_predecessor(
         },
     };
     match result.as_ref() {
+        Ok(route)
+            if key.admission == RootRepositoryLoadAdmission::Ordinary
+                && route.is_builtin_bazel_tools() =>
+        {
+            Ok(ControlFlow::Continue(RootPredecessor::Builtin {
+                canonical_repo: route.canonical_repo().clone(),
+                observations,
+            }))
+        }
         Ok(route) => Ok(ControlFlow::Break(complete(
             key,
             Ok(HostRootRepositoryLoadRoute {
@@ -352,12 +378,12 @@ async fn root_predecessor(
             }),
             observations,
         ))),
-        Err(error) if error.is_generated_route_fallback() => {
-            Ok(ControlFlow::Continue(FallbackState {
+        Err(error) if error.is_generated_route_fallback() => Ok(ControlFlow::Continue(
+            RootPredecessor::GeneratedFallback(FallbackState {
                 original: error.clone(),
                 observations,
-            }))
-        }
+            }),
+        )),
         Err(error) => Ok(ControlFlow::Break(complete(
             key,
             Err(HostRootRepositoryLoadRouteErrorKind::Root(error.clone())),
@@ -467,7 +493,7 @@ async fn mapping_predecessor(
 async fn load_predecessor(
     ctx: &mut DiceComputations<'_>,
     key: &HostRootRepositoryLoadRouteKey,
-    fallback: FallbackState,
+    predecessor: RootPredecessor,
     target: CanonicalRepoName,
     mode: LoadRouteMode,
 ) -> Driver {
@@ -491,7 +517,7 @@ async fn load_predecessor(
                     Err(HostRootRepositoryLoadRouteErrorKind::LoadRouteCompute(
                         error.to_string().into(),
                     )),
-                    fallback.observations,
+                    predecessor.observations().dupe(),
                 );
             }
         },
@@ -519,24 +545,32 @@ async fn load_predecessor(
                     Err(HostRootRepositoryLoadRouteErrorKind::LoadRouteCompute(
                         error.to_string().into(),
                     )),
-                    fallback.observations,
+                    predecessor.observations().dupe(),
                 );
             }
         },
     };
-    let observations = match merge_observations(&fallback.observations, &incoming) {
+    let observations = match merge_observations(predecessor.observations(), &incoming) {
         Ok(observations) => observations,
         Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
     };
-    match result.as_ref() {
-        Err(error) => complete(
+    if let Err(error) = result.as_ref() {
+        return complete(
             key,
             Err(HostRootRepositoryLoadRouteErrorKind::LoadRoute(
                 error.clone(),
             )),
             observations,
-        ),
-        Ok(route) if route.route().view().kind() == HostCanonicalRepositoryRouteKind::Generated => {
+        );
+    }
+    let route = result
+        .as_ref()
+        .as_ref()
+        .expect("canonical error handled above");
+    match predecessor {
+        RootPredecessor::Builtin { .. }
+            if route.route().view().kind() == HostCanonicalRepositoryRouteKind::Builtin =>
+        {
             complete(
                 key,
                 Ok(HostRootRepositoryLoadRoute {
@@ -546,7 +580,26 @@ async fn load_predecessor(
                 observations,
             )
         }
-        Ok(_) => complete(
+        RootPredecessor::Builtin { .. } => complete(
+            key,
+            Err(HostRootRepositoryLoadRouteErrorKind::Projection(
+                "built-in root route resolved to a non-built-in canonical source".into(),
+            )),
+            observations,
+        ),
+        RootPredecessor::GeneratedFallback(_)
+            if route.route().view().kind() == HostCanonicalRepositoryRouteKind::Generated =>
+        {
+            complete(
+                key,
+                Ok(HostRootRepositoryLoadRoute {
+                    apparent_repo: key.apparent_repo.clone(),
+                    source: HostRepositorySourceRoute::canonical(route.input().clone()),
+                }),
+                observations,
+            )
+        }
+        RootPredecessor::GeneratedFallback(fallback) => complete(
             key,
             Err(HostRootRepositoryLoadRouteErrorKind::Root(
                 fallback.original,
@@ -561,15 +614,43 @@ async fn compute_load_route(
     key: &HostRootRepositoryLoadRouteKey,
     mode: LoadRouteMode,
 ) -> Driver {
-    let fallback = match root_predecessor(ctx, key, mode).await {
+    let predecessor = match root_predecessor(ctx, key, mode).await {
         Err(outcome) | Ok(ControlFlow::Break(outcome)) => return outcome,
-        Ok(ControlFlow::Continue(fallback)) => fallback,
+        Ok(ControlFlow::Continue(predecessor)) => predecessor,
     };
-    let (fallback, target) = match mapping_predecessor(ctx, key, fallback, mode).await {
-        Err(outcome) | Ok(ControlFlow::Break(outcome)) => return outcome,
-        Ok(ControlFlow::Continue(next)) => next,
-    };
-    load_predecessor(ctx, key, fallback, target, mode).await
+    match predecessor {
+        RootPredecessor::Builtin {
+            canonical_repo,
+            observations,
+        } => {
+            let target = canonical_repo.clone();
+            load_predecessor(
+                ctx,
+                key,
+                RootPredecessor::Builtin {
+                    canonical_repo,
+                    observations,
+                },
+                target,
+                mode,
+            )
+            .await
+        }
+        RootPredecessor::GeneratedFallback(fallback) => {
+            let (fallback, target) = match mapping_predecessor(ctx, key, fallback, mode).await {
+                Err(outcome) | Ok(ControlFlow::Break(outcome)) => return outcome,
+                Ok(ControlFlow::Continue(next)) => next,
+            };
+            load_predecessor(
+                ctx,
+                key,
+                RootPredecessor::GeneratedFallback(fallback),
+                target,
+                mode,
+            )
+            .await
+        }
+    }
 }
 
 #[async_trait]
