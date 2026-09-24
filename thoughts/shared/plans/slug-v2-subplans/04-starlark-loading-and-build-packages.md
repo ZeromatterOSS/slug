@@ -9288,3 +9288,30 @@ the unsupported configured boundary. The authentic rebuilt build passed its
 former `proto` fragment error and reached a separate rules_kotlin
 `provider_callable` hashability failure at row 55. Other proto declarations,
 configured proto semantics, Kotlin success and M7A close remain deferred.
+
+### Exported user-provider constructor dictionary keys accepted (2026-09-24)
+
+WP805 admits exported ordinary and initialized `provider()` constructors as
+Starlark dictionary keys in the ordinary `.bzl` Loading closure. Bazel 9.2
+exports on first top-level assignment, including private names, and hashes
+and equates provider constructors by their exported key. The selected
+rules_kotlin 1.9.6 `_value_to_flag_info` is privately exported in
+`derive.bzl`, passed through `derive.info`, used twice as a dictionary key
+in `opts.javac.bzl`, and later looked up by `convert.bzl`. Pinned Bazel
+source and a fresh offline scratch oracle discriminate named, aliased,
+imported and initialized positives from inline/unbound and raw-constructor
+negatives. Special Bazel BzlLoad key classes/context and numeric Java hash
+bytes are outside the exact claim.
+
+The existing `ProviderId` source-label/export-name identity is the only
+retained owner. Four live/frozen callable forms now share one structural
+hash/equality path; an unbound constructor cannot hash, and the separate raw
+constructor explicitly rejects hashing. No new provider identity, storage,
+cache, DICE fact or package publication path was added. Focused tests cover
+the source-shaped two-key import/lookup, live/frozen restoration, aliasing,
+name/source distinction, same-ID schema independence and protected provider
+instance barriers. The rebuilt authentic build passed the old
+`provider_callable` hashability stop and reached generated rules_kotlin
+`compiler.bzl:67` with unsupported repository-rule attribute schema
+`_capabilities_templates`. Repository-rule schema admission, provider
+instances/configured Kotlin behavior and M7A close remain separate work.

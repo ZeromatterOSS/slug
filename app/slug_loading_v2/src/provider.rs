@@ -577,6 +577,14 @@ impl<'v> AllocValue<'v> for UserProviderCallable {
 impl<'v> StarlarkValue<'v> for UserProviderCallable {
     type Canonical = FrozenUserProviderCallable;
 
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        write_user_provider_constructor_hash(self.id.get(), hasher)
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(user_provider_constructor_equals(self.id.get(), other))
+    }
+
     fn export_as(
         &self,
         variable_name: &str,
@@ -624,6 +632,14 @@ impl fmt::Display for FrozenUserProviderCallable {
 #[starlark_value(type = "provider_callable")]
 impl<'v> StarlarkValue<'v> for FrozenUserProviderCallable {
     type Canonical = Self;
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        write_user_provider_constructor_hash(Some(&self.id), hasher)
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(user_provider_constructor_equals(Some(&self.id), other))
+    }
 
     fn invoke(
         &self,
@@ -693,6 +709,15 @@ impl Freeze for InitializedUserProviderCallable<'_> {
 #[starlark_value(type = "provider_callable")]
 impl<'v> StarlarkValue<'v> for InitializedUserProviderCallable<'v> {
     type Canonical = FrozenInitializedUserProviderCallable;
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        write_user_provider_constructor_hash(self.id.get(), hasher)
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(user_provider_constructor_equals(self.id.get(), other))
+    }
+
     fn export_as(
         &self,
         variable_name: &str,
@@ -738,6 +763,15 @@ impl fmt::Display for FrozenInitializedUserProviderCallable {
 #[starlark_value(type = "provider_callable")]
 impl<'v> StarlarkValue<'v> for FrozenInitializedUserProviderCallable {
     type Canonical = Self;
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        write_user_provider_constructor_hash(Some(&self.id), hasher)
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(user_provider_constructor_equals(Some(&self.id), other))
+    }
+
     fn invoke(
         &self,
         _me: Value<'v>,
@@ -754,6 +788,36 @@ impl<'v> StarlarkValue<'v> for FrozenInitializedUserProviderCallable {
         )
     }
 }
+/// The existing exported key is shared by live/frozen and initialized/plain
+/// constructors; an unexported constructor has no dictionary-key identity.
+fn user_provider_constructor_id(value: Value<'_>) -> Option<&ProviderId> {
+    if let Some(callable) = value.downcast_ref::<UserProviderCallable>() {
+        return callable.id.get();
+    }
+    if let Some(callable) = FrozenUserProviderCallable::from_value(value) {
+        return Some(&callable.id);
+    }
+    if let Some(callable) = value.downcast_ref::<InitializedUserProviderCallable>() {
+        return callable.id.get();
+    }
+    FrozenInitializedUserProviderCallable::from_value(value).map(|callable| &callable.id)
+}
+
+fn user_provider_constructor_equals(id: Option<&ProviderId>, other: Value<'_>) -> bool {
+    id.zip(user_provider_constructor_id(other))
+        .is_some_and(|(left, right)| left == right)
+}
+
+fn write_user_provider_constructor_hash(
+    id: Option<&ProviderId>,
+    hasher: &mut StarlarkHasher,
+) -> starlark::Result<()> {
+    let id =
+        id.ok_or_else(|| starlark::Error::new_other(anyhow::anyhow!("unhashable type: Provider")))?;
+    id.hash(hasher);
+    Ok(())
+}
+
 fn unbound_provider_error() -> starlark::Error {
     let message = "the result of provider() must be assigned before it can be called";
     starlark::Error::new_other(anyhow::anyhow!(message))
@@ -776,6 +840,13 @@ where
     Self: ProvidesStaticType<'v>,
 {
     type Canonical = FrozenInitializedProviderRaw;
+
+    fn write_hash(&self, _hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        Err(starlark::Error::new_other(anyhow::anyhow!(
+            "unhashable type: RawConstructor"
+        )))
+    }
+
     fn invoke(
         &self,
         _me: Value<'v>,

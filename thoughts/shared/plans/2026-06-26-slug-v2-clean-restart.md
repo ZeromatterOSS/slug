@@ -29,19 +29,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-104-m7a-proto-configuration-field-declarations-r1
+Packet: WP-7-105-m7a-exported-provider-constructor-dict-keys-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP804 admits three authenticated protobuf v33.4
-`configuration_field(fragment = "proto", ...)` declarations for Java Lite,
-Java and C++ toolchains as compact declaration-only private label defaults.
-Pinned Bazel 9.2 source and an offline scratch oracle distinguish selected
-acceptance from unknown fragment/name and public-attribute failures. Core and
-Loading focused tests passed, with independent design/final reviews. The
-rebuilt authentic smoke cleared the proto stop and reached rules_kotlin's
-separate `provider_callable` hashability failure at row 55. Configured proto
-resolution, other valid proto fields, Kotlin Loading and M7A close remain
-deferred. WP803 is accepted at `b4777a817`.
+WP805 admits Loading dictionary-key hash/equality for exported ordinary
+and initialized user-provider constructors, reusing the existing
+`ProviderId`; unexported and raw constructors remain unhashable. Pinned
+Bazel 9.2 source, authenticated rules_kotlin 1.9.6 `derive.info` usage and
+an offline scratch oracle distinguish the boundary. Five focused tests and
+the rebuilt authentic smoke passed the old hashability stop and reached a
+separate generated rules_kotlin `repository_rule` attribute-schema failure
+at row 55, with independent design/final reviews. Provider instances,
+special Bzl load-key contexts, configured Kotlin behavior and M7A close
+remain deferred. WP804 is accepted at `213e20ffb`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

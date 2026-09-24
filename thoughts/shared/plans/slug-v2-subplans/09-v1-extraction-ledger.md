@@ -2780,6 +2780,20 @@ and fail-closed configured behavior. This no-extraction slice is accepted;
 the next authentic stop is Kotlin provider-callable hashability, not a change
 to retained configuration-field representation.
 
+`WP-7-105-m7a-exported-provider-constructor-dict-keys-r1` reuses the
+existing `ProviderId` `Arc`/`Dupe` structural source-label/export-name
+identity, `CompactString`, Starlark hashing and Allocative coverage for both
+ordinary and initialized user-provider constructors across live/frozen
+forms. It imports no V1/Buck2 code and adds no second identity, string,
+collection, interner, cache, DICE key, lock or allocation. Unexported
+constructors and the initialized raw constructor remain unhashable;
+provider-instance structural hashing is unchanged. The authenticated
+Kotlin-shaped import/dictionary lookup, same-ID/different-schema hash,
+source/name distinction and protected instance barriers prove this bounded
+reuse. Rust hash bytes and special Bzl load-key contexts stay Slug-native or
+deferred as classified; the next authentic stop is a generated Kotlin
+repository-rule attribute schema, outside this retained owner.
+
 `WP-4-7A-build-imported-bzl-label-caller-provenance-audit-r1` also requires no
 V1/Buck2 extraction. Reuse `CompactString`, `BzlModuleIdentity`, immutable
 `Arc<[T]>`, constant-time Arc clone and the identity's existing `Allocative`

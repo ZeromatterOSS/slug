@@ -34904,6 +34904,160 @@ NESTED_HEADERS = EMPTY_COMPILATION_CONTEXT._header_info.modular_public_headers
 }
 
 #[test]
+fn exported_provider_key_survives_kotlin_shaped_imported_dictionary_lookup() {
+    let owner = |name: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(&format!(
+            "@@rules_kotlin+//src/main/starlark/core/options:{name}.bzl"
+        ))
+        .unwrap(),
+        workspace_path: PathBuf::from(format!(
+            "/rules_kotlin/src/main/starlark/core/options/{name}.bzl"
+        )),
+        repository_mapping: Arc::from([]),
+    };
+    let derive_owner = owner("derive");
+    let derive = eval_bzl_with_identity(
+        r#"_value_to_flag_info = provider(fields = {"ctx": "context", "derive": "callback"})
+Alias = _value_to_flag_info
+def _repeated_values_for(name):
+    return _value_to_flag_info(ctx = name, derive = name)
+derive = struct(info = _value_to_flag_info, repeated_values_for = _repeated_values_for)
+"#,
+        derive_owner.clone(),
+    )
+    .unwrap();
+    let opts_owner = owner("opts");
+    let opts = eval_bzl_with_loaded_children(
+        r#"load(":derive.bzl", "derive")
+JOPTS = {
+    "x_lint": struct(value_to_flag = {derive.info: derive.repeated_values_for("-Xlint:")}),
+    "add_exports": struct(value_to_flag = {derive.info: derive.repeated_values_for("--add-exports=")}),
+}
+KEY = derive.info
+"#,
+        opts_owner.clone(),
+        &[(":derive.bzl", derive_owner.clone(), derive.dupe())],
+    )
+    .unwrap();
+    let convert = eval_bzl_with_loaded_children(
+        r#"load(":opts.bzl", "JOPTS", "KEY")
+FIRST = JOPTS["x_lint"].value_to_flag.get(KEY).ctx
+SECOND = JOPTS["add_exports"].value_to_flag[KEY].ctx
+"#,
+        owner("convert"),
+        &[(":opts.bzl", opts_owner, opts.dupe())],
+    )
+    .unwrap();
+    assert_eq!(convert.get("FIRST").unwrap().unpack_str(), Some("-Xlint:"));
+    assert_eq!(
+        convert.get("SECOND").unwrap().unpack_str(),
+        Some("--add-exports=")
+    );
+    let private = derive.get_any_visibility("_value_to_flag_info").unwrap().0;
+    let alias = derive.get("Alias").unwrap();
+    let imported = opts.get("KEY").unwrap();
+    assert_symmetric_equal_and_hash(private.value(), alias.value());
+    assert_symmetric_equal_and_hash(private.value(), imported.value());
+    let identity = starlark_provider_identity(private.value()).unwrap();
+    let id = identity.user_id().unwrap();
+    assert_eq!(id.source_label(), derive_owner.label.to_string());
+    assert_eq!(id.exported_name(), "_value_to_flag_info");
+}
+
+#[test]
+fn exported_provider_keys_are_structural_live_and_frozen_with_unbound_barriers() {
+    const SOURCE: &str = r#"P = provider(fields = ["value"])
+Alias = P
+Q = provider()
+def _init(value): return {"value": value}
+Initialized, Raw = provider("doc", fields = ["value"], init = _init)
+InitializedAlias = Initialized
+"#;
+    let owner = |repo: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(&format!("@@{repo}//:keys.bzl")).unwrap(),
+        workspace_path: PathBuf::from("/workspace/keys.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let first_owner = owner("first+");
+    let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
+        root: first_owner.clone(),
+        direct_children: Arc::from([]),
+        reachable: [first_owner.clone()]
+            .into_iter()
+            .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
+            .collect(),
+        fingerprint: [0; 32],
+    });
+    let ast = AstModule::parse("/workspace/keys.bzl", SOURCE.to_owned(), &Dialect::Bazel).unwrap();
+    let live = Module::new();
+    let mut evaluator = Evaluator::new(&live);
+    evaluator.extra = Some(&context);
+    evaluator.eval_module(ast, &loading_globals()).unwrap();
+    drop(evaluator);
+    let first = eval_bzl_with_identity(SOURCE, first_owner.clone()).unwrap();
+    let second = eval_bzl_with_identity(SOURCE, owner("second+")).unwrap();
+    let restored = eval_bzl_with_identity(SOURCE, first_owner.clone()).unwrap();
+    let changed_schema =
+        eval_bzl_with_identity("P = provider(fields = ['different'])", first_owner).unwrap();
+    for name in ["P", "Initialized"] {
+        assert_symmetric_equal_and_hash(live.get(name).unwrap(), first.get(name).unwrap().value());
+        assert_symmetric_equal_and_hash(
+            first.get(name).unwrap().value(),
+            restored.get(name).unwrap().value(),
+        );
+        assert!(
+            !first
+                .get(name)
+                .unwrap()
+                .value()
+                .equals(second.get(name).unwrap().value())
+                .unwrap()
+        );
+    }
+    assert_symmetric_equal_and_hash(
+        first.get("P").unwrap().value(),
+        first.get("Alias").unwrap().value(),
+    );
+    assert_symmetric_equal_and_hash(
+        first.get("P").unwrap().value(),
+        changed_schema.get("P").unwrap().value(),
+    );
+    assert_symmetric_equal_and_hash(
+        first.get("Initialized").unwrap().value(),
+        first.get("InitializedAlias").unwrap().value(),
+    );
+    assert!(
+        !first
+            .get("P")
+            .unwrap()
+            .value()
+            .equals(first.get("Q").unwrap().value())
+            .unwrap()
+    );
+    assert!(
+        !first
+            .get("P")
+            .unwrap()
+            .value()
+            .equals(first.get("Initialized").unwrap().value())
+            .unwrap()
+    );
+    assert!(live.get("Raw").unwrap().get_hashed().is_err());
+    assert!(first.get("Raw").unwrap().value().get_hashed().is_err());
+
+    for source in [
+        "X = {provider(): 1}",
+        "holder = struct(key = provider())\nX = {holder.key: 1}",
+        "def init(value): return {'value': value}\nX = {provider('doc', fields = ['value'], init = init)[0]: 1}",
+    ] {
+        let error = eval_bzl_with_identity(source, owner("first+"))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("hashable"), "{source}: {error}");
+    }
+}
+
+#[test]
 fn bazel_empty_list_freeze_loads_empty_cc_compilation_outputs() {
     let owner = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@rules_cc+//cc/private/compile:cc_compilation_outputs.bzl")
