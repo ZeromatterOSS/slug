@@ -29,16 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-118-m7a-label-keyed-dict-empty-aspects-r1
+Packet: WP-7-119-m7a-label-empty-aspects-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP818 admits rules_python's forwarded empty `aspects=[]` on
-`attr.label_keyed_string_dict` as zero attached aspects. Pinned Bazel 9.2
-source and offline query/build oracle establish omission equivalence; four
-focused/protected tests and the rebuilt authentic smoke clear the keyword
-stop. The next independent stop is `attr.label(aspects=[])`. WP817 was
-accepted at `a89845c02`; nonempty dictionary-key aspects, Python-helper
-invocation and M7A close remain deferred.
+WP819 admits rules_python's forwarded empty `aspects=[]` on `attr.label` as
+zero attached aspects. Pinned Bazel 9.2 source and an offline query/build
+oracle establish omission equivalence; five selected tests and the rebuilt
+authentic smoke clear the keyword stop. The next independent stop is
+`config.exec(value)` in rules_python. WP818 was accepted at `069535ebe`;
+nonempty scalar-label aspects, Python-helper invocation and M7A close remain
+deferred.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

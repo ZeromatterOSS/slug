@@ -7122,12 +7122,20 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] allow_single_file: Option<Value<'v>>,
         #[starlark(require = named)] allow_rules: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
+        #[starlark(require = named)] aspects: Option<Value<'v>>,
         #[starlark(require = named)] executable: Option<bool>,
         #[starlark(require = named)] doc: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
+        if let Some(aspects) = aspects {
+            let aspects = ListRef::from_value(aspects)
+                .ok_or_else(|| anyhow::anyhow!("label aspects must be a list"))?;
+            if !aspects.is_empty() {
+                anyhow::bail!("nonempty label aspects are unsupported");
+            }
+        }
         let mut definition = attribute_definition_before_later_properties(
             AttributeKind::Label,
             mandatory.unwrap_or(false),

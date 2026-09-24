@@ -9552,3 +9552,17 @@ Core/CLI compile and the CLI rebuild passed. The authentic build clears this
 keyword stop and next fails separately on `attr.label(aspects=[])` in
 rules_python. Nonempty dictionary-key aspects, configured propagation and
 M7A close remain deferred.
+
+### Empty scalar-label aspects accepted (2026-09-24)
+
+WP819 adds the named `aspects` argument only to Loading's `attr.label` and
+accepts literal `[]` as no attached aspect, matching Bazel 9.2's
+default-empty sequence and zero-iteration factory. Nonempty input fails
+closed; direct `None` and wrong types remain errors. The frozen schema keeps
+`attached_aspect=None`, with scalar-label default, cfg, provider, executable
+and coercion behavior unchanged. No DICE key, retained representation, cache
+or lock changes. A pre-fix exact regression failed, then five selected
+Loading tests, Core/CLI compile and the CLI rebuild passed. The authentic
+build clears this keyword stop and next fails separately on
+`config.exec(value)` in rules_python. Nonempty scalar-label aspects,
+configured propagation and M7A close remain deferred.
