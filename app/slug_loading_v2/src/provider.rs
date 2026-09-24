@@ -1728,6 +1728,11 @@ pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> 
 pub fn configured_target_provider_identity(
     value: Value<'_>,
 ) -> starlark::Result<Option<ProviderIdentity>> {
+    if BuiltinProviderKey::from_value(value).is_some_and(|key| key.name == "FeatureFlagInfo") {
+        return Err(starlark::Error::new_other(anyhow::anyhow!(
+            "config_common.FeatureFlagInfo is declaration-only; configured-target membership and indexing are unsupported"
+        )));
+    }
     if let Some(key) = DeclarationOnlyAppleProviderKey::from_value(value) {
         return Err(starlark::Error::new_other(anyhow::anyhow!(
             "apple_common.{} is declaration-only; configured-target membership and indexing are unsupported",
@@ -1979,10 +1984,13 @@ impl<'v> StarlarkValue<'v> for AnalysisBuiltinCallable {
 
 #[cfg(test)]
 mod tests {
+    use slug_build_api_v2::ProviderId;
+    use slug_build_api_v2::ProviderIdentity;
     use starlark::environment::Module;
     use starlark::eval::Evaluator;
     use starlark::syntax::AstModule;
     use starlark::syntax::Dialect;
+    use starlark::values::Value;
 
     use super::AnalysisBuiltinCallable;
     use super::BuiltinProviderKey;
@@ -2072,6 +2080,74 @@ mod tests {
             );
         }
         evaluate_module("X=platform_common.TemplateVariableInfo({})").unwrap();
+    }
+
+    #[test]
+    fn config_feature_flag_info_is_a_declaration_only_builtin_provider_key() {
+        let module = evaluate_module(
+            "KEY = config_common.FeatureFlagInfo\n\
+             AGAIN = config_common.FeatureFlagInfo\n\
+             KEY_TYPE = type(KEY)\n\
+             KEY_REPR = repr(KEY)\n\
+             HAS_KEY = 'FeatureFlagInfo' in dir(config_common)\n\
+             HAS_TOOLCHAIN = 'toolchain_type' in dir(config_common)\n",
+        )
+        .unwrap();
+        let key_owned = module.get("KEY").unwrap();
+        let again_owned = module.get("AGAIN").unwrap();
+        let key = key_owned.value();
+        let again = again_owned.value();
+        assert_eq!(
+            module.get("KEY_TYPE").unwrap().unpack_str(),
+            Some("Provider")
+        );
+        assert_eq!(
+            module.get("KEY_REPR").unwrap().unpack_str(),
+            Some("<function FeatureFlagInfo>")
+        );
+        assert_eq!(module.get("HAS_KEY").unwrap().unpack_bool(), Some(true));
+        assert_eq!(
+            module.get("HAS_TOOLCHAIN").unwrap().unpack_bool(),
+            Some(true)
+        );
+        assert!(key.equals(again).unwrap());
+        let hash = |value: Value<'_>| value.get_hashed().unwrap().hash();
+        assert_eq!(hash(key), hash(again));
+        let heap = starlark::values::FrozenHeap::new();
+        let rematerialized = heap.alloc(BuiltinProviderKey::new("FeatureFlagInfo"));
+        assert!(key.equals(rematerialized.to_value()).unwrap());
+        assert_eq!(hash(key), hash(rematerialized.to_value()));
+        assert_eq!(
+            starlark_provider_identity(key),
+            Some(ProviderIdentity::builtin("FeatureFlagInfo"))
+        );
+        assert_ne!(
+            starlark_provider_identity(key),
+            Some(ProviderIdentity::user(
+                ProviderId::unqualified("FeatureFlagInfo").unwrap()
+            ))
+        );
+        let ordinary = heap.alloc(BuiltinProviderKey::new("PackageSpecificationInfo"));
+        assert!(!key.equals(ordinary.to_value()).unwrap());
+        assert_ne!(hash(key), hash(ordinary.to_value()));
+        let error = configured_target_provider_identity(key)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("config_common.FeatureFlagInfo is declaration-only"),
+            "{error}"
+        );
+        assert!(error.contains("membership and indexing"), "{error}");
+        assert_eq!(
+            configured_target_provider_identity(ordinary.to_value()).unwrap(),
+            Some(ProviderIdentity::builtin("PackageSpecificationInfo"))
+        );
+        let error =
+            evaluate_module("X=config_common.FeatureFlagInfo(value='enabled')").unwrap_err();
+        assert!(
+            error.contains("Operation `call()` not supported on type `Provider`"),
+            "{error}"
+        );
     }
 
     #[test]

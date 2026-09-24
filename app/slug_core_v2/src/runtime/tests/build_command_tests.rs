@@ -1850,6 +1850,62 @@ async fn java_plugins_flag_alias_direct_build_fails_configured_analysis() {
 }
 
 #[tokio::test]
+async fn feature_flag_provider_declaration_does_not_complete_direct_build() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(LegacyBuildTracker::default());
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let mut epoch = BuildRootEpoch::base(43);
+    epoch.package("rules", "", 43);
+    epoch.file(
+        "/workspace/rules/defs.bzl",
+        r#"FeatureFlagInfo = config_common.FeatureFlagInfo
+def _dep(ctx): return [DefaultInfo()]
+def _consumer(ctx): return [DefaultInfo()]
+dep_rule = rule(implementation = _dep, provides = [FeatureFlagInfo])
+consumer_rule = rule(
+    implementation = _consumer,
+    attrs = {"dep": attr.label(providers = [FeatureFlagInfo])},
+)
+"#,
+        43,
+    );
+    epoch.package(
+        "app",
+        "load('//rules:defs.bzl', 'consumer_rule', 'dep_rule')\n\
+         dep_rule(name = 'advertised')\n\
+         consumer_rule(name = 'consumer', dep = ':advertised')\n",
+        43,
+    );
+    let key = BuildCommandRootKey::new(
+        workspace,
+        &[TargetPattern::parse("//app:consumer").unwrap()],
+        build_test_configuration("target"),
+    )
+    .unwrap();
+    let user_data = UserComputationData {
+        activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+        ..Default::default()
+    };
+    let mut transaction = build_root_transaction_with_data(&dice, epoch.build(), user_data).await;
+    let value = compute_build_root(&mut transaction, &key, &tracker).await;
+    assert!(
+        matches!(
+            value,
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref result)
+                if matches!(
+                    result.as_ref(),
+                    Err(BuildCommandError {
+                        kind: BuildCommandErrorKind::Analysis(error),
+                    }) if error.to_string().contains("does not provide any admitted provider alternative")
+                        && error.to_string().contains("FeatureFlagInfo")
+                )
+        ),
+        "advertising the declaration-only key must not publish a configured build: {value:?}"
+    );
+    assert_eq!(tracker.forbidden.load(Ordering::Relaxed), 0);
+}
+
+#[tokio::test]
 async fn build_command_root_replays_root_module_and_build_create_edit_delete_restore() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();

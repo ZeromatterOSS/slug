@@ -2876,3 +2876,13 @@ representation is introduced. Its cold declaration seam does not warrant a
 new benchmark. Focused same-DICE source A/B/A, root/external Query and
 configured Build failure tests prove the retained boundary; configured Java
 behavior is deferred.
+
+WP831 reuses the existing `BuiltinProviderKey` and
+`ProviderIdentity::Builtin` path for the fixed `FeatureFlagInfo` singleton,
+plus existing `CompactString`, immutable Arc provider-policy slices and
+Allocative coverage. The key is retained through ordinary declaration
+equality/invalidation, not in a second identity or provider-instance store.
+No V1/Buck2 import, new map, cache, interner, DICE key, lock or ownership
+carrier is added. The cold Loading field seam does not warrant a benchmark.
+Same-DICE imported-policy A/B/A and configured membership/indexing rejection
+prove the retained boundary; construction/value analysis remains deferred.

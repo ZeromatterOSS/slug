@@ -7738,6 +7738,15 @@ fn config_common_methods(builder: &mut MethodsBuilder) {
 
 #[starlark_value(type = "config_common")]
 impl<'v> StarlarkValue<'v> for ConfigCommonModule {
+    fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        (name == "FeatureFlagInfo")
+            .then(|| heap.alloc_simple(BuiltinProviderKey::new("FeatureFlagInfo")))
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec!["FeatureFlagInfo".to_owned()]
+    }
+
     fn get_methods() -> Option<&'static Methods> {
         static METHODS: MethodsStatic = MethodsStatic::new();
         METHODS.methods(config_common_methods)

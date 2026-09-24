@@ -1,135 +1,125 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-130-m7a-java-plugins-flag-alias-loading-r1
+Packet: WP-7-131-m7a-feature-flag-provider-declaration-r1
 Status: ACCEPTED; M7A remains partial
 
 ## Outcome and compatibility
 
-Clear the authentic `@@bazel_tools//tools/jdk:BUILD:48` Loading stop by
-admitting Bazel 9.2's native `java_plugins_flag_alias` rule declaration, not
-its configured Java behavior. Exact selected Loading: BUILD and `.bzl`
-`native` callability, distinct recorded rule-class identity, the inherited
-attribute-name/order contract, private implicit `:java_plugins` label-list
-with empty Loading default, and no ordinary dependency edge under default
-flags. Existing inherited-attribute diagnostics and query rendering remain
-Slug-native where already classified. Slug-native fail-closed direct Build and
-configured-analysis errors must replace any false `LoadedOnly` success.
-Unsupported/deferred: `--plugin` option projection, late-bound configured
-dependencies and exec transition, JavaPluginInfo provider validation/merging,
-configured target or cquery parity, Java actions, and full JDK package Loading.
-A later authentic stop cannot widen this packet.
+Clear the authentic rules_python 1.7.0 `python/private/pypi/flags.bzl:158`
+Loading stop by exposing Bazel 9.2's `config_common.FeatureFlagInfo` provider
+key to `.bzl` declarations. Exact selected behavior: `.bzl`-only field
+availability, provider-key type/repr and singleton equality, distinctness from
+a user `provider()` with the same exported name, and its ordered identity in
+`attr.label(providers = [[BuildSettingInfo], [config_common.FeatureFlagInfo]])`
+and `rule(provides = [...])`. Keep `config_common.toolchain_type` unchanged.
+Slug-native representation and diagnostics use the existing built-in provider
+key, structural `ProviderIdentity::Builtin`, and immutable provider-policy
+slices. Configured membership/indexing through this key must fail closed;
+constructor invocation must remain unsupported rather than fabricate a
+provider. Deferred: `FeatureFlagInfo(value = ...)`, `config_feature_flag`
+native rule/transition, configured provider instance and value/error/validity,
+Python flag analysis, and any complete root-build claim. A later authentic
+stop cannot widen this packet.
 
 ## Source, owner and decision
 
 Pinned Bazel 9.2 source commit `8220c6198837d5c13d53fea211cf3282aa12408a`:
-`tools/jdk/BUILD.tools:47-50` calls the native rule with only `name`;
-`JavaPluginsFlagAliasRule.java:47-69` adds `:java_plugins` to `NativeBuildRule`,
-using an execution transition, either JavaPluginInfo identity and
-`JavaSemantics.JAVA_PLUGINS`. `BaseRuleClasses.java:226-339` supplies its 18
-inherited slots after the `name` slot inserted by `RuleClass.java:753-817`.
-`JavaSemantics.java:49-53` reads target-configured
-plugins; `Attribute.java:1788-1805` gives a label-list late-bound default an
-empty Loading value. `JavaOptions.java:351-362` owns repeatable `--plugin`.
-The rule's allowlisted-label check and provider merge occur only in its
-configured factory; Bazel's `JavaPluginsFlagAliasTest` covers default, one/two
-plugins, wrong provider and wrong location. No Java helper enters Slug.
+`ConfigStarlarkCommonApi.java:30-39` declares the field;
+`ConfigStarlarkCommon.java:32-35` returns the singleton
+`ConfigFeatureFlagProvider.STARLARK_CONSTRUCTOR`;
+`ConfigFeatureFlagProvider.java:40-50,74-104,138-148` distinguishes native
+provider-key identity, configured constructor/value and instance identity.
+Its `ConfigFeatureFlagTest.java:131-231,295-313` exercises constructor,
+indexing and value behavior in Analysis, which this packet does not admit.
+The authenticated rules_python 1.7.0 source at
+`python/private/pypi/flags.bzl:156-159` uses the key in a top-level nested
+provider predicate; `env_marker_setting.bzl:88-101` additionally uses it in
+top-level label and rule-provides declarations. Calls and membership/value
+reads in those sources are under configured implementation functions. The
+selected `flags.bzl` SHA-256 is
+`75634214e292a5af5fd61f8ab9d44fa4b28b99c4c49672de577e17922616d070`.
+An ignored-RC/no-fetch Bazel 9.2 query of
+`@@rules_python+//python/config_settings:_pip_env_marker_default_config`
+exits 0 and shows the declaration stack through `flags.bzl:95,116,148`;
+this proves Loading, not configured provider behavior.
 
-An ignored-RC/no-fetch Bazel 9.2 oracle in the authentic workspace resolves
-the JDK target as class `java_plugins_flag_alias`. XML default-value query
-reports 20 ordered attributes: the 19 inherited native slots followed by
-empty private `:java_plugins`. Default `deps(target, 1)` returns only the
-target. Default cquery succeeds, while an explicit `--plugin` pointing at
-`:toolchain_type` fails the mandatory JavaPluginInfo check. The scratch output
-base required a copy of already-materialized external repositories after
-`--nofetch`; no new network fetch or complete configured-valid-plugin proof
-is claimed. Bazel's inherited `licenses` default is a LICENSE value containing
-`NONE`; Slug's existing native schema stores an empty string list, an inherited
-Slug-native query-rendering boundary rather than exact license parity.
-Existing source/catalog certificates own these immutable BUILD
-bytes; the source file and package-load DICE dependencies own invalidation.
-
-Append one `NativeRuleClass` schema in `attrs.rs`, preserving existing enum
-discriminants. Add a unit `PackageTargetKind` and fixed `RuleCapability` in
-`package.rs`, with recording via existing `PackageRecorder`, generator and
-override handling, BUILD global and `.bzl` `native` method. The rule class
-itself encodes the late-bound nature; retain no fabricated plugin labels or
-option value. Keep `:java_plugins` implicit and non-callable with its empty
-Loading value. Reuse the existing `Arc`-backed native-attribute slice,
-`CompactString`, `Allocative`, target equality, source manifest and DICE
-ownership; no new map/interner/cache/lock/key or evaluator borrow. Query's
-root and external projections report the distinct class and default empty
-edges. Core must route a directly requested instance to the existing
-configured-analysis failure instead of treating it as `LoadedOnly` success;
-do not synthesize empty Java providers.
+`ConfigCommonModule` in `app/slug_loading_v2/src/package.rs` owns the field
+exposure. Reuse `BuiltinProviderKey::new("FeatureFlagInfo")` in `provider.rs`
+as a fixed Loading token, not a new provider store or callable. Its existing
+hash/equality and `starlark_provider_identity` lower to
+`ProviderIdentity::Builtin("FeatureFlagInfo")`; existing
+`declaration_required_providers` and `advertised_provider_ids` retain it in
+the same canonical Arc slices and package equality. Add a precise rejection
+for that key in `configured_target_provider_identity` before map lookup; the
+ordinary built-in keys keep their current behavior. The external Bzl source
+evaluation and repository package-load DICE dependencies own invalidation;
+root analogues remain unchanged. Add no DICE key/input, lock, registry, map,
+interner, cache, source copy or evaluator borrow. Fixed token allocation is
+Loading scratch/frozen-module ownership; no hot-path or clone-cost change.
 
 ## Evidence and validation
 
-The accepted WP829 authentic replay is the prechange discriminator: the first
-new failure is the missing `java_plugins_flag_alias` BUILD global at line 48.
-Add a source-shaped Loading regression for a bare BUILD call and a `.bzl`
-`native` call. Verify rule class, public/package/declared visibility,
-source-relative generator metadata, exact schema order and implicit empty
-plugin slot, duplicate/unknown/private-attribute negatives, and source A/B/A
-restoration. Add root/external Query class and empty-edge controls, preserving
-the inherited Slug-native rendering boundary. Add a direct requested-Build
-negative proving configured failure before any action, publication or false
-success; a source/configuration change must not turn that into success.
-Reuse the pinned source and no-fetch oracle; no new Stage 1 fixture.
+WP830's rebuilt normalized-PATH `slug build //:probe` is the prechange
+discriminator: first error is absent `config_common.FeatureFlagInfo` at
+`@@rules_python+//python/private/pypi:flags.bzl:158:47`. Replace the two
+existing absence assertions for this field. Test field inventory and absence
+from direct BUILD, fixed repr/type/equality/hash, ordinary-key and same-name
+user-provider separation, direct and imported/re-exported use in nested
+provider alternatives and `rule(provides)`, declaration order/dedup and frozen
+identity. Prove changed source/provider policy A/B/A on one DICE. Test
+constructor rejection and configured membership/indexing rejection, including
+against a coincidentally named retained provider; a direct requested Build
+must not turn the declaration into a configured success. Preserve protected
+`config_common.toolchain_type` and ordinary provider controls.
 
-Resolve the pinned nightly via `rustup which`, compile selected test binaries
-with Cargo JSON `--no-run`, and use `scripts/v2_test_preflight.py` for exact
-nonignored selectors before execution. Run focused Loading, Query and Core
-tests, direct checks for Loading/Query/Analysis/Core/CLI, and rebuild
-`slug_cli_v2` before one normalized-PATH authentic `//:probe` replay. The
-replay is required to show this Loading stop cleared; it does not prove a
-configured JDK. Clean/check `slugd` before and after. Run pinned rustfmt,
-`git diff --check`, plan and archive checks. Obtain independent DESIGN and
-FINAL reviews for the new native rule-class/retained target boundary.
+Resolve the pinned nightly with `rustup which`. Compile selected test binaries
+with Cargo JSON `--no-run`; run `scripts/v2_test_preflight.py` for exact
+nonignored selectors before execution. Run focused Loading and configured
+guard/Analysis tests, then direct checks for Loading, Analysis, Core and CLI.
+Rebuild `slug_cli_v2` before one normalized-PATH authentic `//:probe` replay;
+if parallel load order masks this gate, use a direct authentic rules_python
+query as a positive trace. Clean/check `slugd` before and after. Run pinned
+rustfmt, `git diff --check`, plan and archive checks. Obtain independent
+DESIGN and FINAL reviews for the provider-key/retained-policy boundary. Reuse
+the pinned source and no-fetch oracle; no new Stage 1 fixture.
 
 ## Scope and stops
 
-Base clean main `8c22cc128`. Allowlist: this manifest and canonical Current;
+Base clean main `c18e59646`. Allowlist: this manifest and canonical Current;
 compact Stage 4 and matching Stage 9 notes after acceptance; production
-`app/slug_loading_v2/src/{attrs,package,bzl_module}.rs`,
-`app/slug_query_v2/src/graph.rs`, and
-`app/slug_core_v2/src/runtime/build_requested_target.rs`; focused tests in
-`app/slug_loading_v2/src/host_package_load_tests.rs`,
-`app/slug_loading_v2/tests/build_file_loading.rs`,
-`app/slug_query_v2/tests/{loading_query,observed_loading_query}.rs`, and
-`app/slug_core_v2/src/runtime/tests/build_command_tests.rs`. The large
-production/test modules remain cohesive Loading, Query and Build owners;
-extracting a new owner would add routing without reducing the rule-family
-coupling. Expected growth about 100 production/180 proof lines is a review
-trigger, not a cap. `REPLAN` if exact Loading requires configured `--plugin`
-resolution, a second retained attribute owner, a new DICE key, or invented
-`@bazel_tools` content. No provider or Java execution implementation is in
-scope. M7A remains partial.
+`app/slug_loading_v2/src/{package,provider}.rs`; focused tests in
+`app/slug_loading_v2/src/{host_package_load_tests,provider}.rs` and
+`app/slug_analysis_v2/tests/starlark_rule.rs`; a direct Build test in
+`app/slug_core_v2/src/runtime/tests/build_command_tests.rs`. Both production
+modules are large but remain the cohesive `config_common` and provider-token
+owners; a new module would add indirection without separating a semantic
+owner. Expected growth about 30 production/160 proof lines is a review
+trigger, not a cap. `REPLAN` if exact selected Loading needs a configured
+provider constructor/value, a new retained schema or DICE owner, or a second
+provider identity representation. No configured Python or JDK package
+publication is in scope. M7A remains partial.
 
 ## Immediate predecessor
 
-WP829 accepted at `8c22cc128`: the native JDK Bzl's private `java.launcher`
-configuration-field declaration now loads through the existing compact
-identity. Its configured resolution remains fail-closed; authentic replay
-advances to this distinct native `java_plugins_flag_alias` BUILD call.
+WP830 accepted at `c18e59646`: the JDK `java_plugins_flag_alias` BUILD call
+now loads with its empty private default. Direct authentic JDK query advances
+to later `proguard_allowlister` executable-rule validation; the wider
+`//:probe` replay exposes this independent rules_python provider-key stop.
 
-## Acceptance receipt
+## Acceptance receipt (2026-09-24)
 
-Independent DESIGN and FINAL reviews accepted the append-only native rule
-class, unit package target and existing Arc-backed attribute representation.
-Pinned Bazel 9.2 source and an ignored-RC/no-fetch oracle establish the exact
-selected declaration. Direct Cargo checks for Loading, Query, Analysis, Core
-and CLI pass; 11 exact preflighted focused/protected tests pass (six Loading,
-three Query, two Core), including direct-Build source/configuration A/B/A
-failure. Pinned rustfmt, `git diff --check`, plan and archive checks pass.
-
-The rebuilt normalized-PATH `slug build //:probe` first reports missing
-`config_common.FeatureFlagInfo` at rules_python `flags.bzl:158`, but parallel
-package-load ordering makes that alone insufficient to prove the JDK gate.
-A direct authentic-package `slug query
-'@bazel_tools//tools/jdk:java_plugins_flag_alias'` reaches the later
-`proguard_allowlister` executable-rule validation at JDK BUILD line 140,
-positively proving evaluation passed `java_plugins_flag_alias` at lines 48-50.
-No `slugd` remained before or after the replays. The JDK package still does
-not publish; configured Java, `--plugin`, provider merge and Java actions
-remain deferred. M7A remains partial. Predecessor commit to acceptance was
-about 27 minutes; compile, test and review phases were not timed separately.
+Independent DESIGN and FINAL reviews both `ACCEPT`. The selected `.bzl`
+field and declaration identity are admitted exactly; configured use and
+construction remain fail-closed and Slug-native as classified above. Pinned
+Bazel 9.2 source plus the ignored-RC/no-fetch authentic rules_python query
+establish the Loading boundary; no Stage 1 fixture was added. Six Loading,
+two Analysis and two Core focused/protected tests pass, including imported
+policy source A/B/A on one DICE and a direct requested Build that fails
+Analysis rather than reporting false success. `cargo check` for Loading,
+Analysis, Core and CLI, and `cargo build -p slug_cli_v2`, pass. Pinned
+rustfmt, diff hygiene, plan and archive checks pass. No stale `slugd` process
+remains. The rebuilt normalized-PATH authentic `slug build //:probe` clears
+the former `flags.bzl:158` missing-field stop and next fails at
+`@@rules_python+//python/private:config_settings.bzl:172:9` on the deferred
+configured `config_common.FeatureFlagInfo(value = value)` call. It does not
+establish a complete root build, configured Python flag, or M7A acceptance.

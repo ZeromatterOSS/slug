@@ -9725,3 +9725,20 @@ evaluates beyond `java_plugins_flag_alias` at BUILD lines 48-50 and fails
 later on `proguard_allowlister` at line 140. The full JDK package, configured
 `--plugin`, JavaPluginInfo merge and Java actions remain deferred. M7A is
 partial.
+
+### FeatureFlagInfo provider-key Loading accepted (2026-09-24)
+
+WP831 exposes Bazel 9.2's selected `config_common.FeatureFlagInfo` singleton
+key to `.bzl` Loading declarations, retaining its built-in identity in nested
+`attr.label(providers = ...)` alternatives and `rule(provides = ...)` without
+altering `config_common.toolchain_type`. It is absent from direct BUILD;
+constructor calls and configured membership/indexing fail closed. The field
+reuses the existing built-in provider key and immutable declaration policy,
+with no configured provider/value claim. Six Loading, two Analysis and two
+Core focused/protected tests pass, including imported-source policy A/B/A on
+one DICE and direct requested Build failure. Independent DESIGN and FINAL
+reviews accept the boundary. The rebuilt authentic `//:probe` clears the
+prior `flags.bzl:158` missing-field stop and next stops at configured
+`config_settings.bzl:172` on `FeatureFlagInfo(value = value)`. Configured
+Python flags, native `config_feature_flag`, full root build and M7A remain
+open.

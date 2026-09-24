@@ -32419,6 +32419,72 @@ async fn imported_descriptor_source_changes_and_restores_through_loaded_module_a
 }
 
 #[tokio::test]
+async fn imported_feature_flag_provider_policy_changes_and_restores_on_one_dice() {
+    const BUILD: &[u8] =
+        b"load(':consumer.bzl','R')\nR(name='subject', visibility=['//visibility:public'])\n";
+    const BRIDGE: &[u8] = b"load(':producer.bzl','POLICY','ADVERTISED')\nREEXPORTED_POLICY=POLICY\nREEXPORTED_ADVERTISED=ADVERTISED\n";
+    const CONSUMER: &[u8] = b"load(':bridge.bzl','REEXPORTED_POLICY','REEXPORTED_ADVERTISED')\ndef impl(ctx): fail('analysis must stay lazy')\nR=rule(implementation=impl, attrs={'flag':attr.label(providers=REEXPORTED_POLICY)}, provides=REEXPORTED_ADVERTISED)\n";
+    const PRODUCER_A: &[u8] = b"BuildSettingInfo=provider()\nKEY=config_common.FeatureFlagInfo\nPOLICY=[[BuildSettingInfo],[KEY]]\nADVERTISED=[KEY,BuildSettingInfo]\n";
+    const PRODUCER_B: &[u8] = b"BuildSettingInfo=provider()\nKEY=config_common.FeatureFlagInfo\nPOLICY=[[BuildSettingInfo,KEY]]\nADVERTISED=[BuildSettingInfo,KEY]\n";
+    let files = |producer| {
+        [
+            ("BUILD.bazel", BUILD),
+            ("producer.bzl", producer),
+            ("bridge.bzl", BRIDGE),
+            ("consumer.bzl", CONSUMER),
+        ]
+    };
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let a = load_repository_package_fixture_on(&dice, &files(PRODUCER_A), 1450).await;
+    let b = load_repository_package_fixture_on(&dice, &files(PRODUCER_B), 1451).await;
+    let restored = load_repository_package_fixture_on(&dice, &files(PRODUCER_A), 1452).await;
+    let snapshot = |outcome: &RepositoryPackageOutcome| {
+        let package = repository_package_terminal(outcome);
+        let PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+            panic!("subject did not retain its imported rule")
+        };
+        let flag = rule
+            .schema()
+            .iter()
+            .find(|schema| schema.declaration_name() == "flag")
+            .unwrap();
+        (
+            flag.required_providers()
+                .iter()
+                .map(|alternative| {
+                    alternative
+                        .iter()
+                        .map(provider_identity_text)
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>(),
+            rule.advertised_providers()
+                .iter()
+                .map(provider_identity_text)
+                .collect::<Vec<_>>(),
+        )
+    };
+    let user = "@@dep+//:producer.bzl%BuildSettingInfo".to_owned();
+    assert_eq!(
+        snapshot(&a),
+        (
+            vec![vec!["FeatureFlagInfo".to_owned()], vec![user.clone()]],
+            vec!["FeatureFlagInfo".to_owned(), user.clone()],
+        )
+    );
+    assert_eq!(
+        snapshot(&b),
+        (
+            vec![vec!["FeatureFlagInfo".to_owned(), user.clone()]],
+            vec![user, "FeatureFlagInfo".to_owned()],
+        )
+    );
+    assert_eq!(snapshot(&a), snapshot(&restored));
+    assert!(!RepositoryPackageLoadKey::equality(&a, &b));
+    assert!(RepositoryPackageLoadKey::equality(&a, &restored));
+}
+
+#[tokio::test]
 async fn generic_aspect_declaration_inputs_invalidate_and_restore_external_module_a_b_a() {
     const A: &[u8] = b"def impl(target, ctx): return []\nA=aspect(implementation=impl, attr_aspects=['deps'], fragments=['cpp'])\n";
     const B: &[u8] = b"def impl(target, ctx): return []\nA=aspect(implementation=impl, attr_aspects=['srcs'], fragments=['apple'])\n";
@@ -33894,7 +33960,11 @@ SECOND = rule(implementation = _impl, attrs = _attrs("different documentation"))
             "{invalid}"
         );
     }
-    assert!(eval_bzl_with_identity("X = config_common.FeatureFlagInfo", owner).is_err());
+    let feature_flag = eval_bzl_with_identity("X = config_common.FeatureFlagInfo", owner).unwrap();
+    assert!(
+        starlark_provider_identity(feature_flag.get("X").unwrap().value())
+            .is_some_and(|identity| identity.is_builtin("FeatureFlagInfo"))
+    );
 }
 
 #[test]
@@ -34121,7 +34191,12 @@ rust_toolchain = rule(implementation = _impl, attrs = {
             "{invalid}"
         );
     }
-    assert!(eval_bzl_with_identity("X = config_common.FeatureFlagInfo", owner.clone()).is_err());
+    let feature_flag =
+        eval_bzl_with_identity("X = config_common.FeatureFlagInfo", owner.clone()).unwrap();
+    assert!(
+        starlark_provider_identity(feature_flag.get("X").unwrap().value())
+            .is_some_and(|identity| identity.is_builtin("FeatureFlagInfo"))
+    );
     assert!(
         eval_bzl_with_identity(
             "def impl(ctx): pass\nX = repository_rule(impl, attrs = {'x': attr.int(values = [1])})",
@@ -36867,6 +36942,87 @@ fn bazel_category_six_globals_and_provider_key_are_exactly_partitioned() {
     assert!(
         error.contains("Operation `call()` not supported on type `Provider`"),
         "{error}"
+    );
+}
+
+#[test]
+fn config_common_feature_flag_info_is_a_bzl_only_builtin_provider_key() {
+    let owner = BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_python+//python/private/pypi:flags.bzl").unwrap(),
+        workspace_path: PathBuf::from("/rules_python/python/private/pypi/flags.bzl"),
+        repository_mapping: Arc::from([]),
+    };
+    let module = eval_bzl_with_identity(
+        "BuildSettingInfo=provider()\nFeatureFlagInfo=provider()\nKEY=config_common.FeatureFlagInfo\ndef impl(ctx): fail('analysis must stay lazy')\nDIRECT=rule(implementation=impl, attrs={'setting':attr.label(providers=[[BuildSettingInfo],[KEY],[KEY]]),'same_name':attr.label(providers=[[FeatureFlagInfo],[KEY]])}, provides=[KEY,FeatureFlagInfo,KEY])\n",
+        owner,
+    )
+    .unwrap();
+    let key_binding = module.get("KEY").unwrap();
+    let user_binding = module.get("FeatureFlagInfo").unwrap();
+    let key = key_binding.value();
+    let user = user_binding.value();
+    assert!(!key.to_value().equals(user.to_value()).unwrap());
+    assert!(
+        starlark_provider_identity(key)
+            .unwrap()
+            .is_builtin("FeatureFlagInfo")
+    );
+    assert_eq!(
+        starlark_provider_identity(user)
+            .unwrap()
+            .user_id()
+            .unwrap()
+            .to_string(),
+        "@@rules_python+//python/private/pypi:flags.bzl%FeatureFlagInfo"
+    );
+    let rule = module
+        .get("DIRECT")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    for (attribute, user_name) in [
+        ("setting", "BuildSettingInfo"),
+        ("same_name", "FeatureFlagInfo"),
+    ] {
+        let schema = rule
+            .schema
+            .iter()
+            .find(|schema| schema.name == attribute)
+            .unwrap();
+        assert_eq!(
+            schema
+                .required_providers
+                .iter()
+                .map(|alternative| alternative
+                    .iter()
+                    .map(provider_identity_text)
+                    .collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+            [
+                vec!["FeatureFlagInfo".to_owned()],
+                vec![format!(
+                    "@@rules_python+//python/private/pypi:flags.bzl%{user_name}"
+                )],
+            ],
+            "{attribute}"
+        );
+    }
+    assert_eq!(
+        rule.advertised_providers()
+            .iter()
+            .map(provider_identity_text)
+            .collect::<Vec<_>>(),
+        [
+            "FeatureFlagInfo",
+            "@@rules_python+//python/private/pypi:flags.bzl%FeatureFlagInfo"
+        ]
+    );
+    assert!(
+        eval_global(
+            "X=config_common.FeatureFlagInfo",
+            &build_file_loading_globals()
+        )
+        .is_err()
     );
 }
 

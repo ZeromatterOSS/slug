@@ -12402,6 +12402,105 @@ consumer(name = "generated_owner_bad", scalar = ":owner")
     }
 }
 
+#[tokio::test]
+async fn feature_flag_provider_declaration_does_not_admit_configured_provider_use() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"FeatureFlagInfo = provider(fields = ["value"])
+
+def _user_flag(ctx):
+    return [FeatureFlagInfo(value = "user")]
+
+def _empty(ctx):
+    return [DefaultInfo()]
+
+def _construct(ctx):
+    return [config_common.FeatureFlagInfo(value = "native")]
+
+def _membership(ctx):
+    if config_common.FeatureFlagInfo in ctx.attr.dep:
+        fail("declaration-only membership unexpectedly succeeded")
+    return [DefaultInfo()]
+
+def _index(ctx):
+    value = ctx.attr.dep[config_common.FeatureFlagInfo]
+    fail("declaration-only indexing unexpectedly returned %s" % value)
+
+user_flag = rule(
+    implementation = _user_flag,
+    provides = [config_common.FeatureFlagInfo],
+)
+needs_flag = rule(
+    implementation = _empty,
+    attrs = {"dep": attr.label(providers = [[config_common.FeatureFlagInfo]])},
+)
+construct = rule(implementation = _construct)
+membership = rule(implementation = _membership, attrs = {"dep": attr.label()})
+index = rule(implementation = _index, attrs = {"dep": attr.label()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "construct", "index", "membership", "needs_flag", "user_flag")
+user_flag(name = "user")
+needs_flag(name = "required", dep = ":user")
+construct(name = "constructed")
+membership(name = "member", dep = ":user")
+index(name = "indexed", dep = ":user")
+"#,
+    )
+    .unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let configuration = test_configuration();
+    let key = |target: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+            configuration.clone(),
+        )
+    };
+    let user = analyze_request(&dice, &workspace, &key("user"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        user.providers()
+            .user(&ProviderId::new("//:defs.bzl", "FeatureFlagInfo").unwrap())
+            .unwrap()
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str),
+        Some("user")
+    );
+    let provider_error = analyze_request(&dice, &workspace, &key("required"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        provider_error
+            .contains("target `@@//:user` does not provide any admitted provider alternative")
+            && provider_error.contains("FeatureFlagInfo"),
+        "advertised built-in key must not match the same-name user provider: {provider_error}"
+    );
+
+    let constructor_error = analyze_request(&dice, &workspace, &key("constructed"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        constructor_error.contains("Operation `call()` not supported on type `Provider`"),
+        "configured constructor must fail closed: {constructor_error}"
+    );
+    for target in ["member", "indexed"] {
+        let error = analyze_request(&dice, &workspace, &key(target), None, false)
+            .await
+            .unwrap_err();
+        assert!(
+            error.contains("config_common.FeatureFlagInfo is declaration-only; configured-target membership and indexing are unsupported"),
+            "{target}: {error}"
+        );
+    }
+}
+
 fn write_rule_class_restriction_definitions(workspace: &PathBuf) -> &'static str {
     fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
     let definitions = r#"P = provider()
