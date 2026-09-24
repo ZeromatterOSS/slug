@@ -29,20 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-112-m7a-apple-configuration-field-declaration-r1
+Packet: WP-7-113-m7a-native-alias-none-visibility-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP812 admits only load-time recognition and typed private-label-default
-retention for `configuration_field(fragment = "apple", name =
-"xcode_config_label")`. Pinned Bazel 9.2 source and offline positive/negative
-oracle support the finite declaration; focused Core/Loading and safe-lifetime
-same-DICE tests pass. The rebuilt authentic smoke clears the rules_swift
-row-56 Apple stop and reaches a distinct rules_rust/bazel_skylib
-`native.alias(visibility = None)` error. Two additional old whole-rule DICE
-tests failed during diagnostics and remain unresolved, not accepted as
-passing. Configured Apple/Xcode, default-label package edges, Swift actions,
-remote transport and M7A close remain deferred. WP811 was accepted at
-`580dee127`.
+WP813 admits `native.alias(visibility = None)` as omitted visibility in
+direct BUILD and loaded legacy-macro calls. Pinned Bazel 9.2 source and an
+offline public-default oracle distinguish None from explicit empty/private
+visibility; three focused/protected Slug tests pass. The rebuilt authentic
+smoke clears the bazel_skylib alias stop and reaches a separate rules_rust
+`constraint_setting(default_constraint_value)` failure for `wasi_version`.
+Other native rules, configured alias behavior, remote transport and M7A
+close remain deferred. WP812 was accepted at `c2a31c4bb`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

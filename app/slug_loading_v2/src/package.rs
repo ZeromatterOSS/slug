@@ -2972,6 +2972,16 @@ impl<'v> UnpackValue<'v> for UnpackVisibility {
     }
 }
 
+fn alias_visibility(value: Option<Value<'_>>) -> anyhow::Result<Option<UnpackVisibility>> {
+    let Some(value) = value.filter(|value| !value.is_none()) else {
+        return Ok(None);
+    };
+    UnpackVisibility::unpack_value(value)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?
+        .ok_or_else(|| anyhow::anyhow!("alias visibility must be a list or tuple"))
+        .map(Some)
+}
+
 pub(crate) fn package_context_label(
     base_package: &str,
     raw: &str,
@@ -9410,11 +9420,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn alias<'v>(
         name: &str,
         actual: Value<'v>,
-        visibility: Option<UnpackVisibility>,
+        visibility: Option<Value<'v>>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        alias_global(name, actual, visibility, eval)?;
+        alias_global(name, actual, alias_visibility(visibility)?, eval)?;
         PackageRecorder::from_evaluator(eval)?.set_native_overrides(name, kwargs)?;
         Ok(NoneType)
     }
@@ -10155,11 +10165,11 @@ fn native_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _native: Value<'v>,
         name: &str,
         actual: Value<'v>,
-        visibility: Option<UnpackVisibility>,
+        visibility: Option<Value<'v>>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        alias_global(name, actual, visibility, eval)?;
+        alias_global(name, actual, alias_visibility(visibility)?, eval)?;
         PackageRecorder::from_evaluator(eval)?.set_native_overrides(name, kwargs)?;
         Ok(NoneType)
     }

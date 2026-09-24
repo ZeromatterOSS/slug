@@ -1,150 +1,128 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-112-m7a-apple-configuration-field-declaration-r1
+Packet: WP-7-113-m7a-native-alias-none-visibility-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit the single Bazel 9.2 `configuration_field(fragment = "apple",
-name = "xcode_config_label")` declaration during ordinary `.bzl` initialization,
-including the private `attr.label` default in authenticated rules_swift 3.1.2
-`swift/toolchains/xcode_swift_toolchain.bzl:969-974`. The rebuilt authentic
-`slug build //:probe` must clear the registration-row-56 invalid-fragment
-stop. A later independently typed stop is acceptable. This packet does not
-claim the generated Xcode toolchain target, configured Swift, or M7A close.
+Admit explicit `visibility = None` on direct `alias(...)` and loaded `.bzl`
+`native.alias(...)` calls as omitted visibility. Authenticated bazel_skylib
+1.8.2 `lib/selects.bzl:177-184` passes `visibility=None` through
+`selects.config_setting_group` while rules_rust registration row 56 loads.
+The rebuilt authentic `slug build //:probe` must clear the current alias
+argument-type stop and may reach a separately typed later stop. This is a
+Loading-only packet, not configured alias resolution or M7A close.
 
-Exact Bazel 9.2 slice: the two-string `configuration_field` call recognizes
-`apple` and exactly `xcode_config_label` in `.bzl` initialization; the result
-is a late-bound label default acceptable in a private rule `attr.label`, not
-a plain Label or an implicit `fragments = ["apple"]` requirement. Unknown
-fragment, unknown Apple field and public-attribute forms reject. Existing
-BUILD-global absence and the already admitted C++, Coverage, Java and Proto
-fields remain protected. Slug-native: finite typed declaration identity,
-diagnostic text and tools-repository carrier. Unsupported/deferred: Bazel's
-load-phase default-label package/query edge, generated repository targets,
-configured Apple/Xcode option and label resolution, Apple fragment access,
-Swift analysis/actions, and any extension-invocation widening. The annotation
-default `//tools/objc:host_xcodes` and the command-option default
-`@bazel_tools//tools/cpp:host_xcodes` are different domains; do not conflate
-them or synthesize a configured value from either.
+Exact Bazel 9.2 slice: for the known alias `visibility` attribute, explicit
+`None` and omission both use the surrounding package/legacy-macro default;
+`None` is not an explicitly declared private or empty visibility. An explicit
+empty list is private; valid list/tuple visibility remains accepted, and a
+scalar string remains invalid. Unknown attributes, including `bogus=None`,
+remain errors. Slug-native: diagnostics, canonical visibility/label identity
+and output path bytes. Unsupported/deferred: other native rule classes or
+attributes receiving `None`, symbolic macro visibility, arbitrary iterable
+coercion, cross-repository policy beyond accepted mapping, configured target
+selection, actions and full rules_rust/Swift bootstrap.
 
 ## Source, owner and decision
 
 Pinned Bazel 9.2 HEAD `8220c6198837d5c13d53fea211cf3282aa12408a`:
-`BazelBuildApiGlobals.java:96-109` validates registered fragment then
-annotated field; `ConfiguredRuleClassProvider.java:825-835`,
-`ObjcRules.java:37-38` and `AppleConfigurationApi.java:25-30` register the
-`apple` fragment; `AppleConfiguration.java:320-326` declares the sole named
-field and its tools-repository default; `StarlarkLateBoundDefault.java:58-94`
-separates loading default and configured resolution.
-`StarlarkRuleImplementationFunctionsTest.java:3022-3144` covers unknown
-fragment/field, private-attribute restriction and no implicit Apple-fragment
-access. Authenticated Swift has one top-level Apple call at the cited source.
+`AttributeProvider.java:205-241` validates a known attribute name then skips
+an explicit Starlark `None` before conversion; `RuleFactory.java:303-324`
+uses that path for native rules. `BaseRuleClasses.java:228-237` gives alias
+its nonconfigurable visibility attribute, and `RuleVisibility.java:175-203`
+distinguishes an explicit empty list from inherited defaults. Bazel's
+`Target.java:166-176`/`Rule.java:674-687` own normal package-default
+inheritance. The authenticated bazel_skylib source hash is
+`df3e9b6a0eaf081103b8d11dee55abcb98db8532cd552d6f32205c3a3d3f54c0`.
 
-The existing one-byte `ConfigurationField` enum in
-`app/slug_configuration_v2/src/native/configuration_field.rs` is the sole
-retained field owner. Add one Apple variant and its finite parse/name branch;
-preserve one-byte layout, `Allocative`, Eq/Hash/Ord and the existing
-`ConfigurationFieldIdentity(field, tools_repository)` structural identity.
-The `subrule.rs` `.bzl` global already obtains the caller's source mapping;
-`package.rs` already freezes the typed private-label default. Do not add a
-string fallback, second registry, label parser, DICE key, cache, lock, source
-read, fragment declaration or new graph representation. Existing source and
-repository-mapping observations own A/B/A invalidation. Add an explicit
-`UnsupportedAppleConfigurationField` error before the configured projection
-falls through; every configured consumer must fail closed before dependency,
-toolchain or implementation work. This is a finite enum extension, not a new
-Buck2/V1 import; retain the Stage 9 compact typed-field pattern. No new
-per-command or service memory is retained beyond the existing one-byte field
-and existing identity, and no asynchronous owner changes.
+In Slug, both `alias` wrappers in
+`app/slug_loading_v2/src/package.rs:9410-9420,10154-10165` currently bind
+`visibility: Option<UnpackVisibility>`, whose list/tuple-only parser rejects
+`None` before `alias_global` runs. Normalize explicit `None` to omitted at
+these two call boundaries only, then reuse the existing `UnpackVisibility`
+parser for non-None values. `alias_global`, `PackageRecorder::alias`, and
+`visibility_source(..., PackageDefault)` already retain the correct fact;
+do not change them or the shared parser used by other rules. The package
+source/default and existing source-manifest/repository observations continue
+to own DICE equality and A/B/A invalidation; no new semantic input, key,
+cache, lock or retained value is added. Parsing is evaluator scratch and
+returns the existing borrowed/owned visibility arguments; package/DICE
+retention and release boundaries are unchanged.
 
 ## Evidence and validation
 
-Fresh offline Bazel 9.2 scratch at `/tmp/slug-wp812-apple-config-field`,
-with ignored RCs and disabled repository downloads, accepts a private
-`attr.label` default (`query --output=xml //:good`, exit 0) and shows
-`@bazel_tools//tools/objc:host_xcodes` as a rule input. Four isolated
-negative queries reject unknown fragment, unknown Apple field, public
-attribute and `attr.string` default (exit 7 each). The XML edge is an
-oracle discriminator, not an admitted Slug package/query edge. Pinned
-source/tests plus this oracle establish the bounded declaration claim; no
-new Stage 1 fixture is needed unless a specific gap is demonstrated.
+Offline Bazel 9.2 scratch `/tmp/slug-wp813-alias-visibility` used ignored RCs
+and disabled repository downloads. With a public package default, XML query
+accepts omitted and explicit-None aliases without a declared visibility
+element; explicit list/tuple public are public and `[]` is private.
+Cross-package builds for omitted/None/list/tuple public exit 0; the empty-list
+alias is rejected by visibility (exit 1). A scalar-string visibility query
+exits 7. A two-setting source-shaped bazel_skylib macro query exits 0 and
+selects the expected aliases under `dbg` and `opt` cquery. This discriminates
+None-as-omission from None-as-empty/private. Reuse this scratch and pinned
+source; no Stage 1 fixture unless a demonstrated gap requires it.
 
-Focused Core tests must check field/name round trip, one-byte layout,
-structural identity including different tools repositories, unknown names
-and explicit configured refusal. Loading tests must construct a source-shaped
-private rule, freeze and retain the typed field, test same-DICE source A/B/A
-and direct-evaluator tools-mapping A/B/A, and cover invalid/BUILD/public-attr
-controls; protect the existing Proto/C++ paths. Existing repository-mapping
-observation/invalidation ownership is unchanged; this packet does not claim a
-new same-DICE repository-mapping transition.
-Use pinned-nightly Cargo JSON `--no-run`, exact nonignored selector preflight
-and serial execution, plus named direct dependent compilation. Rebuild
-`slug_cli_v2` before a normalized-PATH authentic one-shot smoke; check/clean
-stale `slugd` before and after. Run Rust formatting, `git diff --check`,
-archive and plan-status checks. Obtain independent DESIGN review before the
-shared enum/error change and FINAL review of the actual diff and evidence.
-No broad suite or remote-service gate is selected; leave `~/.bazelrc` and
-BuildBuddy auth untouched.
+Add a focused Loading regression beside existing alias tests. Through both
+direct BUILD and a loaded `.bzl` legacy macro, compare omitted, explicit
+None, explicit `[]`, and explicit public list/tuple under a public package
+default; inspect retained visibility source/effective visibility and
+cross-package query or Loading visibility where available. Keep bad scalar,
+bad element, unknown-kwarg-None and malformed `actual` fail-closed controls.
+Use exact nonignored test preflight/serial execution after pinned-nightly Cargo
+JSON `--no-run`, plus one named direct Query/Analysis dependent compile if
+the retained visibility contract changes. Rebuild `slug_cli_v2` before the
+authentic normalized-PATH smoke; check/clean `slugd` before and after. Run
+Rust format, diff, archive and plan-status checks. Independent DESIGN review
+must precede implementation, with FINAL review of the diff/evidence. No broad
+suite or remote-service gate is selected; leave BuildBuddy auth untouched.
 
 ## Scope and stops
 
-Base clean main `580dee127`. Allowlist: this manifest, canonical Current
-paragraph, Stage 4 and Stage 9 owner updates after acceptance; production
-`app/slug_configuration_v2/src/native/{configuration_field,configuration}.rs`;
-focused tests in `app/slug_configuration_v2/src/native/tests.rs`,
-`app/slug_loading_v2/tests/{subrule_loading,bzl_invalidation}.rs` and the
-existing focused mapping test in
-`app/slug_loading_v2/src/host_package_load_tests.rs`. Approximate
-production/proof growth 35/120 lines is a review trigger, not a permission
-ceiling. The configuration owner is large but the new refusal branch stays
-within its sole projection owner; the very large Loading test module already
-owns the only direct-evaluator tools-mapping helper, so amend its adjacent
-Proto regression rather than add another framework or split it for one field.
-REPLAN if Bazel's observed value is not a
-late-bound label default, the field needs a new retained owner, the authentic
-stop requires configured Apple semantics, or current private-default
-retention cannot preserve the typed identity. Do not paper over the next
-independent stop.
+Base clean main `c2a31c4bb`. Allowlist: this manifest and canonical Current
+paragraph; Stage 4 owner update after acceptance; only
+`app/slug_loading_v2/src/package.rs` production and focused tests in
+`app/slug_loading_v2/tests/build_file_loading.rs` (or the adjacent existing
+Loading alias test owner if that is required for source-shaped macro proof).
+Approximate production/proof growth 25/110 lines is a review trigger. The
+large `package.rs` already owns both call wrappers and the shared recorder;
+two local signature conversions belong there, without splitting or modifying
+its many unrelated rule entrypoints. REPLAN if Bazel treats this `None` as an
+explicit visibility, if Slug's wrapper cannot preserve existing list/tuple
+and invalid-value validation without global parser widening, or if clearing
+the authentic stop needs configured/native-rule-family semantics. Do not
+paper over a new independent stop.
 
 ## Acceptance receipt
 
-Three independent DESIGN and FINAL reviews returned ACCEPT for the finite
-declaration boundary. The offline Bazel 9.2 positive query and four isolated
-negative queries distinguish the exact private `attr.label` constructor from
-unknown names, public attributes and wrong attribute kind. Pinned-nightly
-Cargo JSON `--no-run` compiled the Core library and Loading library plus both
-focused integration binaries without compiler errors. Exact nonignored
-preflight and serial execution passed: Core new field/identity/refusal 1/1;
-Swift-shaped Loading plus two protected tests 3/3; direct-evaluator Apple/Proto
-tools-mapping and frozen Proto recording 2/2; same-DICE Apple source
-Apple→C++→Apple owned-identity restoration 1/1. The new DICE test clones only
-the owned identity while the loaded package remains alive.
+Three independent DESIGN and FINAL reviews returned ACCEPT. Pinned Bazel
+9.2 source and offline scratch query/build/cquery distinguish known-alias
+explicit `None`/omitted package default from `[]` explicit private, accepted
+public list/tuple, rejected scalar, and the selected two-setting Skylib
+path. The two Slug wrappers alone now normalize explicit `None`; non-None
+values still pass the unchanged `UnpackVisibility` parser, then the existing
+recorder owns `PackageDefault` versus declared visibility. No new retained
+value, DICE dependency, cache, lock or imported utility was added.
 
-Two additional older `bzl_invalidation` selectors were run diagnostically and
-did not pass. `same_dice_subrule_descriptor_attachment_and_typed_producer_restore_semantics`
-segfaulted or panicked during panic formatting even after the attempted Apple
-case was removed. `same_dice_attribute_and_rule_output_edits_are_semantic_and_recreate_cleanly`
-failed its existing whole-rule equality assertion at line 2126. Source review
-identified a plausible frozen-value lifetime hazard in the former test's
-cloned-rule-outside-package pattern; a clean-base execution has not proved
-baseline status. These failures are unresolved and are neither acceptance
-evidence nor claimed passing. WP812 changes no C++/generic branch and its
-focused safe-lifetime same-DICE test passes; track the old tests separately.
-
-The rebuilt `slug_cli_v2` succeeds. A normalized-PATH authentic one-shot
-`slug build //:probe` clears the prior row-56 Apple configuration-field stop
-and reaches independent Loading failure in rules_rust → bazel_skylib
-`selects.bzl:178` on `native.alias(visibility = None)` (exit 2). No configured
-Apple/Xcode or remote transport was run. Pre/post-smoke `slugd` checks show no
-processes. Rust format, diff, archive and plan-status checks pass. The packet
-took roughly 19 minutes from selection through final review; the CLI build
-and authentic smoke took roughly 30 and 46 seconds respectively.
+Pinned-nightly Cargo JSON `--no-run` compiled the Loading integration binary
+with zero compiler errors after a bounded error-conversion compile correction.
+Exact nonignored preflight selected three tests; the new direct-BUILD and
+loaded-macro visibility matrix and two protected alias tests passed 3/3
+serially. The matrix covers bad scalar/element, unknown-kwarg-None and
+malformed-actual negatives. `cargo build -p slug_cli_v2` exits 0 before the
+normalized-PATH authentic one-shot smoke. That smoke clears the prior
+`native.alias(visibility = None)` failure and stops separately at
+`constraint setting defaults are unsupported: @@rules_rust+//rust/platform:wasi_version`
+(exit 2). No configured alias/action or remote-service test ran. Pre/post
+smoke `slugd` checks find no process; Rust format, diff, archive and plan
+status checks pass. Packet selection through final review took roughly
+thirteen minutes; the CLI build took about ten seconds and smoke about
+forty-eight seconds.
 
 ## Immediate predecessor
 
-WP811 accepted at `580dee127`: `apple_common.platform` ordinary structs
-clear the prior rules_swift table load. Three focused/protected tests,
-offline Bazel oracle and independent reviews pass. Structural behavior is
-exact within the packet; generic struct text remains Slug-native. The
-rebuilt authentic smoke reaches this Apple configuration-field declaration.
+WP812 accepted at `c2a31c4bb`: the typed Apple
+`configuration_field(xcode_config_label)` declaration clears the preceding
+rules_swift stop. Seven focused tests, offline Bazel oracle and independent
+reviews support its finite boundary. Two extra older whole-rule DICE tests
+failed diagnostically and remain unresolved, not passing evidence.

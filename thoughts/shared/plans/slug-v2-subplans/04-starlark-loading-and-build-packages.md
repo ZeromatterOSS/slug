@@ -9473,3 +9473,23 @@ authentic build clears the row-56 Apple-field error and reaches a separate
 rules_rust/bazel_skylib `native.alias(visibility = None)` Loading failure.
 Generated Xcode targets, Apple configuration, Swift analysis/actions and M7A
 close remain deferred.
+
+### Native alias explicit-None visibility accepted (2026-09-24)
+
+WP813 admits Bazel 9.2's known `alias` visibility attribute with explicit
+`None` as omission in direct BUILD and loaded legacy-macro `native.alias`
+calls. The two call wrappers normalize only this value before the existing
+list/tuple visibility parser; the unchanged recorder retains
+`VisibilitySource::PackageDefault`. An explicit empty list remains declared
+private, while explicit public lists/tuples remain declared public. Other
+native rule classes and symbolic-macro visibility are not admitted by this
+change. No retained semantic representation, DICE key, cache or lock changes.
+
+Pinned Bazel source, an offline public-package-default oracle and the
+authenticated bazel_skylib `selects.bzl` path support the finite boundary.
+The new direct/macro matrix and two protected alias tests pass, including
+bad-value, unknown-kwarg-None and malformed-actual controls. The rebuilt
+authentic build clears `native.alias(visibility = None)` and reaches a
+distinct rules_rust `constraint_setting(default_constraint_value)` stop for
+`@@rules_rust+//rust/platform:wasi_version`. Configured alias resolution,
+remote transport, full Rust rules and M7A close remain deferred.

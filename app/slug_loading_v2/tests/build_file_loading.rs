@@ -5187,6 +5187,115 @@ alias(name = "selected", actual = select({":a": ":left", ":b": ":right", "//cond
 }
 
 #[test]
+fn native_alias_none_visibility_inherits_package_default_in_build_and_macro() {
+    let workspace = scratch("native-alias-none-visibility");
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"def emit_aliases():
+    native.alias(name = "macro_omitted", actual = ":leaf")
+    native.alias(name = "macro_none", actual = ":leaf", visibility = None)
+    native.alias(name = "macro_empty", actual = ":leaf", visibility = [])
+    native.alias(name = "macro_list", actual = ":leaf", visibility = ["//visibility:public"])
+    native.alias(name = "macro_tuple", actual = ":leaf", visibility = ("//visibility:public",))
+
+def bad_visibility(value):
+    native.alias(name = "bad", actual = ":leaf", visibility = value)
+
+def bad_unknown():
+    native.alias(name = "bad", actual = ":leaf", bogus = None)
+"#,
+    )
+    .unwrap();
+    let build = package.join(BUILD_FILE_PRIMARY);
+    let build_prefix = r#"load(":defs.bzl", "emit_aliases", "bad_visibility", "bad_unknown")
+package(default_visibility = ["//visibility:public"])
+filegroup(name = "leaf")
+"#;
+    fs::write(
+        &build,
+        format!(
+            "{build_prefix}{}",
+            r#"alias(name = "direct_omitted", actual = ":leaf")
+alias(name = "direct_none", actual = ":leaf", visibility = None)
+alias(name = "direct_empty", actual = ":leaf", visibility = [])
+alias(name = "direct_list", actual = ":leaf", visibility = ["//visibility:public"])
+alias(name = "direct_tuple", actual = ":leaf", visibility = ("//visibility:public",))
+emit_aliases()
+"#
+        ),
+    )
+    .unwrap();
+    let loaded = load_package(&workspace, &package);
+    assert_eq!(loaded.default_visibility, RuleVisibility::Public);
+    for prefix in ["direct", "macro"] {
+        for suffix in ["omitted", "none"] {
+            let name = format!("{prefix}_{suffix}");
+            let target = loaded
+                .targets
+                .iter()
+                .find(|target| target.name == name)
+                .unwrap();
+            assert_eq!(
+                target.visibility,
+                VisibilitySource::PackageDefault,
+                "{name}"
+            );
+            assert_eq!(
+                loaded.effective_visibility(target),
+                Some(RuleVisibility::Public)
+            );
+        }
+        let name = format!("{prefix}_empty");
+        let target = loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap();
+        assert_eq!(
+            target.visibility,
+            VisibilitySource::Declared(RuleVisibility::Private)
+        );
+        assert_eq!(
+            loaded.effective_visibility(target),
+            Some(RuleVisibility::Private)
+        );
+        for suffix in ["list", "tuple"] {
+            let name = format!("{prefix}_{suffix}");
+            let target = loaded
+                .targets
+                .iter()
+                .find(|target| target.name == name)
+                .unwrap();
+            assert_eq!(
+                target.visibility,
+                VisibilitySource::Declared(RuleVisibility::Public),
+                "{name}"
+            );
+            assert_eq!(
+                loaded.effective_visibility(target),
+                Some(RuleVisibility::Public)
+            );
+        }
+    }
+
+    for invalid in [
+        "alias(name = 'bad', actual = ':leaf', visibility = '//visibility:public')",
+        "alias(name = 'bad', actual = ':leaf', visibility = [1])",
+        "alias(name = 'bad', actual = ':leaf', bogus = None)",
+        "alias(name = 'bad', actual = [':leaf'], visibility = None)",
+        "bad_visibility('//visibility:public')",
+        "bad_visibility([1])",
+        "bad_unknown()",
+    ] {
+        fs::write(&build, format!("{build_prefix}{invalid}\n")).unwrap();
+        assert!(try_load_package(&workspace, &package).is_err(), "{invalid}");
+    }
+}
+
+#[test]
 fn native_alias_rejects_invalid_loading_shapes_atomically() {
     let workspace = scratch("native-alias-invalid");
     fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
