@@ -1,129 +1,127 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-122-m7a-build-genrule-loading-r1
+Packet: WP-7-123-m7a-starlark-bool-rule-call-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit the authenticated protobuf v33.4 BUILD's one bare `genrule` at
-`@@protobuf+//:BUILD.bazel:654-661` as a Loading declaration. The rebuilt
-authentic `slug build //:probe` in `/tmp/slug-wp797-authentic-2YQmSt` must
-clear the missing-`genrule` stop; any later failure is separate. Exact Bazel
-9.2 slice: BUILD-only global, selected `name`, `srcs`, `outs`, `cmd` and
-`testonly` binding; bool or integer 0/1 conversion and `None` inheritance;
-package default and explicit override; canonical labels, output owner and
-generated-file publication. Slug-native: compact structural package identity
-and diagnostics. Unsupported/deferred: arbitrary genrule attributes or
-selectors, query/configured genrule projections, Make variables, actions,
-execution and exact Bazel configuration/output identity. An admitted Loading
-declaration does not claim a configured or executable genrule.
+Admit Bazel 9.2's direct integer 0/1 rule-call values for declared Boolean
+attributes of ordinary Starlark rules. The authenticated rules_license 1.0.0
+`_license` call at `@@rules_license+//rules:license.bzl:124-135` passes
+`testonly = 0`; the rebuilt authentic `slug build //:probe` in
+`/tmp/slug-wp797-authentic-2YQmSt` must clear that stop. Exact slice:
+direct scalar `False`/`True`/`0`/`1` binding for inherited `testonly` and
+ordinary `attr.bool` values, with 0/1 normalized to the retained Boolean
+and explicit provenance; 2, -1 and strings fail. Slug-native structural
+Loading identity and diagnostics remain. Unsupported/deferred here:
+integer-valued `select()` branches, rule initializers, native-rule Boolean
+overrides, `attr.bool(default=0/1)` (which Bazel itself rejects), built-in
+`testonly=None` inheritance and late `package()` default timing, configured
+effects not already admitted, and exact Bazel configuration/output identity.
+This packet does not claim all Boolean conversion contexts.
 
 ## Source, owner and decision
 
-Pinned Bazel 9.2 `BazelGenRuleRule.java:47-55` registers the rule,
-`GenRuleBaseRule.java:66-113` declares selected attributes,
-`BazelStarlarkEnvironment.java:245-264,275-302` distinguishes `.bzl`
-`native` members from bare BUILD globals, `BaseRuleClasses.java:66-74,264-267`
-provides inherited `testonly` with package default, and `Type.java:409-433`
-converts non-None bool or integer 0/1 only. The ignored-RC/offline Bazel 9.2
-oracle
-`/tmp/slug-wp822-genrule-9p-oracle` proves the selected bare call loads,
-publishes a generated output and builds; `testonly=1/0`, omitted package
-default, explicit `None` inheriting a later default, and explicit zero
-overriding a true package default discriminate the effective bit. Invalid
-`testonly=2`, string, malformed `srcs`/`cmd` fail. The authentic protobuf
-source uses `testonly=1`, one src, one output and a
-plain command; the following loaded `proto_library` consumes the output.
-No remote service, BuildBuddy credential or NativeLink is required by this
-Loading packet.
+Pinned Bazel 9.2 `StarlarkRuleClassFunctions.java:159-165` inherits
+`BaseRuleClasses.java:264-267` Boolean `testonly`;
+`RuleFactory.java:58-105`, `RuleClass.java:2057-2072`,
+`AttributeProvider.java:219-280`, `BuildType.java:165-208,226-249` and
+`Type.java:409-428` convert rule-call Boolean values from bool or exactly
+0/1. `StarlarkAttrModule.java:1078-1091` binds `attr.bool`'s declaration
+default as a Java Boolean before rule-call conversion. Authenticated
+rules_license `rules/license.bzl:32-66,124-135` defines and calls the private
+Starlark rule with `testonly=0`; sibling `rules/package_info.bzl:117` does
+likewise. Ignored-RC/offline Bazel 9.2 oracle
+`/tmp/slug-wp823-rule-bool-oracle` proves direct 0/1 and booleans for both
+inherited `testonly` and ordinary `attr.bool`, with the typed values visible
+in query XML and build implementation. Direct 2/string fail; Boolean
+constructor defaults of integer 0/1/2 fail earlier. The oracle also proves
+None and integer select branches, recorded as distinct deferred contexts
+rather than silently claimed.
 
-Slug already owns imported `native.genrule` through `PackageRecorder::genrule`
-and one `GenruleDeclaration` retained inside `PackageTargetKind`; it has
-generated-file publication and explicit Query/Analysis rejection. Add a
-BUILD-only callable to BUILD globals, reusing the recorder and coercion;
-do not place it in shared `package_globals` or expose a bare `.bzl` symbol.
-Extend the one declaration with a one-byte `Option<bool> testonly` staging
-value: an explicit bool/0/1 binds `Some`, omission or Starlark `None` stages
-`None`, and package finalization replaces every `None` with
-`Some(final package default)` before
-publication. Every retained genrule therefore has `Some(effective bool)`;
-the optional state does not survive as an unresolved inherited value. This
-also honors a `package()` declaration after a rule. No second
-attribute map, rule schema, synthetic query/configured carrier, DICE key,
-lock, cache or fallback. The immutable package value's existing structural
-equality and observed BUILD/loaded-source fingerprints own invalidation and
-A/B/A restoration; the evaluator and recorder remain attempt scratch and
-failed attempts publish no package. Existing `CompactString`, canonical
-labels, `Arc` slices and `Allocative` remain the compact representation;
-Stage 9's imported-genrule no-extraction decision applies. Although
-`package.rs` is large, its existing global binding and recorder are the
-single natural owner; splitting this one cold callable would add a second
-semantic path. No performance claim or benchmark for this cold path.
+Slug's `FrozenRuleDefinition::invoke` in `package.rs:8212-8280` routes an
+explicit value to `coerce_starlark_value`; the raw integer is then rejected
+by the shared `coerce_raw_value(Boolean)` branch. Normalize only direct
+scalar integer values at this Starlark rule-call boundary, before shared
+raw coercion. Do not widen `coerce_raw_value`: it also handles attribute
+definition defaults, selectors and rule initializer values. Keep existing
+`CoercedAttributeValue::Boolean`, `AttributeProvenance::Explicit`, frozen
+rule/schema and package structural equality. The observed BUILD and loaded
+source fingerprints already own DICE invalidation and A/B/A restoration;
+no key, lock, cache, representation, sidecar, evaluator borrow or new
+memory owner. Native/genrule call paths remain untouched. The large
+`package.rs` is the existing rule-call semantic owner; a small branch there
+is more cohesive than a separate coercion framework. This cold Loading
+conversion has no performance claim or benchmark.
 
 ## Evidence and validation
 
-Before production changes, turn the protected bare-BUILD negative into a
-selected source-shaped test that fails at the missing global on the base.
-Assert canonical src/output and generated owner, exact command and effective
-`testonly` true; explicit 0, omitted/None true package default (including a
-later `package()` call), and same-DICE default 0/1/0 and explicit 1/0/1
-restoration must discriminate retained equality/invalidation. Keep
-`.bzl` bare-global absence and invalid 2, string, malformed input,
-unsupported keyword and output-conflict negatives. Existing imported
-`native.genrule` positives/negatives and Query/Analysis fail-closed tests
-remain protected. Do not add a Stage 1 fixture; the temporary oracle is
-discriminating source evidence. Reuse accepted external-package loading and
-generated-owner tests.
+First add a source-shaped loaded `license` wrapper/rule test that fails
+on the unmodified branch at `testonly=0`, with a true package default set
+before the call so explicit false is discriminating. Add ordinary Boolean
+attribute direct 0/1 and existing bool controls; assert retained typed
+value/provenance and same-DICE 0/1/0 structural restoration. Reject 2,
+-1, string and integer `attr.bool(default=0)` without treating a failure
+in the wrong phase as proof. Preserve selected Boolean default, selector,
+native override, configured and Query tests; do not add a Stage 1 fixture.
+Reuse the offline Bazel oracle.
 
-Resolve pinned-nightly Cargo. Compile selected Loading and directly affected
-Query/Analysis test binaries with JSON `--no-run`; batch exact nonignored
-preflight selectors and run focused/protected tests serially. Direct Loading,
-Query, Analysis, Core and CLI compile and CLI rebuild precede one normalized
-`PATH` authentic smoke. That approximately 35-second smoke is necessary to
-prove transitive closure advancement that focused tests cannot establish.
-Check/clean `slugd` before and after. Rust format, diff, plan and archive
-checks are required. Independent DESIGN and FINAL review cover semantic
-identity, package default, BUILD-only scope and fail-closed consumers.
+Resolve pinned-nightly Cargo. Compile selected Loading and direct Query/
+Analysis dependent test binaries with JSON `--no-run`, batch exact nonignored
+preflight and run focused/protected tests serially. Direct Loading, Query,
+Analysis, Core and CLI compile and CLI rebuild precede one normalized-`PATH`
+authentic smoke. This about-35-second replay is necessary to prove
+transitive source closure advancement; focused tests cannot. Check/clean
+`slugd` before and after. Rust format, diff, plan and archive checks, and
+independent DESIGN and FINAL review of the context boundary are required.
 
 ## Scope and stops
 
-Base clean main `85c44c1f6`. Allowlist: this manifest, canonical Current,
-compact Stage 4/9 owner notes after acceptance; production
-`app/slug_loading_v2/src/package.rs`; selected tests in
-`app/slug_loading_v2/tests/build_file_loading.rs`, with a Query test literal
-update only if required by the retained-field extension. A focused Loading
-same-DICE test may live in existing host tests if the integration helper
-cannot discriminate restoration. Rough growth 50 production/85 proof lines
-is a review trigger, not permission to widen configured behavior. REPLAN if
-the oracle contradicts the selected binding, a package default cannot be
-retained structurally, `.bzl` isolation fails, or Query/Analysis cannot stay
-fail-closed. A later authentic error cannot expand this packet.
+Base clean main `51ded99c1`. Allowlist: this manifest, canonical Current
+and compact Stage 4 note after acceptance; production
+`app/slug_loading_v2/src/package.rs`; focused tests in
+`app/slug_loading_v2/tests/build_file_loading.rs` or existing
+`host_package_load_tests.rs`, plus a directly affected test only if needed.
+Rough growth 20 production/80 proof lines is a review trigger, not a license
+to change Boolean defaults, selectors or configured behavior. REPLAN if
+the oracle contradicts direct conversion, normalization cannot be isolated
+from constructor/default paths, or semantic equality/negative contexts
+cannot be preserved. A later authentic error cannot widen this packet.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviewers ACCEPT the one-declaration effective
-`testonly` representation and BUILD-only boundary. The selected source-shaped
-Loading test compiled on the base, passed exact preflight 1, then failed at
-`Variable genrule not found` (exit 101). Final pinned-nightly JSON `--no-run`
-compiled Loading, Query and Analysis test binaries; exact preflights selected
-5, 2 and 1 nonignored tests respectively, and all eight passed serially in
-under 0.1 second combined. Direct Loading/Query/Analysis/Core/CLI `cargo
-check` and the required CLI rebuild passed. The normalized-PATH authentic
-smoke (exit 2, about 34 seconds) clears protobuf's BUILD `genrule` and stops
-separately at `@@rules_license+//rules:license.bzl:124`, where a Starlark rule
-rejects `testonly = 0` as a non-bool. Pre/post checks found no `slugd`.
-Rust format, diff, plan and archive checks pass; no remote transport or
-BuildBuddy credentials were used. The 116 touched production and 148 proof
-lines exceed the rough 50/85-line trigger because the shared helper moves
-existing native coercion and the proofs separately cover source shape,
-late defaults, structural A/B/A and protected failures; final review accepted
-that proportionality. Packet wall time from the accepted predecessor through
-final review was about 25 minutes; Cargo preparation and the authentic smoke
-dominated test time.
+Independent DESIGN and FINAL reviewers ACCEPT the direct scalar rule-call
+boundary. The source-shaped loaded-license test compiled on the clean base,
+passed exact preflight 1, then failed (exit 101) at `_license(...testonly=0)`
+with `attribute must be a bool`. Final pinned-nightly JSON `--no-run` compiled
+Loading, Query and Analysis test binaries; exact preflights selected 4, 1
+and 1 nonignored tests, and all six passed serially (Loading under 0.03
+seconds, Query under 0.01, Analysis about 0.02). Direct Loading/Query/
+Analysis/Core/CLI `cargo check` and required CLI rebuild passed. The
+normalized-PATH authentic smoke (exit 2, about 41 seconds) clears the
+rules_license Boolean stop and next fails separately at
+`@@protobuf+//:BUILD.bazel:356` through rules_cc `cc_binary` because rule
+initializer input `copts` contains `select()`. Pre/post checks found no
+`slugd`; Rust format, diff, plan and archive checks pass. No remote
+transport or BuildBuddy credentials were used. The 23 touched production
+and 191 proof lines exceed the rough 20/80-line trigger because source
+shape, typed/default/negative contexts and independent same-DICE Boolean
+fields need separate proofs; final review accepted proportionality.
+
+An extra older `scalar_and_string_attr_descriptors_retain_typed_values`
+test was run but failed on its unchanged optional-label `None` provenance
+assertion (expected Explicit, actual Default). The existing ordinary-None
+filter yields Default on both base and candidate; the new direct-integer
+branch cannot reach that path. This is an unresolved preexisting
+inconsistency, not a WP823 pass or regression, and is not an acceptance
+gate. Packet wall time from predecessor acceptance through final review was
+about 18 minutes; Cargo preparation and the authentic smoke dominated
+test time.
 
 ## Immediate predecessor
 
-WP821 accepted at `85c44c1f6`: the typed proto-compiler Loading declaration
-and configured guard clear the protobuf `.bzl:81` stop; the rebuilt authentic
-smoke reaches this separate bare BUILD `genrule` stop. Five focused tests,
-direct checks, CLI rebuild, plan checks and independent reviews passed.
+WP822 accepted at `51ded99c1`: one BUILD-only bare genrule Loading
+declaration, effective inherited testonly and generated output owner.
+Eight focused/protected tests, direct checks and rebuilt authentic smoke
+cleared the protobuf BUILD stop and reached this separate rules_license
+Boolean coercion failure.

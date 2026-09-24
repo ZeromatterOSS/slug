@@ -5081,6 +5081,197 @@ fn imported_native_genrule_retains_selected_declaration_and_generated_outputs() 
     );
 }
 
+fn starlark_rule_attr<'a>(
+    loaded: &'a slug_loading_v2::LegacyLoadedPackage,
+    target: &str,
+    attribute: &str,
+) -> &'a slug_loading_v2::AttributeValue {
+    let PackageTargetKind::StarlarkRule(rule) = &loaded
+        .targets
+        .iter()
+        .find(|candidate| candidate.name == target)
+        .unwrap()
+        .kind
+    else {
+        panic!("{target} was not recorded as a Starlark rule")
+    };
+    rule.values()
+        .iter()
+        .find(|value| value.declaration_name == attribute)
+        .unwrap()
+}
+
+#[test]
+fn starlark_rule_license_wrapper_accepts_explicit_zero_testonly() {
+    let workspace = scratch("starlark-rule-license-zero-testonly");
+    let package = workspace.join("licenses");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("license.bzl"),
+        r#"
+def _license_impl(ctx):
+    return []
+
+_license = rule(implementation = _license_impl)
+
+def license(name):
+    _license(name = name, testonly = 0)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(':license.bzl', 'license')\npackage(default_testonly = True)\nlicense(name = 'subject')\n",
+    )
+    .unwrap();
+    let loaded = load_package(&workspace, &package);
+    let testonly = starlark_rule_attr(&loaded, "subject", "testonly");
+    assert_eq!(testonly.provenance, AttributeProvenance::Explicit);
+    assert_eq!(
+        testonly.value.as_ref(),
+        &CoercedAttributeValue::Boolean(false)
+    );
+}
+
+#[test]
+fn starlark_rule_boolean_calls_accept_direct_values_and_reject_other_contexts() {
+    let workspace = scratch("starlark-rule-boolean-direct");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    let defs = package.join("defs.bzl");
+    let build = package.join(BUILD_FILE_PRIMARY);
+    fs::write(
+        &defs,
+        "def _impl(ctx): return []\nprobe = rule(implementation = _impl, attrs = {'flag': attr.bool(default = False)})\n",
+    )
+    .unwrap();
+    fs::write(
+        &build,
+        concat!(
+            "load(':defs.bzl', 'probe')\n",
+            "probe(name = 'zero', flag = 0, testonly = False)\n",
+            "probe(name = 'one', flag = 1, testonly = True)\n",
+            "probe(name = 'bool_false', flag = False)\n",
+            "probe(name = 'bool_true', flag = True)\n",
+            "probe(name = 'omitted')\n",
+        ),
+    )
+    .unwrap();
+    let loaded = load_package(&workspace, &package);
+    for (target, expected) in [
+        ("zero", false),
+        ("one", true),
+        ("bool_false", false),
+        ("bool_true", true),
+    ] {
+        let flag = starlark_rule_attr(&loaded, target, "flag");
+        assert_eq!(flag.provenance, AttributeProvenance::Explicit);
+        assert_eq!(
+            flag.value.as_ref(),
+            &CoercedAttributeValue::Boolean(expected)
+        );
+    }
+    for (target, expected) in [("zero", false), ("one", true)] {
+        let testonly = starlark_rule_attr(&loaded, target, "testonly");
+        assert_eq!(testonly.provenance, AttributeProvenance::Explicit);
+        assert_eq!(
+            testonly.value.as_ref(),
+            &CoercedAttributeValue::Boolean(expected)
+        );
+    }
+    let omitted = starlark_rule_attr(&loaded, "omitted", "flag");
+    assert_eq!(omitted.provenance, AttributeProvenance::Default);
+    assert_eq!(
+        omitted.value.as_ref(),
+        &CoercedAttributeValue::Boolean(false)
+    );
+    for attribute in ["flag", "testonly"] {
+        for bad in ["2", "-1", "'1'"] {
+            fs::write(
+                &build,
+                format!("load(':defs.bzl', 'probe')\nprobe(name='bad', {attribute}={bad})\n"),
+            )
+            .unwrap();
+            let error = try_load_package(&workspace, &package)
+                .unwrap_err()
+                .to_string();
+            assert!(
+                error.contains("attribute must be a bool"),
+                "{attribute}={bad}: {error}"
+            );
+        }
+    }
+    fs::write(
+        &build,
+        "load(':defs.bzl', 'probe')\nprobe(name='bad', flag=select({'//conditions:default': 1}))\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("attribute must be a bool"), "{error}");
+
+    // The constructor default fails during .bzl evaluation, with no rule call.
+    fs::write(&build, "load(':defs.bzl', 'probe')\n").unwrap();
+    fs::write(
+        &defs,
+        "def _impl(ctx): return []\nprobe = rule(implementation = _impl, attrs = {'flag': attr.bool(default = 0)})\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("attribute must be a bool"), "{error}");
+}
+
+#[test]
+fn starlark_rule_boolean_direct_values_restore_on_same_dice() {
+    let workspace = scratch("starlark-rule-boolean-aba");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def _impl(ctx): return []\nprobe = rule(implementation = _impl, attrs = {'flag': attr.bool(default = False)})\n",
+    )
+    .unwrap();
+    let build = package.join(BUILD_FILE_PRIMARY);
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load = |flag: i32, testonly: i32| {
+        fs::write(
+            &build,
+            format!("load(':defs.bzl', 'probe')\nprobe(name='subject', flag={flag}, testonly={testonly})\n"),
+        )
+        .unwrap();
+        runtime
+            .block_on(load_package_with_retained_dice(&dice, &workspace, &package))
+            .unwrap()
+    };
+    let a = load(0, 0);
+    let flag_changed = load(1, 0);
+    let testonly_changed = load(0, 1);
+    let restored = load(0, 0);
+    let pair = |loaded: &slug_loading_v2::LegacyLoadedPackage| {
+        ["flag", "testonly"].map(|name| starlark_rule_attr(loaded, "subject", name).clone())
+    };
+    assert_eq!(
+        pair(&a).map(|value| value.value.as_ref().clone()),
+        [
+            CoercedAttributeValue::Boolean(false),
+            CoercedAttributeValue::Boolean(false),
+        ]
+    );
+    assert_ne!(pair(&a), pair(&flag_changed));
+    assert_ne!(pair(&a), pair(&testonly_changed));
+    assert_eq!(pair(&a), pair(&restored));
+    assert_ne!(a, flag_changed);
+    assert_ne!(a, testonly_changed);
+    assert_eq!(a, restored);
+}
+
 #[test]
 fn build_file_genrule_retains_protobuf_declaration_and_effective_testonly() {
     let workspace = scratch("build-file-genrule");

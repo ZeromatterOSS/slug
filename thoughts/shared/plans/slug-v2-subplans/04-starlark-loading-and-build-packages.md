@@ -9614,3 +9614,21 @@ Query and one Analysis protected tests, direct dependent checks and rebuilt
 authentic smoke support the Loading-only slice. The smoke advances past
 protobuf's `genrule` and next stops at `rules_license`'s Starlark-rule
 `testonly = 0` bool coercion; M7A remains partial.
+
+### Direct Starlark-rule Boolean call values accepted (2026-09-24)
+
+WP823 normalizes direct scalar 0/1 values for declared Boolean attributes
+at the ordinary Starlark rule-call boundary, including inherited `testonly`
+and user `attr.bool` attributes. The existing typed Boolean and explicit
+provenance stay in the structural package value; no DICE or representation
+change occurs. The shared raw coercer, `attr.bool` constructor defaults,
+integer-valued selector branches, initializer values, native overrides,
+built-in None inheritance and late package-default timing remain outside
+this exact slice. Pinned Bazel source/oracle, the pre-fix rules_license
+failure, three focused Loading tests, protected Query/Analysis tests, direct
+dependent checks and rebuilt authentic smoke support the scope. The smoke
+clears `rules_license`'s `testonly=0` and next stops separately at rules_cc's
+initializer input `copts` with `select()` in protobuf BUILD line 356.
+An older scalar-descriptor test still has an unrelated optional-label None
+provenance assertion inconsistent with the unchanged defaulting path; WP823
+neither fixes nor counts that test as passing. M7A remains partial.

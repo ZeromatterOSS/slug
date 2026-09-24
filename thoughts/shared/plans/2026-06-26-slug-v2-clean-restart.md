@@ -29,17 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-122-m7a-build-genrule-loading-r1
+Packet: WP-7-123-m7a-starlark-bool-rule-call-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP822 admits protobuf's one bare BUILD `genrule` as a bounded Loading
-declaration, with effective `testonly` finalized in the existing structural
-fact. Pinned Bazel 9.2 source/oracle, eight focused/protected tests and the
-rebuilt authentic smoke clear `@@protobuf+//:BUILD.bazel:654`. The next
-separate stop is a Starlark-rule `testonly = 0` bool-coercion failure at
-`@@rules_license+//rules:license.bzl:124`. Query/configured genrule and
-actions remain deferred; M7A remains partial. WP821 was accepted at
-`85c44c1f6`.
+WP823 admits direct integer 0/1 values for Boolean Starlark rule-call
+attributes, including rules_license's inherited `testonly = 0`, while
+preserving strict declaration defaults, selectors and initializer paths.
+Pinned Bazel 9.2 source/oracle, six focused/protected tests and rebuilt
+authentic smoke clear that Loading stop. The next separate failure is
+rules_cc's initializer input `copts` containing `select()` at
+`@@protobuf+//:BUILD.bazel:356`. An older optional-label None-provenance
+test remains inconsistent with unchanged code and is not counted as passed.
+M7A remains partial; WP822 was accepted at `51ded99c1`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

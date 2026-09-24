@@ -3959,6 +3959,27 @@ fn coerce_starlark_value(
     coerce_raw_value(RawLabelContext::Package(recorder), kind, &raw)
 }
 
+fn coerce_direct_starlark_rule_value(
+    recorder: &PackageRecorder,
+    kind: AttributeKind,
+    attribute_name: &str,
+    configurable: bool,
+    value: Value,
+) -> anyhow::Result<CoercedAttributeValue> {
+    // Bazel admits 0/1 for direct Boolean rule-call values. Keep this separate
+    // from attr.bool's strict definition-time default and shared raw paths.
+    if kind == AttributeKind::Boolean {
+        if let Some(value) = value.unpack_i32() {
+            return match value {
+                0 => Ok(CoercedAttributeValue::Boolean(false)),
+                1 => Ok(CoercedAttributeValue::Boolean(true)),
+                _ => anyhow::bail!("attribute must be a bool"),
+            };
+        }
+    }
+    coerce_starlark_value(recorder, kind, attribute_name, configurable, value)
+}
+
 fn coerce_selector_value<'v, V: ValueLike<'v>>(
     recorder: &PackageRecorder,
     kind: AttributeKind,
@@ -8266,7 +8287,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         }
                         Some(value) => (
                             AttributeProvenance::Explicit,
-                            coerce_starlark_value(
+                            coerce_direct_starlark_rule_value(
                                 recorder,
                                 declaration.kind,
                                 &declaration.name,
