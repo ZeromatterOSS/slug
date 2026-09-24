@@ -2780,6 +2780,17 @@ and fail-closed configured behavior. This no-extraction slice is accepted;
 the next authentic stop is Kotlin provider-callable hashability, not a change
 to retained configuration-field representation.
 
+WP821 extends the same adopted no-extraction representation with one appended
+`ProtoCompiler` discriminant. The one-byte enum, 32-byte field-plus-tools
+repository identity, frozen late-bound slices and structural equality/hash
+remain unchanged in shape; no Buck2/V1 code, string payload, map, interner,
+cache or DICE key is added. Configured proto resolution remains explicitly
+unsupported, and `proto_toolchain_for_j2objc` remains outside the admitted
+declaration set. Focused Core, Loading and Analysis proofs cover layout,
+source/mapping restoration and fail-before-dependency behavior; authentic
+protobuf Loading advances to a separate missing-`genrule` stop. This cold
+enum extension makes no memory or performance improvement claim.
+
 `WP-7-105-m7a-exported-provider-constructor-dict-keys-r1` reuses the
 existing `ProviderId` `Arc`/`Dupe` structural source-label/export-name
 identity, `CompactString`, Starlark hashing and Allocative coverage for both

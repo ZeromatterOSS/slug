@@ -1110,6 +1110,7 @@ impl SlugConfiguration {
             ConfigurationField::ProtoToolchainForJavaLite
                 | ConfigurationField::ProtoToolchainForJava
                 | ConfigurationField::ProtoToolchainForCc
+                | ConfigurationField::ProtoCompiler
         ) {
             return Err(SlugConfigurationError::UnsupportedProtoConfigurationField {
                 field: identity.field(),

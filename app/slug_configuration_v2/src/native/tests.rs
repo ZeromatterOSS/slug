@@ -991,6 +991,7 @@ mod command_configuration_tests {
                 "proto_toolchain_for_cc",
                 ConfigurationField::ProtoToolchainForCc,
             ),
+            ("proto_compiler", ConfigurationField::ProtoCompiler),
         ];
         assert!(ConfigurationField::is_fragment_name("proto"));
         assert_eq!(size_of::<ConfigurationField>(), 1);
@@ -1021,10 +1022,11 @@ mod command_configuration_tests {
         for name in ["not_a_field", "proto_toolchain_for_javalite"] {
             assert_eq!(ConfigurationField::from_starlark_names("proto", name), None);
         }
-        // These are valid Bazel 9.2 annotations, deliberately deferred here.
-        for name in ["proto_compiler", "proto_toolchain_for_j2objc"] {
-            assert_eq!(ConfigurationField::from_starlark_names("proto", name), None);
-        }
+        // This valid Bazel 9.2 annotation remains deliberately deferred.
+        assert_eq!(
+            ConfigurationField::from_starlark_names("proto", "proto_toolchain_for_j2objc"),
+            None
+        );
 
         let identity = |field, tools| {
             ConfigurationFieldIdentity::new(field, CanonicalRepoName::new(tools).unwrap())
@@ -1040,6 +1042,10 @@ mod command_configuration_tests {
         assert_eq!(hash(&first), hash(&restored));
         assert_ne!(first, identity(selected[1].1, "bazel_tools+"));
         assert_ne!(first, identity(selected[0].1, "bazel_tools+next"));
+        let compiler = identity(ConfigurationField::ProtoCompiler, "bazel_tools+");
+        for (_, field) in selected.iter().take(3) {
+            assert_ne!(compiler, identity(*field, "bazel_tools+"));
+        }
     }
 
     #[test]

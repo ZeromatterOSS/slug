@@ -29,16 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-120-m7a-config-exec-positional-group-r1
+Packet: WP-7-121-m7a-proto-compiler-configuration-field-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP820 admits one positional `config.exec` argument using the already-retained
-default or named execution-group transition. Pinned Bazel 9.2 source and an
-offline platform discriminator establish positional/named equivalence; the
-focused Loading and protected Analysis tests pass, and rebuilt authentic
-smoke clears the rules_python call. The next independent stop is protobuf's
-`configuration_field("proto", "proto_compiler")`. WP819 was accepted at
-`a3fa5107c`; broader configuration identity and M7A close remain deferred.
+WP821 admits protobuf's eagerly constructed
+`configuration_field("proto", "proto_compiler")` private label default as a
+typed Loading fact, with configured proto resolution explicitly fail-closed.
+Pinned Bazel 9.2 source/oracle, five selected tests and rebuilt authentic
+smoke clear that stop; the next independent failure is missing `genrule` in
+`@@protobuf+//:BUILD.bazel:654`. WP820 was accepted at `e1b48a978`.
+Configured proto options, legacy proto toolchains and M7A close remain
+deferred.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

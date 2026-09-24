@@ -36509,9 +36509,15 @@ fn proto_and_apple_configuration_fields_retain_private_defaults_and_tools_mappin
 def _aspect_impl(target, ctx): return []
 def _if_legacy_toolchain(attrs): return {}
 DISCARDED = _if_legacy_toolchain({
-    "_unused": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java_lite")),
+    "_proto_compiler": attr.label(
+        cfg = "exec",
+        executable = True,
+        allow_files = True,
+        default = configuration_field("proto", "proto_compiler"),
+    ),
 })
 FIELDS = aspect(implementation = _aspect_impl, attrs = {
+    "_compiler": attr.label(cfg = "exec", executable = True, allow_files = True, default = configuration_field("proto", "proto_compiler")),
     "_lite": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java_lite")),
     "_java": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java")),
     "_cc": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_cc")),
@@ -36538,7 +36544,7 @@ FIELDS = aspect(implementation = _aspect_impl, attrs = {
             .unwrap()
             .downcast::<FrozenAspectDefinition>()
             .unwrap();
-        assert_eq!(aspect.late_bound_attributes.len(), 4);
+        assert_eq!(aspect.late_bound_attributes.len(), 5);
         aspect
             .late_bound_attributes
             .iter()
@@ -36567,12 +36573,16 @@ FIELDS = aspect(implementation = _aspect_impl, attrs = {
     )
     .unwrap();
     let first = retained(&first);
+    let same_mapping_other_source = retained(&same_mapping_other_source);
+    let remapped = retained(&remapped);
+    let restored = retained(&restored);
     assert_eq!(
         first
             .iter()
             .map(|identity| identity.field().field_name())
             .collect::<Vec<_>>(),
         [
+            "proto_compiler",
             "proto_toolchain_for_java_lite",
             "proto_toolchain_for_java",
             "proto_toolchain_for_cc",
@@ -36580,11 +36590,11 @@ FIELDS = aspect(implementation = _aspect_impl, attrs = {
         ]
     );
     assert!(
-        first[..3]
+        first[..4]
             .iter()
             .all(|identity| identity.field().fragment_name() == "proto")
     );
-    assert_eq!(first[3].field().fragment_name(), "apple");
+    assert_eq!(first[4].field().fragment_name(), "apple");
     assert!(
         first
             .iter()
@@ -36592,9 +36602,21 @@ FIELDS = aspect(implementation = _aspect_impl, attrs = {
     );
     assert_ne!(first[0], first[1]);
     assert_ne!(first[1], first[2]);
-    assert_eq!(first, retained(&same_mapping_other_source));
-    assert_ne!(first, retained(&remapped));
-    assert_eq!(first, retained(&restored));
+    assert_eq!(first, same_mapping_other_source);
+    assert_ne!(first, remapped);
+    assert_eq!(first, restored);
+    let identity_hash = |identity: &slug_configuration_v2::ConfigurationFieldIdentity| {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        std::hash::Hash::hash(identity, &mut hasher);
+        std::hash::Hasher::finish(&hasher)
+    };
+    assert_ne!(identity_hash(&first[0]), identity_hash(&first[1]));
+    assert_eq!(
+        identity_hash(&first[0]),
+        identity_hash(&same_mapping_other_source[0])
+    );
+    assert_ne!(identity_hash(&first[0]), identity_hash(&remapped[0]));
+    assert_eq!(identity_hash(&first[0]), identity_hash(&restored[0]));
 
     assert!(
         eval_global(
@@ -36613,17 +36635,15 @@ FIELDS = aspect(implementation = _aspect_impl, attrs = {
         missing.contains("invalid configuration field name 'missing' on fragment 'proto'"),
         "{missing}"
     );
-    // Bazel admits these names; Slug deliberately leaves them unsupported.
-    for name in ["proto_compiler", "proto_toolchain_for_j2objc"] {
-        assert!(
-            eval_bzl_with_identity(
-                &format!("X = configuration_field(fragment = 'proto', name = '{name}')"),
-                owner("@@protobuf+//bazel/private:probe.bzl", "bazel_tools+one"),
-            )
-            .is_err(),
-            "{name} must stay outside the selected Slug slice"
-        );
-    }
+    // Bazel admits this name; Slug deliberately leaves it unsupported.
+    assert!(
+        eval_bzl_with_identity(
+            "X = configuration_field(fragment = 'proto', name = 'proto_toolchain_for_j2objc')",
+            owner("@@protobuf+//bazel/private:probe.bzl", "bazel_tools+one"),
+        )
+        .is_err(),
+        "proto_toolchain_for_j2objc must stay outside the selected Slug slice"
+    );
     let error = eval_bzl_with_identity(
         "def impl(ctx): return []\nPUBLIC = rule(implementation = impl, attrs = {'late': attr.label(default = configuration_field(fragment = 'proto', name = 'proto_toolchain_for_java_lite'))})",
         owner("@@protobuf+//bazel/private:probe.bzl", "bazel_tools+one"),
@@ -36638,6 +36658,7 @@ async fn proto_configuration_fields_survive_frozen_rule_package_recording() {
     const BUILD: &[u8] = b"load(':defs.bzl', 'RULE')\nRULE(name = 'subject', visibility = ['//visibility:public'])\n";
     const DEFS: &[u8] = br#"def _impl(ctx): return []
 RULE = rule(implementation = _impl, attrs = {
+    "_compiler": attr.label(cfg = "exec", executable = True, allow_files = True, default = configuration_field("proto", "proto_compiler")),
     "_lite": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java_lite")),
     "_java": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java")),
     "_cc": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_cc")),
@@ -36658,6 +36679,7 @@ RULE = rule(implementation = _impl, attrs = {
     assert_eq!(
         rule.late_bound_rule_attributes().collect::<Vec<_>>(),
         [
+            ("_compiler", "proto_compiler"),
             ("_lite", "proto_toolchain_for_java_lite"),
             ("_java", "proto_toolchain_for_java"),
             ("_cc", "proto_toolchain_for_cc"),
@@ -36669,6 +36691,11 @@ RULE = rule(implementation = _impl, attrs = {
         };
         assert_eq!(identity.field().fragment_name(), "proto");
         assert_eq!(identity.tools_repository().as_str(), "bazel_tools");
+        if attribute.name() == "_compiler" {
+            assert_eq!(identity.field().field_name(), "proto_compiler");
+            assert!(attribute.executable());
+            assert!(attribute.exec_configuration());
+        }
     }
 }
 

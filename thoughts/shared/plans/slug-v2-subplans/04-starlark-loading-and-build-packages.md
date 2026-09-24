@@ -9583,3 +9583,18 @@ rebuilt authentic smoke support this call-binding slice. The smoke clears
 rules_python's `config.exec(value)` and next fails separately at protobuf's
 `configuration_field("proto", "proto_compiler")`. Broader configuration
 identity and M7A close remain deferred.
+
+### Proto compiler field declaration accepted (2026-09-24)
+
+WP821 appends Bazel 9.2's `proto_compiler` to the existing one-byte closed
+`ConfigurationField` and accepts it in `.bzl` Loading and private label
+defaults. The field plus tools-repository identity freezes in existing rule
+and package late-bound slices; no new DICE key, collection, cache or lock is
+added. The configured resolver explicitly rejects it before dependency,
+toolchain or implementation activation. This is declaration parity only:
+Bazel's option-backed default and `--proto_compiler` override, plus legacy
+proto toolchains, are not Slug configured claims. `proto_toolchain_for_j2objc`
+remains deferred. Pinned Bazel source/oracle, five focused/protected tests
+and a rebuilt authentic smoke support this slice. The smoke clears the field
+error and stops separately at missing `genrule` in
+`@@protobuf+//:BUILD.bazel:654`; M7A remains partial.

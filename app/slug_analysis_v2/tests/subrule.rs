@@ -907,6 +907,30 @@ java_rule = rule(
     epoch
 }
 
+fn proto_compiler_field_epoch() -> Epoch {
+    let mut epoch = Epoch::fixture();
+    epoch.package("rules", "");
+    epoch.file(
+        "/workspace/rules/proto.bzl",
+        r#"FIELD = configuration_field("proto", "proto_compiler")
+def _impl(ctx): fail("Proto implementation ran")
+proto_rule = rule(
+    implementation = _impl,
+    attrs = {
+        "_dependency": attr.label(default = "//deps:must_not_activate"),
+        "_proto": attr.label(default = FIELD, cfg = "exec"),
+    },
+    toolchains = ["//toolchains:must_not_activate"],
+)
+"#,
+    );
+    epoch.package(
+        "subject",
+        "load('//rules:proto.bzl', 'proto_rule')\nproto_rule(name = 'proto')\n",
+    );
+    epoch
+}
+
 fn high_count_invocation_epoch(count: usize) -> Epoch {
     let mut defs = String::from("def _call(ctx, value): return value\n");
     for index in 0..count {
@@ -1669,6 +1693,36 @@ async fn java_configuration_fields_fail_before_dependency_toolchain_or_implement
         }
         assert_eq!(errors[0], errors[2], "{route:?}: A/B/A did not restore");
         assert_ne!(errors[0], errors[1], "{route:?}: Java fields collapsed");
+    }
+}
+
+#[tokio::test]
+async fn proto_compiler_field_fails_before_dependency_toolchain_or_implementation() {
+    for route in [AnalysisRoute::Legacy, AnalysisRoute::Observed] {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(Tracker::default());
+        let error = analyze(
+            &dice,
+            proto_compiler_field_epoch().build(),
+            "@@//subject:proto",
+            configuration(None),
+            tracker.clone(),
+            route,
+        )
+        .await;
+        assert!(
+            error.contains("configuration_field(fragment = \"proto\", name = \"proto_compiler\") configured resolution is unsupported"),
+            "{route:?}: {error}"
+        );
+        assert!(!error.contains("Proto implementation ran"), "{error}");
+        assert!(
+            tracker.0.lock().unwrap().iter().all(|(label, _, _)| {
+                !label.contains("must_not_activate")
+                    && !label.starts_with("@@//deps:")
+                    && !label.starts_with("@@//toolchains:")
+            }),
+            "{route:?}: downstream configured analysis activated"
+        );
     }
 }
 

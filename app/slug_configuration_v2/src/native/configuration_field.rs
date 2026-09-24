@@ -128,6 +128,7 @@ pub enum ConfigurationField {
     ProtoToolchainForJava,
     ProtoToolchainForCc,
     AppleXcodeConfigLabel,
+    ProtoCompiler,
 }
 
 impl ConfigurationField {
@@ -173,6 +174,7 @@ impl ConfigurationField {
                 "proto_toolchain_for_java_lite" => Some(Self::ProtoToolchainForJavaLite),
                 "proto_toolchain_for_java" => Some(Self::ProtoToolchainForJava),
                 "proto_toolchain_for_cc" => Some(Self::ProtoToolchainForCc),
+                "proto_compiler" => Some(Self::ProtoCompiler),
                 _ => None,
             },
             "apple" => (name == "xcode_config_label").then_some(Self::AppleXcodeConfigLabel),
@@ -192,7 +194,8 @@ impl ConfigurationField {
             }
             Self::ProtoToolchainForJavaLite
             | Self::ProtoToolchainForJava
-            | Self::ProtoToolchainForCc => "proto",
+            | Self::ProtoToolchainForCc
+            | Self::ProtoCompiler => "proto",
             Self::AppleXcodeConfigLabel => "apple",
             _ => "cpp",
         }
@@ -206,6 +209,7 @@ impl ConfigurationField {
             Self::ProtoToolchainForJavaLite => return "proto_toolchain_for_java_lite",
             Self::ProtoToolchainForJava => return "proto_toolchain_for_java",
             Self::ProtoToolchainForCc => return "proto_toolchain_for_cc",
+            Self::ProtoCompiler => return "proto_compiler",
             Self::AppleXcodeConfigLabel => return "xcode_config_label",
             _ => {}
         }
@@ -235,7 +239,8 @@ impl ConfigurationField {
             | Self::ProtoToolchainForJavaLite
             | Self::ProtoToolchainForJava
             | Self::ProtoToolchainForCc
-            | Self::AppleXcodeConfigLabel => return None,
+            | Self::AppleXcodeConfigLabel
+            | Self::ProtoCompiler => return None,
         })
     }
 
