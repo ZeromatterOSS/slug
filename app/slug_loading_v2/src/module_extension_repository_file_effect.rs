@@ -2120,15 +2120,17 @@ def setup_vc_env_vars(*args, **kwargs):
 "#;
     const TEMPLATE_RULE_FIXTURE: &str = r#"def _cc_configure_impl(ctx):
     ctx.file("before", "terminal", executable = False)
-    source = ctx.path(Label("//cc/private/toolchain:BUILD.toolchains.tpl"))
     print("before-template")
-    ctx.template("BUILD", source, {"%{name}": "%{cpu}", "%{cpu}": "k8"})
-    ctx.template("COPY", source, {"%{name}": "arm"}, executable = False)
+    ctx.template("BUILD", ctx.attr._template, {"%{name}": "%{cpu}", "%{cpu}": "k8"})
+    ctx.template("COPY", ctx.path(ctx.attr._template), {"%{name}": "arm"}, executable = False)
     read = ctx.read(Label("//cc/private/toolchain:READ.source"))
     ctx.file("READ", read + ctx.read(Label("//cc/private/toolchain:READ.source")), executable = False)
     ctx.template("READ_COPY", ctx.path(Label("//cc/private/toolchain:READ.source")), executable = False)
 
-cc_configure = repository_rule(implementation = _cc_configure_impl)
+cc_configure = repository_rule(
+    implementation = _cc_configure_impl,
+    attrs = {"_template": attr.label(default = "//cc/private/toolchain:BUILD.toolchains.tpl")},
+)
 "#;
     const TEMPLATE_PATH: &str = "cc/private/toolchain/BUILD.toolchains.tpl";
     const TEMPLATE_A: &[u8] = b"toolchain=%{name}\nraw=\xff\n";

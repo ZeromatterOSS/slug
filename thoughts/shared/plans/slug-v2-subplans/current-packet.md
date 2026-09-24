@@ -1,139 +1,147 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-106-m7a-private-repository-label-list-default-r1
+Packet: WP-7-107-m7a-direct-label-repository-template-source-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit the source-authentic rules_kotlin 1.9.6 repository-rule declaration
-`_capabilities_templates: attr.label_list(default = _CAPABILITIES_TEMPLATES.values())`
-in authenticated BCR `compiler.bzl:76-79`. Its eight ordered label defaults must be
-retained in the frozen repository-rule definition, visible through
-`repository_ctx.attr._capabilities_templates`, and distinct in structural
-definition identity when changed. The rebuilt normalized-PATH authentic
-`slug build //:probe` must pass its current unsupported-schema stop; a later
-independently typed stop is acceptable. Full repository execution/effects, Kotlin
-analysis/actions, target success and M7A close are not claimed.
+Admit a direct typed `Label` as the source argument of the already accepted
+bounded `repository_ctx.template` method when it names a canonical external
+repository file. The authenticated rules_kotlin 1.9.6 capabilities repository
+passes private attr.label defaults and a selected private attr.label_list
+element directly to three ordered template calls in `compiler.bzl:25-42`;
+the rebuilt normalized-PATH authentic `slug build //:probe` must pass its
+current `repository_ctx.template invocation is unsupported` stop. A later
+independently typed stop is acceptable. Complete generated repository
+success, Kotlin analysis/actions and M7A close are not claimed.
 
-Exact Bazel 9.2 slice: private `attr.label_list` declaration with ordinary
-typed label defaults from a sequence, including `dict.values()`; default
-elements resolve in the defining `.bzl` package and keep
-sequence order; the public Starlark `_name` exposes defaults and concrete
-overrides through `repository_ctx.attr`. Malformed element types, malformed
-labels and a raw dictionary instead of a sequence fail at declaration.
-Slug-native: canonical-label structural tokens, repository-rule projection
-and source-fingerprint/DICE equality. Unsupported/deferred: Bazel's native
-`$name` private representation, cross-repository caller mapping, attached
-aspects and other lossy/deferred repository schemas, full repository effects
-and configured Kotlin semantics.
-An attached aspect on the newly admitted private list must fail closed, not
-be silently discarded. Bazel's acceptance of such a declaration is known;
-Slug does not claim parity for its aspect semantics.
+Exact Bazel 9.2 slice: a direct Label template source follows Bazel's
+`getPath(template)` source path/package validation before file read, then
+uses the existing accepted destination, default/explicit executable mode,
+insertion-ordered literal Latin-1 substitution, and output byte behavior.
+For the source-authentic calls, the destination is a normalized relative
+string, the Label belongs to a canonical external repository, and explicit
+`executable=False` is retained. The Label package must exist, but its file
+need not be a declared target. Slug-native: lexical/materialized absolute
+path tokens, bounded evaluator retries, canonical route observations and
+structural effect-plan identity. Unsupported/deferred: root/built-in,
+self-generated, raw string and non-Label path sources beyond the already
+accepted `path(Label)` slice; explicit watch modes, arbitrary template
+sizes/encodings, broader repository effects and configured Kotlin semantics.
 
 ## Source, owner and decision
 
-The authenticated selected BCR rules_kotlin source
-`src/main/starlark/core/repositories/compiler.bzl:56-88` declares eight
-ordered Kotlin capabilities templates and passes
-`ctx.attr._capabilities_templates` to `_get_capability_template` before
-`repository_ctx.template`. Pinned Bazel 9.2
-`StarlarkRepositoryModule.java:80-91` builds the repository descriptor;
-`StarlarkAttrModule.java:375-378` converts the label-list default with the
-defining `.bzl` label converter (`LabelConverter.java:35-44`).
-`AttributeValueSource.java:23-71` maps private `_x` to native `$x`;
-`RepoDefinition.java:42-60` exposes the declared default under `_x` in
-`repository_ctx.attr`, while `RepoRule.java:107-115` keeps explicit call
-overrides separately. A Bazel 9.2 offline scratch oracle at
-`/tmp/slug-wp806-label-list-default`, with fresh output base and
-`--ignore_all_rc_files`, observes ordered private defaults from
-`dict.values()`, a tuple and a list of Labels, including `:local` resolution
-in the defining `.bzl` package. The scratch does not distinguish a different
-caller repository mapping. Separate malformed defaults reject a raw
-dict, an integer element and an invalid label. A separate aspect control
-confirms Bazel accepts a private label-list aspect declaration; this packet
-explicitly defers that semantics. These checks select bounded
-declaration/default behavior, not arbitrary repository execution.
+The authenticated selected BCR rules_kotlin 1.9.6
+`src/main/starlark/core/repositories/compiler.bzl:18-42` writes `WORKSPACE`,
+then uses direct Labels for ordered `BUILD.bazel`, `artifacts.bzl` and
+`capabilities.bzl` template effects, all nonexecutable. The first has one
+`$git_repo$` substitution; the others have none. The defaults and selected
+capabilities Label are at `compiler.bzl:44-88`; the authenticated Bzlmod
+default compiler 1.9.23 selects the 1.9 capabilities file. All three
+template sources are below Slug's existing 2 MiB limit. Pinned Bazel 9.2
+`StarlarkRepositoryContext.java:258-359` calls `getPath` on destination and
+source, observes the source, applies literal replacements in dict order and
+writes output bytes; `StarlarkBaseExternalContext.java:2353-2379` resolves a
+Label path through package lookup and external materialization, and
+`RepositoryUtils.java:53-72` requires a package but not a declared target.
+`StarlarkRepositoryIntegrationTest.java:126-154` and
+`starlark_repository_test.sh:459-470,777-800,1076-1100` cover direct
+Label sources, source edits and executable mode. A Bazel 9.2 offline
+scratch oracle at `/tmp/slug-wp807-template-Pxwnp9`, run with
+`--ignore_all_rc_files` and download disabled, confirms a direct
+`ctx.attr.template` Label into nested destinations, insertion-ordered
+forward/reverse substitutions, the Kotlin `$git_repo$` token and explicit
+false/default true executable modes. A cross-repository local-path-override
+case resolves `@@producer+//templates:source.tpl` and produces identical
+bytes/mode in two fresh output bases. Missing source, non-string map keys or
+values, invalid executable, destination and source types fail separately.
+The scratch stays outside this checkout and proves no general repository
+effects or watch-mode parity. Existing accepted path-wrapped template
+evidence remains the control.
 
-`app/slug_loading_v2/src/package.rs` is the declaration gate owner: its
-existing `repository_rule_default_matches` already accepts a typed
-`CoercedAttributeValue::LabelList`, while the private-kind allowlist alone
-rejects it. Admit `AttributeKind::LabelList` there, with an explicit
-`attached_aspect.is_some()` rejection for this newly admitted private kind:
-`RepositoryRuleAttribute` does not retain that field. Keep all other schema
-guards intact. The existing source-backed label coercion, ordered
-`RepositoryRuleAttribute.default`, frozen
-`RepositoryRuleDefinitionProjection`, call record, instantiation validation
-and `repository_ctx.attr` allocation own the resulting values. Do not add a
-second default map, identity, cache, DICE key, lock or bypass. The existing
-Loading source/recursive-manifest observations own invalidation and A/B/A
-restoration; the default stays in the immutable projection, not a call-site
-override-only `RepoSpec`. `package.rs` is large but this is one local guard
-in its established declaration owner; a split would fragment the bounded
-schema check without removing a second responsibility.
+`app/slug_loading_v2/src/repository_rule_context.rs` is the sole intake
+owner. Its template method currently requires a `RepositoryStarlarkPath`
+from `ctx.path(Label)` and rejects the direct `StarlarkLabel` before any
+source observation. Derive the existing owned `RepositoryLabelPathAddress`
+from a direct Label as well as the admitted path wrapper. For the direct
+Label, reject an address whose canonical repository equals the invocation's
+`generated_repository` before any Need, preventing self-materialization
+through its own file-effect key. Otherwise request `LabelPathNeed` before
+`RepositorySourceNeed`, reusing the existing retry driver and the accepted
+containing-package/materialization owner. Keep the current external-root
+guard, substitution limits,
+source-byte read, generated-file effect, call order and terminal-attempt
+publication. Do not introduce a second source resolver, retained effect,
+cache, DICE key, lock or fallback. The existing
+`HostRepositoryLabelPathObservationKey` and canonical route/source-read keys
+own package/materialization, exact file bytes, Need/error and A/B/A
+invalidation; the immutable ordered `GeneratedRepositoryFileEffectPlan`
+remains sole output path/content/mode identity. Each retry drops evaluator
+state before DICE awaits. New address and substitution values are invocation
+scratch only, bounded by existing limits; no extra retained or clone-heavy
+representation is selected. The large `repository_rule_context.rs` remains
+cohesive because the change is one source-intake branch beside its existing
+template method, not a second effect executor.
 
 ## Evidence and validation
 
-Update the obsolete private-list rejection in the repository-rule definition
-matrix, preserving private-bool and unrelated schema negatives. Add a
-source-shaped frozen declaration/call test with an ordered eight-label
-`dict.values()` default from an external defining `.bzl` context, exact
-ordered canonical-label assertions, concrete override, default A/B/A identity and a
-changed-order/changed-element distinction. Add a private-list
-`repository_ctx.attr` test for default and override order and typed Labels;
-retain existing public-list and private string/label protections. Add a
-negative attached-aspect descriptor and malformed default checks. Reuse the
-offline scratch oracle; no Stage 1 fixture is selected unless a focused
-regression demonstrates a missing discriminator. Scratch artifacts stay
-outside this checkout. No `~/.bazelrc` contents, BuildBuddy credentials,
+Extend the focused context test to discriminate direct Label path Need,
+prepared path then source Need, terminal output bytes/mode and unchanged
+`ctx.path(Label)` and non-Label-path controls. In the existing observed DICE
+template fixture, convert one source call to direct Label while keeping one
+path-wrapped control; reuse its route/materialization/source-read, warm reuse,
+A/B/A byte restoration and terminal-effect assertions. Include root and
+same-generated-repository direct-Label fail-closed controls, plus
+unprepared/missing-source controls where the existing tests do
+not already distinguish them. Reuse accepted path-wrapped Bazel/Slug
+evidence; the direct-Label scratch oracle discriminates this new intake.
+No Stage 1 fixture is selected unless focused proof exposes a gap. Scratch
+stays outside the checkout. No `~/.bazelrc` contents, BuildBuddy credentials,
 remote transport or NativeLink enter this Loading packet.
 
 Resolve pinned Cargo/rustc from `rust-toolchain`; compile Loading library
 tests with Cargo JSON `--no-run`, preflight exact nonignored selectors, and
 run selected tests serially. Rebuild `slug_cli_v2` before the authentic
 normalized-PATH smoke; check/clean `slugd` before and after. Run format,
-archive, diff and plan-status checks, and obtain independent DESIGN and
-FINAL reviews. A downstream direct CLI build covers this public Loading
-behavior; no broad suite or remote-service gate is selected.
+archive, diff and plan-status checks and obtain independent DESIGN and FINAL
+reviews. No broad suite or remote-service gate is selected.
 
 ## Scope and stops
 
-Base clean main `6e3abc2ee`. Allowlist: this manifest, canonical Current
-paragraph, Stage 4 repository-rule owner contract after acceptance;
-production `app/slug_loading_v2/src/package.rs`; focused tests in
-`app/slug_loading_v2/src/module_extension_repository_rule.rs` and
-`app/slug_loading_v2/src/repository_rule_context.rs`. Production growth
-under roughly 15 lines and proof under roughly 150 lines are review
-triggers, not permission ceilings. REPLAN if Bazel 9.2 does not admit the
-authentic private list, the existing label coercion/default owner loses
-order or source-relative mapping, exact behavior requires a new retained
-owner, or the authentic stop cannot clear without unrelated repository or
-configured semantics.
+Base clean main `139bd8c7d`. Allowlist: this manifest and canonical Current
+paragraph; Stage 4 template owner contract only after acceptance;
+production and focused tests in
+`app/slug_loading_v2/src/repository_rule_context.rs`; one existing observed
+retry/effect test and its local fixture in
+`app/slug_loading_v2/src/module_extension_repository_file_effect.rs`.
+Production growth under roughly 35 lines and proof under roughly 100 lines
+are review triggers, not permission ceilings. REPLAN if Bazel's direct Label
+does not share the admitted `getPath`/source-read semantics, existing source
+owners cannot validate the authentic external Label, a new retained effect
+or DICE owner is required, or the authentic stop cannot clear without a
+different repository method or configured Kotlin work.
 
 ## Immediate predecessor
 
-WP805 accepted at `6e3abc2ee`: exported ordinary and initialized provider
-constructors now serve as dict keys. Five focused tests and the rebuilt
-authentic smoke passed the old provider hashability stop and reached this
-separate rules_kotlin repository-rule schema error at toolchain registration
-row 55. M7A remains partial.
+WP806 accepted at `139bd8c7d`: private repository-rule LabelList defaults
+now retain ordered typed labels and fail closed on attached aspects. Six
+focused tests and the rebuilt authentic smoke passed its schema stop and
+reached this separate direct-Label template-source rejection at toolchain
+registration row 55. M7A remains partial.
 
 ## Acceptance receipt
 
 Independent DESIGN and FINAL reviews returned ACCEPT. The pinned-nightly
 Loading JSON library-test compile passed. Exact preflight
-verified six nonignored selectors and all six passed: the source-shaped
-eight-label frozen definition/call and context default/override tests, the
-updated declaration/negative matrix, and three protected private/public
-repository attribute tests. The malformed dict, integer-element, bad-label
-and aspect-bearing private-list negatives all failed as intended. The direct
+verified five nonignored selectors and all five passed: direct Label path
+Need, source Need and terminal bytes/mode; self-generated/root fail-closed
+controls; the observed DICE route/source A/B/A test with an actual private
+`ctx.attr._template` direct Label and a path-wrapped control; and protected
+read/source, substitution-limit and which-path negatives. The direct
 `slug_cli_v2` rebuild passed. The normalized-PATH authentic one-shot
-`slug build //:probe` cleared the old `_capabilities_templates` schema stop
-and failed independently at registration row 55 on
-`repository_ctx.template invocation is unsupported` in the selected
-rules_kotlin generated repository. No `slugd` remained before or after.
-Two focused test owners add about 184 lines, above the estimated 150-line
-review trigger because the source-authentic eight-label order, canonical
-source resolution, A/B/A distinction and context projection require separate
-direct assertions; the production guard remains six changed lines. Full
-repository effects, configured Kotlin and M7A close remain deferred. No
-remote cache, NativeLink or BuildBuddy gate was selected.
+`slug build //:probe` cleared the old `repository_ctx.template` stop and
+failed independently at toolchain registration row 55 when
+`@@rules_kotlin+//kotlin/internal:toolchains.bzl:353` calls unsupported
+`native.package_name()` during Loading. No `slugd` remained before or after.
+No remote cache, NativeLink or BuildBuddy gate was selected. Full Kotlin
+repository/build behavior and M7A close remain deferred.

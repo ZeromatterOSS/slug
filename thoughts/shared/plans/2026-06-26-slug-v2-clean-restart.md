@@ -29,19 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-106-m7a-private-repository-label-list-default-r1
+Packet: WP-7-107-m7a-direct-label-repository-template-source-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP806 admits the authenticated rules_kotlin 1.9.6 private repository-rule
-`attr.label_list(default = _CAPABILITIES_TEMPLATES.values())` declaration.
-Bazel 9.2 source and a fresh offline oracle establish ordered, defining-Bzl-
-relative Label defaults. Slug reuses its typed default/projection owner and
-fails closed on unretained attached aspects. Six focused tests and the rebuilt
-authentic smoke passed the old schema stop and reached separate
-`repository_ctx.template` unsupported effects. Independent design/final
-reviews accepted the bounded Loading slice. Full repository effects,
-configured Kotlin behavior and M7A close remain deferred. WP805 is accepted
-at `6e3abc2ee`.
+WP807 admits direct typed canonical-external Labels as source arguments for
+the already accepted bounded `repository_ctx.template` effect. The
+authenticated rules_kotlin 1.9.6 capabilities repository passes private
+Label defaults and a selected private LabelList element directly to three
+ordered template calls. Bazel 9.2 source and a direct-Label scratch oracle
+support the existing Label-path/source retry and generated-file effect
+owners; a self-generated source fails closed. Five focused tests and the
+rebuilt authentic smoke passed the old template stop and reached separate
+`native.package_name()` Loading. Independent design/final reviews accepted
+the bounded slice. Full repository execution, configured Kotlin behavior
+and M7A close remain deferred. WP806 is accepted at `139bd8c7d`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

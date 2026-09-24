@@ -892,23 +892,32 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         let Some(destination) = path.unpack_str() else {
             return Err(state.fail(RepositoryRuleInvocationError::TemplateDestinationArgument));
         };
-        let Some(template) = RepositoryStarlarkPath::from_value(template) else {
+        let (address, direct_label) = if let Some(label) = StarlarkLabel::from_value(template) {
+            (
+                RepositoryLabelPathAddress::from_label(label.canonical()),
+                true,
+            )
+        } else if let Some(path) = RepositoryStarlarkPath::from_value(template) {
+            let Some(address) = path.label_address() else {
+                return Err(state.fail(RepositoryRuleInvocationError::TemplateSourceArgument));
+            };
+            (address.clone(), false)
+        } else {
             return Err(state.fail(RepositoryRuleInvocationError::TemplateSourceArgument));
         };
-        let Some(address) = template.label_address() else {
+        if direct_label && address.repo().as_str() == state.generated_repository.as_str() {
             return Err(state.fail(RepositoryRuleInvocationError::TemplateSourceArgument));
-        };
+        }
+        if direct_label && !state.prepared_paths.contains_key(&address) {
+            return Err(state.fail(RepositoryRuleInvocationError::LabelPathNeed(address)));
+        }
         if address.repo().is_root() {
             return Err(state.fail(RepositoryRuleInvocationError::TemplateSourceArgument));
         }
         let substitutions =
             latin1_substitutions(&substitutions).map_err(|error| state.fail(error))?;
-        let Some(source) = state.prepared_sources.get(address) else {
-            return Err(
-                state.fail(RepositoryRuleInvocationError::RepositorySourceNeed(
-                    address.clone(),
-                )),
-            );
+        let Some(source) = state.prepared_sources.get(&address) else {
+            return Err(state.fail(RepositoryRuleInvocationError::RepositorySourceNeed(address)));
         };
         if source.len() > MAX_TEMPLATE_BYTES {
             return Err(state.fail(RepositoryRuleInvocationError::TemplateLimit));
@@ -2605,7 +2614,8 @@ def implementation(ctx):
         assert!(
             matches!(invoke_prepared(source, &paths, &SmallMap::new()), Err(RepositoryRuleInvocationError::RepositorySourceNeed(need)) if need == address)
         );
-        let templates = SmallMap::from_iter([(address, Arc::from(&b"a %{x} %{xy} \xff"[..]))]);
+        let templates =
+            SmallMap::from_iter([(address.clone(), Arc::from(&b"a %{x} %{xy} \xff"[..]))]);
         let invocation = invoke_prepared(source, &paths, &templates).unwrap();
         let effects = invocation.plan.effects();
         assert_eq!(
@@ -2624,6 +2634,53 @@ def implementation(ctx):
             ),
             ("default", b"a %{x} %{xy} \xff".as_slice(), true)
         );
+        let direct = r#"
+def implementation(ctx):
+    ctx.template("DIRECT", Label("@@dep+//pkg:template"), {"%{x}": "%{xy}", "%{xy}": "Z"}, executable = False)
+"#;
+        assert!(
+            matches!(invoke_prepared(direct, &SmallMap::new(), &SmallMap::new()), Err(RepositoryRuleInvocationError::LabelPathNeed(need)) if need == address)
+        );
+        assert!(
+            matches!(invoke_prepared(direct, &paths, &SmallMap::new()), Err(RepositoryRuleInvocationError::RepositorySourceNeed(need)) if need == address)
+        );
+        let direct_invocation = invoke_prepared(direct, &paths, &templates).unwrap();
+        let direct_effects = direct_invocation.plan.effects();
+        assert_eq!(direct_effects.len(), 1);
+        assert_eq!(
+            (
+                direct_effects[0].path(),
+                direct_effects[0].content(),
+                direct_effects[0].executable()
+            ),
+            ("DIRECT", b"a Z Z \xff".as_slice(), false)
+        );
+        assert!(matches!(
+            invoke_prepared(
+                "def implementation(ctx):\n    ctx.template('SELF', Label('@@repo//:template'))\n",
+                &SmallMap::new(),
+                &SmallMap::new()
+            ),
+            Err(RepositoryRuleInvocationError::TemplateSourceArgument)
+        ));
+        let root_address = RepositoryLabelPathAddress::from_label(
+            &CanonicalLabel::parse("@@//:template").unwrap(),
+        );
+        let root_direct =
+            "def implementation(ctx):\n    ctx.template('ROOT', Label('@@//:template'))\n";
+        assert!(
+            matches!(invoke_prepared(root_direct, &SmallMap::new(), &SmallMap::new()), Err(RepositoryRuleInvocationError::LabelPathNeed(need)) if need == root_address)
+        );
+        let root_path = HostRepositoryLabelPathValue::new(
+            NormalizedAbsolutePath::new("/materialized/root/template").unwrap(),
+            PathObservationNamespace::Host,
+        )
+        .unwrap();
+        let root_paths = SmallMap::from_iter([(root_address, root_path)]);
+        assert!(matches!(
+            invoke_prepared(root_direct, &root_paths, &SmallMap::new()),
+            Err(RepositoryRuleInvocationError::TemplateSourceArgument)
+        ));
         assert!(matches!(
             invoke_prepared(
                 "def implementation(ctx):\n    ctx.template('x', ctx.path(Label('@@dep+//pkg:template')), None)\n",

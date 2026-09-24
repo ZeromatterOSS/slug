@@ -9334,3 +9334,24 @@ identity, A/B/A, context and negative tests pass; the rebuilt authentic
 build clears the schema stop and reaches separate unsupported
 `repository_ctx.template` effects. Full repository execution, configured
 Kotlin behavior and M7A close remain deferred.
+
+### Direct Label repository template sources accepted (2026-09-24)
+
+WP807 admits direct typed canonical-external Label sources to the existing
+bounded `repository_ctx.template` effect. Authenticated rules_kotlin 1.9.6
+passes private `attr.label` defaults and one selected private LabelList
+element directly to three ordered template calls. Pinned Bazel 9.2 source
+and an offline cross-repository oracle establish Label package/path lookup,
+ordered literal substitutions, output bytes and executable modes for the
+selected shape. Slug reuses its existing `RepositoryLabelPathAddress`,
+`LabelPathNeed` then `RepositorySourceNeed` retry driver, observed
+route/materialization/source-read owners and immutable ordered generated-file
+effect plan. A direct Label naming the generated repository fails closed
+before any Need to avoid self-materialization; root and non-Label path
+sources retain their prior boundaries. No retained effect, DICE key, lock,
+source resolver or cache was added. Focused evaluator and observed DICE
+A/B/A tests pass with an actual private `ctx.attr._template` Label and a
+path-wrapped control. The rebuilt authentic build clears the template stop
+and reaches separate `native.package_name()` Loading in rules_kotlin.
+Broader template inputs, repository execution, configured Kotlin and M7A
+close remain deferred.
