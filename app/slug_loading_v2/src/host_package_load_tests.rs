@@ -34205,6 +34205,170 @@ async fn string_allowed_values_enforce_configurable_candidates() {
     }
 }
 
+#[tokio::test]
+async fn public_starlark_rule_direct_none_uses_all_five_rust_toolchain_defaults() {
+    const DEFS: &[u8] = br#"def _impl(ctx): fail('implementation must stay lazy')
+rust_toolchain = rule(implementation = _impl, attrs = {
+    'allocator_library': attr.label(default = Label('//rust/settings:default_allocator_library')),
+    'global_allocator_library': attr.label(default = Label('//rust/private/cc:global_allocator_library')),
+    'opt_level': attr.string_dict(default = {'dbg': '0', 'fastbuild': '0', 'opt': '3'}),
+    'strip_level': attr.string_dict(default = {'dbg': 'none', 'fastbuild': 'none', 'opt': 'debuginfo'}),
+    'iso_date': attr.string(default = ''),
+    'channel': attr.string(default = 'stable'),
+})
+"#;
+    const BUILD: &[u8] = br#"load(':defs.bzl', 'rust_toolchain')
+rust_toolchain(name = 'omitted', visibility = ['//visibility:public'])
+rust_toolchain(name = 'none', allocator_library = None, global_allocator_library = None, opt_level = None, strip_level = None, iso_date = None, channel = None, visibility = ['//visibility:public'])
+rust_toolchain(name = 'explicit', allocator_library = ':allocator', global_allocator_library = ':global_allocator', opt_level = {}, strip_level = {}, iso_date = '', channel = '', visibility = ['//visibility:public'])
+"#;
+    let package =
+        load_repository_package_fixture(&[("BUILD.bazel", BUILD), ("defs.bzl", DEFS)], 961).await;
+    let package = repository_package_terminal(&package);
+    let defaults = [
+        (
+            "allocator_library",
+            CoercedAttributeValue::Label(
+                CanonicalLabel::parse("@@dep+//rust/settings:default_allocator_library").unwrap(),
+            ),
+        ),
+        (
+            "global_allocator_library",
+            CoercedAttributeValue::Label(
+                CanonicalLabel::parse("@@dep+//rust/private/cc:global_allocator_library").unwrap(),
+            ),
+        ),
+        (
+            "opt_level",
+            CoercedAttributeValue::StringDict(Arc::from([
+                ("dbg".into(), "0".into()),
+                ("fastbuild".into(), "0".into()),
+                ("opt".into(), "3".into()),
+            ])),
+        ),
+        (
+            "strip_level",
+            CoercedAttributeValue::StringDict(Arc::from([
+                ("dbg".into(), "none".into()),
+                ("fastbuild".into(), "none".into()),
+                ("opt".into(), "debuginfo".into()),
+            ])),
+        ),
+        ("iso_date", CoercedAttributeValue::String("".into())),
+        ("channel", CoercedAttributeValue::String("stable".into())),
+    ];
+    for target in ["omitted", "none"] {
+        for (name, expected) in &defaults {
+            let attribute = starlark_attr(package, target, name);
+            assert_eq!(&attribute.value, expected, "{target}.{name}");
+            assert_eq!(
+                attribute.provenance,
+                AttributeProvenance::Default,
+                "{target}.{name}"
+            );
+        }
+    }
+    for (name, expected) in [
+        (
+            "allocator_library",
+            CoercedAttributeValue::Label(CanonicalLabel::parse("@@dep+//:allocator").unwrap()),
+        ),
+        (
+            "global_allocator_library",
+            CoercedAttributeValue::Label(
+                CanonicalLabel::parse("@@dep+//:global_allocator").unwrap(),
+            ),
+        ),
+        (
+            "opt_level",
+            CoercedAttributeValue::StringDict(Arc::from([])),
+        ),
+        (
+            "strip_level",
+            CoercedAttributeValue::StringDict(Arc::from([])),
+        ),
+        ("iso_date", CoercedAttributeValue::String("".into())),
+        ("channel", CoercedAttributeValue::String("".into())),
+    ] {
+        let attribute = starlark_attr(package, "explicit", name);
+        assert_eq!(attribute.value, expected, "explicit.{name}");
+        assert_eq!(
+            attribute.provenance,
+            AttributeProvenance::Explicit,
+            "explicit.{name}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn public_starlark_rule_direct_none_preserves_mandatory_and_other_boundaries() {
+    const DEFS: &[u8] = b"def _impl(ctx): fail('implementation must stay lazy')\nprobe = rule(implementation = _impl, attrs = {'required': attr.string(mandatory = True), 'value': attr.string(default = 'fallback'), '_private': attr.string(default = 'hidden')})\n";
+    for (variant, call, expected) in [
+        (
+            962,
+            "probe(name='bad', required=None)",
+            "missing value for mandatory attribute 'required'",
+        ),
+        (
+            963,
+            "probe(name='bad', required='set', unknown=None)",
+            "unknown attribute `unknown`",
+        ),
+        (
+            964,
+            "probe(name='bad', required='set', _private=None)",
+            "attribute `_private` must contain only string labels",
+        ),
+        (
+            965,
+            "probe(name='bad', required='set', value=[])",
+            "must be a string",
+        ),
+    ] {
+        let build = format!("load(':defs.bzl', 'probe')\n{call}\n");
+        let outcome = load_repository_package_fixture(
+            &[("BUILD.bazel", build.as_bytes()), ("defs.bzl", DEFS)],
+            variant,
+        )
+        .await;
+        let error = repository_package_error(&outcome);
+        assert!(error.contains(expected), "{call}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn public_starlark_rule_direct_none_replays_declared_default_a_b_a() {
+    const BUILD: &[u8] = b"load(':defs.bzl', 'probe')\nprobe(name='subject', value=None, visibility=['//visibility:public'])\n";
+    const DEFS_A: &[u8] = b"def _impl(ctx): fail('implementation must stay lazy')\nprobe=rule(implementation=_impl, attrs={'value': attr.string(default='alpha')})\n";
+    const DEFS_B: &[u8] = b"def _impl(ctx): fail('implementation must stay lazy')\nprobe=rule(implementation=_impl, attrs={'value': attr.string(default='beta')})\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let a = load_repository_package_fixture_on(
+        &dice,
+        &[("BUILD.bazel", BUILD), ("defs.bzl", DEFS_A)],
+        966,
+    )
+    .await;
+    let b = load_repository_package_fixture_on(
+        &dice,
+        &[("BUILD.bazel", BUILD), ("defs.bzl", DEFS_B)],
+        967,
+    )
+    .await;
+    let restored = load_repository_package_fixture_on(
+        &dice,
+        &[("BUILD.bazel", BUILD), ("defs.bzl", DEFS_A)],
+        968,
+    )
+    .await;
+    for (outcome, expected) in [(&a, "alpha"), (&b, "beta"), (&restored, "alpha")] {
+        let value = starlark_attr(repository_package_terminal(outcome), "subject", "value");
+        assert_eq!(value.value, CoercedAttributeValue::String(expected.into()));
+        assert_eq!(value.provenance, AttributeProvenance::Default);
+    }
+    assert!(!RepositoryPackageLoadKey::equality(&a, &b));
+    assert!(RepositoryPackageLoadKey::equality(&a, &restored));
+}
+
 fn eval_bzl_with_identity(
     source: &str,
     owner: BzlModuleIdentity,

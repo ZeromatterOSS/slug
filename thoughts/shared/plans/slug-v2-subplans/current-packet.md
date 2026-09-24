@@ -1,172 +1,162 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-97-m7a-selected-module-extension-host-factors-r1
+Packet: WP-7-98-m7a-starlark-rule-direct-none-default-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit declared OS and architecture evaluation factors for DICE-owned selected
-module-extension owners. The source-authentic rules_rust 0.73
-`rust_host_tools` extension must advance through its selected owner and the
-accepted WP796 archive materializer; the generated BUILD
-`rust_toolchain(iso_date=None)` Loading stop remains a separate next packet.
-This advances the authentic M7A source closure, not root-build readiness.
+Admit Bazel 9.2's direct `None`-as-omitted rule-attribute behavior for known,
+ordinary public declared Starlark rule attributes. The authentic rules_rust 0.73
+`rust_host_tools` generated `rust_toolchain` call supplies five such values:
+two labels, two nonempty-default string dictionaries, and `iso_date`, a
+string defaulting to empty. All five must take their declared defaults, and
+the original extension route must advance beyond its current
+`iso_date=None` Loading stop. This is an M7A source-closure packet, not a
+root-build or configured-toolchain success claim.
 
-Exact Bazel 9.2 behavior claimed here: declaration flags independently select
-OS and architecture factor participation; unchanged extension ID retains the
-same canonical generated-repository name; on this Linux x86_64 host, the pinned
-rules_rust extension selects the host-tools repository rule and source-derived
-Rust 1.97.1/nightly rustfmt attributes. Slug-native: Rust Host observations
-and structural factor strings/identity, rather than Bazel's raw JVM
-`os.arch`/HotSpot bytes or exact hidden-lockfile key spelling. Unsupported/
-deferred: global pure-extension aggregation with factors, `facts_version`
-or nonempty facts, exact visible/hidden lockfile factor replay and error-mode
-reuse, cross-host Bazel factor-byte parity, unaudited generated-repository
-effects, and any unrelated extension method or root-build claim. These
-boundaries must fail closed; no Bazel/JVM semantic execution enters Slug.
+Exact Bazel 9.2 semantics: after known-name validation, direct `None` on an
+ordinary public Starlark rule attribute does not set an explicit value, undergo type
+conversion, or override its declaration default. A mandatory declaration
+still reports missing. A concrete value remains explicit and type checked.
+Slug-native: retained `AttributeProvenance` and structural package/DICE
+identity, not Bazel's internal bitset or checksum bytes. Unsupported/deferred:
+`None` inside `select()` branches or concatenations, callable built-ins such
+as `visibility`, private `_` and implicit/built-in attributes, native rule APIs, arbitrary
+macro/initializer changes, exact diagnostic wording, and analysis-time
+requirements beyond this Loading slice. Those paths retain their existing
+behavior with no new parity claim; if the selected source requires one,
+scope-correct or REPLAN. Do not infer all-rule or configured parity.
 
 ## Source, owner and decision
 
-Pinned Bazel 9.2 `RegularRunnableExtension.java:201-205` derives only the
-declared factors from host OS and raw architecture.
-`ModuleExtensionEvalFactors.java:32-97` keeps conditional components and
-renders OS before architecture. `ModuleExtensionId.java:29-43`,
-`BazelDepGraphFunction.java:170-215`, `SingleExtensionValue.java:68-74`,
-and `SingleExtensionEvalFunction.java:139-303` separate extension ID,
-generated repo name, factor-keyed evaluation and lockfile selection.
-`BazelLockFileModule.java:157-310` puts reproducible entries in Bazel's
-hidden output-base lockfile and retains/replaces other factor entries by
-dependency shape. Pinned rules_rust
-`rust/extensions.bzl:327-366` declares both flags, computes its host
-triple through `module_ctx.os`, calls `rust_toolchain_tools_repository`,
-and returns reproducible metadata; its MODULE self-use supplies the tag.
-Accepted WP796 proved the six resulting Linux x86_64 archive effects.
+Pinned Bazel 9.2 `StarlarkRuleClassFunctions.java:1886-1893` passes the
+default-true unknown-attribute flag from `BuildLanguageOptions.java:634-641`.
+`AttributeProvider.java:204-241,251-327` checks a rule
+attribute name, ignores a known direct `Starlark.NONE` before type conversion
+and explicit-bit setting, then supplies the declared default or reports a
+mandatory missing value. `RuleFactory.java:67-72` treats `name=None`
+separately; `BuildType.java:720-723` handles selector-branch `None` through a
+different path. The authenticated rules_rust 0.73
+`rust/private/toolchain.bzl:664-869` declares `allocator_library` and
+`global_allocator_library` as labels, `opt_level` and `strip_level` as
+string dictionaries, and `iso_date` as a string. Its generated BUILD writes
+all five as direct `None` for the selected stable Rust 1.97.1 host tools.
+Bazel 9.2's authentic offline build succeeds. Its query oracle returns the
+five declared defaults: `@rules_rust//rust/settings:default_allocator_library`,
+`@rules_rust//rust/private/cc:global_allocator_library`, `opt_level =
+{"dbg": "0", "fastbuild": "0", "opt": "3"}`, `strip_level = {"dbg": "none",
+"fastbuild": "none", "opt": "debuginfo"}`, and `iso_date = ""`. This is not a
+string-only or type-null normalization.
 
-The selected `HostSelectedExtensionOwnerPureObservationKey` is the semantic
-producer. Its existing owner inputs, authenticated first/reacquired .bzl
-projection, observed `RepositoryPlatformKey`, environment/download/path
-frontiers, and invocation calls remain its dependencies. Add one compact
-structural factor projection: OS only when `os_dependent`, architecture only
-when `arch_dependent`; retain declaration shape and selected host values in
-the pure result, post-host pure errors, and post-host outer observation errors
-so DICE equality cannot cut off a factor change with identical repository
-calls or identical error text.
-The owner certificate inherits that value. Keep the factor distinct from
-`module_ctx.os`'s displayed host values, toolchain triple, repository
-mapping, and canonical generated name. No command-side source inference,
-process-global cache, new DICE key, or lock held across a DICE computation.
+`FrozenRuleDefinition::invoke` in
+`app/slug_loading_v2/src/package.rs:8026-8190` is the Loading owner. Its
+unknown-name loop must run on raw kwargs first. Keep existing raw-presence
+checks for implicit/built-in attributes and `name`; after those checks, and
+only when `!builtin` and the declaration name is public (does not start
+with `_`), treat a direct `Some(Starlark None)` for an ordinary declared
+attribute as absent
+before the default/mandatory/provenance branch. Reuse the existing schema
+default and `AttributeProvenance::Default`, with no invented `None` value in
+`CoercedAttributeValue`, no untyped bypass, and no source-specific name
+switch. Explicit non-None values still take current coercion, allowed-value,
+file/provider and configuration checks. Rule-initializer input and callable
+visibility stay in their existing, separately scoped paths.
 
-The selected owner may admit the four flag combinations for existing
-supported `RepositoryPlatform` values. The legacy aggregate
-`HostPureModuleExtensionInvocationsKey` keeps its current factor rejection.
-Existing host observation and authenticated re-acquisition precede evaluation;
-missing or changed injected host input remains Need/typed terminal, not an
-ambient OS read. Changed declaration, source, host platform, tags, environment,
-mapping or owner must recompute or fail closed under existing
-observation/promotion rules. A/B/A restoration must recover the original
-factor and generated spec; output equality may cut off only when every
-declared factor-relevant structural input matches. Bazel's
-reproducibility/lockfile lifetime is not
-silently simulated.
-
-The retained factor is at most two compact strings plus declaration presence
-in the DICE-owned result/error; no retained archive, evaluator value, temp root
-or extra service cache. The Starlark invocation remains phase scratch, released
-on Need/error/cancellation. The existing immutable materialization and
-selected-download owners keep their publication and cleanup rules. The
-large `module_extension.rs` file remains the cohesive selected-owner
-implementation and colocated test owner; a short factor type/helper may live
-there, but do not add a second broad extension driver.
+Keep source/owner configuration structural through existing package
+observation and DICE equality; direct None and omission may share normalized
+semantic value/provenance, but a changed source or declaration must recompute
+and A/B/A restore. No DICE key, locking, repository owner, macro storage,
+transport, archive materializer or command-side cache changes. This is a
+short branch in the existing cohesive `package.rs` owner; no retained heap
+increase or new data structure is needed.
 
 ## Evidence and validation
 
-Reuse pinned Bazel sources and WP796's authentic
-`@@rules_rust++rust_host_tools+rust_host_tools` mapping/RepoSpec evidence.
-Bazel 9.2 `mod show_extension`, `dump_repo_mapping` and `show_repo`
-on the genuine rules_rust 0.73 module pass without fetching archives.
-`--host_cpu=aarch64` does not alter extension Host factors, so it is not
-a cross-host oracle. Add a small Stage 1 self-contained nonreproducible
-four-export fixture only for the demonstrated conditional-factor gap: both,
-OS-only, architecture-only and general keys, stable generated names, and a
-fresh-output-base missing-factor error-mode negative. Record provenance and
-use message-shape/structured-semantic comparison for host-dependent text.
-Do not claim a multi-OS oracle from this one host. The authentic rules_rust
-lane is source-pinned and checked by the direct smoke; no copied upstream
-archive or credential material belongs in the fixture.
+Add a small Stage 1 Bazel 9.2 fixture only for the demonstrated gap: a
+Starlark rule with string, string-dictionary and label defaults, and omitted,
+direct-None, explicit-empty and concrete-override calls. Use `query attr`
+and `labels` to discriminate actual default values from empty, literal
+`"None"` and concrete overrides; use `--output=xml` to distinguish
+non-explicit omitted/direct-None attributes from explicit empty/concrete
+ones. Include separate mandatory-None, unknown-name-None, private-attribute
+`_x=None` and wrong-type
+negative packages so one invalid BUILD cannot poison positives. Run the
+fixture Bazel-only with message-shape/anchored output expectations; this is
+Loading evidence, not a claim about Slug query support. Keep outputs/source
+provenance host-independent and
+self-contained. Reuse the authentic rules_rust direct/extension smoke as
+source-derived closure evidence; do not copy upstream files or archives into
+the fixture. The existing label-list default may be a local regression
+control, but do not claim selector-None or native-attribute parity.
 
-Focused Rust tests must cover four factor selections, declaration change,
-platform OS-only/arch-only/both A/B/A with identical repository calls,
-post-host identical-error factor discrimination in both pure and outer
-observation terminals, owner certificate/repository
-mapping stability, and preserved arbitrary-owner `facts_version`/legacy
-aggregate rejection. Include observed and legacy selected views, Need/error
-and event nonpublication at the existing boundaries. Build with the pinned
-Rust toolchain: JSON `--no-run`, exact-selector preflight, serial Cargo,
-direct Loading/Bzlmod/Core compile dependents, and a fresh
-`cargo build -p slug_cli_v2` before any `SLUG_V2_BIN` or CLI smoke. Clean
-stale `slugd` before/after. The original `rust_host_tools` extension smoke
-must reach the accepted archive behavior; a separately typed earlier source
-prerequisite is diagnostic evidence for scope correction or REPLAN, not an
-acceptance substitute. Do not pass an unsupported factor by fiat.
-Run format, diff, archive and plan status checks; obtain independent DESIGN
-review before Rust edits and FINAL review of the actual diff. No broad suite
-or M7A close is selected.
+Focused Rust tests in the Loading owner must distinguish omission versus
+direct None versus explicit empty/concrete values in both value and
+provenance, including a nonempty string/dictionary/label default, mandatory
+None, unknown-name None, private `_x=None` exclusion from the admitted
+normalization, wrong-type non-None, and source/default A/B/A. The private
+negative need only preserve the preexisting disposition; it does not claim
+Bazel parity for that unsupported form.
+Preserve accepted label-None/default, initializer, visibility and generated
+repository Loading tests. Compare all five authentic selected defaults above
+against Bazel evidence and require the original extension smoke to pass the
+former `iso_date=None` Loading stop; a later separately typed stop is recorded
+as next work, while a different earlier stop requires scope correction or
+REPLAN.
+
+Run pinned-toolchain JSON `--no-run`, exact-selector preflight and focused
+tests with serial Cargo, direct Loading/Bzlmod/Core compile dependents, and
+fresh `cargo build -p slug_cli_v2` before any CLI smoke. Clean stale `slugd`
+before/after. Run format, diff, V1 archive and plan-status checks. Obtain
+independent DESIGN review before Rust edits and FINAL review of the actual
+diff. No broad suite or M7A close is selected.
 
 ## Scope and stops
 
-Base clean main `1ecf53a8b`. Allowlist: this manifest, canonical Current
-paragraph and Stage 5 owner contract only for accepted changes;
-`app/slug_loading_v2/src/module_extension.rs` with colocated tests;
-`app/slug_loading_v2/src/registration_diagnostic.rs` only to unwrap the
-new structural selected-error carrier without changing displayed diagnostics;
-`tests/v2_oracle/fixtures/module-extension-host-factors/` for the small
-oracle fixture and its generated expectation. No Bzlmod lockfile parser or
-writer, Core Host observer, global extension driver, repository materializer,
-NativeLink/BuildBuddy configuration, credential file, target-pattern support,
-generated BUILD attribute schema, or generic source acquisition change.
-If factor retention requires altering a different DICE/public owner, source
-proves a different factor domain, ordinary selected evaluation needs a
-lockfile lifecycle to be correct, or authentic rules_rust requires an
-unmodeled method before archive effects, stop for reviewed scope correction
-or REPLAN. Do not weaken the prior arbitrary-factor rejection test without
-its positive factor/identity replacements. Normal Bazel RC discovery may
-pick up user auth when explicitly needed; never inspect or print
-`~/.bazelrc` or netrc contents.
-
-## Acceptance receipt
-
-Independent DESIGN and FINAL reviews returned ACCEPT. A reviewed compile
-correction added only the selected-error display unwrapping in
-`registration_diagnostic.rs`; the structural factor remains in DICE equality.
-Bazel 9.2's self-contained nonreproducible oracle passed generation and
-independent replay in separate fresh roots: four visible factor shapes,
-stable generated names, and a same-extension-ID missing-factor error after
-an isolated declaration change and output-base expunge. The observed JVM
-architecture factor was `amd64`; Slug's Rust Host projection was `x86_64`,
-so no raw-factor-byte parity is claimed. Bazel's authentic offline
-`//:probe` build passed for the dependency-owned rules_rust extension.
-
-Pinned-toolchain JSON `--no-run` passed for Loading, Bzlmod and Core. Exact
-selector preflight preceded 3/3 new tests, the existing global-factor guard,
-and the existing selected Host-input test; all five passed. A fresh
-`cargo build -p slug_cli_v2` passed. The original rules_rust `rust_host_tools`
-extension smoke, in a new workspace with HOME/NETRC unset, passed the former
-factor stop and WP796 materialization, then stopped at generated
-`BUILD.bazel:131` because `rust_toolchain(iso_date=None)` is rejected by
-Loading. No `slugd` process remained before or after. Format, diff, V1
-archive and plan-status checks passed. No broad suite or root-build success
-is claimed.
-
-Two older `registration_diagnostic` tests were run and failed because their
-unchanged owner fixture omits `RepositoryHostInputTransaction` and
-`RepositoryPlatformKey`; the pre-WP797 selected owner already required those
-inputs. Those broad diagnostic fixtures remain an independent validation gap,
-not passing evidence for this packet. They were not silently repaired or
-counted as passing tests.
+Base clean main `7efc2508f`. Allowlist: this manifest, canonical Current
+paragraph and Stage 4 owner contract only for accepted changes;
+`app/slug_loading_v2/src/package.rs`,
+`app/slug_loading_v2/src/host_package_load_tests.rs` with focused tests;
+`tests/v2_oracle/fixtures/starlark-rule-direct-none-default/` for the small
+oracle fixture. No DICE key, Starlark runtime, Bzlmod, Core, repository
+materializer, NativeLink/BuildBuddy configuration, credential, generated
+rules_rust file, or unrelated attribute family change. The large Loading
+file remains the existing cohesive rule-invocation owner; add one bounded
+normalization branch, not a second attribute interpreter. If exact behavior
+requires a different semantic owner, a new retained representation, selector
+semantics, a changed builtin policy, or unmodeled generated-rule effects,
+stop for reviewed scope correction or REPLAN. Normal Bazel RC discovery may
+pick up user auth when needed; never inspect or print `~/.bazelrc` or netrc.
 
 ## Immediate predecessor
 
-WP796 at `1ecf53a8b` accepted the six source-selected host-tools tar.xz
-effects and bounded materialization. An innate `use_repo_rule` route reaches
-the generated BUILD, then stops at `iso_date=None` Loading; the original
-module-extension route still stops at declared OS/architecture factors.
+WP797 at `7efc2508f` admitted declared Host OS/architecture factors on the
+selected extension owner. Its authentic rules_rust smoke passes the factor
+gate and six accepted archive effects, then stops in generated BUILD at
+`rust_toolchain(iso_date=None)`. Exact JVM factor bytes and lockfile replay
+remain deferred. Two older diagnostic fixtures lacking Host inputs remain a
+separate known validation gap.
+
+## Acceptance receipt
+
+Independent DESIGN and FINAL reviews returned ACCEPT. Bazel 9.2's
+self-contained fixture passed generation and independent replay in separate
+fresh roots, 8/8 commands each. Value queries distinguished omitted/direct
+`None`, explicit empty, literal `"None"` and concrete overrides; XML without
+defaults established the non-explicit versus explicit attribute distinction.
+Four isolated negative packages preserved mandatory, unknown-name, private
+and concrete wrong-type boundaries. The source-derived authentic Bazel
+rules_rust target also returned the five declared defaults recorded above.
+
+Pinned-toolchain JSON `--no-run` compiled Loading, Bzlmod and Core. Exact
+selector preflight found all three new tests; 3/3 new tests and three selected
+existing Loading regressions passed. A fresh `cargo build -p slug_cli_v2`
+passed before the authentic CLI smoke. The first ambient-`PATH` replay passed
+the former generated `iso_date=None` Loading stop but hit the previously
+recorded transient `rules_shell` repository `which` limit. A second replay
+with the already validated `PATH=/bin:/usr/bin:/usr/local/bin` cleared that
+limit and reached toolchain registration row 53: rules_python's
+`python_repository.bzl` declares unsupported repository-rule attribute
+`_rule_name`. This is the next source-selected Loading boundary, not a
+root-build or M7A completion claim. No stale `slugd` process was present
+before or after. Format,
+diff, V1 archive and plan-status checks passed; no broad suite was selected.

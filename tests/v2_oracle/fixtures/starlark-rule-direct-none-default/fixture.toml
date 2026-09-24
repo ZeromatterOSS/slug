@@ -1,0 +1,79 @@
+[fixture]
+name = "starlark-rule-direct-none-default"
+description = "Bazel 9.2 direct None defaulting and explicitness for public Starlark rule attributes."
+comparison = "message_shape"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Loading-only, self-contained evidence. Direct None and omission take declared string, dictionary, and label defaults without an explicit attribute bit; explicit empty and concrete values remain distinct. Unknown-name None, mandatory None, wrong concrete type, and private _x=None are isolated negative packages. The private result is a boundary control, not an admitted private-attribute parity claim."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/packages/AttributeProvider.java#populateDefinedRuleAttributeValues",
+  "src/main/java/com/google/devtools/build/lib/packages/AttributeProvider.java#populateDefaultRuleAttributeValues",
+  "src/main/java/com/google/devtools/build/lib/packages/RuleFactory.java#createRule",
+  "src/main/java/com/google/devtools/build/lib/packages/BuildType.java#convertFromBuildLangType",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java",
+  "src/main/java/com/google/devtools/build/lib/packages/semantics/BuildLanguageOptions.java",
+  "rules_rust 0.73.0 rust/private/toolchain.bzl:664-869",
+]
+translation_notes = "The local rule isolates the three direct-None attribute kinds in the source-authentic generated rust_toolchain: string, string_dict, and label. The nonempty defaults distinguish omission from a type-null replacement; XML with default values disabled observes Bazel's explicit-attribute bit without claiming its internal representation in Slug. Each invalid call lives in a separate package so no error masks the positive package."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture starlark-rule-direct-none-default --tool bazel --bazel bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture starlark-rule-direct-none-default --tool bazel --bazel bazel"
+
+[[commands]]
+name = "omitted_and_direct_none_use_declared_defaults"
+argv = ["query", "attr(dep, \"fallback\", attr(levels, \"dbg.*0\", attr(text, \"^sentinel$\", set(//:omitted //:direct_none))))", "--output=label", "--order_output=full", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A//:omitted\n//:direct_none\Z']
+
+[[commands]]
+name = "explicit_empty_and_label_override_do_not_reapply_defaults"
+argv = ["query", "attr(dep, \"replacement\", attr(text, \"^$\", //:explicit_empty)) except attr(levels, \"dbg\", //:explicit_empty)", "--output=label", "--order_output=full", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A//:explicit_empty\n?\Z']
+
+[[commands]]
+name = "literal_none_and_concrete_values_remain_explicit"
+argv = ["query", "attr(text, \"^None$\", //:literal_none) union attr(text, \"^override$\", attr(levels, \"dbg.*1\", //:concrete))", "--output=label", "--order_output=full", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A//:literal_none\n//:concrete\Z']
+
+[[commands]]
+name = "xml_explicitness_omitted_none_empty_and_concrete"
+argv = ["query", "set(//:omitted //:direct_none //:explicit_empty //:concrete)", "--output=xml", "--noxml:default_values", "--order_output=full", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = [
+  '(?s)<rule\b[^\n]*name="//:omitted"(?:(?!</rule>)(?!name="(?:text|levels|dep)").)*</rule>',
+  '(?s)<rule\b[^\n]*name="//:direct_none"(?:(?!</rule>)(?!name="(?:text|levels|dep)").)*</rule>',
+  '(?s)<rule\b[^\n]*name="//:explicit_empty"(?:(?!</rule>).)*<string name="text" value=""/>(?:(?!</rule>).)*<dict name="levels"/>(?:(?!</rule>).)*<label name="dep" value="//:replacement"/>(?:(?!</rule>).)*</rule>',
+  '(?s)<rule\b[^\n]*name="//:concrete"(?:(?!</rule>).)*<string name="text" value="override"/>(?:(?!</rule>).)*<dict name="levels">(?:(?!</rule>).)*<label name="dep" value="//:replacement"/>(?:(?!</rule>).)*</rule>',
+]
+
+[[commands]]
+name = "mandatory_direct_none_is_missing"
+argv = ["query", "//bad_mandatory:bad", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 7
+stdout_patterns = ['\A\Z']
+stderr_patterns = ["missing value for mandatory attribute 'required_dep'"]
+
+[[commands]]
+name = "unknown_direct_none_still_rejected"
+argv = ["query", "//bad_unknown:bad", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 7
+stdout_patterns = ['\A\Z']
+stderr_patterns = ["no such attribute 'unknown' in 'probe' rule"]
+
+[[commands]]
+name = "private_direct_none_still_rejected"
+argv = ["query", "//bad_private:bad", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 7
+stdout_patterns = ['\A\Z']
+stderr_patterns = ["no such attribute '_x' in 'probe' rule"]
+
+[[commands]]
+name = "wrong_concrete_type_still_rejected"
+argv = ["query", "//bad_type:bad", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 7
+stdout_patterns = ['\A\Z']
+stderr_patterns = ["expected value of type 'string' for attribute 'text'"]

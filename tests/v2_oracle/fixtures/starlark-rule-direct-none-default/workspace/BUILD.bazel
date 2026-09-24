@@ -1,0 +1,10 @@
+load(":defs.bzl", "probe")
+
+filegroup(name = "fallback")
+filegroup(name = "replacement")
+
+probe(name = "omitted")
+probe(name = "direct_none", text = None, levels = None, dep = None)
+probe(name = "explicit_empty", text = "", levels = {}, dep = ":replacement")
+probe(name = "literal_none", text = "None")
+probe(name = "concrete", text = "override", levels = {"dbg": "1"}, dep = ":replacement")

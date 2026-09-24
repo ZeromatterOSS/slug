@@ -29,19 +29,21 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-97-m7a-selected-module-extension-host-factors-r1
+Packet: WP-7-98-m7a-starlark-rule-direct-none-default-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP797 selects declared OS/architecture factors for the original rules_rust
-0.73 `rust_host_tools` extension. Its DICE-owned selected result and
-post-host terminals now retain only the declared Rust Host components;
-canonical generated-repository names remain independent of factors. Bazel
-9.2's four-factor oracle, focused Rust checks and independent reviews passed.
-The authentic extension advances through WP796's six archive effects and
-stops at the separate generated BUILD `iso_date=None` Loading boundary.
-Exact Bazel JVM factor bytes, lockfile replay, unrelated owners and root
-bootstrap remain deferred. Two older diagnostic tests with missing Host
-fixture inputs remain an unrelated validation gap; see the packet receipt.
+WP798 admits Bazel 9.2 direct-`None` defaulting for known ordinary public
+declared Starlark-rule attributes; private attributes remain deferred. The
+authentic rules_rust 0.73 generated `rust_toolchain` passes five such values:
+two labels, two string dictionaries and string `iso_date`. All now use their
+declared defaults without explicit provenance. Bazel's eight-command fixture,
+focused Loading proofs and independent reviews passed. The authentic Slug
+smoke passes the former `iso_date=None` stop. Under the already validated
+normalized `PATH`, it clears the transient `rules_shell` `which` limit and
+reaches rules_python's unsupported repository-rule `_rule_name` declaration
+at toolchain registration row 53. This is not root-build readiness.
+Selector-branch `None`, callable built-ins, native
+rules, exact JVM factor bytes and lockfile replay remain deferred.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

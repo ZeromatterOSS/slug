@@ -1,0 +1,310 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "attr(dep, \"fallback\", attr(levels, \"dbg.*0\", attr(text, \"^sentinel$\", set(//:omitted //:direct_none))))",
+        "--output=label",
+        "--order_output=full",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "attr(dep, \"fallback\", attr(levels, \"dbg.*0\", attr(text, \"^sentinel$\", set(//:omitted //:direct_none))))",
+        "--output=label",
+        "--order_output=full",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "omitted_and_direct_none_use_declared_defaults",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...",
+      "normalized_stdout": "//:omitted\n//:direct_none",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n",
+      "stdout": "//:omitted\n//:direct_none\n"
+    },
+    {
+      "argv": [
+        "query",
+        "attr(dep, \"replacement\", attr(text, \"^$\", //:explicit_empty)) except attr(levels, \"dbg\", //:explicit_empty)",
+        "--output=label",
+        "--order_output=full",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "attr(dep, \"replacement\", attr(text, \"^$\", //:explicit_empty)) except attr(levels, \"dbg\", //:explicit_empty)",
+        "--output=label",
+        "--order_output=full",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "explicit_empty_and_label_override_do_not_reapply_defaults",
+      "normalized_stderr": "",
+      "normalized_stdout": "//:explicit_empty",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "//:explicit_empty\n"
+    },
+    {
+      "argv": [
+        "query",
+        "attr(text, \"^None$\", //:literal_none) union attr(text, \"^override$\", attr(levels, \"dbg.*1\", //:concrete))",
+        "--output=label",
+        "--order_output=full",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "attr(text, \"^None$\", //:literal_none) union attr(text, \"^override$\", attr(levels, \"dbg.*1\", //:concrete))",
+        "--output=label",
+        "--order_output=full",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "literal_none_and_concrete_values_remain_explicit",
+      "normalized_stderr": "",
+      "normalized_stdout": "//:literal_none\n//:concrete",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "//:literal_none\n//:concrete\n"
+    },
+    {
+      "argv": [
+        "query",
+        "set(//:omitted //:direct_none //:explicit_empty //:concrete)",
+        "--output=xml",
+        "--noxml:default_values",
+        "--order_output=full",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "set(//:omitted //:direct_none //:explicit_empty //:concrete)",
+        "--output=xml",
+        "--noxml:default_values",
+        "--order_output=full",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "xml_explicitness_omitted_none_empty_and_concrete",
+      "normalized_stderr": "",
+      "normalized_stdout": "<?xml version=\"1.1\" encoding=\"UTF-8\" standalone=\"no\"?>\n<query version=\"2\">\n    <rule class=\"probe\" location=\"<workspace>/BUILD.bazel:6:6\" name=\"//:omitted\">\n        <string name=\"name\" value=\"omitted\"/>\n        <rule-input name=\"//:fallback\"/>\n    </rule>\n    <rule class=\"probe\" location=\"<workspace>/BUILD.bazel:8:6\" name=\"//:explicit_empty\">\n        <string name=\"name\" value=\"explicit_empty\"/>\n        <string name=\"text\" value=\"\"/>\n        <dict name=\"levels\"/>\n        <label name=\"dep\" value=\"//:replacement\"/>\n        <rule-input name=\"//:replacement\"/>\n    </rule>\n    <rule class=\"probe\" location=\"<workspace>/BUILD.bazel:7:6\" name=\"//:direct_none\">\n        <string name=\"name\" value=\"direct_none\"/>\n        <rule-input name=\"//:fallback\"/>\n    </rule>\n    <rule class=\"probe\" location=\"<workspace>/BUILD.bazel:10:6\" name=\"//:concrete\">\n        <string name=\"name\" value=\"concrete\"/>\n        <string name=\"text\" value=\"override\"/>\n        <dict name=\"levels\">\n            <pair>\n                <string value=\"dbg\"/>\n                <string value=\"1\"/>\n            </pair>\n        </dict>\n        <label name=\"dep\" value=\"//:replacement\"/>\n        <rule-input name=\"//:replacement\"/>\n    </rule>\n</query>",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "<?xml version=\"1.1\" encoding=\"UTF-8\" standalone=\"no\"?>\n<query version=\"2\">\n    <rule class=\"probe\" location=\"/tmp/slug-wp798-gen-final-fnpjIU/runs/starlark-rule-direct-none-default/20260923-220609-1194759-bazel/workspace/BUILD.bazel:6:6\" name=\"//:omitted\">\n        <string name=\"name\" value=\"omitted\"/>\n        <rule-input name=\"//:fallback\"/>\n    </rule>\n    <rule class=\"probe\" location=\"/tmp/slug-wp798-gen-final-fnpjIU/runs/starlark-rule-direct-none-default/20260923-220609-1194759-bazel/workspace/BUILD.bazel:8:6\" name=\"//:explicit_empty\">\n        <string name=\"name\" value=\"explicit_empty\"/>\n        <string name=\"text\" value=\"\"/>\n        <dict name=\"levels\"/>\n        <label name=\"dep\" value=\"//:replacement\"/>\n        <rule-input name=\"//:replacement\"/>\n    </rule>\n    <rule class=\"probe\" location=\"/tmp/slug-wp798-gen-final-fnpjIU/runs/starlark-rule-direct-none-default/20260923-220609-1194759-bazel/workspace/BUILD.bazel:7:6\" name=\"//:direct_none\">\n        <string name=\"name\" value=\"direct_none\"/>\n        <rule-input name=\"//:fallback\"/>\n    </rule>\n    <rule class=\"probe\" location=\"/tmp/slug-wp798-gen-final-fnpjIU/runs/starlark-rule-direct-none-default/20260923-220609-1194759-bazel/workspace/BUILD.bazel:10:6\" name=\"//:concrete\">\n        <string name=\"name\" value=\"concrete\"/>\n        <string name=\"text\" value=\"override\"/>\n        <dict name=\"levels\">\n            <pair>\n                <string value=\"dbg\"/>\n                <string value=\"1\"/>\n            </pair>\n        </dict>\n        <label name=\"dep\" value=\"//:replacement\"/>\n        <rule-input name=\"//:replacement\"/>\n    </rule>\n</query>\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//bad_mandatory:bad",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//bad_mandatory:bad",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "mandatory_direct_none_is_missing",
+      "normalized_stderr": "ERROR: <workspace>/bad_mandatory/BUILD.bazel:3:16: //bad_mandatory:bad: missing value for mandatory attribute 'required_dep' in 'mandatory_probe' rule\nERROR: Evaluation of query \"//bad_mandatory:bad\" failed",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "ERROR: /tmp/slug-wp798-gen-final-fnpjIU/runs/starlark-rule-direct-none-default/20260923-220609-1194759-bazel/workspace/bad_mandatory/BUILD.bazel:3:16: //bad_mandatory:bad: missing value for mandatory attribute 'required_dep' in 'mandatory_probe' rule\nERROR: Evaluation of query \"//bad_mandatory:bad\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//bad_unknown:bad",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//bad_unknown:bad",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "unknown_direct_none_still_rejected",
+      "normalized_stderr": "ERROR: <workspace>/bad_unknown/BUILD.bazel:3:6: //bad_unknown:bad: no such attribute 'unknown' in 'probe' rule\nERROR: Evaluation of query \"//bad_unknown:bad\" failed",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "ERROR: /tmp/slug-wp798-gen-final-fnpjIU/runs/starlark-rule-direct-none-default/20260923-220609-1194759-bazel/workspace/bad_unknown/BUILD.bazel:3:6: //bad_unknown:bad: no such attribute 'unknown' in 'probe' rule\nERROR: Evaluation of query \"//bad_unknown:bad\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//bad_private:bad",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//bad_private:bad",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "private_direct_none_still_rejected",
+      "normalized_stderr": "ERROR: <workspace>/bad_private/BUILD.bazel:3:6: //bad_private:bad: no such attribute '_x' in 'probe' rule\nERROR: Evaluation of query \"//bad_private:bad\" failed",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "ERROR: /tmp/slug-wp798-gen-final-fnpjIU/runs/starlark-rule-direct-none-default/20260923-220609-1194759-bazel/workspace/bad_private/BUILD.bazel:3:6: //bad_private:bad: no such attribute '_x' in 'probe' rule\nERROR: Evaluation of query \"//bad_private:bad\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//bad_type:bad",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//bad_type:bad",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "wrong_concrete_type_still_rejected",
+      "normalized_stderr": "ERROR: <workspace>/bad_type/BUILD.bazel:3:6: //bad_type:bad: expected value of type 'string' for attribute 'text' of 'probe', but got 7 (int)\nERROR: Evaluation of query \"//bad_type:bad\" failed",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "ERROR: /tmp/slug-wp798-gen-final-fnpjIU/runs/starlark-rule-direct-none-default/20260923-220609-1194759-bazel/workspace/bad_type/BUILD.bazel:3:6: //bad_type:bad: expected value of type 'string' for attribute 'text' of 'probe', but got 7 (int)\nERROR: Evaluation of query \"//bad_type:bad\" failed\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "starlark-rule-direct-none-default",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

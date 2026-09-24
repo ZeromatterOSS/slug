@@ -8144,6 +8144,14 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                             declaration.name
                         );
                     }
+                    // Bazel ignores direct None for ordinary rule attributes after
+                    // validating their names, so the declared default (or mandatory
+                    // check) supplies the value without explicit provenance.
+                    let explicit = if !builtin && !declaration.name.starts_with('_') {
+                        explicit.filter(|value| !value.is_none())
+                    } else {
+                        explicit
+                    };
                     let (provenance, value) = match initialized {
                         Some(RuleInitializerOverride::Value(value)) => {
                             (AttributeProvenance::Explicit, value.clone())

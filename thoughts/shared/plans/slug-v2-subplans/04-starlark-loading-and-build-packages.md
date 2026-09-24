@@ -9200,3 +9200,19 @@ The sole replay is accepted with lifecycle 222/222/221 and
 `T=S=2541`, `C=U=E=O=0`. This is aggregate dependency-context type evidence,
 not identity or evaluation causality. Stop the diagnostic chain; any semantic
 change requires a new docs-first architecture packet and ordinary proofs.
+
+### Public Starlark-rule direct-`None` defaulting accepted (2026-09-24)
+
+WP798 admits Bazel 9.2 Loading behavior for a known ordinary public declared
+Starlark-rule attribute passed direct `None`: validate its name first, then
+treat it as omitted so the declaration's default applies without explicit
+provenance, or a mandatory declaration reports missing. Concrete values remain
+explicit and type checked. The package owner retains structural DICE source
+identity; source/default A/B/A restoration is covered. The source-authentic
+rules_rust `rust_toolchain` now passes the former five direct-`None` Loading
+values. The ambient-`PATH` smoke encountered the previously recorded
+transient `rules_shell` repository-`which` limit; the already validated
+normalized `PATH` cleared it and reached rules_python's unsupported
+repository-rule `_rule_name` declaration at toolchain registration row 53.
+Selector-branch `None`, private and built-in attributes, native rules,
+initializer changes and configured semantics remain outside this exact slice.
