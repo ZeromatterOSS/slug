@@ -7740,7 +7740,7 @@ fn config_common_methods(builder: &mut MethodsBuilder) {
 impl<'v> StarlarkValue<'v> for ConfigCommonModule {
     fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         (name == "FeatureFlagInfo")
-            .then(|| heap.alloc_simple(BuiltinProviderKey::new("FeatureFlagInfo")))
+            .then(|| heap.alloc_simple(crate::provider::FeatureFlagInfoConstructor))
     }
 
     fn dir_attr(&self) -> Vec<String> {

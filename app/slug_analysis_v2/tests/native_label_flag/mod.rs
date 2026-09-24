@@ -117,6 +117,13 @@ fn with_label(config: &ConfigurationKey, setting: &str, value: &str) -> Configur
         slug_configuration_v2::StarlarkOptionScope::Default,
     ))
 }
+fn with_string(config: &ConfigurationKey, setting: &str, value: &str) -> ConfigurationKey {
+    config.with_starlark_option(StarlarkOption::new(
+        CanonicalLabel::parse(setting).unwrap(),
+        StarlarkOptionValue::String(value.into()),
+        slug_configuration_v2::StarlarkOptionScope::Default,
+    ))
+}
 fn field<'a>(result: &'a ConfiguredNodeResult, name: &str) -> &'a slug_build_api_v2::AnalysisValue {
     result
         .providers()
@@ -257,6 +264,146 @@ async fn label_predicates_normalize_alias_keys_and_expected_labels_and_reject_du
         .await
         .unwrap();
     assert_eq!(text(&selected), "specific");
+}
+
+#[tokio::test]
+async fn feature_flag_predicates_use_typed_provider_before_raw_setting_and_accept_ordinary_rules() {
+    let workspace = Workspace::new();
+    fs::write(
+        workspace.0.join("feature_predicates.bzl"),
+        r#"def _feature_setting(ctx):
+    return [config_common.FeatureFlagInfo(value = ctx.attr.feature_value)]
+feature_setting = rule(
+    implementation = _feature_setting,
+    attrs = {"feature_value": attr.string()},
+    build_setting = config.string(flag = True),
+)
+
+def _plain_setting(ctx):
+    return []
+plain_setting = rule(implementation = _plain_setting, build_setting = config.string(flag = True))
+
+def _ordinary(ctx):
+    return [config_common.FeatureFlagInfo(value = ctx.attr.feature_value)]
+ordinary = rule(implementation = _ordinary, attrs = {"feature_value": attr.string()})
+"#,
+    )
+    .unwrap();
+    let original = include_str!("BUILD.fixture");
+    let build = |feature_value: &str| {
+        format!(
+            r#"load(":feature_predicates.bzl", "feature_setting", "plain_setting", "ordinary")
+{original}
+feature_setting(name = "feature_mode", build_setting_default = "raw", feature_value = "{feature_value}")
+plain_setting(name = "plain_mode", build_setting_default = "fallback")
+ordinary(name = "ordinary_flag", feature_value = ":literal")
+ordinary(name = "canonical_ordinary_flag", feature_value = "@@dep+//:literal")
+label_flag(name = "label_feature_flag", build_setting_default = ":canonical_ordinary_flag")
+alias(name = "label_feature_alias", actual = ":label_feature_flag")
+alias(name = "feature_alias", actual = ":feature_mode")
+alias(name = "ordinary_alias", actual = ":ordinary_flag")
+config_setting(name = "feature_match", flag_values = {{":feature_mode": "provider"}})
+config_setting(name = "raw_match", flag_values = {{":feature_mode": "raw"}})
+config_setting(name = "feature_alias_match", flag_values = {{":feature_alias": "provider"}})
+config_setting(name = "duplicate_feature", flag_values = {{":feature_mode": "provider", ":feature_alias": "provider"}})
+config_setting(name = "ordinary_match", flag_values = {{":ordinary_flag": ":literal"}})
+config_setting(name = "ordinary_alias_match", flag_values = {{":ordinary_alias": ":literal"}})
+config_setting(name = "ordinary_relative_miss", flag_values = {{":canonical_ordinary_flag": ":literal"}})
+config_setting(name = "ordinary_mapped_miss", flag_values = {{":canonical_ordinary_flag": "@dep//:literal"}})
+config_setting(name = "ordinary_canonical_match", flag_values = {{":canonical_ordinary_flag": "@@dep+//:literal"}})
+config_setting(name = "label_feature_match", flag_values = {{":label_feature_flag": "@dep//:literal"}})
+config_setting(name = "label_feature_alias_match", flag_values = {{":label_feature_alias": "@dep//:literal"}})
+config_setting(name = "label_feature_relative_miss", flag_values = {{":label_feature_flag": ":literal"}})
+config_setting(name = "plain_match", flag_values = {{":plain_mode": "fallback"}})
+select_probe(name = "feature_probe", value = select({{":feature_match": "provider", "//conditions:default": "default"}}))
+select_probe(name = "raw_probe", value = select({{":raw_match": "raw", "//conditions:default": "default"}}))
+select_probe(name = "feature_alias_probe", value = select({{":feature_alias_match": "alias", "//conditions:default": "default"}}))
+select_probe(name = "duplicate_feature_probe", value = select({{":duplicate_feature": "duplicate", "//conditions:default": "default"}}))
+select_probe(name = "ordinary_probe", value = select({{":ordinary_match": "ordinary", "//conditions:default": "default"}}))
+select_probe(name = "ordinary_alias_probe", value = select({{":ordinary_alias_match": "ordinary alias", "//conditions:default": "default"}}))
+select_probe(name = "ordinary_relative_probe", value = select({{":ordinary_relative_miss": "wrong", "//conditions:default": "default"}}))
+select_probe(name = "ordinary_mapped_probe", value = select({{":ordinary_mapped_miss": "wrong", "//conditions:default": "default"}}))
+select_probe(name = "ordinary_canonical_probe", value = select({{":ordinary_canonical_match": "canonical", "//conditions:default": "default"}}))
+select_probe(name = "label_feature_probe", value = select({{":label_feature_match": "label feature", "//conditions:default": "default"}}))
+select_probe(name = "label_feature_alias_probe", value = select({{":label_feature_alias_match": "alias label feature", "//conditions:default": "default"}}))
+select_probe(name = "label_feature_relative_probe", value = select({{":label_feature_relative_miss": "wrong", "//conditions:default": "default"}}))
+select_probe(name = "plain_probe", value = select({{":plain_match": "fallback", "//conditions:default": "default"}}))
+"#
+        )
+    };
+    fs::write(workspace.0.join("BUILD.bazel"), build("provider")).unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let base = configuration();
+    let first = workspace
+        .request(&dice, false, "feature_probe", base.clone())
+        .await
+        .unwrap();
+    assert_eq!(text(&first), "provider");
+    for (target, expected) in [
+        ("raw_probe", "default"),
+        ("feature_alias_probe", "alias"),
+        ("ordinary_probe", "ordinary"),
+        ("ordinary_alias_probe", "ordinary alias"),
+        ("ordinary_relative_probe", "default"),
+        ("ordinary_mapped_probe", "default"),
+        ("ordinary_canonical_probe", "canonical"),
+        ("label_feature_probe", "label feature"),
+        ("label_feature_alias_probe", "alias label feature"),
+        ("label_feature_relative_probe", "default"),
+        ("plain_probe", "fallback"),
+    ] {
+        let result = workspace
+            .request(&dice, false, target, base.clone())
+            .await
+            .unwrap();
+        assert_eq!(text(&result), expected, "{target}");
+    }
+    let duplicate = workspace
+        .request(&dice, false, "duplicate_feature_probe", base.clone())
+        .await
+        .err()
+        .expect("aliases to one feature target have one normalized identity");
+    assert!(
+        duplicate.contains("referenced multiple times"),
+        "{duplicate}"
+    );
+
+    let overridden = with_string(&base, "@@//:feature_mode", "configured raw");
+    assert_eq!(
+        text(
+            &workspace
+                .request(&dice, false, "feature_probe", overridden)
+                .await
+                .unwrap()
+        ),
+        "provider"
+    );
+    assert_eq!(
+        first,
+        workspace
+            .request(&dice, false, "feature_probe", base.clone())
+            .await
+            .unwrap()
+    );
+
+    fs::write(workspace.0.join("BUILD.bazel"), build("changed")).unwrap();
+    assert_eq!(
+        text(
+            &workspace
+                .request(&dice, false, "feature_probe", base.clone())
+                .await
+                .unwrap()
+        ),
+        "default"
+    );
+    fs::write(workspace.0.join("BUILD.bazel"), build("provider")).unwrap();
+    assert_eq!(
+        first,
+        workspace
+            .request(&dice, false, "feature_probe", base)
+            .await
+            .unwrap()
+    );
 }
 
 #[tokio::test]

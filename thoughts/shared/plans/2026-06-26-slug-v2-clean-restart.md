@@ -29,19 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-131-m7a-feature-flag-provider-declaration-r1
+Packet: WP-7-132-m7a-configured-feature-flag-info-r1
 Status: ACCEPTED; M7A remains partial
 
-WP831 accepts Bazel 9.2 `.bzl` Loading of the singleton
-`config_common.FeatureFlagInfo` provider key used by rules_python 1.7.0's
-top-level attribute/provider declarations. The configured constructor,
-membership, value and Python flag analysis remain unadmitted and fail closed.
-Ten focused/protected tests, source-owned A/B/A, direct Analysis-failure
-proof, rebuilt CLI replay and independent DESIGN/FINAL `ACCEPT` support the
-bounded Loading surface. The authentic `//:probe` replay clears the former
-`flags.bzl:158` stop and next reaches the deferred configured
-`FeatureFlagInfo(value = value)` call in `config_settings.bzl:172`. WP830 at
-`c18e59646` is the immediate predecessor; M7A remains partial.
+WP832 accepts Bazel 9.2's selected Starlark-created configured
+`config_common.FeatureFlagInfo` instance, direct typed provider publication
+and lookup, and provider-first `config_setting(flag_values)` matching,
+including native `label_flag` forwarding with requested-flag label
+canonicalization. Seventeen focused/protected tests and independent DESIGN
+and FINAL reviews pass. The authentic rules_python 1.7.0 `//:probe` replay
+no longer observed the prior `config_settings.bzl:172` constructor error and
+first reported missing `@@bazel_tools//tools/python` BUILD content; parallel
+package loading does not prove the constructor path executed. Native
+`config_feature_flag`, Starlark `config.label`, nested provider transport,
+full Python/root build and M7A remain open. WP831 is `0f5e698b7`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

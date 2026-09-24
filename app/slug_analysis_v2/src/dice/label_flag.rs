@@ -1,5 +1,8 @@
 //! Native label settings: own option identity, selected target providers.
+use slug_build_api_v2::ProviderIdentity;
+use slug_build_api_v2::RunfilesPackageMetadata;
 use slug_configuration_v2::StarlarkOptionValue;
+use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::package::BuildSettingDefinition;
 use slug_loading_v2::package::ConfigSettingTarget;
 
@@ -41,6 +44,72 @@ pub(super) async fn declaration(
                 return analysis_semantic_complete(Ok((label, declaration)));
             }
             Ok(BuildSettingLookupStep::Alias(next)) => label = next,
+            Err(error) => return analysis_semantic_complete(Err(AnalysisError::message(error))),
+        }
+    }
+}
+
+/// A native label_flag keeps its label-typed BuildSettingProvider while
+/// forwarding the selected target's FeatureFlagInfo. Classify the requested
+/// flag (through aliases), not the forwarded actual target.
+async fn feature_label_typed(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    requested: &CanonicalLabel,
+) -> AnalysisSemanticOutcome<bool> {
+    let mut label = requested.clone();
+    let mut visited = SmallSet::new();
+    loop {
+        if !visited.insert(label.clone()) {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "build setting alias cycle at {label}"
+            ))));
+        }
+        let inventory = semantic_value!(
+            compute_configured_package_input(
+                ctx,
+                mode,
+                workspace.dupe(),
+                label.package().clone(),
+                "loading feature-flag declaration through DICE",
+            )
+            .await
+        );
+        let package = match inventory.loaded() {
+            Ok(package) => package,
+            Err(error) => return analysis_semantic_complete(Err(package_inventory_error(error))),
+        };
+        let Some(target) = package
+            .targets
+            .iter()
+            .find(|target| target.name == label.target().as_str())
+        else {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "feature-flag target {label} is missing from its package"
+            ))));
+        };
+        if !matches!(target.kind, PackageTargetKind::Alias { .. }) {
+            return match target.kind.build_setting_declaration() {
+                Ok(Some(_)) => match build_setting_lookup_step(package, &label) {
+                    Ok(BuildSettingLookupStep::Setting(declaration)) => {
+                        analysis_semantic_complete(Ok(matches!(
+                            declaration.definition(),
+                            BuildSettingDefinition::Label { .. }
+                        )))
+                    }
+                    Ok(BuildSettingLookupStep::Alias(_)) => unreachable!("nonalias is a setting"),
+                    Err(error) => analysis_semantic_complete(Err(AnalysisError::message(error))),
+                },
+                Ok(None) => analysis_semantic_complete(Ok(false)),
+                Err(error) => analysis_semantic_complete(Err(AnalysisError::message(format!(
+                    "invalid build-setting declaration for {label}: {error}"
+                )))),
+            };
+        }
+        match build_setting_lookup_step(package, &label) {
+            Ok(BuildSettingLookupStep::Alias(next)) => label = next,
+            Ok(BuildSettingLookupStep::Setting(_)) => unreachable!("alias is not a setting"),
             Err(error) => return analysis_semantic_complete(Err(AnalysisError::message(error))),
         }
     }
@@ -127,8 +196,6 @@ async fn predicate(
     requested: &CanonicalLabel,
     text: &str,
 ) -> AnalysisSemanticOutcome<(CanonicalLabel, CompactString, bool)> {
-    let (setting, declaration) =
-        semantic_value!(declaration(ctx, mode, workspace, requested).await);
     let child = match compute_configured_child(
         ctx,
         mode,
@@ -147,6 +214,27 @@ async fn predicate(
             Err(error) => return analysis_semantic_complete(Err(error.clone())),
         },
     };
+    let actual = child.actual_target().label().clone();
+    let feature = child
+        .providers()
+        .get(&ProviderIdentity::builtin("FeatureFlagInfo"));
+    if let Some(feature) = feature {
+        let ProviderValue::FeatureFlagInfo(feature) = feature else {
+            return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                "target {actual} has a malformed FeatureFlagInfo provider"
+            ))));
+        };
+        // Bazel canonicalizes before provider comparison using the requested
+        // label_flag's BuildSettingProvider, not the forwarded actual target.
+        let label_typed =
+            semantic_value!(feature_label_typed(ctx, mode, workspace, requested).await);
+        let expected = canonicalize_feature_expected(text, package.runfiles_package(), label_typed);
+        let matches = feature.value() == expected.as_str();
+        return analysis_semantic_complete(Ok((actual, expected, matches)));
+    }
+
+    let (setting, declaration) =
+        semantic_value!(declaration(ctx, mode, workspace, requested).await);
     let expected = if matches!(
         declaration.definition(),
         BuildSettingDefinition::Label { .. }
@@ -176,12 +264,80 @@ async fn predicate(
         configuration.starlark_option(&setting),
         &expected,
     ) {
-        Ok(matches) => analysis_semantic_complete(Ok((
-            child.actual_target().label().clone(),
-            expected,
-            matches,
-        ))),
+        Ok(matches) => analysis_semantic_complete(Ok((actual, expected, matches))),
         Err(error) => analysis_semantic_complete(Err(AnalysisError::message(error))),
+    }
+}
+
+fn canonicalize_feature_expected(
+    text: &str,
+    metadata: &RunfilesPackageMetadata,
+    label_typed: bool,
+) -> CompactString {
+    if !label_typed {
+        return CompactString::new(text);
+    }
+    CanonicalLabel::parse_with_package_context(text, metadata.package(), |apparent| {
+        if apparent.is_empty() {
+            return Ok(slug_identity_v2::CanonicalRepoName::root());
+        }
+        metadata
+            .mapping()
+            .entries()
+            .iter()
+            .find(|(name, _)| name.as_str() == apparent)
+            .map(|(_, repo)| repo.clone())
+            .ok_or_else(|| format!("no repository visible as @{apparent} in config_setting"))
+    })
+    .map(|label| CompactString::new(label.to_string()))
+    // Bazel leaves invalid label text intact for the subsequent type
+    // conversion. For a feature provider, the raw text is compared verbatim.
+    .unwrap_or_else(|_| CompactString::new(text))
+}
+
+#[cfg(test)]
+mod feature_expected_tests {
+    use slug_build_api_v2::RunfilesRepositoryMapping;
+    use slug_identity_v2::ApparentRepoName;
+    use slug_identity_v2::CanonicalRepoName;
+
+    use super::*;
+
+    #[test]
+    fn label_setting_feature_expectations_use_condition_context_and_leave_invalid_text_raw() {
+        let metadata = RunfilesPackageMetadata::new(
+            CanonicalLabel::parse("@@//conditions:selector")
+                .unwrap()
+                .package()
+                .clone(),
+            Arc::new(RunfilesRepositoryMapping::new(
+                Arc::from([(
+                    ApparentRepoName::new("visible").unwrap(),
+                    CanonicalRepoName::new("dep+").unwrap(),
+                )]),
+                None,
+            )),
+        );
+        assert_eq!(
+            canonicalize_feature_expected(":local", &metadata, true),
+            "@@//conditions:local"
+        );
+        assert_eq!(
+            canonicalize_feature_expected("@visible//:leaf", &metadata, true),
+            "@@dep+//:leaf"
+        );
+        assert_eq!(
+            canonicalize_feature_expected("//bad/...:x", &metadata, true),
+            "//bad/...:x"
+        );
+        assert_eq!(
+            canonicalize_feature_expected("@missing//:leaf", &metadata, true),
+            "@missing//:leaf"
+        );
+        assert_eq!(
+            canonicalize_feature_expected(":local", &metadata, false),
+            ":local"
+        );
     }
 }
 

@@ -37027,6 +37027,67 @@ fn config_common_feature_flag_info_is_a_bzl_only_builtin_provider_key() {
 }
 
 #[test]
+fn config_common_feature_flag_info_constructor_accepts_string_and_preserves_identity() {
+    let globals = loading_globals();
+    let module = eval_global(
+        "KEY=config_common.FeatureFlagInfo\nAGAIN=config_common.FeatureFlagInfo\nPOSITIONAL=KEY('enabled')\nALIAS=POSITIONAL\nNAMED=AGAIN(value='enabled')\nKEYS_EQUAL=KEY==AGAIN\nSAME_INSTANCE=POSITIONAL==ALIAS\nFRESH_INSTANCE=POSITIONAL!=NAMED\nKIND=type(POSITIONAL)\nTEXT=repr(POSITIONAL)\nVALUE=POSITIONAL.value\nERROR=POSITIONAL.error\nVALID=POSITIONAL.is_valid_value('not-an-allowed-value')\nEMPTY_VALID=POSITIONAL.is_valid_value('')\n",
+        &globals,
+    )
+    .unwrap();
+    for name in [
+        "KEYS_EQUAL",
+        "SAME_INSTANCE",
+        "FRESH_INSTANCE",
+        "VALID",
+        "EMPTY_VALID",
+    ] {
+        assert_eq!(
+            module.get(name).unwrap().unpack_bool(),
+            Some(true),
+            "{name}"
+        );
+    }
+    let hash = |name| {
+        module
+            .get(name)
+            .unwrap()
+            .value()
+            .get_hashed()
+            .unwrap()
+            .hash()
+    };
+    assert_eq!(hash("KEY"), hash("AGAIN"));
+    assert_eq!(hash("POSITIONAL"), hash("ALIAS"));
+    assert_eq!(
+        module.get("KIND").unwrap().unpack_str(),
+        Some("FeatureFlagInfo")
+    );
+    assert_eq!(
+        module.get("TEXT").unwrap().unpack_str(),
+        Some("struct(error = None, value = \"enabled\")")
+    );
+    assert_eq!(module.get("VALUE").unwrap().unpack_str(), Some("enabled"));
+    assert!(module.get("ERROR").unwrap().value().is_none());
+
+    for rejected in [
+        "X=config_common.FeatureFlagInfo()",
+        "X=config_common.FeatureFlagInfo(1)",
+        "X=config_common.FeatureFlagInfo(value=1)",
+        "X=config_common.FeatureFlagInfo('one', 'two')",
+        "X=config_common.FeatureFlagInfo('one', value='two')",
+        "X=config_common.FeatureFlagInfo(value='one', extra='two')",
+        "X=config_common.FeatureFlagInfo(value=None)",
+        "X=config_common.FeatureFlagInfo(value='one').is_valid_value(42)",
+    ] {
+        assert!(eval_global(rejected, &globals).is_err(), "{rejected}");
+    }
+    assert!(
+        eval_global("X=PackageSpecificationInfo('enabled')", &globals).is_err(),
+        "the unrelated declaration-only builtin remains noncallable"
+    );
+}
+
+#[test]
 fn symbolic_macro_expands_nested_rules_and_retains_package_owned_origin() {
     let build = r#"load(":defs.bzl", loaded_outer = "outer")
 loaded_outer(name = "tree", text = "explicit", visibility = ["//visibility:public"])

@@ -73,8 +73,12 @@ use crate::bzl_module::manifest_starlark_sources;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::starlark_label::StarlarkLabel;
 
+mod feature_flag_info;
 mod output_group;
 mod template_variable_info;
+pub(crate) use feature_flag_info::FeatureFlagInfoConstructor;
+pub use feature_flag_info::alloc_frozen_feature_flag_info;
+pub use feature_flag_info::feature_flag_info;
 pub use output_group::StarlarkOutputGroupInfo;
 pub(crate) use template_variable_info::TemplateVariableInfoConstructor;
 pub use template_variable_info::alloc_frozen_template_variable_info;
@@ -1709,6 +1713,9 @@ pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> 
     if TemplateVariableInfoConstructor::from_value(value).is_some() {
         return Some(ProviderIdentity::builtin("TemplateVariableInfo"));
     }
+    if FeatureFlagInfoConstructor::from_value(value).is_some() {
+        return Some(ProviderIdentity::builtin("FeatureFlagInfo"));
+    }
     if let Some(callable) = AnalysisBuiltinCallable::from_value(value) {
         return matches!(callable.name, "DefaultInfo" | "ToolchainInfo")
             .then(|| ProviderIdentity::builtin(callable.name));
@@ -1728,11 +1735,6 @@ pub fn starlark_provider_identity(value: Value<'_>) -> Option<ProviderIdentity> 
 pub fn configured_target_provider_identity(
     value: Value<'_>,
 ) -> starlark::Result<Option<ProviderIdentity>> {
-    if BuiltinProviderKey::from_value(value).is_some_and(|key| key.name == "FeatureFlagInfo") {
-        return Err(starlark::Error::new_other(anyhow::anyhow!(
-            "config_common.FeatureFlagInfo is declaration-only; configured-target membership and indexing are unsupported"
-        )));
-    }
     if let Some(key) = DeclarationOnlyAppleProviderKey::from_value(value) {
         return Err(starlark::Error::new_other(anyhow::anyhow!(
             "apple_common.{} is declaration-only; configured-target membership and indexing are unsupported",
@@ -1749,6 +1751,7 @@ pub fn alloc_starlark_provider_callable(
     name: &'static str,
 ) -> Option<FrozenValue> {
     Some(match name {
+        "FeatureFlagInfo" => heap.alloc(FeatureFlagInfoConstructor),
         "TemplateVariableInfo" => heap.alloc(TemplateVariableInfoConstructor),
         "PackageSpecificationInfo" => heap.alloc(BuiltinProviderKey::new(name)),
         "DefaultInfo" | "ToolchainInfo" => heap.alloc(AnalysisBuiltinCallable::new(name)),
@@ -1996,6 +1999,7 @@ mod tests {
     use super::BuiltinProviderKey;
     use super::DeclarationOnlyAppleProviderKey;
     use super::DeclarationOnlyAppleProviderKind;
+    use super::FeatureFlagInfoConstructor;
     use super::StarlarkDefaultInfo;
     use super::TemplateVariableInfoConstructor;
     use super::alloc_starlark_provider_callable;
@@ -2083,7 +2087,7 @@ mod tests {
     }
 
     #[test]
-    fn config_feature_flag_info_is_a_declaration_only_builtin_provider_key() {
+    fn config_feature_flag_info_has_callable_singleton_builtin_identity() {
         let module = evaluate_module(
             "KEY = config_common.FeatureFlagInfo\n\
              AGAIN = config_common.FeatureFlagInfo\n\
@@ -2114,7 +2118,7 @@ mod tests {
         let hash = |value: Value<'_>| value.get_hashed().unwrap().hash();
         assert_eq!(hash(key), hash(again));
         let heap = starlark::values::FrozenHeap::new();
-        let rematerialized = heap.alloc(BuiltinProviderKey::new("FeatureFlagInfo"));
+        let rematerialized = heap.alloc(FeatureFlagInfoConstructor);
         assert!(key.equals(rematerialized.to_value()).unwrap());
         assert_eq!(hash(key), hash(rematerialized.to_value()));
         assert_eq!(
@@ -2130,24 +2134,81 @@ mod tests {
         let ordinary = heap.alloc(BuiltinProviderKey::new("PackageSpecificationInfo"));
         assert!(!key.equals(ordinary.to_value()).unwrap());
         assert_ne!(hash(key), hash(ordinary.to_value()));
-        let error = configured_target_provider_identity(key)
-            .unwrap_err()
-            .to_string();
-        assert!(
-            error.contains("config_common.FeatureFlagInfo is declaration-only"),
-            "{error}"
+        assert_eq!(
+            configured_target_provider_identity(key).unwrap(),
+            Some(ProviderIdentity::builtin("FeatureFlagInfo"))
         );
-        assert!(error.contains("membership and indexing"), "{error}");
         assert_eq!(
             configured_target_provider_identity(ordinary.to_value()).unwrap(),
             Some(ProviderIdentity::builtin("PackageSpecificationInfo"))
         );
-        let error =
-            evaluate_module("X=config_common.FeatureFlagInfo(value='enabled')").unwrap_err();
-        assert!(
-            error.contains("Operation `call()` not supported on type `Provider`"),
-            "{error}"
+        let callable = evaluate_module("X=config_common.FeatureFlagInfo(value='enabled')").unwrap();
+        assert_eq!(
+            callable.get("X").unwrap().value().get_type(),
+            "FeatureFlagInfo"
         );
+    }
+
+    #[test]
+    fn config_feature_flag_info_constructor_and_instance_identity() {
+        let module = evaluate_module(
+            "FIRST = config_common.FeatureFlagInfo('ready')\n\
+             ALIAS = FIRST\n\
+             AGAIN = config_common.FeatureFlagInfo(value = 'ready')\n\
+             VALUE = FIRST.value\n\
+             ERROR = FIRST.error\n\
+             VALID = FIRST.is_valid_value('anything')\n\
+             INSTANCE_TYPE = type(FIRST)\n\
+             INSTANCE_REPR = repr(FIRST)\n",
+        )
+        .unwrap();
+        let first = module.get("FIRST").unwrap();
+        let alias = module.get("ALIAS").unwrap();
+        let again = module.get("AGAIN").unwrap();
+        assert!(first.value().equals(alias.value()).unwrap());
+        assert!(!first.value().equals(again.value()).unwrap());
+        assert_eq!(
+            first.value().get_hashed().unwrap().hash(),
+            alias.value().get_hashed().unwrap().hash()
+        );
+        assert_eq!(module.get("VALUE").unwrap().unpack_str(), Some("ready"));
+        assert!(module.get("ERROR").unwrap().value().is_none());
+        assert_eq!(module.get("VALID").unwrap().unpack_bool(), Some(true));
+        assert_eq!(
+            module.get("INSTANCE_TYPE").unwrap().unpack_str(),
+            Some("FeatureFlagInfo")
+        );
+        assert_eq!(
+            module.get("INSTANCE_REPR").unwrap().unpack_str(),
+            Some("struct(error = None, value = \"ready\")")
+        );
+        let heap = starlark::values::FrozenHeap::new();
+        let restored = super::alloc_frozen_feature_flag_info(
+            &heap,
+            super::feature_flag_info(first.value()).unwrap(),
+        );
+        assert!(first.value().equals(restored.to_value()).unwrap());
+    }
+
+    #[test]
+    fn config_feature_flag_info_rejects_invalid_constructor_arguments() {
+        for (arguments, expected) in [
+            ("", "missing required value"),
+            ("None", "must be a string"),
+            ("1", "must be a string"),
+            ("'a', 'b'", "one value string"),
+            ("'a', value = 'b'", "specified twice"),
+            ("other = 'a'", "one value string"),
+        ] {
+            let error = evaluate_module(&format!("X = config_common.FeatureFlagInfo({arguments})"))
+                .unwrap_err();
+            assert!(error.contains(expected), "{arguments}: {error}");
+        }
+        let error = evaluate_module("X = config_common.FeatureFlagInfo('ok').is_valid_value(1)")
+            .unwrap_err();
+        assert!(error.contains("string"), "{error}");
+        let error = evaluate_module("X = PackageSpecificationInfo()").unwrap_err();
+        assert!(error.contains("not supported"), "{error}");
     }
 
     #[test]

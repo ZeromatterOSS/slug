@@ -9742,3 +9742,25 @@ prior `flags.bzl:158` missing-field stop and next stops at configured
 `config_settings.bzl:172` on `FeatureFlagInfo(value = value)`. Configured
 Python flags, native `config_feature_flag`, full root build and M7A remain
 open.
+
+### Configured Starlark FeatureFlagInfo accepted (2026-09-24)
+
+WP832 admits the selected Bazel 9.2 `.bzl` constructor and configured target
+slice: each one-string call creates a distinct typed FeatureFlagInfo instance;
+its value, null error, always-valid method, simple repr, key membership and
+indexing survive direct Starlark return and forwarding. `config_setting`
+prefers that returned provider over a raw string setting. Native `label_flag`
+may forward an ordinary rule's FeatureFlagInfo while retaining a label-valued
+BuildSettingProvider: predicates resolve the requested flag/alias through
+tracked DICE loading and canonicalize the expected label in the condition
+package before provider comparison. Ordinary provider expectations stay
+literal. Retained occurrence equality is pointer identity, while publication
+cutoff is structural and Slug-native; diagnostics/Unicode remain Slug-native.
+Forged generic built-in occurrences and nested transport fail closed. Seventeen
+focused/protected tests, including one-DICE source/config A/B/A, direct Build,
+mapped-label and ordinary-provider contrasts, pass; independent DESIGN and
+FINAL reviews accept. The authentic Slug `//:probe` replay first reported
+missing `@@bazel_tools//tools/python` BUILD content and did not report WP831's
+constructor error, but parallel loading does not establish constructor-path
+passage. Native `config_feature_flag`, Starlark `config.label`, nested
+transport, complete Python/root bootstrap and M7A remain open.

@@ -694,6 +694,12 @@ impl<'a> AnalysisValueMaterializer<'a> {
     ) -> Result<FrozenValue, String> {
         let mut fields = SmallMap::new();
         match value {
+            ProviderValue::FeatureFlagInfo(info) => {
+                return Ok(slug_loading_v2::provider::alloc_frozen_feature_flag_info(
+                    self.heap,
+                    info.dupe(),
+                ));
+            }
             ProviderValue::DefaultInfo(info) => {
                 fields.insert("files".into(), self.depset(info.files())?);
                 fields.insert(

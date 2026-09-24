@@ -76,6 +76,7 @@ use slug_build_api_v2::AnalysisValueKind;
 use slug_build_api_v2::ArtifactInputSource;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::ProviderId;
+use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::RetainedCommandLineSegment;
 use slug_build_api_v2::RetainedRunfiles;
 use slug_build_api_v2::RetainedSpawnInvocation;
@@ -12403,12 +12404,15 @@ consumer(name = "generated_owner_bad", scalar = ":owner")
 }
 
 #[tokio::test]
-async fn feature_flag_provider_declaration_does_not_admit_configured_provider_use() {
+async fn feature_flag_info_configured_return_lookup_and_fail_closed_boundaries() {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
     fs::write(
         workspace.join("defs.bzl"),
         r#"FeatureFlagInfo = provider(fields = ["value"])
+ObservedInfo = provider(fields = ["value"])
+NestedInfo = provider(fields = ["flag"])
+KEY = config_common.FeatureFlagInfo
 
 def _user_flag(ctx):
     return [FeatureFlagInfo(value = "user")]
@@ -12417,39 +12421,85 @@ def _empty(ctx):
     return [DefaultInfo()]
 
 def _construct(ctx):
-    return [config_common.FeatureFlagInfo(value = "native")]
+    return [KEY(value = "native")]
 
-def _membership(ctx):
-    if config_common.FeatureFlagInfo in ctx.attr.dep:
-        fail("declaration-only membership unexpectedly succeeded")
-    return [DefaultInfo()]
+def _forward(ctx):
+    return [ctx.attr.dep[KEY]]
 
-def _index(ctx):
-    value = ctx.attr.dep[config_common.FeatureFlagInfo]
-    fail("declaration-only indexing unexpectedly returned %s" % value)
+def _observe(ctx):
+    dep = ctx.attr.dep
+    if KEY not in dep:
+        fail("real FeatureFlagInfo is missing")
+    if FeatureFlagInfo in dep:
+        fail("same-name user provider leaked into builtin lookup")
+    info = dep[KEY]
+    if type(info) != "FeatureFlagInfo" or repr(info) != 'struct(error = None, value = "native")':
+        fail("FeatureFlagInfo instance shape changed")
+    if info.error != None or not info.is_valid_value("not-allowed"):
+        fail("Starlark-created FeatureFlagInfo validity changed")
+    return [ObservedInfo(value = info.value)]
+
+def _observe_user(ctx):
+    dep = ctx.attr.dep
+    if KEY in dep or FeatureFlagInfo not in dep:
+        fail("same-name user provider confused with builtin")
+    return [ObservedInfo(value = dep[FeatureFlagInfo].value)]
+
+def _missing(ctx):
+    if KEY in ctx.attr.dep:
+        fail("advertised or absent provider was fabricated")
+    return [ObservedInfo(value = "missing")]
+
+def _index_user(ctx):
+    return [ObservedInfo(value = ctx.attr.dep[KEY].value)]
+
+def _duplicate(ctx):
+    return [KEY("first"), KEY("second")]
+
+def _nested(ctx):
+    return [NestedInfo(flag = KEY("nested"))]
 
 user_flag = rule(
     implementation = _user_flag,
-    provides = [config_common.FeatureFlagInfo],
+    provides = [KEY],
 )
+advertised_only = rule(implementation = _empty, provides = [KEY])
+empty = rule(implementation = _empty)
+construct = rule(implementation = _construct, provides = [KEY])
+forward = rule(implementation = _forward, attrs = {"dep": attr.label(providers = [KEY])}, provides = [KEY])
+observe = rule(implementation = _observe, attrs = {"dep": attr.label(providers = [KEY])})
+observe_user = rule(implementation = _observe_user, attrs = {"dep": attr.label()})
+missing = rule(implementation = _missing, attrs = {"dep": attr.label()})
+index_user = rule(implementation = _index_user, attrs = {"dep": attr.label()})
+duplicate = rule(implementation = _duplicate)
+nested = rule(implementation = _nested)
 needs_flag = rule(
     implementation = _empty,
-    attrs = {"dep": attr.label(providers = [[config_common.FeatureFlagInfo]])},
+    attrs = {"dep": attr.label(providers = [[KEY]])},
 )
-construct = rule(implementation = _construct)
-membership = rule(implementation = _membership, attrs = {"dep": attr.label()})
-index = rule(implementation = _index, attrs = {"dep": attr.label()})
 "#,
     )
     .unwrap();
     fs::write(
         workspace.join("BUILD.bazel"),
-        r#"load(":defs.bzl", "construct", "index", "membership", "needs_flag", "user_flag")
+        r#"load(":defs.bzl", "advertised_only", "construct", "duplicate", "empty", "forward", "index_user", "missing", "needs_flag", "nested", "observe", "observe_user", "user_flag")
 user_flag(name = "user")
-needs_flag(name = "required", dep = ":user")
+advertised_only(name = "advertised")
+empty(name = "empty")
 construct(name = "constructed")
-membership(name = "member", dep = ":user")
-index(name = "indexed", dep = ":user")
+forward(name = "forwarded", dep = ":constructed")
+observe(name = "observed", dep = ":constructed")
+observe(name = "observed_forwarded", dep = ":forwarded")
+observe_user(name = "observed_user", dep = ":user")
+missing(name = "missing_empty", dep = ":empty")
+missing(name = "missing_advertised", dep = ":advertised")
+index_user(name = "indexed_user", dep = ":user")
+needs_flag(name = "required_user", dep = ":user")
+needs_flag(name = "required_advertised", dep = ":advertised")
+needs_flag(name = "required_builtin", dep = ":constructed")
+needs_flag(name = "required_forwarded", dep = ":forwarded")
+duplicate(name = "duplicate")
+nested(name = "nested")
 "#,
     )
     .unwrap();
@@ -12473,32 +12523,147 @@ index(name = "indexed", dep = ":user")
             .and_then(slug_build_api_v2::AnalysisValue::as_str),
         Some("user")
     );
-    let provider_error = analyze_request(&dice, &workspace, &key("required"), None, false)
-        .await
-        .unwrap_err();
-    assert!(
-        provider_error
-            .contains("target `@@//:user` does not provide any admitted provider alternative")
-            && provider_error.contains("FeatureFlagInfo"),
-        "advertised built-in key must not match the same-name user provider: {provider_error}"
-    );
-
-    let constructor_error = analyze_request(&dice, &workspace, &key("constructed"), None, false)
-        .await
-        .unwrap_err();
-    assert!(
-        constructor_error.contains("Operation `call()` not supported on type `Provider`"),
-        "configured constructor must fail closed: {constructor_error}"
-    );
-    for target in ["member", "indexed"] {
+    for target in ["constructed", "forwarded"] {
+        let result = analyze_request(&dice, &workspace, &key(target), None, false)
+            .await
+            .unwrap();
+        assert!(
+            result
+                .providers()
+                .contains(&ProviderIdentity::builtin("FeatureFlagInfo")),
+            "{target} must publish a real builtin provider"
+        );
+    }
+    for target in [
+        "observed",
+        "observed_forwarded",
+        "observed_user",
+        "missing_empty",
+        "missing_advertised",
+        "required_builtin",
+        "required_forwarded",
+    ] {
+        let result = analyze_request(&dice, &workspace, &key(target), None, false)
+            .await
+            .unwrap();
+        if let Some(expected) = match target {
+            "observed" | "observed_forwarded" => Some("native"),
+            "observed_user" => Some("user"),
+            "missing_empty" | "missing_advertised" => Some("missing"),
+            _ => None,
+        } {
+            assert_eq!(
+                result
+                    .providers()
+                    .user(&ProviderId::new("//:defs.bzl", "ObservedInfo").unwrap())
+                    .unwrap()
+                    .field("value")
+                    .and_then(slug_build_api_v2::AnalysisValue::as_str),
+                Some(expected),
+                "{target}"
+            );
+        }
+    }
+    for (target, dependency) in [
+        ("required_user", "user"),
+        ("required_advertised", "advertised"),
+    ] {
         let error = analyze_request(&dice, &workspace, &key(target), None, false)
             .await
             .unwrap_err();
         assert!(
-            error.contains("config_common.FeatureFlagInfo is declaration-only; configured-target membership and indexing are unsupported"),
+            error.contains(&format!(
+                "target `@@//:{dependency}` does not provide any admitted provider alternative"
+            )) && error.contains("FeatureFlagInfo"),
             "{target}: {error}"
         );
     }
+    for target in ["indexed_user", "duplicate", "nested"] {
+        let error = analyze_request(&dice, &workspace, &key(target), None, false)
+            .await
+            .unwrap_err();
+        assert!(error.contains("FeatureFlagInfo"), "{target}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn feature_flag_info_source_and_configuration_revisions_restore_on_one_dice() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    let definitions = |prefix: &str| {
+        format!(
+            r#"ObservedInfo = provider(fields = ["value"])
+def _flag(ctx):
+    return [config_common.FeatureFlagInfo(value = "{prefix}" + ctx.build_setting_value)]
+flag = rule(implementation = _flag, build_setting = config.string(flag = True))
+def _consumer(ctx):
+    info = ctx.attr.dep[config_common.FeatureFlagInfo]
+    return [ObservedInfo(value = info.value)]
+consumer = rule(implementation = _consumer, attrs = {{"dep": attr.label(providers = [config_common.FeatureFlagInfo])}})
+"#
+        )
+    };
+    let source = workspace.join("defs.bzl");
+    fs::write(&source, definitions("")).unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(':defs.bzl', 'consumer', 'flag')\nflag(name='setting', build_setting_default='default')\nconsumer(name='observed', dep=':setting')\n",
+    )
+    .unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let base = test_configuration();
+    let overridden = base.with_starlark_option(StarlarkOption::string(
+        CanonicalLabel::parse("@@//:setting").unwrap(),
+        "explicit",
+        StarlarkOptionScope::Default,
+    ));
+    let key = |configuration| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:observed").unwrap(),
+            configuration,
+        )
+    };
+    let observed = ProviderId::new("//:defs.bzl", "ObservedInfo").unwrap();
+    let value = |result: &ConfiguredNodeResult| {
+        result
+            .providers()
+            .user(&observed)
+            .unwrap()
+            .field("value")
+            .and_then(slug_build_api_v2::AnalysisValue::as_str)
+            .unwrap()
+            .to_owned()
+    };
+
+    let initial = analyze_request(&dice, &workspace, &key(base.clone()), None, false)
+        .await
+        .unwrap();
+    assert_eq!(value(&initial), "default");
+    let configured = analyze_request(&dice, &workspace, &key(overridden.clone()), None, false)
+        .await
+        .unwrap();
+    assert_eq!(value(&configured), "explicit");
+    let restored_config = analyze_request(&dice, &workspace, &key(base.clone()), None, false)
+        .await
+        .unwrap();
+    assert_eq!(initial, restored_config);
+
+    fs::write(&source, definitions("source:")).unwrap();
+    let changed_source = analyze_request(&dice, &workspace, &key(base.clone()), None, false)
+        .await
+        .unwrap();
+    assert_eq!(value(&changed_source), "source:default");
+    assert_ne!(initial, changed_source);
+    fs::write(&source, definitions("")).unwrap();
+    let restored_source = analyze_request(&dice, &workspace, &key(base), None, false)
+        .await
+        .unwrap();
+    assert_eq!(initial, restored_source);
+    let restored_override = analyze_request(&dice, &workspace, &key(overridden), None, false)
+        .await
+        .unwrap();
+    assert_eq!(configured, restored_override);
 }
 
 fn write_rule_class_restriction_definitions(workspace: &PathBuf) -> &'static str {

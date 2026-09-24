@@ -1850,7 +1850,7 @@ async fn java_plugins_flag_alias_direct_build_fails_configured_analysis() {
 }
 
 #[tokio::test]
-async fn feature_flag_provider_declaration_does_not_complete_direct_build() {
+async fn feature_flag_provider_advertisement_without_instance_does_not_complete_direct_build() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(LegacyBuildTracker::default());
     let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
@@ -1900,7 +1900,65 @@ consumer_rule = rule(
                         && error.to_string().contains("FeatureFlagInfo")
                 )
         ),
-        "advertising the declaration-only key must not publish a configured build: {value:?}"
+        "advertising a key without returning its instance must not publish a configured build: {value:?}"
+    );
+    assert_eq!(tracker.forbidden.load(Ordering::Relaxed), 0);
+}
+
+#[tokio::test]
+async fn feature_flag_provider_instance_completes_direct_build() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(LegacyBuildTracker::default());
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let mut epoch = BuildRootEpoch::base(44);
+    epoch.package("rules", "", 44);
+    epoch.file(
+        "/workspace/rules/defs.bzl",
+        r#"FeatureFlagInfo = config_common.FeatureFlagInfo
+def _dep(ctx):
+    return [FeatureFlagInfo(value = "ready")]
+def _consumer(ctx):
+    if FeatureFlagInfo not in ctx.attr.dep:
+        fail("configured feature flag provider is missing")
+    if ctx.attr.dep[FeatureFlagInfo].value != "ready":
+        fail("configured feature flag value is wrong")
+    return [DefaultInfo()]
+dep_rule = rule(implementation = _dep, provides = [FeatureFlagInfo])
+consumer_rule = rule(
+    implementation = _consumer,
+    attrs = {"dep": attr.label(providers = [FeatureFlagInfo])},
+)
+"#,
+        44,
+    );
+    epoch.package(
+        "app",
+        "load('//rules:defs.bzl', 'consumer_rule', 'dep_rule')\n\
+         dep_rule(name = 'actual')\n\
+         consumer_rule(name = 'consumer', dep = ':actual')\n",
+        44,
+    );
+    let key = BuildCommandRootKey::new(
+        workspace,
+        &[TargetPattern::parse("//app:consumer").unwrap()],
+        build_test_configuration("target"),
+    )
+    .unwrap();
+    let user_data = UserComputationData {
+        activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+        ..Default::default()
+    };
+    let mut transaction = build_root_transaction_with_data(&dice, epoch.build(), user_data).await;
+    let value = compute_build_root(&mut transaction, &key, &tracker).await;
+    assert!(
+        matches!(
+            value,
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref result)
+                if result.as_ref().as_ref().is_ok_and(|result| {
+                    result.targets.len() == 1 && result.targets[0].analysis.is_some()
+                })
+        ),
+        "an actual configured feature flag provider must complete direct Build: {value:?}"
     );
     assert_eq!(tracker.forbidden.load(Ordering::Relaxed), 0);
 }

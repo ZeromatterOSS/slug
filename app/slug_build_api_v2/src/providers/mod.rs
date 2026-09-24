@@ -98,6 +98,7 @@ pub enum ProviderError {
     MissingExecutable,
     FilesToRunAlreadyComplete,
     RunfilesMissingExecutable,
+    InvalidFeatureFlagInfoOccurrence,
 }
 
 impl fmt::Display for ProviderError {
@@ -105,6 +106,9 @@ impl fmt::Display for ProviderError {
         match self {
             Self::EmptyProviderName => f.write_str("provider name must not be empty"),
             Self::DuplicateProvider { name } => write!(f, "provider {name} specified twice"),
+            Self::InvalidFeatureFlagInfoOccurrence => f.write_str(
+                "FeatureFlagInfo requires a native typed instance, not a generic provider occurrence",
+            ),
             Self::MissingDefaultInfo => {
                 f.write_str("collection did not receive a `DefaultInfo` provider")
             }
@@ -643,11 +647,13 @@ pub enum ProviderValue {
     FilesToRunProvider(FilesToRunProvider),
     PlatformInfo(PlatformInfo),
     Occurrence(ProviderOccurrence),
+    FeatureFlagInfo(crate::FeatureFlagInfo),
 }
 
 impl ProviderValue {
     pub fn name(&self) -> ProviderName {
         match self {
+            Self::FeatureFlagInfo(_) => ProviderName("FeatureFlagInfo".into()),
             Self::TemplateVariableInfo(_) => ProviderName("TemplateVariableInfo".into()),
             Self::PackageSpecificationInfo(_) => ProviderName("PackageSpecificationInfo".into()),
             Self::DefaultInfo(_) => ProviderName("DefaultInfo".into()),
@@ -661,6 +667,7 @@ impl ProviderValue {
 
     fn identity(&self) -> ProviderIdentity {
         match self {
+            Self::FeatureFlagInfo(_) => ProviderIdentity::builtin("FeatureFlagInfo"),
             Self::TemplateVariableInfo(_) => ProviderIdentity::builtin("TemplateVariableInfo"),
             Self::PackageSpecificationInfo(_) => {
                 ProviderIdentity::builtin("PackageSpecificationInfo")
@@ -676,6 +683,9 @@ impl ProviderValue {
 
     fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         match (self, other) {
+            (Self::FeatureFlagInfo(left), Self::FeatureFlagInfo(right)) => {
+                left.publication_eq(right)
+            }
             (Self::TemplateVariableInfo(left), Self::TemplateVariableInfo(right)) => {
                 left.publication_eq_with(right, state)
             }
@@ -724,6 +734,10 @@ impl ProviderCollection {
     ) -> Result<Self, ProviderError> {
         let mut providers = SmallMap::with_capacity(values.len());
         for value in values {
+            if matches!(&value, ProviderValue::Occurrence(occurrence) if occurrence.identity().is_builtin("FeatureFlagInfo"))
+            {
+                return Err(ProviderError::InvalidFeatureFlagInfoOccurrence);
+            }
             let name = value.name();
             if providers.insert(value.identity(), value).is_some() {
                 return Err(ProviderError::DuplicateProvider { name });
@@ -788,6 +802,13 @@ impl ProviderCollection {
     pub fn template_variable_info(&self) -> Option<&crate::TemplateVariableInfo> {
         match self.get(&ProviderIdentity::builtin("TemplateVariableInfo")) {
             Some(ProviderValue::TemplateVariableInfo(info)) => Some(info),
+            _ => None,
+        }
+    }
+
+    pub fn feature_flag_info(&self) -> Option<&crate::FeatureFlagInfo> {
+        match self.get(&ProviderIdentity::builtin("FeatureFlagInfo")) {
+            Some(ProviderValue::FeatureFlagInfo(info)) => Some(info),
             _ => None,
         }
     }

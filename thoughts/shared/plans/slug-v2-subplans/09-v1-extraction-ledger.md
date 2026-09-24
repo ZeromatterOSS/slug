@@ -2886,3 +2886,17 @@ No V1/Buck2 import, new map, cache, interner, DICE key, lock or ownership
 carrier is added. The cold Loading field seam does not warrant a benchmark.
 Same-DICE imported-policy A/B/A and configured membership/indexing rejection
 prove the retained boundary; construction/value analysis remains deferred.
+
+WP832 replaces WP831's declaration-only FeatureFlagInfo with a retained
+pointer-sized `Arc<CompactString>` occurrence, `Dupe` and `Allocative`, and a
+typed provider variant. Starlark instance equality/hash preserve occurrence
+identity; DICE publication compares the immutable value structurally across
+reevaluation. The singleton key, provider identity, collection and configured
+child edge remain existing owners. Provider-first `config_setting` matching
+reads the tracked child; native label-typed classification reads requested
+flag/alias package inputs through DICE. No V1/Buck2 import, new interner,
+retained map/cache, DICE key, lock, evaluator borrow or action representation
+is introduced. This cold constructor/provider boundary does not warrant a
+new benchmark. Focused direct Build, typed-forwarding and same-DICE source/
+configuration A/B/A tests exercise the retained/publication boundary; nested
+provider transport remains deferred.
