@@ -27,9 +27,14 @@ use slug_bzlmod_v2::FactNumber;
 use slug_bzlmod_v2::FactValue;
 use slug_bzlmod_v2::Facts;
 use slug_bzlmod_v2::HostRepositoryLabelPathObservationKey;
+use slug_bzlmod_v2::HostRepositoryLabelPathValue;
 use slug_bzlmod_v2::HostRepositoryRelativePath;
+use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionSource;
+use slug_bzlmod_v2::HostSelectedExtensionDemandErrorDisposition;
+use slug_bzlmod_v2::HostSelectedExtensionDemandObservationError;
+use slug_bzlmod_v2::HostSelectedExtensionDemandObservationKey;
 use slug_bzlmod_v2::HostSelectedExtensionOwner;
 use slug_bzlmod_v2::HostSelectedExtensionOwnerInputs;
 use slug_bzlmod_v2::HostSelectedExtensionOwnerInputsError;
@@ -100,6 +105,8 @@ use starlark::values::tuple::TupleRef;
 use starlark_map::small_set::SmallSet;
 use starlark_map::sorted_map::SortedMap;
 
+use crate::HostCanonicalRepositoryLoadRouteObservationError;
+use crate::HostCanonicalRepositoryLoadRouteObservationKey;
 use crate::attrs::CoercedAttributeValue;
 use crate::bzl_module::ExternalBzlModuleEvalKey;
 use crate::bzl_module::ExternalBzlModuleObservationKey;
@@ -687,11 +694,13 @@ impl ObservedHostSelectedExtensionOwnerPure { pub(crate) fn result(&self) -> &Ow
 pub(crate) struct OwnerProjection { manifest: crate::bzl_module::BzlLoadManifest, definition: ModuleExtensionDefinitionProjection }
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-pub(crate) enum HostSelectedExtensionOwnerPureObservationError { Inputs(HostSelectedExtensionOwnerInputsObservationError), HostBzl { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError }, Merge { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError } }
+pub(crate) enum HostSelectedExtensionOwnerPureObservationError { Inputs(HostSelectedExtensionOwnerInputsObservationError), HostBzl { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError }, Demand { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Arc<OwnerProjection>, error: HostSelectedExtensionDemandObservationError }, CanonicalRoute { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Arc<OwnerProjection>, error: Arc<HostCanonicalRepositoryLoadRouteObservationError> }, Merge { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError } }
 impl HostSelectedExtensionOwnerPureObservationError {
     pub(crate) fn selected_frontier(&self) -> slug_bzlmod_v2::HostSelectedObservationFrontier {
         match self {
             Self::Inputs(error) => error.selected_frontier(),
+            Self::Demand { error, .. } => error.selected_frontier(),
+            Self::CanonicalRoute { error, .. } => error.selected_frontier(),
             Self::HostBzl { error, .. } | Self::Merge { error, .. } => {
                 slug_bzlmod_v2::HostSelectedObservationFrontier::Path(error.clone())
             }
@@ -1056,6 +1065,140 @@ async fn observe_selected_watches(
     Ok(observations)
 }
 
+async fn observe_selected_path_label(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedExtensionOwnerPureKey,
+    inputs: &Arc<HostSelectedExtensionOwnerInputs>,
+    first: &Arc<OwnerProjection>,
+    calls: &Arc<[RepositoryRuleCallRecord]>,
+    label: &CanonicalLabel,
+    mut observations: PathObservationEpoch,
+) -> Result<(HostRepositoryLabelPathValue, PathObservationEpoch), OwnerPureDriver> {
+    macro_rules! merge {
+        ($incoming:expr) => {
+            observations = union_pure_observations(&observations, $incoming).map_err(|error| {
+                SourcePreparationOutcome::Complete(Err(
+                    HostSelectedExtensionOwnerPureObservationError::Merge {
+                        inputs: inputs.clone(),
+                        first: Some(first.clone()),
+                        error,
+                    },
+                ))
+            })?;
+        };
+    }
+    macro_rules! fail {
+        ($message:expr) => {
+            return Err(owner_complete(
+                Err(owner_after(inputs, calls.clone(), $message)),
+                observations,
+            ))
+        };
+    }
+    let address = RepositoryLabelPathAddress::from_label(label);
+    let route = if address.repo().is_root() {
+        None
+    } else {
+        // The demand key resolves generated ownership without evaluating the
+        // owner. Never ask the load route for a generated repository here:
+        // that can recurse into this owner (or a cross-owner cycle).
+        let demand = match ctx
+            .compute(&HostSelectedExtensionDemandObservationKey::new(
+                key.workspace.dupe(),
+                address.repo().clone(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return Err(SourcePreparationOutcome::Need(need));
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return Err(SourcePreparationOutcome::Complete(Err(
+                    HostSelectedExtensionOwnerPureObservationError::Demand {
+                        inputs: inputs.clone(),
+                        first: first.clone(),
+                        error,
+                    },
+                )));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => observed,
+            Err(error) => fail!(format!(
+                "module_ctx.path generated-owner preflight failed: {error}"
+            )),
+        };
+        merge!(demand.observations());
+        match demand.result().as_ref() {
+            Ok(_) => fail!("module_ctx.path does not support generated repository Labels"),
+            Err(error)
+                if error.disposition() == HostSelectedExtensionDemandErrorDisposition::Missing => {}
+            Err(error) => fail!(format!(
+                "module_ctx.path generated-owner preflight failed: {error}"
+            )),
+        }
+        let route = match ctx
+            .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+                key.workspace.dupe(),
+                address.repo().clone(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return Err(SourcePreparationOutcome::Need(need));
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return Err(SourcePreparationOutcome::Complete(Err(
+                    HostSelectedExtensionOwnerPureObservationError::CanonicalRoute {
+                        inputs: inputs.clone(),
+                        first: first.clone(),
+                        error: Arc::new(error),
+                    },
+                )));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => observed,
+            Err(error) => fail!(format!("module_ctx.path canonical route failed: {error}")),
+        };
+        merge!(route.observations());
+        let route = match route.result().as_ref() {
+            Ok(value) => value,
+            Err(error) => fail!(format!("module_ctx.path canonical route failed: {error:?}")),
+        };
+        if route.route().view().generated_effect_seed().is_some() {
+            fail!("module_ctx.path does not support generated repository Labels");
+        }
+        Some(HostRepositorySourceRoute::canonical(route.input().clone()))
+    };
+    let path_key = match route {
+        None => HostRepositoryLabelPathObservationKey::new_root(key.workspace.dupe(), address),
+        Some(route) => HostRepositoryLabelPathObservationKey::new_external(route, address),
+    };
+    let path_key = match path_key {
+        Ok(value) => value,
+        Err(error) => fail!(format!("module_ctx.path Label is unsupported: {error:?}")),
+    };
+    let observed = match ctx.compute(&path_key).await {
+        Ok(SourcePreparationOutcome::Need(need)) => {
+            return Err(SourcePreparationOutcome::Need(need));
+        }
+        Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+            return Err(SourcePreparationOutcome::Complete(Err(
+                HostSelectedExtensionOwnerPureObservationError::Merge {
+                    inputs: inputs.clone(),
+                    first: Some(first.clone()),
+                    error,
+                },
+            )));
+        }
+        Ok(SourcePreparationOutcome::Complete(Ok(observed))) => observed,
+        Err(error) => fail!(format!("module_ctx.path Label lookup failed: {error}")),
+    };
+    merge!(observed.observations());
+    let path = match observed.result().as_ref() {
+        Ok(value) => value.clone(),
+        Err(error) => fail!(format!("module_ctx.path Label lookup failed: {error:?}")),
+    };
+    Ok((path, observations))
+}
+
 #[rustfmt::skip]
 async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerPureKey, mode: PureInvocationsMode) -> OwnerPureDriver {
     let (inputs, observations) = match mode {
@@ -1103,78 +1246,96 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
     if second != *first {
         return owner_complete(Err(owner_after(&inputs, Arc::from([]), "reacquired selected module extension differs")), observations);
     }
-    let selected_download = Arc::new(SelectedDownloadInvocation::new(key.workspace.dupe(), key.owner.clone(), ready));
-    let selected_watch = Arc::new(SelectedWatchInvocation::new());
     let definition = module.module.get_assigned(inputs.request().parts().1).expect("projection authenticated export").0.downcast::<FrozenModuleExtensionDefinition>().expect("projection authenticated kind");
     let root_usage = inputs.root_proxies().map(|proxies| RootModuleExtensionUsage::new(
         proxies.iter().any(|proxy| !proxy.dev_dependency),
         proxies.iter().any(|proxy| proxy.dev_dependency),
     ));
-    let (returned, calls, capture) = {
-        let invocation_module = Module::new();
-        let modules = modules
-            .iter()
-            .cloned()
-            .map(|module| module.materialize(invocation_module.frozen_heap()))
-            .collect::<Vec<_>>()
-            .into();
-        let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage, Some(host)).with_selected_download(selected_download.clone()).with_selected_watch(selected_watch.clone()));
-        let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);
-        let repository_rules = RepositoryRuleInvocationState::new();
-        let mut evaluator = Evaluator::new(&invocation_module);
-        evaluator.extra = Some(&repository_rules);
-        if let Some(capture) = capture.as_ref() {
-            evaluator.set_print_handler(capture);
-        }
-        let returned = evaluator.eval_function(definition.implementation.to_value(), &[context], &[]);
-        let pending = match selected_download.need() {
-            Ok(pending) => pending,
+    let mut ready_paths = Vec::new();
+    loop {
+        // Nothing emitted by an interrupted Starlark pass is published. The
+        // path-ready map is the only evaluation state retained for replay.
+        let selected_download = Arc::new(SelectedDownloadInvocation::new(key.workspace.dupe(), key.owner.clone(), ready.clone()));
+        let selected_watch = Arc::new(SelectedWatchInvocation::new());
+        let selected_path = Arc::new(SelectedPathInvocation::new(ready_paths.clone()));
+        let (returned, calls, capture, pending_path) = {
+            let invocation_module = Module::new();
+            let modules = modules
+                .iter()
+                .cloned()
+                .map(|module| module.materialize(invocation_module.frozen_heap()))
+                .collect::<Vec<_>>()
+                .into();
+            let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage, Some(host.clone())).with_selected_download(selected_download.clone()).with_selected_watch(selected_watch.clone()).with_selected_path(selected_path.clone()));
+            let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);
+            let repository_rules = RepositoryRuleInvocationState::new();
+            let mut evaluator = Evaluator::new(&invocation_module);
+            evaluator.extra = Some(&repository_rules);
+            if let Some(capture) = capture.as_ref() {
+                evaluator.set_print_handler(capture);
+            }
+            let returned = evaluator.eval_function(definition.implementation.to_value(), &[context], &[]);
+            let pending = match selected_download.need() {
+                Ok(pending) => pending,
+                Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+            };
+            if let Some(need) = pending {
+                return SourcePreparationOutcome::Need(SourcePreparationNeeds::selected_extension_download((*need).clone()));
+            }
+            let pending_path = match selected_path.pending() {
+                Ok(pending) => pending,
+                Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+            };
+            let returned = returned
+                .map_err(|error| CompactString::from(error.to_string()))
+                .and_then(|value| returned_metadata(value).map_err(|error| CompactString::from(error.to_string())));
+            drop(evaluator);
+            (returned, repository_rules.records(), capture, pending_path)
+        };
+        // A successful download is part of the selected closure even when
+        // later Starlark evaluation, watch or Label preparation fails.
+        let used = match selected_download.used() {
+            Ok(used) => used,
             Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
         };
-        if let Some(need) = pending {
-            return SourcePreparationOutcome::Need(SourcePreparationNeeds::selected_extension_download((*need).clone()));
+        if let Some(used) = used {
+            if let Err(error) = ctx.compute(&UsedDownloadRequestKey::new(used)).await {
+                return owner_complete(Err(owner_after(&inputs, calls, error.to_string())), observations);
+            }
         }
-        let returned = returned
-            .map_err(|error| CompactString::from(error.to_string()))
-            .and_then(|value| returned_metadata(value).map_err(|error| CompactString::from(error.to_string())));
-        drop(evaluator);
-        (returned, repository_rules.records(), capture)
-    };
-    // A successful download is part of the selected closure even when later
-    // Starlark evaluation or a later watch fails. Unused preflighted content
-    // does not enter it.
-    let used = match selected_download.used() {
-        Ok(used) => used,
-        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
-    };
-    if let Some(used) = used {
-        if let Err(error) = ctx.compute(&UsedDownloadRequestKey::new(used)).await {
-            return owner_complete(Err(owner_after(&inputs, calls, error.to_string())), observations);
+        let watched = match selected_watch.called() {
+            Ok(watched) => watched,
+            Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+        };
+        observations = match observe_selected_watches(ctx, key, &inputs, &first, &calls, &watched, observations).await {
+            Ok(observations) => observations,
+            Err(terminal) => return terminal,
+        };
+        if let Some(label) = pending_path {
+            let (path, next_observations) = match observe_selected_path_label(ctx, key, &inputs, &first, &calls, &label, observations).await {
+                Ok(value) => value,
+                Err(terminal) => return terminal,
+            };
+            observations = next_observations;
+            ready_paths.push((label, path));
+            continue;
         }
+        let request = inputs.request().clone();
+        let result = match returned {
+            Err(error) => Err(owner_after(&inputs, calls, error)),
+            Ok(metadata) => match metadata {
+                metadata if metadata.facts().is_empty() => Ok(HostSelectedExtensionOwnerPureResult {
+                    inputs,
+                    receipt: HostPureModuleExtensionInvocationReceipt { request, repository_rule_calls: calls, metadata, root_usage },
+                }),
+                _ => Err(owner_after(&inputs, calls, "nonempty module extension facts require the deferred lockfile lifecycle")),
+            },
+        };
+        if let Some(capture) = capture {
+            ctx.store_evaluation_data(capture.into_batch()).expect("selected owner invocation stores one local Complete event batch");
+        }
+        return owner_complete(result, observations);
     }
-    let watched = match selected_watch.called() {
-        Ok(watched) => watched,
-        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
-    };
-    observations = match observe_selected_watches(ctx, key, &inputs, &first, &calls, &watched, observations).await {
-        Ok(observations) => observations,
-        Err(terminal) => return terminal,
-    };
-    let request = inputs.request().clone();
-    let result = match returned {
-        Err(error) => Err(owner_after(&inputs, calls, error)),
-        Ok(metadata) => match metadata {
-            metadata if metadata.facts().is_empty() => Ok(HostSelectedExtensionOwnerPureResult {
-                inputs,
-                receipt: HostPureModuleExtensionInvocationReceipt { request, repository_rule_calls: calls, metadata, root_usage },
-            }),
-            _ => Err(owner_after(&inputs, calls, "nonempty module extension facts require the deferred lockfile lifecycle")),
-        },
-    };
-    if let Some(capture) = capture {
-        ctx.store_evaluation_data(capture.into_batch()).expect("selected owner invocation stores one local Complete event batch");
-    }
-    owner_complete(result, observations)
 }
 
 #[async_trait]
@@ -1519,11 +1680,52 @@ struct InvocationContext {
     os: Option<ModuleExtensionOs>,
     selected_download: Option<Arc<SelectedDownloadInvocation>>,
     selected_watch: Option<Arc<SelectedWatchInvocation>>,
+    selected_path: Option<Arc<SelectedPathInvocation>>,
     #[allocative(skip)]
     owner: Arc<()>,
 }
 
 const MAX_SELECTED_WATCHES: usize = 8;
+const MAX_SELECTED_PATH_LABELS: usize = 8;
+
+#[derive(Debug, Allocative)]
+struct SelectedPathInvocation {
+    ready: Vec<(CanonicalLabel, HostRepositoryLabelPathValue)>,
+    pending: Mutex<Option<CanonicalLabel>>,
+}
+
+impl SelectedPathInvocation {
+    fn new(ready: Vec<(CanonicalLabel, HostRepositoryLabelPathValue)>) -> Self {
+        Self {
+            ready,
+            pending: Mutex::new(None),
+        }
+    }
+
+    fn call(&self, label: &CanonicalLabel) -> anyhow::Result<HostRepositoryLabelPathValue> {
+        if let Some((_, path)) = self.ready.iter().find(|(candidate, _)| candidate == label) {
+            return Ok(path.clone());
+        }
+        if self.ready.len() == MAX_SELECTED_PATH_LABELS {
+            anyhow::bail!(
+                "module_ctx.path supports at most {MAX_SELECTED_PATH_LABELS} distinct Labels"
+            );
+        }
+        let mut pending = self
+            .pending
+            .lock()
+            .map_err(|_| anyhow::anyhow!("selected module extension path scratch unavailable"))?;
+        *pending = Some(label.clone());
+        anyhow::bail!("selected module extension Label path requires preparation")
+    }
+
+    fn pending(&self) -> Result<Option<CanonicalLabel>, CompactString> {
+        self.pending
+            .lock()
+            .map(|pending| pending.clone())
+            .map_err(|_| "selected module extension path scratch unavailable".into())
+    }
+}
 
 #[derive(Debug, Allocative)]
 struct SelectedWatchInvocation {
@@ -1650,6 +1852,56 @@ starlark::starlark_simple_value!(SelectedModuleScratchPath);
 #[starlark_value(type = "module_extension_scratch_path")]
 impl<'v> StarlarkValue<'v> for SelectedModuleScratchPath {}
 
+/// A prepared Label path. Derivation is lexical and never probes the target.
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct SelectedModuleLabelPath(HostRepositoryLabelPathValue);
+
+impl fmt::Display for SelectedModuleLabelPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0.path_str())
+    }
+}
+starlark::starlark_simple_value!(SelectedModuleLabelPath);
+
+#[starlark_value(type = "path")]
+impl<'v> StarlarkValue<'v> for SelectedModuleLabelPath {
+    fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        if name != "dirname" {
+            return None;
+        }
+        let parent = self.0.path().as_path().parent()?;
+        let parent = NormalizedAbsolutePath::new(parent.to_path_buf())
+            .expect("the parent of a normalized absolute path is normalized");
+        let parent = HostRepositoryLabelPathValue::new(parent, self.0.namespace())
+            .expect("the parent of a Unicode path is Unicode");
+        Some(heap.alloc_simple(Self(parent)))
+    }
+
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(selected_module_label_path_methods)
+    }
+}
+
+#[starlark_module]
+fn selected_module_label_path_methods(builder: &mut MethodsBuilder) {
+    fn get_child<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] child: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let this = SelectedModuleLabelPath::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid selected Label path receiver"))?;
+        let child = selected_scratch_relative(child)?;
+        let joined = this.0.path().as_path().join(child.as_path());
+        let joined = NormalizedAbsolutePath::new(joined)
+            .map_err(|_| anyhow::anyhow!("module_ctx.path get_child requires a relative path"))?;
+        let path = HostRepositoryLabelPathValue::new(joined, this.0.namespace())
+            .map_err(|_| anyhow::anyhow!("module_ctx.path get_child requires Unicode"))?;
+        Ok(eval.heap().alloc_simple(SelectedModuleLabelPath(path)))
+    }
+}
+
 fn selected_scratch_relative(path: &str) -> anyhow::Result<HostRepositoryRelativePath> {
     // PathBuf's component iterator normalizes some spellings, so check the
     // spelling as well as the repository-relative path invariant.
@@ -1737,6 +1989,7 @@ impl InvocationContext {
             os,
             selected_download: None,
             selected_watch: None,
+            selected_path: None,
             owner: owner.clone(),
         }
     }
@@ -1748,6 +2001,11 @@ impl InvocationContext {
 
     fn with_selected_watch(mut self, watch: Arc<SelectedWatchInvocation>) -> Self {
         self.selected_watch = Some(watch);
+        self
+    }
+
+    fn with_selected_path(mut self, path: Arc<SelectedPathInvocation>) -> Self {
+        self.selected_path = Some(path);
         self
     }
 }
@@ -1796,19 +2054,31 @@ fn invocation_context_methods(builder: &mut MethodsBuilder) {
         watch.call(label.canonical())?;
         Ok(Value::new_none())
     }
-    fn path(
-        this: Value,
-        #[starlark(require = pos)] path: &str,
-    ) -> anyhow::Result<SelectedModuleScratchPath> {
+    fn path<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] path: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
         let this = InvocationContext::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
-        if this.selected_download.is_none() {
+        if this.selected_download.is_none() && this.selected_path.is_none() {
             anyhow::bail!("module_ctx.path is only supported for a selected module extension");
         }
-        Ok(SelectedModuleScratchPath {
-            relative: selected_scratch_relative(path)?,
-            owner: this.owner.clone(),
-        })
+        if let Some(path) = path.unpack_str() {
+            return Ok(eval.heap().alloc_simple(SelectedModuleScratchPath {
+                relative: selected_scratch_relative(path)?,
+                owner: this.owner.clone(),
+            }));
+        }
+        let label = StarlarkLabel::from_value(path)
+            .ok_or_else(|| anyhow::anyhow!("module_ctx.path requires a string or Label"))?;
+        let selected_path = this.selected_path.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "module_ctx.path Label is only supported for a selected module extension"
+            )
+        })?;
+        let path = selected_path.call(label.canonical())?;
+        Ok(eval.heap().alloc_simple(SelectedModuleLabelPath(path)))
     }
     fn download<'v>(
         this: Value<'v>,
@@ -2456,6 +2726,7 @@ mod tests {
             os: None,
             selected_download: None,
             selected_watch: None,
+            selected_path: None,
             owner: owner.clone(),
         };
         let modules = call("def f(ctx):\n  ctx.modules.append(1)\n", |module| {
@@ -2507,6 +2778,7 @@ mod tests {
             os: None,
             selected_download: None,
             selected_watch: None,
+            selected_path: None,
             owner: owner.clone(),
         };
         let foreign_heap = FrozenHeap::new();
@@ -2576,6 +2848,7 @@ mod tests {
             os: None,
             selected_download: None,
             selected_watch: None,
+            selected_path: None,
             owner: owner.clone(),
         };
         let value = call(
@@ -2615,6 +2888,7 @@ mod tests {
             os: None,
             selected_download: None,
             selected_watch: None,
+            selected_path: None,
             owner,
         };
         let result = call(
@@ -2676,6 +2950,7 @@ mod tests {
             os: None,
             selected_download: None,
             selected_watch: None,
+            selected_path: None,
             owner,
         };
         for name in [
@@ -2754,6 +3029,7 @@ mod tests {
             os: None,
             selected_download: None,
             selected_watch: None,
+            selected_path: None,
             owner: other_owner,
         };
         for method in ["is_dev_dependency", "tag_sort_key"] {
@@ -2794,6 +3070,7 @@ mod tests {
             os: None,
             selected_download: None,
             selected_watch: None,
+            selected_path: None,
             owner,
         };
         let none = metadata_call("def f(ctx):\n  return None\n", context.clone()).unwrap();
@@ -2919,6 +3196,7 @@ mod tests {
                 os: None,
                 selected_download: None,
                 selected_watch: None,
+                selected_path: None,
                 owner: owner.clone(),
             };
             assert_eq!(
@@ -3028,6 +3306,7 @@ mod tests {
             os: None,
             selected_download: None,
             selected_watch: None,
+            selected_path: None,
             owner,
         };
         let value = call("def f(ctx, tag):\n  label=tag.target\n  return [len(ctx.modules), ctx.modules[0].name, ctx.modules[0].version, ctx.modules[0].is_root, ctx.is_dev_dependency(tag), label.name, label.package, label.repo_name, label.workspace_name, str(label), repr(label), '%s' % label, '%r' % label, '{}'.format(label), '{!s}'.format(label), '{!r}'.format(label), label.same_package_label('other').name, {label: 1}[label], label == label]\n", |module| vec![module.heap().alloc_simple(context), module.heap().alloc_simple(tag)]).unwrap();
@@ -4249,6 +4528,103 @@ mod tests {
         selected_watch_epoch_named(module_source, extension_source, "watch.txt", content)
     }
 
+    fn selected_path_package_epoch(
+        module_source: &str,
+        extension_source: &str,
+        watch: bool,
+        package_exists: bool,
+    ) -> PathObservationEpoch {
+        let base = if watch {
+            selected_watch_epoch(module_source, extension_source, Some(b"watched"))
+        } else {
+            selected_factor_epoch(module_source, extension_source)
+        };
+        let marker = if package_exists {
+            PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                0,
+                1,
+                1,
+                602,
+                0o644,
+            ))
+        } else {
+            PathOperationResult::Missing
+        };
+        let lstat = |relative: &str, result| {
+            (
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new(format!("{REPO_RULE_WORKSPACE}/{relative}"))
+                        .unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                Arc::new(PathObservationResult::Lstat(result)),
+            )
+        };
+        PathObservationEpoch::from_shared(
+            base.observations()
+                .iter()
+                .map(|(demand, result)| (demand.dupe(), result.dupe()))
+                .chain([
+                    lstat(
+                        "pkg",
+                        PathOperationResult::Present(PathLstat::new(
+                            PathNodeKind::Directory,
+                            0,
+                            1,
+                            1,
+                            601,
+                            0o755,
+                        )),
+                    ),
+                    lstat("pkg/BUILD.bazel", marker),
+                    lstat("pkg/BUILD", PathOperationResult::Missing),
+                ]),
+        )
+        .unwrap()
+    }
+
+    fn selected_external_path_absent_package_epoch(
+        module_source: &str,
+        extension_source: &str,
+    ) -> PathObservationEpoch {
+        let namespace =
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(77));
+        let lstat = |relative: &str, result| {
+            (
+                PathObservationDemand::new(
+                    namespace.clone(),
+                    NormalizedAbsolutePath::new(format!("/registry-dep/{relative}")).unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                Arc::new(PathObservationResult::Lstat(result)),
+            )
+        };
+        PathObservationEpoch::from_shared(
+            selected_factor_epoch(module_source, extension_source)
+                .observations()
+                .iter()
+                .map(|(demand, result)| (demand.dupe(), result.dupe()))
+                .chain([
+                    lstat(
+                        "pkg",
+                        PathOperationResult::Present(PathLstat::new(
+                            PathNodeKind::Directory,
+                            0,
+                            1,
+                            1,
+                            701,
+                            0o755,
+                        )),
+                    ),
+                    lstat("pkg/BUILD.bazel", PathOperationResult::Missing),
+                    lstat("pkg/BUILD", PathOperationResult::Missing),
+                ]),
+        )
+        .unwrap()
+    }
+
     async fn selected_watch_observations(
         transaction: dice::DiceTransaction,
         epoch: PathObservationEpoch,
@@ -4509,6 +4885,35 @@ mod tests {
             None,
         )
         .await
+    }
+
+    async fn selected_path_case(
+        dice: &Arc<Dice>,
+        module: &str,
+        extension: &str,
+        tracker: Arc<RepositoryRuleActivationTracker>,
+    ) -> (
+        dice::DiceTransaction,
+        HostSelectedExtensionOwnerPureObservationKey,
+    ) {
+        let (base, owner) =
+            selected_factor_transaction(dice, module, extension, tracker.clone(), true).await;
+        let transaction = selected_factor_host_inputs(
+            base,
+            tracker,
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::from_unsorted([
+                CompactString::new("FACTOR"),
+                CompactString::new("MISSING"),
+            ]),
+        )
+        .await;
+        let key = HostSelectedExtensionOwnerPureObservationKey::new(
+            NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap(),
+            owner,
+        );
+        (transaction, key)
     }
 
     async fn selected_factor_host_inputs_with_download(
@@ -4961,6 +5366,669 @@ ext = module_extension(implementation=impl, tag_classes={'watch': watch_tag}, en
                     .any(|row| row.key == key.to_string() && row.kind == ActivationKind::Reused)
             );
         }
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_path_label_missing_target_and_lexical_child() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.path(file='//:missing')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None, attrs = {'value': attr.string()})
+path_tag = tag_class(attrs = {'file': attr.label()})
+def impl(ctx):
+    for mod in ctx.modules:
+        for tag in mod.tags.path:
+            path = ctx.path(tag.file)
+            repo(name = 'proof', value = str(path.dirname.get_child('bin/cargo')))
+ext = module_extension(implementation=impl, tag_classes={'path': path_tag}, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (base, owner) =
+            selected_factor_transaction(&dice, MODULE, EXTENSION, tracker.clone(), true).await;
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let key = HostSelectedExtensionOwnerPureObservationKey::new(workspace.dupe(), owner);
+        let mut transaction = selected_factor_host_inputs(
+            base,
+            tracker,
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::from_unsorted([
+                CompactString::new("FACTOR"),
+                CompactString::new("MISSING"),
+            ]),
+        )
+        .await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("root Label path must resolve through the existing package: {outcome:?}");
+        };
+        let result = observed.result().as_ref().as_ref().unwrap();
+        let calls = &result.receipt.repository_rule_calls;
+        assert_eq!(calls.len(), 1);
+        let (_, crate::module_extension_repository_rule::RepositoryRuleCallValue::String(value)) =
+            calls[0]
+                .kwargs
+                .iter()
+                .find(|(name, _)| name == "value")
+                .unwrap()
+        else {
+            panic!("derived path was not retained as a string");
+        };
+        assert_eq!(value.as_str(), format!("{REPO_RULE_WORKSPACE}/bin/cargo"));
+        assert!(
+            observed
+                .observations()
+                .observations()
+                .iter()
+                .all(|(demand, _)| { !demand.path().as_path().ends_with("missing") })
+        );
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_path_label_source_complete_external_repo() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.path(file='@dep_alias//:missing')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None, attrs={'value': attr.string()})
+path_tag = tag_class(attrs={'file': attr.label()})
+def impl(ctx):
+    for mod in ctx.modules:
+        for tag in mod.tags.path:
+            p = ctx.path(tag.file)
+            repo(name='proof', value=str(p.dirname.get_child('bin/cargo')))
+ext = module_extension(implementation=impl, tag_classes={'path': path_tag}, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (mut transaction, key) = selected_path_case(&dice, MODULE, EXTENSION, tracker).await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("source-complete external Label path must complete: {outcome:?}");
+        };
+        let result = observed.result().as_ref().as_ref().unwrap();
+        let calls = &result.receipt.repository_rule_calls;
+        assert_eq!(calls.len(), 1);
+        let (_, crate::module_extension_repository_rule::RepositoryRuleCallValue::String(value)) =
+            calls[0]
+                .kwargs
+                .iter()
+                .find(|(name, _)| name == "value")
+                .unwrap()
+        else {
+            panic!("external Label child was not retained");
+        };
+        assert_eq!(value.as_str(), "/registry-dep/bin/cargo");
+        assert!(
+            observed
+                .observations()
+                .observations()
+                .iter()
+                .all(|(demand, _)| { !demand.path().as_path().ends_with("missing") })
+        );
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_path_label_cold_need_replays_without_partial_effects() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.watch(file='//:watch.txt')\ne.path(file='//pkg:missing')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None)
+watch_tag = tag_class(attrs={'file': attr.label()})
+path_tag = tag_class(attrs={'file': attr.label()})
+def impl(ctx):
+    print('before-path')
+    for mod in ctx.modules:
+        for tag in mod.tags.watch:
+            ctx.watch(tag.file)
+    repo(name='prefix')
+    for mod in ctx.modules:
+        for tag in mod.tags.path:
+            ctx.path(tag.file)
+    repo(name='proof')
+    print('after-path')
+ext = module_extension(implementation=impl, tag_classes={'watch': watch_tag, 'path': path_tag}, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (transaction, key) =
+            selected_path_case(&dice, MODULE, EXTENSION, tracker.clone()).await;
+        let mut transaction = selected_watch_observations(
+            transaction,
+            selected_watch_epoch(MODULE, EXTENSION, Some(b"watched")),
+        )
+        .await;
+        tracker.take();
+        let SourcePreparationOutcome::Need(need) = transaction.compute(&key).await.unwrap() else {
+            panic!("cold subpackage path must request observations");
+        };
+        assert!(need.path_observations().is_some(), "{need:?}");
+        let rows = tracker.take();
+        assert!(
+            rows.iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+        assert!(
+            rows.iter()
+                .flat_map(|row| row.batch.as_ref())
+                .flat_map(EventBatch::events)
+                .all(|event| !format!("{event:?}").contains("before-path"))
+        );
+
+        transaction = selected_watch_observations(
+            transaction,
+            selected_path_package_epoch(MODULE, EXTENSION, true, true),
+        )
+        .await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("subpackage replay must complete: {outcome:?}");
+        };
+        let calls = &observed
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .receipt
+            .repository_rule_calls;
+        assert_eq!(
+            calls
+                .iter()
+                .map(|call| call.name.as_str())
+                .collect::<Vec<_>>(),
+            ["prefix", "proof"]
+        );
+        assert!(
+            observed
+                .observations()
+                .observations()
+                .iter()
+                .all(|(demand, _)| { !demand.path().as_path().ends_with("pkg/missing") })
+        );
+        let rows = tracker.take();
+        let events = rows
+            .iter()
+            .filter(|row| row.key == key.to_string())
+            .flat_map(|row| row.batch.as_ref())
+            .flat_map(EventBatch::events)
+            .map(|event| format!("{event:?}"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.contains("before-path"))
+                .count(),
+            1,
+            "{events:?}"
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.contains("after-path"))
+                .count(),
+            1,
+            "{events:?}"
+        );
+        let warm = transaction.compute(&key).await.unwrap();
+        assert!(matches!(warm, SourcePreparationOutcome::Complete(Ok(_))));
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .any(|row| row.key == key.to_string() && row.kind == ActivationKind::Reused)
+        );
+
+        transaction = selected_watch_observations(
+            transaction,
+            selected_path_package_epoch(MODULE, EXTENSION, true, false),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(absent)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("absent package must be a stable refusal");
+        };
+        let error = absent.result().as_ref().as_ref().unwrap_err();
+        assert!(format!("{error:?}").contains("PackageAbsent"), "{error:?}");
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_path_label_refuses_generated_owners_before_route() {
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None)
+path_tag = tag_class(attrs={'file': attr.label()})
+def impl(ctx):
+    for mod in ctx.modules:
+        for tag in mod.tags.path:
+            print('before-generated-path')
+            repo(name='prefix')
+            ctx.path(tag.file)
+    repo(name='proof')
+def other_impl(ctx):
+    repo(name='other')
+ext = module_extension(implementation=impl, tag_classes={'path': path_tag}, environ=['FACTOR','MISSING','FACTOR'])
+other = module_extension(implementation=other_impl)
+"#;
+        for second_owner in [false, true] {
+            let other = if second_owner {
+                "f=use_extension('@dep_alias//:ext.bzl','other')\nuse_repo(f, other='other')\n"
+            } else {
+                ""
+            };
+            let base_module = format!(
+                "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n{other}"
+            );
+            let mut builder = Dice::builder();
+            install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+            let dice = Arc::new(builder.build(DetectCycles::Enabled));
+            let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+            let (mut bootstrap, _) =
+                selected_factor_transaction(&dice, &base_module, EXTENSION, tracker.clone(), true)
+                    .await;
+            let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+            let mapping = bootstrap
+                .compute(&HostRootRepositoryMappingKey::new(workspace))
+                .await
+                .unwrap();
+            let SourcePreparationOutcome::Complete(mapping) = mapping else {
+                panic!("generated owner mapping must complete");
+            };
+            let mapped = mapping.as_ref().as_ref().unwrap();
+            let name = if second_owner { "other" } else { "proof" };
+            let generated = mapped
+                .view()
+                .unwrap()
+                .mapping()
+                .find(|(apparent, _)| apparent.as_str() == name)
+                .unwrap()
+                .1
+                .clone();
+            let module = format!(
+                "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.path(file='@@{}//:missing')\nuse_repo(e, proof='proof')\n{other}",
+                generated.as_str(),
+            );
+            let (mut transaction, key) =
+                selected_path_case(&dice, &module, EXTENSION, tracker.clone()).await;
+            tracker.take();
+            tracker.take_dependencies();
+            let outcome = transaction.compute(&key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                panic!("generated Label must fail closed without a Need: {outcome:?}");
+            };
+            let error = observed.result().as_ref().as_ref().unwrap_err();
+            assert!(
+                format!("{error:?}").contains("does not support generated repository Labels"),
+                "{second_owner}: {error:?}"
+            );
+            let rows = tracker.take();
+            assert!(
+                rows.iter()
+                    .filter(|row| row.key == key.to_string())
+                    .all(|row| row.batch.is_none())
+            );
+            assert!(
+                rows.iter()
+                    .flat_map(|row| row.batch.as_ref())
+                    .flat_map(EventBatch::events)
+                    .all(|event| !format!("{event:?}").contains("before-generated-path"))
+            );
+            let dependencies = tracker.take_dependencies();
+            assert!(dependencies.iter().any(|(name, children)| {
+                name == &key.to_string()
+                    && children
+                        .iter()
+                        .any(|child| child.contains("host-selected-extension-demand:"))
+            }));
+            assert!(
+                dependencies
+                    .iter()
+                    .flat_map(|(_, children)| children.iter())
+                    .all(|child| !child.contains(&format!(
+                        "host-canonical-repository-load-route:{}:{}",
+                        REPO_RULE_WORKSPACE,
+                        generated.as_str()
+                    )))
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_path_label_tag_set_changes_a_b_a() {
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None, attrs={'value': attr.string()})
+path_tag = tag_class(attrs={'file': attr.label()})
+def impl(ctx):
+    for mod in ctx.modules:
+        for tag in mod.tags.path:
+            repo(name='proof', value=str(ctx.path(tag.file)))
+ext = module_extension(implementation=impl, tag_classes={'path': path_tag}, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let mut results = Vec::new();
+        for target in ["a", "b", "a"] {
+            let module = format!(
+                "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.path(file='//:{target}')\nuse_repo(e, proof='proof')\n"
+            );
+            let (mut transaction, key) =
+                selected_path_case(&dice, &module, EXTENSION, tracker.clone()).await;
+            let outcome = transaction.compute(&key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                panic!("changed path Label set must complete: {outcome:?}");
+            };
+            let result = observed.result().as_ref().as_ref().unwrap();
+            let (
+                _,
+                crate::module_extension_repository_rule::RepositoryRuleCallValue::String(value),
+            ) = result.receipt.repository_rule_calls[0]
+                .kwargs
+                .iter()
+                .find(|(name, _)| name == "value")
+                .unwrap()
+            else {
+                panic!("path string was not retained");
+            };
+            results.push(value.clone());
+            assert_eq!(value.as_str(), format!("{REPO_RULE_WORKSPACE}/{target}"));
+        }
+        assert_ne!(results[0], results[1]);
+        assert_eq!(results[0], results[2]);
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_download_watch_then_path_label_replay_is_clean() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.watch(file='//:watch.txt')\ne.path(file='//pkg:missing')\nuse_repo(e, proof='proof')\n";
+        const BYTES: &[u8] = b"selected-path-download";
+        let checksum = format!("{:x}", Sha256::digest(BYTES));
+        let extension = format!(
+            r#"
+repo = repository_rule(lambda ctx: None)
+watch_tag = tag_class(attrs={{'file': attr.label()}})
+path_tag = tag_class(attrs={{'file': attr.label()}})
+def impl(ctx):
+    print('before-download-path')
+    output = ctx.path('generator')
+    ctx.download(url='file:///selected-path-download', output=output, sha256='{checksum}')
+    for mod in ctx.modules:
+        for tag in mod.tags.watch:
+            ctx.watch(tag.file)
+    repo(name='prefix')
+    for mod in ctx.modules:
+        for tag in mod.tags.path:
+            ctx.path(tag.file)
+    repo(name='proof')
+    print('after-download-path')
+ext = module_extension(implementation=impl, tag_classes={{'watch': watch_tag, 'path': path_tag}}, environ=['FACTOR','MISSING','FACTOR'])
+"#
+        );
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (base, owner) =
+            selected_factor_transaction(&dice, MODULE, &extension, tracker.clone(), true).await;
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let key =
+            HostSelectedExtensionOwnerPureObservationKey::new(workspace.dupe(), owner.clone());
+        let frontier = RepositoryEnvironmentNameFrontier::from_unsorted([
+            CompactString::new("FACTOR"),
+            CompactString::new("MISSING"),
+        ]);
+        let mut transaction = selected_factor_host_inputs(
+            base,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            frontier.clone(),
+        )
+        .await;
+        let SourcePreparationOutcome::Need(need) = transaction.compute(&key).await.unwrap() else {
+            panic!("cold selected download must return Need");
+        };
+        let request = need
+            .selected_extension_downloads()
+            .iter()
+            .next()
+            .unwrap()
+            .1
+            .clone();
+        let verified =
+            Arc::new(SelectedExtensionDownloadVerified::new(request, Arc::from(BYTES)).unwrap());
+        transaction = selected_factor_host_inputs_with_download(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            frontier,
+            SelectedExtensionDownloadTransaction::new(
+                workspace,
+                [owner.clone()],
+                [verified.clone()],
+            )
+            .unwrap(),
+            Some((owner, SelectedExtensionDownloadEpoch::Ready(verified))),
+        )
+        .await;
+        transaction = selected_watch_observations(
+            transaction,
+            selected_watch_epoch(MODULE, &extension, Some(b"watched")),
+        )
+        .await;
+        tracker.take();
+        let SourcePreparationOutcome::Need(need) = transaction.compute(&key).await.unwrap() else {
+            panic!("cold path package must return Need after prepared download and watch");
+        };
+        assert!(need.path_observations().is_some(), "{need:?}");
+        let rows = tracker.take();
+        assert!(
+            rows.iter()
+                .any(|row| row.key.starts_with("used-selected-extension-download:"))
+        );
+        assert!(
+            rows.iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+        assert!(
+            rows.iter()
+                .flat_map(|row| row.batch.as_ref())
+                .flat_map(EventBatch::events)
+                .all(|event| !format!("{event:?}").contains("before-download-path"))
+        );
+        transaction = selected_watch_observations(
+            transaction,
+            selected_path_package_epoch(MODULE, &extension, true, true),
+        )
+        .await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("download/watch/path replay must complete: {outcome:?}");
+        };
+        let calls = &observed
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .receipt
+            .repository_rule_calls;
+        assert_eq!(
+            calls
+                .iter()
+                .map(|call| call.name.as_str())
+                .collect::<Vec<_>>(),
+            ["prefix", "proof"]
+        );
+        let rows = tracker.take();
+        let events = rows
+            .iter()
+            .filter(|row| row.key == key.to_string())
+            .flat_map(|row| row.batch.as_ref())
+            .flat_map(EventBatch::events)
+            .map(|event| format!("{event:?}"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.contains("before-download-path"))
+                .count(),
+            1,
+            "{events:?}"
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.contains("after-download-path"))
+                .count(),
+            1,
+            "{events:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_multiple_label_paths_replay_once_per_new_label() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.path(file='//:first')\ne.path(file='//:second')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None, attrs={'value': attr.string()})
+path_tag = tag_class(attrs={'file': attr.label()})
+def impl(ctx):
+    print('multiple-label-paths')
+    values = []
+    for mod in ctx.modules:
+        for tag in mod.tags.path:
+            values.append(str(ctx.path(tag.file)))
+    repo(name='proof', value='|'.join(values))
+ext = module_extension(implementation=impl, tag_classes={'path': path_tag}, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (mut transaction, key) =
+            selected_path_case(&dice, MODULE, EXTENSION, tracker.clone()).await;
+        tracker.take();
+        let outcome = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("two root Label paths must complete: {outcome:?}");
+        };
+        let calls = &observed
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .receipt
+            .repository_rule_calls;
+        assert_eq!(calls.len(), 1);
+        let (_, crate::module_extension_repository_rule::RepositoryRuleCallValue::String(value)) =
+            calls[0]
+                .kwargs
+                .iter()
+                .find(|(name, _)| name == "value")
+                .unwrap()
+        else {
+            panic!("two paths were not retained");
+        };
+        assert_eq!(
+            value.as_str(),
+            format!("{REPO_RULE_WORKSPACE}/first|{REPO_RULE_WORKSPACE}/second")
+        );
+        let rows = tracker.take();
+        let events = rows
+            .iter()
+            .filter(|row| row.key == key.to_string())
+            .flat_map(|row| row.batch.as_ref())
+            .flat_map(EventBatch::events)
+            .map(|event| format!("{event:?}"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.contains("multiple-label-paths"))
+                .count(),
+            1,
+            "{events:?}"
+        );
+        assert!(
+            observed
+                .observations()
+                .observations()
+                .iter()
+                .all(|(demand, _)| {
+                    !demand.path().as_path().ends_with("first")
+                        && !demand.path().as_path().ends_with("second")
+                })
+        );
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_path_label_external_package_absent_is_observed() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.path(file='@dep_alias//pkg:missing')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None)
+path_tag = tag_class(attrs={'file': attr.label()})
+def impl(ctx):
+    for mod in ctx.modules:
+        for tag in mod.tags.path:
+            print('before-absent-external-package')
+            ctx.path(tag.file)
+    repo(name='proof')
+ext = module_extension(implementation=impl, tag_classes={'path': path_tag}, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (mut transaction, key) =
+            selected_path_case(&dice, MODULE, EXTENSION, tracker.clone()).await;
+        tracker.take();
+        let SourcePreparationOutcome::Need(need) = transaction.compute(&key).await.unwrap() else {
+            panic!("cold external package must request path observations");
+        };
+        assert!(need.path_observations().is_some(), "{need:?}");
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+        transaction = selected_watch_observations(
+            transaction,
+            selected_external_path_absent_package_epoch(MODULE, EXTENSION),
+        )
+        .await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("absent external package must be a stable terminal: {outcome:?}");
+        };
+        let error = observed.result().as_ref().as_ref().unwrap_err();
+        assert!(format!("{error:?}").contains("PackageAbsent"), "{error:?}");
+        assert!(
+            observed
+                .observations()
+                .observations()
+                .iter()
+                .any(|(demand, _)| { demand.path().as_path().ends_with("pkg/BUILD.bazel") })
+        );
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
     }
 
     #[tokio::test]
@@ -5687,6 +6755,70 @@ ext = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTO
             "{error}"
         );
         assert_eq!(watch.called().unwrap().len(), MAX_SELECTED_WATCHES);
+    }
+
+    #[test]
+    fn selected_module_label_path_value_refuses_unmodeled_operations_and_caps_labels() {
+        let owner = Arc::new(());
+        let label = CanonicalLabel::parse("@@//:missing").unwrap();
+        let physical = HostRepositoryLabelPathValue::new(
+            NormalizedAbsolutePath::new("/fixture/missing").unwrap(),
+            PathObservationNamespace::Host,
+        )
+        .unwrap();
+        let path = Arc::new(SelectedPathInvocation::new(vec![(label.clone(), physical)]));
+        let context =
+            InvocationContext::new_modules(Arc::from([empty_module(&owner)]), &owner, None, None)
+                .with_selected_path(path.clone());
+        let starlark_label = StarlarkLabel::new(label.clone());
+        assert_eq!(
+            call(
+                "def f(ctx, label):\n  p=ctx.path(label)\n  return [str(p), str(p.dirname), str(p.dirname.get_child('bin/cargo'))]\n",
+                |module| vec![module.heap().alloc_simple(context.clone()), module.heap().alloc_simple(starlark_label.clone())],
+            )
+            .unwrap(),
+            "[\"/fixture/missing\", \"/fixture\", \"/fixture/bin/cargo\"]"
+        );
+        for source in [
+            "def f(ctx, label):\n  return ctx.path(ctx.path(label))\n",
+            "def f(ctx, label):\n  return ctx.path(label).exists\n",
+            "def f(ctx, label):\n  return ctx.path(label).is_dir\n",
+            "def f(ctx, label):\n  return ctx.path(label).realpath\n",
+            "def f(ctx, label):\n  return ctx.path(label).get_child()\n",
+            "def f(ctx, label):\n  return ctx.path(label).get_child('a', 'b')\n",
+            "def f(ctx, label):\n  return ctx.path(label).get_child('../escape')\n",
+        ] {
+            assert!(
+                call(source, |module| vec![
+                    module.heap().alloc_simple(context.clone()),
+                    module.heap().alloc_simple(starlark_label.clone())
+                ])
+                .is_err(),
+                "{source}"
+            );
+        }
+        assert!(path.pending().unwrap().is_none());
+        let ready = (0..MAX_SELECTED_PATH_LABELS)
+            .map(|index| {
+                (
+                    CanonicalLabel::parse(&format!("@@//:ready{index}")).unwrap(),
+                    HostRepositoryLabelPathValue::new(
+                        NormalizedAbsolutePath::new(format!("/fixture/ready{index}")).unwrap(),
+                        PathObservationNamespace::Host,
+                    )
+                    .unwrap(),
+                )
+            })
+            .collect();
+        let capped = SelectedPathInvocation::new(ready);
+        let error = capped
+            .call(&CanonicalLabel::parse("@@//:overflow").unwrap())
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("at most 8 distinct Labels"),
+            "{error}"
+        );
+        assert!(capped.pending().unwrap().is_none());
     }
 
     #[test]
