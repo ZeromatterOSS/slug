@@ -9956,6 +9956,20 @@ static NATIVE_METHODS: MethodsStatic = MethodsStatic::new();
 
 #[starlark_module]
 fn native_methods(builder: &mut MethodsBuilder) {
+    fn package_name<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<String> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        if eval.native_caller_function_filename().is_none() {
+            anyhow::bail!("native.package_name() requires a loaded .bzl function caller");
+        }
+        // Authenticate the executing source against this package's loaded
+        // .bzl manifest; the source label is not the returned package.
+        PackageRecorder::label_source_identity_for_call(eval)?;
+        Ok(recorder.package.to_string())
+    }
+
     fn package_relative_label<'v>(
         #[starlark(this)] _native: Value<'v>,
         input: Value<'v>,

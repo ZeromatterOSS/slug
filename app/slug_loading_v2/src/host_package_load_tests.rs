@@ -40131,3 +40131,186 @@ async fn package_relative_label_rejects_bad_inputs_and_does_not_publish_partial_
     assert!(matches!(interrupted, LoadingPreparationOutcome::Need(_)));
     assert!(!RepositoryPackageLoadObservationKey::validity(&interrupted));
 }
+
+fn package_name_materialized_epoch() -> (PathObservationEpoch, PathObservationInstanceId) {
+    let variant = 810;
+    let mut epoch = EpochBuilder::workspace_sources(
+        "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\n",
+        "",
+        &[],
+        variant,
+    );
+    let instance = PathObservationInstanceId::new(810);
+    for directory in [
+        "/",
+        "/registry-dep",
+        "/registry-dep/kotlin",
+        "/registry-dep/kotlin/internal",
+        "/registry-dep/other",
+    ] {
+        epoch.materialized_directory(instance, directory, variant);
+    }
+    epoch.materialized_file(
+        instance,
+        "/registry-dep/MODULE.bazel",
+        "module(name='dep', version='1', repo_name='rules_rust')\n",
+        variant,
+    );
+    epoch.materialized_missing(instance, "/registry-dep/REPO.bazel");
+    epoch.materialized_missing(instance, "/registry-dep/.bazelignore");
+    epoch.materialized_file(
+        instance,
+        "/registry-dep/defs.bzl",
+        "def emit():\n    native.filegroup(name = 'a' + native.package_name().replace('/', '_'))\n",
+        variant,
+    );
+    for build in [
+        "/registry-dep/BUILD.bazel",
+        "/registry-dep/kotlin/internal/BUILD.bazel",
+        "/registry-dep/other/BUILD.bazel",
+    ] {
+        epoch.materialized_file(
+            instance,
+            build,
+            "load('//:defs.bzl', 'emit')\nemit()\n",
+            variant,
+        );
+    }
+    (epoch.build(), instance)
+}
+
+#[tokio::test]
+async fn native_package_name_uses_caller_build_package_across_canonical_external_loads() {
+    let (epoch, instance) = package_name_materialized_epoch();
+    let (mut tx, _) = selected_registry_visibility_transaction(epoch, instance, None).await;
+    let route = tx
+        .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+            workspace(),
+            CanonicalRepoName::new("dep+").unwrap(),
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(route)) = route else {
+        panic!("canonical external route must complete: {route:?}")
+    };
+    let input = route.result().as_ref().as_ref().unwrap().input().clone();
+    for (package_path, expected) in [
+        ("", "a"),
+        ("kotlin/internal", "akotlin_internal"),
+        ("other", "aother"),
+    ] {
+        let outcome = tx
+            .compute(&RepositoryPackageLoadObservationKey::new_canonical(
+                input.clone(),
+                PackagePath::parse(package_path).unwrap(),
+            ))
+            .await
+            .unwrap();
+        let package = observed_repository_package(&outcome)
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            package
+                .targets
+                .iter()
+                .map(|target| target.name.as_str())
+                .collect::<Vec<_>>(),
+            [expected],
+            "caller package {package_path} must not use the defining .bzl package"
+        );
+    }
+}
+
+#[tokio::test]
+async fn native_package_name_source_revision_restores_a_b_a() {
+    const BUILD: &[u8] = b"load(':defs.bzl', 'emit')\nemit()\n";
+    const DEFS_A: &[u8] = b"def emit(): native.filegroup(name = 'a' + native.package_name())\n";
+    const DEFS_B: &[u8] = b"def emit(): native.filegroup(name = 'b' + native.package_name())\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut outcomes = Vec::new();
+    for (variant, defs, expected) in [(811, DEFS_A, "a"), (812, DEFS_B, "b"), (813, DEFS_A, "a")] {
+        let mut tx = transaction(
+            &dice,
+            EpochBuilder::external_sources(&[("BUILD.bazel", BUILD), ("defs.bzl", defs)], variant)
+                .build(),
+            false,
+            None,
+        )
+        .await;
+        let route = external_route(&mut tx).await;
+        let outcome = tx
+            .compute(&RepositoryPackageLoadObservationKey::new(
+                route,
+                PackagePath::root(),
+            ))
+            .await
+            .unwrap();
+        let package = observed_repository_package(&outcome)
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            package
+                .targets
+                .iter()
+                .map(|target| target.name.as_str())
+                .collect::<Vec<_>>(),
+            [expected]
+        );
+        outcomes.push(outcome);
+    }
+    fn loaded(outcome: &ObservedRepositoryPackageOutcome) -> &crate::LoadedPackage {
+        observed_repository_package(outcome)
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+    }
+    assert_ne!(loaded(&outcomes[0]), loaded(&outcomes[1]));
+    assert_eq!(loaded(&outcomes[0]), loaded(&outcomes[2]));
+}
+
+#[tokio::test]
+async fn native_package_name_rejects_direct_build_calls_and_invalid_contexts() {
+    let direct = load_repository_package_fixture(
+        &[(
+            "BUILD.bazel",
+            b"filegroup(name='before')\nnative.package_name()\n",
+        )],
+        814,
+    )
+    .await;
+    assert!(repository_package_error(&direct).contains("requires a loaded .bzl function caller"));
+    let build_def = load_repository_package_fixture(
+        &[
+            (
+                "BUILD.bazel",
+                b"load(':defs.bzl', 'DUMMY')\ndef direct(): return native.package_name()\ndirect()\n",
+            ),
+            ("defs.bzl", b"DUMMY = 1\n"),
+        ],
+        815,
+    )
+    .await;
+    assert!(
+        repository_package_error(&build_def)
+            .contains("Label() can only be used during .bzl initialization (top-level evaluation)"),
+        "BUILD-defined function must reach the loaded-source guard: {}",
+        repository_package_error(&build_def)
+    );
+    let arity = load_repository_package_fixture(
+        &[
+            ("BUILD.bazel", b"load(':defs.bzl', 'emit')\nemit()\n"),
+            ("defs.bzl", b"def emit(): native.package_name('extra')\n"),
+        ],
+        816,
+    )
+    .await;
+    assert!(repository_package_error(&arity).contains("package_name"));
+    for globals in [loading_globals(), bzlmod_loading_globals()] {
+        assert!(eval_global("X = native.package_name()\n", &globals).is_err());
+    }
+}

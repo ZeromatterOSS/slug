@@ -29,20 +29,22 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-107-m7a-direct-label-repository-template-source-r1
+Packet: WP-7-108-m7a-native-package-name-build-context-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP807 admits direct typed canonical-external Labels as source arguments for
-the already accepted bounded `repository_ctx.template` effect. The
-authenticated rules_kotlin 1.9.6 capabilities repository passes private
-Label defaults and a selected private LabelList element directly to three
-ordered template calls. Bazel 9.2 source and a direct-Label scratch oracle
-support the existing Label-path/source retry and generated-file effect
-owners; a self-generated source fails closed. Five focused tests and the
-rebuilt authentic smoke passed the old template stop and reached separate
-`native.package_name()` Loading. Independent design/final reviews accepted
-the bounded slice. Full repository execution, configured Kotlin behavior
-and M7A close remain deferred. WP806 is accepted at `139bd8c7d`.
+WP808 selects zero-argument `native.package_name()` in an ordinary loaded
+`.bzl` macro called from a BUILD package. The authenticated
+rules_kotlin 1.9.6 macro in `kotlin/internal:toolchains.bzl` expects exactly
+`kotlin/internal` from its external BUILD caller. Pinned Bazel 9.2 source
+uses caller package context, and Slug already retains that identity in its
+package recorder. A fresh offline oracle proves caller-package results and
+that Bazel leaves `native` unbound directly in BUILD; the new method must
+fail closed there. Independent design/final reviews accepted the bounded
+change. Five focused tests, a rebuilt CLI and the authentic smoke passed the
+old stop; the next independent error is frozen `select` BUILD attribute
+values at `toolchains.bzl:320`. Bare-global exposure, non-package contexts,
+downstream Kotlin semantics and M7A close remain deferred. WP807 is accepted
+at `7e6920923`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

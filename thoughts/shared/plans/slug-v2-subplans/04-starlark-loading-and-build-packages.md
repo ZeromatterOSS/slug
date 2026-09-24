@@ -9248,9 +9248,10 @@ deferred.
 
 ### Package-relative Label and typed `select` keys accepted (2026-09-24)
 
-WP802 admits ordinary BUILD/macro `native.package_relative_label` for string
-inputs resolved in the calling package and its known repository mapping, with
-existing Label values returned unchanged after package-context validation.
+WP802 admits `native.package_relative_label` in a loaded `.bzl` macro called
+from BUILD for string inputs resolved in the calling package and its known
+repository mapping, with existing Label values returned unchanged after
+package-context validation.
 The package-owned `select` intake now retains Label keys as canonical
 conditions while preserving string keys as raw, ordered conditions under the
 default non-eager semantics. Attribute coercion recognizes the canonical root
@@ -9265,6 +9266,10 @@ materialization-entry-mode stop at registration row 55. Rule initializers,
 unknown-apparent nonvisible Label values, eager select-key semantics, mixed
 equivalent-key precedence and broad configured/toolchain behavior remain
 deferred; M7A is still partial.
+
+WP808 evidence correction: the WP802 oracle called this method from a loaded
+`.bzl` macro, not directly from BUILD. Bazel does not bind the `native`
+namespace directly in BUILD; no direct-BUILD `native` parity was admitted.
 
 ### Selected protobuf configuration-field declarations accepted (2026-09-24)
 
@@ -9355,3 +9360,21 @@ path-wrapped control. The rebuilt authentic build clears the template stop
 and reaches separate `native.package_name()` Loading in rules_kotlin.
 Broader template inputs, repository execution, configured Kotlin and M7A
 close remain deferred.
+
+### Loaded-macro `native.package_name()` accepted (2026-09-24)
+
+WP808 admits zero-argument `native.package_name()` for an ordinary loaded
+`.bzl` macro called during BUILD-package evaluation. Pinned Bazel 9.2 source
+and an offline root/external oracle establish that the result is the caller
+BUILD package path, not the defining `.bzl` package or repository prefix.
+Slug returns its existing package recorder path after requiring a Starlark
+function frame and authenticating the native call source in that package's
+recursive loaded `.bzl` manifest. Direct BUILD calls, including a Slug
+BUILD-defined function, fail closed; no new DICE key, retained context or
+global package state was added. Focused canonical-external root/other/
+`kotlin/internal`, source A/B/A, negative and protected tests pass. The
+rebuilt authentic build clears the former Kotlin `native.package_name()`
+stop and reaches a separate frozen-`select` BUILD-attribute-value error in
+`toolchains.bzl:320`. Symbolic macros, the broader preexisting BUILD
+`native` namespace, bare-global `package_name()`, exact invalid-context
+diagnostics, downstream Kotlin and M7A close remain deferred.

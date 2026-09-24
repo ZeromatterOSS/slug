@@ -1,106 +1,97 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-107-m7a-direct-label-repository-template-source-r1
+Packet: WP-7-108-m7a-native-package-name-build-context-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit a direct typed `Label` as the source argument of the already accepted
-bounded `repository_ctx.template` method when it names a canonical external
-repository file. The authenticated rules_kotlin 1.9.6 capabilities repository
-passes private attr.label defaults and a selected private attr.label_list
-element directly to three ordered template calls in `compiler.bzl:25-42`;
-the rebuilt normalized-PATH authentic `slug build //:probe` must pass its
-current `repository_ctx.template invocation is unsupported` stop. A later
-independently typed stop is acceptable. Complete generated repository
-success, Kotlin analysis/actions and M7A close are not claimed.
+Admit zero-argument `native.package_name()` in an ordinary loaded `.bzl`
+macro called during BUILD-package evaluation. The
+authenticated rules_kotlin 1.9.6
+`@@rules_kotlin+//kotlin/internal:BUILD.bazel:15-18` invokes
+`kt_configure_toolchains()` from `toolchains.bzl`; its first body check at
+`:347-354` must receive `kotlin/internal`, without a repository prefix.
+The rebuilt normalized-PATH authentic `slug build //:probe` must pass the
+current missing-method stop; a later independently typed stop is acceptable.
+Subsequent Kotlin toolchain declarations, analysis/actions, target success
+and M7A close are not claimed.
 
-Exact Bazel 9.2 slice: a direct Label template source follows Bazel's
-`getPath(template)` source path/package validation before file read, then
-uses the existing accepted destination, default/explicit executable mode,
-insertion-ordered literal Latin-1 substitution, and output byte behavior.
-For the source-authentic calls, the destination is a normalized relative
-string, the Label belongs to a canonical external repository, and explicit
-`executable=False` is retained. The Label package must exist, but its file
-need not be a declared target. Slug-native: lexical/materialized absolute
-path tokens, bounded evaluator retries, canonical route observations and
-structural effect-plan identity. Unsupported/deferred: root/built-in,
-self-generated, raw string and non-Label path sources beyond the already
-accepted `path(Label)` slice; explicit watch modes, arbitrary template
-sizes/encodings, broader repository effects and configured Kotlin semantics.
+Exact Bazel 9.2 slice: `native.package_name()` in a loaded `.bzl` macro
+returns the calling BUILD package path, not the defining `.bzl` package,
+for root and external callers; root returns the empty string. A direct
+BUILD-file `native.package_name()` call fails closed, since Bazel does not
+bind `native` in BUILD globals. Slug-native: the
+existing `PackageRecorder`/`PackageIdentifier` Rust representation and
+repository package DICE/source-observation equality. Unsupported/deferred:
+top-level `.bzl`, module-extension and repository-rule invocations without
+a BUILD recorder; bare-global `package_name()` exposure, Slug's existing
+broader BUILD `native` namespace, broader `native` introspection, exact
+invalid-context diagnostic text and downstream Kotlin
+semantics. Invalid non-package calls must fail closed without fabricating a
+package from source labels.
 
 ## Source, owner and decision
 
-The authenticated selected BCR rules_kotlin 1.9.6
-`src/main/starlark/core/repositories/compiler.bzl:18-42` writes `WORKSPACE`,
-then uses direct Labels for ordered `BUILD.bazel`, `artifacts.bzl` and
-`capabilities.bzl` template effects, all nonexecutable. The first has one
-`$git_repo$` substitution; the others have none. The defaults and selected
-capabilities Label are at `compiler.bzl:44-88`; the authenticated Bzlmod
-default compiler 1.9.23 selects the 1.9 capabilities file. All three
-template sources are below Slug's existing 2 MiB limit. Pinned Bazel 9.2
-`StarlarkRepositoryContext.java:258-359` calls `getPath` on destination and
-source, observes the source, applies literal replacements in dict order and
-writes output bytes; `StarlarkBaseExternalContext.java:2353-2379` resolves a
-Label path through package lookup and external materialization, and
-`RepositoryUtils.java:53-72` requires a package but not a declared target.
-`StarlarkRepositoryIntegrationTest.java:126-154` and
-`starlark_repository_test.sh:459-470,777-800,1076-1100` cover direct
-Label sources, source edits and executable mode. A Bazel 9.2 offline
-scratch oracle at `/tmp/slug-wp807-template-Pxwnp9`, run with
-`--ignore_all_rc_files` and download disabled, confirms a direct
-`ctx.attr.template` Label into nested destinations, insertion-ordered
-forward/reverse substitutions, the Kotlin `$git_repo$` token and explicit
-false/default true executable modes. A cross-repository local-path-override
-case resolves `@@producer+//templates:source.tpl` and produces identical
-bytes/mode in two fresh output bases. Missing source, non-string map keys or
-values, invalid executable, destination and source types fail separately.
-The scratch stays outside this checkout and proves no general repository
-effects or watch-mode parity. Existing accepted path-wrapped template
-evidence remains the control.
+Pinned Bazel 9.2 `StarlarkNativeModule.java:616-620` obtains the current
+`TargetDefinitionContext` and returns its package fragment as a string;
+`StarlarkNativeModuleApi.java:229-239` specifies the caller BUILD package
+for a loaded `.bzl` function. `PackageFactory.java:518-544` supplies the
+BUILD context, `MacroClass.java:412-429` preserves the caller context for
+macros, and `TargetDefinitionContext.java:161-195,224-249` rejects calls
+without it. `StarlarkRepositoryIntegrationTest.java:235-250` checks an
+external `//p` package. A Bazel 9.2 offline scratch oracle at
+`/tmp/slug-wp808-package-name-Q2wlze`, run with `--ignore_all_rc_files`
+and downloads disabled in two fresh output bases, observes a root-defined
+`.bzl` macro returning caller package `alpha`, `beta/nested` and `nested`
+from a generated external BUILD. Direct BUILD `native.package_name()` fails
+because `native` is unbound; top-level `.bzl` and rule-implementation calls
+fail phase validation. Bare-global BUILD `package_name()` succeeds but is
+outside this packet. A separate fresh output base proves a root BUILD
+calling that macro receives the empty string, while direct BUILD `native`
+remains unbound.
+The scratch stays outside the checkout. The authenticated Kotlin check is
+the selected source closure, not broad toolchain parity.
 
-`app/slug_loading_v2/src/repository_rule_context.rs` is the sole intake
-owner. Its template method currently requires a `RepositoryStarlarkPath`
-from `ctx.path(Label)` and rejects the direct `StarlarkLabel` before any
-source observation. Derive the existing owned `RepositoryLabelPathAddress`
-from a direct Label as well as the admitted path wrapper. For the direct
-Label, reject an address whose canonical repository equals the invocation's
-`generated_repository` before any Need, preventing self-materialization
-through its own file-effect key. Otherwise request `LabelPathNeed` before
-`RepositorySourceNeed`, reusing the existing retry driver and the accepted
-containing-package/materialization owner. Keep the current external-root
-guard, substitution limits,
-source-byte read, generated-file effect, call order and terminal-attempt
-publication. Do not introduce a second source resolver, retained effect,
-cache, DICE key, lock or fallback. The existing
-`HostRepositoryLabelPathObservationKey` and canonical route/source-read keys
-own package/materialization, exact file bytes, Need/error and A/B/A
-invalidation; the immutable ordered `GeneratedRepositoryFileEffectPlan`
-remains sole output path/content/mode identity. Each retry drops evaluator
-state before DICE awaits. New address and substitution values are invocation
-scratch only, bounded by existing limits; no extra retained or clone-heavy
-representation is selected. The large `repository_rule_context.rs` remains
-cohesive because the change is one source-intake branch beside its existing
-template method, not a second effect executor.
+`app/slug_loading_v2/src/package.rs` owns both the `native_methods` table
+and `PackageRecorder::from_evaluator`. The latter already resolves ordinary
+BUILD evaluation and `MacroEvaluationContext` to the caller's recorder;
+its `package` is initialized from the package path in the existing package
+identifier. Add only a zero-argument `native_methods::package_name` that
+requires a Starlark caller-function frame whose source is a member of the
+recorder's loaded `.bzl` manifest, then returns that recorder's package
+string. Reuse the existing `label_source_identity_for_call` source
+authentication without using its label as the package result. This gate
+rejects both module-scope direct BUILD and a Slug BUILD-defined `def`
+calling the broader existing `native` namespace; neither is an exact Bazel
+admission. Do not use the defining `.bzl` label,
+repository name, a global mutable current package, a direct filesystem read
+or a new DICE key. The existing root/repository package-load keys, route and
+source observations own change, invalidation, A/B/A restoration and errors;
+the value is evaluator scratch allocated from an already retained compact
+package path. `NativeModule` and `BzlmodNativeModule` share the methods
+table, but outside BUILD/macro execution there is no recorder and the
+method must fail closed. No new retained value, interner, lock, cache or
+clone-heavy representation is selected. The large `package.rs` remains the
+cohesive owner because this is one method beside existing package-context
+`native.package_relative_label`, not a new subsystem.
 
 ## Evidence and validation
 
-Extend the focused context test to discriminate direct Label path Need,
-prepared path then source Need, terminal output bytes/mode and unchanged
-`ctx.path(Label)` and non-Label-path controls. In the existing observed DICE
-template fixture, convert one source call to direct Label while keeping one
-path-wrapped control; reuse its route/materialization/source-read, warm reuse,
-A/B/A byte restoration and terminal-effect assertions. Include root and
-same-generated-repository direct-Label fail-closed controls, plus
-unprepared/missing-source controls where the existing tests do
-not already distinguish them. Reuse accepted path-wrapped Bazel/Slug
-evidence; the direct-Label scratch oracle discriminates this new intake.
-No Stage 1 fixture is selected unless focused proof exposes a gap. Scratch
-stays outside the checkout. No `~/.bazelrc` contents, BuildBuddy credentials,
-remote transport or NativeLink enter this Loading packet.
+Add a focused external-package Loading test adjacent to the existing
+caller-package `native.package_relative_label` macro regression: define the
+function in a different `.bzl` package, call it from external
+`kotlin/internal` and another consumer BUILD, and assert returned package
+text has no repository/definition prefix. Cover a root BUILD calling the
+macro and receiving `""`, zero-argument arity, direct-BUILD `native` call
+rejection at module scope and in a BUILD-defined function, and invalid
+top-level `.bzl`/extension context. Reuse the existing observed source and
+route A/B/A harness; add a new fixture only for a demonstrated discriminator
+gap. A protected `package_relative_label` test should still pass. No
+`~/.bazelrc` contents, BuildBuddy credentials, remote transport or
+NativeLink enter this Loading packet.
 
 Resolve pinned Cargo/rustc from `rust-toolchain`; compile Loading library
-tests with Cargo JSON `--no-run`, preflight exact nonignored selectors, and
+tests with Cargo JSON `--no-run`, preflight exact nonignored selectors and
 run selected tests serially. Rebuild `slug_cli_v2` before the authentic
 normalized-PATH smoke; check/clean `slugd` before and after. Run format,
 archive, diff and plan-status checks and obtain independent DESIGN and FINAL
@@ -108,40 +99,40 @@ reviews. No broad suite or remote-service gate is selected.
 
 ## Scope and stops
 
-Base clean main `139bd8c7d`. Allowlist: this manifest and canonical Current
-paragraph; Stage 4 template owner contract only after acceptance;
-production and focused tests in
-`app/slug_loading_v2/src/repository_rule_context.rs`; one existing observed
-retry/effect test and its local fixture in
-`app/slug_loading_v2/src/module_extension_repository_file_effect.rs`.
-Production growth under roughly 35 lines and proof under roughly 100 lines
-are review triggers, not permission ceilings. REPLAN if Bazel's direct Label
-does not share the admitted `getPath`/source-read semantics, existing source
-owners cannot validate the authentic external Label, a new retained effect
-or DICE owner is required, or the authentic stop cannot clear without a
-different repository method or configured Kotlin work.
+Base clean main `7e6920923`. Allowlist: this manifest and canonical Current
+paragraph; Stage 4 native/package owner contract after acceptance;
+production `app/slug_loading_v2/src/package.rs`; focused tests in
+`app/slug_loading_v2/src/host_package_load_tests.rs` and, only for a smaller
+wrong-context direct unit, the existing `package.rs` test module.
+Production growth under roughly 15 lines and proof under roughly 130 lines
+are review triggers, not permission ceilings. REPLAN if Bazel returns the
+defining `.bzl` package in the selected call, the current recorder cannot
+identify the caller BUILD package, exact behavior requires a new retained
+context or DICE owner, or the authentic stop cannot clear without unrelated
+native/toolchain semantics.
 
 ## Immediate predecessor
 
-WP806 accepted at `139bd8c7d`: private repository-rule LabelList defaults
-now retain ordered typed labels and fail closed on attached aspects. Six
-focused tests and the rebuilt authentic smoke passed its schema stop and
-reached this separate direct-Label template-source rejection at toolchain
-registration row 55. M7A remains partial.
+WP807 accepted at `7e6920923`: direct canonical-external Label sources now
+reuse the bounded repository template path/source/effect owners, with a
+self-generated-source guard. Five focused tests and the rebuilt authentic
+smoke passed its template stop and reached this separate rules_kotlin
+`native.package_name()` Loading error at registration row 55. M7A remains
+partial.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviews returned ACCEPT. The pinned-nightly
-Loading JSON library-test compile passed. Exact preflight
-verified five nonignored selectors and all five passed: direct Label path
-Need, source Need and terminal bytes/mode; self-generated/root fail-closed
-controls; the observed DICE route/source A/B/A test with an actual private
-`ctx.attr._template` direct Label and a path-wrapped control; and protected
-read/source, substitution-limit and which-path negatives. The direct
-`slug_cli_v2` rebuild passed. The normalized-PATH authentic one-shot
-`slug build //:probe` cleared the old `repository_ctx.template` stop and
-failed independently at toolchain registration row 55 when
-`@@rules_kotlin+//kotlin/internal:toolchains.bzl:353` calls unsupported
-`native.package_name()` during Loading. No `slugd` remained before or after.
-No remote cache, NativeLink or BuildBuddy gate was selected. Full Kotlin
-repository/build behavior and M7A close remain deferred.
+Independent corrected DESIGN and FINAL reviews returned ACCEPT. The pinned
+nightly Loading JSON library-test compile passed. Exact preflight verified
+five nonignored selectors; all five passed serially: canonical-external
+root, `kotlin/internal` and other caller packages against a root `.bzl`
+definition; source A/B/A restoration; direct BUILD module/function,
+arity and non-package fail-closed cases; and two protected package-context
+regressions. The direct `slug_cli_v2` rebuild passed. The normalized-PATH
+authentic one-shot `slug build //:probe` cleared the old
+`native.package_name()` stop and failed independently at rules_kotlin
+`toolchains.bzl:320` with `frozen select values are not valid BUILD attribute
+values`. No `slugd` remained before or after. Format, archive, diff and
+plan-status checks passed. No remote cache, NativeLink or BuildBuddy gate
+was selected. Symbolic macros, broader direct-BUILD `native` exposure,
+configured Kotlin behavior and M7A close remain deferred.
