@@ -1,0 +1,280 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "@dynamic_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@dynamic_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "undeclared_absent_returns_none_and_default",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...",
+      "normalized_stdout": "@dynamic_repo//:dyn_none_fallback",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n",
+      "stdout": "@dynamic_repo//:dyn_none_fallback\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@dynamic_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC="
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@dynamic_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC="
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "undeclared_present_empty_overrides_default",
+      "normalized_stderr": "",
+      "normalized_stdout": "@dynamic_repo//:dyn_empty_empty",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@dynamic_repo//:dyn_empty_empty\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@dynamic_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC=one"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@dynamic_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC=one"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "undeclared_present_one",
+      "normalized_stderr": "",
+      "normalized_stdout": "@dynamic_repo//:dyn_one_one",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@dynamic_repo//:dyn_one_one\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@dynamic_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC=two"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@dynamic_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC=two"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "undeclared_changed_to_two",
+      "normalized_stderr": "",
+      "normalized_stdout": "@dynamic_repo//:dyn_two_two",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@dynamic_repo//:dyn_two_two\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@dynamic_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC=one"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@dynamic_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC=one"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "undeclared_restored_to_one",
+      "normalized_stderr": "",
+      "normalized_stdout": "@dynamic_repo//:dyn_one_one",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@dynamic_repo//:dyn_one_one\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@raw_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC=one",
+        "--repo_env=SLUG_WP800_RAW=one"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@raw_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC=one",
+        "--repo_env=SLUG_WP800_RAW=one"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "raw_os_environ_reads_one",
+      "normalized_stderr": "",
+      "normalized_stdout": "@raw_repo//:raw_one",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@raw_repo//:raw_one\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@raw_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC=one",
+        "--repo_env=SLUG_WP800_RAW=two"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@raw_repo//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--repo_env=SLUG_WP800_DYNAMIC=one",
+        "--repo_env=SLUG_WP800_RAW=two"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "raw_os_environ_does_not_track_change_to_two",
+      "normalized_stderr": "",
+      "normalized_stdout": "@raw_repo//:raw_one",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@raw_repo//:raw_one\n"
+    }
+  ],
+  "fixture": "module-extension-dynamic-getenv",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

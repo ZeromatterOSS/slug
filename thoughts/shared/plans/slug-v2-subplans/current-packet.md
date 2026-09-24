@@ -1,154 +1,55 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-99-m7a-private-repository-rule-attrs-r1
+Packet: WP-7-100-m7a-selected-module-getenv-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit ordinary one-underscore private `repository_rule` attributes of the
-source-selected `attr.string` and `attr.label` kinds. A declaration's typed
-default must survive export, module-extension invocation, repository-spec
-conversion and `repository_ctx.attr` access. Concrete call-site overrides
-remain legal and type checked; direct `None` behaves as omission. The original
-rules_rust 0.73 workspace with Bazel's resolved rules_python 1.7.0 must pass
-the current `_rule_name` definition-time Loading stop when replayed under
-the already validated normalized `PATH`. A later separately typed stop is
-acceptable. This is source closure, not Python toolchain or root-build success.
+Admit `module_ctx.getenv(name, default = None)` for a selected module extension, including names omitted from `module_extension(environ = ...)`. The authentic rules_python 1.7.0 extension must pass its first undeclared `RULES_PYTHON_REPO_DEBUG` observation stop under the existing normalized PATH; a later independently typed stop is acceptable. This is a selected environment-observation slice, not Python toolchain or root-build success.
 
-Exact Bazel 9.2 observable slice: public Starlark spelling `_x` for a private
-repository-rule descriptor; default and concrete override values appear as
-`repository_ctx.attr._x`; `None` (even on an unknown supplied name) is ignored
-before lookup, while an unknown concrete name and wrong concrete type fail.
-Slug-native: retaining the public `_x` spelling structurally rather than
-Bazel's native `$x` storage spelling, and retained DICE/package/repository
-identity rather than Bazel checksum bytes. Unsupported/deferred: additional
-private kinds, computed/late-bound defaults, nonordinary schema options,
-arbitrary name grammar beyond the admitted one-underscore ASCII form,
-repository effects not already admitted, Python toolchain analysis, exact
-diagnostic wording and root bootstrap. No all-repository-rule parity claim.
+Exact Bazel 9.2 observable slice: string name, absent `None`, absent string default, present empty string, present value and undeclared names; a raw absent observation is distinct from a present value equal to its default. `--repo_env` changes re-evaluate the selected extension, including A/B/A. Slug-native: typed structural DICE identity, bounded selected-owner replay/errors, and Rust Host snapshot observation rather than Bazel Skyframe or HotSpot bytes. Unsupported/deferred: nonselected extension execution, lockfile recorded-input replay, broad environment enumeration, arbitrary repository effects, exact diagnostic wording, Python toolchain analysis and root bootstrap. Existing declaration-restricted `module_ctx.os.environ` remains unchanged.
 
 ## Source, owner and decision
 
-Pinned Bazel 9.2 `StarlarkRepositoryModule.java:75-90` converts descriptor
-names and builds attrs. `AttributeValueSource.java:21-29,44-71` maps `_x`
-to native `$x`; `RepoRule.java:139-150` indexes the public Starlark name;
-`AttributeUtils.java:57-118` skips `None`, type-checks concrete kwargs and
-installs defaults; `RepoDefinition.java:40-60` exposes them through `rctx.attr`.
-The source-authentic rules_python 1.7.0 BCR `python/private/python_repository.bzl`
-(SHA-256 `a977ffc6ed258301330a993864762e2bbb9f64cad5caf1519d02c24e68f228ff`)
-declares `_rule_name: attr.string(default = "python_repository")` at line 352,
-while `pythons_hub.bzl:186` declares a private `attr.label` default that its
-implementation reads. The row-53 stop loads `python_repository.bzl` as an
-import; it does not prove that repository was instantiated or downloaded.
+Pinned Bazel 9.2 commit `8220c619` has `StarlarkBaseExternalContext.java:1512-1542` recording a `RepoRecordedInput.EnvVar(name)` before applying a `None` or string default; `RepoRecordedInput.java:703-776` and `RepoEnvironmentFunction.java:49-61` distinguish absent, empty and present cells. `RegularRunnableExtension.java:182-186` and `ModuleExtensionContext.java:90-94` pre-record declared `environ` independently. The Bazel `bazel_lockfile_test.py:2599-2717` uses an undeclared lazy name; fresh Bazel 9.2 scratch oracles `/tmp/slug-wp800-getenv-a-MWm5ZF` and `/tmp/slug-wp800-getenv-b-Wk6LBM` proved returned absent/default, empty, one/two/one and the raw-host-lookup control in two output bases. Raw absent versus present-default-equal identity is proven by the pinned recorded-input path and a Slug structural test, not target output. Convert the value-behavior rows to a self-contained fixture and independently replay it. Authenticated rules_python 1.7.0 `python/private/python.bzl:1374-1386` declares only `RULES_PYTHON_BZLMOD_DEBUG`; `repo_utils.bzl:314-316` asks for `RULES_PYTHON_REPO_DEBUG` and verbosity through `getenv` if available.
 
-`package.rs::repository_rule` is the definition-time owner. Extend only its
-name predicate to admit a single leading `_` followed by an ASCII letter and
-then ASCII alphanumerics/underscores; keep the existing public grammar and
-built-in collision checks. After the existing `attr.*` descriptor conversion,
-admit private descriptors only for `AttributeKind::{String, Label}` through
-the existing schema checks. Do not special-case `_rule_name`, fabricate native
-`$` names, or alter regular Starlark rule/implicit attr policy.
+`HostSelectedExtensionOwnerPureKey` in `module_extension.rs` owns selected evaluation. Its existing `observe_selected_host` preflights declared names through `RepositoryEnvironmentCellKey` and an immutable `RepositoryHostInputTransaction`; the selected invocation loop owns dynamic Need/replay. Add an attempt-local selected `getenv` scratch bridge: a first unprepared name records a pending name and aborts the Starlark pass; the async owner requests missing frontier names through existing `SourcePreparationNeeds::environment` or verifies a per-name DICE cell against the request snapshot, stores the raw optional value and replays. No evaluator code reads ambient process environment. Guards are dropped before any DICE compute. Invalid/unavailable cells fail closed, including authorized absence; Need/interrupted passes publish neither call records nor events. Preserve previous error/observation paths and revocation after request changes. `docs/developers/dice.md` governs dependency recording, equality cutoff and lock ownership; Core already injects/revokes these cells.
 
-The existing `RepositoryRuleAttribute` and frozen definition/call projection
-retain raw Starlark names and typed defaults. `instantiate_call_with_conversion`
-already skips `None` before name lookup, type-checks concrete overrides and
-keeps only supplied overrides in `RepoSpec`; the existing context resolves an
-omitted override from the declaration. Preserve these paths and their typed
-Need/error, label-conversion, repository-mapping and publication behavior.
-The definition/source observation and the certificate's retained call
-definition must distinguish changed private defaults, with A/B/A restoration;
-`RepoSpec` stores supplied overrides only and must not be mistaken for default
-identity. No DICE
-key, lock, new retained representation, ambient source read, command cache or
-foreign semantic executor is selected. A retained private descriptor uses
-the existing descriptor storage; attempt-local evaluator values and temporary
-source roots remain scratch and are released on completion/error.
+Retain a deterministic name/raw-value recorded-environment projection on Complete owner results and post-host error/observation terminals so equal generated repository calls or error strings cannot erase changed reads. It contains declared names and only dynamically *read* names, not all names prepared on aborted passes; absent and present-default-equal remain distinct. Its `Debug` and terminal formatting must redact raw values while preserving structural equality; test that no sentinel value appears in formatted results/errors. Keep this projection separate from OS/arch selection flags and REAPI/Bazel digest domains. Retained values use existing Arc/CompactString storage; attempt-local scratch uses existing small collections per Stage 9 row 96, with no global cache or new DICE key. Retained data has no evaluator-heap borrow and is released with its owner value. DICE equality/dependency revalidation owns invalidation and restoration; there is no command-side repair.
+
+`module_ctx.getenv` is present in the shared Starlark method table but fails closed outside selected evaluation. `module_ctx.os.environ` remains declaration-restricted. `getenv` accepts a string name and optional string-or-None default, returning raw value when present and default otherwise. At most 16 distinct names requested through `getenv` are supported per selected evaluation (Slug-native bound), whether also declared or not; repeated reads of a name do not consume another slot. This covers both rules_python logger names and the source-selected case, without claiming unbounded Bazel parity.
 
 ## Evidence and validation
 
-A Bazel-only fresh-output-base scratch oracle at
-`/tmp/slug-repo-private-attr-UZDhCd` already distinguished seven cases:
-omitted private string default, concrete string override, direct `None`,
-wrong concrete type, unknown concrete name, unknown-`None`, and private label
-default read. Add a private label override with a distinct source marker so
-the second admitted kind's call-site conversion is discriminated. Add one
-small self-contained Stage 1 fixture with source
-provenance and deterministic BUILD content to preserve those discriminators.
-Use message-shape for diagnostics and exact target-name/value checks; keep
-invalid module calls isolated by command mutation or separate minimal fixtures.
-Generate and independently replay Bazel 9.2 in fresh roots. This fixture is
-Loading/repository-definition evidence, not Slug Query parity. Reuse accepted
-repository-effect and module-extension evidence; copy no upstream source,
-archive or credential into the fixture. Its new files remain below the
-orchestration fixture-growth checkpoint.
+Make one small Stage 1 fixture with `fixture.toml` provenance and deterministic generated BUILD, for selected undeclared getenv returned absent/default, empty, one/two/one and Bazel's untracked `os.environ` control. Compare exact target names/values and message shape where appropriate; the control documents a deferred Slug boundary rather than an admitted negative behavior. Fresh Bazel 9.2 generation and independent replay must agree. The fixture does not claim to distinguish raw absent from present-default-equal, which has pinned-source and focused Rust structural evidence. Reuse accepted 9.1.1 lockfile fixture only as historical context; it is not Bazel 9.2 evidence for this exact slice. Keep fixture at most five small files and below the orchestration fixture-growth checkpoint; copy no upstream source, archive or credential. Launch oracle harness with synthetic probe variables unset. Bazel's upstream lockfile replay assertions are skipped because that lifecycle is deferred here.
 
-Focused Rust tests must replace the old `_private` declaration-rejection
-expectation with a malformed-name guard; prove both private kinds' typed
-defaults and `repository_ctx.attr` visibility, concrete string and label
-overrides, direct
-`None`, unknown concrete versus unknown-`None`, wrong type, descriptor
-retention across freeze/call/RepoSpec and changed-default A/B/A structural
-identity. Preserve public attrs, built-in collisions and unsupported schema
-guards. Use pinned-toolchain JSON `--no-run`, exact-selector preflight and
-focused owner tests with serial Cargo; compile direct Loading/Bzlmod/Core
-dependents, then fresh `cargo build -p slug_cli_v2` before authentic CLI smoke.
-Clean stale `slugd` before and after. The authentic replay uses
-`PATH=/bin:/usr/bin:/usr/local/bin` with HOME/NETRC unset to avoid the
-previously recorded ambient-PATH `which` limit. If it fails before the
-`_rule_name` declaration or requires a different owner/effect, correct scope
-or REPLAN. Run format, diff, archive and plan-status checks; require
-independent DESIGN and FINAL reviews. No broad suite or M7A close selected.
+Focused Rust tests must prove selected cold Need/replay; absent/empty/present and default type; undeclared dynamic versus declared-only `os.environ`; raw absent versus present-default-equal structural identity; A/B/A request revisions with unchanged repository calls and identical post-host error; no events/calls from interrupted passes; nonselected fail-closed; 16 distinct names accepted, 17th rejected, and repeated reads not consuming another slot or Need. Verify debug redaction. Reuse selected-owner declared Host, OS-environ, forbidden-ABI and factored-error regressions. Compile Loading/Bzlmod/Core direct dependents with pinned-toolchain JSON `--no-run`, run exact-selector preflight and focused tests serially, rebuild `slug_cli_v2` before authentic smoke, and clean stale `slugd` before and after. The smoke uses accepted normalized PATH with HOME/NETRC unset. Run format, diff, archive and plan-status checks; require independent DESIGN and FINAL review. No broad suite, remote transport gate or M7A close is selected. BuildBuddy is available through normal Bazel RC discovery if a later remote check needs it; never inspect or print `~/.bazelrc`, netrc or auth material.
 
 ## Scope and stops
 
-Base clean main `50d282a2e`. Allowlist: this manifest, canonical Current
-paragraph and Stage 4 owner contract only for accepted invariants;
-`app/slug_loading_v2/src/package.rs` for the bounded name/kind gate;
-`app/slug_loading_v2/src/module_extension_repository_rule.rs`,
-`module_extension_repository_instantiation.rs` and
-`repository_rule_context.rs` for focused tests only;
-`tests/v2_oracle/fixtures/repository-rule-private-attrs/` for the small
-Bazel fixture. The already large `package.rs` remains the cohesive declaration
-owner; add no second repository attribute parser. No Starlark runtime,
-cross-crate API, DICE key, repository-effect driver, remote transport,
-NativeLink/BuildBuddy configuration, lockfile, credential or generated
-rules_python source change. If a private default needs new storage/identity,
-call-site behavior contradicts the pinned oracle, or the selected source
-requires an unmodeled repository effect to pass the definition-time gate,
-stop for reviewed correction or REPLAN. Normal Bazel RC discovery may pick
-up user auth when explicitly needed; never inspect or print `~/.bazelrc`
-or netrc.
+Base clean main `f0bddcce3`. Allowlist: this manifest, canonical Current paragraph and Stage 5 owner contract only for accepted invariants; `app/slug_loading_v2/src/module_extension.rs` for selected bridge, identity and focused tests; `tests/v2_oracle/fixtures/module-extension-dynamic-getenv/` for the new small fixture. The large `module_extension.rs` remains the cohesive selected-owner/evaluator owner; add no second environment registry. A split is a review trigger only if implementation crosses another subsystem or mixes command/transport concerns. Do not change repository rule semantics, Core cell keys, lockfile, remote transport, NativeLink/BuildBuddy setup, credentials or generated rules_python source. REPLAN if dynamic reads cannot be tracked through existing per-name DICE cell/Need bridge, equality requires a new cross-crate owner, or the authentic next stop requires an unmodeled repository effect merely to pass this getenv gate.
 
 ## Immediate predecessor
 
-WP798 at `50d282a2e` admitted ordinary public direct-`None` Starlark rule
-defaults. Its normalized-PATH authentic smoke passed the former generated
-`iso_date=None` stop and reached rules_python's `_rule_name` declaration at
-toolchain registration row 53. An initial ambient-PATH `rules_shell` `which`
-limit was the previously recorded transient environment boundary, not a new
-selected implementation gap. WP798's eight-command Bazel oracle, focused
-Rust gates and independent reviews passed; M7A remains partial.
+WP799 at `f0bddcce3` admitted ordinary private repository-rule string/label defaults, passed an eight-row Bazel 9.2 fixture, six focused Rust tests and independent reviews, and moved authentic normalized-PATH smoke past `_rule_name` to undeclared `RULES_PYTHON_REPO_DEBUG` observation. M7A remains partial.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviews returned ACCEPT. The Bazel 9.2 fixture
-passed generation and independent replay in separate fresh roots, 8/8 rows
-each: private string default, concrete override, direct `None`, unknown-`None`,
-private label default/read and concrete label override/read, plus isolated
-wrong-type and unknown-concrete negatives. The authenticated rules_python
-1.7.0 `_rule_name` and `_rules_python_workspace` source anchors were checked;
-the fixture copies no upstream files. The only production change is the
-bounded `package.rs` name/kind gate. Existing retained call definitions carry
-private defaults; `RepoSpec` continues to carry supplied overrides only.
-
-Pinned-toolchain JSON `--no-run` compiled Loading/Bzlmod/Core in 13.74 s.
-Exact-selector preflight found four new/changed tests and two selected
-regressions; all six passed. Fresh `cargo build -p slug_cli_v2` passed before
-the authentic normalized-PATH smoke. That smoke passed the former `_rule_name`
-definition stop and reached a distinct rules_python module-extension
-observation error: `repo_utils.bzl:316` requests undeclared environment name
-`RULES_PYTHON_REPO_DEBUG`. This does not admit environment behavior, Python
-repository effects, toolchain analysis or root-build success. No stale
-`slugd` process was present before or after. Format, diff, V1 archive and
-plan-status checks passed. The packet took approximately 14 minutes from
-draft through final review; no broad suite was selected.
+Independent DESIGN and FINAL reviews returned ACCEPT. The five-file Bazel
+9.2 fixture passed seven rows during generation and independent fresh-root
+replay (5.90 s and 5.92 s). Pinned source establishes raw recorded-input
+identity where target-output rows cannot. The selected-owner bridge uses the
+existing per-name DICE cell and Need/replay route, retains redacted structural
+raw observations, and leaves `os.environ` declaration-restricted. A review
+correction discarded repository calls from a pass interrupted by failed
+dynamic Host verification; the focused test invokes a repository rule before
+`getenv` to discriminate that case. Pinned-toolchain JSON `--no-run` compiled
+Loading (latest 10.72 s), Bzlmod and Core (57.46 s before the local
+interrupted-pass correction); exact preflight selected eight tests and all
+eight passed after the correction. A fresh CLI build passed (5.69 s), and
+the normalized-PATH authentic smoke passed the old debug-variable stop then
+stopped at the separate `py_toolchain_suite.bzl` / generated
+`pythons_hub//:BUILD.bazel` LoadLabel boundary (exit 2). No stale `slugd`
+was present before or after. Format, diff, archive and plan-status checks
+passed. The packet took about 24 minutes from draft through final review;
+M7A and M8 remain open.

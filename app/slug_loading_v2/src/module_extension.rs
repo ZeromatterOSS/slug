@@ -666,10 +666,22 @@ impl Key for HostPureModuleExtensionInvocationsObservationKey {
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostSelectedExtensionOwnerPureResult { pub(crate) inputs: Arc<HostSelectedExtensionOwnerInputs>, pub(crate) factors: Arc<SelectedExtensionEvalFactors>, pub(crate) receipt: HostPureModuleExtensionInvocationReceipt }
+#[derive(Clone, PartialEq, Eq, Allocative)]
+struct SelectedRecordedEnvironment(Arc<[(CompactString, Option<Arc<str>>)]>);
+
+impl fmt::Debug for SelectedRecordedEnvironment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list()
+            .entries(self.0.iter().map(|(name, value)| (name, value.is_some())))
+            .finish()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct SelectedExtensionEvalFactors {
     operating_system: Option<CompactString>,
     architecture: Option<CompactString>,
+    recorded_environment: SelectedRecordedEnvironment,
 }
 impl SelectedExtensionEvalFactors {
     fn from_host(
@@ -683,6 +695,22 @@ impl SelectedExtensionEvalFactors {
             architecture: definition
                 .arch_dependent
                 .then(|| CompactString::new(host.platform.arch())),
+            recorded_environment: SelectedRecordedEnvironment(host.environment.clone()),
+        }
+    }
+
+    fn with_dynamic_environment(&self, reads: &[(CompactString, Option<Arc<str>>)]) -> Self {
+        let mut recorded = self.recorded_environment.0.to_vec();
+        for (name, value) in reads {
+            if !recorded.iter().any(|(known, _)| known == name) {
+                recorded.push((name.clone(), value.clone()));
+            }
+        }
+        recorded.sort_by(|a, b| a.0.cmp(&b.0));
+        Self {
+            operating_system: self.operating_system.clone(),
+            architecture: self.architecture.clone(),
+            recorded_environment: SelectedRecordedEnvironment(recorded.into()),
         }
     }
 }
@@ -852,6 +880,62 @@ async fn observe_selected_host(
         platform,
         environment: environment.into(),
     }))
+}
+
+async fn observe_selected_getenv(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    name: CompactString,
+) -> SourcePreparationOutcome<Result<Option<Arc<str>>, CompactString>> {
+    let transaction = match ctx
+        .per_transaction_data()
+        .data
+        .get::<RepositoryHostInputTransaction>()
+    {
+        Ok(transaction) => transaction.clone(),
+        Err(_) => {
+            return SourcePreparationOutcome::Complete(Err(
+                "selected module extension Host inputs unavailable".into(),
+            ));
+        }
+    };
+    if !transaction.frontier().contains(name.as_str()) {
+        return SourcePreparationOutcome::Need(SourcePreparationNeeds::environment(
+            NeedRepositoryEnvironmentNames::new(
+                workspace.dupe(),
+                RepositoryEnvironmentNameFrontier::from_unsorted([name]),
+            )
+            .expect("selected getenv has one unobserved environment name"),
+        ));
+    }
+    let cell = match ctx
+        .compute(&RepositoryEnvironmentCellKey::new(
+            workspace.dupe(),
+            name.clone(),
+        ))
+        .await
+    {
+        Ok(cell) => cell,
+        Err(_) => {
+            return SourcePreparationOutcome::Complete(Err(format!(
+                "selected module extension environment name {name:?} unavailable"
+            )
+            .into()));
+        }
+    };
+    let Some(value) = cell.value() else {
+        return SourcePreparationOutcome::Complete(Err(format!(
+            "selected module extension environment name {name:?} unauthorized"
+        )
+        .into()));
+    };
+    if value != &transaction.snapshot().get(&name).cloned() {
+        return SourcePreparationOutcome::Complete(Err(format!(
+            "selected module extension environment name {name:?} differs from request"
+        )
+        .into()));
+    }
+    SourcePreparationOutcome::Complete(Ok(value.clone()))
 }
 
 /// Authenticate the injected download cell before entering synchronous
@@ -1300,13 +1384,15 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         proxies.iter().any(|proxy| proxy.dev_dependency),
     ));
     let mut ready_paths = Vec::new();
+    let mut ready_environment = Vec::new();
     loop {
         // Nothing emitted by an interrupted Starlark pass is published. The
-        // path-ready map is the only evaluation state retained for replay.
+        // path and environment ready maps are the only evaluator state retained for replay.
         let selected_download = Arc::new(SelectedDownloadInvocation::new(key.workspace.dupe(), key.owner.clone(), ready.clone()));
         let selected_watch = Arc::new(SelectedWatchInvocation::new());
         let selected_path = Arc::new(SelectedPathInvocation::new(ready_paths.clone()));
-        let (returned, calls, capture, pending_path) = {
+        let selected_getenv = Arc::new(SelectedGetenvInvocation::new(ready_environment.clone()));
+        let (returned, calls, capture, pending_download, pending_path, pending_getenv, reads) = {
             let invocation_module = Module::new();
             let modules = modules
                 .iter()
@@ -1314,7 +1400,7 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
                 .map(|module| module.materialize(invocation_module.frozen_heap()))
                 .collect::<Vec<_>>()
                 .into();
-            let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage, Some(host.clone())).with_selected_download(selected_download.clone()).with_selected_watch(selected_watch.clone()).with_selected_path(selected_path.clone()));
+            let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage, Some(host.clone())).with_selected_download(selected_download.clone()).with_selected_watch(selected_watch.clone()).with_selected_path(selected_path.clone()).with_selected_getenv(selected_getenv.clone()));
             let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);
             let repository_rules = RepositoryRuleInvocationState::new();
             let mut evaluator = Evaluator::new(&invocation_module);
@@ -1323,46 +1409,64 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
                 evaluator.set_print_handler(capture);
             }
             let returned = evaluator.eval_function(definition.implementation.to_value(), &[context], &[]);
-            let pending = match selected_download.need() {
-                Ok(pending) => pending,
-                Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
-            };
-            if let Some(need) = pending {
-                return SourcePreparationOutcome::Need(SourcePreparationNeeds::selected_extension_download((*need).clone()));
-            }
-            let pending_path = match selected_path.pending() {
-                Ok(pending) => pending,
-                Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
-            };
             let returned = returned
                 .map_err(|error| CompactString::from(error.to_string()))
                 .and_then(|value| returned_metadata(value).map_err(|error| CompactString::from(error.to_string())));
             drop(evaluator);
-            (returned, repository_rules.records(), capture, pending_path)
+            (returned, repository_rules.records(), capture, selected_download.need(), selected_path.pending(), selected_getenv.pending(), selected_getenv.reads())
+        };
+        let reads = match reads {
+            Ok(reads) => reads,
+            Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
+        };
+        let invocation_factors = Arc::new(factors.with_dynamic_environment(&reads));
+        let pending_getenv = match pending_getenv {
+            Ok(pending) => pending,
+            Err(error) => return factor_owner_terminal(&invocation_factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
+        };
+        if let Some(name) = pending_getenv {
+            let value = match observe_selected_getenv(ctx, &key.workspace, name.clone()).await {
+                SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(Err(error)) => return factor_owner_terminal(&invocation_factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
+                SourcePreparationOutcome::Complete(Ok(value)) => value,
+            };
+            ready_environment.push((name, value));
+            continue;
+        }
+        let pending_download = match pending_download {
+            Ok(pending) => pending,
+            Err(error) => return factor_owner_terminal(&invocation_factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
+        };
+        if let Some(need) = pending_download {
+            return SourcePreparationOutcome::Need(SourcePreparationNeeds::selected_extension_download((*need).clone()));
+        }
+        let pending_path = match pending_path {
+            Ok(pending) => pending,
+            Err(error) => return factor_owner_terminal(&invocation_factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
         };
         // A successful download is part of the selected closure even when
         // later Starlark evaluation, watch or Label preparation fails.
         let used = match selected_download.used() {
             Ok(used) => used,
-            Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
+            Err(error) => return factor_owner_terminal(&invocation_factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
         };
         if let Some(used) = used {
             if let Err(error) = ctx.compute(&UsedDownloadRequestKey::new(used)).await {
-                return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, calls, error.to_string())), observations));
+                return factor_owner_terminal(&invocation_factors, owner_complete(Err(owner_after(&inputs, calls, error.to_string())), observations));
             }
         }
         let watched = match selected_watch.called() {
             Ok(watched) => watched,
-            Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
+            Err(error) => return factor_owner_terminal(&invocation_factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
         };
         observations = match observe_selected_watches(ctx, key, &inputs, &first, &calls, &watched, observations).await {
             Ok(observations) => observations,
-            Err(terminal) => return factor_owner_terminal(&factors, terminal),
+            Err(terminal) => return factor_owner_terminal(&invocation_factors, terminal),
         };
         if let Some(label) = pending_path {
             let (path, next_observations) = match observe_selected_path_label(ctx, key, &inputs, &first, &calls, &label, observations).await {
                 Ok(value) => value,
-                Err(terminal) => return factor_owner_terminal(&factors, terminal),
+                Err(terminal) => return factor_owner_terminal(&invocation_factors, terminal),
             };
             observations = next_observations;
             ready_paths.push((label, path));
@@ -1374,7 +1478,7 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
             Ok(metadata) => match metadata {
                 metadata if metadata.facts().is_empty() => Ok(HostSelectedExtensionOwnerPureResult {
                     inputs,
-                    factors: factors.clone(),
+                    factors: invocation_factors.clone(),
                     receipt: HostPureModuleExtensionInvocationReceipt { request, repository_rule_calls: calls, metadata, root_usage },
                 }),
                 _ => Err(owner_after(&inputs, calls, "nonempty module extension facts require the deferred lockfile lifecycle")),
@@ -1383,7 +1487,7 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         if let Some(capture) = capture {
             ctx.store_evaluation_data(capture.into_batch()).expect("selected owner invocation stores one local Complete event batch");
         }
-        return factor_owner_terminal(&factors, owner_complete(result, observations));
+        return factor_owner_terminal(&invocation_factors, owner_complete(result, observations));
     }
 }
 
@@ -1730,12 +1834,90 @@ struct InvocationContext {
     selected_download: Option<Arc<SelectedDownloadInvocation>>,
     selected_watch: Option<Arc<SelectedWatchInvocation>>,
     selected_path: Option<Arc<SelectedPathInvocation>>,
+    selected_getenv: Option<Arc<SelectedGetenvInvocation>>,
     #[allocative(skip)]
     owner: Arc<()>,
 }
 
 const MAX_SELECTED_WATCHES: usize = 8;
 const MAX_SELECTED_PATH_LABELS: usize = 8;
+const MAX_SELECTED_GETENV_NAMES: usize = 16;
+
+#[derive(Debug, Default, Allocative)]
+struct SelectedGetenvScratch {
+    reads: Vec<CompactString>,
+    pending: Option<CompactString>,
+}
+
+#[derive(Allocative)]
+struct SelectedGetenvInvocation {
+    ready: Vec<(CompactString, Option<Arc<str>>)>,
+    scratch: Mutex<SelectedGetenvScratch>,
+}
+
+impl fmt::Debug for SelectedGetenvInvocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SelectedGetenvInvocation")
+            .field("prepared_names", &self.ready.len())
+            .finish()
+    }
+}
+
+impl SelectedGetenvInvocation {
+    fn new(ready: Vec<(CompactString, Option<Arc<str>>)>) -> Self {
+        Self {
+            ready,
+            scratch: Mutex::new(SelectedGetenvScratch::default()),
+        }
+    }
+
+    fn call(&self, name: &str) -> anyhow::Result<Option<Arc<str>>> {
+        let mut scratch = self
+            .scratch
+            .lock()
+            .map_err(|_| anyhow::anyhow!("selected module extension getenv scratch unavailable"))?;
+        if let Some((_, value)) = self.ready.iter().find(|(ready, _)| ready == name) {
+            if !scratch.reads.iter().any(|read| read == name) {
+                scratch.reads.push(name.into());
+            }
+            return Ok(value.clone());
+        }
+        if self.ready.len() == MAX_SELECTED_GETENV_NAMES {
+            anyhow::bail!(
+                "module_ctx.getenv supports at most {MAX_SELECTED_GETENV_NAMES} distinct names"
+            );
+        }
+        scratch.pending = Some(name.into());
+        anyhow::bail!("selected module extension environment name requires preparation")
+    }
+
+    fn pending(&self) -> Result<Option<CompactString>, CompactString> {
+        self.scratch
+            .lock()
+            .map(|scratch| scratch.pending.clone())
+            .map_err(|_| "selected module extension getenv scratch unavailable".into())
+    }
+
+    fn reads(&self) -> Result<Vec<(CompactString, Option<Arc<str>>)>, CompactString> {
+        self.scratch
+            .lock()
+            .map(|scratch| {
+                scratch
+                    .reads
+                    .iter()
+                    .map(|name| {
+                        let (_, value) = self
+                            .ready
+                            .iter()
+                            .find(|(ready, _)| ready == name)
+                            .expect("completed getenv read was prepared");
+                        (name.clone(), value.clone())
+                    })
+                    .collect()
+            })
+            .map_err(|_| "selected module extension getenv scratch unavailable".into())
+    }
+}
 
 #[derive(Debug, Allocative)]
 struct SelectedPathInvocation {
@@ -2039,6 +2221,7 @@ impl InvocationContext {
             selected_download: None,
             selected_watch: None,
             selected_path: None,
+            selected_getenv: None,
             owner: owner.clone(),
         }
     }
@@ -2055,6 +2238,11 @@ impl InvocationContext {
 
     fn with_selected_path(mut self, path: Arc<SelectedPathInvocation>) -> Self {
         self.selected_path = Some(path);
+        self
+    }
+
+    fn with_selected_getenv(mut self, getenv: Arc<SelectedGetenvInvocation>) -> Self {
+        self.selected_getenv = Some(getenv);
         self
     }
 }
@@ -2089,6 +2277,26 @@ impl<'v> StarlarkValue<'v> for InvocationContext {
 
 #[starlark_module]
 fn invocation_context_methods(builder: &mut MethodsBuilder) {
+    fn getenv<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] name: &str,
+        #[starlark(require = pos)] default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let this = InvocationContext::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
+        let selected = this.selected_getenv.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("module_ctx.getenv is only supported for a selected module extension")
+        })?;
+        let default = default.unwrap_or_else(Value::new_none);
+        if !default.is_none() && default.unpack_str().is_none() {
+            anyhow::bail!("module_ctx.getenv default must be a string or None");
+        }
+        match selected.call(name)? {
+            Some(value) => Ok(eval.heap().alloc_str(&value).to_value()),
+            None => Ok(default),
+        }
+    }
     fn watch<'v>(
         this: Value<'v>,
         #[starlark(require = pos)] label: Value<'v>,
@@ -2776,6 +2984,7 @@ mod tests {
             selected_download: None,
             selected_watch: None,
             selected_path: None,
+            selected_getenv: None,
             owner: owner.clone(),
         };
         let modules = call("def f(ctx):\n  ctx.modules.append(1)\n", |module| {
@@ -2828,6 +3037,7 @@ mod tests {
             selected_download: None,
             selected_watch: None,
             selected_path: None,
+            selected_getenv: None,
             owner: owner.clone(),
         };
         let foreign_heap = FrozenHeap::new();
@@ -2898,6 +3108,7 @@ mod tests {
             selected_download: None,
             selected_watch: None,
             selected_path: None,
+            selected_getenv: None,
             owner: owner.clone(),
         };
         let value = call(
@@ -2938,6 +3149,7 @@ mod tests {
             selected_download: None,
             selected_watch: None,
             selected_path: None,
+            selected_getenv: None,
             owner,
         };
         let result = call(
@@ -3000,6 +3212,7 @@ mod tests {
             selected_download: None,
             selected_watch: None,
             selected_path: None,
+            selected_getenv: None,
             owner,
         };
         for name in [
@@ -3009,7 +3222,6 @@ mod tests {
             "download_and_extract",
             "extract",
             "file",
-            "getenv",
             "read",
             "report_progress",
             "os",
@@ -3043,6 +3255,7 @@ mod tests {
             "{error}"
         );
         for source in [
+            "def f(ctx):\n  return ctx.getenv('UNDECLARED')\n",
             "def f(ctx):\n  return ctx.path('cargo-bazel')\n",
             "def f(ctx):\n  return ctx.download(url='file:///artifact', output='cargo-bazel', sha256='0000000000000000000000000000000000000000000000000000000000000000')\n",
         ] {
@@ -3079,6 +3292,7 @@ mod tests {
             selected_download: None,
             selected_watch: None,
             selected_path: None,
+            selected_getenv: None,
             owner: other_owner,
         };
         for method in ["is_dev_dependency", "tag_sort_key"] {
@@ -3111,6 +3325,103 @@ mod tests {
     }
 
     #[test]
+    fn selected_getenv_scratch_bounds_names_and_redacts_values() {
+        let ready = (0..MAX_SELECTED_GETENV_NAMES)
+            .map(|index| {
+                (
+                    format!("NAME_{index}").into(),
+                    Some(Arc::from("private-sentinel")),
+                )
+            })
+            .collect::<Vec<(CompactString, Option<Arc<str>>)>>();
+        let invocation = SelectedGetenvInvocation::new(ready);
+        for index in 0..MAX_SELECTED_GETENV_NAMES {
+            assert_eq!(
+                invocation
+                    .call(&format!("NAME_{index}"))
+                    .unwrap()
+                    .as_deref(),
+                Some("private-sentinel")
+            );
+        }
+        assert_eq!(
+            invocation.call("NAME_0").unwrap().as_deref(),
+            Some("private-sentinel")
+        );
+        assert_eq!(invocation.reads().unwrap().len(), MAX_SELECTED_GETENV_NAMES);
+        assert!(
+            invocation
+                .call("NAME_16")
+                .unwrap_err()
+                .to_string()
+                .contains("at most 16")
+        );
+        assert!(invocation.pending().unwrap().is_none());
+        assert!(!format!("{invocation:?}").contains("private-sentinel"));
+
+        let cold = SelectedGetenvInvocation::new(Vec::new());
+        assert!(
+            cold.call("NAME_0")
+                .unwrap_err()
+                .to_string()
+                .contains("requires preparation")
+        );
+        assert_eq!(cold.pending().unwrap().as_deref(), Some("NAME_0"));
+        assert!(cold.reads().unwrap().is_empty());
+    }
+
+    #[test]
+    fn selected_getenv_abi_defaults_and_declared_os_boundary() {
+        let owner = Arc::new(());
+        let context = InvocationContext::new_modules(
+            Arc::from([]),
+            &owner,
+            None,
+            Some(ModuleExtensionOs {
+                platform: RepositoryPlatform::new("linux", "x86_64"),
+                environment: Arc::from([(CompactString::new("DECLARED"), None)]),
+            }),
+        )
+        .with_selected_getenv(Arc::new(SelectedGetenvInvocation::new(vec![
+            ("MISSING".into(), None),
+            ("EMPTY".into(), Some(Arc::from(""))),
+            ("PRESENT".into(), Some(Arc::from("value"))),
+        ])));
+        let evaluate = |source: &str| {
+            call(source, |module| {
+                vec![module.heap().alloc_simple(context.clone())]
+            })
+        };
+        assert_eq!(
+            evaluate("def f(ctx):\n  return ctx.getenv('MISSING')\n").unwrap(),
+            "None"
+        );
+        assert_eq!(
+            evaluate("def f(ctx):\n  return ctx.getenv('MISSING', 'fallback')\n").unwrap(),
+            "\"fallback\""
+        );
+        assert_eq!(
+            evaluate("def f(ctx):\n  return ctx.getenv('EMPTY', 'fallback')\n").unwrap(),
+            "\"\""
+        );
+        assert_eq!(
+            evaluate("def f(ctx):\n  return ctx.getenv('PRESENT', 'fallback')\n").unwrap(),
+            "\"value\""
+        );
+        assert!(
+            evaluate("def f(ctx):\n  return ctx.getenv('PRESENT', 7)\n")
+                .unwrap_err()
+                .contains("string or None")
+        );
+        assert!(evaluate("def f(ctx):\n  return ctx.getenv(7)\n").is_err());
+        assert!(
+            evaluate("def f(ctx):\n  return ctx.os.environ.get('MISSING')\n")
+                .unwrap_err()
+                .contains("undeclared module extension environment name")
+        );
+    }
+
+    #[test]
     fn extension_metadata_complete_constructor_and_default_return_are_retained() {
         let owner = Arc::new(());
         let context = InvocationContext {
@@ -3120,6 +3431,7 @@ mod tests {
             selected_download: None,
             selected_watch: None,
             selected_path: None,
+            selected_getenv: None,
             owner,
         };
         let none = metadata_call("def f(ctx):\n  return None\n", context.clone()).unwrap();
@@ -3246,6 +3558,7 @@ mod tests {
                 selected_download: None,
                 selected_watch: None,
                 selected_path: None,
+                selected_getenv: None,
                 owner: owner.clone(),
             };
             assert_eq!(
@@ -3356,6 +3669,7 @@ mod tests {
             selected_download: None,
             selected_watch: None,
             selected_path: None,
+            selected_getenv: None,
             owner,
         };
         let value = call("def f(ctx, tag):\n  label=tag.target\n  return [len(ctx.modules), ctx.modules[0].name, ctx.modules[0].version, ctx.modules[0].is_root, ctx.is_dev_dependency(tag), label.name, label.package, label.repo_name, label.workspace_name, str(label), repr(label), '%s' % label, '%r' % label, '{}'.format(label), '{!s}'.format(label), '{!r}'.format(label), label.same_package_label('other').name, {label: 1}[label], label == label]\n", |module| vec![module.heap().alloc_simple(context), module.heap().alloc_simple(tag)]).unwrap();
@@ -5310,6 +5624,377 @@ ext = module_extension(implementation = impl, environ = ['FACTOR', 'MISSING', 'F
     }
 
     #[tokio::test]
+    async fn selected_getenv_need_replay_and_raw_environment_identity() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None, attrs = {'value': attr.string()})
+def impl(ctx):
+    print('getenv-attempt')
+    value = ctx.getenv('DYNAMIC', 'fallback')
+    ctx.getenv('DYNAMIC')
+    repo(name='proof', value='same-call')
+ext = module_extension(implementation=impl, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        fn snapshot(value: Option<&str>, unrelated: Option<&str>) -> RepositoryEnvironmentSnapshot {
+            let mut entries = Vec::new();
+            if let Some(value) = value {
+                entries.push(RepositoryEnvironmentEntry::new("DYNAMIC", value));
+            }
+            if let Some(value) = unrelated {
+                entries.push(RepositoryEnvironmentEntry::new("UNRELATED", value));
+            }
+            RepositoryEnvironmentSnapshot::from_canonical(entries).unwrap()
+        }
+        fn result(
+            outcome: &<HostSelectedExtensionOwnerPureObservationKey as Key>::Value,
+        ) -> &HostSelectedExtensionOwnerPureResult {
+            let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                panic!("selected getenv owner did not complete: {outcome:?}")
+            };
+            observed.result().as_ref().as_ref().unwrap()
+        }
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (base, owner) =
+            selected_factor_transaction(&dice, MODULE, EXTENSION, tracker.clone(), true).await;
+        tracker.take();
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let key = HostSelectedExtensionOwnerPureObservationKey::new(workspace, owner);
+        let declared = RepositoryEnvironmentNameFrontier::from_unsorted([
+            CompactString::new("FACTOR"),
+            CompactString::new("MISSING"),
+        ]);
+        let observed = RepositoryEnvironmentNameFrontier::from_unsorted([
+            CompactString::new("FACTOR"),
+            CompactString::new("MISSING"),
+            CompactString::new("DYNAMIC"),
+        ]);
+        let mut transaction = selected_factor_host_inputs(
+            base,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(None, None),
+            declared,
+        )
+        .await;
+        let SourcePreparationOutcome::Need(need) = transaction.compute(&key).await.unwrap() else {
+            panic!("cold dynamic getenv must return Need")
+        };
+        assert_eq!(
+            need.repository_environment()
+                .unwrap()
+                .names()
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            ["DYNAMIC"]
+        );
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(None, None),
+            observed.clone(),
+        )
+        .await;
+        let absent = transaction.compute(&key).await.unwrap();
+        assert_eq!(result(&absent).receipt.repository_rule_calls.len(), 1);
+        assert_eq!(
+            result(&absent)
+                .factors
+                .recorded_environment
+                .0
+                .iter()
+                .find(|(name, _)| name == "DYNAMIC")
+                .unwrap()
+                .1,
+            None
+        );
+        let absent_calls = result(&absent).receipt.repository_rule_calls.clone();
+        tracker.take();
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(Some("fallback"), None),
+            observed.clone(),
+        )
+        .await;
+        let present_default = transaction.compute(&key).await.unwrap();
+        assert_eq!(
+            result(&present_default).receipt.repository_rule_calls,
+            absent_calls
+        );
+        assert!(!HostSelectedExtensionOwnerPureObservationKey::equality(
+            &absent,
+            &present_default
+        ));
+        assert_eq!(
+            result(&present_default)
+                .factors
+                .recorded_environment
+                .0
+                .iter()
+                .find(|(name, _)| name == "DYNAMIC")
+                .unwrap()
+                .1
+                .as_deref(),
+            Some("fallback")
+        );
+        tracker.take();
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(Some("private-sentinel"), None),
+            observed.clone(),
+        )
+        .await;
+        let changed = transaction.compute(&key).await.unwrap();
+        assert!(!HostSelectedExtensionOwnerPureObservationKey::equality(
+            &present_default,
+            &changed
+        ));
+        assert!(!format!("{changed:?}").contains("private-sentinel"));
+        tracker.take();
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(Some(""), None),
+            observed.clone(),
+        )
+        .await;
+        let empty = transaction.compute(&key).await.unwrap();
+        assert_eq!(
+            result(&empty)
+                .factors
+                .recorded_environment
+                .0
+                .iter()
+                .find(|(name, _)| name == "DYNAMIC")
+                .unwrap()
+                .1
+                .as_deref(),
+            Some("")
+        );
+        tracker.take();
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(None, None),
+            observed.clone(),
+        )
+        .await;
+        let restored = transaction.compute(&key).await.unwrap();
+        assert!(HostSelectedExtensionOwnerPureObservationKey::equality(
+            &absent, &restored
+        ));
+        tracker.take();
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(None, Some("unrelated")),
+            observed,
+        )
+        .await;
+        let unrelated = transaction.compute(&key).await.unwrap();
+        assert!(HostSelectedExtensionOwnerPureObservationKey::equality(
+            &absent, &unrelated
+        ));
+        assert!(tracker.take().iter().any(|row| row.key == key.to_string()
+            && row.kind == ActivationKind::Reused
+            && row.batch.is_none()));
+
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to([(
+                RepositoryEnvironmentCellKey::new(workspace.dupe(), "DYNAMIC"),
+                RepositoryEnvironmentCell::observed(Some(Arc::from("mismatch-sentinel"))),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let mismatch = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = mismatch else {
+            panic!("mismatched dynamic cell must complete as an error")
+        };
+        let diagnostic = format!("{:?}", observed.result().as_ref().as_ref().unwrap_err());
+        assert!(diagnostic.contains("differs from request"), "{diagnostic}");
+        assert!(!diagnostic.contains("mismatch-sentinel"), "{diagnostic}");
+
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to([(
+                RepositoryEnvironmentCellKey::new(workspace, "DYNAMIC"),
+                RepositoryEnvironmentCell::Unauthorized,
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let unauthorized = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = unauthorized else {
+            panic!("unauthorized dynamic cell must complete as an error")
+        };
+        let diagnostic = format!("{:?}", observed.result().as_ref().as_ref().unwrap_err());
+        assert!(diagnostic.contains("unauthorized"), "{diagnostic}");
+    }
+
+    #[tokio::test]
+    async fn selected_getenv_identical_error_retains_raw_environment() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None)
+def impl(ctx):
+    repo(name='proof')
+    print('before-getenv')
+    ctx.getenv('DYNAMIC', 'fallback')
+    fail('same-error')
+ext = module_extension(implementation=impl, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        fn snapshot(value: Option<&str>) -> RepositoryEnvironmentSnapshot {
+            RepositoryEnvironmentSnapshot::from_canonical(
+                value
+                    .into_iter()
+                    .map(|value| RepositoryEnvironmentEntry::new("DYNAMIC", value))
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap()
+        }
+        fn error(
+            outcome: &<HostSelectedExtensionOwnerPureObservationKey as Key>::Value,
+        ) -> &HostSelectedExtensionOwnerPureError {
+            let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                panic!("getenv error owner did not complete: {outcome:?}")
+            };
+            observed.result().as_ref().as_ref().unwrap_err()
+        }
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (base, owner) =
+            selected_factor_transaction(&dice, MODULE, EXTENSION, tracker.clone(), true).await;
+        tracker.take();
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let key = HostSelectedExtensionOwnerPureObservationKey::new(workspace, owner);
+        let frontier = RepositoryEnvironmentNameFrontier::from_unsorted([
+            CompactString::new("FACTOR"),
+            CompactString::new("MISSING"),
+            CompactString::new("DYNAMIC"),
+        ]);
+        let transaction = selected_factor_host_inputs(
+            base,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(None),
+            frontier.clone(),
+        )
+        .await;
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to([(
+                RepositoryEnvironmentCellKey::new(workspace, "DYNAMIC"),
+                RepositoryEnvironmentCell::observed(Some(Arc::from("mismatched"))),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let interrupted = transaction.compute(&key).await.unwrap();
+        let HostSelectedExtensionOwnerPureError::Factored {
+            error: interrupted_error,
+            ..
+        } = error(&interrupted)
+        else {
+            panic!("interrupted selected getenv error must retain factors")
+        };
+        let HostSelectedExtensionOwnerPureError::AfterInputs { current_calls, .. } =
+            interrupted_error.as_ref()
+        else {
+            panic!("interrupted selected getenv error must be after inputs")
+        };
+        assert!(
+            current_calls.is_empty(),
+            "aborted Starlark calls must not publish"
+        );
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(None),
+            frontier.clone(),
+        )
+        .await;
+        let absent = transaction.compute(&key).await.unwrap();
+        assert!(format!("{:?}", error(&absent)).contains("same-error"));
+        tracker.take();
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(Some("fallback")),
+            frontier.clone(),
+        )
+        .await;
+        let present = transaction.compute(&key).await.unwrap();
+        assert!(format!("{:?}", error(&present)).contains("same-error"));
+        assert!(!HostSelectedExtensionOwnerPureObservationKey::equality(
+            &absent, &present
+        ));
+        tracker.take();
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(Some("private-sentinel")),
+            frontier.clone(),
+        )
+        .await;
+        let private = transaction.compute(&key).await.unwrap();
+        assert!(!format!("{private:?}").contains("private-sentinel"));
+        tracker.take();
+
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker,
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot(None),
+            frontier,
+        )
+        .await;
+        let restored = transaction.compute(&key).await.unwrap();
+        assert!(HostSelectedExtensionOwnerPureObservationKey::equality(
+            &absent, &restored
+        ));
+    }
+
+    #[tokio::test]
     async fn selected_external_owner_watch_label_need_replay_and_content_invalidation() {
         const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.watch(file='//:watch.txt')\nuse_repo(e, proof='proof')\n";
         const EXTENSION: &str = r#"
@@ -6758,6 +7443,7 @@ ext = module_extension(implementation=impl, tag_classes={'watch': watch_tag}, en
         let b_factors = Arc::new(SelectedExtensionEvalFactors {
             operating_system: Some("mac os x".into()),
             architecture: Some("aarch64".into()),
+            recorded_environment: a_factors.recorded_environment.clone(),
         });
         let factored_b = observed_outer(factor_owner_terminal(&b_factors, outer()));
         let factored_restored = observed_outer(factor_owner_terminal(a_factors, outer()));

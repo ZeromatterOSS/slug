@@ -29,19 +29,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-99-m7a-private-repository-rule-attrs-r1
+Packet: WP-7-100-m7a-selected-module-getenv-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP799 admits ordinary private `repository_rule` string/label declarations and
-typed defaults for the source-authentic rules_python 1.7.0 Loading boundary.
-Concrete overrides remain checked; direct and unknown-name `None` retain
-Bazel 9.2's omission behavior. Its eight-row Bazel fixture, six focused Rust
-tests and independent reviews passed. The authentic normalized-PATH smoke
-passes `_rule_name` and reaches a separate rules_python module-extension
-environment lookup error for undeclared `RULES_PYTHON_REPO_DEBUG`.
-Structural repository identity is preserved; Python repository effects,
-toolchain analysis, native `$` name bytes and root bootstrap remain deferred.
-WP798 is accepted at `50d282a2e`.
+WP800 admits selected `module_ctx.getenv` over tracked per-name DICE cells,
+including undeclared names, raw absent/empty/present structural identity,
+Need/replay and redacted Complete terminals. Bazel 9.2's seven-row fixture
+passed generation and fresh replay; eight focused Rust tests and independent
+design/final reviews passed. The fresh authentic rules_python 1.7.0 smoke
+passes `RULES_PYTHON_REPO_DEBUG` and stops at a distinct generated hub
+LoadLabel boundary. Declared-only `module_ctx.os.environ` remains unchanged;
+lockfile replay, Python repository effects, toolchain analysis and root
+bootstrap remain deferred. WP799 is accepted at `f0bddcce3`; WP798 at
+`50d282a2e`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

@@ -457,6 +457,24 @@ and stable repository naming are exact; raw JVM architecture factor bytes are
 not. A source-authentic rules_rust 0.73 smoke reaches WP796's archive
 materializer before the independent generated BUILD Loading stop.
 
+### Selected module-extension dynamic environment (WP800)
+
+Selected `module_ctx.getenv` observes an ordinary string name through the
+per-name `RepositoryEnvironmentCellKey`, including names absent from the
+extension's declared `environ`. An unprepared read yields a transient Need;
+the owner verifies the cell against the immutable request snapshot before
+replaying the Starlark invocation. Interrupted passes publish no repository
+calls or evaluator events, including when host verification fails. Complete
+success and post-host error terminals structurally retain declared inputs
+plus actual dynamic name/raw-value reads, including observed absence; their
+Debug representation redacts values. This keeps equality/invalidation sound
+even when generated calls or error text are unchanged. Only 16 distinct
+`getenv` names per selected evaluation are admitted (Slug-native), while
+`module_ctx.os.environ` remains declaration-restricted. Nonselected
+execution, lockfile recorded-input replay and Bazel Host/identity bytes stay
+deferred. The authentic rules_python 1.7.0 smoke advances from undeclared
+`RULES_PYTHON_REPO_DEBUG` to a separate generated hub LoadLabel stop.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

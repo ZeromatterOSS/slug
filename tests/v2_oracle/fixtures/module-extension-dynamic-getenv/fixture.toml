@@ -1,0 +1,63 @@
+[fixture]
+name = "module-extension-dynamic-getenv"
+description = "Bazel 9.2 selected module_ctx.getenv values and dynamic environment invalidation."
+comparison = "message_shape"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Self-contained Bazel-only fixture. The dynamic extension declares only SLUG_WP800_DECLARED, while getenv reads undeclared SLUG_WP800_DYNAMIC twice with and without a default. Distinct generated BUILD target names show absent/default, present empty, and one/two/one re-evaluation. A separate os.environ extension reads only the synthetic SLUG_WP800_RAW name; its stale target after a flag change is an untracked Bazel control, not an admitted Slug behavior. These target names do not prove raw absent versus present-default-equal identity; pinned source and focused Rust structural tests cover that distinction. The harness must launch with both synthetic probe names unset for the absent row."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java#getEnvironmentValue",
+  "src/main/java/com/google/devtools/build/lib/rules/repository/RepoRecordedInput.java#EnvVar",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionContext.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkOS.java#getEnvironmentVariables",
+  "rules_python 1.7.0 python/private/python.bzl#python module_extension",
+  "rules_python 1.7.0 python/private/repo_utils.bzl#_getenv",
+]
+translation_notes = "The local extension isolates source-selected undeclared module_ctx.getenv values and repeated reads; no upstream source is copied. One synthetic declared name proves the read name is outside environ. Repeated query rows use the same Bazel output base to discriminate dynamic invalidation and A/B/A restoration. The raw os.environ control demonstrates Bazel's non-recorded lookup; Slug's declaration-restricted os.environ and Bazel lockfile replay remain deferred."
+generation_command = "env -u SLUG_WP800_DYNAMIC -u SLUG_WP800_RAW python3 -B -m tools.v2_oracle run --fixture module-extension-dynamic-getenv --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "env -u SLUG_WP800_DYNAMIC -u SLUG_WP800_RAW python3 -B -m tools.v2_oracle run --fixture module-extension-dynamic-getenv --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
+
+[[commands]]
+name = "undeclared_absent_returns_none_and_default"
+argv = ["query", "@dynamic_repo//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A@dynamic_repo//:dyn_none_fallback\n?\Z']
+
+[[commands]]
+name = "undeclared_present_empty_overrides_default"
+argv = ["query", "@dynamic_repo//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download", "--repo_env=SLUG_WP800_DYNAMIC="]
+expected_exit = 0
+stdout_patterns = ['\A@dynamic_repo//:dyn_empty_empty\n?\Z']
+
+[[commands]]
+name = "undeclared_present_one"
+argv = ["query", "@dynamic_repo//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download", "--repo_env=SLUG_WP800_DYNAMIC=one"]
+expected_exit = 0
+stdout_patterns = ['\A@dynamic_repo//:dyn_one_one\n?\Z']
+
+[[commands]]
+name = "undeclared_changed_to_two"
+argv = ["query", "@dynamic_repo//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download", "--repo_env=SLUG_WP800_DYNAMIC=two"]
+expected_exit = 0
+stdout_patterns = ['\A@dynamic_repo//:dyn_two_two\n?\Z']
+
+[[commands]]
+name = "undeclared_restored_to_one"
+argv = ["query", "@dynamic_repo//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download", "--repo_env=SLUG_WP800_DYNAMIC=one"]
+expected_exit = 0
+stdout_patterns = ['\A@dynamic_repo//:dyn_one_one\n?\Z']
+
+[[commands]]
+name = "raw_os_environ_reads_one"
+argv = ["query", "@raw_repo//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download", "--repo_env=SLUG_WP800_DYNAMIC=one", "--repo_env=SLUG_WP800_RAW=one"]
+expected_exit = 0
+stdout_patterns = ['\A@raw_repo//:raw_one\n?\Z']
+
+[[commands]]
+name = "raw_os_environ_does_not_track_change_to_two"
+argv = ["query", "@raw_repo//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download", "--repo_env=SLUG_WP800_DYNAMIC=one", "--repo_env=SLUG_WP800_RAW=two"]
+expected_exit = 0
+stdout_patterns = ['\A@raw_repo//:raw_one\n?\Z']

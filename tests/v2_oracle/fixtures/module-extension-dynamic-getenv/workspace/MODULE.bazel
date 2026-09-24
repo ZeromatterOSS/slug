@@ -1,0 +1,7 @@
+module(name = "dynamic_getenv_probe")
+
+dynamic = use_extension("//:ext.bzl", "dynamic")
+use_repo(dynamic, "dynamic_repo")
+
+raw = use_extension("//:ext.bzl", "raw")
+use_repo(raw, "raw_repo")
