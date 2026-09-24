@@ -3913,8 +3913,13 @@ fn coerce_starlark_value(
             let mut branches = Vec::new();
             let mut default = None;
             for branch in part.branches.iter() {
-                if matches!(&branch.condition, SelectorCondition::Raw(condition) if condition == "//conditions:default")
-                {
+                if matches!(
+                    &branch.condition,
+                    SelectorCondition::Raw(condition) if condition == "//conditions:default"
+                ) || matches!(
+                    &branch.condition,
+                    SelectorCondition::Canonical(condition) if condition == "@@//conditions:default"
+                ) {
                     default = Some(Arc::new(coerce_starlark_value(
                         recorder,
                         kind,
@@ -9900,21 +9905,30 @@ fn is_repository_rule_attribute_name(name: &str) -> bool {
 
 #[starlark_module]
 fn select_globals(builder: &mut GlobalsBuilder) {
-    fn select<'v>(branches: SmallMap<String, Value<'v>>) -> anyhow::Result<SelectorValue<'v>> {
+    fn select<'v>(branches: Value<'v>) -> anyhow::Result<SelectorValue<'v>> {
+        let branches = DictRef::from_value(branches)
+            .ok_or_else(|| anyhow::anyhow!("select() requires a dictionary of conditions"))?;
         if branches.is_empty() {
             anyhow::bail!("select() requires at least one branch");
         }
+        let branches = branches
+            .iter()
+            .map(|(condition, value)| {
+                let condition = if let Some(label) = StarlarkLabel::from_value(condition) {
+                    SelectorCondition::Canonical(label.canonical().to_string())
+                } else if let Some(raw) = condition.unpack_str() {
+                    SelectorCondition::Raw(raw.to_owned())
+                } else {
+                    anyhow::bail!("select() condition keys must be strings or Labels");
+                };
+                Ok(SelectorBranchGen { condition, value })
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(SelectorValueGen {
             parts: vec![SelectorPart {
                 prefix: Vec::new(),
                 suffix: Vec::new(),
-                branches: branches
-                    .into_iter()
-                    .map(|(condition, value)| SelectorBranchGen {
-                        condition: SelectorCondition::Raw(condition.to_owned()),
-                        value,
-                    })
-                    .collect(),
+                branches,
             }],
         })
     }
@@ -9942,6 +9956,24 @@ static NATIVE_METHODS: MethodsStatic = MethodsStatic::new();
 
 #[starlark_module]
 fn native_methods(builder: &mut MethodsBuilder) {
+    fn package_relative_label<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        input: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        if StarlarkLabel::from_value(input).is_some() {
+            return Ok(input);
+        }
+        let raw = input.unpack_str().ok_or_else(|| {
+            anyhow::anyhow!("native.package_relative_label input must be a string or Label")
+        })?;
+        let label = recorder.dependency_label(raw).map_err(|error| {
+            anyhow::anyhow!("invalid label in native.package_relative_label: {error}")
+        })?;
+        Ok(eval.heap().alloc_simple(StarlarkLabel::new(label)))
+    }
+
     fn genrule<'v>(
         #[starlark(this)] _native: Value<'v>,
         #[starlark(require = named)] name: &str,

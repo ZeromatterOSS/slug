@@ -1,0 +1,7 @@
+module(name = "consumer", version = "0.0.0")
+
+bazel_dep(name = "producer", version = "1.0")
+local_path_override(module_name = "producer", path = "producer")
+
+ext = use_extension("@producer//:ext.bzl", "ext")
+use_repo(ext, "hub", "bad")

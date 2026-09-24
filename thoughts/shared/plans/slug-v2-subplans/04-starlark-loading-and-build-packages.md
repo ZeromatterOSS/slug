@@ -9245,3 +9245,23 @@ the authentic build proceeds to the separately typed
 `native.package_relative_label` call in bazel_skylib. Explicit `@@//` main,
 broader label grammar, Python toolchain analysis and root bootstrap remain
 deferred.
+
+### Package-relative Label and typed `select` keys accepted (2026-09-24)
+
+WP802 admits ordinary BUILD/macro `native.package_relative_label` for string
+inputs resolved in the calling package and its known repository mapping, with
+existing Label values returned unchanged after package-context validation.
+The package-owned `select` intake now retains Label keys as canonical
+conditions while preserving string keys as raw, ordered conditions under the
+default non-eager semantics. Attribute coercion recognizes the canonical root
+`@@//conditions:default` as a default alongside the existing raw spelling.
+The accepted selector and package values remain structurally owned by Loading
+and its existing observed source/route DICE dependencies; no new key or
+representation is introduced. A generated-repository Bazel 9.2 fixture and
+authentic rules_python/bazel_skylib smoke cover the coupled edge, with focused
+Slug macro, source A/B/A, negative and protected regressions. The authentic
+build proceeds to a distinct rules_kotlin selected-BCR `REPO.bazel`
+materialization-entry-mode stop at registration row 55. Rule initializers,
+unknown-apparent nonvisible Label values, eager select-key semantics, mixed
+equivalent-key precedence and broad configured/toolchain behavior remain
+deferred; M7A is still partial.

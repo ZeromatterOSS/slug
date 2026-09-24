@@ -1,0 +1,63 @@
+[fixture]
+name = "native-package-relative-label-select"
+description = "Bazel 9.2 generated BUILD macro caller-package labels and typed select condition."
+comparison = "message_shape"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Self-contained Bazel-only evidence. An extension-generated nonroot BUILD imports a macro from a local-path-overridden producer module. The macro logs canonical Label values from package_relative_label and Label, declares a Label-keyed select with a raw-string default, and exposes dbg/opt branch choice through configured query. A separate generated BUILD rejects an int input. The observed equal printed Label value/type for passthrough does not by itself establish object identity; pinned source establishes unchanged return. Mixed equivalent string/Label selector-key precedence, rule-initializer context and Python toolchain analysis are not claimed."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkNativeModuleApi.java:274-308",
+  "src/main/java/com/google/devtools/build/lib/packages/StarlarkNativeModule.java:650-666",
+  "src/main/java/com/google/devtools/build/lib/cmdline/LabelConverter.java:61-93",
+  "src/main/java/com/google/devtools/build/lib/packages/SelectorList.java:90-115,279-307",
+  "src/main/java/com/google/devtools/build/lib/packages/BuildType.java:700-738",
+  "rules_python 1.7.0 python/private/py_toolchain_suite.bzl:58-89",
+  "bazel_skylib lib/selects.bzl:177-185",
+]
+translation_notes = "The local producer and its generated hub isolate the authentic bare setting label to typed select-key path without copying upstream source. The first query forces the macro and exposes caller versus defining label context; configured dbg/opt deps show the Label condition and raw default selecting distinct branches. The negative checks the String-or-Label boundary. Canonical producer+ and generated hub names are verified by dump_repo_mapping, not inferred solely from printed labels. All commands are offline."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture native-package-relative-label-select --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture native-package-relative-label-select --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
+
+[[commands]]
+name = "generated_macro_label_context_and_select_load"
+argv = ["query", "@hub//:selected", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A@hub//:selected\n?\Z']
+stderr_contains = [
+  "WP802 relative=@@producer++ext+hub//:marker.txt",
+  "bare=@@producer++ext+hub//:marker.txt",
+  "same_repo=@@producer++ext+hub//:marker.txt",
+  "defining=@@producer+//:marker.txt",
+  "apparent=@@producer+//:marker.txt",
+  "canonical=@@producer+//:marker.txt",
+  "preserved=@@producer+//:marker.txt",
+  "preserved_type=Label",
+]
+
+[[commands]]
+name = "verify_canonical_repo_mapping"
+argv = ["mod", "dump_repo_mapping", "", "producer+", "--lockfile_mode=off", "--repository_disable_download", "--noshow_progress"]
+expected_exit = 0
+stdout_contains = ['"producer":"producer+"', '"hub":"producer++ext+hub"', '"bad":"producer++ext+bad"']
+
+[[commands]]
+name = "label_condition_selects_dbg_value"
+argv = ["cquery", "deps(@hub//:selected)", "--compilation_mode=dbg", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['(?s)\A(?=.*@hub//:selected)(?=.*@hub//:value)(?!.*@hub//:fallback).*\Z']
+
+[[commands]]
+name = "string_default_selects_opt_fallback"
+argv = ["cquery", "deps(@hub//:selected)", "--compilation_mode=opt", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['(?s)\A(?=.*@hub//:selected)(?=.*@hub//:fallback)(?!.*@hub//:value).*\Z']
+
+[[commands]]
+name = "wrong_type_rejected_before_package_publication"
+argv = ["query", "@bad//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 7
+stdout_patterns = ['\A\Z']
+stderr_contains = ["parameter 'input' got value of type 'int', want 'string or Label'"]

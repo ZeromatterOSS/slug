@@ -29,20 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-101-m7a-canonical-generated-build-bzl-load-r1
+Packet: WP-7-102-m7a-package-relative-label-select-key-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP801 admits the source-authentic generated `pythons_hub` BUILD load of
-`@@rules_python+//python/private:py_toolchain_suite.bzl`. Explicit nonroot
-canonical `.bzl` loads bypass apparent mapping while retaining the existing
-canonical child route and source/package/visibility owners. A three-row
-Bazel 9.2 fixture passed generation and fresh replay; eleven focused Rust
-tests and independent design/final reviews passed. The rebuilt authentic
-smoke passed the old LoadLabel stop and reached `bazel_skylib`'s separate
-`native.package_relative_label` boundary. Three older single-`@` route tests
-remain known preexisting debt, recorded in the packet receipt. Python
-repository effects, toolchain analysis, `@@//` root-canonical loads and root
-bootstrap remain deferred. WP800 is accepted at `d88bec975`.
+WP802 admits the source-authentic rules_python/bazel_skylib macro use of
+`native.package_relative_label` in a generated BUILD. The method uses the
+calling BUILD package and mapping; its Label result enters `select()` as a
+typed condition key, with the existing raw-string/default path preserved.
+Five Bazel 9.2 fixture rows passed generation and replay, seven focused and
+protected Rust tests passed, and independent design/final reviews accepted.
+The rebuilt authentic build passed that expression and stopped separately at
+rules_kotlin's selected-BCR `REPO.bazel` materialization entry mode (row 55).
+Rule initializers, unknown-apparent nonvisible Labels, eager selector keys,
+broader configured behavior and M7A close remain deferred. WP801 is accepted
+at `923c80db7`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

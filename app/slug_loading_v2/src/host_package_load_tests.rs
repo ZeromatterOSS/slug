@@ -39525,3 +39525,289 @@ mod cc_freeze_tests;
 
 #[path = "artifact_root_helper_tests.rs"]
 mod artifact_root_helper_tests;
+
+fn package_relative_materialized_epoch(
+    build: &str,
+    defs: &str,
+    variant: i64,
+) -> (PathObservationEpoch, PathObservationInstanceId) {
+    let mut epoch = EpochBuilder::workspace_sources(
+        "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\n",
+        "",
+        &[],
+        variant,
+    );
+    let instance = PathObservationInstanceId::new(802);
+    epoch.materialized_directory(instance, "/", variant);
+    epoch.materialized_directory(instance, "/registry-dep", variant);
+    epoch.materialized_directory(instance, "/registry-dep/consumer", variant);
+    epoch.materialized_file(
+        instance,
+        "/registry-dep/MODULE.bazel",
+        "module(name='dep', version='1', repo_name='rules_rust')\n",
+        variant,
+    );
+    epoch.materialized_missing(instance, "/registry-dep/REPO.bazel");
+    epoch.materialized_missing(instance, "/registry-dep/.bazelignore");
+    epoch.materialized_file(instance, "/registry-dep/BUILD.bazel", "", variant);
+    epoch.materialized_file(instance, "/registry-dep/defs.bzl", defs, variant);
+    epoch.materialized_file(
+        instance,
+        "/registry-dep/consumer/BUILD.bazel",
+        build,
+        variant,
+    );
+    (epoch.build(), instance)
+}
+
+#[tokio::test]
+async fn package_relative_label_in_canonical_external_macro_uses_calling_package_and_typed_select_keys()
+ {
+    // The Slug harness uses a materialized canonical repository; the Stage 1
+    // Bazel fixture separately covers an extension-generated repository.
+    const DEFS: &str = r#"def emit():
+    native.genrule(name = 'labels', srcs = [
+        native.package_relative_label(':caller'),
+        Label(':definition'),
+        native.package_relative_label('@rules_rust//mapped:apparent'),
+        native.package_relative_label('@@dep+//:canonical'),
+        native.package_relative_label(Label(':passthrough')),
+    ], outs = ['out'], cmd = 'touch $@')
+    native.alias(name = 'typed_first', visibility = ['//visibility:public'], actual = select({
+        native.package_relative_label(':condition'): ':dbg',
+        '//conditions:default': ':opt',
+    }))
+    native.alias(name = 'typed_default', visibility = ['//visibility:public'], actual = select({
+        '//:raw_condition': ':dbg',
+        native.package_relative_label('@@//conditions:default'): ':opt',
+    }))
+"#;
+    let (epoch, instance) =
+        package_relative_materialized_epoch("load('//:defs.bzl', 'emit')\nemit()\n", DEFS, 802);
+    let (mut tx, _) = selected_registry_visibility_transaction(epoch, instance, None).await;
+    let route = tx
+        .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+            workspace(),
+            CanonicalRepoName::new("dep+").unwrap(),
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(route)) = route else {
+        panic!("canonical external route must complete: {route:?}")
+    };
+    let input = route.result().as_ref().as_ref().unwrap().input().clone();
+    let outcome = tx
+        .compute(&RepositoryPackageLoadObservationKey::new_canonical(
+            input,
+            PackagePath::parse("consumer").unwrap(),
+        ))
+        .await
+        .unwrap();
+    let package = observed_repository_package(&outcome)
+        .result()
+        .as_ref()
+        .as_ref()
+        .unwrap();
+    assert_eq!(
+        package
+            .direct_load_roots
+            .iter()
+            .map(|identity| identity.label.to_string())
+            .collect::<Vec<_>>(),
+        ["@@dep+//:defs.bzl"]
+    );
+    let labels = package
+        .targets
+        .iter()
+        .find(|target| target.name == "labels")
+        .unwrap();
+    let PackageTargetKind::Genrule(rule) = &labels.kind else {
+        panic!("macro must publish a genrule")
+    };
+    assert_eq!(
+        rule.srcs
+            .as_deref()
+            .unwrap()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        [
+            "@@dep+//consumer:caller",
+            "@@dep+//:definition",
+            "@@dep+//mapped:apparent",
+            "@@dep+//:canonical",
+            "@@dep+//:passthrough",
+        ]
+    );
+    let typed_first = package
+        .targets
+        .iter()
+        .find(|target| target.name == "typed_first")
+        .unwrap();
+    let PackageTargetKind::Alias {
+        actual: AliasActual::Visible(CoercedAttributeValue::Selector { branches, default }),
+    } = &typed_first.kind
+    else {
+        panic!("typed condition must be retained in the native alias: {typed_first:?}")
+    };
+    assert_eq!(branches.len(), 1);
+    assert_eq!(branches[0].0.to_string(), "@@dep+//consumer:condition");
+    assert_eq!(
+        branches[0].1.as_ref(),
+        &CoercedAttributeValue::Label(CanonicalLabel::parse("@@dep+//consumer:dbg").unwrap())
+    );
+    assert_eq!(
+        default.as_deref(),
+        Some(&CoercedAttributeValue::Label(
+            CanonicalLabel::parse("@@dep+//consumer:opt").unwrap()
+        ))
+    );
+    let typed_default = package
+        .targets
+        .iter()
+        .find(|target| target.name == "typed_default")
+        .unwrap();
+    let PackageTargetKind::Alias {
+        actual: AliasActual::Visible(CoercedAttributeValue::Selector { branches, default }),
+    } = &typed_default.kind
+    else {
+        panic!("canonical default must be retained in the native alias: {typed_default:?}")
+    };
+    assert_eq!(branches.len(), 1);
+    assert_eq!(branches[0].0.to_string(), "@@dep+//:raw_condition");
+    assert_eq!(
+        default.as_deref(),
+        Some(&CoercedAttributeValue::Label(
+            CanonicalLabel::parse("@@dep+//consumer:opt").unwrap()
+        ))
+    );
+}
+
+#[tokio::test]
+async fn package_relative_label_selector_source_revision_replays_a_b_a() {
+    const DEFS: &[u8] = b"def emit(condition): native.alias(name = 'selected', visibility = ['//visibility:public'], actual = select({native.package_relative_label(condition): ':dbg', '//conditions:default': ':opt'}))\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut outcomes = Vec::new();
+    for (variant, condition) in [(803, ":first"), (804, ":second"), (805, ":first")] {
+        let build = format!("load(':defs.bzl', 'emit')\nemit('{condition}')\n");
+        let mut tx = transaction(
+            &dice,
+            EpochBuilder::external_sources(
+                &[("BUILD.bazel", build.as_bytes()), ("defs.bzl", DEFS)],
+                variant,
+            )
+            .build(),
+            false,
+            None,
+        )
+        .await;
+        let route = external_route(&mut tx).await;
+        let outcome = tx
+            .compute(&RepositoryPackageLoadObservationKey::new(
+                route,
+                PackagePath::root(),
+            ))
+            .await
+            .unwrap();
+        let package = observed_repository_package(&outcome)
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+        let selected = package
+            .targets
+            .iter()
+            .find(|target| target.name == "selected")
+            .unwrap();
+        let PackageTargetKind::Alias {
+            actual: AliasActual::Visible(actual),
+        } = &selected.kind
+        else {
+            panic!("typed selector must remain in the native alias: {selected:?}")
+        };
+        assert_eq!(
+            actual
+                .selector_key_labels()
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+            [format!("@@dep+//:{}", &condition[1..])]
+        );
+        outcomes.push(outcome);
+    }
+    assert!(!RepositoryPackageLoadObservationKey::equality(
+        &outcomes[0],
+        &outcomes[1]
+    ));
+    // The restored bytes recover semantic package identity, while the observed
+    // carrier still records each epoch's distinct Host file metadata.
+    fn loaded(outcome: &ObservedRepositoryPackageOutcome) -> &crate::LoadedPackage {
+        observed_repository_package(outcome)
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+    }
+    assert_ne!(loaded(&outcomes[0]), loaded(&outcomes[1]));
+    assert_eq!(loaded(&outcomes[0]), loaded(&outcomes[2]));
+    assert!(!RepositoryPackageLoadObservationKey::equality(
+        &outcomes[0],
+        &outcomes[2]
+    ));
+}
+
+#[tokio::test]
+async fn package_relative_label_rejects_bad_inputs_and_does_not_publish_partial_package() {
+    for (variant, call, diagnostic) in [
+        (806, "native.package_relative_label(17)", "string or Label"),
+        (
+            807,
+            "native.package_relative_label(':bad:extra')",
+            "invalid label in native.package_relative_label",
+        ),
+        (
+            809,
+            "select({17: ':target'})",
+            "condition keys must be strings or Labels",
+        ),
+    ] {
+        let build = format!("filegroup(name = 'before')\n{call}\nfilegroup(name = 'after')\n");
+        let outcome =
+            load_repository_package_fixture(&[("BUILD.bazel", build.as_bytes())], variant).await;
+        assert!(
+            repository_package_error(&outcome).contains(diagnostic),
+            "{call}: {}",
+            repository_package_error(&outcome)
+        );
+    }
+    for input in ["':target'", "Label(':target')", "17"] {
+        let source = format!("X = native.package_relative_label({input})");
+        let error = eval_global(&source, &loading_globals()).unwrap_err();
+        assert!(
+            error.contains("Bazel package global invoked without package state"),
+            "{input}: {error}"
+        );
+    }
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut tx = transaction(
+        &dice,
+        EpochBuilder::external_sources(
+            &[("BUILD.bazel", b"load(':defs.bzl', 'emit')\nemit()\n")],
+            808,
+        )
+        .build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut tx).await;
+    let interrupted = tx
+        .compute(&RepositoryPackageLoadObservationKey::new(
+            route,
+            PackagePath::root(),
+        ))
+        .await
+        .unwrap();
+    assert!(matches!(interrupted, LoadingPreparationOutcome::Need(_)));
+    assert!(!RepositoryPackageLoadObservationKey::validity(&interrupted));
+}

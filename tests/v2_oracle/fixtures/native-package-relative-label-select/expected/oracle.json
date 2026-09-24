@@ -1,0 +1,198 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "@hub//:selected",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@hub//:selected",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "generated_macro_label_context_and_select_load",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nDEBUG: <output_base>/external/producer+/suite.bzl:11:10: WP802 relative=@@producer++ext+hub//:marker.txt bare=@@producer++ext+hub//:marker.txt same_repo=@@producer++ext+hub//:marker.txt defining=@@producer+//:marker.txt apparent=@@producer+//:marker.txt canonical=@@producer+//:marker.txt preserved=@@producer+//:marker.txt preserved_type=Label",
+      "normalized_stdout": "@hub//:selected",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nDEBUG: /tmp/slug-wp802-fixture-gen-T6Ptj2/ob/native-package-relative-label-select/bazel/external/producer+/suite.bzl:11:10: WP802 relative=@@producer++ext+hub//:marker.txt bare=@@producer++ext+hub//:marker.txt same_repo=@@producer++ext+hub//:marker.txt defining=@@producer+//:marker.txt apparent=@@producer+//:marker.txt canonical=@@producer+//:marker.txt preserved=@@producer+//:marker.txt preserved_type=Label\n",
+      "stdout": "@hub//:selected\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "dump_repo_mapping",
+        "",
+        "producer+",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "dump_repo_mapping",
+        "",
+        "producer+",
+        "--lockfile_mode=off",
+        "--repository_disable_download",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "verify_canonical_repo_mapping",
+      "normalized_stderr": "",
+      "normalized_stdout": "{\"hub\":\"producer++ext+hub\",\"bad\":\"producer++ext+bad\",\"\":\"\",\"consumer\":\"\",\"producer\":\"producer+\",\"bazel_tools\":\"bazel_tools\"}\n{\"producer\":\"producer+\",\"bazel_tools\":\"bazel_tools\"}",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "{\"hub\":\"producer++ext+hub\",\"bad\":\"producer++ext+bad\",\"\":\"\",\"consumer\":\"\",\"producer\":\"producer+\",\"bazel_tools\":\"bazel_tools\"}\n{\"producer\":\"producer+\",\"bazel_tools\":\"bazel_tools\"}\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(@hub//:selected)",
+        "--compilation_mode=dbg",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(@hub//:selected)",
+        "--compilation_mode=dbg",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "label_condition_selects_dbg_value",
+      "normalized_stderr": "INFO: Analyzed target @@producer++ext+hub//:selected (4 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@hub//:selected (70ad46f)\n@hub//:condition (70ad46f)\n@bazel_tools//tools:host_platform (3030ed4)\n@@platforms//host:host (3030ed4)\n@hub//:value (70ad46f)\n@@platforms//os:linux (3030ed4)\n@@platforms//cpu:x86_64 (3030ed4)\n@@platforms//cpu:cpu (3030ed4)\n@@platforms//os:os (3030ed4)",
+      "startup_argv": [],
+      "stderr": "INFO: Analyzed target @@producer++ext+hub//:selected (4 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.955s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@hub//:selected (70ad46f)\n@hub//:condition (70ad46f)\n@bazel_tools//tools:host_platform (3030ed4)\n@@platforms//host:host (3030ed4)\n@hub//:value (70ad46f)\n@@platforms//os:linux (3030ed4)\n@@platforms//cpu:x86_64 (3030ed4)\n@@platforms//cpu:cpu (3030ed4)\n@@platforms//os:os (3030ed4)\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(@hub//:selected)",
+        "--compilation_mode=opt",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(@hub//:selected)",
+        "--compilation_mode=opt",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "string_default_selects_opt_fallback",
+      "normalized_stderr": "WARNING: Build option --compilation_mode has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nINFO: Analyzed target @@producer++ext+hub//:selected (0 packages loaded, 3 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@hub//:selected (bf3a44e)\n@bazel_tools//tools:host_platform (3030ed4)\n@hub//:condition (bf3a44e)\n@@platforms//host:host (3030ed4)\n@hub//:fallback (bf3a44e)\n@@platforms//os:linux (3030ed4)\n@@platforms//cpu:x86_64 (3030ed4)\n@@platforms//cpu:cpu (3030ed4)\n@@platforms//os:os (3030ed4)",
+      "startup_argv": [],
+      "stderr": "WARNING: Build option --compilation_mode has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nINFO: Analyzed target @@producer++ext+hub//:selected (0 packages loaded, 3 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.128s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@hub//:selected (bf3a44e)\n@bazel_tools//tools:host_platform (3030ed4)\n@hub//:condition (bf3a44e)\n@@platforms//host:host (3030ed4)\n@hub//:fallback (bf3a44e)\n@@platforms//os:linux (3030ed4)\n@@platforms//cpu:x86_64 (3030ed4)\n@@platforms//cpu:cpu (3030ed4)\n@@platforms//os:os (3030ed4)\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@bad//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@bad//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "wrong_type_rejected_before_package_publication",
+      "normalized_stderr": "ERROR: Traceback (most recent call last):\n\tFile \"<output_base>/external/producer++ext+bad/BUILD.bazel\", line 2, column 4, in <toplevel>\n\t\tbad()\n\tFile \"<output_base>/external/producer+/suite.bzl\", line 34, column 34, in bad\n\t\tnative.package_relative_label(7)\nError in package_relative_label: in call to package_relative_label(), parameter 'input' got value of type 'int', want 'string or Label'\nERROR: package contains errors: : Traceback (most recent call last):\n\tFile \"<output_base>/external/producer++ext+bad/BUILD.bazel\", line 2, column 4, in <toplevel>\n\t\tbad()\n\tFile \"<output_base>/external/producer+/suite.bzl\", line 34, column 34, in bad\n\t\tnative.package_relative_label(7)\nError in package_relative_label: in call to package_relative_label(), parameter 'input' got value of type 'int', want 'string or Label'\nERROR: Evaluation of query \"@bad//:all\" failed",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "ERROR: Traceback (most recent call last):\n\tFile \"/tmp/slug-wp802-fixture-gen-T6Ptj2/ob/native-package-relative-label-select/bazel/external/producer++ext+bad/BUILD.bazel\", line 2, column 4, in <toplevel>\n\t\tbad()\n\tFile \"/tmp/slug-wp802-fixture-gen-T6Ptj2/ob/native-package-relative-label-select/bazel/external/producer+/suite.bzl\", line 34, column 34, in bad\n\t\tnative.package_relative_label(7)\nError in package_relative_label: in call to package_relative_label(), parameter 'input' got value of type 'int', want 'string or Label'\nERROR: package contains errors: : Traceback (most recent call last):\n\tFile \"/tmp/slug-wp802-fixture-gen-T6Ptj2/ob/native-package-relative-label-select/bazel/external/producer++ext+bad/BUILD.bazel\", line 2, column 4, in <toplevel>\n\t\tbad()\n\tFile \"/tmp/slug-wp802-fixture-gen-T6Ptj2/ob/native-package-relative-label-select/bazel/external/producer+/suite.bzl\", line 34, column 34, in bad\n\t\tnative.package_relative_label(7)\nError in package_relative_label: in call to package_relative_label(), parameter 'input' got value of type 'int', want 'string or Label'\nERROR: Evaluation of query \"@bad//:all\" failed\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "native-package-relative-label-select",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
