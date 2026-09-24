@@ -7674,7 +7674,7 @@ fn root_string_build_setting(flag: bool) -> anyhow::Result<RootStringBuildSettin
 fn config_methods(builder: &mut MethodsBuilder) {
     fn exec<'v>(
         #[starlark(this)] _config: Value<'v>,
-        #[starlark(require = named)] exec_group: Option<NoneOr<&'v str>>,
+        exec_group: Option<NoneOr<&'v str>>,
     ) -> anyhow::Result<StarlarkExecTransition> {
         Ok(StarlarkExecTransition(
             exec_group
@@ -10877,17 +10877,21 @@ mod module_extension_definition_tests {
             "named = attr.label(cfg = config.exec(exec_group = 'test'))\n",
             "default_exec = attr.label(cfg = config.exec())\n",
             "default_none = attr.label(cfg = config.exec(exec_group = None))\n",
+            "positional_none = attr.label(cfg = config.exec(None))\n",
+            "positional_named = attr.label(cfg = config.exec('test'))\n",
+            "positional_empty = attr.label(cfg = config.exec(''))\n",
             "cpp = exec_group(toolchains = [config_common.toolchain_type('//:one', mandatory = False), '//:two'])\n",
             "test_group = exec_group(exec_compatible_with = ['//:constraint'])\n",
             "binary = rule(implementation = impl, attrs = {'dep': named}, exec_groups = {'cpp_link': cpp} | {})\n",
             "test_rule = rule(implementation = impl, attrs = {'dep': named}, exec_groups = {'cpp_link': cpp, 'default': test_group, 'test': test_group})\n",
+            "positional_rule = rule(implementation = impl, attrs = {'dep': positional_named}, exec_groups = {'test': test_group})\n",
             "library = rule(implementation = impl, exec_groups = {'cpp_link': cpp})\n",
             "plain = rule(implementation = impl, exec_groups = None)\n",
             "empty = rule(implementation = impl, exec_groups = {})\n",
         );
         for globals in [loading_globals(), bzlmod_loading_globals()] {
             let module = evaluate_with_globals(source, globals).unwrap();
-            for name in ["default_exec", "default_none"] {
+            for name in ["default_exec", "default_none", "positional_none"] {
                 let default_exec = module
                     .get(name)
                     .unwrap()
@@ -10896,6 +10900,21 @@ mod module_extension_definition_tests {
                 assert!(default_exec.exec_configuration);
                 assert!(default_exec.named_exec_group.is_none());
             }
+            for name in ["named", "positional_named"] {
+                let named = module
+                    .get(name)
+                    .unwrap()
+                    .downcast::<FrozenAttributeDefinition>()
+                    .unwrap();
+                assert!(!named.exec_configuration);
+                assert_eq!(named.named_exec_group.as_deref(), Some("test"));
+            }
+            let empty = module
+                .get("positional_empty")
+                .unwrap()
+                .downcast::<FrozenAttributeDefinition>()
+                .unwrap();
+            assert_eq!(empty.named_exec_group.as_deref(), Some(""));
             let rule = module
                 .get("test_rule")
                 .unwrap()
@@ -10920,6 +10939,15 @@ mod module_extension_definition_tests {
             };
             assert_eq!(rule.schema[*index as usize].name, "dep");
             assert_eq!(group, "test");
+            let positional_rule = module
+                .get("positional_rule")
+                .unwrap()
+                .downcast::<FrozenRuleDefinition>()
+                .unwrap();
+            assert_eq!(
+                positional_rule.named_exec_transition_attributes,
+                rule.named_exec_transition_attributes
+            );
             let cloned = rule.declared_exec_groups.clone();
             assert!(Arc::ptr_eq(
                 cloned.as_ref().unwrap(),
@@ -10952,13 +10980,21 @@ mod module_extension_definition_tests {
                 assert!(plain.named_exec_transition_attributes.is_none());
             }
         }
-        for source in ["X = exec_group()\n", "X = config.exec(exec_group = 'x')\n"] {
+        for source in [
+            "X = exec_group()\n",
+            "X = config.exec(exec_group = 'x')\n",
+            "X = config.exec(None)\n",
+        ] {
             assert!(evaluate_with_globals(source, build_file_loading_globals()).is_err());
         }
         let prelude = concat!("def impl(ctx): pass\n", "G = exec_group()\n",);
         for invalid in [
             "X = exec_group(toolchains = [1])\n",
             "X = config.exec(exec_group = 1)\n",
+            "X = config.exec(1)\n",
+            "X = config.exec(None, None)\n",
+            "X = config.exec(None, exec_group = None)\n",
+            "X = config.exec(value = None)\n",
             "X = rule(implementation = impl, exec_groups = [])\n",
             "X = rule(implementation = impl, exec_groups = {1: G})\n",
             "X = rule(implementation = impl, exec_groups = {'bad-name': G})\n",

@@ -9566,3 +9566,20 @@ Loading tests, Core/CLI compile and the CLI rebuild passed. The authentic
 build clears this keyword stop and next fails separately on
 `config.exec(value)` in rules_python. Nonempty scalar-label aspects,
 configured propagation and M7A close remain deferred.
+
+### Positional execution-group transition argument accepted (2026-09-24)
+
+WP820 permits one positional string-or-None argument to Loading's existing
+`config.exec` callable, matching Bazel 9.2's optional positional-or-named
+parameter. Positional None and omitted/named None retain the default-exec
+transition; positional and named strings retain the same named group in the
+frozen attribute and sparse rule-schema reference. An empty string remains a
+distinct named group at Loading and may fail later if undeclared. Too many,
+duplicate, wrong-type and unknown-keyword arguments remain errors; BUILD
+access remains denied. No transition representation, DICE key, cache, lock
+or Analysis implementation changed. The pre-fix exact failure, focused
+Loading and protected configured Analysis tests, Core/CLI compile and
+rebuilt authentic smoke support this call-binding slice. The smoke clears
+rules_python's `config.exec(value)` and next fails separately at protobuf's
+`configuration_field("proto", "proto_compiler")`. Broader configuration
+identity and M7A close remain deferred.
