@@ -101,6 +101,8 @@ pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlanError
 #[doc(hidden)]
 pub use generated_repository_file_effect::GeneratedRepositoryOrderedEffectRef;
 #[doc(hidden)]
+pub use generated_repository_file_effect::GeneratedRepositorySymlinkEffect;
+#[doc(hidden)]
 pub use generated_repository_file_effect::generated_repository_archive_sha256_hex;
 #[doc(hidden)]
 pub use generated_repository_file_effect::generated_repository_archive_sha256_sri;

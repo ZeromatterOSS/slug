@@ -1,142 +1,162 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-136-m7a-configured-condition-alias-r1
-Status: ACCEPTED; M7A remains partial
+Packet: WP-7-137-m7a-generated-repository-symlink-r1
+Status: ACCEPTED; independent DESIGN and FINAL reviews accepted; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit the Bazel 9.2 configured-condition behavior needed by the authentic
-`rules_java` 9.1.0 generated toolchains: a native `alias` named in
-`toolchain.target_settings` may select a `config_setting` through its
-configurable `actual`. Match the selected setting under the condition's
-configuration, retain the requested alias label for selector lookup and the
-declared `target_settings` edge, and use the selected declaration for condition
-specialization. Bazel's forwarded `ConfigMatchingProvider.label` names the
-selected leaf, a distinct identity not exposed by this packet's Slug result.
-The selected condition truth and toolchain eligibility are **exact** within
-the existing admitted target/exec configuration and toolchain family. Slug's
-structural configuration/path identity and diagnostics remain **Slug-native**;
-generic alias-provider forwarding and provider-label inspection, exact Bazel configuration/output bytes,
-remote JDK fetching, complete root Build, and unrelated rule families remain
-**unsupported/deferred**. Existing accepted exact slices stay exact.
+Admit the two authentic generated `rules_cc` 0.2.17 Linux
+`repository_ctx.symlink` calls: a source path returned by
+`repository_ctx.path(Label(...))` for an existing external repository file,
+and a nonempty safe repository-relative string destination. Produce a real
+POSIX symlink in the generated repository, in invocation order, without
+overwriting an existing destination. The Starlark call shape and selected
+link/file loading behavior are **exact** for this subset under Bazel 9.2.
+Slug's generated-root location, materialization/source-association bytes,
+safe-path rejection diagnostics and Rust Host observations are **Slug-native**.
+Direct String/Label or host-path sources, root Label sources, dangling sources,
+directory links, generated-source links, Windows copy/junction behavior,
+symlink/archive mixtures, arbitrary destination path objects, complete C++
+toolchain setup and root Build are **unsupported/deferred**. Existing exact
+slices remain exact; no Java runtime/helper enters Slug.
 
-## Pinned source, owner and decision
+## Pinned source and authentic demand
 
-Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`:
-`Alias.java:41-55` constructs an alias configured target;
-`AliasConfiguredTarget.java:86-125,165-169` selects `actual` and forwards
-the selected `ConfigMatchingProvider`; `ConfigSetting.java:150-165` produces
-that provider; `Toolchain.java:55-58` consumes it for `target_settings`,
-and `RegisteredToolchainsFunction.java:129-145` validates the prerequisite.
-The cached `rules_java` 9.1.0
-`toolchains/remote_java_repository.bzl:23-33,55-101` writes two real
-settings and `version_or_prefix_version_setting = alias(actual = select(...))`;
-both generated Java toolchains list that alias in `target_settings`. An
-ignored-RC, no-fetch Bazel 9.2 query confirmed the authentic target is an
-alias. Upstream configurable-alias and toolchain-setting tests establish
-the component behaviors, but no single pinned test combines them.
+Pinned Bazel 9.2 `StarlarkRepositoryContext.java:197-254` resolves
+`symlink(target, link_name)`, checks the destination under the repository,
+creates parents and calls native `createSymbolicLink` without pre-deleting
+the destination. `StarlarkBaseExternalContext.java:313-322` owns the lexical
+destination check; `RepositoryUtils.java:54-76` checks a Label package but
+not the named source file. Unix `UnixFileSystem.java:299-307` uses POSIX
+symlink; Windows behavior is different and deferred. Positive upstream
+evidence is `StarlarkRepositoryContextTest.java:566-575`,
+`StarlarkRepositoryIntegrationTest.java:91-123` and
+`starlark_repository_test.sh:151-173`. The cached `rules_cc` 0.2.17
+`cc/private/toolchain/unix_cc_configure.bzl:348-370` resolves two `@rules_cc`
+Labels to path objects, then links them as `cc_toolchain_config.bzl` and
+`armeabi_cc_toolchain_config.bzl`. An isolated ignored-RC Bazel 9.2 probe at
+`/tmp/slug-wp837-symlink-O6wkPT` queried `@linked//:through_link` with exit
+zero and observed a native BUILD symlink; that probe is diagnostic until a
+checked-in offline fixture is generated and independently verified.
 
-Analysis's `ConfiguredConditionKey` in `app/slug_analysis_v2/src/dice.rs`
-owns match truth, while `prepare_configured_attribute_conditions` and
-`load_configured_condition_declarations` own selected declarations and
-specificity. Both currently require a direct `PackageTargetKind::ConfigSetting`.
-Walk native alias declarations without analyzing an arbitrary selected rule:
-use the existing `AliasActual` selector preparation/resolution, DICE-load
-each visited alias/leaf package, use the configured-condition cycle guard for
-recursive selector conditions and a transient visited-label set for plain
-alias chains, then require the selected final target to be a `ConfigSetting`.
-Preserve the original alias label in selector truth and condition edges;
-load and normalize the selected declaration. Both the matcher and the parent
-declaration loader must walk the alias, so the latter directly depends on
-alias/leaf packages even when condition truth equality-cuts. Preserve
-`Need`, errors, target/exec configuration,
-repository mapping, and same-DICE A→B→A restoration. Do not treat the
-branches as an OR, admit a wrong-kind leaf, introduce a new condition
-provider model/key or retain a new hot-path representation. Existing
-immutable label/configuration and compact condition collections remain the
-owners; Stage 9 utility disposition is reuse.
+## Semantic owner and decision
+
+The existing selected repository-rule effect DICE key and replay loop own
+the call, prepared Label path and observed external source bytes. The
+`repository_ctx.symlink` method accepts only a prepared external Label-derived
+`RepositoryStarlarkPath` and relative string destination, requests
+`RepositorySourceNeed` as `read`/`template` do, and records no partial plan on
+Need/error/cancellation. Both source path/route and exact source bytes must
+participate through existing observed dependencies; A→B→A source-byte edits
+and source rematerialization must restore the result. Do not infer bytes from
+a physical path or read the filesystem outside its DICE owner.
+
+Extend the existing `GeneratedRepositoryFileEffectPlan` with one ordered
+Symlink variant; keep `File` and `Archive` unchanged. Retain destination as
+`CompactString`, source as the existing immutable Label-path value, and one
+shared `Arc<[u8]>` observed source value for structural equality and exact
+content identity. Reuse the existing `SmallSet` destination de-duplication,
+`Allocative` and immutable plan Arc; add no interner, global cache, DICE key,
+evaluator-heap borrow or Buck2/V1 donor import. The plan's retained memory
+releases with its DICE value/request. A symlink-containing plan uses a new
+domain-separated ordered Slug source association including kind, destination,
+source path/namespace and exact bytes; never reuse the file-only association
+without those inputs. Keep symlink/archive mixtures fail-closed.
+
+Core's existing provisional generated-repository writer creates parent
+directories and the actual Unix symlink inside its temporary root, rejects
+duplicate/ancestor destination conflicts and symlinked destination ancestors,
+and publishes only after all ordered effects succeed and session validation
+accepts. No link may escape via a destination ancestor. Before exact
+acceptance, prove with a lifecycle test that the external immutable source
+root remains retained while an accepted generated link can be read across
+warm/reselected same-daemon requests, and that abort/discard/shutdown release
+both roots. If existing retention does not prove this, add the smallest
+transfer-owned Core lease inside this packet only after independent design
+review; do not put a tempdir handle in DICE or silently copy the source.
+The existing large repository context and Core writer files remain cohesive
+owners because this change extends their current method/effect application
+tables, not a new repository execution path.
 
 ## Evidence and validation
 
-Add focused Analysis tests with a configurable alias to distinct settings,
-including target and exec configuration, selected match and no-match,
-specialization when two leaves have equal truth, alias chains, wrong-kind
-selected actual, cycle and missing selected dependency, and same-DICE A→B→A
-changes. Extend the existing configurable `target_settings` test with the
-configurable-actual alias itself in `target_settings`: both selected leaves
-must match in separate configurations, while a third configuration must not
-match any toolchain. Protect direct
-condition, native configurable-alias, toolchain-setting and observed-mode
-tests. Pinned-source regression plus focused tests are the parity evidence:
-the isolated ignored-RC Bazel 9.2 `cquery //:probe` probe at
-`/tmp/slug-toolchain-alias-r53coc` with `--repository_disable_download`,
-explicit local host/target platform and `--output=label_kind` succeeded
-for `opt`/`dbg` and rejected `fastbuild`, but Slug currently encounters an
-unrelated `repository_ctx.which` limit in that tiny workspace before this
-alias; it is diagnostic, not an accepted oracle fixture. Do not broaden this
-packet to repair that fixture bootstrap or claim a three-source oracle row.
+Add one minimal offline Stage 1 fixture `repository-rule-symlink` using an
+external local module source file, `path(Label)` and generated BUILD symlink.
+Its query row must distinguish successful generated BUILD loading; Rust
+materialization tests must separately assert native symlink kind/target.
+Generate with fresh ignored-RC Bazel 9.2, verify in an independent fresh
+root, and replay with rebuilt Slug. The fixture records pinned provenance,
+exact anchored stdout, no credential-bearing RC or copied upstream archive.
+It is expected to add about 8 files/1 row, below the Stage 1 growth trigger.
+Protect existing generated-source, file-effect and Label-path fixtures.
 
-Resolve pinned nightly via `rustup which`, serialize Cargo, preflight exact
-test selectors and run focused/protected Analysis tests plus Core/CLI checks.
-Format changed Rust and run diff, plan and archive hygiene. Rebuild
-`slug_cli_v2` before using `SLUG_V2_BIN`; clean `slugd` before and after one
-authentic `//:probe` smoke. That smoke is progression evidence, not proof of
-full root closure. Obtain independent DESIGN and FINAL reviews of the
-configured-condition/DICE boundary.
+Focused Bzlmod builder tests cover order, structural equality, cross-kind
+duplicate/ancestor conflicts, path traversal and source-byte distinctions.
+Focused Loading tests cover typed ABI, path-then-source Need, selected call
+atomicity, external route/source edits, A→B→A and rejection of unsupported
+forms. Core tests prove real symlink, link target, order, nested destination,
+conflict, failed/aborted provisional cleanup, source-root retention and
+reselection. Resolve pinned nightly via `rustup which --toolchain`; serialize
+Cargo, compile with JSON `--no-run`, preflight all exact selectors with
+`scripts/v2_test_preflight.py`, run focused/protected tests and named Core/CLI
+dependents. Format Rust; run diff, plan, archive and fixture-hygiene checks.
+Rebuild `slug_cli_v2`, clean `slugd` before/after one authentic `//:probe`
+smoke, and record its next first error without claiming full closure.
+Independent DESIGN and FINAL reviews are required for the new retained effect
+and Core lifecycle boundary.
 
 ## Scope and stops
 
-Base clean main `735fb8d9b`. Allowlist: this manifest and canonical Current;
-`app/slug_analysis_v2/src/dice.rs` and focused tests in
-`app/slug_analysis_v2/tests/starlark_rule.rs`; one compact Stage 6 owner note
-after acceptance. Roughly 120-250 Rust/test lines are a review trigger, not
-a cap. No generated repository writer, Loading key, generic provider,
-configuration identity, toolchain policy, fixture, remote execution or action
-change. `REPLAN` if the selected leaf cannot be validated without unrelated
-target analysis, if an equality cutoff loses leaf-identity invalidation, if
-the authentic stop needs an unmodeled Bazel provider surface, or if the
-minimal change creates a new DICE key/retained representation or weakens
-wrong-kind/cycle rejection.
+Base clean main `b29d00c76`. Allowlist: this manifest and canonical Current;
+`app/slug_loading_v2/src/repository_rule_context.rs`, the exhaustive plan-error
+renderer in `app/slug_loading_v2/src/registration_diagnostic.rs`, and existing
+focused tests in `app/slug_loading_v2/src/module_extension_repository_file_effect.rs`;
+`app/slug_bzlmod_v2/src/generated_repository_file_effect.rs` and `lib.rs`;
+`app/slug_core_v2/src/runtime/repository_io.rs`;
+`tests/v2_oracle/fixtures/repository-rule-symlink/**`; compact Stage 4/5 and
+Stage 9 owner/disposition notes after acceptance. Review triggers are roughly
+150-300 production and 200-400 proof lines, not caps. No generic path API,
+archive extractor, repository route/key, action symlink, remote transport,
+configuration identity or Windows implementation change. `REPLAN` if source
+bytes cannot be observed through the existing selected owner, if a source
+root can disappear while an accepted generated link remains live without a
+bounded Core lease, if exact link behavior requires unmodeled external path
+forms, or if the only viable correction is a copied file masquerading as a
+symlink. A smaller source copy may be proposed only as explicitly Slug-native
+in a new decision, never as this packet's exact completion.
 
 ## Immediate predecessor
 
-WP835 at `735fb8d9b` accepted the exact known Starlark-rule
-`visibility=None` omission and moved the authentic `//:probe` first stop to
-`@@rules_java++toolchains+remote_jdk8_linux_toolchain_config_repo//:version_or_prefix_version_setting`
-being rejected as not a `config_setting`. M7A remains partial.
+WP836 at `b29d00c76` admitted configured `config_setting` aliases for
+toolchain settings and moved the authentic first stop to generated `rules_cc`
+`repository_ctx.symlink`. M7A remains partial.
 
-## Acceptance (2026-09-24)
+## Acceptance evidence (2026-09-24)
 
-Independent DESIGN and FINAL reviews ACCEPT the bounded exact selected-condition
-and toolchain-eligibility slice. Analysis now walks native alias declarations
-through existing selector preparation/resolution, DICE-loads each visited
-alias/leaf package, and requires the selected leaf to be a `config_setting`
-without analyzing an arbitrary wrong-kind rule. The condition key and the
-declaration parent both walk the alias; the latter's direct package
-dependencies preserve selected-leaf specificity when match truth equality-cuts.
-No new DICE key, retained representation, provider model or Loading route is
-introduced. The transient `SmallSet` visited labels and existing compact
-condition rows are reused under the Stage 9 utility disposition.
+The existing selected repository-rule owner now replays an external
+Label-derived path and DICE-observed bytes before publishing a distinct
+ordered symlink effect. Core writes a real Unix link, checks destination
+ancestors and conflicts, and keeps accepted source roots alive through warm
+reselection; discard and shutdown release provisional/retained roots. The
+source Label-path key computes the repository materialization result key,
+whose request is selected from the DICE activation closure. The new observed
+test proves source bytes A→B→A and a changed materialization root/instance;
+the Core lifecycle test proves acceptance, reselection, discard and teardown.
+No new DICE key, retained cache or lease was needed.
 
-Four new exact Analysis selectors and three protected selectors pass after
-pinned-nightly Cargo JSON `--no-run` compilation. The new tests cover a
-configurable-actual alias in `target_settings` (two eligible configurations,
-one ineligible), selected-false versus an unselected true leaf, selected and
-unselected wrong-kind branches, alias chains and selector-condition cycles,
-target/exec configuration, and same-DICE A→B→A including an equal-truth
-leaf switch that changes specialization. The direct-condition test helper
-now installs the same configured cycle detector as production root requests;
-without it, a new self-selector negative hung and was interrupted during
-development. Core/CLI checks, CLI rebuild, pinned rustfmt, diff/plan/archive
-hygiene and post-smoke `slugd` absence pass.
-
-The broader `starlark_rule` binary passed 223/225. Two untouched tests,
-`directory_args::unexpanded_directory_vectors_retain_literal_paths_and_reject_expansion`
-and `output_group_info::configured_output_groups_preserve_artifacts_sharing_forwarding_and_a_b_a`,
-fail on bare versus Slug-prefixed action-output-path assertions; neither
-contains a condition/alias/select/toolchain path. They are unrelated
-validation debt, not a clean-main baseline claim or a WP836 waiver. The
-rebuilt authentic `//:probe` smoke moved beyond the `rules_java` alias and
-first stopped in generated `rules_cc++cc_configure_extension+local_config_cc`
-at unsupported `repository_ctx.symlink` (exit 2, about 46 seconds). Full
-C++ toolchain configuration, root Build and M7A remain open.
+The one-row offline `repository-rule-symlink` fixture passed fresh ignored-RC
+Bazel 9.2 generation and independent fresh verification, then rebuilt Slug
+replay (exit zero, exact `@linked//:through_link`). Its canonical `@@source+`
+Label avoids a separate root `.bzl` apparent-repository visibility boundary;
+the selected external path-object-to-link call shape is unchanged. Two new
+Bzlmod builder tests, three new Loading tests, two new Core tests, all 24
+repository-context tests, nine retained-plan tests, six generated Core tests,
+and four protected selected-effect tests pass. Pinned JSON no-run compiles,
+`slug_cli_v2` rebuild, rustfmt and independent FINAL review pass. The
+authentic Rust-toolchain `//:probe` cquery now first stops at selected
+`rules_shell++sh_configure+local_config_shell` `repository_ctx.which` limits
+(exit 2); this is progression evidence, not full C++/root Build closure.
+The final scope remains the exact Unix existing external Label-derived file
+slice stated above; omitted path forms, dangling/directory/Windows links,
+symlink/archive mixtures, exact Bazel identity bytes and M7A completion stay
+deferred.

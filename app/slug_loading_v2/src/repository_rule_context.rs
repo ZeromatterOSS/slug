@@ -438,7 +438,7 @@ impl RepositoryRuleHostObservation {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), HostPathNeed(NormalizedAbsolutePath), ReadArgument, ReadLimit, TemplateDestinationArgument, TemplateSourceArgument, RepositorySourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), ArchiveArgument, ArchiveAuth, ArchiveLimit, ArchiveIncomplete, ArchivePathObservation, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
+pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), HostPathNeed(NormalizedAbsolutePath), ReadArgument, ReadLimit, TemplateDestinationArgument, TemplateSourceArgument, SymlinkArgument, RepositorySourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), ArchiveArgument, ArchiveAuth, ArchiveLimit, ArchiveIncomplete, ArchivePathObservation, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
 
 #[rustfmt::skip]
 pub(crate) struct RepositoryRuleInvocation { pub(crate) plan: GeneratedRepositoryFileEffectPlan, pub(crate) dynamic_environment: Arc<[CompactString]> }
@@ -509,6 +509,7 @@ impl RepositoryRuleInvocationState {
         Ok(RepositoryStarlarkPath::Host { path: normalized, exists })
     }
     fn push_effect(&self, path: CompactString, content: Arc<[u8]>, executable: bool) -> Result<(), GeneratedRepositoryFileEffectPlanError> { self.effects.borrow_mut().as_mut().expect("repository context has not completed").push(path.clone(), content, executable)?; record_generated_path(&mut self.generated_present.lock().expect("generated path state mutex poisoned"), &path); Ok(()) }
+    fn push_symlink(&self, path: CompactString, source: HostRepositoryLabelPathValue, content: Arc<[u8]>) -> Result<(), GeneratedRepositoryFileEffectPlanError> { self.effects.borrow_mut().as_mut().expect("repository context has not completed").push_symlink(path.clone(), source, content)?; record_generated_path(&mut self.generated_present.lock().expect("generated path state mutex poisoned"), &path); Ok(()) }
     fn push_archive(&self, urls: Arc<[CompactString]>, sha256: [u8; 32], strip_prefix: CompactString) -> Result<(), RepositoryRuleInvocationError> { let mut count = self.archive_count.borrow_mut(); if *count >= 6 { return Err(RepositoryRuleInvocationError::ArchiveLimit); } self.effects.borrow_mut().as_mut().expect("repository context has not completed").push_archive(urls, sha256, strip_prefix).map_err(RepositoryRuleInvocationError::Plan)?; *count += 1; Ok(()) }
     fn fail(&self, error: RepositoryRuleInvocationError) -> anyhow::Error { *self.error.borrow_mut() = Some(error); anyhow::anyhow!("repository_ctx invocation failed") }
     fn record_environment(&self, name: &str) { self.dynamic_environment.borrow_mut().push(name.into()); }
@@ -926,6 +927,46 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
             .map_err(|error| state.fail(error))?;
         state
             .push_effect(CompactString::new(destination), output.into(), executable)
+            .map_err(|error| state.fail(RepositoryRuleInvocationError::Plan(error)))?;
+        Ok(NoneType)
+    }
+
+    fn symlink<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] target: Value<'v>,
+        #[starlark(require = pos)] link_name: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        RepositoryRuleContext::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
+        let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        let Some(RepositoryStarlarkPath::Label { address, path }) =
+            RepositoryStarlarkPath::from_value(target)
+        else {
+            return Err(state.fail(RepositoryRuleInvocationError::SymlinkArgument));
+        };
+        let Some(destination) = link_name.unpack_str() else {
+            return Err(state.fail(RepositoryRuleInvocationError::SymlinkArgument));
+        };
+        if address.repo().is_root()
+            || address.repo().as_str() == state.generated_repository.as_str()
+            || state.prepared_paths.get(address) != Some(path)
+        {
+            return Err(state.fail(RepositoryRuleInvocationError::SymlinkArgument));
+        }
+        let Some(content) = state.prepared_sources.get(address) else {
+            return Err(
+                state.fail(RepositoryRuleInvocationError::RepositorySourceNeed(
+                    address.clone(),
+                )),
+            );
+        };
+        state
+            .push_symlink(
+                CompactString::new(destination),
+                path.clone(),
+                content.clone(),
+            )
             .map_err(|error| state.fail(RepositoryRuleInvocationError::Plan(error)))?;
         Ok(NoneType)
     }
@@ -1540,7 +1581,7 @@ mod tests {
         let invocation = invoke_input(r#"
 def implementation(ctx):
     if not (ctx.name == "canonical" and ctx.original_name == "canonical" and ctx.attr.name == ctx.name): fail("names")
-    if not (hasattr(ctx, "attr") and getattr(ctx, "name") == "canonical" and dir(ctx) == ["attr", "download_and_extract", "file", "getenv", "name", "original_name", "os", "path", "read", "template", "which"]): fail("context reflection")
+    if not (hasattr(ctx, "attr") and getattr(ctx, "name") == "canonical" and dir(ctx) == ["attr", "download_and_extract", "file", "getenv", "name", "original_name", "os", "path", "read", "symlink", "template", "which"]): fail("context reflection")
     if not (ctx.attr.s == "value" and ctx.attr.b and ctx.attr.i == 7 and type(ctx.attr.l) == "Label"): fail("scalars")
     if not (type(ctx.attr.ll[0]) == "Label" and type(ctx.attr.o) == "Label" and type(ctx.attr.ol[0]) == "Label"): fail("labels")
     if not (ctx.attr.sd == {"k": "v"} and ctx.attr.sld == {"k": ["v"]} and type(ctx.attr.skld["k"]) == "Label"): fail("maps")
@@ -2412,6 +2453,140 @@ def implementation(ctx):
             (effects[2].content(), effects[2].executable()),
             (b"ascii\nascii\n".as_slice(), false)
         );
+    }
+
+    #[test]
+    fn symlink_demands_external_label_path_then_source_and_retains_ordered_identity() {
+        use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef;
+
+        let label = CanonicalLabel::parse("@@dep+//pkg:source").unwrap();
+        let address = RepositoryLabelPathAddress::from_label(&label);
+        let source = r#"
+def implementation(ctx):
+    ctx.file("marker", "before")
+    ctx.symlink(ctx.path(Label("@@dep+//pkg:source")), "nested/BUILD.bazel")
+    ctx.file("after", "done")
+"#;
+        assert!(matches!(
+            invoke_prepared(source, &SmallMap::new(), &SmallMap::new()),
+            Err(RepositoryRuleInvocationError::LabelPathNeed(need)) if need == address
+        ));
+        let path = HostRepositoryLabelPathValue::new(
+            NormalizedAbsolutePath::new("/materialized/pkg/source").unwrap(),
+            PathObservationNamespace::Host,
+        )
+        .unwrap();
+        let paths = SmallMap::from_iter([(address.clone(), path.clone())]);
+        assert!(matches!(
+            invoke_prepared(source, &paths, &SmallMap::new()),
+            Err(RepositoryRuleInvocationError::RepositorySourceNeed(need)) if need == address
+        ));
+        let invoke_bytes = |bytes: &[u8]| {
+            invoke_prepared(
+                source,
+                &paths,
+                &SmallMap::from_iter([(address.clone(), Arc::from(bytes))]),
+            )
+            .unwrap()
+            .plan
+        };
+        let first = invoke_bytes(b"alpha");
+        let changed = invoke_bytes(b"beta");
+        assert_ne!(first, changed);
+        assert_eq!(first, invoke_bytes(b"alpha"));
+        let effects = first.ordered_effects().collect::<Vec<_>>();
+        assert_eq!(effects.len(), 3);
+        assert!(
+            matches!(effects[0], GeneratedRepositoryOrderedEffectRef::File(file) if file.path() == "marker")
+        );
+        assert!(
+            matches!(effects[1], GeneratedRepositoryOrderedEffectRef::Symlink(link)
+            if link.path() == "nested/BUILD.bazel"
+                && link.source() == &path
+                && link.content() == b"alpha")
+        );
+        assert!(
+            matches!(effects[2], GeneratedRepositoryOrderedEffectRef::File(file) if file.path() == "after")
+        );
+    }
+
+    #[test]
+    fn symlink_rejects_other_source_forms_and_unsafe_destination() {
+        for expression in [
+            "ctx.symlink('source', 'BUILD.bazel')",
+            "ctx.symlink(Label('@@dep+//pkg:source'), 'BUILD.bazel')",
+            "ctx.symlink(ctx.path('generated'), 'BUILD.bazel')",
+        ] {
+            assert!(matches!(
+                invoke_prepared(
+                    &format!("def implementation(ctx):\n    {expression}\n"),
+                    &SmallMap::new(),
+                    &SmallMap::new(),
+                ),
+                Err(RepositoryRuleInvocationError::SymlinkArgument)
+            ));
+        }
+        let root_label = CanonicalLabel::parse("@@//:source").unwrap();
+        let root_address = RepositoryLabelPathAddress::from_label(&root_label);
+        let root_path = HostRepositoryLabelPathValue::new(
+            NormalizedAbsolutePath::new("/workspace/source").unwrap(),
+            PathObservationNamespace::Host,
+        )
+        .unwrap();
+        assert!(matches!(
+            invoke_prepared(
+                "def implementation(ctx):\n    ctx.symlink(ctx.path(Label('@@//:source')), 'BUILD.bazel')\n",
+                &SmallMap::from_iter([(root_address, root_path)]),
+                &SmallMap::new(),
+            ),
+            Err(RepositoryRuleInvocationError::SymlinkArgument)
+        ));
+
+        let host_source =
+            "def implementation(ctx):\n    ctx.symlink(ctx.path('/probe/source'), 'BUILD.bazel')\n";
+        let (_owner, frozen_implementation) = implementation(host_source);
+        let host_path = NormalizedAbsolutePath::new("/probe/source").unwrap();
+        let host_attempt = invoke_repository_rule_with_host_paths(
+            frozen_implementation,
+            &invocation_manifest(),
+            &SmallMap::new(),
+            &SmallMap::new(),
+            &SmallMap::new(),
+            &SmallMap::from_iter([(host_path, true)]),
+            RepositoryRuleInvocationInput::new(
+                "repo".into(),
+                None,
+                Arc::new(SmallMap::new()),
+                Arc::from([]),
+            )
+            .unwrap(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            None,
+        );
+        assert!(matches!(
+            host_attempt.result,
+            Err(RepositoryRuleInvocationError::SymlinkArgument)
+        ));
+
+        let label = CanonicalLabel::parse("@@dep+//pkg:source").unwrap();
+        let address = RepositoryLabelPathAddress::from_label(&label);
+        let path = HostRepositoryLabelPathValue::new(
+            NormalizedAbsolutePath::new("/materialized/pkg/source").unwrap(),
+            PathObservationNamespace::Host,
+        )
+        .unwrap();
+        let paths = SmallMap::from_iter([(address.clone(), path)]);
+        let sources = SmallMap::from_iter([(address, Arc::from(&b"source"[..]))]);
+        for destination in ["../BUILD.bazel", "/absolute", ""] {
+            let source = format!(
+                "def implementation(ctx):\n    ctx.symlink(ctx.path(Label('@@dep+//pkg:source')), '{destination}')\n"
+            );
+            assert!(matches!(
+                invoke_prepared(&source, &paths, &sources),
+                Err(RepositoryRuleInvocationError::Plan(_))
+            ));
+        }
     }
 
     #[test]

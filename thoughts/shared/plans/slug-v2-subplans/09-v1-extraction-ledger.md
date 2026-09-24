@@ -2920,3 +2920,14 @@ retained collection, interner, cache, DICE key, lock, digest or V1/Buck2
 import is needed. Stage 4 makes only evaluator-scoped compact-string copies
 and ordinary returned strings. This cold Loading projection does not warrant
 a benchmark; focused A/B/A, caller-context and fail-closed tests cover it.
+
+WP837 stores each generated symlink once in the existing ordered effect
+plan, reusing CompactString destination, the Arc-backed Label path value,
+one shared Arc byte slice, SmallSet destination de-duplication and Allocative.
+Structural path/namespace/bytes identity and DICE observation remain with
+the selected repository-rule owner; Core retains accepted immutable roots
+through its existing materializer lifetime. No V1/Buck2 import, new
+interner, map, cache, DICE key, lock, evaluator borrow or additional lease
+is introduced. The cold generated-repository boundary does not warrant a
+new benchmark. Builder order/identity tests, observed source A→B→A and route
+mutation, real-link and retained-root lifecycle tests cover the boundary.

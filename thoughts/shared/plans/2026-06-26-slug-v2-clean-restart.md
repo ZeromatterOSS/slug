@@ -29,20 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-136-m7a-configured-condition-alias-r1
+Packet: WP-7-137-m7a-generated-repository-symlink-r1
 Status: ACCEPTED; M7A remains partial
 
-WP836 accepts the authentic generated `rules_java` 9.1.0 toolchain
-`target_settings` alias within the existing admitted configuration family.
-Analysis matches its selected `config_setting`, retains requested selector
-identity, and DICE-tracks selected-leaf declarations even when truth is
-unchanged. Four new and three protected selectors pass; the authentic
-`//:probe` first stop moves to generated `rules_cc`'s unsupported
-`repository_ctx.symlink`. Generic alias-provider inspection, exact Bazel
-configuration/output bytes, remote JDK fetching, full C++ toolchain and root
-Build remain deferred. M7A remains partial. The broader Analysis binary's
-two unrelated action-output-path assertion failures are recorded in the
-current packet; no clean-main baseline claim is made.
+WP837 accepts the authentic generated `rules_cc` Unix
+`repository_ctx.symlink` slice: an existing external Label-derived source
+path, safe relative destination and a real ordered link. The selected
+repository-rule effect owner observes source bytes through DICE and retains
+a distinct structural symlink effect; Core's accepted-root lifecycle keeps
+its source alive across reselection. A one-row Bazel 9.2/Slug offline fixture,
+focused/protected tests and independent DESIGN/FINAL reviews pass. The
+authentic Rust-toolchain `//:probe` next stops at a separate selected
+`rules_shell` `repository_ctx.which` limit. Root, host, dangling, directory
+and Windows links, symlink/archive mixtures, full C++ toolchain and root Build
+remain deferred. See `slug-v2-subplans/current-packet.md`; M7A is partial.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

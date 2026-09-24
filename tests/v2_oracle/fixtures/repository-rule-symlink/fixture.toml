@@ -1,0 +1,25 @@
+[fixture]
+name = "repository-rule-symlink"
+description = "Bazel 9.2 repository_ctx.symlink of an external Label-derived path into a generated BUILD file."
+comparison = "semantic"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Offline local_path_override source: the repository rule resolves an external source file with path(Label), symlinks it as its generated BUILD.bazel, and Query loads a target that exists only through that link. This row tests method availability, source routing, and linked BUILD loading; native link kind/target and lifecycle are checked by focused Rust tests. No credential RC, network download, or copied upstream archive is used."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryContext.java:197-254 (symlink)",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java:313-322 (destination check)",
+  "src/test/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryIntegrationTest.java:91-123 (linked BUILD from a Label)",
+  "rules_cc 0.2.17 cc/private/toolchain/unix_cc_configure.bzl:348-370 (Label path to generated link)",
+]
+translation_notes = "The fixture uses a small local module instead of rules_cc toolchain sources. It spells the module's canonical @@source+ Label because Slug's separate root .bzl apparent-repository visibility is not admitted here. The selected external Label is converted to a repository path before the symlink call, matching the authentic call shape. Its generated BUILD target is absent from the repository rule's own file effects; Query success therefore requires loading the linked source. Direct String/Label arguments, root sources, dangling/directory links, path errors, duplicate destinations, and symlink/archive mixtures are outside this row."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture repository-rule-symlink --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture repository-rule-symlink --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
+
+[[commands]]
+name = "linked_external_build_loads"
+argv = ["query", "@linked//:through_link", "--output=label", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\A@linked//:through_link\n?\Z']

@@ -1,0 +1,44 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "@linked//:through_link",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@linked//:through_link",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "linked_external_build_loads",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...",
+      "normalized_stdout": "@linked//:through_link",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n",
+      "stdout": "@linked//:through_link\n"
+    }
+  ],
+  "fixture": "repository-rule-symlink",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

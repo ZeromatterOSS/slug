@@ -1386,6 +1386,13 @@ fn terminal_repository_rule_invocation_error(
                 message: "repository_ctx.template invocation is unsupported".into(),
             }
         }
+        RepositoryRuleInvocationError::SymlinkArgument => {
+            HostSelectedRepositoryFileEffectError::Invocation {
+                certificate: certificate.clone(),
+                ordinal,
+                message: "repository_ctx.symlink requires an external Label-derived path and a relative string destination".into(),
+            }
+        }
         RepositoryRuleInvocationError::WhichArgument(message) => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message },
         RepositoryRuleInvocationError::WhichLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.which invocation exceeds the admitted Unix limits".into() },
         RepositoryRuleInvocationError::ArchiveArgument => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract arguments are outside the selected SHA-pinned tar.xz surface".into() },
@@ -2520,6 +2527,7 @@ cc_configure = repository_rule(
     ) -> (
         dice::DiceTransaction,
         ObservedHostSelectedRepositoryFileEffect,
+        Option<Arc<RepositoryMaterializationRequest>>,
     ) {
         let global = transaction.compute(&PathObservationEpochKey).await.unwrap();
         let mut observations = global
@@ -2527,11 +2535,19 @@ cc_configure = repository_rule(
             .iter()
             .map(|(demand, result)| (demand.dupe(), result.dupe()))
             .collect::<Vec<_>>();
+        let mut source_request = None;
         for _ in 0..24 {
             match transaction.compute(key).await.unwrap() {
-                SourcePreparationOutcome::Complete(Ok(value)) => return (transaction, value),
+                SourcePreparationOutcome::Complete(Ok(value)) => {
+                    return (transaction, value, source_request);
+                }
                 SourcePreparationOutcome::Need(need) => {
                     assert!(need.repository_environment().is_none(), "{need:?}");
+                    if let Some(request) = need.repository_materializations().values().next()
+                        && request.id.canonical_repo.as_str() == "rules_cc+"
+                    {
+                        source_request = Some(request.clone());
+                    }
                     transaction = update_template_need(
                         transaction,
                         workspace,
@@ -3488,7 +3504,7 @@ ext = module_extension(implementation = impl)
             "../../tests/v2_oracle/fixtures/nonroot-module-extension-semantics/workspace/registry/modules/rules_cc/0.2.17",
         );
         let instance = PathObservationInstanceId::new(952);
-        let (transaction, first) = converge_observed_template(
+        let (transaction, first, _) = converge_observed_template(
             transaction,
             &key,
             &workspace,
@@ -3666,6 +3682,168 @@ ext = module_extension(implementation = impl)
         let fixture = template_effect_fixture().await;
         assert_template_result(&fixture);
         assert_template_reuse_and_a_b_a(fixture).await;
+    }
+
+    #[tokio::test]
+    async fn repository_symlink_observes_external_source_and_restores_a_b_a() {
+        use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef;
+
+        use crate::canonical_repository_route_tests::tests::WORKSPACE as BUILTIN_WORKSPACE;
+        use crate::canonical_repository_route_tests::tests::builtin_graph_dice;
+        use crate::canonical_repository_route_tests::tests::builtin_graph_module;
+        use crate::canonical_repository_route_tests::tests::transaction as builtin_transaction;
+
+        const EXTENSION: &str = r#"
+def write(ctx):
+    ctx.file("marker", "before")
+    ctx.symlink(ctx.path(Label("@@rules_cc+//cc/private/toolchain:READ.source")), "BUILD.bazel")
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = builtin_graph_dice();
+        let workspace = NormalizedAbsolutePath::new(BUILTIN_WORKSPACE).unwrap();
+        let mut module = builtin_graph_module();
+        module.push_str(
+            "\nsymlink_probe=use_extension('//:ext.bzl','ext')\nuse_repo(symlink_probe, symlink_out='first')\n",
+        );
+        let transaction = builtin_transaction(&dice, &module, EXTENSION, true, None).await;
+        let transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::empty(),
+        )
+        .await;
+        let mut transaction = transaction;
+        let owner = owner_named(&mut transaction, workspace.dupe(), "+ext+first").await;
+        let key = HostSelectedRepositoryFileEffectObservationKey::new(workspace.dupe(), owner, 0);
+        let logical_root = PathBuf::from("/symlink-rules-cc");
+        let fixture_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+            "../../tests/v2_oracle/fixtures/nonroot-module-extension-semantics/workspace/registry/modules/rules_cc/0.2.17",
+        );
+        let instance = PathObservationInstanceId::new(953);
+        let (mut transaction, first, source_request) = converge_observed_template(
+            transaction,
+            &key,
+            &workspace,
+            &logical_root,
+            &fixture_root,
+            instance,
+        )
+        .await;
+        let plan = first.result().as_ref().as_ref().unwrap().plan();
+        let links = plan
+            .ordered_effects()
+            .filter_map(|effect| match effect {
+                GeneratedRepositoryOrderedEffectRef::Symlink(link) => Some(link),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].path(), "BUILD.bazel");
+        assert_eq!(links[0].content(), READ_A);
+        assert_eq!(
+            links[0].source().namespace(),
+            PathObservationNamespace::Materialization(instance)
+        );
+        assert!(first.observations().observations().keys().any(|demand| {
+            demand.path().as_path().ends_with(READ_PATH)
+                && demand.operation() == PathObservationOperation::FileBytes
+        }));
+
+        let SourcePreparationOutcome::Complete(Ok(warm)) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("warm symlink must complete")
+        };
+        assert!(Arc::ptr_eq(first.result(), warm.result()));
+        let baseline = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        let changed = replace_source_observations(
+            &baseline,
+            READ_PATH,
+            b"read=beta\n",
+            PathNodeKind::RegularFile,
+        );
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, changed)])
+            .unwrap();
+        transaction = updater.commit().await;
+        let SourcePreparationOutcome::Complete(Ok(second)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("changed symlink source must complete")
+        };
+        let second_plan = second.result().as_ref().as_ref().unwrap().plan();
+        assert_ne!(plan, second_plan);
+        assert!(second_plan.ordered_effects().any(|effect| {
+            matches!(effect, GeneratedRepositoryOrderedEffectRef::Symlink(link)
+                if link.content() == b"read=beta\n")
+        }));
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, baseline)])
+            .unwrap();
+        transaction = updater.commit().await;
+        let SourcePreparationOutcome::Complete(Ok(restored)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("restored symlink source must complete")
+        };
+        assert_eq!(first.result(), restored.result());
+
+        let source_request = source_request.expect("external source request was observed");
+        let rerouted_root = PathBuf::from("/symlink-rules-cc-reselected");
+        let rerouted_instance = PathObservationInstanceId::new(954);
+        let rerouted_epoch = RepositoryMaterializationResultEpoch::new(
+            workspace.dupe(),
+            [
+                platform_materialization(&workspace, "platforms+"),
+                platform_materialization(&workspace, "platforms"),
+                RepositoryMaterializationEpochEntry {
+                    request: source_request,
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Immutable {
+                            source_identity: Arc::from("symlink-rules-cc-reselected"),
+                            generation_root: rerouted_root.clone(),
+                            observation_instance: rerouted_instance,
+                        },
+                    ),
+                },
+            ],
+        )
+        .unwrap();
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.dupe(),
+                },
+                rerouted_epoch,
+            )])
+            .unwrap();
+        transaction = updater.commit().await;
+        let (_transaction, rerouted, _) = converge_observed_template(
+            transaction,
+            &key,
+            &workspace,
+            &rerouted_root,
+            &fixture_root,
+            rerouted_instance,
+        )
+        .await;
+        let rerouted_plan = rerouted.result().as_ref().as_ref().unwrap().plan();
+        assert_ne!(plan, rerouted_plan);
+        assert!(rerouted_plan.ordered_effects().any(|effect| {
+            matches!(effect, GeneratedRepositoryOrderedEffectRef::Symlink(link)
+                if link.content() == READ_A
+                    && link.source().path().as_path().starts_with(&rerouted_root)
+                    && link.source().namespace()
+                        == PathObservationNamespace::Materialization(rerouted_instance))
+        }));
     }
 
     #[tokio::test]

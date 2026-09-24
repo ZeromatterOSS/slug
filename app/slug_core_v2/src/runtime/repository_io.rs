@@ -1331,6 +1331,7 @@ trait GeneratedRepositoryFileEffectsIo {
     fn temporary_root(&mut self) -> Result<tempfile::TempDir, String>;
     fn create_parent(&mut self, path: &Path) -> Result<(), String>;
     fn create_file(&mut self, path: &Path) -> Result<File, String>;
+    fn create_symlink(&mut self, source: &Path, path: &Path) -> Result<(), String>;
     fn write_file(&mut self, file: &mut File, content: &[u8]) -> Result<(), String>;
     fn flush_file(&mut self, file: &mut File) -> Result<(), String>;
     fn set_mode(&mut self, path: &Path, executable: bool) -> Result<(), String>;
@@ -1353,6 +1354,18 @@ impl GeneratedRepositoryFileEffectsIo for NativeGeneratedRepositoryFileEffectsIo
             .create_new(true)
             .open(path)
             .map_err(|error| error.to_string())
+    }
+
+    fn create_symlink(&mut self, source: &Path, path: &Path) -> Result<(), String> {
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(source, path).map_err(|error| error.to_string())
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = (source, path);
+            Err("generated repository symlinks are unsupported on this platform".into())
+        }
     }
 
     fn write_file(&mut self, file: &mut File, content: &[u8]) -> Result<(), String> {
@@ -1388,6 +1401,43 @@ fn generated_repository_file_effect_source_association(
     plan: &GeneratedRepositoryFileEffectPlan,
 ) -> Arc<str> {
     let mut digest = Sha256::new();
+    if plan.has_symlinks() {
+        digest.update(b"slug.generated-repository-symlink-effects.v1\0");
+        for effect in plan.ordered_effects() {
+            match effect {
+                GeneratedRepositoryOrderedEffectRef::File(file) => {
+                    digest.update(b"file\0");
+                    for bytes in [file.path().as_bytes(), file.content()] {
+                        digest.update((bytes.len() as u64).to_be_bytes());
+                        digest.update(bytes);
+                    }
+                    digest.update([u8::from(file.executable())]);
+                }
+                GeneratedRepositoryOrderedEffectRef::Symlink(link) => {
+                    digest.update(b"symlink\0");
+                    for bytes in [
+                        link.path().as_bytes(),
+                        link.source().path_str().as_bytes(),
+                        link.content(),
+                    ] {
+                        digest.update((bytes.len() as u64).to_be_bytes());
+                        digest.update(bytes);
+                    }
+                    match link.source().namespace() {
+                        PathObservationNamespace::Host => digest.update(b"host\0"),
+                        PathObservationNamespace::Materialization(instance) => {
+                            digest.update(b"materialization\0");
+                            digest.update(instance.value().to_be_bytes());
+                        }
+                    }
+                }
+                GeneratedRepositoryOrderedEffectRef::Archive(_) => {
+                    unreachable!("symlink/archive mixtures are rejected by the plan builder")
+                }
+            }
+        }
+        return Arc::from(hex::encode(digest.finalize()));
+    }
     if plan.has_archives() {
         digest.update(b"slug.generated-repository-ordered-effects.v1\0");
         for effect in plan.ordered_effects() {
@@ -1416,6 +1466,9 @@ fn generated_repository_file_effect_source_association(
                     digest.update((archive.strip_prefix().len() as u64).to_be_bytes());
                     digest.update(archive.strip_prefix().as_bytes());
                 }
+                GeneratedRepositoryOrderedEffectRef::Symlink(_) => {
+                    unreachable!("symlink plans use their separate source-association domain")
+                }
             }
         }
         return Arc::from(hex::encode(digest.finalize()));
@@ -1435,9 +1488,12 @@ fn generated_repository_file_effect_paths_are_valid(
     plan: &GeneratedRepositoryFileEffectPlan,
 ) -> bool {
     let paths = plan
-        .effects()
-        .iter()
-        .map(|effect| effect.path())
+        .ordered_effects()
+        .filter_map(|effect| match effect {
+            GeneratedRepositoryOrderedEffectRef::File(file) => Some(file.path()),
+            GeneratedRepositoryOrderedEffectRef::Symlink(link) => Some(link.path()),
+            GeneratedRepositoryOrderedEffectRef::Archive(_) => None,
+        })
         .collect::<Vec<_>>();
     paths.iter().all(|path| {
         !path.is_empty()
@@ -1460,11 +1516,40 @@ fn generated_repository_file_effect_paths_are_valid(
     })
 }
 
+fn generated_repository_parent_is_safe(root: &Path, parent: &Path) -> Result<(), String> {
+    let relative = parent
+        .strip_prefix(root)
+        .map_err(|_| "generated repository destination escapes its root".to_owned())?;
+    let root_metadata = std::fs::symlink_metadata(root).map_err(|error| error.to_string())?;
+    if !root_metadata.file_type().is_dir() {
+        return Err("generated repository root is not a real directory".into());
+    }
+    let mut current = root.to_path_buf();
+    for component in relative.components() {
+        let Component::Normal(name) = component else {
+            return Err("generated repository destination has an invalid ancestor".into());
+        };
+        current.push(name);
+        match std::fs::symlink_metadata(&current) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err("generated repository destination has a symlinked ancestor".into());
+            }
+            Ok(metadata) if !metadata.file_type().is_dir() => {
+                return Err("generated repository destination has a non-directory ancestor".into());
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Ok(())
+}
+
 fn materialize_generated_repository_file_effects(
     plan: &GeneratedRepositoryFileEffectPlan,
     io: &mut impl GeneratedRepositoryFileEffectsIo,
 ) -> RepositoryMaterializationAttempt {
-    if !generated_repository_file_effect_paths_are_valid(plan) {
+    if plan.has_archives() || !generated_repository_file_effect_paths_are_valid(plan) {
         return RepositoryMaterializationAttempt::SpecError(
             "invalid generated repository file-effect plan".into(),
         );
@@ -1474,25 +1559,52 @@ fn materialize_generated_repository_file_effects(
         Ok(root) => root,
         Err(error) => return RepositoryMaterializationAttempt::MaterializationError(error),
     };
-    for effect in plan.effects() {
-        let target = root.path().join(effect.path());
-        if let Some(parent) = target.parent()
-            && let Err(error) = io.create_parent(parent)
-        {
-            return RepositoryMaterializationAttempt::MaterializationError(error);
-        }
-        let mut file = match io.create_file(&target) {
-            Ok(file) => file,
-            Err(error) => return RepositoryMaterializationAttempt::MaterializationError(error),
+    for effect in plan.ordered_effects() {
+        let path = match &effect {
+            GeneratedRepositoryOrderedEffectRef::File(file) => file.path(),
+            GeneratedRepositoryOrderedEffectRef::Symlink(link) => link.path(),
+            GeneratedRepositoryOrderedEffectRef::Archive(_) => {
+                return RepositoryMaterializationAttempt::SpecError(
+                    "generated repository symlink/archive mixtures are unsupported".into(),
+                );
+            }
         };
-        if let Err(error) = io.write_file(&mut file, effect.content()) {
-            return RepositoryMaterializationAttempt::MaterializationError(error);
+        let target = root.path().join(path);
+        if let Some(parent) = target.parent() {
+            if let Err(error) = generated_repository_parent_is_safe(root.path(), parent) {
+                return RepositoryMaterializationAttempt::MaterializationError(error);
+            }
+            if let Err(error) = io.create_parent(parent) {
+                return RepositoryMaterializationAttempt::MaterializationError(error);
+            }
+            if let Err(error) = generated_repository_parent_is_safe(root.path(), parent) {
+                return RepositoryMaterializationAttempt::MaterializationError(error);
+            }
         }
-        if let Err(error) = io.flush_file(&mut file) {
-            return RepositoryMaterializationAttempt::MaterializationError(error);
-        }
-        if let Err(error) = io.set_mode(&target, effect.executable()) {
-            return RepositoryMaterializationAttempt::MaterializationError(error);
+        match effect {
+            GeneratedRepositoryOrderedEffectRef::File(file) => {
+                let mut output = match io.create_file(&target) {
+                    Ok(output) => output,
+                    Err(error) => {
+                        return RepositoryMaterializationAttempt::MaterializationError(error);
+                    }
+                };
+                if let Err(error) = io.write_file(&mut output, file.content()) {
+                    return RepositoryMaterializationAttempt::MaterializationError(error);
+                }
+                if let Err(error) = io.flush_file(&mut output) {
+                    return RepositoryMaterializationAttempt::MaterializationError(error);
+                }
+                if let Err(error) = io.set_mode(&target, file.executable()) {
+                    return RepositoryMaterializationAttempt::MaterializationError(error);
+                }
+            }
+            GeneratedRepositoryOrderedEffectRef::Symlink(link) => {
+                if let Err(error) = io.create_symlink(link.source().path().as_path(), &target) {
+                    return RepositoryMaterializationAttempt::MaterializationError(error);
+                }
+            }
+            GeneratedRepositoryOrderedEffectRef::Archive(_) => unreachable!("checked above"),
         }
     }
     RepositoryMaterializationAttempt::GeneratedImmutable {
@@ -1506,7 +1618,10 @@ fn materialize_generated_repository_archive_effects(
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
 ) -> Result<Materialized, ArchiveMaterializationError> {
-    if !plan.has_archives() || !generated_repository_file_effect_paths_are_valid(plan) {
+    if !plan.has_archives()
+        || plan.has_symlinks()
+        || !generated_repository_file_effect_paths_are_valid(plan)
+    {
         return Err(ArchiveMaterializationError::spec(
             "invalid generated repository archive-effect plan",
         ));
@@ -1600,6 +1715,11 @@ fn materialize_generated_repository_archive_effects(
                 NativeGeneratedRepositoryFileEffectsIo
                     .set_mode(&target, file.executable())
                     .map_err(ArchiveMaterializationError::materialization)?;
+            }
+            GeneratedRepositoryOrderedEffectRef::Symlink(_) => {
+                return Err(ArchiveMaterializationError::spec(
+                    "generated repository symlink/archive mixtures are unsupported",
+                ));
             }
         }
     }
@@ -2118,6 +2238,7 @@ mod tests {
     use compact_str::CompactString;
     use sha2::Digest;
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
+    use slug_bzlmod_v2::HostRepositoryLabelPathValue;
     use slug_bzlmod_v2::RepoRuleId;
     use slug_identity_v2::CanonicalLabel;
     use starlark_map::small_map::SmallMap;
@@ -2137,6 +2258,27 @@ mod tests {
             },
         ))
         .unwrap()
+    }
+
+    fn generated_symlink_plan(
+        destination: &str,
+        source: &Path,
+        namespace: PathObservationNamespace,
+        content: &[u8],
+    ) -> GeneratedRepositoryFileEffectPlan {
+        let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+        builder
+            .push_symlink(
+                CompactString::new(destination),
+                HostRepositoryLabelPathValue::new(
+                    NormalizedAbsolutePath::new(source.to_path_buf()).unwrap(),
+                    namespace,
+                )
+                .unwrap(),
+                Arc::from(content),
+            )
+            .unwrap();
+        builder.finish()
     }
 
     fn selected_archive_bytes(prefix: &str, files: &[(&str, &[u8], u32)]) -> Vec<u8> {
@@ -2284,6 +2426,8 @@ mod tests {
         Root,
         Parent,
         Create,
+        Symlink,
+        SymlinkAncestor,
         Write,
         Flush,
         Mode,
@@ -2301,6 +2445,17 @@ mod tests {
                 return Err("root".into());
             }
             let root = tempfile::tempdir().map_err(|error| error.to_string())?;
+            #[cfg(unix)]
+            if matches!(
+                self.failure,
+                ScriptedGeneratedFileEffectsFailure::SymlinkAncestor
+            ) {
+                std::os::unix::fs::symlink(
+                    root.path().parent().expect("temporary root has a parent"),
+                    root.path().join("nested"),
+                )
+                .map_err(|error| error.to_string())?;
+            }
             self.root_path = Some(root.path().to_path_buf());
             Ok(root)
         }
@@ -2323,6 +2478,14 @@ mod tests {
                 .create_new(true)
                 .open(path)
                 .map_err(|error| error.to_string())
+        }
+
+        fn create_symlink(&mut self, source: &Path, path: &Path) -> Result<(), String> {
+            if matches!(self.failure, ScriptedGeneratedFileEffectsFailure::Symlink) {
+                Err("symlink".into())
+            } else {
+                NativeGeneratedRepositoryFileEffectsIo.create_symlink(source, path)
+            }
         }
 
         fn write_file(&mut self, _file: &mut File, _content: &[u8]) -> Result<(), String> {
@@ -2443,6 +2606,275 @@ mod tests {
                 assert!(!path.exists());
             }
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn generated_symlink_effects_materialize_real_ordered_links_and_fail_atomically() {
+        let source_root = tempfile::tempdir().unwrap();
+        let source = source_root.path().join("source.bzl");
+        std::fs::write(&source, b"filegroup(name='linked')\n").unwrap();
+        let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+        builder
+            .push(CompactString::new("FIRST"), Arc::from(&b"first"[..]), false)
+            .unwrap();
+        builder
+            .push_symlink(
+                CompactString::new("nested/BUILD.bazel"),
+                HostRepositoryLabelPathValue::new(
+                    NormalizedAbsolutePath::new(source.clone()).unwrap(),
+                    PathObservationNamespace::Host,
+                )
+                .unwrap(),
+                Arc::from(&b"filegroup(name='linked')\n"[..]),
+            )
+            .unwrap();
+        builder
+            .push(CompactString::new("LAST"), Arc::from(&b"last"[..]), false)
+            .unwrap();
+        let plan = builder.finish();
+        let association = generated_repository_file_effect_source_association(&plan);
+        let RepositoryMaterializationAttempt::GeneratedImmutable {
+            source_identity,
+            root,
+        } = materialize_generated_repository_file_effects(
+            &plan,
+            &mut NativeGeneratedRepositoryFileEffectsIo,
+        )
+        else {
+            panic!("ordered symlink plan must materialize");
+        };
+        assert_eq!(source_identity, association);
+        assert_eq!(std::fs::read(root.path().join("FIRST")).unwrap(), b"first");
+        assert_eq!(std::fs::read(root.path().join("LAST")).unwrap(), b"last");
+        let link = root.path().join("nested/BUILD.bazel");
+        assert!(
+            std::fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(std::fs::read_link(&link).unwrap(), source);
+        assert_eq!(std::fs::read(&link).unwrap(), b"filegroup(name='linked')\n");
+
+        let symlink_only = generated_symlink_plan(
+            "nested/BUILD.bazel",
+            &source,
+            PathObservationNamespace::Host,
+            b"filegroup(name='linked')\n",
+        );
+        let symlink_only_association =
+            generated_repository_file_effect_source_association(&symlink_only);
+        let changed_bytes = generated_symlink_plan(
+            "nested/BUILD.bazel",
+            &source,
+            PathObservationNamespace::Host,
+            b"changed",
+        );
+        assert_ne!(
+            symlink_only_association,
+            generated_repository_file_effect_source_association(&changed_bytes)
+        );
+        let changed_namespace = generated_symlink_plan(
+            "nested/BUILD.bazel",
+            &source,
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(17)),
+            b"filegroup(name='linked')\n",
+        );
+        assert_ne!(
+            symlink_only_association,
+            generated_repository_file_effect_source_association(&changed_namespace)
+        );
+        let changed_path = generated_symlink_plan(
+            "nested/BUILD.bazel",
+            &source_root.path().join("other.bzl"),
+            PathObservationNamespace::Host,
+            b"filegroup(name='linked')\n",
+        );
+        assert_ne!(
+            symlink_only_association,
+            generated_repository_file_effect_source_association(&changed_path)
+        );
+        assert_ne!(
+            symlink_only_association,
+            generated_repository_file_effect_source_association(&generated_plan([(
+                "nested/BUILD.bazel",
+                b"filegroup(name='linked')\n" as &[u8],
+                false,
+            )]))
+        );
+
+        let existing = source_root.path().join("existing");
+        std::fs::write(&existing, b"keep").unwrap();
+        assert!(
+            NativeGeneratedRepositoryFileEffectsIo
+                .create_symlink(&source, &existing)
+                .is_err()
+        );
+        assert_eq!(std::fs::read(&existing).unwrap(), b"keep");
+        assert!(
+            !std::fs::symlink_metadata(&existing)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+
+        for failure in [
+            ScriptedGeneratedFileEffectsFailure::Symlink,
+            ScriptedGeneratedFileEffectsFailure::SymlinkAncestor,
+        ] {
+            let mut io = ScriptedGeneratedFileEffectsIo {
+                failure,
+                root_path: None,
+                creates: 0,
+            };
+            assert!(matches!(
+                materialize_generated_repository_file_effects(&changed_namespace, &mut io),
+                RepositoryMaterializationAttempt::MaterializationError(_)
+            ));
+            assert!(!io.root_path.unwrap().exists());
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn generated_symlink_source_root_survives_accept_reselection_and_releases_on_discard() {
+        let workspace_root = tempfile::tempdir().unwrap();
+        let workspace = NormalizedAbsolutePath::new(workspace_root.path().to_path_buf()).unwrap();
+        let materializer = RepositoryMaterializer::new(workspace.clone());
+        let spec = || RepoSpec {
+            rule_id: RepoRuleId {
+                bzl_file: CanonicalLabel::parse("@@extension+repo//:defs.bzl").unwrap(),
+                rule_name: "generated_repository".into(),
+            },
+            attributes: Arc::default(),
+        };
+        let source_request = native_request(
+            &workspace,
+            "source",
+            spec(),
+            RepositoryMaterializationKind::GeneratedFileEffects(generated_plan([(
+                "source.bzl",
+                b"filegroup(name='linked')\n" as &[u8],
+                false,
+            )])),
+        );
+        let token = begin_empty(&materializer);
+        materializer
+            .materialize_native(
+                token,
+                source_request.clone(),
+                RepositoryMaterializationGeneration(1),
+            )
+            .unwrap();
+        let (source_root, source_instance) = immutable_result(&materializer, "source");
+        let link_request = native_request(
+            &workspace,
+            "linked",
+            spec(),
+            RepositoryMaterializationKind::GeneratedFileEffects(generated_symlink_plan(
+                "BUILD.bazel",
+                &source_root.join("source.bzl"),
+                PathObservationNamespace::Materialization(source_instance),
+                b"filegroup(name='linked')\n",
+            )),
+        );
+        materializer
+            .materialize_native(
+                token,
+                link_request.clone(),
+                RepositoryMaterializationGeneration(1),
+            )
+            .unwrap();
+        let (linked_root, _) = immutable_result(&materializer, "linked");
+        let link = linked_root.join("BUILD.bazel");
+        assert!(
+            std::fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        materializer
+            .accept(
+                token,
+                &[source_request.clone(), link_request.clone()],
+                Vec::new(),
+            )
+            .unwrap();
+        assert_eq!(std::fs::read(&link).unwrap(), b"filegroup(name='linked')\n");
+
+        let token = materializer.begin().unwrap();
+        materializer
+            .preflight_native(token, std::iter::empty())
+            .unwrap();
+        let next_instance = materializer.state.lock().unwrap().next_instance;
+        materializer
+            .materialize_native(
+                token,
+                link_request.clone(),
+                RepositoryMaterializationGeneration(2),
+            )
+            .unwrap();
+        assert_eq!(
+            materializer.state.lock().unwrap().next_instance,
+            next_instance
+        );
+        materializer
+            .accept(token, std::slice::from_ref(&link_request), Vec::new())
+            .unwrap();
+        assert!(source_root.exists(), "accepted source root was released");
+        assert_eq!(std::fs::read(&link).unwrap(), b"filegroup(name='linked')\n");
+
+        let token = begin_empty(&materializer);
+        let provisional_source = native_request(
+            &workspace,
+            "provisional_source",
+            spec(),
+            RepositoryMaterializationKind::GeneratedFileEffects(generated_plan([(
+                "source.bzl",
+                b"provisional" as &[u8],
+                false,
+            )])),
+        );
+        materializer
+            .materialize_native(
+                token,
+                provisional_source,
+                RepositoryMaterializationGeneration(3),
+            )
+            .unwrap();
+        let (provisional_root, provisional_instance) =
+            immutable_result(&materializer, "provisional_source");
+        let provisional_link = native_request(
+            &workspace,
+            "provisional_link",
+            spec(),
+            RepositoryMaterializationKind::GeneratedFileEffects(generated_symlink_plan(
+                "BUILD.bazel",
+                &provisional_root.join("source.bzl"),
+                PathObservationNamespace::Materialization(provisional_instance),
+                b"provisional",
+            )),
+        );
+        materializer
+            .materialize_native(
+                token,
+                provisional_link,
+                RepositoryMaterializationGeneration(3),
+            )
+            .unwrap();
+        let (provisional_link_root, _) = immutable_result(&materializer, "provisional_link");
+        assert_eq!(
+            std::fs::read(provisional_link_root.join("BUILD.bazel")).unwrap(),
+            b"provisional"
+        );
+        materializer.discard(token).unwrap();
+        assert!(!provisional_root.exists());
+        assert!(!provisional_link_root.exists());
+        assert_eq!(std::fs::read(&link).unwrap(), b"filegroup(name='linked')\n");
+        drop(materializer);
+        assert!(!source_root.exists());
+        assert!(!linked_root.exists());
     }
 
     #[test]

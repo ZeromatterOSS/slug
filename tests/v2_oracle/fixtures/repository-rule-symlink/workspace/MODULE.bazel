@@ -1,0 +1,7 @@
+module(name = "symlink_probe", version = "0.1.0")
+
+bazel_dep(name = "source", version = "1.0.0")
+local_path_override(module_name = "source", path = "modules/source")
+
+linked_repo = use_repo_rule("//:repo.bzl", "linked_repo")
+linked_repo(name = "linked")

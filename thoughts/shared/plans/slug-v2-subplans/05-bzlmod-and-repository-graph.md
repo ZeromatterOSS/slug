@@ -525,6 +525,21 @@ builtin routes project no admitted metadata; no new key, source read or
 retained owner is introduced. Public nonregistry package-loading parity is
 not claimed by this route proof.
 
+### Ordered generated symlink effect accepted (WP837, 2026-09-24)
+
+The selected repository-rule plan retains a distinct ordered Symlink effect:
+safe relative destination, immutable external Label path/namespace and
+DICE-observed source bytes. Structural equality and a separate
+domain-separated Slug source association include all three; File/Archive
+domains and prior exact slices remain unchanged. The builder rejects
+cross-kind duplicate/ancestor destinations and symlink/archive mixtures.
+Core's provisional writer creates a real Unix link without pre-deleting a
+destination, rejects symlinked ancestors, and publishes only accepted roots.
+Accepted source roots remain live across reselection; discard and runtime
+teardown release provisional and retained roots. Focused builder, Core
+lifecycle, and fresh Bazel/Slug linked-BUILD evidence pass. Full C++/root
+bootstrap remains open.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

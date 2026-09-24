@@ -17,6 +17,8 @@ use compact_str::CompactString;
 use starlark_map::small_set::SmallSet;
 use url::Url;
 
+use crate::repository_label_path::HostRepositoryLabelPathValue;
+
 const MAX_ARCHIVES: usize = 6;
 const MAX_ARCHIVE_URLS: usize = 8;
 const MAX_ARCHIVE_URL_BYTES: usize = 2048;
@@ -44,6 +46,30 @@ impl GeneratedRepositoryFileEffect {
 
     pub fn executable(&self) -> bool {
         self.executable
+    }
+}
+
+/// One selected external Label source linked at a normalized repository-relative
+/// destination. Observed source bytes participate in structural plan identity.
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct GeneratedRepositorySymlinkEffect {
+    path: CompactString,
+    source: HostRepositoryLabelPathValue,
+    content: Arc<[u8]>,
+}
+
+impl GeneratedRepositorySymlinkEffect {
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub fn source(&self) -> &HostRepositoryLabelPathValue {
+        &self.source
+    }
+
+    pub fn content(&self) -> &[u8] {
+        &self.content
     }
 }
 
@@ -131,6 +157,7 @@ pub fn generated_repository_archive_sha256_sri(sha256: [u8; 32]) -> String {
 enum GeneratedRepositoryOrderItem {
     File(usize),
     Archive(GeneratedRepositoryArchiveEffect),
+    Symlink(GeneratedRepositorySymlinkEffect),
 }
 
 /// A borrowed effect in invocation order; file bytes remain owned only by the
@@ -140,6 +167,7 @@ enum GeneratedRepositoryOrderItem {
 pub enum GeneratedRepositoryOrderedEffectRef<'a> {
     File(&'a GeneratedRepositoryFileEffect),
     Archive(&'a GeneratedRepositoryArchiveEffect),
+    Symlink(&'a GeneratedRepositorySymlinkEffect),
 }
 
 /// Ordered, structural output of one selected repository-rule invocation.
@@ -163,6 +191,9 @@ impl GeneratedRepositoryFileEffectPlan {
             GeneratedRepositoryOrderItem::Archive(archive) => {
                 GeneratedRepositoryOrderedEffectRef::Archive(archive)
             }
+            GeneratedRepositoryOrderItem::Symlink(symlink) => {
+                GeneratedRepositoryOrderedEffectRef::Symlink(symlink)
+            }
         })
     }
 
@@ -177,6 +208,12 @@ impl GeneratedRepositoryFileEffectPlan {
         self.order
             .iter()
             .any(|item| matches!(item, GeneratedRepositoryOrderItem::Archive(_)))
+    }
+
+    pub fn has_symlinks(&self) -> bool {
+        self.order
+            .iter()
+            .any(|item| matches!(item, GeneratedRepositoryOrderItem::Symlink(_)))
     }
 
     pub fn builder() -> GeneratedRepositoryFileEffectPlanBuilder {
@@ -194,6 +231,8 @@ impl GeneratedRepositoryFileEffectPlan {
 pub enum GeneratedRepositoryFileEffectPlanError {
     InvalidPath(CompactString),
     RepeatedPath(CompactString),
+    ConflictingPath(CompactString),
+    SymlinkArchiveMix,
     TooManyArchives,
     EmptyArchiveUrls,
     TooManyArchiveUrls,
@@ -232,9 +271,15 @@ impl GeneratedRepositoryFileEffectPlanBuilder {
         if !valid_path(&path) {
             return Err(GeneratedRepositoryFileEffectPlanError::InvalidPath(path));
         }
-        if !self.seen.insert(path.clone()) {
+        if self.seen.contains(&path) {
             return Err(GeneratedRepositoryFileEffectPlanError::RepeatedPath(path));
         }
+        if self.order.iter().any(|item| {
+            matches!(item, GeneratedRepositoryOrderItem::Symlink(symlink) if paths_conflict(&path, symlink.path()))
+        }) {
+            return Err(GeneratedRepositoryFileEffectPlanError::ConflictingPath(path));
+        }
+        self.seen.insert(path.clone());
         self.order
             .push(GeneratedRepositoryOrderItem::File(self.files.len()));
         self.files.push(GeneratedRepositoryFileEffect {
@@ -245,12 +290,52 @@ impl GeneratedRepositoryFileEffectPlanBuilder {
         Ok(())
     }
 
+    pub fn push_symlink(
+        &mut self,
+        path: CompactString,
+        source: HostRepositoryLabelPathValue,
+        content: Arc<[u8]>,
+    ) -> Result<(), GeneratedRepositoryFileEffectPlanError> {
+        if !valid_path(&path) {
+            return Err(GeneratedRepositoryFileEffectPlanError::InvalidPath(path));
+        }
+        if self.seen.contains(&path) {
+            return Err(GeneratedRepositoryFileEffectPlanError::RepeatedPath(path));
+        }
+        if self.archive_count != 0 {
+            return Err(GeneratedRepositoryFileEffectPlanError::SymlinkArchiveMix);
+        }
+        if self.files.iter().any(|file| paths_conflict(&path, file.path()))
+            || self.order.iter().any(|item| {
+                matches!(item, GeneratedRepositoryOrderItem::Symlink(symlink) if paths_conflict(&path, symlink.path()))
+            })
+        {
+            return Err(GeneratedRepositoryFileEffectPlanError::ConflictingPath(path));
+        }
+        self.seen.insert(path.clone());
+        self.order.push(GeneratedRepositoryOrderItem::Symlink(
+            GeneratedRepositorySymlinkEffect {
+                path,
+                source,
+                content,
+            },
+        ));
+        Ok(())
+    }
+
     pub fn push_archive(
         &mut self,
         urls: Arc<[CompactString]>,
         sha256: [u8; 32],
         strip_prefix: CompactString,
     ) -> Result<(), GeneratedRepositoryFileEffectPlanError> {
+        if self
+            .order
+            .iter()
+            .any(|item| matches!(item, GeneratedRepositoryOrderItem::Symlink(_)))
+        {
+            return Err(GeneratedRepositoryFileEffectPlanError::SymlinkArchiveMix);
+        }
         if self.archive_count == MAX_ARCHIVES {
             return Err(GeneratedRepositoryFileEffectPlanError::TooManyArchives);
         }
@@ -322,6 +407,16 @@ fn valid_path(path: &str) -> bool {
             .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
 }
 
+fn paths_conflict(left: &str, right: &str) -> bool {
+    left == right
+        || left
+            .strip_prefix(right)
+            .is_some_and(|remainder| remainder.starts_with('/'))
+        || right
+            .strip_prefix(left)
+            .is_some_and(|remainder| remainder.starts_with('/'))
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::hash_map::DefaultHasher;
@@ -330,6 +425,9 @@ mod tests {
     use std::sync::Arc;
 
     use compact_str::CompactString;
+    use slug_workspace_v2::NormalizedAbsolutePath;
+    use slug_workspace_v2::PathObservationInstanceId;
+    use slug_workspace_v2::PathObservationNamespace;
 
     use super::GeneratedRepositoryArchiveFormat;
     use super::GeneratedRepositoryArchiveOutput;
@@ -338,6 +436,32 @@ mod tests {
     use super::GeneratedRepositoryOrderedEffectRef;
     use super::generated_repository_archive_sha256_hex;
     use super::generated_repository_archive_sha256_sri;
+    use crate::repository_label_path::HostRepositoryLabelPathValue;
+
+    fn source(path: &str, instance: u64) -> HostRepositoryLabelPathValue {
+        HostRepositoryLabelPathValue::new(
+            NormalizedAbsolutePath::new(path).unwrap(),
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(instance)),
+        )
+        .unwrap()
+    }
+
+    fn symlink_plan(
+        destination: &str,
+        source_path: &str,
+        instance: u64,
+        content: &'static [u8],
+    ) -> GeneratedRepositoryFileEffectPlan {
+        let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+        builder
+            .push_symlink(
+                destination.into(),
+                source(source_path, instance),
+                Arc::from(content),
+            )
+            .unwrap();
+        builder.finish()
+    }
 
     fn urls(values: &[&str]) -> Arc<[CompactString]> {
         values
@@ -428,6 +552,213 @@ mod tests {
             ]),
             Err(GeneratedRepositoryFileEffectPlanError::RepeatedPath(path)) if path == "a"
         ));
+    }
+
+    #[test]
+    fn symlink_effect_preserves_order_source_and_bytes_in_structural_identity() {
+        let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+        builder
+            .push(
+                "BUILD.bazel".into(),
+                Arc::from(&b"exports_files([])"[..]),
+                false,
+            )
+            .unwrap();
+        builder
+            .push_symlink(
+                "nested/source.bzl".into(),
+                source("/source-a/config.bzl", 7),
+                Arc::from(&b"source A"[..]),
+            )
+            .unwrap();
+        builder
+            .push("last.txt".into(), Arc::from(&b"last"[..]), false)
+            .unwrap();
+        let plan = builder.finish();
+        assert!(plan.has_symlinks());
+        assert!(!plan.has_archives());
+        assert_eq!(plan.effects().len(), 2);
+        let mut ordered = plan.ordered_effects();
+        assert!(
+            matches!(ordered.next(), Some(GeneratedRepositoryOrderedEffectRef::File(file)) if file.path() == "BUILD.bazel")
+        );
+        let Some(GeneratedRepositoryOrderedEffectRef::Symlink(link)) = ordered.next() else {
+            panic!("second effect should be a symlink");
+        };
+        assert_eq!(link.path(), "nested/source.bzl");
+        assert_eq!(link.source(), &source("/source-a/config.bzl", 7));
+        assert_eq!(link.content(), b"source A");
+        assert!(
+            matches!(ordered.next(), Some(GeneratedRepositoryOrderedEffectRef::File(file)) if file.path() == "last.txt")
+        );
+        assert!(ordered.next().is_none());
+
+        let base = symlink_plan("link.bzl", "/source-a/config.bzl", 7, b"source A");
+        assert_eq!(
+            base,
+            symlink_plan("link.bzl", "/source-a/config.bzl", 7, b"source A")
+        );
+        for changed in [
+            symlink_plan("other.bzl", "/source-a/config.bzl", 7, b"source A"),
+            symlink_plan("link.bzl", "/source-b/config.bzl", 7, b"source A"),
+            symlink_plan("link.bzl", "/source-a/config.bzl", 8, b"source A"),
+            symlink_plan("link.bzl", "/source-a/config.bzl", 7, b"source B"),
+        ] {
+            assert_ne!(base, changed);
+            let mut original_hash = DefaultHasher::new();
+            base.hash(&mut original_hash);
+            let mut changed_hash = DefaultHasher::new();
+            changed.hash(&mut changed_hash);
+            assert_ne!(original_hash.finish(), changed_hash.finish());
+        }
+        let mut file_then_link = GeneratedRepositoryFileEffectPlan::builder();
+        file_then_link
+            .push("BUILD.bazel".into(), Arc::from(&b"file"[..]), false)
+            .unwrap();
+        file_then_link
+            .push_symlink(
+                "link.bzl".into(),
+                source("/source-a/config.bzl", 7),
+                Arc::from(&b"source A"[..]),
+            )
+            .unwrap();
+        let mut link_then_file = GeneratedRepositoryFileEffectPlan::builder();
+        link_then_file
+            .push_symlink(
+                "link.bzl".into(),
+                source("/source-a/config.bzl", 7),
+                Arc::from(&b"source A"[..]),
+            )
+            .unwrap();
+        link_then_file
+            .push("BUILD.bazel".into(), Arc::from(&b"file"[..]), false)
+            .unwrap();
+        assert_ne!(file_then_link.finish(), link_then_file.finish());
+    }
+
+    #[test]
+    fn symlink_builder_rejects_invalid_duplicate_ancestor_and_archive_mixtures() {
+        for invalid in ["", "/absolute", "a/../b", "a//b", "a\\b", "a/"] {
+            let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+            assert!(matches!(
+                builder.push_symlink(
+                    invalid.into(),
+                    source("/source/config.bzl", 1),
+                    Arc::from(&b"x"[..]),
+                ),
+                Err(GeneratedRepositoryFileEffectPlanError::InvalidPath(_))
+            ));
+            assert!(!builder.finish().has_symlinks());
+        }
+        for (first_is_symlink, first, second) in [
+            (false, "a", "a"),
+            (true, "a", "a"),
+            (false, "a", "a/b"),
+            (true, "a", "a/b"),
+            (false, "a/b", "a"),
+            (true, "a/b", "a"),
+        ] {
+            let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+            if first_is_symlink {
+                builder
+                    .push_symlink(
+                        first.into(),
+                        source("/source/config.bzl", 1),
+                        Arc::from(&b"x"[..]),
+                    )
+                    .unwrap();
+            } else {
+                builder
+                    .push(first.into(), Arc::from(&b"x"[..]), false)
+                    .unwrap();
+            }
+            let result = if first_is_symlink {
+                builder.push(second.into(), Arc::from(&b"y"[..]), false)
+            } else {
+                builder.push_symlink(
+                    second.into(),
+                    source("/source/config.bzl", 1),
+                    Arc::from(&b"y"[..]),
+                )
+            };
+            assert_eq!(
+                result,
+                Err(if first == second {
+                    GeneratedRepositoryFileEffectPlanError::RepeatedPath(second.into())
+                } else {
+                    GeneratedRepositoryFileEffectPlanError::ConflictingPath(second.into())
+                })
+            );
+            let plan = builder.finish();
+            assert_eq!(plan.ordered_effects().count(), 1);
+        }
+        for (first, second) in [("a", "a"), ("a", "a/b"), ("a/b", "a")] {
+            let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+            builder
+                .push_symlink(
+                    first.into(),
+                    source("/source/config.bzl", 1),
+                    Arc::from(&b"x"[..]),
+                )
+                .unwrap();
+            assert_eq!(
+                builder.push_symlink(
+                    second.into(),
+                    source("/source/other.bzl", 1),
+                    Arc::from(&b"y"[..]),
+                ),
+                Err(if first == second {
+                    GeneratedRepositoryFileEffectPlanError::RepeatedPath(second.into())
+                } else {
+                    GeneratedRepositoryFileEffectPlanError::ConflictingPath(second.into())
+                })
+            );
+            assert_eq!(builder.finish().ordered_effects().count(), 1);
+        }
+        let mut sibling = GeneratedRepositoryFileEffectPlan::builder();
+        sibling
+            .push("a/b".into(), Arc::from(&b"x"[..]), false)
+            .unwrap();
+        sibling
+            .push_symlink(
+                "a/bc".into(),
+                source("/source/config.bzl", 1),
+                Arc::from(&b"y"[..]),
+            )
+            .unwrap();
+        assert_eq!(sibling.finish().ordered_effects().count(), 2);
+
+        let mut archive_first = GeneratedRepositoryFileEffectPlan::builder();
+        archive_first
+            .push_archive(urls(&["file:///tmp/rustc.tar.xz"]), [1; 32], "rustc".into())
+            .unwrap();
+        assert_eq!(
+            archive_first.push_symlink(
+                "link.bzl".into(),
+                source("/source/config.bzl", 1),
+                Arc::from(&b"x"[..]),
+            ),
+            Err(GeneratedRepositoryFileEffectPlanError::SymlinkArchiveMix)
+        );
+        assert!(!archive_first.finish().has_symlinks());
+
+        let mut symlink_first = GeneratedRepositoryFileEffectPlan::builder();
+        symlink_first
+            .push_symlink(
+                "link.bzl".into(),
+                source("/source/config.bzl", 1),
+                Arc::from(&b"x"[..]),
+            )
+            .unwrap();
+        assert_eq!(
+            symlink_first.push_archive(
+                urls(&["file:///tmp/rustc.tar.xz"]),
+                [1; 32],
+                "rustc".into(),
+            ),
+            Err(GeneratedRepositoryFileEffectPlanError::SymlinkArchiveMix)
+        );
+        assert_eq!(symlink_first.finish().archive_count(), 0);
     }
 
     #[test]

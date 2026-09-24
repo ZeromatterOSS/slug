@@ -9790,3 +9790,15 @@ and source dependencies are unchanged. Focused root/external A/B/A and
 negative tests, WP813 native-alias controls and a two-row Bazel/Slug Query
 fixture pass. The authentic build advances to a separate generated
 `rules_java` non-`config_setting` stop; full bootstrap remains open.
+
+### Generated repository symlink call accepted (WP837, 2026-09-24)
+
+Selected `repository_ctx.symlink` accepts the authentic Unix external
+Label-derived path object and safe relative string destination, replaying
+path-then-source Needs before recording an ordered effect. Direct String/Label,
+root/generated/host path sources and unsafe destinations fail closed. The
+existing selected owner observes source bytes through DICE; a focused test
+proves warm reuse, source-byte A→B→A and materialization-route changes. The
+one-row Bazel 9.2/Slug generated-BUILD fixture passes. Other source/destination
+forms, dangling and directory links, Windows behavior and full Build remain
+deferred.
