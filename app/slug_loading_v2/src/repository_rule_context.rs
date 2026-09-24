@@ -1648,6 +1648,65 @@ def implementation(ctx):
     }
 
     #[test]
+    fn private_repository_label_list_exposes_ordered_default_and_override() {
+        let declaration: Arc<[RepositoryRuleAttribute]> = [schema(
+            "_capabilities_templates",
+            AttributeKind::LabelList,
+            false,
+            Some(CoercedAttributeValue::LabelList(Arc::from([
+                CanonicalLabel::parse("@@rules_kotlin+//kotlin:legacy.tpl").unwrap(),
+                CanonicalLabel::parse("@@rules_kotlin+//kotlin:new.tpl").unwrap(),
+            ]))),
+        )]
+        .into();
+        let default_input = RepositoryRuleInvocationInput::new(
+            "generated".into(),
+            None,
+            Arc::new(SmallMap::new()),
+            declaration.clone(),
+        )
+        .unwrap();
+        invoke_input(
+            r#"def implementation(ctx):
+    templates = ctx.attr._capabilities_templates
+    if "_capabilities_templates" not in dir(ctx.attr): fail("private list reflection")
+    if [type(label) for label in templates] != ["Label", "Label"]: fail("private list types")
+    if [str(label) for label in templates] != ["@@rules_kotlin+//kotlin:legacy.tpl", "@@rules_kotlin+//kotlin:new.tpl"]: fail("private list default order")
+"#,
+            default_input,
+        )
+        .unwrap();
+
+        let override_input = RepositoryRuleInvocationInput::new(
+            "generated".into(),
+            None,
+            attributes([(
+                "_capabilities_templates".into(),
+                OverrideAttributeValue::Iterable(Arc::from([
+                    OverrideAttributeValue::Label(
+                        CanonicalLabel::parse("@@other+//kotlin:new.tpl").unwrap(),
+                    ),
+                    OverrideAttributeValue::Label(
+                        CanonicalLabel::parse("@@other+//kotlin:legacy.tpl").unwrap(),
+                    ),
+                ])),
+            )]),
+            declaration,
+        )
+        .unwrap();
+        invoke_input(
+            r#"def implementation(ctx):
+    templates = ctx.attr._capabilities_templates
+    if "_capabilities_templates" not in dir(ctx.attr): fail("private override reflection")
+    if [type(label) for label in templates] != ["Label", "Label"]: fail("private override types")
+    if [str(label) for label in templates] != ["@@other+//kotlin:new.tpl", "@@other+//kotlin:legacy.tpl"]: fail("private list override order")
+"#,
+            override_input,
+        )
+        .unwrap();
+    }
+
+    #[test]
     fn repository_context_projects_all_declared_default_kinds_and_order() {
         let label_z = CanonicalLabel::parse("@@dep+//pkg:z").unwrap();
         let label_a = CanonicalLabel::parse("@@dep+//pkg:a").unwrap();

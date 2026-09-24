@@ -9170,10 +9170,10 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 "repository_rule",
             )?;
             if (name.starts_with('_')
-                && !matches!(
+                && (!matches!(
                     definition.kind,
-                    AttributeKind::String | AttributeKind::Label
-                ))
+                    AttributeKind::String | AttributeKind::Label | AttributeKind::LabelList
+                ) || definition.attached_aspect.is_some()))
                 || definition.configurable_set
                 || definition.late_bound_default.is_some()
                 || definition.computed_default.is_some()

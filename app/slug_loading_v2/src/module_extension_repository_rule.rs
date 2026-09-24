@@ -492,11 +492,11 @@ mod tests {
     use crate::package::loading_globals;
     use crate::provider::BzlEvaluationContext;
 
-    fn load(source: &str) -> Result<FrozenModule, String> {
-        let ast = AstModule::parse("//:ext.bzl", source.to_owned(), &Dialect::Standard)
+    fn load_at(source_label: &str, source: &str) -> Result<FrozenModule, String> {
+        let ast = AstModule::parse(source_label, source.to_owned(), &Dialect::Standard)
             .map_err(|error| error.to_string())?;
         let module = Module::new();
-        let context = BzlEvaluationContext::new("//:ext.bzl");
+        let context = BzlEvaluationContext::new(source_label);
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&context);
         evaluator
@@ -504,6 +504,10 @@ mod tests {
             .map_err(|error| error.to_string())?;
         drop(evaluator);
         module.freeze().map_err(|error| format!("{error:?}"))
+    }
+
+    fn load(source: &str) -> Result<FrozenModule, String> {
+        load_at("//:ext.bzl", source)
     }
 
     fn evaluate_build(source: &str) -> Result<(), String> {
@@ -1043,6 +1047,107 @@ def run(tool):
     }
 
     #[test]
+    fn private_repository_label_list_dict_values_preserve_order_source_and_identity() {
+        const SOURCE_LABEL: &str =
+            "@@rules_kotlin+//src/main/starlark/core/repositories:compiler.bzl";
+        const PACKAGE: &str = "//src/main/starlark/core/repositories/kotlin:";
+        const FILES: [&str; 8] = [
+            "capabilities_legacy.bzl.com_github_jetbrains_kotlin.bazel",
+            "capabilities_1.4.bzl.com_github_jetbrains_kotlin.bazel",
+            "capabilities_1.5.bzl.com_github_jetbrains_kotlin.bazel",
+            "capabilities_1.6.bzl.com_github_jetbrains_kotlin.bazel",
+            "capabilities_1.7.bzl.com_github_jetbrains_kotlin.bazel",
+            "capabilities_1.8.bzl.com_github_jetbrains_kotlin.bazel",
+            "capabilities_1.9.bzl.com_github_jetbrains_kotlin.bazel",
+            "capabilities_2.0.bzl.com_github_jetbrains_kotlin.bazel",
+        ];
+        const VERSIONS: [&str; 8] = ["legacy", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "2.0"];
+        let source = |files: &[&str; 8]| {
+            let entries = VERSIONS
+                .iter()
+                .zip(files)
+                .map(|(version, file)| format!("    \"{version}\": \"{PACKAGE}{file}\",\n"))
+                .collect::<String>();
+            format!(
+                r#"_CAPABILITIES_TEMPLATES = {{
+{entries}}}
+def impl(ctx): pass
+repo = repository_rule(impl, attrs = {{
+    "_capabilities_templates": attr.label_list(default = _CAPABILITIES_TEMPLATES.values()),
+    "_relative": attr.label_list(default = (":local", "//:root")),
+}})
+def run():
+    repo(name = "omitted")
+    repo(name = "concrete", _capabilities_templates = [":override", "//:other"])
+"#
+            )
+        };
+        let original = source(&FILES);
+        let loaded = load_at(SOURCE_LABEL, &original).unwrap();
+        let definition = projection(&loaded, "repo");
+        assert_eq!(definition.defining_label.to_string(), SOURCE_LABEL);
+        assert_eq!(definition.attributes.len(), 2);
+        let attribute = &definition.attributes[0];
+        assert_eq!(attribute.name, "_capabilities_templates");
+        assert_eq!(attribute.kind, AttributeKind::LabelList);
+        let Some(CoercedAttributeValue::LabelList(defaults)) = &attribute.default else {
+            panic!("private label-list default must remain typed after freeze");
+        };
+        let expected = FILES
+            .iter()
+            .map(|file| format!("@@rules_kotlin+{PACKAGE}{file}"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            defaults.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            expected
+        );
+        assert_eq!(definition.attributes[1].name, "_relative");
+        let Some(CoercedAttributeValue::LabelList(relative)) = &definition.attributes[1].default
+        else {
+            panic!("relative label-list default must remain typed after freeze");
+        };
+        assert_eq!(
+            relative.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            [
+                "@@rules_kotlin+//src/main/starlark/core/repositories:local",
+                "@@rules_kotlin+//:root",
+            ]
+        );
+
+        let (result, calls) = invoke(&loaded, "run", |_| Vec::new());
+        assert_eq!(result.unwrap(), "None");
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0].definition, definition);
+        assert_eq!(calls[1].definition, definition);
+        assert!(Arc::ptr_eq(
+            &calls[0].definition.attributes,
+            &definition.attributes
+        ));
+        assert_eq!(calls[0].kwargs.len(), 1, "omission is not a call override");
+        assert_eq!(
+            calls[1].kwargs[1],
+            (
+                "_capabilities_templates".into(),
+                RepositoryRuleCallValue::Sequence(Arc::from([
+                    RepositoryRuleCallValue::String(":override".into()),
+                    RepositoryRuleCallValue::String("//:other".into()),
+                ]))
+            )
+        );
+
+        let mut reordered = FILES;
+        reordered.swap(0, 1);
+        let mut changed = FILES;
+        changed[7] = "capabilities_future.bzl.com_github_jetbrains_kotlin.bazel";
+        let reordered = projection(&load_at(SOURCE_LABEL, &source(&reordered)).unwrap(), "repo");
+        let changed = projection(&load_at(SOURCE_LABEL, &source(&changed)).unwrap(), "repo");
+        let restored = projection(&load_at(SOURCE_LABEL, &original).unwrap(), "repo");
+        assert_ne!(definition, reordered, "default order is semantic");
+        assert_ne!(definition, changed, "default elements are semantic");
+        assert_eq!(definition, restored, "A/B/A restores definition identity");
+    }
+
+    #[test]
     fn definition_surface_accepts_metadata_and_rejects_deferred_families() {
         for source in [
             "def impl(ctx): pass\nr=repository_rule(impl)\n",
@@ -1124,8 +1229,20 @@ def run(tool):
                 "unsupported repository_rule attribute schema",
             ),
             (
-                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'_private':attr.label_list()})\n",
+                "def impl(ctx): pass\ndef aspect_impl(target, ctx): return []\na=aspect(implementation=aspect_impl)\nr=repository_rule(impl, attrs={'_private':attr.label_list(aspects=[a])})\n",
                 "unsupported repository_rule attribute schema",
+            ),
+            (
+                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'_private':attr.label_list(default={'one':':one'})})\n",
+                "attribute must be a list of labels",
+            ),
+            (
+                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'_private':attr.label_list(default=[42])})\n",
+                "attribute `label list` must be a string",
+            ),
+            (
+                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'_private':attr.label_list(default=['//:bad:name'])})\n",
+                "bad:name",
             ),
             (
                 "def impl(ctx): pass\nr=repository_rule(impl, attrs={'x':attr.string(configurable=False)})\n",

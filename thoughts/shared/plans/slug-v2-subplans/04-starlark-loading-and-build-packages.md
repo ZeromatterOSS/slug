@@ -9315,3 +9315,22 @@ instance barriers. The rebuilt authentic build passed the old
 `compiler.bzl:67` with unsupported repository-rule attribute schema
 `_capabilities_templates`. Repository-rule schema admission, provider
 instances/configured Kotlin behavior and M7A close remain separate work.
+
+### Private repository-rule label-list defaults accepted (2026-09-24)
+
+WP806 admits the authenticated rules_kotlin 1.9.6
+`_capabilities_templates: attr.label_list(default = _CAPABILITIES_TEMPLATES.values())`
+private repository-rule schema. Pinned Bazel 9.2 source and an offline oracle
+establish ordered, defining-`.bzl`-package label defaults from `dict.values()`;
+bad element types, invalid labels and a raw dictionary fail at declaration.
+The existing typed `CoercedAttributeValue::LabelList` default and immutable
+`RepositoryRuleDefinitionProjection` own structural identity, while
+`repository_ctx.attr` exposes default or explicit override as ordered Labels.
+The sole new declaration gate admits private `LabelList` and rejects its
+unretained attached aspect; other deferred private kinds and schema guards
+remain closed. Bazel's native `$name` representation and cross-repository
+caller mapping are not claimed exact. Source-shaped eight-label, frozen
+identity, A/B/A, context and negative tests pass; the rebuilt authentic
+build clears the schema stop and reaches separate unsupported
+`repository_ctx.template` effects. Full repository execution, configured
+Kotlin behavior and M7A close remain deferred.

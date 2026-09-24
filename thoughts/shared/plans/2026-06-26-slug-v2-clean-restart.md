@@ -29,19 +29,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-105-m7a-exported-provider-constructor-dict-keys-r1
+Packet: WP-7-106-m7a-private-repository-label-list-default-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP805 admits Loading dictionary-key hash/equality for exported ordinary
-and initialized user-provider constructors, reusing the existing
-`ProviderId`; unexported and raw constructors remain unhashable. Pinned
-Bazel 9.2 source, authenticated rules_kotlin 1.9.6 `derive.info` usage and
-an offline scratch oracle distinguish the boundary. Five focused tests and
-the rebuilt authentic smoke passed the old hashability stop and reached a
-separate generated rules_kotlin `repository_rule` attribute-schema failure
-at row 55, with independent design/final reviews. Provider instances,
-special Bzl load-key contexts, configured Kotlin behavior and M7A close
-remain deferred. WP804 is accepted at `213e20ffb`.
+WP806 admits the authenticated rules_kotlin 1.9.6 private repository-rule
+`attr.label_list(default = _CAPABILITIES_TEMPLATES.values())` declaration.
+Bazel 9.2 source and a fresh offline oracle establish ordered, defining-Bzl-
+relative Label defaults. Slug reuses its typed default/projection owner and
+fails closed on unretained attached aspects. Six focused tests and the rebuilt
+authentic smoke passed the old schema stop and reached separate
+`repository_ctx.template` unsupported effects. Independent design/final
+reviews accepted the bounded Loading slice. Full repository effects,
+configured Kotlin behavior and M7A close remain deferred. WP805 is accepted
+at `6e3abc2ee`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
