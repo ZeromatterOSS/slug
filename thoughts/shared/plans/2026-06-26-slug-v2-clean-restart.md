@@ -29,28 +29,26 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-93-m7a-selected-extension-label-path-r1
-Status: accepted; independent design and FINAL review ACCEPT
+Packet: WP-7-94-m7a-selected-file-effect-fixture-download-input-r1
+Status: accepted; independent DESIGN and FINAL review ACCEPT
 
-WP793 targets selected `module_ctx.path(Label)` plus immediate lexical
-`dirname/get_child` for real observed root or non-generated,
-source-complete external package routes. An observed generated-owner
-preflight fails closed before any load-route recursion. A synchronous
-first call records the Label and replays
-the Starlark invocation after DICE route/package/materialization
-preparation; no partial effects or uncalled-prefetch dependencies may
-publish. Bazel 9's default path(Label) does not stat or watch the target.
-The authentic rules_rust `@rust_host_tools` Label names a generated
-repository whose rule needs unsupported `download_and_extract` before
-BUILD/sentinel creation. A fresh rebuilt CLI reaches the generated-Label
-refusal at that call without fabricating its root. Loading's 39 focused
-tests, three reused Core checks and four Bzlmod path checks pass;
-13 older repository-file-effect tests remain red from a pre-existing
-missing download-transaction fixture input, not this packet's path
-semantics. WP792 at `9016125f4` independently accepted
-tracked root-Label watches and passed both Cargo watches in a fresh
-CLI smoke. Generated host-tools execution, physical reads and generator
-execution remain separate M7A work.
+WP794 repairs the shared selected repository-file-effect test fixture's
+missing `SelectedExtensionDownloadTransaction` input. The unchanged
+suite previously passed 6/19 because its selected-owner certificate
+path reached the accepted download preflight without that input. An
+empty unauthorized transaction for the exact fixture workspace restores
+19/19, and WP793's selected-owner group still passes 39/39. Production
+semantics and compatibility classes do not change. Generated host-tools
+execution and M7A closure remain separate work.
+
+WP793 at `3e9a895a6` accepted bounded selected `module_ctx.path(Label)`
+for root/non-generated external packages, lexical dirname/get_child,
+owner-local replay and a generated-owner recursion guard. Loading's 39
+focused tests, three Core checks and four Bzlmod path checks passed.
+The fresh root CLI reaches generated `@rust_host_tools` Label refusal
+without fabricating its root. WP792 at `9016125f4` accepted tracked
+root-Label watches and passed both Cargo watches. Physical reads,
+generated repository execution and generator execution remain open.
 
 WP785 at `9931f6a2d` accepted bounded Linux `run_shell` execution through
 fresh NativeLink 1.7.1: one REAPI action, zero direct-local actions and exact

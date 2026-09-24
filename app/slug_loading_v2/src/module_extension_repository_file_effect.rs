@@ -1702,6 +1702,7 @@ mod tests {
     use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
     use slug_bzlmod_v2::RepositoryMaterializationSuccess;
     use slug_bzlmod_v2::RepositoryPlatform;
+    use slug_bzlmod_v2::SelectedExtensionDownloadTransaction;
     use slug_bzlmod_v2::SourcePreparationNeeds;
     use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
@@ -1747,6 +1748,9 @@ mod tests {
         data.data.set(RepositoryHostInputTransaction::new(
             snapshot.clone(),
             frontier.clone(),
+        ));
+        data.data.set(SelectedExtensionDownloadTransaction::empty(
+            workspace.dupe(),
         ));
         let mut updater = transaction.into_updater();
         updater
