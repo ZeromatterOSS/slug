@@ -84,6 +84,21 @@ route does not admit JDK BUILD Loading, configured Java toolchains or the full
 embedded-tools archive. The next authentic Loading stop belongs to Stage 4's
 Java `launcher` configuration-field semantics, not source materialization.
 
+WP833 extends that same immutable source owner with the selected seven-file
+Bazel 9.2 runtime `tools/python` package closure: upstream `BUILD.tools`
+becomes catalog `BUILD`, accompanied verbatim by its one local `.bzl` load
+and six exported files. Exact bytes, SHA-256, nonexecutable modes, sorted
+listings, parent-package exports and eight Loading target kinds are accepted;
+the catalog-derived route manifest remains Slug-native and changes with the
+new bytes. No new source key, filesystem observation, cache or DICE owner is
+introduced. Fourteen focused/protected tests and a direct rebuilt Slug Query
+pass. The broader embedded Python directory, separate runfiles package,
+configured Python semantics and complete root build remain deferred. The
+authentic `//:probe` first reports missing `module_version()` in
+`@@platforms//:BUILD:21`; parallel loading does not prove all rules_python
+paths completed. That next semantic stop belongs to Stage 4 Loading, not
+Stage 5 source ingress.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation

@@ -1,1 +1,2 @@
 * text=auto eol=lf
+app/slug_bzlmod_v2/builtin/bazel_tools/tools/python/BUILD whitespace=-blank-at-eof

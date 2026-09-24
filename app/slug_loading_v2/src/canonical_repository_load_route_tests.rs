@@ -1853,6 +1853,142 @@ compatibility=module_extension(implementation=impl)
     }
 
     #[tokio::test]
+    async fn builtin_python_package_load_preserves_selected_targets_and_parent_exports() {
+        // Bazel 9.2 tools/python/BUILD.tools is the embedded package source.
+        // Its eight rule rows are independently reported by Bazel query :all;
+        // the six exports are source targets in this same parent package.
+        let dice = builtin_graph_dice();
+        let module = builtin_graph_module();
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let mut tx = transaction(&dice, &module, EXTENSION_A, true, None).await;
+        let route = tx
+            .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+                workspace,
+                CanonicalRepoName::new("bazel_tools").unwrap(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(route)) = route else {
+            panic!("built-in Python route must complete: {route:?}")
+        };
+        let key = RepositoryPackageLoadObservationKey::new_canonical(
+            route.result().as_ref().as_ref().unwrap().input().clone(),
+            PackagePath::parse("tools/python").unwrap(),
+        );
+        let loaded = tx.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(loaded)) = loaded else {
+            panic!("built-in Python package must load: {loaded:?}")
+        };
+        assert!(loaded.observations().observations().is_empty());
+        let loaded = loaded.result().as_ref().as_ref().unwrap();
+        assert_eq!(
+            loaded.direct_load_roots[0].label,
+            CanonicalLabel::parse("@@bazel_tools//tools/python:python_version.bzl").unwrap()
+        );
+
+        let by_name = loaded
+            .targets
+            .iter()
+            .map(|target| (target.name.as_str(), target))
+            .collect::<BTreeMap<_, _>>();
+        let rule_names = by_name
+            .iter()
+            .filter_map(|(name, target)| {
+                (!matches!(target.kind, PackageTargetKind::ExportedFile)).then_some(*name)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            rule_names,
+            [
+                "PY2",
+                "PY3",
+                "autodetecting_toolchain",
+                "bzl_srcs",
+                "py2_interpreter_path",
+                "py3_interpreter_path",
+                "python_version",
+                "toolchain_type",
+            ]
+        );
+        assert!(matches!(
+            by_name["PY2"].kind,
+            PackageTargetKind::ConfigSetting { .. }
+        ));
+        assert!(matches!(
+            by_name["PY3"].kind,
+            PackageTargetKind::ConfigSetting { .. }
+        ));
+        assert_eq!(
+            by_name["python_version"]
+                .rule_capability()
+                .unwrap()
+                .rule_class
+                .as_str(),
+            "_python_version_flag"
+        );
+        assert!(matches!(
+            by_name["python_version"].kind,
+            PackageTargetKind::StarlarkRule(_)
+        ));
+        assert!(matches!(
+            by_name["toolchain_type"].kind,
+            PackageTargetKind::NativeToolchain(
+                crate::package::NativeToolchainTarget::ToolchainType
+            )
+        ));
+        for name in ["py2_interpreter_path", "py3_interpreter_path"] {
+            assert!(matches!(
+                by_name[name].kind,
+                PackageTargetKind::NativeToolchain(
+                    crate::package::NativeToolchainTarget::ConstraintSetting { .. }
+                )
+            ));
+        }
+        assert!(matches!(
+            &by_name["autodetecting_toolchain"].kind,
+            PackageTargetKind::Alias {
+                actual: crate::AliasActual::Visible(CoercedAttributeValue::Label(actual))
+            } if actual == &CanonicalLabel::parse(
+                "@@rules_python+//python:autodetecting_toolchain"
+            ).unwrap()
+        ));
+
+        let exports = by_name
+            .iter()
+            .filter_map(|(name, target)| {
+                matches!(target.kind, PackageTargetKind::ExportedFile)
+                    .then(|| format!("@@bazel_tools//tools/python:{name}"))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            exports,
+            [
+                "@@bazel_tools//tools/python:private/py_test_alias.bzl",
+                "@@bazel_tools//tools/python:python_bootstrap_template.txt",
+                "@@bazel_tools//tools/python:python_version.bzl",
+                "@@bazel_tools//tools/python:srcs_version.bzl",
+                "@@bazel_tools//tools/python:toolchain.bzl",
+                "@@bazel_tools//tools/python:utils.bzl",
+            ]
+        );
+        let PackageTargetKind::Filegroup { srcs, .. } = &by_name["bzl_srcs"].kind else {
+            panic!("Python bzl_srcs must be a filegroup")
+        };
+        let mut srcs = srcs.iter().map(ToString::to_string).collect::<Vec<_>>();
+        srcs.sort();
+        assert_eq!(
+            srcs,
+            [
+                "@@bazel_tools//tools/python:private/py_test_alias.bzl",
+                "@@bazel_tools//tools/python:python_version.bzl",
+                "@@bazel_tools//tools/python:srcs_version.bzl",
+                "@@bazel_tools//tools/python:toolchain.bzl",
+                "@@bazel_tools//tools/python:utils.bzl",
+            ]
+        );
+    }
+
+    #[tokio::test]
     async fn local_and_root_adapter_share_materialization_path_and_listing_owners() {
         const LOCAL_MODULE: &str = "module(name='bazel_tools')\nlocal_path_override(module_name='local', path='local')\nbazel_dep(name='local', version='1', repo_name='local_alias')\n";
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));

@@ -371,6 +371,41 @@ const FILES: &[(&str, &str, bool)] = &[
         false,
     ),
     (
+        "tools/python/BUILD",
+        "a9989e4f44dec38e493508e4db75419471f1f6fd87c532454d25921ba40ca79f",
+        false,
+    ),
+    (
+        "tools/python/private/py_test_alias.bzl",
+        "e16604aa92e5d4d82745f6353e41d1bab11992926f8d3a48bb15db25a1719b9b",
+        false,
+    ),
+    (
+        "tools/python/python_bootstrap_template.txt",
+        "b5146d4eb484e8e30905d9a51adae93a21c6f951f549ae9e043e266b0fb90c3b",
+        false,
+    ),
+    (
+        "tools/python/python_version.bzl",
+        "8568edfc1b408d4640be1f1b4f3f52136b1ac17d17f3f05cbfe218e3e9fe5e38",
+        false,
+    ),
+    (
+        "tools/python/srcs_version.bzl",
+        "95498780651a61714a1e8a08fef234d8d3860f5fac714f74ed02b40e1eae5b79",
+        false,
+    ),
+    (
+        "tools/python/toolchain.bzl",
+        "d9b9101682acde3cff1437ca31ab45631c4b94eb360b0ecfa3a2d72307d69ee4",
+        false,
+    ),
+    (
+        "tools/python/utils.bzl",
+        "e28cdc0fbf6e6a2f862c5afdf0561d5ba1d118b4bf56327c92d32bd681d92761",
+        false,
+    ),
+    (
         "tools/res/BUILD",
         "bef477365d864eab46fcfe73c635bafd11a7300e4e47c158abe20d269e07e8ac",
         false,
@@ -458,6 +493,23 @@ async fn runtime_jdk_build_uses_build_tools_bytes_not_source_tree_wrapper() {
 }
 
 #[tokio::test]
+async fn runtime_python_build_uses_build_tools_bytes_not_source_tree_wrapper() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let build = read(&dice, "tools/python/BUILD").await.unwrap();
+    assert_eq!(
+        hex::encode(build.sha256()),
+        "a9989e4f44dec38e493508e4db75419471f1f6fd87c532454d25921ba40ca79f"
+    );
+    // Bazel 9.2 source-tree tools/python/BUILD packages embedded_tools;
+    // the runtime archive renames BUILD.tools to tools/python/BUILD.
+    assert_ne!(
+        hex::encode(build.sha256()),
+        "30336493cac4de1e474ce11547afc0789fcdf084e13ac43340a6cf6e40f3be24"
+    );
+    assert!(!build.executable());
+}
+
+#[tokio::test]
 async fn invalid_wrong_kind_and_unsupported_catalog_are_distinct() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     for path in [
@@ -507,6 +559,23 @@ async fn invalid_wrong_kind_and_unsupported_catalog_are_distinct() {
         ));
     }
     for path in [
+        "tools/python/BUILD.tools",
+        "tools/python/runfiles/BUILD",
+        "tools/python/pywrapper_template.txt",
+    ] {
+        assert!(matches!(
+            read(&dice, path).await,
+            Err(BuiltinBazelToolsSourceFileError::UnsupportedCatalog { .. })
+        ));
+    }
+    assert!(matches!(
+        read(&dice, "tools/python/private").await,
+        Err(BuiltinBazelToolsSourceFileError::WrongKind {
+            actual: BuiltinBazelToolsSourceKind::Directory,
+            ..
+        })
+    ));
+    for path in [
         "tools/cpp/modules_tools/aggregate-ddi.exe",
         "tools/cpp/modules_tools/generate-modmap.exe",
     ] {
@@ -542,21 +611,25 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
     let sibling = read(&first_dice, "tools/cpp/modules_tools/BUILD")
         .await
         .unwrap();
+    let python = read(&first_dice, "tools/python/BUILD").await.unwrap();
     let restored = read(&first_dice, "tools/cpp/BUILD").await.unwrap();
     let independent_graph = read(&second_dice, "tools/cpp/BUILD").await.unwrap();
+    let independent_python = read(&second_dice, "tools/python/BUILD").await.unwrap();
     assert_eq!(first, restored);
     assert_eq!(first, independent_graph);
+    assert_eq!(python, independent_python);
     assert_ne!(first.sha256(), middle.sha256());
     assert_ne!(first.sha256(), sibling.sha256());
+    assert_ne!(python.sha256(), first.sha256());
 
     let identity = BuiltinBazelToolsSnapshot::CURRENT.route_identity();
     assert_eq!(identity.snapshot(), BuiltinBazelToolsSnapshot::Bazel9_2);
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
         if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-            "a68101afc04f6c48b65f432975245b69b3873792ca2a339b0375a59705e8b655"
+            "129fa30549446c3b0b8d90b0a21b8b3143225135e3b6ec82ea7de5cec0964c20"
         } else {
-            "de2a4424c8a43911b76ba2875446a30a40560af64cb4782cc582d1d3bbdaad7e"
+            "b0efdad2c5a0eedced946a68e0fb50708ecabc3e027fb4e84a67e8dc73b3c11d"
         }
     );
 }
@@ -582,6 +655,7 @@ fn embedded_catalog_paths_remain_exact_with_bazel_input_metadata() {
         "tools/cpp/modules_tools/BUILD.bazel",
         "tools/jdk/BUILD.bazel",
         "tools/launcher/BUILD.bazel",
+        "tools/python/BUILD.bazel",
         "tools/res/BUILD.bazel",
         "tools/test/BUILD.bazel",
     ];

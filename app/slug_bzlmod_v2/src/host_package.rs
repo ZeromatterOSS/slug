@@ -2975,6 +2975,18 @@ mod tests {
                 ExternalRepositoryPackageLookup::Package(HostBuildFileName::Build),
             ),
             (
+                "tools/python",
+                ExternalRepositoryPackageLookup::Package(HostBuildFileName::Build),
+            ),
+            (
+                "tools/python/private",
+                ExternalRepositoryPackageLookup::NoBuildFile,
+            ),
+            (
+                "tools/python/runfiles",
+                ExternalRepositoryPackageLookup::NoBuildFile,
+            ),
+            (
                 "missing/package",
                 ExternalRepositoryPackageLookup::NoBuildFile,
             ),
@@ -3010,7 +3022,12 @@ mod tests {
         assert!(observed_ignore.result().as_ref().is_ok());
         assert!(observed_ignore.observations().observations().is_empty());
 
-        for package in ["tools/test", "tools/cpp", "tools/cpp/modules_tools"] {
+        for package in [
+            "tools/test",
+            "tools/cpp",
+            "tools/cpp/modules_tools",
+            "tools/python",
+        ] {
             let SourcePreparationOutcome::Complete(Ok(observed_package)) = transaction
                 .compute(&ExternalRepositoryPackageLookupObservationKey(
                     builtin_external_key(package),
@@ -3030,6 +3047,25 @@ mod tests {
                 observed_package.observations().observations().is_empty(),
                 "package {package:?}"
             );
+        }
+        for package in ["tools/python/private", "tools/python/runfiles"] {
+            let SourcePreparationOutcome::Complete(Ok(observed_package)) = transaction
+                .compute(&ExternalRepositoryPackageLookupObservationKey(
+                    builtin_external_key(package),
+                ))
+                .await
+                .unwrap()
+            else {
+                panic!("observed built-in nonpackage must complete for {package}");
+            };
+            assert!(
+                matches!(
+                    observed_package.result().as_ref(),
+                    Ok(ExternalRepositoryPackageLookup::NoBuildFile)
+                ),
+                "package {package:?}"
+            );
+            assert!(observed_package.observations().observations().is_empty());
         }
     }
 

@@ -176,6 +176,9 @@ async fn canonical_builtin_subtree_uses_shared_boundary_and_listing_owners() {
         .map(|package| package.as_str())
         .collect::<Vec<_>>();
     assert!(packages.contains(&"tools/test"));
+    assert!(packages.contains(&"tools/python"));
+    assert!(!packages.contains(&"tools/python/private"));
+    assert!(!packages.contains(&"tools/python/runfiles"));
     assert!(observed.observations().observations().is_empty());
 }
 
@@ -770,9 +773,15 @@ async fn real_builtin_catalog_discovers_root_and_prefixed_package_sets() {
                 "src/tools/launcher",
                 "src/tools/launcher/util",
                 "tools",
+                "tools/build_defs/build_info",
+                "tools/build_defs/build_info/templates",
                 "tools/build_defs/cc",
                 "tools/build_defs/repo",
+                "tools/cpp",
+                "tools/cpp/modules_tools",
+                "tools/jdk",
                 "tools/launcher",
+                "tools/python",
                 "tools/res",
                 "tools/test",
             ],
@@ -781,13 +790,20 @@ async fn real_builtin_catalog_discovers_root_and_prefixed_package_sets() {
             "tools",
             vec![
                 "tools",
+                "tools/build_defs/build_info",
+                "tools/build_defs/build_info/templates",
                 "tools/build_defs/cc",
                 "tools/build_defs/repo",
+                "tools/cpp",
+                "tools/cpp/modules_tools",
+                "tools/jdk",
                 "tools/launcher",
+                "tools/python",
                 "tools/res",
                 "tools/test",
             ],
         ),
+        ("tools/python", vec!["tools/python"]),
     ] {
         let prefix = package(prefix);
         let SourcePreparationOutcome::Complete(outcome) = transaction

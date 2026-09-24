@@ -29,20 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-132-m7a-configured-feature-flag-info-r1
+Packet: WP-7-133-m7a-builtin-python-package-source-r1
 Status: ACCEPTED; M7A remains partial
 
-WP832 accepts Bazel 9.2's selected Starlark-created configured
-`config_common.FeatureFlagInfo` instance, direct typed provider publication
-and lookup, and provider-first `config_setting(flag_values)` matching,
-including native `label_flag` forwarding with requested-flag label
-canonicalization. Seventeen focused/protected tests and independent DESIGN
-and FINAL reviews pass. The authentic rules_python 1.7.0 `//:probe` replay
-no longer observed the prior `config_settings.bzl:172` constructor error and
-first reported missing `@@bazel_tools//tools/python` BUILD content; parallel
-package loading does not prove the constructor path executed. Native
-`config_feature_flag`, Starlark `config.label`, nested provider transport,
-full Python/root build and M7A remain open. WP831 is `0f5e698b7`.
+WP833 accepts the exact selected seven-file Bazel 9.2 runtime source/Loading
+slice for `@@bazel_tools//tools/python`, using Stage 5's immutable catalog
+and runtime `BUILD.tools`-to-BUILD mapping. Fourteen focused/protected tests
+and independent DESIGN/FINAL reviews pass; isolated exact-target Slug Query
+now resolves `python_version`. The authentic `//:probe` replay first reports
+missing `module_version()` in `@@platforms//:BUILD:21`, without proving every
+parallel rules_python path completed. The broader embedded Python archive,
+configured Python behavior, full root build and M7A remain open. WP832 is
+`e054b08f5`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

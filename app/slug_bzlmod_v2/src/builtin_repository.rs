@@ -540,6 +540,48 @@ const CATALOG: &[CatalogEntry] = &[
         executable: false,
     },
     CatalogEntry {
+        path: "tools/python/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/python/BUILD"),
+        expected_sha256: "a9989e4f44dec38e493508e4db75419471f1f6fd87c532454d25921ba40ca79f",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/python/private/py_test_alias.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/python/private/py_test_alias.bzl"),
+        expected_sha256: "e16604aa92e5d4d82745f6353e41d1bab11992926f8d3a48bb15db25a1719b9b",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/python/python_bootstrap_template.txt",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/python/python_bootstrap_template.txt"),
+        expected_sha256: "b5146d4eb484e8e30905d9a51adae93a21c6f951f549ae9e043e266b0fb90c3b",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/python/python_version.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/python/python_version.bzl"),
+        expected_sha256: "8568edfc1b408d4640be1f1b4f3f52136b1ac17d17f3f05cbfe218e3e9fe5e38",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/python/srcs_version.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/python/srcs_version.bzl"),
+        expected_sha256: "95498780651a61714a1e8a08fef234d8d3860f5fac714f74ed02b40e1eae5b79",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/python/toolchain.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/python/toolchain.bzl"),
+        expected_sha256: "d9b9101682acde3cff1437ca31ab45631c4b94eb360b0ecfa3a2d72307d69ee4",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/python/utils.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/python/utils.bzl"),
+        expected_sha256: "e28cdc0fbf6e6a2f862c5afdf0561d5ba1d118b4bf56327c92d32bd681d92761",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/res/BUILD",
         bytes: include_bytes!("../builtin/bazel_tools/tools/res/BUILD"),
         expected_sha256: "bef477365d864eab46fcfe73c635bafd11a7300e4e47c158abe20d269e07e8ac",
@@ -1133,6 +1175,7 @@ mod tests {
                 ("jdk".to_owned(), PathDirectoryEntryKind::Directory),
                 ("launcher".to_owned(), PathDirectoryEntryKind::Directory),
                 ("osx".to_owned(), PathDirectoryEntryKind::Directory),
+                ("python".to_owned(), PathDirectoryEntryKind::Directory),
                 ("res".to_owned(), PathDirectoryEntryKind::Directory),
                 ("test".to_owned(), PathDirectoryEntryKind::Directory),
             ]
@@ -1274,6 +1317,33 @@ mod tests {
                 "xcode_configure.bzl".to_owned(),
                 PathDirectoryEntryKind::File
             )]
+        );
+        assert_eq!(
+            listing_rows("tools/python"),
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("private".to_owned(), PathDirectoryEntryKind::Directory),
+                (
+                    "python_bootstrap_template.txt".to_owned(),
+                    PathDirectoryEntryKind::File,
+                ),
+                (
+                    "python_version.bzl".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+                ("srcs_version.bzl".to_owned(), PathDirectoryEntryKind::File),
+                ("toolchain.bzl".to_owned(), PathDirectoryEntryKind::File),
+                ("utils.bzl".to_owned(), PathDirectoryEntryKind::File),
+            ]
+        );
+        assert_eq!(
+            listing_rows("tools/python/private"),
+            [("py_test_alias.bzl".to_owned(), PathDirectoryEntryKind::File)]
+        );
+        assert_eq!(
+            builtin_directory_listing(&PackagePath::parse("tools/python/runfiles").unwrap())
+                .unwrap(),
+            PathDirectoryListing::Missing,
         );
         assert_eq!(
             listing_rows("tools/res"),
@@ -1437,9 +1507,9 @@ mod tests {
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
             if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-                "a68101afc04f6c48b65f432975245b69b3873792ca2a339b0375a59705e8b655"
+                "129fa30549446c3b0b8d90b0a21b8b3143225135e3b6ec82ea7de5cec0964c20"
             } else {
-                "de2a4424c8a43911b76ba2875446a30a40560af64cb4782cc582d1d3bbdaad7e"
+                "b0efdad2c5a0eedced946a68e0fb50708ecabc3e027fb4e84a67e8dc73b3c11d"
             }
         );
         assert_eq!(value.module_sha256, source.sha256());

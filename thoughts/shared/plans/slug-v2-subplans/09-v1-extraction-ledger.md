@@ -2900,3 +2900,15 @@ is introduced. This cold constructor/provider boundary does not warrant a
 new benchmark. Focused direct Build, typed-forwarding and same-DICE source/
 configuration A/B/A tests exercise the retained/publication boundary; nested
 provider transport remains deferred.
+
+WP833 adds seven pinned `@bazel_tools//tools/python` static byte slices to
+the existing sorted built-in CATALOG, with no V1/Buck2 import, new retained
+collection, interner, cache, DICE key, lock, evaluator borrow or action
+representation. Existing source-key values retain exact SHA-256 and mode;
+the Slug-native route manifest hash intentionally changes with the catalog
+but remains structurally owned by the same immutable snapshot. `include_bytes!`
+storage is process-lifetime, while source/package DICE values keep their
+existing Arc/Dupe/Allocative ownership and equality. The cold source-catalog
+ingress does not warrant a benchmark. Byte/mode, listing, route identity,
+parent-package Loading and direct Query regressions cover the boundary;
+broader embedded Python files remain deferred.
