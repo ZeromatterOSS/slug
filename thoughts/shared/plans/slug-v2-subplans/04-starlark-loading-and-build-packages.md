@@ -9647,3 +9647,18 @@ authentic smoke support this exact Loading slice. The smoke clears the
 initializer `copts` stop and next reaches rules_cc's unsupported
 aspect-bearing `_deps_analyzed_by_graph_structure_aspect` attribute. M7A
 remains partial.
+
+### Empty aspect-bearing dependency accepted (2026-09-24)
+
+WP825 admits a final literal empty `LabelList` on an attached aspect only
+when the frozen aspect has no attributes, required parameters or required
+aspects. The empty list has no propagation edge; nonempty and unresolved
+values still fail before target publication because the published attribute
+schema does not yet retain aspect metadata. Pinned Bazel source/oracle
+includes parameter validation even on empty lists, justifying the narrow
+gate. The pre-fix guard failure, eight selected Loading/Query/Analysis
+tests, direct dependent checks and rebuilt authentic smoke support the
+Loading-only slice. The smoke clears rules_cc `cc_binary`'s private empty
+aspect attr and next stops at protobuf BUILD:682 through `cc_proto_library`
+on its nonempty aspect-bearing `deps`; application, configured C++ and
+compilation remain open. M7A remains partial.

@@ -29,18 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-124-m7a-initializer-selector-passthrough-r1
+Packet: WP-7-125-m7a-empty-aspect-dependency-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP824 accepts unchanged configurable StringList selector pass-through
-through rules_cc's rule initializer during Loading. Pinned Bazel 9.2
-source/oracle and eight focused/protected tests show symbolic imported
-`COPTS`/`LINKOPTS` retain typed branches, provenance and same-DICE identity
-only for same-attribute, same-object returns. Rebuilt authentic smoke clears
-the initializer `copts` stop and next reaches rules_cc's unsupported
-aspect-bearing `_deps_analyzed_by_graph_structure_aspect` attribute. New or
-swapped selectors, mapping expansion and configured C++ remain deferred.
-Accepted WP823 at `81341fae8` was the immediate predecessor; M7A is partial.
+WP825 accepts the zero-propagation aspect-bearing private label-list value
+exposed by protobuf's rules_cc `cc_binary`. Pinned source/oracle, eight
+focused/protected tests and rebuilt authentic smoke show its omitted
+`_deps_analyzed_by_graph_structure_aspect` is empty. Slug admits only a
+final literal empty list on an aspect without attributes, required
+parameters or required aspects; the smoke advances to protobuf BUILD:682,
+where `cc_proto_library` has unsupported nonempty aspect-bearing `deps`.
+Actual aspect application and configured C++ remain deferred. Accepted
+WP824 at `5ac86ad7e` was the immediate predecessor; M7A is partial.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

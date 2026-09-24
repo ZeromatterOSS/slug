@@ -5102,6 +5102,198 @@ fn starlark_rule_attr<'a>(
 }
 
 #[test]
+fn empty_private_aspect_dependency_loads_without_propagation() {
+    let workspace = scratch("empty-private-aspect-dependency");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+def _aspect_impl(target, ctx):
+    return []
+
+graph_structure_aspect = aspect(
+    implementation = _aspect_impl,
+    attr_aspects = ["*"],
+)
+
+def _impl(ctx):
+    return []
+
+def _init(name, **kwargs):
+    if "dynamic_deps" in kwargs and len(kwargs["dynamic_deps"]) != 0:
+        return kwargs | {"_deps_analyzed_by_graph_structure_aspect": kwargs["dynamic_deps"]}
+    return kwargs | {"marker": "initializer-called"}
+
+cc_binary = rule(
+    implementation = _impl,
+    initializer = _init,
+    attrs = {
+        "dynamic_deps": attr.label_list(),
+        "_deps_analyzed_by_graph_structure_aspect": attr.label_list(aspects = [graph_structure_aspect]),
+        "targets": attr.label_list(aspects = [graph_structure_aspect]),
+        "marker": attr.string(),
+    },
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(':defs.bzl', 'cc_binary')\ncc_binary(name = 'subject')\ncc_binary(name = 'explicit_empty', targets = [])\n",
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let PackageTargetKind::StarlarkRule(rule) = &loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "subject")
+        .unwrap()
+        .kind
+    else {
+        panic!("subject was not recorded as a Starlark rule")
+    };
+    let aspect_attribute = "_deps_analyzed_by_graph_structure_aspect";
+    assert_eq!(
+        rule.schema()
+            .iter()
+            .find(|schema| schema.declaration_name() == aspect_attribute)
+            .unwrap()
+            .query_name(),
+        "$deps_analyzed_by_graph_structure_aspect"
+    );
+    let value = starlark_rule_attr(&loaded, "subject", aspect_attribute);
+    assert_eq!(value.provenance, AttributeProvenance::Implicit);
+    assert!(matches!(
+        value.value.as_ref(),
+        CoercedAttributeValue::LabelList(labels) if labels.is_empty()
+    ));
+    assert!(matches!(
+        starlark_rule_attr(&loaded, "subject", "$config_dependencies")
+            .value
+            .as_ref(),
+        CoercedAttributeValue::LabelList(labels) if labels.is_empty()
+    ));
+    assert!(rule.dependencies().is_empty());
+    let marker = starlark_rule_attr(&loaded, "subject", "marker");
+    assert_eq!(marker.provenance, AttributeProvenance::Explicit);
+    assert_eq!(
+        marker.value.as_ref(),
+        &CoercedAttributeValue::String("initializer-called".into())
+    );
+    let explicit = starlark_rule_attr(&loaded, "explicit_empty", "targets");
+    assert_eq!(explicit.provenance, AttributeProvenance::Explicit);
+    assert!(matches!(
+        explicit.value.as_ref(),
+        CoercedAttributeValue::LabelList(labels) if labels.is_empty()
+    ));
+}
+
+#[test]
+fn aspect_dependency_rejects_nonempty_selector_and_parameterized_values() {
+    let workspace = scratch("aspect-dependency-rejections");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    let definitions = package.join("defs.bzl");
+    let build = package.join(BUILD_FILE_PRIMARY);
+    for (case, aspect_attrs, rule_attrs, invocation) in [
+        (
+            "nonempty-default",
+            "",
+            "{'_deps_analyzed_by_graph_structure_aspect': attr.label_list(default = [':dep'], aspects = [A])}",
+            "probe(name = 'blocked')",
+        ),
+        (
+            "empty-selector",
+            "",
+            "{'targets': attr.label_list(aspects = [A])}",
+            "probe(name = 'blocked', targets = select({'//conditions:default': []}))",
+        ),
+        (
+            "nonempty-direct",
+            "",
+            "{'targets': attr.label_list(aspects = [A])}",
+            "probe(name = 'blocked', targets = [':dep'])",
+        ),
+        (
+            "parameterized-empty-default",
+            "attrs = {'mode': attr.string(mandatory = True)},",
+            "{'_deps_analyzed_by_graph_structure_aspect': attr.label_list(aspects = [A])}",
+            "probe(name = 'blocked')",
+        ),
+    ] {
+        fs::write(
+            &definitions,
+            format!(
+                "def _aspect_impl(target, ctx): return []\nA = aspect(implementation = _aspect_impl, {aspect_attrs})\ndef _impl(ctx): return []\nprobe = rule(implementation = _impl, attrs = {rule_attrs})\n"
+            ),
+        )
+        .unwrap();
+        fs::write(
+            &build,
+            format!("load(':defs.bzl', 'probe')\nfilegroup(name = 'earlier')\n{invocation}\n"),
+        )
+        .unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("target invocation for aspect-bearing attribute"),
+            "{case}: {error}"
+        );
+    }
+}
+
+#[test]
+fn empty_aspect_dependency_restores_after_nonempty_source_on_same_dice() {
+    let workspace = scratch("empty-aspect-dependency-aba");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(':defs.bzl', 'probe')\nprobe(name = 'subject')\n",
+    )
+    .unwrap();
+    let definitions = package.join("defs.bzl");
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load = |default: &str| {
+        fs::write(
+            &definitions,
+            format!(
+                "def _aspect_impl(target, ctx): return []\nA = aspect(implementation = _aspect_impl)\ndef _impl(ctx): return []\nprobe = rule(implementation = _impl, attrs = {{'_deps_analyzed_by_graph_structure_aspect': attr.label_list(default = {default}, aspects = [A])}})\n"
+            ),
+        )
+        .unwrap();
+        runtime.block_on(load_package_with_retained_dice(&dice, &workspace, &package))
+    };
+    let first = load("[]").unwrap();
+    let error = load("[':dep']").unwrap_err().to_string();
+    assert!(
+        error.contains("target invocation for aspect-bearing attribute"),
+        "{error}"
+    );
+    let restored = load("[]").unwrap();
+    assert_eq!(
+        starlark_rule_attr(
+            &first,
+            "subject",
+            "_deps_analyzed_by_graph_structure_aspect"
+        ),
+        starlark_rule_attr(
+            &restored,
+            "subject",
+            "_deps_analyzed_by_graph_structure_aspect"
+        )
+    );
+    assert_eq!(first, restored);
+}
+
+#[test]
 fn starlark_rule_license_wrapper_accepts_explicit_zero_testonly() {
     let workspace = scratch("starlark-rule-license-zero-testonly");
     let package = workspace.join("licenses");

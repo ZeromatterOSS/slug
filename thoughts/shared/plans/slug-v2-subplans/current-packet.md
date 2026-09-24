@@ -1,138 +1,123 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-124-m7a-initializer-selector-passthrough-r1
+Packet: WP-7-125-m7a-empty-aspect-dependency-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit the authenticated protobuf/rules_cc initializer's unchanged
-configurable `StringList` selector pass-through during Loading. Protobuf
-v33.4 `@@protobuf+//:BUILD.bazel:356-362` calls rules_cc `cc_binary` with
-frozen imported `COPTS` and `LINKOPTS` selects. The rebuilt authentic
-`slug build //:probe` in `/tmp/slug-wp797-authentic-2YQmSt` must clear
-the current `rule initializer input 'copts' cannot use select()` stop;
-any later failure is separate. Exact Bazel 9.2 slice: explicit public
-configurable StringList selector enters the initializer unresolved, and
-the initializer's same-attribute, same-object return retains its ordered
-conditions/branches/default without choosing a configuration. Slug-native:
-pointer-identity pass-through gate, structural package identity and
-diagnostics. Unsupported/deferred: synthesized, modified, swapped or
-concatenated selector returns; other attribute kinds and nonconfigurable
-selectors; definition-relative remapping of new returned selector keys;
-configured C++ rule semantics, branch selection/actions and exact Bazel
-configuration/output bytes. A Loading pass-through is not an executable
-`cc_binary` claim.
+Admit the zero-propagation attached-aspect attribute in the authenticated
+protobuf/rules_cc `cc_binary` Loading call. `@@rules_cc+//cc:cc_binary.bzl:44`
+currently stops at an unconditional target-invocation guard for private
+`_deps_analyzed_by_graph_structure_aspect`. Exact Bazel 9.2 slice: an
+aspect-bearing `attr.label_list` whose final typed value is literally empty
+has no dependency edge on which to propagate its aspect, provided the
+attached aspect declares no attributes, required parameters or required
+aspects. The rule target and empty value may be recorded. Slug-native
+structural package identity and diagnostics remain. Unsupported/deferred:
+any nonempty, selected or concatenated aspect-bearing dependency value,
+aspects with parameters/required aspects, actual aspect application,
+configured providers/actions and configured C++. Do not treat an empty
+branch of an unresolved selector as an empty final value. A Loading advance
+does not claim protobuf compilation.
 
 ## Source, owner and decision
 
-Pinned Bazel 9.2 `StarlarkRuleClassFunctions.java:1793-1878` lifts only
-explicit non-None public attrs into the initializer and reifies returned
-dict values under the initializer defining-label converter;
-`BuildType.java:274-299,321-340` copies/lifts symbolic selector branches
-without selecting one. Authenticated protobuf `build_defs/cpp_opts.bzl:3-22,
-25-52` defines frozen StringList `COPTS`/`LINKOPTS` selects and BUILD
-356-362 forwards them. rules_cc 0.2.17 `cc/private/rules_impl/attrs.bzl:168,
-330` declares these attrs as `string_list`; `cc_binary.bzl:851-853` runs
-PostMark's identity initializer then `dynamic_deps_initializer`, which
-returns kwargs unchanged without `dynamic_deps`. The ignored-RC/offline
-Bazel 9.2 oracle `/tmp/slug-wp824-init-select-oracle` shows the initializer
-receives imported `copts` as `type=select`, direct attrs as lists, and
-omitted/None attrs absent. Returning kwargs unchanged preserves both
-branches: fastbuild produces `-DDEFAULT`, dbg `-DDBG`; unconfigured XML
-lists both branch values and the condition input. This does not prove
-Slug's configured C++ path.
+Pinned rules_cc 0.2.17 `cc/private/rules_impl/cc_shared_library.bzl:827-834,
+1087-1115,1129-1134` declares this private attr as
+`attr.label_list(providers=[CcInfo], aspects=[graph_structure_aspect])`
+without an explicit default. The graph aspect has no attributes, required
+parameters or required aspects. `dynamic_deps_initializer` returns kwargs
+unchanged without nonempty `dynamic_deps`; protobuf v33.4's `cc_binary`
+call has none. rules_cc `cc_binary.bzl:851-853` invokes that initializer.
+Pinned Bazel 9.2 `StarlarkRuleClassFunctions.java:1776,1806-1824,
+1844-1858,1900-1903` validates attached-aspect parameters at rule
+invocation even when the dependency value is empty, omits private attrs
+from initializer inputs and allows rules_cc's private return only in the
+dynamic-deps case. `AspectsList.java:87-116` checks public parameters and
+required rule attrs. An ignored-RC/offline Bazel query of authentic
+`@@protobuf+//:protoc` with XML default values explicitly reports empty
+`dynamic_deps` and `$deps_analyzed_by_graph_structure_aspect` lists.
+Offline fixture `/tmp/slug-wp825-aspect-zero-32VFsR` demonstrates omitted
+and explicit empty values produce no aspect application, whereas nonempty
+produces one; this fixture uses a public attr for initializer variants
+because arbitrary `.bzl` files cannot return private initializer keys.
 
-Slug's `invoke_rule_initializer` in
-`app/slug_loading_v2/src/package.rs:7935-8055` already coerces the
-frozen StringList selector to a canonical `CoercedAttributeValue::Selector`
-and `allocate_macro_attribute` reifies it as one scratch immutable
-`SelectorValue`; an input guard rejects it before callback and a return
-guard rejects it afterward. Admit only a pure `Selector` with declared
-configurable `StringList` kind. Save a scratch tuple of its attribute name,
-reified `Value` and pre-coerced structural value. Execute the initializer
-normally. On return, accept a selector only for that same attribute when
-`Value::ptr_eq` confirms the same reified object; publish the original
-pre-coerced value, never re-coerce it in the caller context. New or swapped
-selectors continue to fail closed because Bazel would use the defining
-`.bzl` mapping that this packet does not implement. Starlark's opaque
-`SelectorValue` exposes no in-place mutation; addition makes a new object.
-Do not bypass callback execution or infer selector contents from repr/path.
-
-The existing frozen rule `AttributeValue`, selector branches and derived
-`$config_dependencies` own the final fact, with package structural equality
-and observed BUILD/loaded-source fingerprints providing invalidation and
-same-DICE A/B/A restoration. The new name/`Value`/coerced tuple is
-initializer-attempt scratch released on success, failure or cancellation;
-no evaluator value enters a retained value. No new DICE key, lock, cache,
-interner, retained sidecar, alternate selector representation or semantic
-fallback. The large `package.rs` already owns initializer invocation and
-selector reification; keep any extraction bounded to those adjacent
-functions. This cold Loading seam needs no performance benchmark.
+Slug's `FrozenRuleDefinition::reject_deferred_attribute_invocation` in
+`app/slug_loading_v2/src/package.rs:4494-4505` unconditionally rejects
+any declaration with `attached_aspect`; it runs after the initializer but
+before the final typed value is assembled. The frozen declaration and
+`FrozenAspectDefinition` retain the aspect and its parameter schema, but
+the published `AttributeSchema` does not. Move the guard to the bounded
+final-value seam: accept only a final literal
+`CoercedAttributeValue::LabelList([])` on an attached-aspect `LabelList`
+whose aspect has no attributes, required parameters or required aspects;
+reject every other aspect-bearing value before target publication. Keep
+existing coercion, defaults, initializer execution, provenance and schema
+publication unchanged. No aspect is executed or silently discarded for a
+nonempty edge. The observed BUILD/loaded-source fingerprints and structural
+package equality already own DICE invalidation and A/B/A restoration; no
+new key, lock, cache, retained representation, sidecar or semantic fallback.
+This cold Loading guard has no performance benchmark.
 
 ## Evidence and validation
 
-First add a source-shaped imported frozen `COPTS`/`LINKOPTS` identity
-initializer test that fails on the unmodified branch at the selected
-`copts` input guard. Assert initializer execution using an additional
-returned marker; assert frozen output selectors retain exact condition
-labels, branch order, values, default, explicit provenance and derived
-configuration dependencies. Cover direct list and omitted/None inputs.
-Prove same-DICE imported source/selector branch change and A/B/A restore.
-Keep synthesized/swapped returned selectors, concatenation, wrong-type
-branch and Label selector negative; preserve the definition-time rejection
-of `attr.string_list(configurable=False)`, which cannot reach the initializer.
-No partial package publication. New returned raw selector keys must not silently
-re-map through the caller. Reuse existing selector/initializer tests and
-the offline Bazel oracle; no Stage 1 fixture growth.
+First add a source-shaped private aspect-bearing empty label-list invocation
+test that compiles on the clean base and fails at the selected guard. Assert
+typed empty value, implicit provenance and no retained dependency labels;
+protect the existing Query edge projection test.
+Keep nonempty default, parameterized aspect and unresolved selector
+negative, with no partial package publication; change the existing
+provider/aspect guard regression to use a genuinely nonempty dependency
+rather than expecting an empty zero-edge value to fail. Prove same-DICE
+empty/nonempty/empty source restoration. Reuse the pinned/offline Bazel
+oracle; no Stage 1 fixture.
 
-Resolve pinned-nightly Cargo. Compile selected Loading and direct Query/
-Analysis dependent test binaries with JSON `--no-run`, exact nonignored
-preflight and serial focused/protected runs. Direct Loading, Query,
-Analysis, Core and CLI compile and CLI rebuild precede one normalized
-`PATH` authentic smoke. That roughly 40-second replay is necessary to
-prove transitive closure advancement that focused tests cannot. Check/
-clean `slugd` before/after. Rust format, diff, plan and archive checks
-and independent DESIGN/FINAL review cover selector ownership, mapping
-gate and fail-closed boundaries.
+Resolve pinned-nightly Cargo. Compile selected Loading/Query/Analysis test
+binaries with JSON `--no-run`; exact nonignored preflight and run focused/
+protected tests serially. Direct Loading/Query/Analysis/Core/CLI compile
+and CLI rebuild precede one normalized-PATH authentic smoke. That replay
+is required to prove this exact transitive closure advance. Check/clean
+`slugd` before/after. Rust format, diff, plan and archive checks, and
+independent DESIGN and FINAL review of the zero-edge boundary are required.
 
 ## Scope and stops
 
-Base clean main `81341fae8`. Allowlist: this manifest, canonical Current,
+Base clean main `5ac86ad7e`. Allowlist: this manifest, canonical Current,
 compact Stage 4 owner note after acceptance; production
 `app/slug_loading_v2/src/package.rs`; selected tests in
-`app/slug_loading_v2/tests/build_file_loading.rs` and, only if needed for
-same-DICE imported-source proof, `src/host_package_load_tests.rs`.
-Rough growth 55 production/140 proof lines is a review trigger, not
-authority for transformed selectors or configured C++. REPLAN if the
-authentic initializer does not return the same object, if pointer identity
-cannot safely preserve the original structural value, if mapping/selector
-facts escape scratch, or if the selected stop requires configured C++
-behavior. A later error cannot widen this packet.
+`app/slug_loading_v2/tests/build_file_loading.rs` and the existing
+`app/slug_loading_v2/src/host_package_load_tests.rs` negative regression.
+Rough growth 40 production/150 proof lines is a review trigger, not
+permission to implement aspect analysis. REPLAN if the final authentic
+value is nonempty/selected, if the empty case has a Bazel-visible aspect
+effect, or if accepting it requires dropping a nonempty semantic input.
+A later authentic error cannot widen this packet.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviewers ACCEPT the bounded selector hand-off.
-The source-shaped imported-selector test compiled on the clean base, passed
-exact preflight 1, then failed (exit 101) at the selected initializer input
-guard for `copts`. Final pinned-nightly JSON `--no-run` compiled Loading
-integration/lib, Query lib and Analysis `starlark_rule` test binaries. Exact
-preflights selected 4, 2, 1 and 1 nonignored tests; all eight passed serially.
-The two Loading lib tests protect initializer reexports and failure atomicity.
-Direct Loading/Query/Analysis/Core/CLI `cargo check` and CLI rebuild passed.
-The normalized-PATH authentic smoke (exit 2, about 55 seconds) clears the
-initializer `copts` selector stop and next fails separately at
-`@@rules_cc+//cc:cc_binary.bzl:44`: target invocation for aspect-bearing
-attribute `_deps_analyzed_by_graph_structure_aspect` is not supported.
-Pre/post checks found no `slugd`; Rust format, diff, plan and archive checks
-pass. No remote transport or BuildBuddy credentials were used. The 26
-production and 255 proof lines exceed the rough 55/140-line review trigger
-only on proof: source-shaped multi-selector values, negative boundaries and
-same-DICE imported-source restoration require separate checks; final review
-accepted proportionality. Configured C++ and action behavior remain open.
+Independent DESIGN and FINAL reviewers ACCEPT the exact zero-edge Loading
+boundary. The source-shaped private-aspect test compiled on the clean base,
+passed exact preflight 1, then failed (exit 101) at the selected unconditional
+guard. Final pinned-nightly JSON `--no-run` compiled Loading integration/lib,
+Query lib and Analysis `starlark_rule` binaries. Exact preflights selected
+4, 2, 1 and 1 nonignored tests; all eight passed serially. Direct Loading/
+Query/Analysis/Core/CLI `cargo check` and required CLI rebuild passed. The
+final-source normalized-PATH authentic smoke (exit 2, about 53 seconds)
+clears rules_cc `cc_binary`'s private empty aspect attr and next fails
+separately at `@@protobuf+//:BUILD.bazel:682`, through `cc_proto_library`:
+target invocation for nonempty aspect-bearing `deps` is unsupported. Pre/
+post checks found no `slugd`; Rust format, diff, plan and archive checks
+pass. No remote transport or BuildBuddy credentials were used. The 41
+production and 192 proof lines modestly exceed rough 40/150-line review
+triggers to cover the final-value guard, parameter-validation exclusion,
+source-shaped empty/explicit controls, negatives and same-DICE restoration;
+FINAL review accepted proportionality. Aspect application, configured C++
+and protobuf compilation remain open.
 
 ## Immediate predecessor
 
-WP823 accepted at `81341fae8`: direct integer 0/1 Boolean Starlark-rule
-call values clear rules_license's `testonly=0` stop. Six selected Loading/
-Query/Analysis tests, direct checks, rebuilt CLI and authentic smoke pass
-their bounded gates; the next independent stop is this initializer input.
+WP824 accepted at `5ac86ad7e`: unchanged configurable StringList selector
+pass-through clears protobuf's rules_cc initializer `copts` stop. Eight
+selected Loading/Query/Analysis tests, direct checks, rebuilt CLI and
+authentic smoke pass their bounded gates; the next separate stop is this
+aspect-bearing private attribute. M7A remains partial.

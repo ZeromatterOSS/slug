@@ -33490,7 +33490,7 @@ async fn repository_package_rejects_provider_or_aspect_dependency_before_recordi
         ),
         (
             "defs.bzl",
-            b"P=provider(fields={})\nQ=provider(fields={})\ndef aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\ndef transition_impl(settings, attr): return {}\nT=transition(implementation=transition_impl, inputs=[], outputs=['//:setting'])\ndef impl(ctx): return []\nprobe=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[P], [Q]], aspects=[A], cfg=T)})\n",
+            b"P=provider(fields={})\nQ=provider(fields={})\ndef aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\ndef transition_impl(settings, attr): return {}\nT=transition(implementation=transition_impl, inputs=[], outputs=['//:setting'])\ndef impl(ctx): return []\nprobe=rule(implementation=impl, attrs={'targets': attr.label_list(default=[':dep'], providers=[[P], [Q]], aspects=[A], cfg=T)})\n",
         ),
     ];
     let dice = Dice::builder().build(DetectCycles::Enabled);

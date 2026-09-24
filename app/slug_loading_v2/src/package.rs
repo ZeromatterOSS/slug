@@ -4491,16 +4491,33 @@ impl FrozenRuleDefinition {
         self.incoming_transition.as_ref()
     }
 
-    fn reject_deferred_attribute_invocation(&self) -> anyhow::Result<()> {
-        if let Some(attribute) = self
-            .schema
-            .iter()
-            .find(|attribute| attribute.attached_aspect.is_some())
-        {
-            anyhow::bail!(
-                "target invocation for aspect-bearing attribute '{}' is not supported",
-                attribute.name
-            );
+    fn reject_deferred_attribute_invocation(
+        &self,
+        values: &[AttributeValue],
+    ) -> anyhow::Result<()> {
+        if self.schema.len() != values.len() {
+            anyhow::bail!("rule attribute values do not match the declaration schema");
+        }
+        for (attribute, value) in self.schema.iter().zip(values) {
+            let Some(aspect) = attribute.attached_aspect.as_ref() else {
+                continue;
+            };
+            let zero_edge = attribute.kind == AttributeKind::LabelList
+                && matches!(value.value.as_ref(), CoercedAttributeValue::LabelList(labels) if labels.is_empty())
+                && aspect
+                    .to_value()
+                    .downcast_ref::<FrozenAspectDefinition>()
+                    .is_some_and(|aspect| {
+                        aspect.attributes.is_empty()
+                            && aspect.required_parameters.is_empty()
+                            && aspect.required_aspects.is_empty()
+                    });
+            if !zero_edge {
+                anyhow::bail!(
+                    "target invocation for aspect-bearing attribute '{}' is not supported",
+                    attribute.name
+                );
+            }
         }
         Ok(())
     }
@@ -8137,7 +8154,6 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     .map(|initializer| invoke_rule_initializer(initializer, &names, recorder, self))
                     .transpose()?
                     .unwrap_or_default();
-                self.reject_deferred_attribute_invocation()?;
                 for attribute in names.keys() {
                     let attribute = canonical_rule_attribute_name(attribute);
                     if attribute != "name"
@@ -8381,6 +8397,9 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         value: Arc::new(value),
                     };
                 }
+                // Empty label lists have no edge on which an attached aspect
+                // could propagate. All other aspect values remain deferred.
+                self.reject_deferred_attribute_invocation(&values)?;
                 let config_dependencies = values
                     .iter()
                     .flat_map(|value| selector_key_labels(&value.value))
