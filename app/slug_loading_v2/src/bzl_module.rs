@@ -144,8 +144,12 @@ use crate::package::ModuleExtensionTagCoercionError;
 use crate::package::PackageRecorder;
 use crate::package::PackageTargetKind;
 use crate::package::build_file_loading_globals;
+#[cfg(test)]
 use crate::package::bzlmod_loading_globals;
+use crate::package::bzlmod_loading_globals_for_source;
+#[cfg(test)]
 use crate::package::loading_globals;
+use crate::package::loading_globals_for_source;
 use crate::package::prepare_module_extension_tag_attributes;
 use crate::package::validate_module_extension_tag_schema;
 use crate::provider::BzlEvaluationContext;
@@ -1552,10 +1556,10 @@ enum BzlModuleContext {
 }
 
 impl BzlModuleContext {
-    fn globals(self) -> starlark::environment::Globals {
+    fn globals(self, source: &CanonicalLabel) -> starlark::environment::Globals {
         match self {
-            Self::Build => loading_globals(),
-            Self::Bzlmod => bzlmod_loading_globals(),
+            Self::Build => loading_globals_for_source(source),
+            Self::Bzlmod => bzlmod_loading_globals_for_source(source),
         }
     }
 }
@@ -2981,7 +2985,7 @@ async fn compute_host_bzl_module(
     };
     let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
     let print_capture = capture_events.then(LoadingPrintCapture::default);
-    let globals = context.globals();
+    let globals = context.globals(&manifest.root.label);
     {
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&evaluation_context);
@@ -5184,7 +5188,7 @@ fn evaluate_external_bzl_module(
     };
     let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
     let print_capture = capture_events.then(LoadingPrintCapture::default);
-    let globals = context.globals();
+    let globals = context.globals(&manifest.root.label);
     {
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&evaluation_context);
@@ -7467,7 +7471,7 @@ impl Key for BzlModuleEvalKey {
                 };
                 let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
                 let print_capture = capture_events.then(LoadingPrintCapture::default);
-                let globals = loading_globals();
+                let globals = loading_globals_for_source(&manifest.root.label);
                 {
                     let mut evaluator = Evaluator::new(&module);
                     evaluator.extra = Some(&evaluation_context);

@@ -29,17 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-115-m7a-starlark-rule-none-return-r1
+Packet: WP-7-116-m7a-python-internal-guarded-global-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP815 admits a bare/implicit `None` Starlark rule-implementation return as
-zero explicit providers for ordinary non-executable rules, preserving the
-existing implicit DefaultInfo path and invalid `[None]` rejection. Two
-pre-fix failures become passing focused tests, three protected tests pass,
-and the rebuilt authentic smoke clears the None-provider stop. It now stops
-separately on an undefined `py_internal` during rules_python loading.
-Tuple/executable return behavior and M7A close remain deferred. WP814 was
-accepted at `bde3226bf`.
+WP816 admits Bazel 9.2's defining-source guard and 26-field frozen
+`py_internal` Loading namespace. Five focused/protected tests, including
+same-DICE export A/B/A, pass; the rebuilt authentic smoke clears the
+undefined global and reaches a separate rules_python multiple-required-aspect
+Loading stop. Python-helper invocation, full rules_python behavior and M7A
+close remain deferred. WP815 was accepted at `7bb492885`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

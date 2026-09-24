@@ -9502,3 +9502,23 @@ Bazel 9.2 declares this attribute NODEP, and a default value commonly points
 back to its setting. Query continues to expose the label attribute without an
 ordinary rule-input edge; configured Analysis validates and consumes the fact
 without preloading or configuring the default target from the setting.
+
+### Source-guarded Python internal Loading namespace accepted (2026-09-24)
+
+WP816 selects `py_internal` by each defining canonical `.bzl` source label,
+matching Bazel 9.2's word-boundary repository and segment-aware root-package
+guard. BUILD and unrelated `.bzl` globals remain denied; an authorized source
+may export the frozen value to a denied caller. A service-retained singleton
+struct owns all 26 pinned fields, including the existing
+`PackageSpecificationInfo` provider identity and nested `cc_helper` shape.
+All 25 helper functions are function-typed but explicitly unsupported on
+invocation; their implementation, callable representation/identity and
+broader rules_python behavior are not exact claims. Existing Bzl source and
+loaded-module owners retain DICE equality, invalidation and restoration;
+there is no new key, lock or cache.
+
+The offline Bazel 9.2 guard/shape oracle, five focused/protected Slug tests
+(including a real same-DICE export A/B/A), Core/CLI compile and rebuilt
+authentic smoke support this slice. The authentic build clears undefined
+`py_internal` and now stops at a separate `attr.label_list` multiple-required-
+aspect declaration in rules_python. M7A remains partial.

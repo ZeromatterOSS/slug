@@ -125,6 +125,7 @@ use crate::provider::RunEnvironmentInfo;
 use crate::provider::UserProviderCallable;
 use crate::provider::starlark_provider_identity;
 use crate::provider::user_provider_from_arguments;
+use crate::py_internal::populate_if_allowed;
 use crate::rule_outputs::PredeclaredOutput;
 use crate::rule_outputs::RuleOutputsDefinitionGen;
 use crate::rule_outputs::resolve_output_names;
@@ -10496,7 +10497,11 @@ fn bzl_only_globals(builder: &mut GlobalsBuilder) {
     }
 }
 
-fn complete_loading_globals(bool_config: bool, bzlmod_native: bool) -> Globals {
+fn complete_loading_globals(
+    bool_config: bool,
+    bzlmod_native: bool,
+    source: Option<&CanonicalLabel>,
+) -> Globals {
     let mut globals = GlobalsBuilder::new();
     populate_universe(&mut globals);
     package_globals(&mut globals);
@@ -10531,6 +10536,9 @@ fn complete_loading_globals(bool_config: bool, bzlmod_native: bool) -> Globals {
             BuiltinProviderKey::new("PackageSpecificationInfo"),
         );
         globals.set("DefaultInfo", AnalysisBuiltinCallable::new("DefaultInfo"));
+        if let Some(source) = source {
+            populate_if_allowed(&mut globals, source);
+        }
     } else {
         globals.set("config", BuildFileConfigModule);
     }
@@ -10540,15 +10548,23 @@ fn complete_loading_globals(bool_config: bool, bzlmod_native: bool) -> Globals {
 }
 
 pub(crate) fn loading_globals() -> Globals {
-    complete_loading_globals(true, false)
+    complete_loading_globals(true, false, None)
 }
 
 pub(crate) fn bzlmod_loading_globals() -> Globals {
-    complete_loading_globals(true, true)
+    complete_loading_globals(true, true, None)
+}
+
+pub(crate) fn loading_globals_for_source(source: &CanonicalLabel) -> Globals {
+    complete_loading_globals(true, false, Some(source))
+}
+
+pub(crate) fn bzlmod_loading_globals_for_source(source: &CanonicalLabel) -> Globals {
+    complete_loading_globals(true, true, Some(source))
 }
 
 pub(crate) fn build_file_loading_globals() -> Globals {
-    complete_loading_globals(false, false)
+    complete_loading_globals(false, false, None)
 }
 
 #[cfg(test)]

@@ -1,36 +1,148 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-115-m7a-starlark-rule-none-return-r1
+Packet: WP-7-116-m7a-python-internal-guarded-global-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit a Starlark rule implementation's bare `None` return as zero explicitly returned providers, then use the existing implicit `DefaultInfo` synthesis. The rebuilt authentic `slug build //:probe` in `/tmp/slug-wp797-authentic-2YQmSt` must clear `rule implementation returned non-provider value None`; a later independent stop is not covered. The error occurred while configuring the alias to `@@rules_rust++rust_host_tools+rust_host_tools//:rust_toolchain`, but the one-shot diagnostic does not identify which transitive rule returned `None`; do not claim that the rust_toolchain implementation itself did so.
+Admit Bazel 9.2's source-guarded `py_internal` predeclared global for the
+authentic rules_python Loading closure. The rebuilt authentic `slug build
+//:probe` in `/tmp/slug-wp797-authentic-2YQmSt` must clear the undefined
+`py_internal` at `py_internal_renamed.bzl:30`; a later independent stop is not
+covered. The defining `.bzl` source, not a loading caller or apparent repo name,
+selects availability. A guarded source may export the frozen value to a caller
+whose own direct global access is denied.
 
-Exact Bazel 9.2 slice: for ordinary non-executable rules, a bare/implicit `None` is an empty provider return, not a single non-provider element; a list containing `None` still fails provider validation. Already-admitted empty list, bare Info/provider and provider-list results remain unchanged, and scalar/string/dict invalid results still fail closed. Slug-native: structural configured identity, diagnostics and default output path bytes. Unsupported/deferred: executable-rule default-output behavior, tuple and other return shapes outside the named slice, arbitrary Starlark provider surfaces, transitive rules_rust analysis/actions, and exact Bazel configuration/output identity. Do not expand tuple support merely because this one-shot oracle observed it.
+Exact Bazel 9.2 slice: source-label availability and denial; `type(py_internal)
+== "struct"`; the source-defined 26 top-level attribute names, with
+`PackageSpecificationInfo` bound to the existing provider key, `cc_helper` a
+nested struct with its one callable name, and the other 24 attributes
+function-typed. `getattr`/`hasattr` for those names must not silently take a
+missing-member fallback. The facade is shared/frozen across Bzl evaluations.
+Slug-native: diagnostics, callable representation and identity/hash beyond
+the frozen reexport, and the existing structural Bzl source identity.
+Unsupported/deferred: invocation of the 25 Python-helper functions (including
+the nested `cc_helper` predicate), their analysis/context behavior, arbitrary
+Python rules and exact Bazel configuration/output identity. Unsupported
+invocations must error explicitly, never return a dummy result. This packet
+does not claim all `py_internal` semantics from namespace availability.
 
 ## Source, owner and decision
 
-Pinned Bazel 9.2 HEAD `8220c6198837d5c13d53fea211cf3282aa12408a` `StarlarkRuleConfiguredTargetUtil.java:119-126,238-279` accepts `None`, Info or a sequence and treats bare `None` as no returned providers; `:305-325` still creates the default provider. `StarlarkIntegrationTest.java:1480-1500,2091-2118` covers implicit and explicit None. Offline Bazel 9.2 scratch `/tmp/slug-wp815-rule-return-95muOk`, with ignored RCs and downloads disabled, sees all eight test rules in query. cquery/build accept bare `None`, `[]`, direct provider and provider list; reject `[None]`, `[string]` and dict. Provider tuple also succeeds in Bazel but is outside this packet. The authenticated rules_rust 0.73.0 `_rust_toolchain_impl` itself returns a provider list, so the authentic error is attributed only to its selected configured dependency closure until proven more narrowly.
+Pinned Bazel 9.2 HEAD `8220c6198837d5c13d53fea211cf3282aa12408a`:
+`BazelRuleClassProvider.java:293-310` registers `py_internal` for `_builtins`,
+`bazel_tools`, `rules_python`, and root `//tools/build_defs/python`;
+`ContextGuardedValue.java:39-79` checks the defining canonical `.bzl` label,
+with Java word-boundary repository-name matching and package-fragment prefix;
+`BzlCompileFunction.java:151-175` applies the guard during source resolution.
+`builtins_bzl/common/python/py_internal.bzl:19-31,133-163` defines the exact
+26-member struct. Authenticated rules_python 1.7.0
+`tools/build_defs/python/private/py_internal_renamed.bzl:14-30` binds the
+predeclared global without a load and the generated internal repository
+reexports it. Bazel 9.2 offline discriminator
+`/tmp/slug-wp816-guard-nKcNAt` accepts an export from a local module named
+`rules_python`, including use by a root caller, as well as a generated repo
+whose canonical name contains a bounded `rules_python` segment. It rejects
+direct use from root, near-name `rules_python_helper`, and a root sibling
+package. Its positive checks cover all 26 names and nested member; RCs and
+downloads were disabled. The authenticated generated-repo mapping confirms
+`rules_python++config+rules_python_internal` is the defining source for the
+observed stop, not a root global or mapping error.
 
-Slug's `app/slug_analysis_v2/src/starlark_rule.rs` evaluates the implementation and calls `build_info_transform::returned_providers`; `app/slug_analysis_v2/src/starlark_rule/build_info_transform.rs:63-65` currently wraps any non-list value, including `None`, as a singleton. Normalize only bare `None` to an empty return at that owner; a list element `None` must still reach the genuine-provider decoder and fail. The existing no-explicit-DefaultInfo branch owns effective files/predeclared outputs. No Loading, configuration, DICE key, provider identity, lock, cache or retained representation changes. The already-observed package/implementation inputs, configured-node result equality, Need/error and request finalization own A/B/A, cancellation and publication as before. The normalized Vec is evaluator-phase scratch and is released after lowering; result providers remain in the existing DICE-retained collection.
+Slug's `BzlModuleContext` in `app/slug_loading_v2/src/bzl_module.rs` currently
+selects globals only by Build/Bzlmod. Pass the canonical defining label into
+globals selection at all three root/external/direct-host module-evaluation
+sites; do not expose the symbol in BUILD globals or arbitrary `.bzl` globals.
+Match the pinned word-boundary repository guard for valid canonical repo
+names and the segment-aware root package prefix. Build a source-derived
+frozen `AllocStruct` namespace in a small Loading owner using a
+`GlobalsStatic` singleton; reuse `BuiltinProviderKey("PackageSpecificationInfo")`
+and function-typed explicit-unsupported callables for all 25 deferred methods.
+The 26-name table is exact source data, not an open-ended fallback. An absent
+field would be unsound: vendored Starlark's `get_attr` returns `Option`, and
+`getattr(x, name, default)` would silently take the default.
+
+No new DICE key, lock, side cache or repository probe. Existing root/external
+Bzl module keys, canonical source labels, observed source certificates,
+repository mapping and frozen loaded-module closure own source selection,
+Need/error, invalidation, equality cutoff and A/B/A restoration. The singleton
+value is service-retained immutable; each published frozen module retains only
+its chosen binding/reexport, not evaluator scratch. Source edits and mapping
+changes retain their accepted owner; no historical mutable-host read is added.
 
 ## Evidence and validation
 
-Add a focused Analysis rule-return test through real BUILD/.bzl loading and configured evaluation: ordinary non-executable `pass` and explicit `return None` both produce effective DefaultInfo (including an existing non-executable predeclared output if chosen); `[]`, direct Info and provider list remain accepted; `[None]`, mixed provider/None, string/dict remain rejected. If the shared normalizer test has an intentional singleton-None assertion, revise it to distinguish bare return from list-element None rather than weakening validation. First demonstrate the new direct-None regression against the current branch. Reuse the offline oracle; no Stage 1 fixture absent a demonstrated gap.
+Add focused Loading tests for root/foreign/near-name denial, `_builtins`,
+`bazel_tools`, `rules_python+` and generated `rules_python++config+...`
+allowance, root package-prefix boundary, BUILD denial, and an allowed-source
+export consumed by a denied-source caller. Assert all 26 names and kinds,
+`getattr`/`hasattr`, provider-key identity, nested member presence, and an
+explicit error on deferred invocation. Include a same-DICE source A/B/A or
+equivalent retained-module restoration check for the export path, using
+existing real Loading routes rather than a command-side inject. Compare the
+selected guards to the offline Bazel discriminator and pinned source; do not
+grow Stage 1 oracle fixtures absent a demonstrated gap. Reuse existing
+provider-key tests as a protected control.
 
-Use pinned-nightly JSON `--no-run` for the named Analysis integration binary, exact nonignored selector preflight and serial focused/protected tests, plus direct CLI dependent compile. Rebuild `slug_cli_v2` before the normalized-PATH authentic one-shot smoke; check/clean `slugd` before and after. Run Rust format, diff, archive and plan-status checks. Independent DESIGN review precedes implementation; independent FINAL review checks diff/evidence. No broad suite or remote-service gate; leave BuildBuddy authentication untouched.
+Before the edit, WP815's recorded rebuilt smoke supplies the authentic
+undefined-global negative. Resolve pinned-nightly Cargo toolchain, JSON
+`--no-run` compile for Loading's selected tests, exact nonignored selector
+preflight, serial focused/protected tests, direct Core and CLI dependent
+compile, Rust format and diff checks. Rebuild `slug_cli_v2` before one
+normalized-`PATH` authentic smoke; its roughly 52-second execution is
+necessary to prove the transitive guard clears. Check/clean `slugd` before
+and after. Independent DESIGN review precedes implementation and FINAL
+review checks the actual diff/evidence. No broad suite or remote transport;
+do not read or alter BuildBuddy authentication.
 
 ## Scope and stops
 
-Base clean main `bde3226bf`. Allowlist: this manifest and canonical Current paragraph; Stage 6 owner note after acceptance; production `app/slug_analysis_v2/src/starlark_rule/build_info_transform.rs` and `app/slug_analysis_v2/src/starlark_rule.rs` only if the call site must distinguish bare None; focused tests in `app/slug_analysis_v2/src/starlark_rule/build_info_transform/tests.rs` and `app/slug_analysis_v2/tests/starlark_rule.rs`. Approximate production/proof growth 10/90 lines is a review trigger. The large `starlark_rule.rs` remains the existing evaluator/lowerer owner; a small result-shape guard belongs at its normalization boundary, not a new dispatcher. REPLAN if Bazel 9.2 treats bare None as a provider value, if Slug's existing default synthesis is not valid for no-return rules, or if clearing the authentic stop requires a different semantic change. Do not paper over a later stop.
+Base clean main `7bb492885`. Allowlist: this manifest and canonical Current
+paragraph; Stage 4 Loading owner note after acceptance; production
+`app/slug_loading_v2/src/py_internal.rs`, `src/lib.rs`, `src/package.rs`,
+`src/bzl_module.rs`; focused Loading tests in `src/host_package_load_tests.rs`
+or a small dedicated test module. Approximate growth 160 production / 180
+proof lines is a review trigger, not permission to weaken the 26-member table.
+The >10,000-line package owner is touched only for one guarded registration;
+the new module owns the static source guard and facade. REPLAN if source-keyed
+globals cannot preserve frozen reexport or if selected Loading calls a deferred
+helper, demanding a new semantic admission. A later stop is a successor, not
+authority to widen this packet. Exact helper invocation requires separate
+source/oracle proof.
 
 ## Acceptance receipt
 
-Three independent DESIGN and FINAL reviews ACCEPT. Pinned Bazel source and the offline 9.2 query/cquery/build oracle distinguish bare/implicit None from invalid list elements; the nonempty provider-list, bare provider and empty-list controls remain admitted. Before the production edit, the exact nonignored unit selector failed at “bare None is an empty provider return” and the real BUILD/.bzl configured-rule selector failed on implicit `pass` with `rule implementation returned non-provider value None` (both exit 101). A single normalizer guard now returns an empty evaluator-scratch Vec for bare None; list elements still enter the original decoder. The integration matrix verifies synthesized DefaultInfo includes predeclared non-executable outputs while registered writes remain, and rejects `[None]`, mixed provider/None, string and dict. No retained representation, DICE key, cache or lock changed.
+Independent DESIGN and FINAL reviews ACCEPT the finite source guard and
+26-field namespace. The pinned Bazel 9.2 source and offline query oracle
+distinguish defining-source access from root/near-name/sibling denial,
+generated repository word boundaries, frozen export and field shape. The
+source-labelled selector now runs at all three admitted `.bzl` evaluation
+sites; BUILD globals remain unchanged. One `GlobalsStatic` heap retains the
+complete struct and its nested callable/provider values, while all 25 helper
+invocations explicitly error. No DICE key, lock or repository side cache was
+added.
 
-Pinned-nightly JSON `--no-run` compiled the Analysis integration and lib binaries without compiler errors. Exact nonignored preflight found the two changed selectors and three protected selectors; all five pass serially. The rebuilt `slug_cli_v2` authentic normalized-PATH one-shot smoke clears the None-provider stop and stops independently during rules_python loading: `py_internal_renamed.bzl` references an undefined `py_internal` (exit 2). The exact transitive rule that had returned None remains unidentified; no rules_rust semantic claim is made. No remote transport or BuildBuddy credentials were used. Pre/post `slugd` checks found no process; Rust format, diff, archive and plan-status checks pass.
+Pinned-nightly JSON Loading `--lib --no-run` compiled the final test binary;
+exact nonignored preflight selected five tests and all five passed serially:
+source guard, all 26 fields and provider equality/hash, same-DICE real
+allowed-export/root-BUILD-use A/B/A with direct-root denial, and two protected
+provider/frozen-module controls. Initial integration attempts exposed only
+fixture setup needs (the test transaction's hardcoded `dep+` materialization
+and root module's unrelated rules_license registry request); the test helper
+was parameterized for `rules_python+`, with the normal `dep+` behavior
+preserved. Direct Core and CLI `cargo check` passed, and `cargo build -p
+slug_cli_v2` rebuilt the binary. The normalized-`PATH` authentic one-shot
+smoke clears the old undefined `py_internal` and stops separately at
+`@@rules_python+//python/private:attr_builders.bzl:89`, `only one required
+aspect is supported` (exit 2, roughly 41 seconds). This packet does not
+admit required-aspect breadth. Pre/post checks found no `slugd`; Rust format,
+diff, archive and plan-status checks pass. No remote service or BuildBuddy
+credentials were used. Packet wall time from draft through review was about
+20 minutes; the five final selected tests ran in under 0.1 second combined,
+with Cargo preparation and the authentic smoke dominating elapsed time.
 
 ## Immediate predecessor
 
-WP814 accepted at `bde3226bf`: NODEP constraint-setting default and bounded configured matching clear the preceding rules_rust stop; six focused Loading/Analysis tests, a protected Query test and authentic smoke pass their selected gates.
+WP815 accepted at `7bb492885`: bare/implicit None rule return now produces
+zero explicit providers and the authentic smoke reaches this separate
+rules_python guarded-global stop.

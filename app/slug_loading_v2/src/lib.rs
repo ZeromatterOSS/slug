@@ -85,6 +85,7 @@ mod module_extension_repository_validation;
 pub mod package;
 #[doc(hidden)]
 pub mod provider;
+mod py_internal;
 mod registration_diagnostic;
 mod registration_expansion;
 #[cfg(test)]

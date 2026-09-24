@@ -544,6 +544,27 @@ async fn transaction_with_policy(
     tracker: Option<Arc<EventTracker>>,
     force_outer: bool,
 ) -> DiceTransaction {
+    transaction_with_policy_and_repo(
+        dice,
+        epoch,
+        policy,
+        capture_events,
+        tracker,
+        force_outer,
+        "dep+",
+    )
+    .await
+}
+
+async fn transaction_with_policy_and_repo(
+    dice: &Arc<Dice>,
+    epoch: PathObservationEpoch,
+    policy: RootPackagePolicyInputs,
+    capture_events: bool,
+    tracker: Option<Arc<EventTracker>>,
+    force_outer: bool,
+    materialized_repo: &str,
+) -> DiceTransaction {
     let module_path = workspace().as_path().join("MODULE.bazel");
     let module_source = epoch
         .get(&EpochBuilder::demand(
@@ -617,7 +638,7 @@ async fn transaction_with_policy(
     let request = Arc::new(RepositoryMaterializationRequest {
         id: RepositoryMaterializationRequestId {
             workspace: workspace(),
-            canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+            canonical_repo: CanonicalRepoName::new(materialized_repo).unwrap(),
         },
         repo_spec: RepoSpec {
             rule_id: RepoRuleId {
@@ -39962,6 +39983,108 @@ async fn observed_external_bzl_source_provenance_tracks_helper_revision() {
             first = Some(module.manifest.clone());
         }
     }
+}
+
+#[tokio::test]
+async fn guarded_python_internal_export_loads_in_root_build_and_restores_a_b_a() {
+    const BUILD: &str = "load('@rules_python//:export.bzl', 'EXPORTED', 'MARKER')\nfilegroup(name = MARKER + '_' + type(EXPORTED))\n";
+    const SOURCE_A: &str = "EXPORTED = py_internal\nALIAS = EXPORTED\nMARKER = 'a'\n";
+    const SOURCE_B: &str = "EXPORTED = py_internal\nALIAS = EXPORTED\nMARKER = 'b'\n";
+    let epoch = |build: &str, source: &str, variant: i64| {
+        let mut epoch = EpochBuilder::workspace_sources(
+            "module(name='bazel_tools')\nbazel_dep(name='rules_python', version='1.0.0')\nlocal_path_override(module_name='rules_python', path='dep')\n",
+            build,
+            &[],
+            variant,
+        );
+        epoch.directory("/workspace/dep", variant);
+        epoch.file(
+            "/workspace/dep/MODULE.bazel",
+            "module(name='rules_python', version='1.0.0')\n",
+            variant,
+        );
+        epoch.missing("/workspace/dep/REPO.bazel");
+        epoch.missing("/workspace/dep/.bazelignore");
+        epoch.file("/workspace/dep/BUILD.bazel", "", variant);
+        epoch.file("/workspace/dep/export.bzl", source, variant);
+        epoch.build()
+    };
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut packages = Vec::new();
+    let mut modules = Vec::new();
+    for (variant, source, expected) in [
+        (1116, SOURCE_A, "a_struct"),
+        (1117, SOURCE_B, "b_struct"),
+        (1118, SOURCE_A, "a_struct"),
+    ] {
+        let mut tx = transaction_with_policy_and_repo(
+            &dice,
+            epoch(BUILD, source, variant),
+            package_policy(),
+            false,
+            None,
+            false,
+            "rules_python+",
+        )
+        .await;
+        let route = external_route_named(&mut tx, "rules_python").await;
+        let module = tx
+            .compute(&external_bzl_key(route, "", "export.bzl"))
+            .await
+            .unwrap();
+        if let LoadingPreparationOutcome::Need(needs) = &module {
+            panic!("unexpected export frontier: {needs:?}");
+        }
+        let frozen = external_terminal(&module);
+        assert_eq!(
+            frozen.manifest.root.label.to_string(),
+            "@@rules_python+//:export.bzl"
+        );
+        let exported = frozen.module.get("EXPORTED").unwrap();
+        assert_eq!(exported.value().get_type(), "struct");
+        assert!(
+            exported
+                .value()
+                .ptr_eq(frozen.module.get("ALIAS").unwrap().value())
+        );
+        let package = tx.compute(&package_key()).await.unwrap();
+        if let LoadingPreparationOutcome::Need(needs) = &package {
+            panic!("unexpected package frontier: {needs:?}");
+        }
+        assert_eq!(target_names(&package), [expected]);
+        modules.push(module);
+        packages.push(package);
+    }
+    assert!(
+        external_terminal(&modules[0])
+            .module
+            .get("EXPORTED")
+            .unwrap()
+            .value()
+            .ptr_eq(
+                external_terminal(&modules[1])
+                    .module
+                    .get("EXPORTED")
+                    .unwrap()
+                    .value()
+            )
+    );
+    assert!(!RootPackageLoadKey::equality(&packages[0], &packages[1]));
+    assert!(RootPackageLoadKey::equality(&packages[0], &packages[2]));
+
+    // A loaded value may cross the guard; the root BUILD's own global cannot.
+    let mut denied_tx = transaction_with_policy_and_repo(
+        &dice,
+        epoch("filegroup(name = type(py_internal))\n", SOURCE_A, 1119),
+        package_policy(),
+        false,
+        None,
+        false,
+        "rules_python+",
+    )
+    .await;
+    let denied = denied_tx.compute(&package_key()).await.unwrap();
+    assert!(terminal_error(&denied).contains("py_internal"));
 }
 
 #[path = "cc_freeze_tests.rs"]
