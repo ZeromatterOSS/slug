@@ -734,10 +734,9 @@ impl NativeToolchainTarget {
 
     pub fn semantic_references(&self) -> Vec<CanonicalLabel> {
         match self {
-            Self::ConstraintSetting {
-                default_constraint_value,
-            } => default_constraint_value.iter().cloned().collect(),
-            Self::ToolchainType => Vec::new(),
+            // Bazel's default_constraint_value is NODEP: retain the declaration,
+            // but do not preload or configure the value through its setting.
+            Self::ConstraintSetting { .. } | Self::ToolchainType => Vec::new(),
             Self::ConstraintValue { constraint_setting } => vec![constraint_setting.clone()],
             Self::Platform { constraint_values } => constraint_values.to_vec(),
             Self::Toolchain {

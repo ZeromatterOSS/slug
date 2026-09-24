@@ -9493,3 +9493,12 @@ authentic build clears `native.alias(visibility = None)` and reaches a
 distinct rules_rust `constraint_setting(default_constraint_value)` stop for
 `@@rules_rust+//rust/platform:wasi_version`. Configured alias resolution,
 remote transport, full Rust rules and M7A close remain deferred.
+
+### Constraint-setting default is a NODEP declaration (2026-09-24)
+
+WP814 keeps `default_constraint_value` as the already-retained native label
+attribute, but removes it from `NativeToolchainTarget::semantic_references()`:
+Bazel 9.2 declares this attribute NODEP, and a default value commonly points
+back to its setting. Query continues to expose the label attribute without an
+ordinary rule-input edge; configured Analysis validates and consumes the fact
+without preloading or configuring the default target from the setting.

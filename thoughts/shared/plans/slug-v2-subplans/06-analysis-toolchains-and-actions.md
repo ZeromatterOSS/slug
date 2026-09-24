@@ -1844,6 +1844,24 @@ stops during later rules_java loading at rule-initializer invocation. Stage 6
 adds no initializer owner; the R2/group/alias stack remains atomic and
 unaccepted while Stage 4 freezes the successor.
 
+## Configured constraint-setting defaults
+
+WP814 admits the Bazel 9.2 NODEP default for configured constraint settings
+with absent refinement. Analysis validates same-package target existence from
+the observed loaded package, not by configuring the default target; a value
+may point back to its setting without a cycle. The configured setting result
+retains a pointer-sized Arc default fact in structural equality. Requested
+constraint values share that fact; platform constraints remain explicitly
+declared only. Condition and toolchain matchers choose an explicit platform
+value first, otherwise compare the requested value with its setting's default.
+`use_target_platform_constraints` requests only the target platform's explicit
+values, then applies that same effective-value comparison on execution.
+Same-DICE default edits restore both condition and toolchain decisions.
+Nonempty refinement fails closed; Starlark providers, full
+`ConstraintCollection`, alias-valued defaults and implicit source-file target
+materialization remain outside this configured slice. The pure `ConstraintSet`
+helper is not the DICE path and gains no parity claim.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

@@ -1835,12 +1835,34 @@ fn constraint_setting_retains_default_value_presence() {
     .unwrap();
 
     let loaded = load_package(&workspace, &workspace);
+    let PackageTargetKind::NativeToolchain(setting) = &loaded.targets[0].kind else {
+        panic!("setting must remain a native toolchain target")
+    };
     assert!(matches!(
-        &loaded.targets[0].kind,
-        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintSetting {
+        setting,
+        NativeToolchainTarget::ConstraintSetting {
             default_constraint_value: Some(label),
-        }) if label == &CanonicalLabel::parse("@@//:value").unwrap()
+        } if label == &CanonicalLabel::parse("@@//:value").unwrap()
     ));
+    assert!(setting.semantic_references().is_empty());
+    let default = loaded
+        .native_attributes("setting")
+        .unwrap()
+        .get("default_constraint_value")
+        .unwrap();
+    assert_eq!(default.1.provenance, AttributeProvenance::Explicit);
+    assert!(matches!(
+        &default.1.value,
+        CoercedAttributeValue::Label(label)
+            if label == &CanonicalLabel::parse("@@//:value").unwrap()
+    ));
+    let PackageTargetKind::NativeToolchain(value) = &loaded.targets[1].kind else {
+        panic!("value must remain a native toolchain target")
+    };
+    assert_eq!(
+        value.semantic_references(),
+        [CanonicalLabel::parse("@@//:setting").unwrap()]
+    );
 }
 
 #[test]

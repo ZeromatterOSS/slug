@@ -1044,12 +1044,7 @@ async fn compute_configured_condition(
                 }
                 LoadingPreparationOutcome::Complete(Ok(Ok(constraint))) => {
                     constraint_match &= platform.as_ref().is_some_and(|platform| {
-                        platform.constraints().iter().any(|candidate| {
-                            candidate.constraint_setting().label()
-                                == constraint.constraint_setting().label()
-                                && candidate.constraint_value().label()
-                                    == constraint.constraint_value().label()
-                        })
+                        platform_has_actual_constraint(platform, &constraint)
                     });
                 }
             }
@@ -2739,7 +2734,8 @@ async fn compute_configured_constraint(
     analysis_semantic_complete(Ok(ConfiguredActionPlatformConstraint::new(
         actual_value,
         actual_setting,
-    )))
+    )
+    .with_default_constraint_value(setting.constraint_setting_default().cloned())))
 }
 
 async fn compute_configured_platform(
@@ -4003,30 +3999,32 @@ async fn actual_toolchain_target(
 
 fn platform_has_actual_constraint(
     platform: &ConfiguredPlatform,
-    constraint: &(CanonicalLabel, CanonicalLabel),
+    constraint: &ConfiguredActionPlatformConstraint,
 ) -> bool {
-    platform.constraints().iter().any(|candidate| {
-        candidate.constraint_setting().label() == &constraint.0
-            && candidate.constraint_value().label() == &constraint.1
-    })
+    match platform.constraints().iter().find(|candidate| {
+        candidate.constraint_setting().label() == constraint.constraint_setting().label()
+    }) {
+        Some(actual) => actual.constraint_value().label() == constraint.constraint_value().label(),
+        None => {
+            constraint.default_constraint_value() == Some(constraint.constraint_value().label())
+        }
+    }
 }
 
 fn platform_satisfies_platform_constraints(
     platform: &ConfiguredPlatform,
     required: &ConfiguredPlatform,
 ) -> bool {
-    required.constraints().iter().all(|constraint| {
-        platform.constraints().iter().any(|candidate| {
-            candidate.constraint_setting().label() == constraint.constraint_setting().label()
-                && candidate.constraint_value().label() == constraint.constraint_value().label()
-        })
-    })
+    required
+        .constraints()
+        .iter()
+        .all(|constraint| platform_has_actual_constraint(platform, constraint))
 }
 
 fn platform_satisfies_constraint_labels(
     platform: &ConfiguredPlatform,
     labels: &[CanonicalLabel],
-    constraints: &SmallMap<CanonicalLabel, (CanonicalLabel, CanonicalLabel)>,
+    constraints: &SmallMap<CanonicalLabel, ConfiguredActionPlatformConstraint>,
 ) -> bool {
     labels.iter().all(|label| {
         platform_has_actual_constraint(
@@ -4043,19 +4041,13 @@ async fn prepared_toolchain_constraints(
     workspace: &NormalizedAbsolutePath,
     configuration: &ConfigurationKey,
     labels: SmallSet<CanonicalLabel>,
-) -> AnalysisSemanticOutcome<SmallMap<CanonicalLabel, (CanonicalLabel, CanonicalLabel)>> {
+) -> AnalysisSemanticOutcome<SmallMap<CanonicalLabel, ConfiguredActionPlatformConstraint>> {
     let mut resolved = SmallMap::with_capacity(labels.len());
     for label in labels {
         let requested = ConfiguredTargetKey::new(label.clone(), configuration.clone());
         let value =
             analysis_value!(compute_configured_constraint(ctx, workspace, &requested).await);
-        resolved.insert(
-            label,
-            (
-                value.constraint_setting().label().clone(),
-                value.constraint_value().label().clone(),
-            ),
-        );
+        resolved.insert(label, value);
     }
     analysis_semantic_complete(Ok(resolved))
 }
@@ -4482,7 +4474,8 @@ async fn compute_configured_toolchain_resolution(
                 let setting = constraints
                     .get(value)
                     .expect("all declaration constraints were prepared")
-                    .0
+                    .constraint_setting()
+                    .label()
                     .clone();
                 if !settings.insert(setting) {
                     return analysis_semantic_complete(Err(AnalysisError::message(format!(
@@ -5410,21 +5403,49 @@ impl ConfiguredNodeAnalysisKey {
                 ConfigurationKind::Target | ConfigurationKind::Exec
             ) =>
             {
-                if default_constraint_value.is_some() {
+                if package
+                    .native_attributes(label.target().as_str())
+                    .and_then(|attrs| attrs.get("refines_constraint_value"))
+                    .is_some_and(|(_, attr)| !matches!(attr.value, CoercedAttributeValue::None))
+                {
                     return root_analysis_driver_complete(Err(AnalysisError::new(format!(
-                        "constraint setting defaults are unsupported: {label}"
+                        "constraint setting refines_constraint_value is unsupported: {label}"
                     ))));
                 }
-                return root_analysis_driver_complete(native_configured_result(
-                    package,
-                    self.node.clone(),
-                    ConfiguredNodeKind::ConstraintSetting,
-                    native_empty_providers(),
-                    target.and_then(|target| target.rule_capability()).cloned(),
-                    Vec::new(),
-                    &[],
-                    &[],
-                ));
+                if let Some(default) = default_constraint_value {
+                    if default.package() != label.package() {
+                        return root_analysis_driver_complete(Err(AnalysisError::new(format!(
+                            "constraint setting default {default} must be in the same package as {label}"
+                        ))));
+                    }
+                    if !package
+                        .targets
+                        .iter()
+                        .any(|candidate| candidate.name.as_str() == default.target().as_str())
+                    {
+                        return root_analysis_driver_complete(Err(AnalysisError::new(format!(
+                            "constraint setting default {default} does not exist"
+                        ))));
+                    }
+                }
+                return root_analysis_driver_complete(
+                    native_configured_result(
+                        package,
+                        self.node.clone(),
+                        ConfiguredNodeKind::ConstraintSetting,
+                        native_empty_providers(),
+                        target.and_then(|target| target.rule_capability()).cloned(),
+                        Vec::new(),
+                        &[],
+                        &[],
+                    )
+                    .map(|result| match default_constraint_value {
+                        Some(default) => {
+                            result.with_constraint_setting_default(Arc::new(default.clone()))
+                        }
+                        None => result,
+                    }),
+                );
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),

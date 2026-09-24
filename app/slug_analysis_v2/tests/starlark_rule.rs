@@ -6159,9 +6159,27 @@ alias(name = "cycle_b", actual = ":cycle_a")
         slug_analysis_v2::ConfigurationKind::Target
     );
 
+    let default_key = ConfiguredPlatformKey::new(
+        workspace_key.dupe(),
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:default_platform").unwrap(),
+            configuration.clone(),
+        ),
+    )
+    .unwrap();
+    let default_platform =
+        configured_platform_result(transaction.compute(&default_key).await.unwrap()).unwrap();
+    assert_eq!(default_platform.constraints().len(), 1);
+    assert_eq!(
+        default_platform.constraints()[0]
+            .constraint_value()
+            .label()
+            .to_string(),
+        "@@//:default_value"
+    );
+
     for (target, expected) in [
         ("duplicate", "duplicate constraint setting"),
-        ("default_platform", "defaults are unsupported"),
         ("wrong_platform", "non-constraint value"),
         ("cycle_a", "configured alias cycle"),
     ] {
@@ -6177,6 +6195,298 @@ alias(name = "cycle_b", actual = ":cycle_a")
             configured_platform_result(transaction.compute(&key).await.unwrap()).unwrap_err();
         assert!(error.contains(expected), "{target}: {error}");
     }
+}
+
+#[tokio::test]
+async fn configured_constraint_setting_default_validates_without_a_default_dependency_edge() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::create_dir_all(workspace.join("foreign")).unwrap();
+    fs::write(
+        workspace.join("foreign/BUILD.bazel"),
+        "filegroup(name = 'value')\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"constraint_setting(name = "good", default_constraint_value = ":value")
+constraint_value(name = "value", constraint_setting = ":good")
+constraint_setting(name = "other")
+constraint_value(name = "other_value", constraint_setting = ":other")
+filegroup(name = "not_constraint_value")
+constraint_setting(name = "wrong_owner", default_constraint_value = ":other_value")
+constraint_setting(name = "wrong_kind", default_constraint_value = ":not_constraint_value")
+constraint_setting(name = "missing", default_constraint_value = ":not_here")
+constraint_setting(name = "cross_package", default_constraint_value = "//foreign:value")
+constraint_setting(name = "refined", default_constraint_value = ":not_here", refines_constraint_value = ":other_value")
+"#,
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for target in ["good", "wrong_owner", "wrong_kind"] {
+        let result = root_target_request(
+            &dice,
+            &workspace,
+            &format!("@@//:{target}"),
+            Arc::new(RootActivationTracker::default()),
+        )
+        .await
+        .unwrap_or_else(|error| panic!("{target}: {error}"));
+        assert_eq!(result.kind(), &ConfiguredNodeKind::ConstraintSetting);
+        assert!(result.edges().is_empty(), "{target} has a NODEP default");
+    }
+    for (target, expected) in [
+        ("missing", "does not exist"),
+        ("cross_package", "same package"),
+        ("refined", "refines_constraint_value"),
+    ] {
+        let error = root_target_request(
+            &dice,
+            &workspace,
+            &format!("@@//:{target}"),
+            Arc::new(RootActivationTracker::default()),
+        )
+        .await
+        .err()
+        .unwrap_or_else(|| panic!("{target} unexpectedly configured"));
+        assert!(error.contains(expected), "{target}: {error}");
+    }
+    assert_eq!(
+        std::mem::size_of::<Option<Arc<CanonicalLabel>>>(),
+        std::mem::size_of::<usize>(),
+        "the optional retained default fact must be pointer-sized"
+    );
+    eprintln!(
+        "ConfiguredNodeResult inline bytes: {}",
+        std::mem::size_of::<slug_analysis_v2::ConfiguredNodeResult>()
+    );
+}
+
+#[tokio::test]
+async fn configured_constraint_default_matches_omission_but_explicit_value_overrides_and_restores()
+{
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    let build = workspace.join("BUILD.bazel");
+    let source = |default| {
+        format!(
+            r#"constraint_setting(name = "wasi_version", default_constraint_value = ":{default}")
+constraint_value(name = "preview_1", constraint_setting = ":wasi_version")
+constraint_value(name = "preview_2", constraint_setting = ":wasi_version")
+platform(name = "platform_omitted", constraint_values = [])
+platform(name = "platform_explicit_2", constraint_values = [":preview_2"])
+config_setting(name = "requires_preview_1", constraint_values = [":preview_1"])
+config_setting(name = "requires_preview_2", constraint_values = [":preview_2"])
+"#
+        )
+    };
+    fs::write(&build, source("preview_1")).unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let matches = |condition: &str, platform: &str| {
+        let dice = dice.clone();
+        let workspace = workspace.clone();
+        let condition = format!("@@//:{condition}");
+        let configuration =
+            ConfigurationKey::from_slug(default_test_configuration().with_host_platform_label(
+                &CanonicalLabel::parse(&format!("@@//:{platform}")).unwrap(),
+            ));
+        async move { configured_condition_request(&dice, &workspace, &condition, configuration).await }
+    };
+    assert_eq!(
+        matches("requires_preview_1", "platform_omitted")
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+    assert_eq!(
+        matches("requires_preview_1", "platform_explicit_2")
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::NoMatch
+    );
+    assert_eq!(
+        matches("requires_preview_2", "platform_explicit_2")
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+    fs::write(&build, source("preview_2")).unwrap();
+    assert_eq!(
+        matches("requires_preview_1", "platform_omitted")
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::NoMatch
+    );
+    fs::write(&build, source("preview_1")).unwrap();
+    assert_eq!(
+        matches("requires_preview_1", "platform_omitted")
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+}
+
+#[tokio::test]
+async fn configured_constraint_defaults_filter_requested_toolchain_constraints_only() {
+    let workspace = scratch();
+    fs::write(workspace.join("defs.bzl"), TOOLCHAIN_DEFS).unwrap();
+    let module = workspace.join("MODULE.bazel");
+    let build = workspace.join("BUILD.bazel");
+    let build_source = |toolchain_attrs| {
+        format!(
+            r#"load(":defs.bzl", "first_impl", "request")
+constraint_setting(name = "wasi_version", default_constraint_value = ":preview_1")
+constraint_value(name = "preview_1", constraint_setting = ":wasi_version")
+constraint_value(name = "preview_2", constraint_setting = ":wasi_version")
+constraint_setting(name = "unrelated", default_constraint_value = ":unrelated_1")
+constraint_value(name = "unrelated_1", constraint_setting = ":unrelated")
+constraint_value(name = "unrelated_2", constraint_setting = ":unrelated")
+platform(name = "exec_default", constraint_values = [":unrelated_2"])
+platform(name = "exec_second", constraint_values = [":preview_2"])
+platform(name = "target_omitted", constraint_values = [])
+platform(name = "target_explicit_1", constraint_values = [":preview_1"])
+toolchain_type(name = "type")
+first_impl(name = "impl", marker = "selected")
+toolchain(name = "selected_tc", toolchain_type = ":type", toolchain = ":impl", {toolchain_attrs})
+request(name = "request")
+"#
+        )
+    };
+    let configuration =
+        |platform: &str| {
+            ConfigurationKey::from_slug(default_test_configuration().with_host_platform_label(
+                &CanonicalLabel::parse(&format!("@@//:{platform}")).unwrap(),
+            ))
+        };
+    let selected_execution_platform = |configuration: ConfigurationKey| {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let workspace = workspace.clone();
+        async move {
+            let result = root_target_request_with_configuration(
+                &dice,
+                &workspace,
+                "@@//:request",
+                configuration,
+                Arc::new(RootActivationTracker::default()),
+            )
+            .await?;
+            assert_eq!(
+                selected_toolchain(&result).declaration().to_string(),
+                "@@//:selected_tc"
+            );
+            Ok::<_, String>(
+                result
+                    .toolchain_topology()
+                    .unwrap()
+                    .toolchain()
+                    .unwrap()
+                    .execution_platform()
+                    .label()
+                    .to_string(),
+            )
+        }
+    };
+
+    fs::write(
+        &module,
+        "module(name = 'root')\nregister_execution_platforms('//:exec_default', '//:exec_second')\nregister_toolchains('//:selected_tc')\n",
+    )
+    .unwrap();
+    fs::write(
+        &build,
+        build_source(
+            "exec_compatible_with = [':preview_1'], target_compatible_with = [':preview_1']",
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        selected_execution_platform(configuration("target_omitted"))
+            .await
+            .unwrap(),
+        "@@//:exec_default",
+        "an unrelated default and explicit different value cannot constrain this toolchain"
+    );
+
+    fs::write(
+        &module,
+        "module(name = 'root')\nregister_execution_platforms('//:exec_second', '//:exec_default')\nregister_toolchains('//:selected_tc')\n",
+    )
+    .unwrap();
+    fs::write(
+        &build,
+        build_source("use_target_platform_constraints = True"),
+    )
+    .unwrap();
+    assert_eq!(
+        selected_execution_platform(configuration("target_omitted"))
+            .await
+            .unwrap(),
+        "@@//:exec_second",
+        "an omitted target setting must not become an implicit request"
+    );
+    assert_eq!(
+        selected_execution_platform(configuration("target_explicit_1"))
+            .await
+            .unwrap(),
+        "@@//:exec_default",
+        "an explicit target value must match the execution platform's default"
+    );
+}
+
+#[tokio::test]
+async fn same_dice_constraint_default_edit_reselects_and_restores_toolchain() {
+    let workspace = scratch();
+    fs::write(workspace.join("defs.bzl"), TOOLCHAIN_DEFS).unwrap();
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = 'root')\nregister_execution_platforms('//:exec_platform')\nregister_toolchains('//:first_tc', '//:second_tc')\n",
+    )
+    .unwrap();
+    let build = workspace.join("BUILD.bazel");
+    let source = |default| {
+        format!(
+            r#"load(":defs.bzl", "first_impl", "request", "second_impl")
+constraint_setting(name = "wasi_version", default_constraint_value = ":{default}")
+constraint_value(name = "preview_1", constraint_setting = ":wasi_version")
+constraint_value(name = "preview_2", constraint_setting = ":wasi_version")
+platform(name = "exec_platform", constraint_values = [])
+platform(name = "target_platform", constraint_values = [])
+toolchain_type(name = "type")
+first_impl(name = "first_impl", marker = "first")
+second_impl(name = "second_impl", marker = "second")
+toolchain(name = "first_tc", toolchain_type = ":type", toolchain = ":first_impl", exec_compatible_with = [":preview_1"])
+toolchain(name = "second_tc", toolchain_type = ":type", toolchain = ":second_impl", exec_compatible_with = [":preview_2"])
+request(name = "request")
+"#
+        )
+    };
+    fs::write(&build, source("preview_1")).unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let configuration = ConfigurationKey::from_slug(
+        default_test_configuration()
+            .with_host_platform_label(&CanonicalLabel::parse("@@//:target_platform").unwrap()),
+    );
+    let selected = || {
+        let dice = dice.clone();
+        let workspace = workspace.clone();
+        let configuration = configuration.clone();
+        async move {
+            let result = root_target_request_with_configuration(
+                &dice,
+                &workspace,
+                "@@//:request",
+                configuration,
+                Arc::new(RootActivationTracker::default()),
+            )
+            .await?;
+            Ok::<_, String>(selected_toolchain(&result).declaration().to_string())
+        }
+    };
+    assert_eq!(selected().await.unwrap(), "@@//:first_tc");
+    fs::write(&build, source("preview_2")).unwrap();
+    assert_eq!(selected().await.unwrap(), "@@//:second_tc");
+    fs::write(&build, source("preview_1")).unwrap();
+    assert_eq!(selected().await.unwrap(), "@@//:first_tc");
 }
 
 #[tokio::test]

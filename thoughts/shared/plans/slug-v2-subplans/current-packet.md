@@ -1,128 +1,38 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-113-m7a-native-alias-none-visibility-r1
+Packet: WP-7-114-m7a-constraint-setting-default-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit explicit `visibility = None` on direct `alias(...)` and loaded `.bzl`
-`native.alias(...)` calls as omitted visibility. Authenticated bazel_skylib
-1.8.2 `lib/selects.bzl:177-184` passes `visibility=None` through
-`selects.config_setting_group` while rules_rust registration row 56 loads.
-The rebuilt authentic `slug build //:probe` must clear the current alias
-argument-type stop and may reach a separately typed later stop. This is a
-Loading-only packet, not configured alias resolution or M7A close.
+Admit the source-shaped `rules_rust` `constraint_setting(default_constraint_value = ":wasi_preview_1")` through configured Analysis, including exact same-package/existence validation and default-aware matching on the already-admitted configured condition and toolchain paths. The rebuilt authentic `slug build //:probe` must clear the current `constraint setting defaults are unsupported` stop; a new independent stop is not covered. This is not a full platform-provider, constraint API, or rules_rust claim.
 
-Exact Bazel 9.2 slice: for the known alias `visibility` attribute, explicit
-`None` and omission both use the surrounding package/legacy-macro default;
-`None` is not an explicitly declared private or empty visibility. An explicit
-empty list is private; valid list/tuple visibility remains accepted, and a
-scalar string remains invalid. Unknown attributes, including `bogus=None`,
-remain errors. Slug-native: diagnostics, canonical visibility/label identity
-and output path bytes. Unsupported/deferred: other native rule classes or
-attributes receiving `None`, symbolic macro visibility, arbitrary iterable
-coercion, cross-repository policy beyond accepted mapping, configured target
-selection, actions and full rules_rust/Swift bootstrap.
+Exact Bazel 9.2 slice: a default label is a nonconfigurable NODEP label, validated when its setting is configured for same package and target existence only; a same-package existing target of a different rule kind or owning setting is not rejected by that validation. A platform's explicit value for a setting wins; when absent, the setting's default supplies the requested value for `config_setting` constraint matching and admitted toolchain/platform eligibility. An unrelated default must not constrain a toolchain that never requests its setting. This slice requires absent `refines_constraint_value`; a nonempty refinement fails closed before default matching. Slug-native: canonical/structural configured identity, diagnostics and platform/action path bytes. Unsupported/deferred: full `ConstraintSettingInfo`/`PlatformInfo` Starlark providers, alias-valued defaults without a discriminating oracle, refinement semantics, arbitrary `ConstraintCollection` API, implicit source-file target materialization beyond loaded package targets, unadmitted toolchain policies and exact Bazel configuration/output identity.
 
 ## Source, owner and decision
 
-Pinned Bazel 9.2 HEAD `8220c6198837d5c13d53fea211cf3282aa12408a`:
-`AttributeProvider.java:205-241` validates a known attribute name then skips
-an explicit Starlark `None` before conversion; `RuleFactory.java:303-324`
-uses that path for native rules. `BaseRuleClasses.java:228-237` gives alias
-its nonconfigurable visibility attribute, and `RuleVisibility.java:175-203`
-distinguishes an explicit empty list from inherited defaults. Bazel's
-`Target.java:166-176`/`Rule.java:674-687` own normal package-default
-inheritance. The authenticated bazel_skylib source hash is
-`df3e9b6a0eaf081103b8d11dee55abcb98db8532cd552d6f32205c3a3d3f54c0`.
+Pinned Bazel 9.2 HEAD `8220c6198837d5c13d53fea211cf3282aa12408a`: `ConstraintSettingRule.java:52-66` declares NODEP; `ConstraintSetting.java:86-120` validates same-package target existence against the already-loaded package, not a configured dependency; `ConstraintSettingInfo.java:38-72` carries/synthesizes the default; `ConstraintCollection.java:171-224` chooses explicit before default; `SingleToolchainResolutionFunction.java:246-281` does not treat an unrelated default as a requested mismatch. `ConstraintTest.java:87-153` covers declaration acceptance and validation negatives. Authenticated rules_rust 0.73.0 `rust/platform/BUILD.bazel:11-24` declares `wasi_version` before `wasi_preview_1`, which points back to that setting. Offline Bazel 9.2 query/cquery probes distinguish NODEP, later declaration, wrong-kind/wrong-setting acceptance, missing/cross-package configured rejection, and default matching/override (oracle receipt before implementation).
 
-In Slug, both `alias` wrappers in
-`app/slug_loading_v2/src/package.rs:9410-9420,10154-10165` currently bind
-`visibility: Option<UnpackVisibility>`, whose list/tuple-only parser rejects
-`None` before `alias_global` runs. Normalize explicit `None` to omitted at
-these two call boundaries only, then reuse the existing `UnpackVisibility`
-parser for non-None values. `alias_global`, `PackageRecorder::alias`, and
-`visibility_source(..., PackageDefault)` already retain the correct fact;
-do not change them or the shared parser used by other rules. The package
-source/default and existing source-manifest/repository observations continue
-to own DICE equality and A/B/A invalidation; no new semantic input, key,
-cache, lock or retained value is added. Parsing is evaluator scratch and
-returns the existing borrowed/owned visibility arguments; package/DICE
-retention and release boundaries are unchanged.
+Loading already retains `NativeToolchainTarget::ConstraintSetting.default_constraint_value` in its package result, and Query projects the native label attribute without an ordinary dependency edge. Correct Loading's `semantic_references()` for this NODEP attribute to return no graph/preload reference, while preserving the retained declaration and Query attribute. Configured-node Analysis in `app/slug_analysis_v2/src/dice.rs` checks retained native attributes to fail closed on nonempty `refines_constraint_value`, validates the default against the observed `LoadedPackage`, and emits a compact `Option<Arc<CanonicalLabel>>` setting-default fact on `ConfiguredNodeResult` in `result.rs`, with no configured edge to the default value (which would cycle). `ConfiguredActionPlatformConstraint` shares the fact from its configured setting, and the existing immutable platform slice holds only explicitly declared values. A common matcher compares explicit setting value first, otherwise the requested setting's default label, across configured conditions, requested execution constraints, declaration target/exec constraints, and `use_target_platform_constraints` comparisons. Do not enumerate global defaults or introduce a side cache/registry.
+
+The observed package/setting configured keys own source invalidation. The new fact participates in structural configured-result and derived constraint equality, so A/B/A default edits must invalidate and restore dependent condition/toolchain decisions even when no platform explicitly lists that setting. Need/error remains within the current DICE owner and no lock crosses a compute. The optional Arc fact costs at most one pointer slot on each common configured node, with one allocation per configured defaulted-setting result shared into derived constraints; record `size_of::<ConfiguredNodeResult>()` and assert the pointer-sized optional carrier in focused tests. Facts are DICE-retained with existing DICE release/cancellation; match maps and candidate scans stay phase scratch. Reuse canonical label, Arc slice, Dupe/Allocative and compact scratch collections under the Stage 9 configured-platform row; no new interner, retained hash map or byte cache. Bazel's Java equality shortcut is not Slug's structural invalidation policy. The existing pure `ConstraintSet` helper is not the configured-DICE path and gains no parity claim in this packet.
 
 ## Evidence and validation
 
-Offline Bazel 9.2 scratch `/tmp/slug-wp813-alias-visibility` used ignored RCs
-and disabled repository downloads. With a public package default, XML query
-accepts omitted and explicit-None aliases without a declared visibility
-element; explicit list/tuple public are public and `[]` is private.
-Cross-package builds for omitted/None/list/tuple public exit 0; the empty-list
-alias is rejected by visibility (exit 1). A scalar-string visibility query
-exits 7. A two-setting source-shaped bazel_skylib macro query exits 0 and
-selects the expected aliases under `dbg` and `opt` cquery. This discriminates
-None-as-omission from None-as-empty/private. Reuse this scratch and pinned
-source; no Stage 1 fixture unless a demonstrated gap requires it.
+Use the offline Bazel 9.2 discriminators and pinned source above; no Stage 1 fixture absent a demonstrated gap. Focused Analysis tests must cover later-declared same-package default, no configured default edge/cycle, missing and cross-package configured errors, same-package wrong kind/setting validation acceptance, implicit default condition match, explicit different-value override, nonrequesting toolchain unaffected, requested exec/target constraint default match, nonempty-refinement refusal, and structural A/B/A edit/restoration. For `use_target_platform_constraints`, discriminate an omitted target setting against a different explicit exec value (must not constrain it) from an explicitly requested target default against an exec platform that omits it (fallback matches); do not materialize implicit defaults as requested settings. Retain the existing alias/normalization, duplicate-setting, wrong-platform and cycle controls. Loading regression must retain the default attribute but remove its `semantic_references()` edge; protect Query's native attribute/deps projection.
 
-Add a focused Loading regression beside existing alias tests. Through both
-direct BUILD and a loaded `.bzl` legacy macro, compare omitted, explicit
-None, explicit `[]`, and explicit public list/tuple under a public package
-default; inspect retained visibility source/effective visibility and
-cross-package query or Loading visibility where available. Keep bad scalar,
-bad element, unknown-kwarg-None and malformed `actual` fail-closed controls.
-Use exact nonignored test preflight/serial execution after pinned-nightly Cargo
-JSON `--no-run`, plus one named direct Query/Analysis dependent compile if
-the retained visibility contract changes. Rebuild `slug_cli_v2` before the
-authentic normalized-PATH smoke; check/clean `slugd` before and after. Run
-Rust format, diff, archive and plan-status checks. Independent DESIGN review
-must precede implementation, with FINAL review of the diff/evidence. No broad
-suite or remote-service gate is selected; leave BuildBuddy auth untouched.
+Run pinned-nightly Cargo JSON `--no-run` for the named Analysis and Loading integration binaries, exact nonignored selector preflight and serial focused tests; then direct Query/dependent compile checks for changed public result consumers. Rebuild `slug_cli_v2` before the authentic normalized-PATH one-shot smoke. Check/clean `slugd` before and after. Run Rust format, diff, archive and plan-status checks. Independent DESIGN review precedes implementation; independent FINAL review checks diff and evidence. No broad suite or remote-service gate selected. Do not read, print or copy BuildBuddy authentication from `~/.bazelrc`.
 
 ## Scope and stops
 
-Base clean main `c2a31c4bb`. Allowlist: this manifest and canonical Current
-paragraph; Stage 4 owner update after acceptance; only
-`app/slug_loading_v2/src/package.rs` production and focused tests in
-`app/slug_loading_v2/tests/build_file_loading.rs` (or the adjacent existing
-Loading alias test owner if that is required for source-shaped macro proof).
-Approximate production/proof growth 25/110 lines is a review trigger. The
-large `package.rs` already owns both call wrappers and the shared recorder;
-two local signature conversions belong there, without splitting or modifying
-its many unrelated rule entrypoints. REPLAN if Bazel treats this `None` as an
-explicit visibility, if Slug's wrapper cannot preserve existing list/tuple
-and invalid-value validation without global parser widening, or if clearing
-the authentic stop needs configured/native-rule-family semantics. Do not
-paper over a new independent stop.
+Base clean main `88ea63d7c`. Allowlist: this manifest and canonical Current paragraph; Stage 4 and Stage 6 owner updates after acceptance; production `app/slug_loading_v2/src/package.rs`, `app/slug_analysis_v2/src/dice.rs`, `app/slug_analysis_v2/src/result.rs`; focused tests in `app/slug_loading_v2/tests/build_file_loading.rs` and `app/slug_analysis_v2/tests/starlark_rule.rs` (adjacent result/Query tests only if required). Approximate production/proof growth 110/190 lines is a review trigger. `dice.rs` is large but remains the existing single configured producer; small validation/matcher helpers belong by its current constraint functions, not a new dispatcher. `result.rs` carries only one typed fact/projection, and Loading changes only the NODEP reference method. REPLAN if exact Bazel default matching requires a new configured edge/cycle, a global-setting scan, unmodeled provider semantics on the selected path, or changes to Query/Loading that exceed this boundary. Stop and classify an independent authentic smoke failure; do not paper it over.
 
 ## Acceptance receipt
 
-Three independent DESIGN and FINAL reviews returned ACCEPT. Pinned Bazel
-9.2 source and offline scratch query/build/cquery distinguish known-alias
-explicit `None`/omitted package default from `[]` explicit private, accepted
-public list/tuple, rejected scalar, and the selected two-setting Skylib
-path. The two Slug wrappers alone now normalize explicit `None`; non-None
-values still pass the unchanged `UnpackVisibility` parser, then the existing
-recorder owns `PackageDefault` versus declared visibility. No new retained
-value, DICE dependency, cache, lock or imported utility was added.
+Three independent DESIGN and FINAL reviews ACCEPT. Offline Bazel 9.2 scratch `/tmp/slug-wp814-constraint-default` proves label-without-rule-input NODEP projection, configured same-package/existence errors, wrong-kind/wrong-setting acceptance, implicit/default and explicit-override conditions, target compatibility and execution toolchain eligibility. The corresponding source-shaped rules_rust declaration hash is `d19f95376747d40bd1c42b16b695abbdd8ef5108a5486b9119774291f0841c4b`. No default-value configured edge or global scan was added. Loading retains the native attribute but drops its preload reference; configured setting/derived constraint equality carry one pointer-sized Arc fact. On this host `ConfiguredNodeResult` is 712 inline bytes; the optional Arc carrier is pointer-sized and only defaulted configured settings allocate its label. The proof exceeds the estimate because distinct condition, validation, toolchain and same-DICE A/B/A cases are necessary, not because the admitted surface widened.
 
-Pinned-nightly Cargo JSON `--no-run` compiled the Loading integration binary
-with zero compiler errors after a bounded error-conversion compile correction.
-Exact nonignored preflight selected three tests; the new direct-BUILD and
-loaded-macro visibility matrix and two protected alias tests passed 3/3
-serially. The matrix covers bad scalar/element, unknown-kwarg-None and
-malformed-actual negatives. `cargo build -p slug_cli_v2` exits 0 before the
-normalized-PATH authentic one-shot smoke. That smoke clears the prior
-`native.alias(visibility = None)` failure and stops separately at
-`constraint setting defaults are unsupported: @@rules_rust+//rust/platform:wasi_version`
-(exit 2). No configured alias/action or remote-service test ran. Pre/post
-smoke `slugd` checks find no process; Rust format, diff, archive and plan
-status checks pass. Packet selection through final review took roughly
-thirteen minutes; the CLI build took about ten seconds and smoke about
-forty-eight seconds.
+Pinned-nightly JSON `--no-run` compiled the Analysis and Loading integration binaries with zero compiler errors. Exact nonignored preflight found four new Analysis selectors, one protected platform selector and one Loading selector; all six passed serially (four new Analysis including same-DICE condition/toolchain A/B/A, one protected Analysis, one Loading). The existing Query native-toolchain projection test passed 1/1; Query lib check and rebuilt `slug_cli_v2` succeeded. The normalized-PATH authentic one-shot smoke in `/tmp/slug-wp797-authentic-2YQmSt` cleared `constraint setting defaults are unsupported` and stopped independently at `rule implementation returned non-provider value None` (exit 2). No remote transport or BuildBuddy credentials were used. Pre/post smoke `slugd` checks found no process. Rust format, diff, archive and plan-status checks pass.
 
 ## Immediate predecessor
 
-WP812 accepted at `c2a31c4bb`: the typed Apple
-`configuration_field(xcode_config_label)` declaration clears the preceding
-rules_swift stop. Seven focused tests, offline Bazel oracle and independent
-reviews support its finite boundary. Two extra older whole-rule DICE tests
-failed diagnostically and remain unresolved, not passing evidence.
+WP813 accepted at `88ea63d7c`: direct BUILD and loaded-macro `native.alias(visibility = None)` inherits package default; the authentic rules_rust smoke now reaches this separate configured constraint-setting default stop.

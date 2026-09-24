@@ -180,19 +180,39 @@ pub enum ConfiguredActionAspectProvenance {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub struct ConfiguredActionPlatformConstraint(ConfiguredTargetKey, ConfiguredTargetKey);
+pub struct ConfiguredActionPlatformConstraint {
+    value: ConfiguredTargetKey,
+    setting: ConfiguredTargetKey,
+    default_value: Option<Arc<CanonicalLabel>>,
+}
 
 impl ConfiguredActionPlatformConstraint {
     pub fn new(value: ConfiguredTargetKey, setting: ConfiguredTargetKey) -> Self {
-        Self(value, setting)
+        Self {
+            value,
+            setting,
+            default_value: None,
+        }
     }
 
     pub fn constraint_value(&self) -> &ConfiguredTargetKey {
-        &self.0
+        &self.value
     }
 
     pub fn constraint_setting(&self) -> &ConfiguredTargetKey {
-        &self.1
+        &self.setting
+    }
+
+    pub fn default_constraint_value(&self) -> Option<&CanonicalLabel> {
+        self.default_value.as_deref()
+    }
+
+    pub(crate) fn with_default_constraint_value(
+        mut self,
+        value: Option<Arc<CanonicalLabel>>,
+    ) -> Self {
+        self.default_value = value;
+        self
     }
 }
 
@@ -767,6 +787,7 @@ pub struct ConfiguredNodeResult {
     rule_capability: Option<RuleCapability>,
     exec_groups: Option<ConfiguredExecGroupCollection>,
     platform_semantic_fact: Option<PlatformSemanticFact>,
+    constraint_setting_default: Option<Arc<CanonicalLabel>>,
     runfiles_packages: RunfilesPackageDepset,
 }
 
@@ -887,6 +908,7 @@ impl ConfiguredNodeResult {
             rule_capability,
             exec_groups: None,
             platform_semantic_fact: None,
+            constraint_setting_default: None,
             runfiles_packages,
         }
     }
@@ -916,6 +938,7 @@ impl ConfiguredNodeResult {
             rule_capability,
             exec_groups: None,
             platform_semantic_fact: None,
+            constraint_setting_default: None,
             runfiles_packages,
         }
     }
@@ -1032,6 +1055,10 @@ impl ConfiguredNodeResult {
 
     pub fn platform_semantic_fact(&self) -> Option<&PlatformSemanticFact> {
         self.platform_semantic_fact.as_ref()
+    }
+
+    pub fn constraint_setting_default(&self) -> Option<&Arc<CanonicalLabel>> {
+        self.constraint_setting_default.as_ref()
     }
 
     pub fn runfiles_packages(&self) -> &RunfilesPackageDepset {
@@ -1157,6 +1184,12 @@ impl ConfiguredNodeResult {
 
     pub(crate) fn with_platform_semantic_fact(mut self, fact: PlatformSemanticFact) -> Self {
         self.platform_semantic_fact = Some(fact);
+        self
+    }
+
+    pub(crate) fn with_constraint_setting_default(mut self, value: Arc<CanonicalLabel>) -> Self {
+        assert_eq!(self.kind, ConfiguredNodeKind::ConstraintSetting);
+        self.constraint_setting_default = Some(value);
         self
     }
 }

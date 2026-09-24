@@ -29,17 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-113-m7a-native-alias-none-visibility-r1
+Packet: WP-7-114-m7a-constraint-setting-default-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP813 admits `native.alias(visibility = None)` as omitted visibility in
-direct BUILD and loaded legacy-macro calls. Pinned Bazel 9.2 source and an
-offline public-default oracle distinguish None from explicit empty/private
-visibility; three focused/protected Slug tests pass. The rebuilt authentic
-smoke clears the bazel_skylib alias stop and reaches a separate rules_rust
-`constraint_setting(default_constraint_value)` failure for `wasi_version`.
-Other native rules, configured alias behavior, remote transport and M7A
-close remain deferred. WP812 was accepted at `c2a31c4bb`.
+WP814 admits NODEP `constraint_setting(default_constraint_value)` and bounded
+configured default-aware condition/toolchain matching with structural A/B/A
+invalidation. Six focused Loading/Analysis tests and the protected Query
+projection pass; the rebuilt authentic rules_rust smoke clears the default
+stop and reaches a separate rule-implementation `None` result failure.
+Provider/refinement breadth, alias-valued defaults and M7A close remain
+deferred. WP813 was accepted at `88ea63d7c`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
