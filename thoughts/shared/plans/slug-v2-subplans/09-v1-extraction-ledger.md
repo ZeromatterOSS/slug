@@ -2939,3 +2939,14 @@ interner, hashing, compact collection, DICE key, lock, cache, async memory or
 V1/Buck2 import. The cold normalization helper needs no performance gate;
 same-candidate raw-PATH A→B→A and the offline Bazel/Slug fixture cover its
 identity and observable behavior.
+
+WP839 reuses the selected repository-rule owner, Arc/Dupe/Allocative request
+and result values, compact strings, ordered effect plan and DICE observation
+keys for a bounded execute transcript. Call index and structural request/
+environment identity prevent duplicate-argv aliasing; Need and abort remain
+transient. Core's staged root, descriptor table, pipe buffers and process
+handle are command/async scratch, not retained DICE state. No new interner,
+hash shortcut, global process cache, lock, V1/Buck2 import or hot-path
+benchmark claim is made. The cold boundary is covered by 18 focused runner
+tests, offline Bazel/Slug fixture evidence and authentic advancement through
+two GCC `-v` calls; later tool lookups and full toolchain remain deferred.

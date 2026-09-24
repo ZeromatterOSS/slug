@@ -100,6 +100,10 @@ use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RegistryRequestGeneration;
 use slug_bzlmod_v2::RegistryRequestGenerationKey;
 use slug_bzlmod_v2::RegistryUrls;
+use slug_bzlmod_v2::RepositoryExecuteEpoch;
+use slug_bzlmod_v2::RepositoryExecuteEpochKey;
+use slug_bzlmod_v2::RepositoryExecuteRecord;
+use slug_bzlmod_v2::RepositoryExecuteTranscript;
 use slug_bzlmod_v2::RepositoryMaterializationGeneration;
 use slug_bzlmod_v2::RepositoryMaterializationGenerationKey;
 use slug_bzlmod_v2::RepositoryMaterializationRequest;
@@ -846,6 +850,10 @@ enum NativeDemandSessionError {
         actual: NormalizedAbsolutePath,
     },
     PathInternalNonProgress,
+    ExecuteInternalNonProgress,
+    ExecuteEnvironmentMismatch,
+    RepositoryExecute(super::repository_process::RepositoryProcessError),
+    ExecuteTranscript(slug_bzlmod_v2::RepositoryExecuteTranscriptError),
     RevisionInternalNonProgress,
     Revision(RequestRevisionError),
     AfterOutputPublication(Box<NativeDemandSessionError>),
@@ -903,6 +911,14 @@ impl fmt::Display for NativeDemandSessionError {
                 "repository environment need belongs to {actual}, expected {expected}"
             ),
             Self::PathInternalNonProgress => f.write_str("path preparation made no progress"),
+            Self::ExecuteInternalNonProgress => {
+                f.write_str("repository execution preparation made no progress")
+            }
+            Self::ExecuteEnvironmentMismatch => {
+                f.write_str("repository execution environment changed before launch")
+            }
+            Self::RepositoryExecute(error) => write!(f, "{error}"),
+            Self::ExecuteTranscript(_) => f.write_str("repository execution transcript conflict"),
             Self::RevisionInternalNonProgress => {
                 f.write_str("request revision made no bounded progress")
             }
@@ -954,6 +970,7 @@ enum NativeDemandProgress {
     Environment,
     Downloads,
     Paths,
+    Executes,
 }
 
 #[allow(dead_code)]
@@ -969,6 +986,7 @@ struct NativeDemandCommand<'a> {
     issued_requests:
         SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>>,
     repository_results: RepositoryMaterializationResultEpoch,
+    execute_transcript: RepositoryExecuteTranscript,
     path_observations: PathObservationEpoch,
     repository_environment_frontier: slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
     download_results:
@@ -6242,6 +6260,7 @@ impl WorkspaceRuntime {
                     .collect(),
                 issued_requests: SmallMap::new(),
                 repository_results: preflight.repository_results().clone(),
+                execute_transcript: RepositoryExecuteTranscript::empty(),
                 path_observations,
                 repository_environment_frontier,
                 download_results,
@@ -7496,6 +7515,13 @@ impl NativeDemandCommand<'_> {
             &self.download_results,
         )
         .map_err(NativeDemandSessionError::Injection)?;
+        // Loading uses this only to reject surplus prepared records on a
+        // replay branch that no longer calls execute. A no-execute graph does
+        // not acquire the transient DICE observation dependency.
+        data.data.set(RepositoryExecuteEpoch::active(
+            self.lease.0,
+            self.execute_transcript.dupe(),
+        ));
         Ok(data)
     }
 
@@ -7518,6 +7544,12 @@ impl NativeDemandCommand<'_> {
             &self.runtime.workspace,
             &self.download_results,
             &self.prior.download_results,
+        )
+        .map_err(NativeDemandSessionError::Injection)?;
+        inject_repository_execute_epoch(
+            updater,
+            &self.runtime.workspace,
+            RepositoryExecuteEpoch::active(self.lease.0, self.execute_transcript.dupe()),
         )
         .map_err(NativeDemandSessionError::Injection)
     }
@@ -7677,39 +7709,108 @@ impl NativeDemandCommand<'_> {
             };
         }
 
-        begin_probe_phase!(need_phase, self.runtime, NeedPath);
-        let Some(path_needs) = needs.path_observations() else {
-            return Err(NativeDemandSessionError::PathInternalNonProgress);
-        };
-        let new_demands = path_needs
-            .demands()
-            .iter()
-            .filter(|demand| self.path_observations.get(demand).is_none())
-            .cloned()
-            .collect::<Vec<_>>();
-        if new_demands.is_empty() {
-            return Err(NativeDemandSessionError::PathInternalNonProgress);
-        }
-        let observed = self
-            .runtime
-            .repository_materializer
-            .observe_native(self.repository_session, new_demands)
-            .map_err(NativeDemandSessionError::Repository)?;
-        let merged = self
-            .path_observations
-            .observations()
-            .iter()
-            .map(|(demand, result)| (demand.clone(), result.dupe()))
-            .chain(
-                observed
+        if let Some(path_needs) = needs.path_observations() {
+            begin_probe_phase!(need_phase, self.runtime, NeedPath);
+            let new_demands = path_needs
+                .demands()
+                .iter()
+                .filter(|demand| self.path_observations.get(demand).is_none())
+                .cloned()
+                .collect::<Vec<_>>();
+            if !new_demands.is_empty() {
+                let observed = self
+                    .runtime
+                    .repository_materializer
+                    .observe_native(self.repository_session, new_demands)
+                    .map_err(NativeDemandSessionError::Repository)?;
+                let merged = self
+                    .path_observations
                     .observations()
                     .iter()
-                    .map(|(demand, result)| (demand.clone(), result.dupe())),
-            );
-        self.path_observations = PathObservationEpoch::from_shared(merged)
-            .map_err(NativeDemandSessionError::PathEpoch)?;
-        finish_probe_phase!(need_phase);
-        Ok(NativeDemandProgress::Paths)
+                    .map(|(demand, result)| (demand.clone(), result.dupe()))
+                    .chain(
+                        observed
+                            .observations()
+                            .iter()
+                            .map(|(demand, result)| (demand.clone(), result.dupe())),
+                    );
+                self.path_observations = PathObservationEpoch::from_shared(merged)
+                    .map_err(NativeDemandSessionError::PathEpoch)?;
+                finish_probe_phase!(need_phase);
+                return Ok(NativeDemandProgress::Paths);
+            }
+            if needs.repository_executes().is_empty() {
+                return Err(NativeDemandSessionError::PathInternalNonProgress);
+            }
+            finish_probe_phase!(need_phase);
+        }
+
+        if !needs.repository_executes().is_empty() {
+            let mut requests = needs
+                .repository_executes()
+                .values()
+                .cloned()
+                .collect::<Vec<_>>();
+            requests.sort_by(|left, right| {
+                left.id()
+                    .owner()
+                    .unique_name()
+                    .cmp(right.id().owner().unique_name())
+                    .then_with(|| left.id().ordinal().cmp(&right.id().ordinal()))
+                    .then_with(|| left.id().call_index().cmp(&right.id().call_index()))
+            });
+            let mut advanced = false;
+            for request in requests {
+                if request.environment() != &self.inputs.request.repository_environment {
+                    return Err(NativeDemandSessionError::ExecuteEnvironmentMismatch);
+                }
+                if let Some(known) = self.execute_transcript.find(request.id()) {
+                    if known.request() != request.as_ref() {
+                        return Err(NativeDemandSessionError::ExecuteInternalNonProgress);
+                    }
+                    continue;
+                }
+                if self.execute_transcript.records().len()
+                    >= slug_bzlmod_v2::REPOSITORY_EXECUTE_MAX_CALLS
+                    || request.id().call_index()
+                        != self
+                            .execute_transcript
+                            .records_for(request.id().owner(), request.id().ordinal())
+                            .count()
+                {
+                    return Err(NativeDemandSessionError::ExecuteInternalNonProgress);
+                }
+                // The entire DICE transaction was dropped by drive_command
+                // before progress. No DICE lock or computation is held while
+                // the child is launched or awaited.
+                let bwrap = if Path::new("/usr/bin/bwrap").is_file() {
+                    Path::new("/usr/bin/bwrap")
+                } else {
+                    Path::new("/home/linuxbrew/.linuxbrew/bin/bwrap")
+                };
+                let result = self
+                    .runtime
+                    .runtime
+                    .block_on(super::repository_process::run_repository_execute(
+                        &request,
+                        &self.runtime.workspace,
+                        bwrap,
+                    ))
+                    .map_err(NativeDemandSessionError::RepositoryExecute)?;
+                self.execute_transcript = self
+                    .execute_transcript
+                    .append(RepositoryExecuteRecord::new(request, result))
+                    .map_err(NativeDemandSessionError::ExecuteTranscript)?;
+                advanced = true;
+            }
+            return if advanced {
+                Ok(NativeDemandProgress::Executes)
+            } else {
+                Err(NativeDemandSessionError::ExecuteInternalNonProgress)
+            };
+        }
+
+        Err(NativeDemandSessionError::PathInternalNonProgress)
     }
 
     fn associate_terminal_observations(
@@ -7766,6 +7867,12 @@ impl NativeDemandCommand<'_> {
                 &self.runtime.workspace,
                 &prior.download_results,
                 &self.download_results,
+            )
+            .map_err(NativeDemandSessionError::Restoration)?;
+            inject_repository_execute_epoch(
+                &mut updater,
+                &self.runtime.workspace,
+                RepositoryExecuteEpoch::revoked(),
             )
             .map_err(NativeDemandSessionError::Restoration)?;
             #[allow(unused_mut)]
@@ -8504,6 +8611,12 @@ fn prepare_selected_native_demand_snapshot(
         &command.download_results,
     )
     .map_err(NativeDemandSessionError::Injection)?;
+    inject_repository_execute_epoch(
+        &mut updater,
+        &command.runtime.workspace,
+        RepositoryExecuteEpoch::revoked(),
+    )
+    .map_err(NativeDemandSessionError::Injection)?;
     // Keep the provisional terminal alive until its prepared updater reaches
     // revision finalization or the ordinary commit leaf.
     std::hint::black_box(terminal_authority);
@@ -8526,6 +8639,18 @@ async fn commit_prepared_native_demand_snapshot(
         .native_demand_sessions
         .record_trace(NativeDemandTestTrace::SelectedInjectionCommitted);
     Ok(())
+}
+
+fn inject_repository_execute_epoch(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &Path,
+    epoch: RepositoryExecuteEpoch,
+) -> anyhow::Result<()> {
+    let workspace = NormalizedAbsolutePath::new(workspace.to_path_buf())
+        .context("normalizing repository execution workspace")?;
+    updater
+        .changed_to(vec![(RepositoryExecuteEpochKey::new(workspace), epoch)])
+        .context("injecting repository execution epoch")
 }
 
 fn install_selected_extension_download_transaction(

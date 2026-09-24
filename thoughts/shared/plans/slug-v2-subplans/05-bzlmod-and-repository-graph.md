@@ -540,6 +540,24 @@ teardown release provisional and retained roots. Focused builder, Core
 lifecycle, and fresh Bazel/Slug linked-BUILD evidence pass. Full C++/root
 bootstrap remains open.
 
+### Guarded GCC repository execute accepted (WP839, 2026-09-24)
+
+The selected repository-rule owner stages prior generated files and records
+source-ordered GCC `repository_ctx.execute` requests and results in a
+lease-scoped DICE transcript. Repeated argv remains distinct by call index;
+changed environment/compiler inputs invalidate the owner, and Need/abort
+publishes neither a successful transcript nor a partial repository. Core
+admits only the pinned rules_cc Linux GCC probe grammar, executing in a
+read-only, network-isolated bwrap sandbox with bounded output and time. The
+Linux/GNU launcher uses direct low-commit `posix_spawn`, runtime-gated
+close-from actions, isolated status FD 3, and cancellation-safe group
+kill/reap. These process limits and Rust Host observations are Slug-native;
+no arbitrary repository command, general path text, compiler flags or full
+toolchain is admitted. The Bazel/Slug offline fixture passes, and authentic
+Rust-toolchain cquery advances through two GCC `-v` probes before the
+pre-existing WP838 `which` candidate cap. Later probes and M7A closure remain
+open.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

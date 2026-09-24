@@ -40,6 +40,7 @@ mod repository_archive_realize;
 mod repository_generated_archive;
 mod repository_host_input;
 mod repository_io;
+mod repository_process;
 mod request_revision;
 mod root_apparent_repository_definition;
 mod root_apparent_repository_route;

@@ -23,9 +23,15 @@ use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanBuilder;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanError;
 use slug_bzlmod_v2::HostRepositoryLabelPathValue;
+use slug_bzlmod_v2::HostSelectedExtensionOwner;
 use slug_bzlmod_v2::OverrideAttributeKey;
 use slug_bzlmod_v2::OverrideAttributeValue;
+use slug_bzlmod_v2::REPOSITORY_EXECUTE_MAX_CALLS;
 use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
+use slug_bzlmod_v2::RepositoryExecuteArg;
+use slug_bzlmod_v2::RepositoryExecuteCallId;
+use slug_bzlmod_v2::RepositoryExecuteRequest;
+use slug_bzlmod_v2::RepositoryExecuteTranscript;
 use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_bzlmod_v2::RepositoryPlatform;
 use slug_bzlmod_v2::generated_repository_archive_sha256_hex;
@@ -51,6 +57,7 @@ use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark::values::string::StarlarkStr;
 use starlark::values::structs::AllocStruct;
+use starlark::values::tuple::TupleRef;
 use starlark::values::tuple::UnpackTuple;
 use starlark_map::StarlarkHasher;
 use starlark_map::small_map::SmallMap;
@@ -70,6 +77,8 @@ pub(crate) struct RepositoryRuleInvocationInput {
     attributes: Arc<SmallMap<CompactString, OverrideAttributeValue>>,
     declaration: Arc<[RepositoryRuleAttribute]>,
     archive_owner: bool,
+    execute_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>,
+    execute_transcript: RepositoryExecuteTranscript,
 }
 
 impl RepositoryRuleInvocationInput {
@@ -132,6 +141,8 @@ impl RepositoryRuleInvocationInput {
             attributes,
             declaration,
             archive_owner: false,
+            execute_owner: None,
+            execute_transcript: RepositoryExecuteTranscript::empty(),
         })
     }
 
@@ -139,6 +150,17 @@ impl RepositoryRuleInvocationInput {
     /// selected effect. Ordinary generated repository rules remain file-only.
     pub(crate) fn with_archive_owner(mut self) -> Self {
         self.archive_owner = true;
+        self
+    }
+
+    pub(crate) fn with_execute(
+        mut self,
+        owner: Arc<HostSelectedExtensionOwner>,
+        ordinal: usize,
+        transcript: RepositoryExecuteTranscript,
+    ) -> Self {
+        self.execute_owner = Some((owner, ordinal));
+        self.execute_transcript = transcript;
         self
     }
 
@@ -418,30 +440,31 @@ fn matches_coerced(kind: AttributeKind, value: &CoercedAttributeValue) -> bool {
 #[doc(hidden)]
 #[rustfmt::skip]
 #[derive(Clone, PartialEq, Eq, Allocative)]
-pub struct RepositoryRuleHostObservation { platform: RepositoryPlatform, environment: Arc<[(CompactString, Option<Arc<str>>)]> }
+pub struct RepositoryRuleHostObservation { platform: RepositoryPlatform, environment: Arc<[(CompactString, Option<Arc<str>>)]>, execute_transcript: RepositoryExecuteTranscript }
 
 #[rustfmt::skip]
 impl fmt::Debug for RepositoryRuleHostObservation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.debug_struct("RepositoryRuleHostObservation").field("platform", &self.platform).field("environment", &self.environment.iter().map(|(name, value)| (name, value.as_ref().map(|_| "<redacted>"))).collect::<Vec<_>>()).finish() }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.debug_struct("RepositoryRuleHostObservation").field("platform", &self.platform).field("environment", &self.environment.iter().map(|(name, value)| (name, value.as_ref().map(|_| "<redacted>"))).collect::<Vec<_>>()).field("execute_transcript", &self.execute_transcript).finish() }
 }
 
 #[rustfmt::skip]
 impl RepositoryRuleHostObservation {
-    pub(crate) fn new(platform: RepositoryPlatform, environment: impl IntoIterator<Item = (CompactString, Option<Arc<str>>)>) -> Self {
+    pub(crate) fn new(platform: RepositoryPlatform, environment: impl IntoIterator<Item = (CompactString, Option<Arc<str>>)>, execute_transcript: RepositoryExecuteTranscript) -> Self {
         let mut environment = environment.into_iter().collect::<Vec<_>>();
         environment.sort_by(|left, right| left.0.cmp(&right.0)); environment.dedup_by(|left, right| left.0 == right.0);
-        Self { platform, environment: environment.into() }
+        Self { platform, environment: environment.into(), execute_transcript }
     }
     pub fn platform(&self) -> &RepositoryPlatform { &self.platform }
     pub fn environment(&self) -> impl ExactSizeIterator<Item = (&str, Option<&Arc<str>>)> { self.environment.iter().map(|(name, value)| (name.as_str(), value.as_ref())) }
+    pub fn execute_transcript(&self) -> &RepositoryExecuteTranscript { &self.execute_transcript }
 }
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), HostPathNeed(NormalizedAbsolutePath), ReadArgument, ReadLimit, TemplateDestinationArgument, TemplateSourceArgument, SymlinkArgument, RepositorySourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), ArchiveArgument, ArchiveAuth, ArchiveLimit, ArchiveIncomplete, ArchivePathObservation, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
+pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), HostPathNeed(NormalizedAbsolutePath), ReadArgument, ReadLimit, TemplateDestinationArgument, TemplateSourceArgument, SymlinkArgument, RepositorySourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), ExecuteArgument, ExecuteOptions, ExecuteLimit, ExecuteNeed(Arc<RepositoryExecuteRequest>), ExecuteReplay, ArchiveArgument, ArchiveAuth, ArchiveLimit, ArchiveIncomplete, ArchivePathObservation, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
 
 #[rustfmt::skip]
-pub(crate) struct RepositoryRuleInvocation { pub(crate) plan: GeneratedRepositoryFileEffectPlan, pub(crate) dynamic_environment: Arc<[CompactString]> }
+pub(crate) struct RepositoryRuleInvocation { pub(crate) plan: GeneratedRepositoryFileEffectPlan, pub(crate) dynamic_environment: Arc<[CompactString]>, pub(crate) execute_transcript: RepositoryExecuteTranscript }
 
 pub(crate) struct RepositoryRuleInvocationAttempt {
     pub(crate) result: Result<RepositoryRuleInvocation, RepositoryRuleInvocationError>,
@@ -452,6 +475,7 @@ pub(crate) struct RepositoryRuleInvocationAttempt {
 impl RepositoryRuleInvocation {
     pub(crate) fn dynamic_environment(&self) -> &[CompactString] { &self.dynamic_environment }
     pub(crate) fn into_plan(self) -> GeneratedRepositoryFileEffectPlan { self.plan }
+    pub(crate) fn execute_transcript(&self) -> &RepositoryExecuteTranscript { &self.execute_transcript }
 }
 
 #[rustfmt::skip]
@@ -480,7 +504,7 @@ pub(crate) enum RepositoryWhichCandidate { Executable, Miss }
 enum RepositoryStarlarkPath { Label { address: RepositoryLabelPathAddress, path: HostRepositoryLabelPathValue }, Which(HostRepositoryLabelPathValue), Host { path: NormalizedAbsolutePath, exists: bool }, Generated { repository: CompactString, relative: CompactString, present: Arc<Mutex<SmallSet<CompactString>>> } }
 
 #[rustfmt::skip] #[derive(Debug, ProvidesStaticType)]
-pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, prepared_paths: PreparedRepositoryLabelPaths, prepared_sources: PreparedRepositoryLabelSources, prepared_which: PreparedRepositoryWhichCandidates, prepared_host_paths: PreparedRepositoryHostPaths, generated_repository: CompactString, generated_present: Arc<Mutex<SmallSet<CompactString>>>, archive_owner: bool, archive_count: RefCell<usize>, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, environment_enumerated: Arc<AtomicBool>, error: RefCell<Option<RepositoryRuleInvocationError>> }
+pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, prepared_paths: PreparedRepositoryLabelPaths, prepared_sources: PreparedRepositoryLabelSources, prepared_which: PreparedRepositoryWhichCandidates, prepared_host_paths: PreparedRepositoryHostPaths, generated_repository: CompactString, generated_present: Arc<Mutex<SmallSet<CompactString>>>, archive_owner: bool, archive_count: RefCell<usize>, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, environment_enumerated: Arc<AtomicBool>, execute_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>, execute_transcript: RepositoryExecuteTranscript, execute_call_index: RefCell<usize>, error: RefCell<Option<RepositoryRuleInvocationError>> }
 
 #[rustfmt::skip]
 fn normalized_generated_path(base: &str, input: &str) -> Option<CompactString> {
@@ -493,7 +517,7 @@ fn normalized_generated_path(base: &str, input: &str) -> Option<CompactString> {
 
 #[rustfmt::skip]
 impl RepositoryRuleInvocationState {
-    fn new(manifest: &BzlLoadManifest, prepared_paths: &PreparedRepositoryLabelPaths, prepared_sources: &PreparedRepositoryLabelSources, prepared_which: &PreparedRepositoryWhichCandidates, prepared_host_paths: &PreparedRepositoryHostPaths, generated_repository: CompactString, archive_owner: bool) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), prepared_paths: prepared_paths.clone(), prepared_sources: prepared_sources.clone(), prepared_which: prepared_which.clone(), prepared_host_paths: prepared_host_paths.clone(), generated_repository, generated_present: Arc::new(Mutex::new(SmallSet::from_iter([CompactString::new("")]))), archive_owner, archive_count: RefCell::new(0), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), environment_enumerated: Arc::new(AtomicBool::new(false)), error: RefCell::new(None) } }
+    fn new(manifest: &BzlLoadManifest, prepared_paths: &PreparedRepositoryLabelPaths, prepared_sources: &PreparedRepositoryLabelSources, prepared_which: &PreparedRepositoryWhichCandidates, prepared_host_paths: &PreparedRepositoryHostPaths, input: &RepositoryRuleInvocationInput) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), prepared_paths: prepared_paths.clone(), prepared_sources: prepared_sources.clone(), prepared_which: prepared_which.clone(), prepared_host_paths: prepared_host_paths.clone(), generated_repository: input.name.clone(), generated_present: Arc::new(Mutex::new(SmallSet::from_iter([CompactString::new("")]))), archive_owner: input.archive_owner, archive_count: RefCell::new(0), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), environment_enumerated: Arc::new(AtomicBool::new(false)), execute_owner: input.execute_owner.clone(), execute_transcript: input.execute_transcript.clone(), execute_call_index: RefCell::new(0), error: RefCell::new(None) } }
     fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> { eval.extra.and_then(|extra| extra.downcast_ref::<Self>()).ok_or_else(|| anyhow::anyhow!("repository_ctx is outside repository-rule execution")) }
     pub(crate) fn bzl(&self) -> &BzlEvaluationContext { &self.bzl }
     fn generated_path(&self, input: &str) -> Result<RepositoryStarlarkPath, RepositoryRuleInvocationError> { let relative = normalized_generated_path("", input).ok_or(RepositoryRuleInvocationError::LabelPathArgument)?; if self.archive_owner && !self.generated_present.lock().expect("generated path state mutex poisoned").contains(&relative) { return Err(RepositoryRuleInvocationError::ArchivePathObservation); } Ok(RepositoryStarlarkPath::Generated { repository: self.generated_repository.clone(), relative, present: self.generated_present.clone() }) }
@@ -513,7 +537,8 @@ impl RepositoryRuleInvocationState {
     fn push_archive(&self, urls: Arc<[CompactString]>, sha256: [u8; 32], strip_prefix: CompactString) -> Result<(), RepositoryRuleInvocationError> { let mut count = self.archive_count.borrow_mut(); if *count >= 6 { return Err(RepositoryRuleInvocationError::ArchiveLimit); } self.effects.borrow_mut().as_mut().expect("repository context has not completed").push_archive(urls, sha256, strip_prefix).map_err(RepositoryRuleInvocationError::Plan)?; *count += 1; Ok(()) }
     fn fail(&self, error: RepositoryRuleInvocationError) -> anyhow::Error { *self.error.borrow_mut() = Some(error); anyhow::anyhow!("repository_ctx invocation failed") }
     fn record_environment(&self, name: &str) { self.dynamic_environment.borrow_mut().push(name.into()); }
-    fn finish(&self) -> RepositoryRuleInvocation { let mut dynamic_environment = self.dynamic_environment.borrow().clone(); dynamic_environment.sort(); dynamic_environment.dedup(); RepositoryRuleInvocation { plan: self.effects.borrow_mut().take().expect("repository context completes at most once").finish(), dynamic_environment: dynamic_environment.into() } }
+    fn prepared_execute_count(&self) -> usize { self.execute_owner.as_ref().map_or(0, |(owner, ordinal)| self.execute_transcript.records_for(owner, *ordinal).count()) }
+    fn finish(&self) -> Result<RepositoryRuleInvocation, RepositoryRuleInvocationError> { if *self.execute_call_index.borrow() != self.prepared_execute_count() { return Err(RepositoryRuleInvocationError::ExecuteReplay); } let mut dynamic_environment = self.dynamic_environment.borrow().clone(); dynamic_environment.sort(); dynamic_environment.dedup(); Ok(RepositoryRuleInvocation { plan: self.effects.borrow_mut().take().expect("repository context completes at most once").finish(), dynamic_environment: dynamic_environment.into(), execute_transcript: self.execute_owner.as_ref().map_or_else(RepositoryExecuteTranscript::empty, |(owner, ordinal)| self.execute_transcript.for_owner(owner, *ordinal)) }) }
 }
 
 #[rustfmt::skip] fn existing_repository_path<'v>(value: Value<'v>) -> Option<Value<'v>> { RepositoryStarlarkPath::from_value(value).map(|_| value) }
@@ -817,6 +842,45 @@ fn ascii_read(bytes: &[u8]) -> Result<&str, RepositoryRuleInvocationError> {
     Ok(std::str::from_utf8(bytes).expect("ASCII bytes are valid UTF-8"))
 }
 
+fn execute_argv(
+    value: Value<'_>,
+) -> Result<Arc<[RepositoryExecuteArg]>, RepositoryRuleInvocationError> {
+    let values: Vec<_> = if let Some(values) = ListRef::from_value(value) {
+        values.iter().collect()
+    } else if let Some(values) = TupleRef::from_value(value) {
+        values.iter().collect()
+    } else {
+        return Err(RepositoryRuleInvocationError::ExecuteArgument);
+    };
+    if values.is_empty() || values.len() > 32 {
+        return Err(RepositoryRuleInvocationError::ExecuteArgument);
+    }
+    let mut argv = Vec::with_capacity(values.len());
+    for (index, value) in values.into_iter().enumerate() {
+        let arg = match (
+            index,
+            RepositoryStarlarkPath::from_value(value),
+            value.unpack_str(),
+        ) {
+            (0, Some(RepositoryStarlarkPath::Which(path)), _) => {
+                RepositoryExecuteArg::Which(path.clone())
+            }
+            (index, _, Some(value))
+                if index != 0 && value.len() <= 4096 && !value.contains('\0') =>
+            {
+                RepositoryExecuteArg::String(value.into())
+            }
+            _ => return Err(RepositoryRuleInvocationError::ExecuteArgument),
+        };
+        argv.push(arg);
+    }
+    Ok(argv.into())
+}
+
+fn latin1_text(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| char::from(*byte)).collect()
+}
+
 #[starlark_value(type = "repository_os")]
 #[rustfmt::skip]
 impl<'v> StarlarkValue<'v> for RepositoryOs {
@@ -1095,6 +1159,70 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         }
         Ok(Value::new_none())
     }
+
+    fn execute<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] arguments: Value<'v>,
+        #[starlark(require = named, default = 600)] timeout: i32,
+        #[starlark(require = named, default = SmallMap::new())] environment: SmallMap<
+            String,
+            String,
+        >,
+        #[starlark(require = named, default = true)] quiet: bool,
+        #[starlark(require = named, default = "")] working_directory: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let context = RepositoryRuleContext::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
+        let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        if timeout != 600 || !environment.is_empty() || !quiet || !working_directory.is_empty() {
+            return Err(state.fail(RepositoryRuleInvocationError::ExecuteOptions));
+        }
+        let argv = execute_argv(arguments).map_err(|error| state.fail(error))?;
+        let (owner, ordinal) = state
+            .execute_owner
+            .as_ref()
+            .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ExecuteArgument))?;
+        let call_index = *state.execute_call_index.borrow();
+        if call_index >= REPOSITORY_EXECUTE_MAX_CALLS {
+            return Err(state.fail(RepositoryRuleInvocationError::ExecuteLimit));
+        }
+        let id = RepositoryExecuteCallId::new(owner.clone(), *ordinal, call_index);
+        let prefix = state
+            .effects
+            .borrow()
+            .as_ref()
+            .expect("repository context has not completed")
+            .snapshot();
+        let request = Arc::new(RepositoryExecuteRequest::new(
+            id.clone(),
+            state.generated_repository.clone(),
+            argv,
+            context.snapshot.dupe(),
+            prefix,
+        ));
+        let Some(record) = state
+            .execute_transcript
+            .records_for(owner, *ordinal)
+            .nth(call_index)
+        else {
+            if call_index != state.prepared_execute_count() {
+                return Err(state.fail(RepositoryRuleInvocationError::ExecuteReplay));
+            }
+            return Err(state.fail(RepositoryRuleInvocationError::ExecuteNeed(request)));
+        };
+        if record.request() != request.as_ref() {
+            return Err(state.fail(RepositoryRuleInvocationError::ExecuteReplay));
+        }
+        *state.execute_call_index.borrow_mut() += 1;
+        let result = record.result();
+        let heap = eval.heap();
+        Ok(heap.alloc(AllocStruct([
+            ("return_code", heap.alloc(result.return_code())),
+            ("stdout", heap.alloc(latin1_text(result.stdout()))),
+            ("stderr", heap.alloc(latin1_text(result.stderr()))),
+        ])))
+    }
 }
 
 #[rustfmt::skip]
@@ -1143,8 +1271,7 @@ pub(crate) fn invoke_repository_rule_with_host_paths(
         prepared_sources,
         prepared_which,
         prepared_host_paths,
-        input.name.clone(),
-        input.archive_owner,
+        &input,
     );
     let context = invocation_module
         .heap()
@@ -1167,7 +1294,7 @@ pub(crate) fn invoke_repository_rule_with_host_paths(
         Err(error) => Err(context_error.unwrap_or_else(|| {
             RepositoryRuleInvocationError::Evaluation(error.to_string().into())
         })),
-        Ok(value) if value.is_none() => Ok(state.finish()),
+        Ok(value) if value.is_none() => state.finish(),
         // Bazel 9.2 uses the opaque repo_metadata return. Slug does not expose
         // that constructor in this packet, so the pinned rules_rust source
         // takes its legacy dict fallback. Admit only that exact selected shape;
@@ -1176,11 +1303,24 @@ pub(crate) fn invoke_repository_rule_with_host_paths(
             if state.archive_owner
                 && selected_host_tools_repro_dict(value, state.generated_repository.as_str()) =>
         {
-            Ok(state.finish())
+            state.finish()
         }
         Ok(value) => Err(RepositoryRuleInvocationError::Result(
             value.get_type().into(),
         )),
+    };
+    let result = if *state.execute_call_index.borrow() != state.prepared_execute_count()
+        && !matches!(
+            &result,
+            Err(RepositoryRuleInvocationError::LabelPathNeed(_))
+                | Err(RepositoryRuleInvocationError::HostPathNeed(_))
+                | Err(RepositoryRuleInvocationError::RepositorySourceNeed(_))
+                | Err(RepositoryRuleInvocationError::WhichNeed(_))
+                | Err(RepositoryRuleInvocationError::ExecuteNeed(_))
+        ) {
+        Err(RepositoryRuleInvocationError::ExecuteReplay)
+    } else {
+        result
     };
     RepositoryRuleInvocationAttempt {
         result,
@@ -2781,6 +2921,58 @@ def implementation(ctx):
                 &prepared,
             ),
             Err(RepositoryRuleInvocationError::TemplateSourceArgument)
+        ));
+    }
+
+    #[test]
+    fn execute_binds_named_defaults_and_rejects_nondefault_or_untyped_argv() {
+        let prepared = SmallMap::from_iter([(
+            NormalizedAbsolutePath::new("/bin/tool").unwrap(),
+            RepositoryWhichCandidate::Executable,
+        )]);
+        let run = |call: &str| {
+            invoke_which(
+                &format!("def implementation(ctx):\n    cc = ctx.which('tool')\n    {call}\n"),
+                Some("/bin"),
+                &prepared,
+            )
+        };
+        for call in [
+            "ctx.execute([cc, '-v'], timeout = 1)",
+            "ctx.execute([cc, '-v'], environment = {'A': 'B'})",
+            "ctx.execute([cc, '-v'], quiet = False)",
+            "ctx.execute([cc, '-v'], working_directory = '/tmp')",
+        ] {
+            assert!(
+                matches!(
+                    run(call),
+                    Err(RepositoryRuleInvocationError::ExecuteOptions)
+                ),
+                "{call}"
+            );
+        }
+        for call in [
+            "ctx.execute([str(cc), '-v'])",
+            "ctx.execute([cc, ctx.path('source')])",
+            "ctx.execute([])",
+        ] {
+            assert!(
+                matches!(
+                    run(call),
+                    Err(RepositoryRuleInvocationError::ExecuteArgument)
+                ),
+                "{call}"
+            );
+        }
+        assert!(matches!(
+            run(
+                "ctx.execute([cc, '-v'], timeout = 600, environment = {}, quiet = True, working_directory = '')"
+            ),
+            Err(RepositoryRuleInvocationError::ExecuteArgument)
+        ));
+        assert!(matches!(
+            run("ctx.execute([cc, '-v'], 600)"),
+            Err(RepositoryRuleInvocationError::Evaluation(_))
         ));
     }
 

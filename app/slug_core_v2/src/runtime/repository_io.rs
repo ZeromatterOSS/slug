@@ -1397,6 +1397,48 @@ impl GeneratedRepositoryFileEffectsIo for NativeGeneratedRepositoryFileEffectsIo
     }
 }
 
+/// A command-scoped variant of the native writer whose temporary parent is
+/// fixed, rather than selected by a caller's `TMPDIR` environment variable.
+struct ScratchGeneratedRepositoryFileEffectsIo(NativeGeneratedRepositoryFileEffectsIo);
+
+impl GeneratedRepositoryFileEffectsIo for ScratchGeneratedRepositoryFileEffectsIo {
+    fn temporary_root(&mut self) -> Result<tempfile::TempDir, String> {
+        let parent = Path::new("/tmp");
+        let metadata = std::fs::symlink_metadata(parent).map_err(|error| error.to_string())?;
+        if !metadata.file_type().is_dir() {
+            return Err("repository process scratch parent is not a real directory".into());
+        }
+        tempfile::Builder::new()
+            .prefix("slug-repository-execute-")
+            .tempdir_in(parent)
+            .map_err(|error| error.to_string())
+    }
+
+    fn create_parent(&mut self, path: &Path) -> Result<(), String> {
+        self.0.create_parent(path)
+    }
+
+    fn create_file(&mut self, path: &Path) -> Result<File, String> {
+        self.0.create_file(path)
+    }
+
+    fn create_symlink(&mut self, source: &Path, path: &Path) -> Result<(), String> {
+        self.0.create_symlink(source, path)
+    }
+
+    fn write_file(&mut self, file: &mut File, content: &[u8]) -> Result<(), String> {
+        self.0.write_file(file, content)
+    }
+
+    fn flush_file(&mut self, file: &mut File) -> Result<(), String> {
+        self.0.flush_file(file)
+    }
+
+    fn set_mode(&mut self, path: &Path, executable: bool) -> Result<(), String> {
+        self.0.set_mode(path, executable)
+    }
+}
+
 fn generated_repository_file_effect_source_association(
     plan: &GeneratedRepositoryFileEffectPlan,
 ) -> Arc<str> {
@@ -1610,6 +1652,36 @@ fn materialize_generated_repository_file_effects(
     RepositoryMaterializationAttempt::GeneratedImmutable {
         source_identity,
         root,
+    }
+}
+
+/// Stage only the effects preceding a repository-rule process call. This root
+/// is request scratch, never a selected or accepted repository generation.
+pub(super) fn stage_generated_repository_file_effect_prefix(
+    plan: &GeneratedRepositoryFileEffectPlan,
+    workspace: &Path,
+) -> Result<tempfile::TempDir, String> {
+    let scratch_parent = Path::new("/tmp")
+        .canonicalize()
+        .map_err(|error| error.to_string())?;
+    let workspace = workspace
+        .canonicalize()
+        .map_err(|error| error.to_string())?;
+    if scratch_parent.starts_with(workspace) {
+        return Err("repository process scratch parent is inside the workspace".into());
+    }
+    match materialize_generated_repository_file_effects(
+        plan,
+        &mut ScratchGeneratedRepositoryFileEffectsIo(NativeGeneratedRepositoryFileEffectsIo),
+    ) {
+        RepositoryMaterializationAttempt::GeneratedImmutable { root, .. } => Ok(root),
+        RepositoryMaterializationAttempt::SpecError(error)
+        | RepositoryMaterializationAttempt::MaterializationError(error) => Err(error),
+        RepositoryMaterializationAttempt::Local
+        | RepositoryMaterializationAttempt::Immutable { .. }
+        | RepositoryMaterializationAttempt::TransportError(_) => {
+            unreachable!("generated file-effect staging returns only generated outcomes")
+        }
     }
 }
 

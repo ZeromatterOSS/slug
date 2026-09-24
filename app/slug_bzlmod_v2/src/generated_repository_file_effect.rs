@@ -262,6 +262,15 @@ pub struct GeneratedRepositoryFileEffectPlanBuilder {
 }
 
 impl GeneratedRepositoryFileEffectPlanBuilder {
+    /// Freeze the effects preceding an execute call without consuming the
+    /// builder. The effect payloads remain shared through their Arc owners.
+    pub fn snapshot(&self) -> GeneratedRepositoryFileEffectPlan {
+        GeneratedRepositoryFileEffectPlan {
+            files: self.files.clone().into(),
+            order: self.order.clone().into(),
+        }
+    }
+
     pub fn push(
         &mut self,
         path: CompactString,
@@ -489,6 +498,33 @@ mod tests {
             )
             .unwrap();
         builder.finish()
+    }
+
+    #[test]
+    fn builder_snapshot_freezes_exact_ordered_prefix_without_copying_bytes() {
+        let source_bytes: Arc<[u8]> = Arc::from(&b"int main() {}"[..]);
+        let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+        builder
+            .push("tools/cpp/empty.cc".into(), source_bytes.clone(), false)
+            .unwrap();
+        let prefix = builder.snapshot();
+        assert_eq!(prefix.ordered_effects().count(), 1);
+        assert!(std::ptr::eq(
+            prefix.effects()[0].content().as_ptr(),
+            source_bytes.as_ptr()
+        ));
+        builder
+            .push(
+                "BUILD.bazel".into(),
+                Arc::from(&b"exports_files([])"[..]),
+                false,
+            )
+            .unwrap();
+        let after = builder.snapshot();
+        assert_eq!(prefix.ordered_effects().count(), 1);
+        assert_eq!(after.ordered_effects().count(), 2);
+        assert_ne!(prefix, after);
+        assert_eq!(after, builder.finish());
     }
 
     #[test]

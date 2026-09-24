@@ -1,0 +1,47 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "@selected//:gcc_probes",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@selected//:gcc_probes",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin"
+      },
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "gcc_execute_generated_file_and_result_fields",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...",
+      "normalized_stdout": "@selected//:gcc_probes",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n",
+      "stdout": "@selected//:gcc_probes\n"
+    }
+  ],
+  "fixture": "repository-rule-execute-gcc-probes",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

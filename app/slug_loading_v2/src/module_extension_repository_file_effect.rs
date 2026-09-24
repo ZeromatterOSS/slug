@@ -36,6 +36,9 @@ use slug_bzlmod_v2::ObservedHostRepositoryLabelPath;
 use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
 use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
 use slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey;
+use slug_bzlmod_v2::RepositoryExecuteEpoch;
+use slug_bzlmod_v2::RepositoryExecuteObservationKey;
+use slug_bzlmod_v2::RepositoryExecuteTranscript;
 use slug_bzlmod_v2::RepositoryHostInputTransaction;
 use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_bzlmod_v2::RepositoryPlatformKey;
@@ -588,6 +591,39 @@ async fn verify_enumerated_environment(
         ));
     }
     Ok(())
+}
+
+async fn verified_execute_transcript(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    transaction: &RepositoryHostInputTransaction,
+    expected: Option<&RepositoryExecuteEpoch>,
+    observations: &PathObservationEpoch,
+) -> Result<RepositoryExecuteTranscript, EffectDriver> {
+    verify_enumerated_environment(ctx, key, certificate, transaction, observations).await?;
+    let epoch = ctx
+        .compute(&RepositoryExecuteObservationKey::new(key.workspace.dupe()))
+        .await
+        .map_err(|error| {
+            complete_effect_error(
+                host_input_error(certificate, key.ordinal, error.to_string()),
+                observations.dupe(),
+            )
+        })?;
+    if expected.is_some_and(|expected| expected != &epoch) {
+        return Err(complete_effect_error(
+            host_input_error(
+                certificate,
+                key.ordinal,
+                "repository execution epoch differs from command transaction",
+            ),
+            observations.dupe(),
+        ));
+    }
+    Ok(epoch
+        .transcript()
+        .map_or_else(RepositoryExecuteTranscript::empty, Clone::clone))
 }
 
 type DefinitionModuleResult =
@@ -1395,6 +1431,10 @@ fn terminal_repository_rule_invocation_error(
         }
         RepositoryRuleInvocationError::WhichArgument(message) => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message },
         RepositoryRuleInvocationError::WhichLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.which invocation exceeds the admitted Unix limits".into() },
+        RepositoryRuleInvocationError::ExecuteArgument => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute requires a Which-origin executable and admitted string arguments".into() },
+        RepositoryRuleInvocationError::ExecuteOptions => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute non-default options are unsupported".into() },
+        RepositoryRuleInvocationError::ExecuteLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute exceeds the admitted per-command call limit".into() },
+        RepositoryRuleInvocationError::ExecuteReplay => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute prepared transcript differs from this invocation".into() },
         RepositoryRuleInvocationError::ArchiveArgument => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract arguments are outside the selected SHA-pinned tar.xz surface".into() },
         RepositoryRuleInvocationError::ArchiveAuth => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract auth is unsupported".into() },
         RepositoryRuleInvocationError::ArchiveLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract exceeds the selected limits".into() },
@@ -1422,7 +1462,8 @@ fn terminal_repository_rule_invocation_error(
         RepositoryRuleInvocationError::LabelPathNeed(_)
         | RepositoryRuleInvocationError::HostPathNeed(_)
         | RepositoryRuleInvocationError::RepositorySourceNeed(_)
-        | RepositoryRuleInvocationError::WhichNeed(_) => unreachable!(),
+        | RepositoryRuleInvocationError::WhichNeed(_)
+        | RepositoryRuleInvocationError::ExecuteNeed(_) => unreachable!(),
     }
 }
 
@@ -1450,6 +1491,34 @@ async fn invoke_repository_rule_with_label_paths(
     let mut prepared_sources = PreparedRepositoryLabelSources::new();
     let mut prepared_which = PreparedRepositoryWhichCandidates::new();
     let mut prepared_host_paths = PreparedRepositoryHostPaths::new();
+    let epoch_hint = ctx
+        .per_transaction_data()
+        .data
+        .get::<RepositoryExecuteEpoch>()
+        .ok()
+        .cloned();
+    let mut prepared_execute = RepositoryExecuteTranscript::empty();
+    if epoch_hint
+        .as_ref()
+        .and_then(RepositoryExecuteEpoch::transcript)
+        .is_some_and(|transcript| {
+            transcript
+                .records_for(&key.owner, key.ordinal)
+                .next()
+                .is_some()
+        })
+    {
+        prepared_execute = verified_execute_transcript(
+            ctx,
+            key,
+            certificate,
+            transaction,
+            epoch_hint.as_ref(),
+            &observations,
+        )
+        .await?
+        .for_owner(&key.owner, key.ordinal);
+    }
     loop {
         let capture = capture_enabled.then(InvocationPrintCapture::default);
         let attempt = invoke_repository_rule_with_host_paths(
@@ -1459,7 +1528,9 @@ async fn invoke_repository_rule_with_label_paths(
             &prepared_sources,
             &prepared_which,
             &prepared_host_paths,
-            input.clone(),
+            input
+                .clone()
+                .with_execute(key.owner.clone(), key.ordinal, prepared_execute.clone()),
             platform.clone(),
             transaction.snapshot().dupe(),
             capture.as_ref().map(|capture| capture as &dyn PrintHandler),
@@ -1573,6 +1644,32 @@ async fn invoke_repository_rule_with_label_paths(
                 .await?;
                 observations = next_observations;
                 prepared_which.insert(candidate, value);
+            }
+            Err(RepositoryRuleInvocationError::ExecuteNeed(request)) => {
+                let observed = verified_execute_transcript(
+                    ctx,
+                    key,
+                    certificate,
+                    transaction,
+                    epoch_hint.as_ref(),
+                    &observations,
+                )
+                .await?;
+                if observed.records_for(&key.owner, key.ordinal).count()
+                    != request.id().call_index()
+                {
+                    return Err(complete_effect_error(
+                        terminal_repository_rule_invocation_error(
+                            certificate,
+                            key.ordinal,
+                            RepositoryRuleInvocationError::ExecuteReplay,
+                        ),
+                        observations,
+                    ));
+                }
+                return Err(SourcePreparationOutcome::Need(
+                    SourcePreparationNeeds::repository_execute(request.as_ref().clone()),
+                ));
             }
             Err(error) => {
                 if matches!(error, RepositoryRuleInvocationError::WhichLimit) {
@@ -1848,6 +1945,7 @@ async fn compute_effect(
         host: RepositoryRuleHostObservation::new(
             platform,
             declared_observed.into_iter().chain(dynamic_observed),
+            invocation.execute_transcript().clone(),
         ),
         plan: invocation.into_plan(),
     });
@@ -1937,6 +2035,10 @@ mod tests {
     use slug_bzlmod_v2::RepositoryEnvironmentCell;
     use slug_bzlmod_v2::RepositoryEnvironmentEntry;
     use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
+    use slug_bzlmod_v2::RepositoryExecuteEpochKey;
+    use slug_bzlmod_v2::RepositoryExecuteRecord;
+    use slug_bzlmod_v2::RepositoryExecuteRequest;
+    use slug_bzlmod_v2::RepositoryExecuteResult;
     use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
     use slug_bzlmod_v2::RepositoryMaterializationKind;
     use slug_bzlmod_v2::RepositoryMaterializationRequest;
@@ -1996,11 +2098,67 @@ mod tests {
         data.data.set(SelectedExtensionDownloadTransaction::empty(
             workspace.dupe(),
         ));
+        data.data.set(RepositoryExecuteEpoch::revoked());
         let mut updater = transaction.into_updater();
         updater
             .changed_to(vec![(
                 RepositoryPlatformKey::new(workspace.dupe()),
                 platform,
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryEnvironmentSnapshotKey::new(workspace.dupe()),
+                snapshot.clone(),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryExecuteEpochKey::new(workspace.dupe()),
+                RepositoryExecuteEpoch::revoked(),
+            )])
+            .unwrap();
+        updater
+            .changed_to(
+                frontier
+                    .iter()
+                    .map(|name| {
+                        (
+                            RepositoryEnvironmentCellKey::new(workspace.dupe(), name.clone()),
+                            RepositoryEnvironmentCell::observed(snapshot.get(name).cloned()),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap();
+        updater.commit_with_data(data).await
+    }
+
+    async fn with_execute_epoch(
+        transaction: dice::DiceTransaction,
+        workspace: NormalizedAbsolutePath,
+        snapshot: RepositoryEnvironmentSnapshot,
+        frontier: RepositoryEnvironmentNameFrontier,
+        epoch: RepositoryExecuteEpoch,
+    ) -> dice::DiceTransaction {
+        let mut data = UserComputationData {
+            cycle_detector: Some(crate::cycle_detector::bzl_load_cycle_detector()),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        data.data.set(RepositoryHostInputTransaction::new(
+            snapshot.clone(),
+            frontier.clone(),
+        ));
+        data.data.set(SelectedExtensionDownloadTransaction::empty(
+            workspace.dupe(),
+        ));
+        data.data.set(epoch.clone());
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                RepositoryExecuteEpochKey::new(workspace.dupe()),
+                epoch,
             )])
             .unwrap();
         updater
@@ -3156,6 +3314,40 @@ ext = module_extension(implementation = impl)
         updater.commit().await
     }
 
+    async fn compute_execute_after_path_needs(
+        mut transaction: dice::DiceTransaction,
+        key: &HostSelectedRepositoryFileEffectObservationKey,
+        workspace: &NormalizedAbsolutePath,
+        snapshot: &RepositoryEnvironmentSnapshot,
+        frontier: &RepositoryEnvironmentNameFrontier,
+        epoch: &RepositoryExecuteEpoch,
+    ) -> (
+        dice::DiceTransaction,
+        SourcePreparationOutcome<
+            Result<
+                ObservedHostSelectedRepositoryFileEffect,
+                HostSelectedRepositoryFileEffectObservationError,
+            >,
+        >,
+    ) {
+        loop {
+            match transaction.compute(key).await.unwrap() {
+                SourcePreparationOutcome::Need(need) if need.path_observations().is_some() => {
+                    transaction = update_which_need(transaction, &need).await;
+                    transaction = with_execute_epoch(
+                        transaction,
+                        workspace.dupe(),
+                        snapshot.clone(),
+                        frontier.clone(),
+                        epoch.clone(),
+                    )
+                    .await;
+                }
+                result => return (transaction, result),
+            }
+        }
+    }
+
     fn replace_which_lstat(
         epoch: &PathObservationEpoch,
         path: &str,
@@ -3472,6 +3664,460 @@ ext = module_extension(implementation = impl)
             panic!("prepared legacy which must complete")
         };
         assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    }
+
+    #[tokio::test]
+    async fn repository_execute_replays_identical_argv_by_call_index_and_exposes_latin1_results() {
+        const EXEC_EXTENSION: &str = r#"
+def write(ctx):
+    ctx.file("pre", "int main() {}")
+    cc = ctx.which("tool")
+    first = ctx.execute([cc, "-v"])
+    ctx.file("middle", "yes" if first.stderr == "A\377" else "no")
+    second = ctx.execute([cc, "-v"])
+    ctx.file("result", "%s|%s|%s" % (first.stderr == "A\377", second.return_code, second.stdout == "B\377"))
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let snapshot = environment_snapshot(&[("PATH", "/which/target")]);
+        let frontier = environment_frontier(&["PATH"]);
+        let base = base_transaction_untracked(&dice, MODULE, EXEC_EXTENSION, true).await;
+        let mut transaction = with_host_inputs_for(
+            base,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot.clone(),
+            frontier.clone(),
+        )
+        .await;
+        let selected_owner = owner(&mut transaction).await;
+        let key = HostSelectedRepositoryFileEffectObservationKey::new(
+            workspace.dupe(),
+            selected_owner,
+            0,
+        );
+
+        let first_request = loop {
+            match transaction.compute(&key).await.unwrap() {
+                SourcePreparationOutcome::Need(need) if need.path_observations().is_some() => {
+                    transaction = update_which_need(transaction, &need).await;
+                }
+                SourcePreparationOutcome::Need(need) => {
+                    let request = need.repository_executes().values().next().unwrap().clone();
+                    assert_eq!(need.repository_executes().len(), 1);
+                    break request;
+                }
+                terminal => panic!("first execute did not yield a Need: {terminal:?}"),
+            }
+        };
+        assert_eq!(first_request.id().call_index(), 0);
+        assert_eq!(first_request.prefix().effects().len(), 1);
+        assert_eq!(
+            first_request.prefix().effects()[0].content(),
+            b"int main() {}"
+        );
+        assert_eq!(first_request.environment(), &snapshot);
+        let first_result =
+            RepositoryExecuteResult::new(0, Arc::from(&b""[..]), Arc::from(&b"A\xff"[..]));
+        let transcript = RepositoryExecuteTranscript::empty()
+            .append(RepositoryExecuteRecord::new(
+                first_request.clone(),
+                first_result,
+            ))
+            .unwrap();
+        let first_epoch = RepositoryExecuteEpoch::active(1, transcript.clone());
+        transaction = with_execute_epoch(
+            transaction,
+            workspace.dupe(),
+            snapshot.clone(),
+            frontier.clone(),
+            first_epoch.clone(),
+        )
+        .await;
+
+        let (next, second_stage) = compute_execute_after_path_needs(
+            transaction,
+            &key,
+            &workspace,
+            &snapshot,
+            &frontier,
+            &first_epoch,
+        )
+        .await;
+        transaction = next;
+        let second_request = match second_stage {
+            SourcePreparationOutcome::Need(need) => {
+                need.repository_executes().values().next().unwrap().clone()
+            }
+            terminal => panic!("second execute did not yield a Need: {terminal:?}"),
+        };
+        assert_eq!(second_request.id().call_index(), 1);
+        assert_eq!(first_request.argv(), second_request.argv());
+        assert_eq!(second_request.prefix().effects().len(), 2);
+        assert_eq!(second_request.prefix().effects()[1].content(), b"yes");
+        let reordered = RepositoryExecuteTranscript::empty()
+            .append(RepositoryExecuteRecord::new(
+                second_request.clone(),
+                RepositoryExecuteResult::new(0, Arc::from(&b""[..]), Arc::from(&b""[..])),
+            ))
+            .unwrap()
+            .append(transcript.records()[0].clone())
+            .unwrap();
+        let reordered_epoch = RepositoryExecuteEpoch::active(1, reordered);
+        transaction = with_execute_epoch(
+            transaction,
+            workspace.dupe(),
+            snapshot.clone(),
+            frontier.clone(),
+            reordered_epoch.clone(),
+        )
+        .await;
+        let (next, reordered_stage) = compute_execute_after_path_needs(
+            transaction,
+            &key,
+            &workspace,
+            &snapshot,
+            &frontier,
+            &reordered_epoch,
+        )
+        .await;
+        transaction = next;
+        let SourcePreparationOutcome::Complete(Ok(reordered_error)) = reordered_stage else {
+            panic!("reordered transcript did not produce a terminal")
+        };
+        assert!(matches!(
+            reordered_error.result().as_ref(),
+            Err(HostSelectedRepositoryFileEffectError::Invocation { message, .. })
+                if message.contains("prepared transcript differs")
+        ));
+        let wrong_prefix_request = Arc::new(RepositoryExecuteRequest::new(
+            second_request.id().clone(),
+            second_request.generated_repository().into(),
+            second_request.argv().to_vec().into(),
+            second_request.environment().clone(),
+            first_request.prefix().clone(),
+        ));
+        let wrong_transcript = transcript
+            .append(RepositoryExecuteRecord::new(
+                wrong_prefix_request,
+                RepositoryExecuteResult::new(0, Arc::from(&b""[..]), Arc::from(&b""[..])),
+            ))
+            .unwrap();
+        let wrong_epoch = RepositoryExecuteEpoch::active(1, wrong_transcript);
+        transaction = with_execute_epoch(
+            transaction,
+            workspace.dupe(),
+            snapshot.clone(),
+            frontier.clone(),
+            wrong_epoch.clone(),
+        )
+        .await;
+        let (next, wrong_stage) = compute_execute_after_path_needs(
+            transaction,
+            &key,
+            &workspace,
+            &snapshot,
+            &frontier,
+            &wrong_epoch,
+        )
+        .await;
+        transaction = next;
+        let SourcePreparationOutcome::Complete(Ok(rejected)) = wrong_stage else {
+            panic!("mismatched prefix did not produce a terminal")
+        };
+        assert!(matches!(
+            rejected.result().as_ref(),
+            Err(HostSelectedRepositoryFileEffectError::Invocation { message, .. })
+                if message.contains("prepared transcript differs")
+        ));
+        let second_result =
+            RepositoryExecuteResult::new(7, Arc::from(&b"B\xff"[..]), Arc::from(&b"bad"[..]));
+        let transcript = transcript
+            .append(RepositoryExecuteRecord::new(second_request, second_result))
+            .unwrap();
+        let complete_epoch = RepositoryExecuteEpoch::active(1, transcript);
+        transaction = with_execute_epoch(
+            transaction,
+            workspace.dupe(),
+            snapshot.clone(),
+            frontier.clone(),
+            complete_epoch.clone(),
+        )
+        .await;
+        let (_, complete_stage) = compute_execute_after_path_needs(
+            transaction,
+            &key,
+            &workspace,
+            &snapshot,
+            &frontier,
+            &complete_epoch,
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(observed)) = complete_stage else {
+            panic!("prepared execute transcript did not complete")
+        };
+        let effect = observed.result().as_ref().as_ref().unwrap();
+        assert_eq!(effect.plan().effects()[2].content(), b"True|7|True");
+        assert_eq!(effect.host().execute_transcript().records().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn repository_execute_fresh_active_nonce_invalidates_completed_observation() {
+        const EXEC_EXTENSION: &str = r#"
+def write(ctx):
+    cc = ctx.which("tool")
+    result = ctx.execute([cc, "-v"])
+    ctx.file("result", result.stderr)
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let snapshot = environment_snapshot(&[("PATH", "/which/target")]);
+        let frontier = environment_frontier(&["PATH"]);
+        let base = base_transaction_untracked(&dice, MODULE, EXEC_EXTENSION, true).await;
+        let mut transaction = with_host_inputs_for(
+            base,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot.clone(),
+            frontier.clone(),
+        )
+        .await;
+        let selected_owner = owner(&mut transaction).await;
+        let key = HostSelectedRepositoryFileEffectObservationKey::new(
+            workspace.dupe(),
+            selected_owner,
+            0,
+        );
+        let first_request = loop {
+            match transaction.compute(&key).await.unwrap() {
+                SourcePreparationOutcome::Need(need) if need.path_observations().is_some() => {
+                    transaction = update_which_need(transaction, &need).await;
+                }
+                SourcePreparationOutcome::Need(need) => {
+                    break need.repository_executes().values().next().unwrap().clone();
+                }
+                terminal => panic!("first command did not need execute: {terminal:?}"),
+            }
+        };
+        let transcript = RepositoryExecuteTranscript::empty()
+            .append(RepositoryExecuteRecord::new(
+                first_request.clone(),
+                RepositoryExecuteResult::new(0, Arc::from(&b""[..]), Arc::from(&b"v1"[..])),
+            ))
+            .unwrap();
+        let first_epoch = RepositoryExecuteEpoch::active(1, transcript);
+        transaction = with_execute_epoch(
+            transaction,
+            workspace.dupe(),
+            snapshot.clone(),
+            frontier.clone(),
+            first_epoch.clone(),
+        )
+        .await;
+        let (next, completed) = compute_execute_after_path_needs(
+            transaction,
+            &key,
+            &workspace,
+            &snapshot,
+            &frontier,
+            &first_epoch,
+        )
+        .await;
+        transaction = next;
+        let SourcePreparationOutcome::Complete(Ok(observed)) = completed else {
+            panic!("prepared first command did not complete: {completed:?}")
+        };
+        assert_eq!(
+            observed
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .plan()
+                .effects()[0]
+                .content(),
+            b"v1"
+        );
+
+        let fresh_epoch = RepositoryExecuteEpoch::active(2, RepositoryExecuteTranscript::empty());
+        transaction = with_execute_epoch(
+            transaction,
+            workspace.dupe(),
+            snapshot.clone(),
+            frontier.clone(),
+            fresh_epoch.clone(),
+        )
+        .await;
+        let (next, fresh) = compute_execute_after_path_needs(
+            transaction,
+            &key,
+            &workspace,
+            &snapshot,
+            &frontier,
+            &fresh_epoch,
+        )
+        .await;
+        transaction = next;
+        let SourcePreparationOutcome::Need(need) = fresh else {
+            panic!("fresh active nonce reused completed execution: {fresh:?}")
+        };
+        let request = need.repository_executes().values().next().unwrap();
+        assert_eq!(need.repository_executes().len(), 1);
+        assert_eq!(request.id(), first_request.id());
+        assert_eq!(request.argv(), first_request.argv());
+
+        let changed = environment_snapshot(&[("PATH", "/which/second")]);
+        let changed_epoch = RepositoryExecuteEpoch::active(3, RepositoryExecuteTranscript::empty());
+        transaction = with_execute_epoch(
+            transaction,
+            workspace.dupe(),
+            changed.clone(),
+            frontier.clone(),
+            changed_epoch.clone(),
+        )
+        .await;
+        let (next, changed_need) = compute_execute_after_path_needs(
+            transaction,
+            &key,
+            &workspace,
+            &changed,
+            &frontier,
+            &changed_epoch,
+        )
+        .await;
+        transaction = next;
+        let SourcePreparationOutcome::Need(need) = changed_need else {
+            panic!("changed input reused completed execution: {changed_need:?}")
+        };
+        let changed_request = need.repository_executes().values().next().unwrap();
+        assert_eq!(need.repository_executes().len(), 1);
+        assert_eq!(changed_request.id(), first_request.id());
+        assert_ne!(changed_request.argv(), first_request.argv());
+
+        let restored_epoch =
+            RepositoryExecuteEpoch::active(4, RepositoryExecuteTranscript::empty());
+        transaction = with_execute_epoch(
+            transaction,
+            workspace.dupe(),
+            snapshot.clone(),
+            frontier.clone(),
+            restored_epoch.clone(),
+        )
+        .await;
+        let (_, restored_need) = compute_execute_after_path_needs(
+            transaction,
+            &key,
+            &workspace,
+            &snapshot,
+            &frontier,
+            &restored_epoch,
+        )
+        .await;
+        let SourcePreparationOutcome::Need(need) = restored_need else {
+            panic!("restored input reused completed execution: {restored_need:?}")
+        };
+        let restored_request = need.repository_executes().values().next().unwrap();
+        assert_eq!(need.repository_executes().len(), 1);
+        assert_eq!(restored_request.id(), first_request.id());
+        assert_eq!(restored_request.argv(), first_request.argv());
+    }
+
+    #[tokio::test]
+    async fn repository_execute_rejects_unused_active_transcript_after_branch_change() {
+        const BRANCH_EXTENSION: &str = r#"
+def write(ctx):
+    if ctx.os.environ.get("SKIP") == "1":
+        ctx.file("skipped", "yes")
+        return
+    cc = ctx.which("tool")
+    ctx.execute([cc, "-v"])
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let base = base_transaction_untracked(&dice, MODULE, BRANCH_EXTENSION, true).await;
+        let mut transaction = with_host_inputs_for(
+            base,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            environment_snapshot(&[("PATH", "/which/target")]),
+            environment_frontier(&["PATH"]),
+        )
+        .await;
+        let selected_owner = owner(&mut transaction).await;
+        let key = HostSelectedRepositoryFileEffectObservationKey::new(
+            workspace.dupe(),
+            selected_owner,
+            0,
+        );
+        let request = loop {
+            match transaction.compute(&key).await.unwrap() {
+                SourcePreparationOutcome::Need(need) if need.path_observations().is_some() => {
+                    transaction = update_which_need(transaction, &need).await;
+                }
+                SourcePreparationOutcome::Need(need) => {
+                    break need.repository_executes().values().next().unwrap().clone();
+                }
+                terminal => panic!("branch fixture did not reach execute: {terminal:?}"),
+            }
+        };
+        let transcript = RepositoryExecuteTranscript::empty()
+            .append(RepositoryExecuteRecord::new(
+                request,
+                RepositoryExecuteResult::new(0, Arc::from(&b""[..]), Arc::from(&b""[..])),
+            ))
+            .unwrap();
+        let changed = environment_snapshot(&[("PATH", "/which/target"), ("SKIP", "1")]);
+        let frontier = environment_frontier(&["PATH", "SKIP"]);
+        transaction = with_execute_epoch(
+            transaction,
+            workspace.dupe(),
+            changed.clone(),
+            frontier.clone(),
+            RepositoryExecuteEpoch::active(9, transcript),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(rejected)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("unused active transcript was not rejected")
+        };
+        assert!(matches!(
+            rejected.result().as_ref(),
+            Err(HostSelectedRepositoryFileEffectError::Invocation { message, .. })
+                if message.contains("prepared transcript differs")
+        ));
+
+        transaction = with_execute_epoch(
+            transaction,
+            workspace,
+            changed,
+            frontier,
+            RepositoryExecuteEpoch::revoked(),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(recovered)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("revoked branch did not recover")
+        };
+        let effect = recovered.result().as_ref().as_ref().unwrap();
+        assert_eq!(effect.plan().effects()[0].path(), "skipped");
+        assert!(effect.host().execute_transcript().records().is_empty());
     }
 
     #[tokio::test]

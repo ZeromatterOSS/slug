@@ -35,6 +35,7 @@ pub mod parser;
 pub mod registry;
 pub mod registry_dice;
 mod repo_file;
+mod repository_execute;
 mod repository_host_input;
 mod repository_ignore;
 mod repository_label_path;
@@ -314,6 +315,30 @@ pub use registry_dice::RootModuleRegistryUrls;
 pub use registry_dice::RootModuleRegistryUrlsKey;
 pub use registry_dice::inject_registry_request_inputs;
 pub use registry_dice::install_registry_io;
+#[doc(hidden)]
+pub use repository_execute::REPOSITORY_EXECUTE_MAX_CALLS;
+#[doc(hidden)]
+pub use repository_execute::RepositoryExecuteArg;
+#[doc(hidden)]
+pub use repository_execute::RepositoryExecuteCallId;
+#[doc(hidden)]
+pub use repository_execute::RepositoryExecuteEpoch;
+#[doc(hidden)]
+pub use repository_execute::RepositoryExecuteEpochKey;
+#[doc(hidden)]
+pub use repository_execute::RepositoryExecuteObservationKey;
+#[doc(hidden)]
+pub use repository_execute::RepositoryExecuteOptions;
+#[doc(hidden)]
+pub use repository_execute::RepositoryExecuteRecord;
+#[doc(hidden)]
+pub use repository_execute::RepositoryExecuteRequest;
+#[doc(hidden)]
+pub use repository_execute::RepositoryExecuteResult;
+#[doc(hidden)]
+pub use repository_execute::RepositoryExecuteTranscript;
+#[doc(hidden)]
+pub use repository_execute::RepositoryExecuteTranscriptError;
 #[doc(hidden)]
 pub use repository_host_input::NeedRepositoryEnvironmentNames;
 #[doc(hidden)]

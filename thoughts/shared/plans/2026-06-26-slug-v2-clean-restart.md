@@ -29,17 +29,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-138-m7a-repository-which-path-normalization-r1
-Status: ACCEPTED; independent DESIGN and FINAL reviews accepted; M7A remains partial
+Packet: WP-7-139-m7a-repository-execute-gcc-probes-r1
+Status: ACCEPTED; M7A remains partial
 
-WP838 validates a bounded exact correction to Unix `repository_ctx.which`:
-normalize absolute `PATH` entries lexically as pinned Bazel 9.2 does before
-probing. A fresh ignored-RC Bazel fixture and rebuilt Slug both accept
-`PATH=/usr/../bin`; same-candidate raw-PATH A→B→A retains the existing DICE
-environment and Host-path observation owners. The ambient authentic replay
-clears rules_shell and reaches separate unsupported `repository_ctx.execute`
-in rules_cc 0.2.17. Independent DESIGN and FINAL reviews accepted; full C++ toolchain
-and root Build remain deferred. See
+WP839 targets the authentic rules_cc 0.2.17 Linux GCC
+`repository_ctx.execute` first stop with an ordered, DICE-owned process
+transcript and Core-owned confined runner. A fresh offline Bazel 9.2 GCC probe
+proves preceding generated-file input and result fields. The bounded
+Slug-native process policy and lease-scoped DICE invalidation are accepted
+with passing offline Bazel/Slug replay. A low-commit Linux/GNU launcher
+correction cleared the host `ENOMEM` stop; authentic cquery consumed two
+source-ordered GCC `-v` probes before the separate pre-existing `which`
+candidate limit. Later compiler probes and full C++ toolchain/root Build
+remain deferred. See
 `slug-v2-subplans/current-packet.md`; M7A is partial.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

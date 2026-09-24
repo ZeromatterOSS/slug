@@ -1,0 +1,4 @@
+module(name = "gcc_execute_probe")
+
+gcc_repo = use_repo_rule("//:repo.bzl", "gcc_repo")
+gcc_repo(name = "selected")
