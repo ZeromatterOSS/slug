@@ -587,6 +587,20 @@ six-effect Bazel/Slug row pass. Authentic cquery clears the former prefix
 rejection and next stops at unsupported `path.dirname` in pinned
 `unix_cc_configure.bzl:500`; full toolchain and M7A remain open.
 
+### Selected repository path dirname accepted (WP842, 2026-09-24)
+
+For selected `repository_ctx.which` executables and already observed-
+present absolute Host paths, `dirname` now yields a lexical Host parent;
+root yields `None`. Host path string text is plain valid Unicode rather
+than the prior debug-quoted Rust `Path` Display. The observed child proves
+parent existence, so no new Host probe or DICE key is introduced. Missing
+Host, Label-source and Generated path dirname remain unsupported; derived
+parents cannot become Which executables or Label sources. A fresh third
+normalized-`which` Bazel/Slug row passes alongside the unchanged two
+rows. Authentic cquery clears `path.dirname` and reaches a separate Core
+prefix stop after the source-authored `builtin_include_directory_paths`
+effect; full toolchain and M7A remain open.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

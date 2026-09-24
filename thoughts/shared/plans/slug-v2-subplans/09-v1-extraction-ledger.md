@@ -2973,3 +2973,13 @@ absent→present→absent replay, fresh two-row Bazel/Slug evidence and authenti
 progression to the separate `path.dirname` boundary discriminate the change.
 The bound is a Slug-native limit, not a hot-path benchmark or exact Bazel
 template-byte claim.
+
+WP842 reuses the existing scratch `RepositoryStarlarkPath::Host` variant
+for lexical parents of observed-present paths and corrects only its Host
+text projection. Which/Host path observation and raw PATH cells remain
+the DICE owners; `exists=true` on the parent follows from the observed
+child, not a new stat or retained snapshot. Hash/equality, Arc/Dupe/
+Allocative shape and retained collections are unchanged. The direct
+path-provenance controls, protected Loading tests and independent fresh
+Bazel/Slug dirname row discriminate the change. No memory or performance
+gain is claimed; missing-path and other-origin dirname stay deferred.

@@ -1,10 +1,10 @@
 [fixture]
 name = "repository-rule-which-normalized-path"
-description = "Bazel 9.2 repository_ctx.which normalizes an absolute Unix PATH component and searches beyond 64 aggregate candidates."
+description = "Bazel 9.2 repository_ctx.which normalizes an absolute Unix PATH component, searches beyond 64 aggregate candidates, and exposes lexical path.dirname."
 comparison = "semantic"
 startup_argv = ["--ignore_all_rc_files"]
 env = { PATH = "/usr/../bin" }
-oracle_notes = "Offline Unix probe. /usr/../bin lexically resolves to /bin, where sh is executable. The original repository requires which('sh') to return the normalized /bin/sh spelling. An independent repository checks 65 distinct reserved names are absent under /bin, then finds /bin/sh, establishing 66 ordered aggregate candidates without a second PATH component. The reserved names' absence is a conditional host assumption, checked by the repository rule. No module dependency, network download, credential RC or copied upstream archive is used."
+oracle_notes = "Offline Unix probe. /usr/../bin lexically resolves to /bin, where sh is executable. The original repository requires which('sh') to return the normalized /bin/sh spelling. An independent repository checks 65 distinct reserved names are absent under /bin, then finds /bin/sh, establishing 66 ordered aggregate candidates without a second PATH component. A third independent repository checks path-valued lexical dirname through which and repository_ctx.path, equality with the observed-present /bin Host path, direct Host text, and the root None boundary. The reserved names' absence is a conditional host assumption, checked by the repository rule. No module dependency, network download, credential RC or copied upstream archive is used."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -15,8 +15,12 @@ source_anchors = [
   "src/test/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryContextTest.java:236-256 (which search ordering and relative-entry filtering)",
   "rules_shell 0.6.1 shell/private/repositories/sh_config.bzl:121-138 (Unix which bash/sh fallback)",
   "rules_cc 0.2.17 cc/private/toolchain/unix_cc_configure.bzl:68-87,376-417 (multiple ordered tool lookups in local_config_cc)",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkPath.java:45-75,127-136 (path equality and lexical dirname)",
+  "src/main/java/com/google/devtools/build/lib/vfs/Path.java:139-151 (root has no parent)",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java:1545-1575 (path object pass-through)",
+  "rules_cc 0.2.17 cc/private/toolchain/unix_cc_configure.bzl:493-507 (compiler parent string and conditional linker parent comparison)",
 ]
-translation_notes = "The original row substitutes a fixed /usr/../bin PATH and sh for the authentic ambient PATH and rules_shell's bash-then-sh lookup; it remains unchanged. The new independent row substitutes 65 reserved absent names plus sh for rules_cc's distinct later tool lookups. All 66 normalize to distinct /bin candidate paths, so only the aggregate budget is crossed, not the per-call component limit. The reserved names must be absent on the oracle host; the row checks that assumption. Host observation details, Windows PATH/PATHEXT, uncapped arbitrary calls, and repository_ctx.execute are outside these rows."
+translation_notes = "The original row substitutes a fixed /usr/../bin PATH and sh for the authentic ambient PATH and rules_shell's bash-then-sh lookup; it remains unchanged. The aggregate row substitutes 65 reserved absent names plus sh for rules_cc's distinct later tool lookups. All 66 normalize to distinct /bin candidate paths, so only the aggregate budget is crossed, not the per-call component limit. The reserved names must be absent on the oracle host; the row checks that assumption. The independent dirname row substitutes sh under the same fixed PATH for authentic rules_cc's selected compiler Which path; it proves the path-valued parent, Which-to-Host equality, Host text and root None but not linker success. Host observation details, Windows PATH/PATHEXT, uncapped arbitrary calls, and repository_ctx.execute are outside these rows."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture repository-rule-which-normalized-path --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture repository-rule-which-normalized-path --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
 
@@ -31,3 +35,9 @@ name = "aggregate_candidates_continue_past_sixty_four"
 argv = ["query", "@aggregate_selected//:aggregate_which", "--output=label", "--noshow_progress"]
 expected_exit = 0
 stdout_patterns = ['\A@aggregate_selected//:aggregate_which\n?\Z']
+
+[[commands]]
+name = "which_path_dirname_and_root_none"
+argv = ["query", "@dirname_selected//:dirname_paths", "--output=label", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\A@dirname_selected//:dirname_paths\n?\Z']

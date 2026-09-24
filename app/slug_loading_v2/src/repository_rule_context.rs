@@ -553,7 +553,7 @@ impl RepositoryRuleInvocationState {
 #[rustfmt::skip] fn existing_repository_path<'v>(value: Value<'v>) -> Option<Value<'v>> { RepositoryStarlarkPath::from_value(value).map(|_| value) }
 
 #[rustfmt::skip] impl RepositoryStarlarkPath {
-    fn text(&self) -> String { match self { Self::Label { path, .. } | Self::Which(path) => path.path_str().to_owned(), Self::Host { path, .. } => path.to_string(), Self::Generated { repository, relative, .. } => format!("@@{repository}//{relative}") } }
+    fn text(&self) -> String { match self { Self::Label { path, .. } | Self::Which(path) => path.path_str().to_owned(), Self::Host { path, .. } => path.as_path().to_str().expect("repository Host paths originate from Unicode Starlark text").to_owned(), Self::Generated { repository, relative, .. } => format!("@@{repository}//{relative}") } }
     fn label_address(&self) -> Option<&RepositoryLabelPathAddress> { match self { Self::Label { address, .. } => Some(address), _ => None } }
 }
 
@@ -579,10 +579,28 @@ impl<'v> StarlarkValue<'v> for RepositoryStarlarkPath {
             _ => false,
         }))
     }
-    fn get_attr(&self, name: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
-        match (name, self) { ("exists", Self::Generated { relative, present, .. }) => Some(Value::new_bool(present.lock().expect("generated path state mutex poisoned").contains(relative))), ("exists", Self::Host { exists, .. }) => Some(Value::new_bool(*exists)), _ => None }
+    fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match (name, self) {
+            ("dirname", Self::Which(value)) => {
+                let Some(parent) = value.path().as_path().parent() else { return Some(Value::new_none()); };
+                let path = NormalizedAbsolutePath::new(parent.to_path_buf()).expect("the parent of a normalized absolute path is normalized");
+                Some(heap.alloc_simple(Self::Host { path, exists: true }))
+            }
+            ("dirname", Self::Host { path, exists: true }) => {
+                let Some(parent) = path.as_path().parent() else { return Some(Value::new_none()); };
+                let path = NormalizedAbsolutePath::new(parent.to_path_buf()).expect("the parent of a normalized absolute path is normalized");
+                Some(heap.alloc_simple(Self::Host { path, exists: true }))
+            }
+            ("exists", Self::Generated { relative, present, .. }) => Some(Value::new_bool(present.lock().expect("generated path state mutex poisoned").contains(relative))),
+            ("exists", Self::Host { exists, .. }) => Some(Value::new_bool(*exists)),
+            _ => None,
+        }
     }
-    fn dir_attr(&self) -> Vec<String> { matches!(self, Self::Generated { .. } | Self::Host { .. }).then(|| vec!["exists".to_owned()]).unwrap_or_default() }
+    fn dir_attr(&self) -> Vec<String> {
+        let mut attributes = matches!(self, Self::Generated { .. } | Self::Host { .. }).then(|| vec!["exists".to_owned()]).unwrap_or_default();
+        if matches!(self, Self::Which(_) | Self::Host { exists: true, .. }) { attributes.push("dirname".to_owned()); }
+        attributes
+    }
     fn get_methods() -> Option<&'static Methods> {
         static METHODS: MethodsStatic = MethodsStatic::new();
         METHODS.methods(repository_starlark_path_methods)
@@ -2475,6 +2493,142 @@ def implementation(ctx):
                 .result,
             Err(RepositoryRuleInvocationError::ReadArgument)
         ));
+    }
+
+    #[test]
+    fn repository_path_dirname_projects_observed_host_parent_without_new_provenance() {
+        let source = r#"
+def implementation(ctx):
+    cc = ctx.which("gcc")
+    parent = ctx.path(cc).dirname
+    host = ctx.path("/usr/bin")
+    root = ctx.path("/")
+    ctx.file("facts", "%s|%s|%s|%s|%s|%s|%s|%s|%s" % (
+        str(parent), type(parent), parent == host, {parent: "same"}[host],
+        parent.exists, str(host), str(host.dirname), str(root), root.dirname == None,
+    ), executable = False)
+"#;
+        let manifest = invocation_manifest();
+        let module = freeze_bzl(&manifest, source, None);
+        let implementation = unsafe {
+            module
+                .get("implementation")
+                .unwrap()
+                .unchecked_frozen_value()
+        };
+        let gcc = NormalizedAbsolutePath::new("/usr/bin/gcc").unwrap();
+        let prepared_which = SmallMap::from_iter([(gcc, RepositoryWhichCandidate::Executable)]);
+        let prepared_host = SmallMap::from_iter([
+            (NormalizedAbsolutePath::new("/usr/bin").unwrap(), true),
+            (NormalizedAbsolutePath::new("/").unwrap(), true),
+        ]);
+        let snapshot =
+            RepositoryEnvironmentSnapshot::from_canonical([RepositoryEnvironmentEntry::new(
+                "PATH", "/usr/bin",
+            )])
+            .unwrap();
+        let attempt = invoke_repository_rule_with_host_paths(
+            implementation,
+            &manifest,
+            &PreparedRepositoryLabelPaths::new(),
+            &PreparedRepositoryLabelSources::new(),
+            &prepared_which,
+            &prepared_host,
+            RepositoryRuleInvocationInput::new(
+                "repo".into(),
+                None,
+                Arc::new(SmallMap::new()),
+                Arc::from([]),
+            )
+            .unwrap(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot,
+            None,
+        );
+        let invocation = attempt.result.unwrap();
+        assert_eq!(
+            invocation.plan.effects()[0].content(),
+            b"/usr/bin|path|True|same|True|/usr/bin|/usr|/|True"
+        );
+    }
+
+    #[test]
+    fn repository_path_dirname_rejects_missing_host_and_source_origins() {
+        let manifest = invocation_manifest();
+        let source_label = CanonicalLabel::parse("@@dep+//pkg:file").unwrap();
+        let address = RepositoryLabelPathAddress::from_label(&source_label);
+        let label_path = HostRepositoryLabelPathValue::new(
+            NormalizedAbsolutePath::new("/materialized/dep/pkg/file").unwrap(),
+            PathObservationNamespace::Materialization(
+                slug_workspace_v2::PathObservationInstanceId::new(842),
+            ),
+        )
+        .unwrap();
+        let prepared_labels = SmallMap::from_iter([(address, label_path)]);
+        let prepared_host =
+            SmallMap::from_iter([(NormalizedAbsolutePath::new("/missing/file").unwrap(), false)]);
+        for source in [
+            "def implementation(ctx):\n    ctx.path('/missing/file').dirname\n",
+            "def implementation(ctx):\n    ctx.path(Label('@@dep+//pkg:file')).dirname\n",
+            "def implementation(ctx):\n    ctx.path('generated').dirname\n",
+        ] {
+            let module = freeze_bzl(&manifest, source, None);
+            let implementation = unsafe {
+                module
+                    .get("implementation")
+                    .unwrap()
+                    .unchecked_frozen_value()
+            };
+            let attempt = invoke_repository_rule_with_host_paths(
+                implementation,
+                &manifest,
+                &prepared_labels,
+                &PreparedRepositoryLabelSources::new(),
+                &PreparedRepositoryWhichCandidates::new(),
+                &prepared_host,
+                RepositoryRuleInvocationInput::new(
+                    "repo".into(),
+                    None,
+                    Arc::new(SmallMap::new()),
+                    Arc::from([]),
+                )
+                .unwrap(),
+                RepositoryPlatform::new("linux", "x86_64"),
+                RepositoryEnvironmentSnapshot::empty(),
+                None,
+            );
+            assert!(
+                matches!(
+                    attempt.result,
+                    Err(RepositoryRuleInvocationError::Evaluation(_))
+                ),
+                "{source}"
+            );
+        }
+
+        let gcc = SmallMap::from_iter([(
+            NormalizedAbsolutePath::new("/usr/bin/gcc").unwrap(),
+            RepositoryWhichCandidate::Executable,
+        )]);
+        for (source, expected) in [
+            (
+                "def implementation(ctx):\n    ctx.execute([ctx.which('gcc').dirname, '-v'])\n",
+                RepositoryRuleInvocationError::ExecuteArgument,
+            ),
+            (
+                "def implementation(ctx):\n    ctx.template('x', ctx.which('gcc').dirname)\n",
+                RepositoryRuleInvocationError::TemplateSourceArgument,
+            ),
+            (
+                "def implementation(ctx):\n    ctx.symlink(ctx.which('gcc').dirname, 'x')\n",
+                RepositoryRuleInvocationError::SymlinkArgument,
+            ),
+        ] {
+            let Err(error) = invoke_which(source, Some("/usr/bin"), &gcc) else {
+                panic!("derived Host parent gained source/executable provenance: {source}")
+            };
+            assert_eq!(error, expected);
+        }
     }
 
     #[test]

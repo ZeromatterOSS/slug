@@ -67,6 +67,40 @@
       "startup_argv": [],
       "stderr": "",
       "stdout": "@aggregate_selected//:aggregate_which\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@dirname_selected//:dirname_paths",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@dirname_selected//:dirname_paths",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "PATH": "/usr/../bin"
+      },
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "which_path_dirname_and_root_none",
+      "normalized_stderr": "",
+      "normalized_stdout": "@dirname_selected//:dirname_paths",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@dirname_selected//:dirname_paths\n"
     }
   ],
   "fixture": "repository-rule-which-normalized-path",
