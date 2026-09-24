@@ -1,127 +1,138 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-123-m7a-starlark-bool-rule-call-r1
+Packet: WP-7-124-m7a-initializer-selector-passthrough-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit Bazel 9.2's direct integer 0/1 rule-call values for declared Boolean
-attributes of ordinary Starlark rules. The authenticated rules_license 1.0.0
-`_license` call at `@@rules_license+//rules:license.bzl:124-135` passes
-`testonly = 0`; the rebuilt authentic `slug build //:probe` in
-`/tmp/slug-wp797-authentic-2YQmSt` must clear that stop. Exact slice:
-direct scalar `False`/`True`/`0`/`1` binding for inherited `testonly` and
-ordinary `attr.bool` values, with 0/1 normalized to the retained Boolean
-and explicit provenance; 2, -1 and strings fail. Slug-native structural
-Loading identity and diagnostics remain. Unsupported/deferred here:
-integer-valued `select()` branches, rule initializers, native-rule Boolean
-overrides, `attr.bool(default=0/1)` (which Bazel itself rejects), built-in
-`testonly=None` inheritance and late `package()` default timing, configured
-effects not already admitted, and exact Bazel configuration/output identity.
-This packet does not claim all Boolean conversion contexts.
+Admit the authenticated protobuf/rules_cc initializer's unchanged
+configurable `StringList` selector pass-through during Loading. Protobuf
+v33.4 `@@protobuf+//:BUILD.bazel:356-362` calls rules_cc `cc_binary` with
+frozen imported `COPTS` and `LINKOPTS` selects. The rebuilt authentic
+`slug build //:probe` in `/tmp/slug-wp797-authentic-2YQmSt` must clear
+the current `rule initializer input 'copts' cannot use select()` stop;
+any later failure is separate. Exact Bazel 9.2 slice: explicit public
+configurable StringList selector enters the initializer unresolved, and
+the initializer's same-attribute, same-object return retains its ordered
+conditions/branches/default without choosing a configuration. Slug-native:
+pointer-identity pass-through gate, structural package identity and
+diagnostics. Unsupported/deferred: synthesized, modified, swapped or
+concatenated selector returns; other attribute kinds and nonconfigurable
+selectors; definition-relative remapping of new returned selector keys;
+configured C++ rule semantics, branch selection/actions and exact Bazel
+configuration/output bytes. A Loading pass-through is not an executable
+`cc_binary` claim.
 
 ## Source, owner and decision
 
-Pinned Bazel 9.2 `StarlarkRuleClassFunctions.java:159-165` inherits
-`BaseRuleClasses.java:264-267` Boolean `testonly`;
-`RuleFactory.java:58-105`, `RuleClass.java:2057-2072`,
-`AttributeProvider.java:219-280`, `BuildType.java:165-208,226-249` and
-`Type.java:409-428` convert rule-call Boolean values from bool or exactly
-0/1. `StarlarkAttrModule.java:1078-1091` binds `attr.bool`'s declaration
-default as a Java Boolean before rule-call conversion. Authenticated
-rules_license `rules/license.bzl:32-66,124-135` defines and calls the private
-Starlark rule with `testonly=0`; sibling `rules/package_info.bzl:117` does
-likewise. Ignored-RC/offline Bazel 9.2 oracle
-`/tmp/slug-wp823-rule-bool-oracle` proves direct 0/1 and booleans for both
-inherited `testonly` and ordinary `attr.bool`, with the typed values visible
-in query XML and build implementation. Direct 2/string fail; Boolean
-constructor defaults of integer 0/1/2 fail earlier. The oracle also proves
-None and integer select branches, recorded as distinct deferred contexts
-rather than silently claimed.
+Pinned Bazel 9.2 `StarlarkRuleClassFunctions.java:1793-1878` lifts only
+explicit non-None public attrs into the initializer and reifies returned
+dict values under the initializer defining-label converter;
+`BuildType.java:274-299,321-340` copies/lifts symbolic selector branches
+without selecting one. Authenticated protobuf `build_defs/cpp_opts.bzl:3-22,
+25-52` defines frozen StringList `COPTS`/`LINKOPTS` selects and BUILD
+356-362 forwards them. rules_cc 0.2.17 `cc/private/rules_impl/attrs.bzl:168,
+330` declares these attrs as `string_list`; `cc_binary.bzl:851-853` runs
+PostMark's identity initializer then `dynamic_deps_initializer`, which
+returns kwargs unchanged without `dynamic_deps`. The ignored-RC/offline
+Bazel 9.2 oracle `/tmp/slug-wp824-init-select-oracle` shows the initializer
+receives imported `copts` as `type=select`, direct attrs as lists, and
+omitted/None attrs absent. Returning kwargs unchanged preserves both
+branches: fastbuild produces `-DDEFAULT`, dbg `-DDBG`; unconfigured XML
+lists both branch values and the condition input. This does not prove
+Slug's configured C++ path.
 
-Slug's `FrozenRuleDefinition::invoke` in `package.rs:8212-8280` routes an
-explicit value to `coerce_starlark_value`; the raw integer is then rejected
-by the shared `coerce_raw_value(Boolean)` branch. Normalize only direct
-scalar integer values at this Starlark rule-call boundary, before shared
-raw coercion. Do not widen `coerce_raw_value`: it also handles attribute
-definition defaults, selectors and rule initializer values. Keep existing
-`CoercedAttributeValue::Boolean`, `AttributeProvenance::Explicit`, frozen
-rule/schema and package structural equality. The observed BUILD and loaded
-source fingerprints already own DICE invalidation and A/B/A restoration;
-no key, lock, cache, representation, sidecar, evaluator borrow or new
-memory owner. Native/genrule call paths remain untouched. The large
-`package.rs` is the existing rule-call semantic owner; a small branch there
-is more cohesive than a separate coercion framework. This cold Loading
-conversion has no performance claim or benchmark.
+Slug's `invoke_rule_initializer` in
+`app/slug_loading_v2/src/package.rs:7935-8055` already coerces the
+frozen StringList selector to a canonical `CoercedAttributeValue::Selector`
+and `allocate_macro_attribute` reifies it as one scratch immutable
+`SelectorValue`; an input guard rejects it before callback and a return
+guard rejects it afterward. Admit only a pure `Selector` with declared
+configurable `StringList` kind. Save a scratch tuple of its attribute name,
+reified `Value` and pre-coerced structural value. Execute the initializer
+normally. On return, accept a selector only for that same attribute when
+`Value::ptr_eq` confirms the same reified object; publish the original
+pre-coerced value, never re-coerce it in the caller context. New or swapped
+selectors continue to fail closed because Bazel would use the defining
+`.bzl` mapping that this packet does not implement. Starlark's opaque
+`SelectorValue` exposes no in-place mutation; addition makes a new object.
+Do not bypass callback execution or infer selector contents from repr/path.
+
+The existing frozen rule `AttributeValue`, selector branches and derived
+`$config_dependencies` own the final fact, with package structural equality
+and observed BUILD/loaded-source fingerprints providing invalidation and
+same-DICE A/B/A restoration. The new name/`Value`/coerced tuple is
+initializer-attempt scratch released on success, failure or cancellation;
+no evaluator value enters a retained value. No new DICE key, lock, cache,
+interner, retained sidecar, alternate selector representation or semantic
+fallback. The large `package.rs` already owns initializer invocation and
+selector reification; keep any extraction bounded to those adjacent
+functions. This cold Loading seam needs no performance benchmark.
 
 ## Evidence and validation
 
-First add a source-shaped loaded `license` wrapper/rule test that fails
-on the unmodified branch at `testonly=0`, with a true package default set
-before the call so explicit false is discriminating. Add ordinary Boolean
-attribute direct 0/1 and existing bool controls; assert retained typed
-value/provenance and same-DICE 0/1/0 structural restoration. Reject 2,
--1, string and integer `attr.bool(default=0)` without treating a failure
-in the wrong phase as proof. Preserve selected Boolean default, selector,
-native override, configured and Query tests; do not add a Stage 1 fixture.
-Reuse the offline Bazel oracle.
+First add a source-shaped imported frozen `COPTS`/`LINKOPTS` identity
+initializer test that fails on the unmodified branch at the selected
+`copts` input guard. Assert initializer execution using an additional
+returned marker; assert frozen output selectors retain exact condition
+labels, branch order, values, default, explicit provenance and derived
+configuration dependencies. Cover direct list and omitted/None inputs.
+Prove same-DICE imported source/selector branch change and A/B/A restore.
+Keep synthesized/swapped returned selectors, concatenation, wrong-type
+branch and Label selector negative; preserve the definition-time rejection
+of `attr.string_list(configurable=False)`, which cannot reach the initializer.
+No partial package publication. New returned raw selector keys must not silently
+re-map through the caller. Reuse existing selector/initializer tests and
+the offline Bazel oracle; no Stage 1 fixture growth.
 
 Resolve pinned-nightly Cargo. Compile selected Loading and direct Query/
-Analysis dependent test binaries with JSON `--no-run`, batch exact nonignored
-preflight and run focused/protected tests serially. Direct Loading, Query,
-Analysis, Core and CLI compile and CLI rebuild precede one normalized-`PATH`
-authentic smoke. This about-35-second replay is necessary to prove
-transitive source closure advancement; focused tests cannot. Check/clean
-`slugd` before and after. Rust format, diff, plan and archive checks, and
-independent DESIGN and FINAL review of the context boundary are required.
+Analysis dependent test binaries with JSON `--no-run`, exact nonignored
+preflight and serial focused/protected runs. Direct Loading, Query,
+Analysis, Core and CLI compile and CLI rebuild precede one normalized
+`PATH` authentic smoke. That roughly 40-second replay is necessary to
+prove transitive closure advancement that focused tests cannot. Check/
+clean `slugd` before/after. Rust format, diff, plan and archive checks
+and independent DESIGN/FINAL review cover selector ownership, mapping
+gate and fail-closed boundaries.
 
 ## Scope and stops
 
-Base clean main `51ded99c1`. Allowlist: this manifest, canonical Current
-and compact Stage 4 note after acceptance; production
-`app/slug_loading_v2/src/package.rs`; focused tests in
-`app/slug_loading_v2/tests/build_file_loading.rs` or existing
-`host_package_load_tests.rs`, plus a directly affected test only if needed.
-Rough growth 20 production/80 proof lines is a review trigger, not a license
-to change Boolean defaults, selectors or configured behavior. REPLAN if
-the oracle contradicts direct conversion, normalization cannot be isolated
-from constructor/default paths, or semantic equality/negative contexts
-cannot be preserved. A later authentic error cannot widen this packet.
+Base clean main `81341fae8`. Allowlist: this manifest, canonical Current,
+compact Stage 4 owner note after acceptance; production
+`app/slug_loading_v2/src/package.rs`; selected tests in
+`app/slug_loading_v2/tests/build_file_loading.rs` and, only if needed for
+same-DICE imported-source proof, `src/host_package_load_tests.rs`.
+Rough growth 55 production/140 proof lines is a review trigger, not
+authority for transformed selectors or configured C++. REPLAN if the
+authentic initializer does not return the same object, if pointer identity
+cannot safely preserve the original structural value, if mapping/selector
+facts escape scratch, or if the selected stop requires configured C++
+behavior. A later error cannot widen this packet.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviewers ACCEPT the direct scalar rule-call
-boundary. The source-shaped loaded-license test compiled on the clean base,
-passed exact preflight 1, then failed (exit 101) at `_license(...testonly=0)`
-with `attribute must be a bool`. Final pinned-nightly JSON `--no-run` compiled
-Loading, Query and Analysis test binaries; exact preflights selected 4, 1
-and 1 nonignored tests, and all six passed serially (Loading under 0.03
-seconds, Query under 0.01, Analysis about 0.02). Direct Loading/Query/
-Analysis/Core/CLI `cargo check` and required CLI rebuild passed. The
-normalized-PATH authentic smoke (exit 2, about 41 seconds) clears the
-rules_license Boolean stop and next fails separately at
-`@@protobuf+//:BUILD.bazel:356` through rules_cc `cc_binary` because rule
-initializer input `copts` contains `select()`. Pre/post checks found no
-`slugd`; Rust format, diff, plan and archive checks pass. No remote
-transport or BuildBuddy credentials were used. The 23 touched production
-and 191 proof lines exceed the rough 20/80-line trigger because source
-shape, typed/default/negative contexts and independent same-DICE Boolean
-fields need separate proofs; final review accepted proportionality.
-
-An extra older `scalar_and_string_attr_descriptors_retain_typed_values`
-test was run but failed on its unchanged optional-label `None` provenance
-assertion (expected Explicit, actual Default). The existing ordinary-None
-filter yields Default on both base and candidate; the new direct-integer
-branch cannot reach that path. This is an unresolved preexisting
-inconsistency, not a WP823 pass or regression, and is not an acceptance
-gate. Packet wall time from predecessor acceptance through final review was
-about 18 minutes; Cargo preparation and the authentic smoke dominated
-test time.
+Independent DESIGN and FINAL reviewers ACCEPT the bounded selector hand-off.
+The source-shaped imported-selector test compiled on the clean base, passed
+exact preflight 1, then failed (exit 101) at the selected initializer input
+guard for `copts`. Final pinned-nightly JSON `--no-run` compiled Loading
+integration/lib, Query lib and Analysis `starlark_rule` test binaries. Exact
+preflights selected 4, 2, 1 and 1 nonignored tests; all eight passed serially.
+The two Loading lib tests protect initializer reexports and failure atomicity.
+Direct Loading/Query/Analysis/Core/CLI `cargo check` and CLI rebuild passed.
+The normalized-PATH authentic smoke (exit 2, about 55 seconds) clears the
+initializer `copts` selector stop and next fails separately at
+`@@rules_cc+//cc:cc_binary.bzl:44`: target invocation for aspect-bearing
+attribute `_deps_analyzed_by_graph_structure_aspect` is not supported.
+Pre/post checks found no `slugd`; Rust format, diff, plan and archive checks
+pass. No remote transport or BuildBuddy credentials were used. The 26
+production and 255 proof lines exceed the rough 55/140-line review trigger
+only on proof: source-shaped multi-selector values, negative boundaries and
+same-DICE imported-source restoration require separate checks; final review
+accepted proportionality. Configured C++ and action behavior remain open.
 
 ## Immediate predecessor
 
-WP822 accepted at `51ded99c1`: one BUILD-only bare genrule Loading
-declaration, effective inherited testonly and generated output owner.
-Eight focused/protected tests, direct checks and rebuilt authentic smoke
-cleared the protobuf BUILD stop and reached this separate rules_license
-Boolean coercion failure.
+WP823 accepted at `81341fae8`: direct integer 0/1 Boolean Starlark-rule
+call values clear rules_license's `testonly=0` stop. Six selected Loading/
+Query/Analysis tests, direct checks, rebuilt CLI and authentic smoke pass
+their bounded gates; the next independent stop is this initializer input.

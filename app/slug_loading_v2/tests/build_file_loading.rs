@@ -5273,6 +5273,261 @@ fn starlark_rule_boolean_direct_values_restore_on_same_dice() {
 }
 
 #[test]
+fn initializer_preserves_imported_frozen_string_list_selectors() {
+    let workspace = scratch("initializer-frozen-string-list-selectors");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+COPTS = select({
+    ":msvc": ["/wd4065", "/wd4146"],
+    "//conditions:default": ["-Wno-sign-compare"],
+})
+LINKOPTS = select({
+    ":android": [],
+    ":darwin": ["-framework", "CoreFoundation"],
+    "//conditions:default": ["-lpthread", "-lm"],
+})
+
+def _impl(ctx):
+    return []
+
+def _init(name, **kwargs):
+    if type(kwargs["copts"]) != "select" or type(kwargs["linkopts"]) != "select":
+        fail("initializer lost unresolved selectors")
+    if type(kwargs["direct"]) != "list" or "nullable" in kwargs or "omitted" in kwargs:
+        fail("initializer argument filtering changed")
+    return {"copts": kwargs["copts"], "linkopts": kwargs["linkopts"], "direct": kwargs["direct"], "marker": "called"}
+
+probe = rule(implementation = _impl, initializer = _init, attrs = {
+    "copts": attr.string_list(),
+    "linkopts": attr.string_list(),
+    "direct": attr.string_list(),
+    "nullable": attr.string_list(),
+    "omitted": attr.string_list(),
+    "marker": attr.string(),
+})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        concat!(
+            "load(':defs.bzl', 'COPTS', 'LINKOPTS', 'probe')\n",
+            "config_setting(name = 'msvc', values = {'cpu': 'x64_windows'})\n",
+            "config_setting(name = 'android', values = {'cpu': 'armeabi-v7a'})\n",
+            "config_setting(name = 'darwin', values = {'cpu': 'darwin'})\n",
+            "probe(name = 'subject', copts = COPTS, linkopts = LINKOPTS, direct = ['direct'], nullable = None)\n",
+        ),
+    )
+    .unwrap();
+    let loaded = load_package(&workspace, &package);
+    let marker = starlark_rule_attr(&loaded, "subject", "marker");
+    assert_eq!(marker.provenance, AttributeProvenance::Explicit);
+    assert_eq!(
+        marker.value.as_ref(),
+        &CoercedAttributeValue::String("called".into())
+    );
+    let copts = starlark_rule_attr(&loaded, "subject", "copts");
+    assert_eq!(copts.provenance, AttributeProvenance::Explicit);
+    let CoercedAttributeValue::Selector { branches, default } = copts.value.as_ref() else {
+        panic!("initializer lost COPTS selector")
+    };
+    assert_eq!(branches.len(), 1);
+    assert_eq!(branches[0].0.to_string(), "@@//pkg:msvc");
+    assert_eq!(
+        branches[0].1.as_ref(),
+        &CoercedAttributeValue::StringList(Arc::from(["/wd4065".into(), "/wd4146".into()]))
+    );
+    assert_eq!(
+        default.as_deref(),
+        Some(&CoercedAttributeValue::StringList(Arc::from([
+            "-Wno-sign-compare".into()
+        ])))
+    );
+    let linkopts = starlark_rule_attr(&loaded, "subject", "linkopts");
+    assert_eq!(linkopts.provenance, AttributeProvenance::Explicit);
+    let CoercedAttributeValue::Selector { branches, default } = linkopts.value.as_ref() else {
+        panic!("initializer lost LINKOPTS selector")
+    };
+    assert_eq!(
+        branches
+            .iter()
+            .map(|(condition, _)| condition.to_string())
+            .collect::<Vec<_>>(),
+        ["@@//pkg:android", "@@//pkg:darwin"]
+    );
+    assert_eq!(
+        branches[0].1.as_ref(),
+        &CoercedAttributeValue::StringList(Arc::from([]))
+    );
+    assert_eq!(
+        branches[1].1.as_ref(),
+        &CoercedAttributeValue::StringList(Arc::from([
+            "-framework".into(),
+            "CoreFoundation".into()
+        ]))
+    );
+    assert_eq!(
+        default.as_deref(),
+        Some(&CoercedAttributeValue::StringList(Arc::from([
+            "-lpthread".into(),
+            "-lm".into()
+        ])))
+    );
+    assert_eq!(
+        starlark_rule_attr(&loaded, "subject", "$config_dependencies")
+            .value
+            .as_ref(),
+        &CoercedAttributeValue::LabelList(Arc::from([
+            CanonicalLabel::parse("@@//pkg:msvc").unwrap(),
+            CanonicalLabel::parse("@@//pkg:android").unwrap(),
+            CanonicalLabel::parse("@@//pkg:darwin").unwrap(),
+        ]))
+    );
+    let direct = starlark_rule_attr(&loaded, "subject", "direct");
+    assert_eq!(direct.provenance, AttributeProvenance::Explicit);
+    assert_eq!(
+        direct.value.as_ref(),
+        &CoercedAttributeValue::StringList(Arc::from(["direct".into()]))
+    );
+    for name in ["nullable", "omitted"] {
+        let value = starlark_rule_attr(&loaded, "subject", name);
+        assert_eq!(value.provenance, AttributeProvenance::Default);
+        assert_eq!(
+            value.value.as_ref(),
+            &CoercedAttributeValue::StringList(Arc::from([]))
+        );
+    }
+}
+
+#[test]
+fn initializer_selector_passthrough_rejects_changed_and_invalid_shapes() {
+    let workspace = scratch("initializer-selector-rejections");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    let defs = package.join("defs.bzl");
+    let build = package.join(BUILD_FILE_PRIMARY);
+    fs::write(
+        &build,
+        "load(':defs.bzl', 'COPTS', 'LINKOPTS', 'probe')\nfilegroup(name='earlier')\nprobe(name='bad', copts=COPTS, linkopts=LINKOPTS)\n",
+    )
+    .unwrap();
+    for (copts, copts_decl, result, expected) in [
+        (
+            "select({':msvc': ['-DMSVC'], '//conditions:default': ['-DDEFAULT']})",
+            "attr.string_list()",
+            "return {'copts': select({'//conditions:default': ['-DNEW']})}",
+            "initializer result",
+        ),
+        (
+            "select({':msvc': ['-DMSVC'], '//conditions:default': ['-DDEFAULT']})",
+            "attr.string_list()",
+            "return {'copts': kwargs['linkopts']}",
+            "initializer result",
+        ),
+        (
+            "select({':msvc': ['-DMSVC'], '//conditions:default': ['-DDEFAULT']})",
+            "attr.string_list()",
+            "return {'copts': kwargs['copts'] + ['-DTAIL']}",
+            "initializer result",
+        ),
+        (
+            "select({':msvc': ['-DMSVC'], '//conditions:default': ['-DDEFAULT']})",
+            // This declaration is rejected before the initializer is called;
+            // it does not exercise the selector pass-through guard.
+            "attr.string_list(configurable = False)",
+            "return kwargs",
+            "has the 'configurable' argument set, which is not allowed in rule definitions",
+        ),
+        (
+            "select({':msvc': [1], '//conditions:default': ['-DDEFAULT']})",
+            "attr.string_list()",
+            "return kwargs",
+            "must be a string",
+        ),
+    ] {
+        fs::write(
+            &defs,
+            format!(
+                "COPTS = {copts}\nLINKOPTS = select({{'//conditions:default': ['-lpthread']}})\ndef _impl(ctx): return []\ndef _init(name, **kwargs): {result}\nprobe = rule(implementation=_impl, initializer=_init, attrs={{'copts': {copts_decl}, 'linkopts': attr.string_list()}})\n"
+            ),
+        )
+        .unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "{result}: {error}");
+    }
+    fs::write(
+        &defs,
+        "def _impl(ctx): return []\ndef _init(name, **kwargs): return kwargs\nprobe = rule(implementation=_impl, initializer=_init, attrs={'dep': attr.label()})\n",
+    )
+    .unwrap();
+    fs::write(
+        &build,
+        "load(':defs.bzl', 'probe')\nprobe(name='bad', dep=select({'//conditions:default': ':dep'}))\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("initializer input 'dep' cannot use select()"),
+        "{error}"
+    );
+}
+
+#[test]
+fn initializer_imported_selector_source_restores_on_same_dice() {
+    let workspace = scratch("initializer-selector-source-aba");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(':defs.bzl', 'COPTS', 'probe')\nconfig_setting(name='msvc', values={'cpu':'x64_windows'})\nconfig_setting(name='darwin', values={'cpu':'darwin'})\nprobe(name='subject', copts=COPTS)\n",
+    )
+    .unwrap();
+    let defs = package.join("defs.bzl");
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load = |condition: &str, branch: &str| {
+        fs::write(
+            &defs,
+            format!(
+                "COPTS = select({{':{condition}': ['{branch}'], '//conditions:default': ['-DDEFAULT']}})\ndef _impl(ctx): return []\ndef _init(name, **kwargs): return kwargs\nprobe = rule(implementation=_impl, initializer=_init, attrs={{'copts': attr.string_list()}})\n"
+            ),
+        )
+        .unwrap();
+        runtime
+            .block_on(load_package_with_retained_dice(&dice, &workspace, &package))
+            .unwrap()
+    };
+    let a = load("msvc", "-DMSVC");
+    let b = load("darwin", "-DDARWIN");
+    let restored = load("msvc", "-DMSVC");
+    let value = |loaded: &slug_loading_v2::LegacyLoadedPackage, name: &str| {
+        starlark_rule_attr(loaded, "subject", name).clone()
+    };
+    assert_ne!(value(&a, "copts"), value(&b, "copts"));
+    assert_eq!(value(&a, "copts"), value(&restored, "copts"));
+    assert_ne!(
+        value(&a, "$config_dependencies"),
+        value(&b, "$config_dependencies")
+    );
+    assert_eq!(
+        value(&a, "$config_dependencies"),
+        value(&restored, "$config_dependencies")
+    );
+    assert_ne!(a, b);
+    assert_eq!(a, restored);
+}
+
+#[test]
 fn build_file_genrule_retains_protobuf_declaration_and_effective_testonly() {
     let workspace = scratch("build-file-genrule");
     let package = workspace.join("protobuf");

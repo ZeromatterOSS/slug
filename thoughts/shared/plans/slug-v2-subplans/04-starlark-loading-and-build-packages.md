@@ -9632,3 +9632,18 @@ initializer input `copts` with `select()` in protobuf BUILD line 356.
 An older scalar-descriptor test still has an unrelated optional-label None
 provenance assertion inconsistent with the unchanged defaulting path; WP823
 neither fixes nor counts that test as passing. M7A remains partial.
+
+### Unchanged rule-initializer StringList selector accepted (2026-09-24)
+
+WP824 passes an explicit configurable StringList `select()` into a Starlark
+rule initializer unresolved and accepts its return only under the same
+attribute and same scratch-object identity. The original caller-coerced
+selector is retained, avoiding incorrect condition-label remapping through
+the caller context. New, swapped, concatenated and other-kind selectors
+remain fail-closed; configured C++ and action behavior are not admitted.
+Pinned Bazel 9.2 source/oracle, the pre-fix protobuf-shaped failure, eight
+selected Loading/Query/Analysis tests, direct dependent checks and rebuilt
+authentic smoke support this exact Loading slice. The smoke clears the
+initializer `copts` stop and next reaches rules_cc's unsupported
+aspect-bearing `_deps_analyzed_by_graph_structure_aspect` attribute. M7A
+remains partial.

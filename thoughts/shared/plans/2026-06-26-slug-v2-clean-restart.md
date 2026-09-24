@@ -29,18 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-123-m7a-starlark-bool-rule-call-r1
+Packet: WP-7-124-m7a-initializer-selector-passthrough-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP823 admits direct integer 0/1 values for Boolean Starlark rule-call
-attributes, including rules_license's inherited `testonly = 0`, while
-preserving strict declaration defaults, selectors and initializer paths.
-Pinned Bazel 9.2 source/oracle, six focused/protected tests and rebuilt
-authentic smoke clear that Loading stop. The next separate failure is
-rules_cc's initializer input `copts` containing `select()` at
-`@@protobuf+//:BUILD.bazel:356`. An older optional-label None-provenance
-test remains inconsistent with unchanged code and is not counted as passed.
-M7A remains partial; WP822 was accepted at `51ded99c1`.
+WP824 accepts unchanged configurable StringList selector pass-through
+through rules_cc's rule initializer during Loading. Pinned Bazel 9.2
+source/oracle and eight focused/protected tests show symbolic imported
+`COPTS`/`LINKOPTS` retain typed branches, provenance and same-DICE identity
+only for same-attribute, same-object returns. Rebuilt authentic smoke clears
+the initializer `copts` stop and next reaches rules_cc's unsupported
+aspect-bearing `_deps_analyzed_by_graph_structure_aspect` attribute. New or
+swapped selectors, mapping expansion and configured C++ remain deferred.
+Accepted WP823 at `81341fae8` was the immediate predecessor; M7A is partial.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

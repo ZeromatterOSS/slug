@@ -7961,6 +7961,9 @@ fn invoke_rule_initializer<'v>(
             )
             .to_value(),
     ];
+    // Attempt-local selector handles allow only an unchanged value to return
+    // without reinterpreting its condition labels in the wrong module.
+    let mut passthrough_selectors = SmallMap::new();
     for declaration in definition
         .schema
         .iter()
@@ -7981,16 +7984,20 @@ fn invoke_rule_initializer<'v>(
                 declaration.configurable,
                 value,
             )?;
-            if matches!(
-                value,
-                CoercedAttributeValue::Selector { .. } | CoercedAttributeValue::Concatenation(_, _)
-            ) {
+            let selected = matches!(&value, CoercedAttributeValue::Selector { .. });
+            if matches!(&value, CoercedAttributeValue::Concatenation(_, _))
+                || (selected && declaration.kind != AttributeKind::StringList)
+            {
                 anyhow::bail!(
                     "rule initializer input '{}' cannot use select()",
                     declaration.name
                 );
             }
-            allocate_macro_attribute(&value, module.heap())?
+            let copied = allocate_macro_attribute(&value, module.heap())?;
+            if selected {
+                passthrough_selectors.insert(declaration.name.clone(), (copied, value));
+            }
+            copied
         };
         argument_names.push(declaration.name.clone());
         argument_values.push(value);
@@ -8044,6 +8051,15 @@ fn invoke_rule_initializer<'v>(
             continue;
         }
         if SelectorValue::from_value(value).is_some() {
+            if let Some((input, coerced)) = passthrough_selectors.get(key)
+                && value.ptr_eq(*input)
+            {
+                overrides.insert(
+                    declaration.name.clone(),
+                    RuleInitializerOverride::Value(coerced.clone()),
+                );
+                continue;
+            }
             anyhow::bail!("rule initializer result '{key}' cannot use select()");
         }
         let raw = raw_attribute_value(value)?;
