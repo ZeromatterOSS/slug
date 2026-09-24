@@ -58,10 +58,15 @@ impl SynchronousAnalysisActionSink {
     }
 }
 
-/// List elements and bare candidates pass through the *same* genuine-provider
-/// decoder. Non-provider structs/Files/None therefore cannot acquire Info status.
+/// A bare None is no explicit providers. List elements and other bare values
+/// still pass through the same genuine-provider decoder, so a list containing
+/// None cannot acquire Info status.
 pub(super) fn returned_providers(value: Value<'_>) -> Vec<Value<'_>> {
-    ListRef::from_value(value).map_or_else(|| vec![value], |list| list.iter().collect())
+    if value.is_none() {
+        Vec::new()
+    } else {
+        ListRef::from_value(value).map_or_else(|| vec![value], |list| list.iter().collect())
+    }
 }
 
 #[cfg(test)]

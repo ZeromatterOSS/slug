@@ -9453,6 +9453,116 @@ async fn custom_only_starlark_rule_gets_implicit_empty_default_info() {
 }
 
 #[tokio::test]
+async fn non_executable_rule_none_return_synthesizes_default_info_without_admitting_none_elements()
+{
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"DemoInfo = provider(fields = ["marker"])
+
+def _implicit(ctx):
+    ctx.actions.write(ctx.outputs.out, "implicit")
+    pass
+
+def _dispatch(ctx):
+    mode = ctx.attr.mode
+    if mode == "none":
+        ctx.actions.write(ctx.outputs.out, "explicit")
+        return None
+    if mode == "empty": return []
+    if mode == "direct": return DemoInfo(marker = "direct")
+    if mode == "listed": return [DemoInfo(marker = "listed")]
+    if mode == "list_none": return [None]
+    if mode == "mixed": return [DemoInfo(marker = "mixed"), None]
+    if mode == "string": return "not a provider"
+    if mode == "dict": return {"value": "not a provider"}
+    fail("unexpected return mode")
+
+implicit = rule(implementation = _implicit, attrs = {"out": attr.output()})
+probe = rule(implementation = _dispatch, attrs = {"mode": attr.string(mandatory = True), "out": attr.output()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "implicit", "probe")
+implicit(name = "implicit", out = "implicit.txt")
+probe(name = "explicit_none", mode = "none", out = "explicit.txt")
+probe(name = "empty", mode = "empty")
+probe(name = "direct", mode = "direct")
+probe(name = "listed", mode = "listed")
+probe(name = "list_none", mode = "list_none")
+probe(name = "mixed", mode = "mixed")
+probe(name = "string", mode = "string")
+probe(name = "dict", mode = "dict")
+"#,
+    )
+    .unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = |name: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{name}")).unwrap(),
+            test_configuration(),
+        )
+    };
+    for (name, output) in [
+        ("implicit", "implicit.txt"),
+        ("explicit_none", "explicit.txt"),
+    ] {
+        let target = key(name);
+        let result = analyze_request(&dice, &workspace, &target, None, false)
+            .await
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert_eq!(
+            default_file_paths(result.providers().default_info().unwrap()),
+            [expected_output_path(target.configuration(), output)],
+            "{name} must synthesize DefaultInfo over its predeclared output"
+        );
+        assert_eq!(
+            result.actions().len(),
+            1,
+            "{name} must retain its write action"
+        );
+    }
+    let empty = analyze_request(&dice, &workspace, &key("empty"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        empty.providers().default_info(),
+        Some(&DefaultInfo::empty())
+    );
+    let demo = ProviderId::new("//:defs.bzl", "DemoInfo").unwrap();
+    for (name, marker) in [("direct", "direct"), ("listed", "listed")] {
+        let result = analyze_request(&dice, &workspace, &key(name), None, false)
+            .await
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert_eq!(
+            result
+                .providers()
+                .user(&demo)
+                .unwrap()
+                .field("marker")
+                .and_then(slug_build_api_v2::AnalysisValue::as_str),
+            Some(marker),
+            "{name} must retain its explicitly returned provider"
+        );
+        assert_eq!(
+            result.providers().default_info(),
+            Some(&DefaultInfo::empty())
+        );
+    }
+    for name in ["list_none", "mixed", "string", "dict"] {
+        let error = analyze_request(&dice, &workspace, &key(name), None, false)
+            .await
+            .err()
+            .unwrap_or_else(|| panic!("{name} unexpectedly accepted a non-provider"));
+        assert!(error.contains("non-provider value"), "{name}: {error}");
+    }
+}
+
+#[tokio::test]
 async fn recursive_provider_values_round_trip_dependencies_and_preserve_publication_order() {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();

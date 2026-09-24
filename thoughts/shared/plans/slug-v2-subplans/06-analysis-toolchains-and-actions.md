@@ -1862,6 +1862,17 @@ Nonempty refinement fails closed; Starlark providers, full
 materialization remain outside this configured slice. The pure `ConstraintSet`
 helper is not the DICE path and gains no parity claim.
 
+## Bare Starlark rule-implementation None
+
+WP815 normalizes a bare/implicit `None` return from an ordinary
+non-executable rule to zero explicitly returned providers. The existing
+no-explicit-DefaultInfo branch synthesizes the effective provider, including
+predeclared files, without losing registered actions. `[None]` and other
+invalid list elements still reach the provider decoder and fail; bare/listed
+Info and empty-list returns are unchanged. This is evaluator scratch only:
+no DICE key, retained provider identity, cache or lock changes. Tuple returns
+and executable-rule default-output semantics remain deferred.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

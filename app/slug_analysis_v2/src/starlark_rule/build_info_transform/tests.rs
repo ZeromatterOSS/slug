@@ -128,9 +128,26 @@ fn bare_native_and_user_infos_reuse_existing_lowering_without_promoting_structs(
         assert!(matches!(lowered.kind(), AnalysisValueKind::Provider(_)));
         assert!(owned.publication_eq(&lowered));
     }
+    assert!(
+        returned_providers(Value::new_none()).is_empty(),
+        "bare None is an empty provider return"
+    );
+    let list_none = AnalysisValue::list(vec![AnalysisValue::none()]);
+    let list_none = AnalysisValueMaterializer::new(&heap)
+        .value(&list_none)
+        .unwrap();
+    let contained_none = returned_providers(list_none.to_value());
+    assert_eq!(contained_none.len(), 1);
+    assert!(contained_none[0].is_none());
+    let lowered = AnalysisValueLowerer::default()
+        .lower(contained_none[0], "$[0]")
+        .unwrap();
+    assert!(
+        !matches!(lowered.kind(), AnalysisValueKind::Provider(_)),
+        "None inside a provider list remains an invalid candidate"
+    );
     for owned in [
         AnalysisValue::strukt([("field", AnalysisValue::string("value"))]),
-        AnalysisValue::none(),
         AnalysisValue::string("not provider"),
     ] {
         let value = AnalysisValueMaterializer::new(&heap).value(&owned).unwrap();

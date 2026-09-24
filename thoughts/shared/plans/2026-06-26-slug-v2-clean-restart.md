@@ -29,16 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-114-m7a-constraint-setting-default-r1
+Packet: WP-7-115-m7a-starlark-rule-none-return-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP814 admits NODEP `constraint_setting(default_constraint_value)` and bounded
-configured default-aware condition/toolchain matching with structural A/B/A
-invalidation. Six focused Loading/Analysis tests and the protected Query
-projection pass; the rebuilt authentic rules_rust smoke clears the default
-stop and reaches a separate rule-implementation `None` result failure.
-Provider/refinement breadth, alias-valued defaults and M7A close remain
-deferred. WP813 was accepted at `88ea63d7c`.
+WP815 admits a bare/implicit `None` Starlark rule-implementation return as
+zero explicit providers for ordinary non-executable rules, preserving the
+existing implicit DefaultInfo path and invalid `[None]` rejection. Two
+pre-fix failures become passing focused tests, three protected tests pass,
+and the rebuilt authentic smoke clears the None-provider stop. It now stops
+separately on an undefined `py_internal` during rules_python loading.
+Tuple/executable return behavior and M7A close remain deferred. WP814 was
+accepted at `bde3226bf`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
