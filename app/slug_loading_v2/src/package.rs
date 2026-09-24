@@ -517,6 +517,8 @@ pub struct GenruleDeclaration {
     pub toolchains: Option<Arc<[CanonicalLabel]>>,
     pub cmd: CompactString,
     pub outs: Arc<[CanonicalLabel]>,
+    /// Resolved to `Some(effective value)` before publication.
+    pub testonly: Option<bool>,
     pub tags: Option<Arc<[CompactString]>>,
     pub generator: Option<(CompactString, CompactString, CompactString)>,
 }
@@ -1848,6 +1850,7 @@ impl PackageRecorder {
         toolchains: Option<Arc<[CanonicalLabel]>>,
         cmd: CompactString,
         outs: Arc<[CanonicalLabel]>,
+        testonly: Option<bool>,
         tags: Option<Arc<[CompactString]>>,
         generator: Option<(CompactString, CompactString, CompactString)>,
     ) -> anyhow::Result<()> {
@@ -1864,6 +1867,7 @@ impl PackageRecorder {
                 toolchains,
                 cmd,
                 outs: outs.clone(),
+                testonly,
                 tags,
                 generator,
             }),
@@ -2345,7 +2349,11 @@ impl PackageRecorder {
             })
             .collect::<Vec<_>>();
         implicit_candidates.sort_by(|(left, _), (right, _)| left.bazel_natural_cmp(right));
+        let default_testonly = state.default_testonly;
         for (_, target) in state.targets.iter_mut() {
+            if let PackageTargetKind::Genrule(rule) = &mut target.kind {
+                rule.testonly.get_or_insert(default_testonly);
+            }
             if let PackageTargetKind::TestSuite {
                 membership: TestSuiteMembership::Implicit { members, .. },
                 tags,
@@ -10019,6 +10027,67 @@ impl fmt::Display for BzlmodNativeModule {
 
 static NATIVE_METHODS: MethodsStatic = MethodsStatic::new();
 
+fn genrule_global<'v>(
+    name: &str,
+    cmd: &str,
+    outs: Value<'v>,
+    srcs: Option<Value<'v>>,
+    toolchains: Option<Value<'v>>,
+    tags: Option<UnpackListOrTuple<&str>>,
+    testonly: Option<Value<'v>>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> anyhow::Result<NoneType> {
+    let recorder = PackageRecorder::from_evaluator(eval)?;
+    let testonly = testonly
+        .map(|value| {
+            if value.is_none() {
+                Ok(None)
+            } else if let Some(value) = value.unpack_bool() {
+                Ok(Some(value))
+            } else if let Some(value) = value.unpack_i32() {
+                match value {
+                    0 => Ok(Some(false)),
+                    1 => Ok(Some(true)),
+                    _ => anyhow::bail!("genrule testonly must be False, True, 0, 1, or None"),
+                }
+            } else {
+                anyhow::bail!("genrule testonly must be False, True, 0, 1, or None")
+            }
+        })
+        .transpose()?
+        .flatten();
+    let generator = starlark_generator_metadata(recorder, eval);
+    let generator = (!generator.0.is_empty() || !generator.1.is_empty() || !generator.2.is_empty())
+        .then_some(generator);
+    let CoercedAttributeValue::OutputList(outs) =
+        coerce_starlark_value(recorder, AttributeKind::OutputList, "outs", false, outs)?
+    else {
+        anyhow::bail!("attribute `outs` must be a list of labels");
+    };
+    recorder.genrule(
+        name.to_owned(),
+        srcs.map(|value| coerce_native_direct_labels(recorder, "srcs", value))
+            .transpose()?,
+        toolchains
+            .map(|value| coerce_native_direct_labels(recorder, "toolchains", value))
+            .transpose()?,
+        cmd.into(),
+        outs,
+        testonly,
+        tags.map(|tags| {
+            let mut tags = tags
+                .items
+                .into_iter()
+                .map(CompactString::new)
+                .collect::<Vec<_>>();
+            tags.sort_unstable();
+            tags.into()
+        }),
+        generator,
+    )?;
+    Ok(NoneType)
+}
+
 #[starlark_module]
 fn native_methods(builder: &mut MethodsBuilder) {
     fn package_name<'v>(
@@ -10063,37 +10132,7 @@ fn native_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] tags: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        let recorder = PackageRecorder::from_evaluator(eval)?;
-        let generator = starlark_generator_metadata(recorder, eval);
-        let generator =
-            (!generator.0.is_empty() || !generator.1.is_empty() || !generator.2.is_empty())
-                .then_some(generator);
-        let CoercedAttributeValue::OutputList(outs) =
-            coerce_starlark_value(recorder, AttributeKind::OutputList, "outs", false, outs)?
-        else {
-            anyhow::bail!("attribute `outs` must be a list of labels");
-        };
-        recorder.genrule(
-            name.to_owned(),
-            srcs.map(|value| coerce_native_direct_labels(recorder, "srcs", value))
-                .transpose()?,
-            toolchains
-                .map(|value| coerce_native_direct_labels(recorder, "toolchains", value))
-                .transpose()?,
-            cmd.into(),
-            outs,
-            tags.map(|tags| {
-                let mut tags = tags
-                    .items
-                    .into_iter()
-                    .map(CompactString::new)
-                    .collect::<Vec<_>>();
-                tags.sort_unstable();
-                tags.into()
-            }),
-            generator,
-        )?;
-        Ok(NoneType)
+        genrule_global(name, cmd, outs, srcs, toolchains, tags, None, eval)
     }
 
     fn package<'v>(
@@ -10516,6 +10555,20 @@ fn bzl_only_globals(builder: &mut GlobalsBuilder) {
     }
 }
 
+#[starlark_module]
+fn build_genrule_globals(builder: &mut GlobalsBuilder) {
+    fn genrule<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] cmd: &str,
+        #[starlark(require = named)] outs: Value<'v>,
+        #[starlark(require = named)] srcs: Option<Value<'v>>,
+        #[starlark(require = named)] testonly: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        genrule_global(name, cmd, outs, srcs, None, None, testonly, eval)
+    }
+}
+
 fn complete_loading_globals(
     bool_config: bool,
     bzlmod_native: bool,
@@ -10560,6 +10613,7 @@ fn complete_loading_globals(
         }
     } else {
         globals.set("config", BuildFileConfigModule);
+        build_genrule_globals(&mut globals);
     }
     globals.set("platform_common", PlatformCommonModule);
     globals.set("depset", AnalysisBuiltinCallable::new("depset"));

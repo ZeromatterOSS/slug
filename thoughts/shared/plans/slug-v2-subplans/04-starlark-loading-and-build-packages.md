@@ -9598,3 +9598,19 @@ remains deferred. Pinned Bazel source/oracle, five focused/protected tests
 and a rebuilt authentic smoke support this slice. The smoke clears the field
 error and stops separately at missing `genrule` in
 `@@protobuf+//:BUILD.bazel:654`; M7A remains partial.
+
+### Bare BUILD genrule declaration accepted (2026-09-24)
+
+WP822 adds a BUILD-only bare `genrule` callable for the authenticated protobuf
+shape: `name`, `srcs`, `outs`, `cmd` and `testonly`. It shares the existing
+imported `native.genrule` recorder and publishes the canonical output owner.
+The one retained `GenruleDeclaration` stages explicit bool/0/1 or inherited
+None, then finalizes every value to `Some(effective testonly)` using the final
+package default. This matches Bazel 9.2's late `package()` behavior and keeps
+same-DICE source/default A/B/A structural. Unsupported keywords/selectors,
+bare `.bzl` use, Query/configured genrule projection and actions stay closed.
+Pinned Bazel oracle, the pre-fix missing-global failure, five Loading, two
+Query and one Analysis protected tests, direct dependent checks and rebuilt
+authentic smoke support the Loading-only slice. The smoke advances past
+protobuf's `genrule` and next stops at `rules_license`'s Starlark-rule
+`testonly = 0` bool coercion; M7A remains partial.

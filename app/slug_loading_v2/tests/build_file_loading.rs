@@ -5082,17 +5082,118 @@ fn imported_native_genrule_retains_selected_declaration_and_generated_outputs() 
 }
 
 #[test]
+fn build_file_genrule_retains_protobuf_declaration_and_effective_testonly() {
+    let workspace = scratch("build-file-genrule");
+    let package = workspace.join("protobuf");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        concat!(
+            "genrule(name = 'generated_protos', testonly = 1, srcs = ['//src/google/protobuf:test_proto_srcs'], outs = ['unittest_gen_import.proto'], cmd = 'cat src/google/protobuf/unittest_import.proto > $@')\n",
+            "genrule(name = 'explicit_false', testonly = 0, outs = ['false.out'], cmd = 'true')\n",
+            "genrule(name = 'omitted', outs = ['omitted.out'], cmd = 'true')\n",
+            "genrule(name = 'explicit_none', testonly = None, outs = ['none.out'], cmd = 'true')\n",
+            "package(default_testonly = True)\n",
+        ),
+    )
+    .unwrap();
+    let loaded = load_package(&workspace, &package);
+    let rule = |name: &str| {
+        let target = loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap();
+        let PackageTargetKind::Genrule(rule) = &target.kind else {
+            panic!("{name} was not recorded as a genrule")
+        };
+        rule
+    };
+    let generated = rule("generated_protos");
+    assert_eq!(generated.testonly, Some(true));
+    assert_eq!(rule("explicit_false").testonly, Some(false));
+    assert_eq!(rule("omitted").testonly, Some(true));
+    assert_eq!(rule("explicit_none").testonly, Some(true));
+    assert_eq!(
+        generated.cmd,
+        "cat src/google/protobuf/unittest_import.proto > $@"
+    );
+    assert_eq!(
+        generated.srcs.as_deref().unwrap(),
+        [CanonicalLabel::parse("@@//src/google/protobuf:test_proto_srcs").unwrap()]
+    );
+    assert_eq!(
+        generated.outs.as_ref(),
+        [CanonicalLabel::parse("@@//protobuf:unittest_gen_import.proto").unwrap()]
+    );
+    let output = loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "unittest_gen_import.proto")
+        .unwrap();
+    assert!(matches!(
+        &output.kind,
+        PackageTargetKind::GeneratedFile { generating_rule, .. } if generating_rule == "generated_protos"
+    ));
+}
+
+#[test]
+fn build_file_genrule_testonly_source_and_default_restore_on_same_dice() {
+    let workspace = scratch("build-file-genrule-testonly-aba");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    let build = |explicit: i32, default: bool| {
+        format!(
+            "genrule(name = 'explicit', testonly = {explicit}, outs = ['explicit.out'], cmd = 'true')\n\
+             genrule(name = 'inherited', testonly = None, outs = ['inherited.out'], cmd = 'true')\n\
+             package(default_testonly = {})\n",
+            if default { "True" } else { "False" },
+        )
+    };
+    let build_file = package.join(BUILD_FILE_PRIMARY);
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load = |explicit, default| {
+        fs::write(&build_file, build(explicit, default)).unwrap();
+        runtime
+            .block_on(load_package_with_retained_dice(&dice, &workspace, &package))
+            .unwrap()
+    };
+    let a = load(1, false);
+    let changed_explicit = load(0, false);
+    assert_ne!(a, changed_explicit);
+    let restored_explicit = load(1, false);
+    assert_eq!(a, restored_explicit);
+    let changed_default = load(1, true);
+    assert_ne!(a, changed_default);
+    let restored_default = load(1, false);
+    assert_eq!(a, restored_default);
+    let effective = |loaded: &slug_loading_v2::LegacyLoadedPackage, name: &str| {
+        let target = loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap();
+        let PackageTargetKind::Genrule(rule) = &target.kind else {
+            panic!("{name} was not recorded as a genrule")
+        };
+        rule.testonly
+    };
+    assert_eq!(effective(&a, "explicit"), Some(true));
+    assert_eq!(effective(&changed_explicit, "explicit"), Some(false));
+    assert_eq!(effective(&a, "inherited"), Some(false));
+    assert_eq!(effective(&changed_default, "inherited"), Some(true));
+    assert_eq!(effective(&restored_default, "inherited"), Some(false));
+}
+
+#[test]
 fn imported_native_genrule_rejects_unadmitted_and_conflicting_shapes_atomically() {
     let workspace = scratch("native-genrule-rejections");
     fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
     let package = workspace.join("pkg");
     fs::create_dir_all(&package).unwrap();
-    fs::write(
-        package.join(BUILD_FILE_PRIMARY),
-        "genrule(name='bare',cmd='x',outs=['x'])\n",
-    )
-    .unwrap();
-    assert!(try_load_package(&workspace, &package).is_err());
     let cases = [
         "native.genrule('x', cmd='x', outs=['x.out'])",
         "native.genrule(cmd='x', outs=['x.out'])",
@@ -5130,6 +5231,41 @@ fn imported_native_genrule_rejects_unadmitted_and_conflicting_shapes_atomically(
             "accepted: {body}"
         );
     }
+}
+
+#[test]
+fn build_file_genrule_rejects_unselected_shapes_and_bzl_global() {
+    let workspace = scratch("build-file-genrule-rejections");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    let build_file = package.join(BUILD_FILE_PRIMARY);
+    for source in [
+        "genrule(name='x',testonly=2,outs=['x.out'],cmd='true')",
+        "genrule(name='x',testonly='true',outs=['x.out'],cmd='true')",
+        "genrule(name='x',srcs=1,outs=['x.out'],cmd='true')",
+        "genrule(name='x',outs=['x.out'],cmd=1)",
+        "genrule(name='x',outs=['x.out'],cmd='true',tools=[':tool'])",
+        "genrule(name='x',outs=['x.out'],cmd='true',srcs=select({'//conditions:default': []}))",
+        "genrule(name='x',outs=['same','same'],cmd='true')",
+        "genrule(name='x',srcs=[':same'],outs=['same'],cmd='true')",
+    ] {
+        fs::write(&build_file, source).unwrap();
+        assert!(
+            try_load_package(&workspace, &package).is_err(),
+            "accepted: {source}"
+        );
+    }
+    fs::write(
+        package.join("defs.bzl"),
+        "def emit(): genrule(name='x',outs=['x.out'],cmd='true')\n",
+    )
+    .unwrap();
+    fs::write(&build_file, "load(':defs.bzl', 'emit')\nemit()\n").unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("genrule"), "{error}");
 }
 
 #[test]

@@ -2676,6 +2676,7 @@ mod graph_tests {
             toolchains: None,
             cmd: "true".into(),
             outs: Arc::from([CanonicalLabel::parse(output).unwrap()]),
+            testonly: Some(false),
             tags: None,
             generator: None,
         })

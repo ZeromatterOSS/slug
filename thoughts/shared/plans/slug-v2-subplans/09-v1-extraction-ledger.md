@@ -2845,5 +2845,15 @@ Add no native-attribute duplicate, map, interner, registry, cache, global
 state, DICE key/input/edge, filesystem/process observation or configured/action
 carrier. Query and configured consumers reject the new target kind before
 projection or child/action work. Any second retained representation or new
-incremental owner returns `REPLAN`. Independent utility review returns
-`ACCEPT`, pending packet review.
+incremental owner returns `REPLAN`. Independent utility and imported-packet
+reviews accepted this representation.
+
+WP822 extends the same single `GenruleDeclaration` with one-byte
+`Option<bool>` staging for inherited or explicit `testonly`; package
+finalization replaces every None with the effective package default before
+the DICE-retained package is published. Existing `Arc` slices,
+`CompactString`, canonical labels and `Allocative` remain; no donor import,
+sidecar, new DICE key, cache or interner. The cold BUILD-global/recorder seam
+does not merit a performance benchmark. Same-DICE explicit/default A/B/A and
+protected Query/Analysis rejection prove the retained boundary; configured
+genrule work remains separate.
