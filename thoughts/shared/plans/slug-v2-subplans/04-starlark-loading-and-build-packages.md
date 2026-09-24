@@ -9662,3 +9662,18 @@ Loading-only slice. The smoke clears rules_cc `cc_binary`'s private empty
 aspect attr and next stops at protobuf BUILD:682 through `cc_proto_library`
 on its nonempty aspect-bearing `deps`; application, configured C++ and
 compilation remain open. M7A remains partial.
+
+### Nonempty attached-aspect Loading edge accepted (2026-09-24)
+
+WP826 admits one exported, parameterless frozen aspect on a final concrete
+nonempty `attr.label_list` for exact Loading and ordinary unconfigured Query.
+The loaded target retains a sparse schema-indexed producer identity and
+frozen callable; its canonical base labels remain ordinary Query edges.
+Imported aspect identity/source A/B/A restores on one DICE. Selectors,
+parameters and multiple nonempty attachments still fail at Loading. Selected
+configured analysis fails before child/provider work; applying the aspect,
+its provider overlay and generated actions remain deferred. Seven focused
+tests, direct checks and rebuilt authentic smoke support this bounded slice.
+The replay clears protobuf BUILD:682 and next stops at
+`protobuf.bzl:729` on `native.filegroup`'s non-boolean `testonly`. M7A
+remains partial.

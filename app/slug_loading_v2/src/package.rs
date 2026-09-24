@@ -911,6 +911,46 @@ impl BuildSettingDefinition {
     }
 }
 
+/// Frozen attachment retained for the lifetime of its loaded package. The
+/// callable is not a configured aspect application or part of target equality.
+#[derive(Debug, Clone, Allocative)]
+pub struct RetainedAttachedAspect {
+    schema_index: u32,
+    defining_label: CanonicalLabel,
+    exported_name: CompactString,
+    #[allocative(skip)]
+    frozen_value: FrozenValue,
+}
+
+impl RetainedAttachedAspect {
+    pub fn schema_index(&self) -> u32 {
+        self.schema_index
+    }
+
+    pub fn defining_label(&self) -> &CanonicalLabel {
+        &self.defining_label
+    }
+
+    pub fn exported_name(&self) -> &str {
+        &self.exported_name
+    }
+
+    #[doc(hidden)]
+    pub fn frozen_value(&self) -> FrozenValue {
+        self.frozen_value
+    }
+}
+
+impl PartialEq for RetainedAttachedAspect {
+    fn eq(&self, other: &Self) -> bool {
+        self.schema_index == other.schema_index
+            && self.defining_label == other.defining_label
+            && self.exported_name == other.exported_name
+    }
+}
+
+impl Eq for RetainedAttachedAspect {}
+
 #[derive(Debug, Clone, Allocative)]
 pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
@@ -926,6 +966,7 @@ pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
     subrule_callables: Arc<[FrozenValue]>,
     late_bound_attributes: Arc<[LateBoundRuleAttribute]>,
+    attached_aspects: Arc<[RetainedAttachedAspect]>,
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
     capability: Arc<RuleCapability>,
@@ -948,6 +989,7 @@ impl PartialEq for StarlarkRuleImplementation {
             && self.required_fragments == other.required_fragments
             && self.attached_subrules == other.attached_subrules
             && self.late_bound_attributes == other.late_bound_attributes
+            && self.attached_aspects == other.attached_aspects
             && self.schema == other.schema
             && self.values == other.values
             && self.capability == other.capability
@@ -978,6 +1020,12 @@ impl StarlarkRuleImplementation {
 
     pub fn dependencies(&self) -> &[CanonicalLabel] {
         &self.dependencies
+    }
+
+    /// Sparse, declaration-indexed aspect attachments on nonempty literal
+    /// label lists. Their configured application remains unsupported.
+    pub fn attached_aspects(&self) -> &[RetainedAttachedAspect] {
+        &self.attached_aspects
     }
 
     /// Toolchain-type requirements declared by the defining `rule()` call.
@@ -1790,6 +1838,7 @@ impl PackageRecorder {
         attached_subrules: AttachedSubrules,
         subrule_callables: Arc<[FrozenValue]>,
         late_bound_attributes: Arc<[LateBoundRuleAttribute]>,
+        attached_aspects: Arc<[RetainedAttachedAspect]>,
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
@@ -1831,6 +1880,7 @@ impl PackageRecorder {
                 attached_subrules,
                 subrule_callables,
                 late_bound_attributes,
+                attached_aspects,
                 schema,
                 values,
                 capability,
@@ -4491,35 +4541,60 @@ impl FrozenRuleDefinition {
         self.incoming_transition.as_ref()
     }
 
-    fn reject_deferred_attribute_invocation(
+    fn retained_attached_aspects(
         &self,
         values: &[AttributeValue],
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Arc<[RetainedAttachedAspect]>> {
         if self.schema.len() != values.len() {
             anyhow::bail!("rule attribute values do not match the declaration schema");
         }
-        for (attribute, value) in self.schema.iter().zip(values) {
+        let mut retained = Vec::new();
+        for (schema_index, (attribute, value)) in self.schema.iter().zip(values).enumerate() {
+            if attribute.name != value.declaration_name {
+                anyhow::bail!("rule attribute values do not match the declaration schema");
+            }
             let Some(aspect) = attribute.attached_aspect.as_ref() else {
                 continue;
             };
-            let zero_edge = attribute.kind == AttributeKind::LabelList
-                && matches!(value.value.as_ref(), CoercedAttributeValue::LabelList(labels) if labels.is_empty())
-                && aspect
-                    .to_value()
-                    .downcast_ref::<FrozenAspectDefinition>()
-                    .is_some_and(|aspect| {
-                        aspect.attributes.is_empty()
-                            && aspect.required_parameters.is_empty()
-                            && aspect.required_aspects.is_empty()
-                    });
-            if !zero_edge {
+            let frozen = aspect.to_value().downcast_ref::<FrozenAspectDefinition>();
+            let supported_shape = attribute.kind == AttributeKind::LabelList
+                && matches!(value.value.as_ref(), CoercedAttributeValue::LabelList(_))
+                && frozen.is_some_and(|aspect| {
+                    aspect.attributes.is_empty()
+                        && aspect.required_parameters.is_empty()
+                        && aspect.required_aspects.is_empty()
+                });
+            if !supported_shape {
                 anyhow::bail!(
                     "target invocation for aspect-bearing attribute '{}' is not supported",
                     attribute.name
                 );
             }
+            let CoercedAttributeValue::LabelList(labels) = value.value.as_ref() else {
+                unreachable!("supported aspect shape requires a literal label list")
+            };
+            if labels.is_empty() {
+                continue;
+            }
+            let frozen_definition =
+                frozen.expect("supported aspect shape requires a frozen definition");
+            let Some(exported_name) = frozen_definition.exported_name.as_ref() else {
+                anyhow::bail!(
+                    "target invocation for unexported aspect on attribute '{}' is not supported",
+                    attribute.name
+                );
+            };
+            if !retained.is_empty() {
+                anyhow::bail!("target invocation with multiple attached aspects is not supported");
+            }
+            retained.push(RetainedAttachedAspect {
+                schema_index: u32::try_from(schema_index)?,
+                defining_label: frozen_definition.defining_label.clone(),
+                exported_name: exported_name.clone(),
+                frozen_value: *aspect,
+            });
         }
-        Ok(())
+        Ok(retained.into())
     }
 }
 
@@ -8397,9 +8472,11 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         value: Arc::new(value),
                     };
                 }
-                // Empty label lists have no edge on which an attached aspect
-                // could propagate. All other aspect values remain deferred.
-                self.reject_deferred_attribute_invocation(&values)?;
+                // Empty lists have no attachment edge. A literal nonempty
+                // list retains its frozen declaration for later configured
+                // analysis, which must fail closed until aspect application
+                // is implemented.
+                let attached_aspects = self.retained_attached_aspects(&values)?;
                 let config_dependencies = values
                     .iter()
                     .flat_map(|value| selector_key_labels(&value.value))
@@ -8484,6 +8561,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     attached_subrules,
                     subrule_callables,
                     late_bound_attributes,
+                    attached_aspects,
                     capability,
                     schema,
                     values,

@@ -5882,6 +5882,88 @@ async fn external_starlark_rules_project_mixed_ordinary_edges_and_preserve_label
 }
 
 #[tokio::test]
+async fn nonempty_attached_aspect_dependency_has_only_ordinary_query_edge() {
+    // Bazel 9.2 XML for protobuf v33.4 BUILD:682 exposes one `deps` label and
+    // rule-input on cc_proto_library; label_kind reports cc_proto_library rule.
+    // The aspect is attached to that edge, not a separate unconfigured node.
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut builder = RootQueryEpochBuilder::external_starlark_package(27);
+    builder.file(
+        "/workspace/dep/rule/defs.bzl",
+        "ProtoInfo = provider()\nCcInfo = provider()\ndef _aspect_impl(target, ctx):\n    fail('aspect must remain lazy')\ncc_proto_aspect = aspect(implementation = _aspect_impl, attr_aspects = ['deps'], required_providers = [ProtoInfo], provides = [CcInfo])\ndef _proto_impl(ctx):\n    fail('proto rule must remain lazy')\ndef _cc_impl(ctx):\n    fail('cc proto rule must remain lazy')\nproto_library = rule(implementation = _proto_impl, provides = [ProtoInfo])\ncc_proto_library = rule(implementation = _cc_impl, attrs = {'deps': attr.label_list(aspects = [cc_proto_aspect], providers = [ProtoInfo], allow_files = False)}, provides = [CcInfo])\n",
+        27,
+    );
+    builder.file(
+        "/workspace/dep/rule/BUILD.bazel",
+        "load(':defs.bzl', 'proto_library', 'cc_proto_library')\nproto_library(name = 'test_messages_proto2_proto', visibility = ['//visibility:public'])\ncc_proto_library(name = 'test_messages_proto2_cc_proto', deps = [':test_messages_proto2_proto'], visibility = ['//visibility:public'])\n",
+        27,
+    );
+    let mut transaction = root_query_transaction(
+        &dice,
+        builder.build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    let cc = "@dep//rule:test_messages_proto2_cc_proto";
+    let proto = "@dep//rule:test_messages_proto2_proto";
+    for (source, expected) in [
+        (format!("deps({cc}, 1)"), vec![cc, proto]),
+        (format!("labels(deps, {cc})"), vec![proto]),
+        (
+            format!("attr(deps, 'test_messages_proto2_proto', {cc})"),
+            vec![cc],
+        ),
+    ] {
+        let QueryPreparationOutcome::Complete(result) =
+            transaction.compute(&root_query_key(&source)).await.unwrap()
+        else {
+            panic!("{source} requested preparation")
+        };
+        let mut actual = result
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .labels
+            .iter()
+            .map(|label| label.as_str())
+            .collect::<Vec<_>>();
+        actual.sort_unstable();
+        let mut expected = expected;
+        expected.sort_unstable();
+        assert_eq!(actual, expected, "{source}");
+    }
+    let QueryPreparationOutcome::Complete(result) = transaction
+        .compute(&root_query_key(&format!("deps({cc}, 1)")))
+        .await
+        .unwrap()
+    else {
+        panic!("graph requested preparation")
+    };
+    let graph = result.as_ref().as_ref().unwrap().graph_stdout(false, true);
+    assert!(
+        graph.contains(&format!("\"{cc}\" -> \"{proto}\"")),
+        "{graph}"
+    );
+    assert_eq!(graph.matches("->").count(), 1, "{graph}");
+
+    let key = RootQueryCommandKey::new(
+        root_query_workspace(),
+        cc,
+        QueryOrder::Auto,
+        QueryPolicy::default(),
+        QueryOutputCompletion::LabelKind,
+    )
+    .unwrap();
+    let QueryPreparationOutcome::Complete(result) = transaction.compute(&key).await.unwrap() else {
+        panic!("label_kind requested preparation")
+    };
+    assert_eq!(
+        result.as_ref().as_ref().unwrap().label_kind_stdout(),
+        format!("cc_proto_library rule {cc}\n")
+    );
+}
+
+#[tokio::test]
 async fn external_starlark_dependency_edits_invalidate_and_restore_same_dice_query_graph() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(RootAnchorTracker::default());

@@ -5974,6 +5974,13 @@ impl ConfiguredNodeAnalysisKey {
             Ok(implementation) => implementation,
             Err(error) => return root_analysis_driver_complete(Err(error)),
         };
+        if let Some(attached) = implementation.attached_aspects().first() {
+            let attribute = &implementation.schema()[attached.schema_index() as usize];
+            return root_analysis_driver_complete(Err(AnalysisError::message(format!(
+                "configured attached aspect application for attribute '{}' is unsupported",
+                attribute.declaration_name()
+            ))));
+        }
         if let Some(delegated) = maybe_compute_rule_transition_delegate(
             ctx,
             mode,

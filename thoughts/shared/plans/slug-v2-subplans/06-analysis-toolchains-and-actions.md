@@ -1873,6 +1873,18 @@ Info and empty-list returns are unchanged. This is evaluator scratch only:
 no DICE key, retained provider identity, cache or lock changes. Tuple returns
 and executable-rule default-output semantics remain deferred.
 
+## Attached-aspect selected Analysis boundary
+
+WP826 retains a nonempty attached-aspect edge in Loading without claiming
+configured aspect semantics. A selected Starlark rule with that retained row
+returns a typed unsupported Analysis result immediately after the loaded-rule
+lookup, before transition, selector, child dependency, toolchain or rule
+implementation work. The ordinary base edge remains available to unconfigured
+Query only; Analysis cannot silently consume plain dependency providers as a
+substitute for the aspect overlay. The zero-edge WP825 path remains eligible.
+The selected fail-closed, sibling and zero-edge controls pass; configured
+aspect application, generated providers and actions remain deferred.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

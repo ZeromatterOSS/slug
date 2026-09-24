@@ -1,123 +1,154 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-125-m7a-empty-aspect-dependency-r1
+Packet: WP-7-126-m7a-lazy-attached-aspect-target-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit the zero-propagation attached-aspect attribute in the authenticated
-protobuf/rules_cc `cc_binary` Loading call. `@@rules_cc+//cc:cc_binary.bzl:44`
-currently stops at an unconditional target-invocation guard for private
-`_deps_analyzed_by_graph_structure_aspect`. Exact Bazel 9.2 slice: an
-aspect-bearing `attr.label_list` whose final typed value is literally empty
-has no dependency edge on which to propagate its aspect, provided the
-attached aspect declares no attributes, required parameters or required
-aspects. The rule target and empty value may be recorded. Slug-native
-structural package identity and diagnostics remain. Unsupported/deferred:
-any nonempty, selected or concatenated aspect-bearing dependency value,
-aspects with parameters/required aspects, actual aspect application,
-configured providers/actions and configured C++. Do not treat an empty
-branch of an unresolved selector as an empty final value. A Loading advance
-does not claim protobuf compilation.
+Load and query the authenticated protobuf v33.4 `cc_proto_library` target
+at `@@protobuf+//:BUILD.bazel:682` without applying its nonempty attached
+`cc_proto_aspect`. This target is present in the protobuf package but
+ignored-RC/offline Bazel 9.2 query finds no path from `//:probe` or
+`@@protobuf+//:protoc` to it. Exact selected Loading/Query slice: one
+exported, frozen, parameterless-aspect `attr.label_list` with a final
+literal nonempty list retains its attached aspect and canonical dependency
+labels; ordinary unconfigured `deps`/attribute projections expose the same
+base-target edges as Bazel query. A selected configured target carrying a
+nonempty attachment must fail before ordinary dependency/provider analysis.
+Slug-native: sparse structural aspect identity and the diagnostic for that
+unsupported configured boundary. Unsupported/deferred: applying or
+propagating the aspect, provider overlays, aspect-generated actions,
+configured `cquery`/`aquery`, configurable/concatenated attached values,
+aspects with declared attrs/required parameters/required aspects, multiple
+attached aspects and broader rulesets. No inert aspect or plain-dependency
+substitution is permitted.
 
 ## Source, owner and decision
 
-Pinned rules_cc 0.2.17 `cc/private/rules_impl/cc_shared_library.bzl:827-834,
-1087-1115,1129-1134` declares this private attr as
-`attr.label_list(providers=[CcInfo], aspects=[graph_structure_aspect])`
-without an explicit default. The graph aspect has no attributes, required
-parameters or required aspects. `dynamic_deps_initializer` returns kwargs
-unchanged without nonempty `dynamic_deps`; protobuf v33.4's `cc_binary`
-call has none. rules_cc `cc_binary.bzl:851-853` invokes that initializer.
-Pinned Bazel 9.2 `StarlarkRuleClassFunctions.java:1776,1806-1824,
-1844-1858,1900-1903` validates attached-aspect parameters at rule
-invocation even when the dependency value is empty, omits private attrs
-from initializer inputs and allows rules_cc's private return only in the
-dynamic-deps case. `AspectsList.java:87-116` checks public parameters and
-required rule attrs. An ignored-RC/offline Bazel query of authentic
-`@@protobuf+//:protoc` with XML default values explicitly reports empty
-`dynamic_deps` and `$deps_analyzed_by_graph_structure_aspect` lists.
-Offline fixture `/tmp/slug-wp825-aspect-zero-32VFsR` demonstrates omitted
-and explicit empty values produce no aspect application, whereas nonempty
-produces one; this fixture uses a public attr for initializer variants
-because arbitrary `.bzl` files cannot return private initializer keys.
+Pinned protobuf v33.4 `BUILD.bazel:682-689`, `bazel/cc_proto_library.bzl:3-10`
+and `bazel/private/bazel_cc_proto_library.bzl:49-197` define the fallback
+Starlark rule. Its `deps` has one `cc_proto_aspect`, requires `ProtoInfo`
+and disallows files; the aspect propagates through `deps`, requires
+`ProtoInfo`, advertises `CcInfo`, requests C++/proto fragments and toolchains,
+and registers GenProto/C++ actions whose generated providers the wrapper
+consumes. Under Bazel 9.2 modern toolchain resolution the aspect declares
+no `attrs`, required parameters or required aspects; Slug's pinned
+`native_proto_common.INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION` is true.
+Bazel 9.2 `AspectResolutionHelpers.java:43-84`,
+`DependencyMapProducer.java:261-305` and `AspectFunction.java:310-317,976-985`
+show actual configured application. Authenticated ignored-RC/offline XML
+query reports one canonical `deps` label and rule-input at BUILD:682;
+`query --output=build` names the Starlark definition; `cquery` shows one
+aspect application; `aquery` identifies the aspect's `.pb.cc/.pb.h`
+GenProto action. The proto3 sibling yields seven applications across six
+direct proto deps. Ignored-RC/no-fetch `somepath(//:probe, target)`,
+`somepath(@@protobuf+//:protoc, target)` and
+`kind(cc_proto_library,deps(@@protobuf+//:protoc))` are empty. These prove
+this stop is package Loading breadth, not selected configured demand.
 
-Slug's `FrozenRuleDefinition::reject_deferred_attribute_invocation` in
-`app/slug_loading_v2/src/package.rs:4494-4505` unconditionally rejects
-any declaration with `attached_aspect`; it runs after the initializer but
-before the final typed value is assembled. The frozen declaration and
-`FrozenAspectDefinition` retain the aspect and its parameter schema, but
-the published `AttributeSchema` does not. Move the guard to the bounded
-final-value seam: accept only a final literal
-`CoercedAttributeValue::LabelList([])` on an attached-aspect `LabelList`
-whose aspect has no attributes, required parameters or required aspects;
-reject every other aspect-bearing value before target publication. Keep
-existing coercion, defaults, initializer execution, provenance and schema
-publication unchanged. No aspect is executed or silently discarded for a
-nonempty edge. The observed BUILD/loaded-source fingerprints and structural
-package equality already own DICE invalidation and A/B/A restoration; no
-new key, lock, cache, retained representation, sidecar or semantic fallback.
-This cold Loading guard has no performance benchmark.
+Slug's frozen rule attribute retains `attached_aspect`, but current
+`FrozenRuleDefinition::reject_deferred_attribute_invocation` in
+`app/slug_loading_v2/src/package.rs` rejects every nonempty attachment.
+The published `AttributeSchema` in `attrs.rs` drops aspect metadata;
+Analysis currently keys target+configuration and would otherwise pass
+ordinary providers into `ctx.attr`, silently losing the aspect. Introduce
+one sparse immutable attachment slice on `StarlarkRuleImplementation`,
+aligned by schema index. Each row retains the exported aspect's defining
+canonical label and first exported name as structural identity and its
+`FrozenValue` as lifetime-only callable metadata. Construct it only from
+the frozen declaration after final typed value coercion; reject missing/
+unexported/wrong-kind attachment identities and mismatched schema indexes.
+Compare row identities in the target's `PartialEq`; do not compare evaluator
+addresses. The package's existing full Bzl load fingerprint and target's
+observed source provenance own implementation-source invalidation; prove
+that imported aspect-source edits change package equality and restore on
+same-DICE A/B/A. PackageEvaluation's retained Bzl module closure owns the
+frozen heaps; the slice owns only compact identity and pointer metadata.
+No new DICE key, lock, cache, interner, raw-pointer registry or second
+attribute schema. The Stage 9 adopted compact/Arc/Allocative patterns
+remain sufficient; avoid an optional pointer on every AttributeSchema.
+
+Keep the ordinary dependency labels derived from typed values for Query.
+At the configured Starlark-root entry in `app/slug_analysis_v2/src/dice.rs`,
+reject a selected rule with a retained nonempty attachment before transition,
+selector, child dependency, toolchain or rule implementation computation.
+The error is a typed unsupported analysis result, never a successful plain
+dependency. Existing zero-edge WP825 values remain eligible for their
+previous analysis path. This is a necessary lazy phase boundary toward
+actual aspect analysis, not a claim that aspect implementation is optional.
+No memory escapes evaluator lifetime; package invalidation/eviction releases
+the sparse row with its retained frozen-module closure. No hot-path
+benchmark is selected for this cold Loading/early-analysis gate.
 
 ## Evidence and validation
 
-First add a source-shaped private aspect-bearing empty label-list invocation
-test that compiles on the clean base and fails at the selected guard. Assert
-typed empty value, implicit provenance and no retained dependency labels;
-protect the existing Query edge projection test.
-Keep nonempty default, parameterized aspect and unresolved selector
-negative, with no partial package publication; change the existing
-provider/aspect guard regression to use a genuinely nonempty dependency
-rather than expecting an empty zero-edge value to fail. Prove same-DICE
-empty/nonempty/empty source restoration. Reuse the pinned/offline Bazel
-oracle; no Stage 1 fixture.
+First compile and exact-preflight a protobuf-shaped nonempty attached
+`deps` Loading test on clean base; it must fail at the current aspect guard.
+Then assert retained attachment index, defining label/exported name,
+canonical typed labels, required-provider constraints, ordinary dependency
+list and initializer execution where applicable. Add an imported aspect
+source/attachment A/B/A on one DICE to prove identity and source-fingerprint
+restoration; protect WP825 empty/parameter/selector negatives. Add a
+focused Query test for ordinary `deps` and attribute projection with no
+fabricated aspect node, matched to the accepted Bazel XML/label-kind query.
+Add a selected Analysis test that fails before child analysis/actions or
+provider consumption, while an unrelated target in the same loaded package
+can be configured normally. Preserve existing zero-edge analysis behavior.
+No new Stage 1 fixture; reuse the authenticated protobuf/oracle evidence.
 
-Resolve pinned-nightly Cargo. Compile selected Loading/Query/Analysis test
-binaries with JSON `--no-run`; exact nonignored preflight and run focused/
-protected tests serially. Direct Loading/Query/Analysis/Core/CLI compile
-and CLI rebuild precede one normalized-PATH authentic smoke. That replay
-is required to prove this exact transitive closure advance. Check/clean
-`slugd` before/after. Rust format, diff, plan and archive checks, and
-independent DESIGN and FINAL review of the zero-edge boundary are required.
+Resolve the pinned nightly toolchain. Compile selected Loading, Query and
+Analysis binaries with Cargo JSON `--no-run`; exact nonignored preflight
+and run focused/protected tests serially. Direct Loading/Query/Analysis/
+Core/CLI compile and CLI rebuild precede one normalized-PATH authentic
+`//:probe` smoke. That roughly 55-second replay is necessary to show this
+package-loading obstacle cleared; it cannot prove aspect execution. Check/
+clean `slugd` before/after. Rust format, diff, plan and archive checks and
+independent DESIGN/FINAL review of retained identity/analysis fail-closed
+are required.
 
 ## Scope and stops
 
-Base clean main `5ac86ad7e`. Allowlist: this manifest, canonical Current,
-compact Stage 4 owner note after acceptance; production
-`app/slug_loading_v2/src/package.rs`; selected tests in
-`app/slug_loading_v2/tests/build_file_loading.rs` and the existing
-`app/slug_loading_v2/src/host_package_load_tests.rs` negative regression.
-Rough growth 40 production/150 proof lines is a review trigger, not
-permission to implement aspect analysis. REPLAN if the final authentic
-value is nonempty/selected, if the empty case has a Bazel-visible aspect
-effect, or if accepting it requires dropping a nonempty semantic input.
-A later authentic error cannot widen this packet.
+Base clean main `5153bbc11`. Allowlist: this manifest, canonical Current,
+compact Stage 4/6 owner notes after acceptance; production
+`app/slug_loading_v2/src/package.rs` and
+`app/slug_analysis_v2/src/dice.rs`; focused tests in
+`app/slug_loading_v2/tests/build_file_loading.rs`,
+`app/slug_query_v2/tests/loading_query.rs` and
+`app/slug_analysis_v2/tests/starlark_rule.rs` (or colocated existing tests
+only when needed). Rough growth 130 production/240 proof lines is a review
+trigger, not authority for aspect execution. The large `package.rs` remains
+the cohesive frozen-rule invocation/target owner; add only one adjacent
+sparse projection. REPLAN if source provenance does not cover imported
+aspect mutations, the frozen value lacks safe package lifetime, the
+authentic target requires configured aspect work to load, the target is
+actually selected by the `//:probe` graph, or Analysis cannot reject before
+plain dependency/provider use. A later authentic error cannot widen this
+packet.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviewers ACCEPT the exact zero-edge Loading
-boundary. The source-shaped private-aspect test compiled on the clean base,
-passed exact preflight 1, then failed (exit 101) at the selected unconditional
-guard. Final pinned-nightly JSON `--no-run` compiled Loading integration/lib,
-Query lib and Analysis `starlark_rule` binaries. Exact preflights selected
-4, 2, 1 and 1 nonignored tests; all eight passed serially. Direct Loading/
-Query/Analysis/Core/CLI `cargo check` and required CLI rebuild passed. The
-final-source normalized-PATH authentic smoke (exit 2, about 53 seconds)
-clears rules_cc `cc_binary`'s private empty aspect attr and next fails
-separately at `@@protobuf+//:BUILD.bazel:682`, through `cc_proto_library`:
-target invocation for nonempty aspect-bearing `deps` is unsupported. Pre/
-post checks found no `slugd`; Rust format, diff, plan and archive checks
-pass. No remote transport or BuildBuddy credentials were used. The 41
-production and 192 proof lines modestly exceed rough 40/150-line review
-triggers to cover the final-value guard, parameter-validation exclusion,
-source-shaped empty/explicit controls, negatives and same-DICE restoration;
-FINAL review accepted proportionality. Aspect application, configured C++
-and protobuf compilation remain open.
+Independent DESIGN and FINAL reviews ACCEPT. The clean-base protobuf-shaped
+Loading test compiled, exact-preflight verified one nonignored test and failed
+at the prior nonempty-aspect guard. After the change, JSON `--no-run` compiled
+the selected Loading, Query and Analysis binaries; exact preflight verified
+5/1/1 nonignored tests and all seven passed, including retained producer
+identity, imported aspect A/B/A restoration, selector/parameter/multiple
+negatives, ordinary Query base edges and selected Analysis fail-closed before
+child computation. Existing source-only Bzl manifest invalidation evidence
+complements the imported identity A/B/A. Direct Loading/Analysis and Core/CLI
+checks, pinned rustfmt, diff/plan/archive checks and rebuilt CLI passed.
+There was no stale `slugd` before or after the smoke. The normalized-PATH
+authentic `//:probe` replay cleared protobuf BUILD:682, then exited 2 at
+`@@protobuf+//:protobuf.bzl:729` in `internal_php_proto_library` because
+`native.filegroup(testonly = testonly)` received a non-boolean value. That
+later native-attribute boundary is not part of this packet; configured aspect
+application, provider overlays and actions remain unsupported/deferred. M7A
+remains partial.
 
 ## Immediate predecessor
 
-WP824 accepted at `5ac86ad7e`: unchanged configurable StringList selector
-pass-through clears protobuf's rules_cc initializer `copts` stop. Eight
-selected Loading/Query/Analysis tests, direct checks, rebuilt CLI and
-authentic smoke pass their bounded gates; the next separate stop is this
-aspect-bearing private attribute. M7A remains partial.
+WP825 accepted at `5153bbc11`: the exact zero-edge, parameterless attached
+aspect `LabelList([])` clears rules_cc `cc_binary`'s empty private attr.
+Eight selected Loading/Query/Analysis tests, direct checks and rebuilt
+authentic smoke pass their bounded gates; the next distinct stop is this
+nonempty but unselected protobuf `cc_proto_library` target. M7A is partial.

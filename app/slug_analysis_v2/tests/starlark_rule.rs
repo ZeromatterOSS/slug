@@ -14027,3 +14027,90 @@ async fn configurable_alias_rejects_invalid_configured_selections() {
         first
     );
 }
+
+#[tokio::test]
+async fn nonempty_attached_aspect_fails_before_child_analysis_and_preserves_siblings() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"ChildInfo = provider(fields = {"value": ""})
+
+def _scan(target, ctx):
+    fail("aspect-implementation-ran")
+
+scan = aspect(implementation = _scan)
+
+def _child(ctx):
+    out = ctx.actions.declare_file("child.txt")
+    ctx.actions.write(out, "child")
+    return [ChildInfo(value = "child"), DefaultInfo(files = depset([out]))]
+
+child = rule(implementation = _child)
+
+def _probe(ctx):
+    value = ctx.attr.deps[0][ChildInfo].value if ctx.attr.deps else "zero"
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, value)
+    return [ChildInfo(value = value), DefaultInfo(files = depset([out]))]
+
+probe = rule(
+    implementation = _probe,
+    attrs = {"deps": attr.label_list(aspects = [scan], providers = [ChildInfo])},
+)
+
+def _plain(ctx):
+    return [ChildInfo(value = "plain")]
+
+plain = rule(implementation = _plain)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(':defs.bzl', 'child', 'plain', 'probe')\nchild(name = 'child')\nprobe(name = 'attached', deps = [':child'])\nprobe(name = 'zero', deps = [])\nplain(name = 'sibling')\n",
+    )
+    .unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let attached = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:attached").unwrap(),
+        test_configuration(),
+    );
+    let error = analyze_request(&dice, &workspace, &attached, Some(tracker.clone()), false)
+        .await
+        .unwrap_err();
+    assert!(
+        error
+            .contains("configured attached aspect application for attribute 'deps' is unsupported"),
+        "{error}"
+    );
+    let activations = tracker.take();
+    assert!(
+        !activations
+            .iter()
+            .any(|activation| activation.label == "@@//:child"),
+        "child analysis ran before the aspect guard: {activations:#?}"
+    );
+
+    let provider = ProviderId::new("//:defs.bzl", "ChildInfo").unwrap();
+    let sibling = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:sibling").unwrap(),
+        test_configuration(),
+    );
+    let sibling = analyze_request(&dice, &workspace, &sibling, None, false)
+        .await
+        .unwrap();
+    assert_eq!(provider_value(&sibling, &provider), "plain");
+
+    let zero = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:zero").unwrap(),
+        test_configuration(),
+    );
+    let zero = analyze_request(&dice, &workspace, &zero, None, false)
+        .await
+        .unwrap();
+    assert_eq!(provider_value(&zero, &provider), "zero");
+    assert_eq!(zero.actions().len(), 1);
+}

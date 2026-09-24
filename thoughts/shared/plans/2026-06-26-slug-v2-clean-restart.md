@@ -29,18 +29,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-125-m7a-empty-aspect-dependency-r1
+Packet: WP-7-126-m7a-lazy-attached-aspect-target-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP825 accepts the zero-propagation aspect-bearing private label-list value
-exposed by protobuf's rules_cc `cc_binary`. Pinned source/oracle, eight
-focused/protected tests and rebuilt authentic smoke show its omitted
-`_deps_analyzed_by_graph_structure_aspect` is empty. Slug admits only a
-final literal empty list on an aspect without attributes, required
-parameters or required aspects; the smoke advances to protobuf BUILD:682,
-where `cc_proto_library` has unsupported nonempty aspect-bearing `deps`.
-Actual aspect application and configured C++ remain deferred. Accepted
-WP824 at `5ac86ad7e` was the immediate predecessor; M7A is partial.
+WP826 admits exact Loading/ordinary Query for protobuf's nonempty
+`cc_proto_library.deps` attachment, which Bazel query proves is in the
+loaded package but absent from `//:probe`'s selected dependency path.
+Producer-owned aspect identity/callable is retained in one sparse target
+row; selected configured analysis fails before plain dependency/provider
+use. Seven focused tests, direct compiles and rebuilt authentic smoke pass
+their bounded gates. The replay clears protobuf BUILD:682 and next stops at
+`protobuf.bzl:729` on a `native.filegroup(testonly = testonly)` non-boolean
+value. Actual aspect propagation, providers/actions and C++ remain deferred.
+Accepted WP825 at `5153bbc11` was the immediate predecessor. M7A is partial.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

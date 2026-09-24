@@ -237,23 +237,33 @@ async fn load_package_with_retained_dice(
     workspace: &Path,
     package: &Path,
 ) -> anyhow::Result<slug_loading_v2::LegacyLoadedPackage> {
-    let files = [
+    let mut paths = vec![
         workspace.join(MODULE_FILE),
         package.join(BUILD_FILE_PRIMARY),
         package.join("defs.bzl"),
-    ]
-    .into_iter()
-    .map(|path| {
-        let value = match fs::read_to_string(&path) {
-            Ok(source) => WorkspaceFileValue::Present(Arc::new(source)),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                WorkspaceFileValue::Absent
-            }
-            Err(error) => WorkspaceFileValue::ReadError(Arc::new(error.to_string())),
-        };
-        (path, value)
-    })
-    .collect();
+    ];
+    paths.extend(
+        fs::read_dir(package)?
+            .map(|entry| entry.map(|entry| entry.path()))
+            .collect::<std::io::Result<Vec<_>>>()?
+            .into_iter()
+            .filter(|path| is_bzl_file(path)),
+    );
+    paths.sort();
+    paths.dedup();
+    let files = paths
+        .into_iter()
+        .map(|path| {
+            let value = match fs::read_to_string(&path) {
+                Ok(source) => WorkspaceFileValue::Present(Arc::new(source)),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    WorkspaceFileValue::Absent
+                }
+                Err(error) => WorkspaceFileValue::ReadError(Arc::new(error.to_string())),
+            };
+            (path, value)
+        })
+        .collect();
     let text = Arc::new(WorkspaceSnapshot {
         files: Arc::new(files),
     });
@@ -5177,6 +5187,7 @@ cc_binary = rule(
         CoercedAttributeValue::LabelList(labels) if labels.is_empty()
     ));
     assert!(rule.dependencies().is_empty());
+    assert!(rule.attached_aspects().is_empty());
     let marker = starlark_rule_attr(&loaded, "subject", "marker");
     assert_eq!(marker.provenance, AttributeProvenance::Explicit);
     assert_eq!(
@@ -5192,37 +5203,226 @@ cc_binary = rule(
 }
 
 #[test]
-fn aspect_dependency_rejects_nonempty_selector_and_parameterized_values() {
+fn nonempty_cc_proto_aspect_dependency_retains_canonical_base_edge() {
+    let workspace = scratch("nonempty-cc-proto-aspect-dependency");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+ProtoInfo = provider()
+CcInfo = provider()
+
+def _proto_impl(ctx):
+    fail("proto implementation must stay lazy")
+
+proto_library = rule(implementation = _proto_impl, provides = [ProtoInfo])
+
+def _aspect_impl(target, ctx):
+    fail("aspect implementation must stay lazy")
+
+cc_proto_aspect = aspect(
+    implementation = _aspect_impl,
+    attr_aspects = ["deps"],
+    fragments = ["cpp", "proto"],
+    required_providers = [ProtoInfo],
+    provides = [CcInfo],
+)
+
+def _cc_proto_impl(ctx):
+    fail("cc_proto implementation must stay lazy")
+
+cc_proto_library = rule(
+    implementation = _cc_proto_impl,
+    attrs = {
+        "deps": attr.label_list(
+            aspects = [cc_proto_aspect],
+            providers = [ProtoInfo],
+            allow_files = False,
+        ),
+    },
+    provides = [CcInfo],
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(':defs.bzl', 'proto_library', 'cc_proto_library')\nproto_library(name = 'proto')\ncc_proto_library(name = 'subject', deps = [':proto'])\n",
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let PackageTargetKind::StarlarkRule(rule) = &loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "subject")
+        .unwrap()
+        .kind
+    else {
+        panic!("subject was not recorded as a Starlark rule")
+    };
+    let dependency = CanonicalLabel::parse("@@//pkg:proto").unwrap();
+    assert_eq!(rule.dependencies(), [dependency.clone()]);
+    let schema_index = rule
+        .schema()
+        .iter()
+        .position(|schema| schema.declaration_name() == "deps")
+        .unwrap();
+    let schema = &rule.schema()[schema_index];
+    assert_eq!(schema.kind(), AttributeKind::LabelList);
+    assert_eq!(schema.required_providers().len(), 1);
+    assert_eq!(schema.required_providers()[0].len(), 1);
+    let required_provider = schema.required_providers()[0][0].user_id().unwrap();
+    assert_eq!(required_provider.source_label(), "//pkg:defs.bzl");
+    assert_eq!(required_provider.exported_name(), "ProtoInfo");
+    let value = starlark_rule_attr(&loaded, "subject", "deps");
+    assert_eq!(value.provenance, AttributeProvenance::Explicit);
+    assert!(matches!(
+        value.value.as_ref(),
+        CoercedAttributeValue::LabelList(labels) if labels.as_ref() == [dependency]
+    ));
+    let [attachment] = rule.attached_aspects() else {
+        panic!("expected exactly one retained attached aspect")
+    };
+    assert_eq!(attachment.schema_index() as usize, schema_index);
+    assert_eq!(
+        attachment.defining_label(),
+        &CanonicalLabel::parse("@@//pkg:defs.bzl").unwrap()
+    );
+    assert_eq!(attachment.exported_name(), "cc_proto_aspect");
+}
+
+#[test]
+fn imported_nonempty_aspect_attachment_restores_on_same_dice() {
+    let workspace = scratch("imported-nonempty-aspect-aba");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+load(':aspects.bzl', 'ProtoInfo', 'ACTIVE')
+
+def _proto_impl(ctx):
+    fail("proto implementation must stay lazy")
+
+proto_library = rule(implementation = _proto_impl, provides = [ProtoInfo])
+
+def _cc_proto_impl(ctx):
+    fail("cc proto implementation must stay lazy")
+
+cc_proto_library = rule(
+    implementation = _cc_proto_impl,
+    attrs = {"deps": attr.label_list(aspects = [ACTIVE], providers = [ProtoInfo], allow_files = False)},
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(':defs.bzl', 'proto_library', 'cc_proto_library')\nproto_library(name = 'proto')\ncc_proto_library(name = 'subject', deps = [':proto'])\n",
+    )
+    .unwrap();
+    let aspect_source = package.join("aspects.bzl");
+    let write_aspect = |selected: &str| {
+        fs::write(
+            &aspect_source,
+            format!(
+                "ProtoInfo = provider()\ndef _aspect_impl(target, ctx): fail('aspect implementation must stay lazy')\nFIRST = aspect(implementation = _aspect_impl, attr_aspects = ['deps'], required_providers = [ProtoInfo])\nSECOND = aspect(implementation = _aspect_impl, attr_aspects = ['deps'], required_providers = [ProtoInfo])\nACTIVE = {selected}\n"
+            ),
+        )
+        .unwrap();
+    };
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load = || runtime.block_on(load_package_with_retained_dice(&dice, &workspace, &package));
+
+    write_aspect("FIRST");
+    let first = load().unwrap();
+    write_aspect("SECOND");
+    let changed = load().unwrap();
+    let attached_name = |loaded: &slug_loading_v2::LegacyLoadedPackage| {
+        let PackageTargetKind::StarlarkRule(rule) = &loaded
+            .targets
+            .iter()
+            .find(|target| target.name == "subject")
+            .unwrap()
+            .kind
+        else {
+            panic!("subject was not recorded as a Starlark rule")
+        };
+        let [attachment] = rule.attached_aspects() else {
+            panic!("expected exactly one retained attached aspect")
+        };
+        assert_eq!(
+            attachment.defining_label(),
+            &CanonicalLabel::parse("@@//pkg:aspects.bzl").unwrap()
+        );
+        assert_eq!(
+            rule.schema()[attachment.schema_index() as usize].declaration_name(),
+            "deps"
+        );
+        attachment.exported_name().to_owned()
+    };
+    assert_eq!(attached_name(&first), "FIRST");
+    assert_eq!(attached_name(&changed), "SECOND");
+    assert_ne!(first.load_fingerprint, changed.load_fingerprint);
+    assert_ne!(first, changed);
+    assert_eq!(
+        starlark_rule_attr(&first, "subject", "deps"),
+        starlark_rule_attr(&changed, "subject", "deps")
+    );
+    write_aspect("FIRST");
+    let restored = load().unwrap();
+    assert_eq!(attached_name(&restored), "FIRST");
+    assert_eq!(first, restored);
+}
+
+#[test]
+fn aspect_dependency_rejects_selector_and_parameterized_values() {
     let workspace = scratch("aspect-dependency-rejections");
     let package = workspace.join("pkg");
     fs::create_dir_all(&package).unwrap();
     fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
     let definitions = package.join("defs.bzl");
     let build = package.join(BUILD_FILE_PRIMARY);
-    for (case, aspect_attrs, rule_attrs, invocation) in [
-        (
-            "nonempty-default",
-            "",
-            "{'_deps_analyzed_by_graph_structure_aspect': attr.label_list(default = [':dep'], aspects = [A])}",
-            "probe(name = 'blocked')",
-        ),
+    for (case, aspect_attrs, rule_attrs, invocation, expected_error) in [
         (
             "empty-selector",
             "",
             "{'targets': attr.label_list(aspects = [A])}",
             "probe(name = 'blocked', targets = select({'//conditions:default': []}))",
+            "target invocation for aspect-bearing attribute",
         ),
         (
-            "nonempty-direct",
+            "nonempty-selector",
             "",
             "{'targets': attr.label_list(aspects = [A])}",
-            "probe(name = 'blocked', targets = [':dep'])",
+            "probe(name = 'blocked', targets = select({'//conditions:default': [':dep']}))",
+            "target invocation for aspect-bearing attribute",
+        ),
+        (
+            "selected-concatenation",
+            "",
+            "{'targets': attr.label_list(aspects = [A])}",
+            "probe(name = 'blocked', targets = select({'//conditions:default': [':dep']}) + [':other'])",
+            "target invocation for aspect-bearing attribute",
         ),
         (
             "parameterized-empty-default",
             "attrs = {'mode': attr.string(mandatory = True)},",
             "{'_deps_analyzed_by_graph_structure_aspect': attr.label_list(aspects = [A])}",
             "probe(name = 'blocked')",
+            "target invocation for aspect-bearing attribute",
+        ),
+        (
+            "multiple-nonempty-aspect-attrs",
+            "",
+            "{'first': attr.label_list(aspects = [A]), 'second': attr.label_list(aspects = [A])}",
+            "probe(name = 'blocked', first = [':earlier'], second = [':earlier'])",
+            "target invocation with multiple attached aspects is not supported",
         ),
     ] {
         fs::write(
@@ -5240,10 +5440,7 @@ fn aspect_dependency_rejects_nonempty_selector_and_parameterized_values() {
         let error = try_load_package(&workspace, &package)
             .unwrap_err()
             .to_string();
-        assert!(
-            error.contains("target invocation for aspect-bearing attribute"),
-            "{case}: {error}"
-        );
+        assert!(error.contains(expected_error), "{case}: {error}");
     }
 }
 
@@ -5272,11 +5469,28 @@ fn empty_aspect_dependency_restores_after_nonempty_source_on_same_dice() {
         runtime.block_on(load_package_with_retained_dice(&dice, &workspace, &package))
     };
     let first = load("[]").unwrap();
-    let error = load("[':dep']").unwrap_err().to_string();
-    assert!(
-        error.contains("target invocation for aspect-bearing attribute"),
-        "{error}"
-    );
+    let changed = load("[':dep']").unwrap();
+    let PackageTargetKind::StarlarkRule(rule) = &changed
+        .targets
+        .iter()
+        .find(|target| target.name == "subject")
+        .unwrap()
+        .kind
+    else {
+        panic!("subject was not recorded as a Starlark rule")
+    };
+    let dependency = CanonicalLabel::parse("@@//pkg:dep").unwrap();
+    assert_eq!(rule.dependencies(), [dependency.clone()]);
+    assert_eq!(rule.attached_aspects().len(), 1);
+    assert_eq!(rule.attached_aspects()[0].exported_name(), "A");
+    assert!(matches!(
+        starlark_rule_attr(&changed, "subject", "_deps_analyzed_by_graph_structure_aspect")
+            .value
+            .as_ref(),
+        CoercedAttributeValue::LabelList(labels) if labels.as_ref() == [dependency]
+    ));
+    assert_ne!(first.load_fingerprint, changed.load_fingerprint);
+    assert_ne!(first, changed);
     let restored = load("[]").unwrap();
     assert_eq!(
         starlark_rule_attr(
