@@ -215,7 +215,7 @@ fn extract(
             .map_err(|error| materialization(format!("reading tar mode: {error}")))?;
         if (kind == EntryKind::Directory && !matches!(mode, 0o750 | 0o755 | 0o775))
             || (kind == EntryKind::Regular
-                && !matches!(mode, 0o444 | 0o640 | 0o644 | 0o664 | 0o755 | 0o775))
+                && !matches!(mode, 0o444 | 0o555 | 0o640 | 0o644 | 0o664 | 0o755 | 0o775))
         {
             return Err(materialization("selected BCR unsupported entry mode"));
         }

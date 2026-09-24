@@ -29,20 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-102-m7a-package-relative-label-select-key-r1
+Packet: WP-7-103-m7a-selected-bcr-regular-0555-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP802 admits the source-authentic rules_python/bazel_skylib macro use of
-`native.package_relative_label` in a generated BUILD. The method uses the
-calling BUILD package and mapping; its Label result enters `select()` as a
-typed condition key, with the existing raw-string/default path preserved.
-Five Bazel 9.2 fixture rows passed generation and replay, seven focused and
-protected Rust tests passed, and independent design/final reviews accepted.
-The rebuilt authentic build passed that expression and stopped separately at
-rules_kotlin's selected-BCR `REPO.bazel` materialization entry mode (row 55).
-Rule initializers, unknown-apparent nonvisible Labels, eager selector keys,
-broader configured behavior and M7A close remain deferred. WP801 is accepted
-at `923c80db7`.
+WP803 admits the source-authentic rules_kotlin 1.9.6 selected-BCR tar's
+regular `0555` file mode. The verified archive and independent Bazel 9.2
+scratch oracle retain exact bytes/mode; a new full-realization Rust test and
+six protected tests passed, with independent design/final reviews. The rebuilt
+authentic build passed the old mode stop and reached protobuf's separate
+`configuration_field(fragment = "proto", ...)` Loading error at row 55.
+Other modes/types, Kotlin/protobuf analysis and M7A close remain deferred.
+WP802 is accepted at `64a07e9c0`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

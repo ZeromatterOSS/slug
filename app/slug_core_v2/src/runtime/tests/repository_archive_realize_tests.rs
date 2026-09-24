@@ -259,6 +259,68 @@ fn selected_bcr_admits_regular_0640_without_changing_bytes_mode_or_mtime() {
 
 #[cfg(unix)]
 #[test]
+fn selected_bcr_realizes_regular_0555_build_and_nested_source_with_bytes_mode_mtime_and_association()
+ {
+    use std::os::unix::fs::PermissionsExt;
+
+    use sha2::Digest;
+
+    const BUILD: &[u8] = b"exports_files(['src/defs.bzl'])\n";
+    const SOURCE: &[u8] = b"VALUE = 'mode-0555'\n";
+    const MODULE: &[u8] = b"module(name = 'mode_probe')\n";
+    let mut raw = Vec::new();
+    append(&mut raw, b"BUILD.bazel", b'0', 0o555, 123, BUILD);
+    assert_eq!(&raw[100..108], b"0000555\0");
+    append(&mut raw, b"src/", b'5', 0o755, 124, b"");
+    append(&mut raw, b"src/defs.bzl", b'0', 0o555, 125, SOURCE);
+    finish(&mut raw);
+    let archive = gzip(&raw);
+    let plan = plan(
+        sha2::Sha256::digest(&archive).into(),
+        sha2::Sha256::digest(MODULE).into(),
+    );
+
+    let Materialized::AssociatedImmutable {
+        source_identity,
+        root,
+    } = realize_selected_bcr(
+        &plan,
+        capture(&archive),
+        Vec::new(),
+        Vec::new(),
+        capture(MODULE),
+        &|| true,
+    )
+    .unwrap()
+    else {
+        panic!("regular 0555 BCR archive must publish an associated immutable root")
+    };
+    assert_eq!(source_identity, selected_bcr_source_association(&plan));
+    for (path, bytes, mtime) in [("BUILD.bazel", BUILD, 123), ("src/defs.bzl", SOURCE, 125)] {
+        let path = root.path().join(path);
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        let metadata = std::fs::metadata(path).unwrap();
+        assert!(metadata.file_type().is_file());
+        assert_eq!(metadata.permissions().mode() & 0o7777, 0o555);
+        assert_eq!(
+            metadata
+                .modified()
+                .unwrap()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            mtime
+        );
+    }
+    assert_eq!(
+        std::fs::read(root.path().join("MODULE.bazel")).unwrap(),
+        MODULE
+    );
+    assert!(!root.path().join("REPO.bazel").exists());
+}
+
+#[cfg(unix)]
+#[test]
 fn selected_bcr_admits_directory_0750_with_native_normalization_and_prefix() {
     use std::os::unix::fs::PermissionsExt;
 

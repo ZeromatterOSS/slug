@@ -475,6 +475,20 @@ execution, lockfile recorded-input replay and Bazel Host/identity bytes stay
 deferred. The authentic rules_python 1.7.0 smoke advances from undeclared
 `RULES_PYTHON_REPO_DEBUG` to a separate generated hub LoadLabel stop.
 
+### Selected-BCR regular `0555` mode accepted (WP803)
+
+The selected Core tar extractor admits ordinary regular entries at `0555` in
+addition to its prior finite mode set. The existing writer preserves payload
+bytes, `mode | 0400` and header mtime, matching pinned Bazel 9.2 for this
+mode. The rules_kotlin 1.9.6 BCR archive's first `BUILD.bazel` header and all
+other regular entries use `0555`; `REPO.bazel` was only the request that
+triggered extraction. Capture integrity, tar path/type/size and special-bit
+rejection, immutable source association, generation errors and provisional
+publication remain with their existing owners. The authentic build now passes
+this materialization stop and reaches protobuf's distinct `proto`
+configuration-fragment Loading boundary. Other archive modes/types and full
+repository/Loading closure remain deferred; M7A is partial.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

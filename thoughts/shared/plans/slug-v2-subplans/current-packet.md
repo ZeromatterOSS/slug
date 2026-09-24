@@ -1,184 +1,146 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-102-m7a-package-relative-label-select-key-r1
+Packet: WP-7-103-m7a-selected-bcr-regular-0555-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit the source-authentic generated `pythons_hub` macro call to
-`native.package_relative_label(settings[i - 1])` and its immediate use as a
-typed `select()` condition key. Under the existing normalized-PATH authentic
-rules_python 1.7.0 smoke, Slug must pass both the current missing-native-method
-stop and the following Label-key `select` intake; a later independently typed
-stop is acceptable. This is one coupled Loading edge, not complete Python
-toolchain or configurable-alias analysis.
+Admit a regular tar entry with mode `0555` in the existing selected-BCR
+`tar.gz` materializer on Linux/Unix. The source-authentic rules_kotlin 1.9.6
+archive must pass Slug's current `selected BCR unsupported entry mode` stop
+when the normalized-PATH authentic build demands its `REPO.bazel` source
+observation. A later independently typed stop is acceptable. `REPO.bazel` is
+the lookup that triggers materialization, not an archive member or special
+mode rule.
 
-Exact Bazel 9.2 slice: during ordinary BUILD-package/macro evaluation, a
-string input is parsed against the calling BUILD package identifier and its
-repository mapping, not the defining `.bzl` package; an existing Label passes
-through unchanged after package-context validation. Supported strings are
-bare/relative, same-repository absolute, known apparent-mapped and explicit
-canonical labels. Malformed strings and wrong input types fail before package
-publication; a call without BUILD package context fails closed. `select()`
-accepts ordered string and Label keys, keeping strings raw under Bazel 9.2's
-default non-eager semantics and retaining typed canonical keys. Both raw and
-typed root `//conditions:default` are default branches at attribute coercion;
-other key types fail. Slug-native: structural selector/package/DICE identity
-and Rust error text rather than Skyframe or Java exception bytes.
-Unsupported/deferred: Bazel's nonvisible Label value and delayed failure for
-unknown apparent repositories (Slug fails closed at mapping lookup), the
-rule-initializer thread-local converter, `ctx.package_relative_label`, the
-eager-select-key flag, `select(no_match_error = ...)`, mixed string/Label
-duplicate-key precedence, rule-implementation calls and broad selector/
-toolchain analysis. Preserve all accepted raw-string selector, Label(), native
-alias and package-source behavior.
+Exact Bazel 9.2 slice: for an admitted regular entry with header mode `0555`,
+extract its payload bytes and set the output mode to `mode | 0400` (`0555`),
+then preserve the header mtime as already implemented. Slug-native: the
+existing finite tar entry/mode grammar, Unicode/path/namespace/size limits,
+directory `0755` normalization, Rust Host observations and structurally
+associated immutable source identity. Unsupported/deferred: other previously
+rejected regular/directory modes, symlink/hardlink/special tar entries, local
+PAX and broader Bazel decompressor parity, non-Unix mode materialization,
+rules_kotlin Loading/analysis/toolchain success and M7A close. Preserve all
+accepted mode, integrity, cancellation, error and publication boundaries.
 
 ## Source, owner and decision
 
-Pinned Bazel 9.2 `StarlarkNativeModuleApi.java:274-308` and
-`StarlarkNativeModule.java:650-666` require String-or-Label input, obtain a
-package `LabelConverter` before passthrough, and resolve strings in the current
-BUILD context. `LabelConverter.java:61-93` uses package plus repository
-mapping. `bazel_module_test.py:573-623` distinguishes calling `@bar+//quux`
-from defining root `.bzl`, known apparent alias, explicit canonical spelling
-and Label passthrough. Bazel's initializer special case is separately owned
-by `StarlarkRuleClassFunctions.java:1780-1790` and remains deferred.
-`SelectorList.java:90-115,279-307` accepts Label or string dict keys;
-`BuildLanguageOptions.java:853-863` defaults eager string resolution off;
-`SelectTest.java:158-205`, `ConfigurableAttributesTest.java:2225-2273`
-and `BuildType.java:700-738` establish raw strings, typed keys and canonical
-default selection.
+The pinned Bazel 9.2 `ArchiveRepoSpecBuilder.java:35-58` and
+`tools/build_defs/repo/http.bzl:194-218` route a BCR archive to the ordinary
+decompressor. `CompressedTarFunction.java:88-147` strips the prefix, writes a
+regular file, then calls `chmod(entry.getMode() | 0400)` and preserves mtime;
+its `CompressedTarFunctionTest.java:45-66` covers extraction but has no
+mode-specific assertion. The authenticated rules_kotlin 1.9.6 BCR
+`source.json` names the tar with SHA-256
+`3b772976fec7bdcda1d84b9d39b176589424c047eb2175bed09aac630e50af43`.
+Verified local archive bytes have 86 regular entries at `0555`, 22 directories
+at already-admitted `0755`, no links and no `REPO.bazel`. The first header is
+regular `BUILD.bazel` with raw USTAR mode `0000555\0`; Bazel's extracted
+`BUILD.bazel` is also a regular `0555` file with matching bytes. This is a
+direct discriminator, not a claim that all Bazel tar modes are supported.
 
-Authenticated rules_python 1.7.0
-`python/private/py_toolchain_suite.bzl:58-89` supplies bare config-setting
-names. Bazel_skylib `lib/selects.bzl:177-185` immediately uses the resulting
-Label as a `select` dictionary key alongside a string default. Thus a
-method-only patch cannot pass the authentic expression. Fresh Bazel 9.2
-scratch `/tmp/slug-wp802-label-context` proves a generated BUILD macro
-resolves `:marker.txt` in the generated hub while `Label(':marker.txt')`
-resolves in its producer `.bzl`; it also proves typed Label condition plus
-string default selects `:value` in dbg and `:fallback` in opt. A wrong-type
-call fails. Mixed typed/string equivalent keys did **not** fail in the scratch
-probe, so no duplicate rejection claim may be inferred from it. Convert the
-positive, negative and branch controls into one compact Stage 1 fixture and
-independently replay it.
+`app/slug_core_v2/src/runtime/repository_archive_realize.rs::extract` is the
+sole semantic owner. Its regular-mode allowlist rejects `0555` before reading
+the header path or applying `strip_prefix`; its existing regular writer already
+uses `set_mode(mode | 0o400)` and header mtime. Add only `0o555` to that
+regular-mode set. Do not move the gate, special-case `REPO.bazel`, synthesize a
+file, change mode normalization, or alter transport/request/DICE owners.
+Keep existing capture SHA-256 verification, immutable request association,
+generation-scoped errors, activity checks, provisional-root cleanup and final
+observation/promotion. The tar digest includes header mode bytes, so changing
+the mode changes the existing source association; no new key, retained value,
+cache, lock, file discovery or memory owner is needed. The temporary output
+root and capture remain phase/session scratch until accepted or discarded.
+The DICE ownership and no-lock-across-compute guidance in
+`docs/developers/dice.md` remains unchanged.
 
-`PackageRecorder` in `package.rs` is the calling-BUILD semantic owner. The
-generated package driver already injects its canonical package identifier,
-repository mapping and observed source route. Add the native method in the
-existing `NATIVE_METHODS` table. Obtain `PackageRecorder` **before** inspecting
-input, return an existing `StarlarkLabel` Value unchanged, and resolve strings
-through `PackageRecorder::dependency_label` / the existing
-`package_context_label_with_repository` parser; never use defining-source
-`Label()` resolution or ambient filesystem state. `select_globals` in the same
-file currently unpacks a string-keyed map. Accept a Starlark dictionary,
-project string keys to the existing `SelectorCondition::Raw` and typed
-`StarlarkLabel` keys to the existing `SelectorCondition::Canonical`, preserving
-order and values. The existing attribute coercer resolves raw keys and parses
-canonical keys; extend only its default recognition for canonical
-`@@//conditions:default`. Reject non-string/non-Label keys without coercing
-arbitrary objects to text. No new label representation, DICE key, mapping,
-cache, interner, side registry, lock or command-side repair.
-
-The selected value is transient/frozen evaluator data using existing
-`SelectorValueGen` Trace/Freeze/Allocative and ordered Vec storage. At package
-coercion, canonical selector conditions enter the existing immutable
-`CoercedAttributeValue::Selector` and `LoadedPackage` structural equality;
-the observed package/source/route DICE keys own invalidation and A/B/A
-restoration for mapping or generated BUILD edits. The Buck2 utility-reuse
-check found no new representation or hot-path container decision; Stage 9's
-retained evaluator/SmallMap utility patterns remain unchanged and no donor
-code is imported. `package.rs` is already large, but both edits belong to its
-existing native/select ABI and package coercer; splitting that shared method
-table in this packet would add indirection without a distinct owner.
+This is a same-owner one-token allowlist extension in a cohesive archive
+extractor; the file's size does not justify a structural split. The Buck2
+utility-reuse skill is inapplicable because no retained representation,
+hashing utility, collection or clone policy changes.
 
 ## Evidence and validation
 
-Make one small Stage 1 Bazel 9.2 fixture with `fixture.toml` provenance and a
-local-path-overridden producer. A generated nonroot BUILD must call an
-imported macro and expose the caller-package versus defining-package label
-distinction, known apparent and explicit canonical spelling, Label passthrough,
-a Label-valued `select` key with raw-string default, and wrong-type or
-wrong-phase failure. Use exact query/cquery outputs or stable message shape;
-fresh generation and independent fresh-root replay must agree. Keep at most
-ten small files and below the orchestration fixture-growth checkpoint. Reuse
-WP801's accepted canonical-owner-load fixture as a protected regression, not
-as a mutable prerequisite. Upstream initializer tests are skipped because
-their thread-local converter is a distinct deferred owner; mixed equivalent
-selector-key precedence is not inferred from the scratch probe. No upstream
-source, archive, auth or credential material enters the fixture.
+No new Stage 1 fixture is selected: pinned Bazel source specifies the exact
+mode projection; verified source-authentic BCR tar bytes and Bazel's extracted
+mode discriminate the observed gap. An independent tiny scratch Bazel 9.2
+`http_archive` oracle at `/tmp/slug-wp803-mode-oracle` confirms the same
+projection: the local-file tar with regular `BUILD.bazel`, `payload.txt` and
+nested source at `0555` and a directory at `0755` queried successfully on a
+fresh output base (exit 0); extracted files remained mode `555`, directory
+`755`. The successful invocation used `--ignore_all_rc_files` and a `file://`
+URL only. Bazel's `--repository_disable_download` also blocks local file
+URLs, so that flag's preliminary exit 7 is an invocation control, not a
+semantic negative. The scratch tar stays under `/tmp`, not in this checkout.
+The upstream decompressor test is not copied
+because it does not assert modes; the existing Slug tar-header writer supplies
+the stronger focused discriminator. Fixture growth is zero and no archive,
+credential or upstream source is committed.
 
-Focused Rust tests must prove macro caller-package versus defining-source
-context in a generated external BUILD, known apparent/explicit canonical and
-Label passthrough, raw/typed selector key order and canonical default, wrong
-type/syntax, no package context (including Label input), and unchanged
-`Label()`/raw-string behavior. Show that a mapping A/B/A or generated BUILD
-source revision changes/restores the canonical condition and observed package
-result; no interrupted Need pass publishes a partial target. Include a
-configured or equivalent structural selector proof that dbg/opt choose the
-expected branch only where the existing native alias family is already
-admitted. Compile Loading plus named direct Analysis, Query and Core
-dependents with pinned-toolchain JSON `--no-run`; batch exact-selector
-preflight and run focused tests serially. Rebuild `slug_cli_v2` before the
-authentic normalized-PATH smoke; check/clean stale `slugd` before and after.
-Run Bazel fixture generation/replay, protected fixture replay, formatting,
-diff, archive and plan-status checks; require independent DESIGN and FINAL
-reviews. No broad suite, remote-transport gate, M7A close or BuildBuddy
-credential access is selected.
+Add a focused `repository_archive_realize_tests.rs` test using its current
+`append`/`header` writer: a regular `BUILD.bazel` and a nested regular source
+at `0555` with known bytes and mtimes pass full `realize_selected_bcr`, retain
+`0555` on Unix, and preserve the existing verified source association. Keep
+the current reject-mode test's `0600`, `0750` and special-bit controls; add a
+neighboring rejected mode only if it materially distinguishes the new set.
+Reuse existing tests for `0640`, directory `0750`, malformed/special entries,
+active cutoff, source association, transform and file-session generation
+behavior. No weakened assertion or broader archive mode claim is acceptable.
+
+Resolve pinned cargo/rustc from `rust-toolchain`; compile Core library tests
+with Cargo JSON `--no-run`, batch exact selectors through preflight, then run
+the new/protected tests serially. Rebuild `slug_cli_v2` before the authentic
+normalized-PATH build; check/clean `slugd` before and after. Run formatting,
+diff, archive and plan-status checks, and obtain independent DESIGN and FINAL
+reviews. No broad suite, remote-transport, NativeLink or BuildBuddy gate is
+selected by this source-materialization packet.
 
 ## Scope and stops
 
-Base clean main `923c80db7`. Allowlist: this manifest, canonical Current
-paragraph, Stage 4 owner contract only for accepted invariants;
-`app/slug_loading_v2/src/package.rs` for native/select/coercion;
-`app/slug_loading_v2/src/host_package_load_tests.rs` for focused tests; and
-`tests/v2_oracle/fixtures/native-package-relative-label-select/` for the
-new fixture. Production growth estimate is under 80 lines and proof growth
-under 300 lines; these are review triggers, not permission ceilings. Preserve
-the accepted `StarlarkLabel` and `SelectorCondition` representations. REPLAN
-if a typed Label key cannot use the existing canonical selector variant, the
-calling package/mapping is absent from the existing recorder in the authentic
-macro, structural equality loses condition identity, or the authentic next
-stop requires a separate repository/analysis owner to pass this precise
-expression. A later selector/alias/toolchain failure is a new packet.
+Base clean main `64a07e9c0`. Allowlist: this manifest and canonical Current
+paragraph; Stage 5 owner contract only for accepted invariant; production
+`app/slug_core_v2/src/runtime/repository_archive_realize.rs`; focused tests
+`app/slug_core_v2/src/runtime/tests/repository_archive_realize_tests.rs`.
+Production growth is approximately one token; proof growth under 90 lines.
+These are review triggers, not permission ceilings. REPLAN if the authenticated
+tar does not use ordinary regular `0555`, Bazel's `0555` output does not match
+the existing writer, mode-only changes escape existing source identity, or
+passing the present stop requires a distinct entry type/transport/DICE owner.
+A later rules_kotlin source or Loading failure is a new packet.
 
 ## Immediate predecessor
 
-WP801 at `923c80db7` accepted nonroot canonical `.bzl` loads from generated
-BUILDs; its Bazel 9.2 fixture generation/replay, eleven focused Rust tests
-and independent reviews passed. The authentic smoke moved from the
-`@@rules_python+` LoadLabel stop to this `native.package_relative_label`
-call. M7A remains partial.
+WP802 at `64a07e9c0` accepted package-relative Label conversion and typed
+`select()` keys in a generated BUILD. Its five-row Bazel 9.2 fixture and seven
+focused/protected Rust tests passed, and the authentic build advanced from
+rules_python/bazel_skylib to this selected-BCR entry-mode stop at toolchain
+registration row 55. M7A remains partial.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviews returned ACCEPT. The eight-file Bazel
-9.2 fixture passed five generated-BUILD, mapping, dbg/opt selector and
-wrong-type rows in generation (6.39 s) and independent fresh-root replay
-(5.28 s); WP801's canonical-owner-load fixture replay also passed. The
-package-owned method resolves strings in the calling BUILD/macro package and
-returns an existing Label unchanged; `select()` retains ordered raw string
-and typed canonical keys, with canonical root default recognition. No DICE
-key, mapping owner or retained selector representation changed. The final
-Loading JSON library test compile passed (12.27 s); exact preflight selected
-seven nonignored tests, and three new plus four protected Rust tests passed.
-Analysis, Query and Core JSON library test targets compiled, and the CLI
-rebuild passed (10.79 s). A broader direct-dependent integration-test compile
-is not a packet gate: unchanged orphan Analysis test files such as
-`tests/directory_args.rs` fail at top-level `use super::*`; the named library
-dependents compile. Formatting, diff, archive and plan-status checks passed.
+Independent DESIGN and FINAL reviews returned ACCEPT. The verified
+rules_kotlin 1.9.6 BCR archive's first regular `BUILD.bazel` header and its
+other 85 regular entries are `0555`; its 22 directory entries are `0755`.
+Bazel's extracted `BUILD.bazel` retains `0555`. A separate, offline pinned
+Bazel 9.2 scratch `repository_ctx.extract` query passed on a fresh output
+base (3.46 s), preserving three regular `0555` files and one `0755`
+directory. The sole production change adds `0o555` to the regular tar mode
+set; the writer's byte, mode and mtime projection and all existing safety
+gates are unchanged. No fixture was added because pinned source plus the
+verified authentic archive/extracted result directly discriminate the one
+mode, with the new source-shaped Rust tar-header regression preserving it.
 
-The rebuilt authentic normalized-PATH smoke passed the former
-`native.package_relative_label` and typed-`select` expression, then stopped at
-toolchain registration row 55 in `@@rules_kotlin+//kotlin/internal` on a
-separate selected-BCR `REPO.bazel` materialization entry mode. No stale
-`slugd` remained. The Slug test's nonroot BUILD uses an existing materialized
-canonical route rather than extension generation; actual generated BUILD
-behavior is covered by the Bazel fixture and authentic smoke. A/B/A restores
-structural `LoadedPackage` equality, while observation carriers remain
-unequal across Host metadata epochs. Rule-initializer context,
-unknown-apparent nonvisible Label values and broader selector/analysis
-behavior remain deferred. No remote transport, BuildBuddy authentication or
-NativeLink gate was used. Packet wall-clock and independent review durations
-were not separately timed; the measured compile/oracle durations above are
-the available timing evidence. M7A and M8 remain open.
+The final pinned-toolchain Core JSON library test compile passed (2.66 s).
+Exact preflight selected seven nonignored tests; the new full-realization
+test and six protected mode/rejection/source-association/file-session tests
+each passed. The CLI rebuild passed (2.49 s). The authentic normalized-PATH
+smoke passed the old selected-BCR entry-mode stop, then failed separately at
+row 55 in `@@protobuf+//bazel/private:java_lite_proto_library.bzl:76` on
+`configuration_field(fragment = "proto", ...)` with `invalid configuration
+fragment name 'proto'`. No `slugd` remained before or after. Format, diff,
+archive and plan-status checks passed. The scratch oracle and reviews were
+independent; packet wall-clock/review durations were not separately timed.
+No remote transport, NativeLink or BuildBuddy authentication path was used.
+Other tar modes/types and full Kotlin/protobuf Loading remain deferred; M7A
+and M8 remain open.
