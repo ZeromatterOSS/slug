@@ -1,0 +1,60 @@
+[fixture]
+name = "module-metadata-build-context"
+description = "Root BUILD module_name/module_version globals and an externally loaded macro use the calling package's declared Bzlmod module across a version edit."
+comparison = "message_shape"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Self-contained Bazel 9.2 and Slug exact-target Query fixture. Target names encode both metadata values, so the root BUILD globals and a macro loaded from a different module discriminate the caller context. A root MODULE version A-to-empty-to-A mutation with unchanged BUILD/.bzl checks invalidation and restoration. Public local-override package module metadata uses Slug's deferred direct-local route, and public canonical @@ target-pattern syntax is also deferred; selected-repository values are instead covered by focused Loading route tests and pinned/authentic Bazel evidence. No credential-bearing RC is read."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/packages/StarlarkNativeModule.java:665-683",
+  "src/main/java/com/google/devtools/build/lib/skyframe/RepositoryMappingFunction.java:115-174",
+  "src/main/java/com/google/devtools/build/lib/skyframe/RepositoryMappingValue.java:57-88",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageFunction.java:1182-1201",
+  "src/test/py/bazel/bzlmod/bazel_module_test.py:713-798",
+]
+translation_notes = "The root starts at 3.4.5, then declares an empty version, then restores 3.4.5 without changing BUILD or the dep-defined .bzl macro. The dep is a local override used only as a foreign macro source; this fixture makes no claim about its own BUILD metadata. Exact target names are derived at loading time from the root caller package's metadata; no network repository is required."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture module-metadata-build-context --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture module-metadata-build-context --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
+
+[[commands]]
+name = "root_build_globals"
+argv = ["query", "//:direct_root_3_4_5", "--output=label"]
+expected_exit = 0
+stdout_patterns = ['\A//:direct_root_3_4_5\n?\Z']
+
+[[commands]]
+name = "root_macro_uses_caller"
+argv = ["query", "//:macro_root_3_4_5", "--output=label"]
+expected_exit = 0
+stdout_patterns = ['\A//:macro_root_3_4_5\n?\Z']
+
+[[commands]]
+name = "root_empty_version"
+argv = ["query", "//:direct_root_empty", "--output=label"]
+expected_exit = 0
+stdout_patterns = ['\A//:direct_root_empty\n?\Z']
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = 'version = "3.4.5"'
+  replace = 'version = ""'
+
+[[commands]]
+name = "root_macro_empty_version"
+argv = ["query", "//:macro_root_empty", "--output=label"]
+expected_exit = 0
+stdout_patterns = ['\A//:macro_root_empty\n?\Z']
+
+[[commands]]
+name = "root_version_restored"
+argv = ["query", "//:direct_root_3_4_5", "--output=label"]
+expected_exit = 0
+stdout_patterns = ['\A//:direct_root_3_4_5\n?\Z']
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = 'version = ""'
+  replace = 'version = "3.4.5"'

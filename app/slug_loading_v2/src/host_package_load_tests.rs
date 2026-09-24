@@ -40710,10 +40710,22 @@ async fn package_relative_label_rejects_bad_inputs_and_does_not_publish_partial_
 }
 
 fn package_name_materialized_epoch() -> (PathObservationEpoch, PathObservationInstanceId) {
+    package_name_materialized_epoch_with(
+        "",
+        "def emit():\n    native.filegroup(name = 'a' + native.package_name().replace('/', '_'))\n",
+        "load('//:defs.bzl', 'emit')\nemit()\n",
+    )
+}
+
+fn package_name_materialized_epoch_with(
+    root_build: &str,
+    defs: &str,
+    external_build: &str,
+) -> (PathObservationEpoch, PathObservationInstanceId) {
     let variant = 810;
     let mut epoch = EpochBuilder::workspace_sources(
         "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\n",
-        "",
+        root_build,
         &[],
         variant,
     );
@@ -40735,25 +40747,181 @@ fn package_name_materialized_epoch() -> (PathObservationEpoch, PathObservationIn
     );
     epoch.materialized_missing(instance, "/registry-dep/REPO.bazel");
     epoch.materialized_missing(instance, "/registry-dep/.bazelignore");
-    epoch.materialized_file(
-        instance,
-        "/registry-dep/defs.bzl",
-        "def emit():\n    native.filegroup(name = 'a' + native.package_name().replace('/', '_'))\n",
-        variant,
-    );
+    epoch.materialized_file(instance, "/registry-dep/defs.bzl", defs, variant);
     for build in [
         "/registry-dep/BUILD.bazel",
         "/registry-dep/kotlin/internal/BUILD.bazel",
         "/registry-dep/other/BUILD.bazel",
     ] {
-        epoch.materialized_file(
-            instance,
-            build,
-            "load('//:defs.bzl', 'emit')\nemit()\n",
-            variant,
-        );
+        epoch.materialized_file(instance, build, external_build, variant);
     }
     (epoch.build(), instance)
+}
+
+#[tokio::test]
+async fn module_metadata_selected_registry_uses_calling_build_for_apparent_canonical_and_root() {
+    let (epoch, instance) = package_name_materialized_epoch_with(
+        "load('@dep_alias//:defs.bzl', 'emit')\nfilegroup(name='root_' + module_name() + '_' + module_version())\nemit()\n",
+        "def emit(): native.filegroup(name='macro_' + native.module_name() + '_' + native.module_version())\n",
+        "load('//:defs.bzl', 'emit')\nfilegroup(name='build_' + module_name() + '_' + module_version())\nemit()\n",
+    );
+    let (mut tx, apparent_route) =
+        selected_registry_visibility_transaction(epoch, instance, None).await;
+    let canonical_route = tx
+        .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+            workspace(),
+            CanonicalRepoName::new("dep+").unwrap(),
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(canonical_route)) = canonical_route else {
+        panic!("canonical selected route must complete: {canonical_route:?}")
+    };
+    let canonical_input = canonical_route
+        .result()
+        .as_ref()
+        .as_ref()
+        .unwrap()
+        .input()
+        .clone();
+    let apparent = tx
+        .compute(&RepositoryPackageLoadObservationKey::new(
+            apparent_route,
+            PackagePath::root(),
+        ))
+        .await
+        .unwrap();
+    let canonical = tx
+        .compute(&RepositoryPackageLoadObservationKey::new_canonical(
+            canonical_input,
+            PackagePath::root(),
+        ))
+        .await
+        .unwrap();
+    let expected = ["build_dep_1", "macro_dep_1"];
+    for outcome in [&apparent, &canonical] {
+        let package = observed_repository_package(outcome)
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            package
+                .targets
+                .iter()
+                .map(|target| target.name.as_str())
+                .collect::<Vec<_>>(),
+            expected,
+        );
+    }
+    let root = tx.compute(&package_key()).await.unwrap();
+    assert_eq!(
+        target_names(&root),
+        ["root_bazel_tools_", "macro_bazel_tools_"]
+    );
+}
+
+#[tokio::test]
+async fn build_module_metadata_uses_declared_root_and_loaded_macro_caller_a_b_a() {
+    const BUILD: &str = "load(':defs.bzl', 'emit')\nfilegroup(name='build_' + module_name() + '_' + module_version())\nemit()\n";
+    const DEFS: &str = "def emit(): native.filegroup(name='macro_' + native.module_name() + '_' + native.module_version())\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut outcomes = Vec::new();
+    for (module, expected) in [
+        (
+            "module(name='bazel_tools', version='1.2.3')\n",
+            ["build_bazel_tools_1.2.3", "macro_bazel_tools_1.2.3"],
+        ),
+        (
+            "module(name='bazel_tools', version='2.0')\n",
+            ["build_bazel_tools_2.0", "macro_bazel_tools_2.0"],
+        ),
+        (
+            "module(name='bazel_tools', version='1.2.3')\n",
+            ["build_bazel_tools_1.2.3", "macro_bazel_tools_1.2.3"],
+        ),
+    ] {
+        let outcome = compute_package(
+            &dice,
+            EpochBuilder::workspace_sources(module, BUILD, &[("defs.bzl", DEFS)], 820).build(),
+            package_policy(),
+        )
+        .await;
+        assert_eq!(target_names(&outcome), expected);
+        outcomes.push(outcome);
+    }
+    assert!(!RootPackageLoadKey::equality(&outcomes[0], &outcomes[1]));
+    assert!(RootPackageLoadKey::equality(&outcomes[0], &outcomes[2]));
+
+    let empty_version = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources(
+            "module(name='bazel_tools')\n",
+            BUILD,
+            &[("defs.bzl", DEFS)],
+            822,
+        )
+        .build(),
+        package_policy(),
+    )
+    .await;
+    assert_eq!(
+        target_names(&empty_version),
+        ["build_bazel_tools_", "macro_bazel_tools_"]
+    );
+}
+
+#[tokio::test]
+async fn build_module_metadata_bindings_reject_wrong_context_and_unsupported_route() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for (build, bzl, expected) in [
+        ("native.module_version()\n", None, "module_version"),
+        ("module_version('extra')\n", None, "module_version"),
+        (
+            "load(':defs.bzl', 'emit')\nemit()\n",
+            Some("def emit(): return module_version()\n"),
+            "module_version",
+        ),
+        (
+            "load(':defs.bzl', 'VALUE')\n",
+            Some("VALUE = native.module_version()\n"),
+            "module_version",
+        ),
+    ] {
+        let bzl_files = bzl
+            .map(|source| vec![("defs.bzl", source)])
+            .unwrap_or_default();
+        let outcome = compute_package(
+            &dice,
+            EpochBuilder::workspace_sources("module(name='bazel_tools')\n", build, &bzl_files, 823)
+                .build(),
+            package_policy(),
+        )
+        .await;
+        let error = terminal_error(&outcome);
+        assert!(error.contains(expected), "{build}: {error}");
+    }
+    let unsupported = load_repository_package_fixture(
+        &[("BUILD.bazel", b"filegroup(name=module_version())\n")],
+        824,
+    )
+    .await;
+    assert!(
+        repository_package_error(&unsupported).contains("unsupported for this repository source")
+    );
+    let module_file = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources(
+            "module(name='bazel_tools')\nVALUE=module_version()\n",
+            "filegroup(name='probe')\n",
+            &[],
+            825,
+        )
+        .build(),
+        package_policy(),
+    )
+    .await;
+    assert!(terminal_error(&module_file).contains("module_version"));
 }
 
 #[tokio::test]

@@ -1,156 +1,185 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-133-m7a-builtin-python-package-source-r1
+Packet: WP-7-134-m7a-build-module-metadata-r1
 Status: ACCEPTED; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit the exact selected Bazel 9.2 runtime source/Loading closure for
-`@@bazel_tools//tools/python` so the missing-BUILD stop is no longer a
-catalog absence. Copy seven pinned upstream files verbatim: runtime
-`tools/python/BUILD.tools` becomes catalog `tools/python/BUILD`; include its
-one local load and six exports (`python_version.bzl`,
-`python_bootstrap_template.txt`, `srcs_version.bzl`, `toolchain.bzl`,
-`utils.bzl`, `private/py_test_alias.bzl`). Exact claims are pinned bytes,
-nonexecutable modes, package/source-label topology and successful Loading
-of the declared `python_version`, `PY2`/`PY3`, `bzl_srcs`, `toolchain_type`,
-`py2_interpreter_path`, `py3_interpreter_path` and
-`autodetecting_toolchain` targets, with names/kinds checked against pinned
-`BUILD.tools`. This is a package Loading claim, not configured evaluation of
-those targets. Slug's
-collision-safe catalog route manifest identity remains Slug-native; this
-packet does not claim Bazel's embedded archive checksum or full directory.
-Wrapper scripts, the separate `tools/python/runfiles` package, Python
-actions/toolchains, native Python rules, full authentic root build and M7A
-remain unsupported/deferred. Existing WP831/832 exact FeatureFlagInfo
-slices remain exact and are not widened by source ingress.
+Admit exact Bazel 9.2 `module_name()` and `module_version()` BUILD globals
+and `native.module_name()` / `native.module_version()` from a loaded
+macro, for root and canonical selected Bzlmod module repositories. Expose
+these selected names context-specifically: bare functions in BUILD but not
+.bzl, and native methods in .bzl but not BUILD. Slug's pre-existing BUILD
+`native` object remains a separate Slug-native environment divergence; it
+must not acquire these new methods. The value
+is the *calling BUILD package's* associated module's declared name and
+normalized declared version, not the macro source's repo, apparent repo name,
+archive URL or selected graph lookup key. A missing root declaration has
+Bazel's empty name/version; an explicitly empty version returns `""`, not
+`None`. These are exact selected-context value and binding claims. The
+existing structural repository/package identities remain Slug-native; no
+Bazel configuration or output-identity bytes are claimed.
 
-## Source, decision and semantic owner
+For direct-local legacy routes, extension-generated repositories and
+`@bazel_tools`, calls fail closed as unsupported/deferred until their
+associated-module provenance is projected from a DICE owner. Do not substitute
+apparent or canonical repo tokens, silently return empty strings, or claim
+full BUILD/native global parity. Direct `MODULE.bazel` remains without
+these globals; .bzl top-level calls have no target-definition context and
+must fail rather than borrow the source repository's metadata. Other
+platforms/rules_python bootstrap gaps and M7A remain open.
+
+## Pinned source, owner and decision
 
 Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`:
-`src/create_embedded_tools.py:67-103` replaces `/BUILD.tools` with `/BUILD`
-and discards source-tree BUILD on collision;
-`scripts/bootstrap/compile.sh:305-312` independently makes that runtime link.
-`tools/BUILD:41-70`
-includes `//tools/python:embedded_tools`. Runtime
-`tools/python/BUILD.tools:13-36,69-108` loads `python_version.bzl`, exports
-the six declared files and defines the selected package targets.
-`tools/python/python_version.bzl:20-44` creates the version rule returning
-`config_common.FeatureFlagInfo(value = "PY3")`. The source-tree
-`tools/python/BUILD` is Bazel's own packaging/test BUILD, not runtime
-`@bazel_tools` content. Its `embedded_tools` glob also carries additional
-files, intentionally outside this selected Loading closure. No new Stage 1
-fixture is needed: exact upstream byte/hash comparisons and the existing
-WP832 configured FeatureFlagInfo evidence are the pinned-source regression.
+`StarlarkGlobalsImpl.java:75-77,129-132` and
+`BazelStarlarkEnvironment.java:252-303` distinguish BUILD globals from
+the .bzl `native` binding; `StarlarkNativeModule.java:665-683` reads
+`TargetDefinitionContext`, which restricts invocation to BUILD/macro
+evaluation (`TargetDefinitionContext.java:170-195,224-249`).
+`RepositoryMappingFunction.java:115-174` supplies associated module
+metadata; `RepositoryMappingValue.java:57-88` normalizes the version;
+`PackageFunction.java:1182-1201` passes it into package evaluation.
+Upstream `bazel_module_test.py:713-798` demonstrates caller context and
+an overridden nonregistry module whose declared version differs from its
+empty lookup version. The live authentic Bazel 9.2 `@@platforms` 1.1.0
+`BUILD:18-21` uses both globals in a package-metadata purl.
 
-Stage 5's immutable `BuiltinBazelToolsSnapshot::Bazel9_2` CATALOG and
-`BuiltinBazelToolsSourceFileKey` own each byte, mode, exact SHA and sorted
-directory listing. Existing `HostBuiltinBazelToolsRepositoryMapping` and
-external package/Bzl keys consume this source route. The CATALOG-derived
-manifest SHA participates in Slug-native route identity; updating its
-expected test vectors is intentional, not a Bazel checksum claim. Static
-`include_bytes!` storage is process-lifetime; DICE-retained source values
-use existing Arc/Dupe/Allocative ownership and unchanged complete equality.
-No new DICE key, lock, interner, cache, mutable registry, filesystem bypass,
-host observation, command scratch borrowing or action representation is
-introduced. The current built-in catalog remains the cohesive source owner;
-do not run or revive the legacy `scripts/sync_bazel_tools.sh` path.
+Stage 5's selected module route owns evaluated declared name/version in
+`HostSelectedModuleRoute.entry.source`; expose a narrow borrowed projection
+through both the canonical route view and the selected
+`RootRepositoryRoute` view. Apparent and canonical package loads of a
+selected-registry module must see the same declaration; local-path
+overrides can still take the unsupported direct-local apparent route.
+Do **not** use
+`HostGraphModuleKey::Module.version`: nonregistry override lookup identity
+can be empty while the module declares a nonempty version. Root
+`RootModuleLoadingAnchorKey` already tracks the evaluated root module;
+project its header through the retained anchor without a new filesystem
+read, key, registry or lock. `RepositoryPackageInventoryKey` and
+`RootPackageLoadKey` already consume those respective route/anchor
+dependencies. Thread the immutable metadata into the evaluator-scoped
+`HostPackageAttemptInput` and `PackageRecorder`, then make both global
+and native calls read that caller package context. No evaluator-heap value,
+command scratch, or temporary route may be retained by DICE. Existing
+complete route and anchor equality/invalidation must account for module
+declaration edits with unchanged BUILD bytes; an A/B/A proof is required.
+Review generated/direct-local source ownership instead of inventing a
+fallback. Vendored `dice/dice/docs/writing_computations.md` records that
+`ctx.compute` creates dependencies and key equality controls resurrection;
+existing root-anchor equality/restoration tests
+(`host_module.rs:2844-2895,3440-3558`) and selected-route equality tests
+(`selected_repo_spec.rs:9994-10030`) are protected. No Buck2
+utility/representation change is planned. Selected canonical and selected
+Root route Hash projections include the borrowed declared name/version
+already retained by their definitions; complete structural Eq remains the
+semantic identity even where hash collisions are possible. Add no new
+retained selected-route allocation, collection, interner or content digest;
+the evaluator-scoped metadata copies and returned strings are ephemeral.
 
 ## Evidence and validation
 
-Before implementation, an isolated
-`slug query '@bazel_tools//tools/python:python_version' --output=label_kind`
-from the
-preserved authentic workspace must show the missing BUILD stop; it is a
-diagnostic, not an oracle or constructor proof. Port each selected file from
-the pinned Git object through `apply_patch`; compare exact bytes to
-`git show` afterward and assert catalog SHA/mode for every file. Assert
-`tools/python/BUILD` differs from source-tree `tools/python/BUILD` and equals
-`BUILD.tools`; exclude `BUILD.tools` and out-of-slice runfiles from Slug's
-catalog. Prove sorted directory listing, selected package marker and
-catalog-derived route manifest identity on one DICE and across independent
-transactions. A focused Loading proof must assert all six `exports_files`
-source labels, especially `tools/python:private/py_test_alias.bzl`, stay in
-the parent package, and that neither `tools/python/private` nor the deferred
-`tools/python/runfiles` has a package marker. Extend the existing catalog file-set/compile-data proof,
-including a Slug-only `BUILD.bazel` sidecar. Preserve representative JDK,
-C++ and test catalog controls; no hardcoded marker-format test may replace
-the current catalog/writer proof.
+Before editing, retain the authentic ignored-RC/no-fetch Bazel 9.2
+`query '@@platforms//:package_metadata' --output=build` evidence:
+`purl = "pkg:bazel/platforms@1.1.0"`. The live source is selected
+platforms 1.1.0, not the older mirrored 1.0.0 archive. Also retain the
+independent `@@package_metadata` 0.0.3 purl oracle and pinned-source
+root/extension/nonregistry behavior above. These cache-bound authentic
+queries and upstream macro test do not portably discriminate bare BUILD
+globals, so add one minimal Stage 1 Bazel-vs-Slug fixture
+`module-metadata-build-context`: a versioned root, an empty-version edit
+and restoration with unchanged BUILD/.bzl, and a macro loaded from a
+different local module but invoked in the root BUILD. Derive exact
+`filegroup` target names from both values so admitted exact-target
+`query --output=label` discriminates them without relying on deferred
+external `:all` or `--output=build` formats. Selected nonroot values are
+covered by focused apparent/canonical Loading tests plus the pinned
+upstream nonregistry test and authentic selected-module purls. Public
+local-path-override package loads still use the deferred direct-local
+route; public canonical `@@` target-pattern syntax is separately deferred.
+Use ignored RC/offline Bazel 9.2 generation and independent verification;
+record pinned source, command, exact outputs and unsupported exclusions in
+`fixture.toml`. Keep at most the files needed for these discriminators,
+run the applicable fixture-growth hygiene checkpoint, and do not copy the
+authentic archive or credentials.
 
-Resolve pinned nightly with `rustup which`; serialize Cargo. Compile
-selected Bzlmod/Loading test executables using Cargo JSON `--no-run`,
-preflight named nonignored selectors and run focused/protected tests.
-Direct-check Bzlmod and Loading dependents, rebuild `slug_cli_v2` before
-authentic Slug replay, and check/clean `slugd` before and after. Run isolated
-`slug query '@bazel_tools//tools/python:python_version' --output=label_kind`
-and assert the exact target kind; the focused Loading test owns the complete
-eight-target inventory because external `:all` Query patterns are deferred.
-Then run the authentic rules_python `//:probe`; a
-parallel first error does not prove the WP832 constructor path executed.
-Where feasible, build a root-visible authentic rules_python
-`construct_config_settings` target to probe the exact
-`config_settings.bzl:172` call independently. Record the next observed stop without claiming
-full Python/root bootstrap. Run pinned rustfmt, `git diff --check`, plan
-and archive checks. Obtain independent DESIGN and FINAL review of this
-catalog/public source boundary.
+Focused tests must cover root declared and omitted metadata, selected
+registry and nonregistry declared-versus-lookup version, nested package,
+a macro loaded from another repository reporting its caller package,
+empty-version truthiness, direct `MODULE.bazel` binding absence, .bzl
+bare-global absence, BUILD `native.module_*` absence, .bzl
+native top-level rejection, arity, and explicit fail-closed generated/
+direct-local/builtin calls. Prove same-DICE and independent-transaction A/B/A
+root package Loading across declaration edits with unchanged BUILD bytes,
+and selected-canonical nonregistry route/definition metadata invalidation
+and restoration across declared-version edits with unchanged source BUILD.
+The latter is a route DICE proof, not a public nonregistry package-loading
+claim; the selected route is consumed by the existing package key. Separately
+prove apparent/canonical selected-registry route agreement and its declaration
+invalidation when the selected version/key changes;
+keep package/mapping controls. Require no direct filesystem or host-name
+lookup from globals. Rebuild `slug_cli_v2` after Rust edits and replay the
+authentic `//:probe` with clean `slugd` before and after. Because Loading is
+parallel, record the next first error without claiming every path completed.
+
+Serialize Cargo. Resolve pinned nightly with `rustup which`, compile
+focused test executables with Cargo JSON `--no-run`, preflight exact
+nonignored selectors, run focused/protected tests and dependent
+`cargo check`. Run pinned rustfmt, diff/plan/archive checks, and
+independent DESIGN and FINAL reviews for this public Loading/DICE boundary.
+Use existing upstream tests as pinned-source regressions; do not copy Java
+helpers or artifacts into Slug.
 
 ## Scope and stops
 
-Base clean main `e054b08f5`. Allowlist: this manifest and canonical
-Current; compact Stage 5/9 owner notes after acceptance; seven verbatim
-files under `app/slug_bzlmod_v2/builtin/bazel_tools/tools/python/` plus
-Slug-only `tools/python/BUILD.bazel`; root `.gitattributes` only for the
-pinned runtime BUILD's upstream blank line at EOF;
-`app/slug_bzlmod_v2/BUILD.bazel`,
-`src/builtin_repository.rs`, `tests/builtin_bazel_tools.rs`; only affected
-catalog/manifest/package expectation tests in
-`app/slug_bzlmod_v2/src/{host_module,host_package,source_preparation}.rs`
-and `app/slug_loading_v2/src/external_subtree_package_set_tests.rs` and
-`app/slug_loading_v2/src/canonical_repository_load_route_tests.rs` if their existing assertions
-require the new package; a focused Loading test in the latter owner.
-Estimated seven upstream files and roughly 100-220 Rust/BUILD proof and
-registration lines are a review trigger, not a cap. The `builtin_repository`
-module is large but remains the cohesive existing catalog owner; do not
-split or add a second registry to evade that boundary. `REPLAN` if package
-Loading requires unadmitted Python semantics, a different archive file
-mapping, new semantic owner/DICE key, more than the declared selected
-source closure, or an unsupported source label. Do not invent or edit
-upstream `@bazel_tools` bytes.
+Base clean main `6a9a0960f`. Allowlist: this manifest and canonical
+Current; one compact Stage 1 fixture-growth checkpoint note before
+acceptance and compact Stage 4/5/9 owner notes after acceptance;
+`app/slug_bzlmod_v2/src/{host_module,selected_repo_spec,canonical_repository_route}.rs`
+and their existing focused tests; `app/slug_loading_v2/src/{bzl_module,package,host_package_load_tests,host_package_attempt_tests}.rs`;
+`tests/v2_oracle/fixtures/module-metadata-build-context/**` (one
+new portable fixture, roughly 7 source/manifest files). Roughly 150-300
+production/test lines is a review trigger, not a cap. The large existing
+Loading files remain their current cohesive owners; do not split merely to
+evade size review. No generated-repo host inference, direct-local
+module-discovery bridge, source-catalog rewrite, action/configuration work,
+or remote-execution policy change. `REPLAN` if admitted values require a
+new semantic key, selected-route equality lacks declared metadata, root
+anchor is not a tracked dependency on every path, or the authentic call
+needs a generated/direct-local/builtin branch.
 
 ## Immediate predecessor
 
-WP832 accepted at `e054b08f5` the selected configured Starlark
-`FeatureFlagInfo` slice. Its parallel authentic `//:probe` replay first
-reported missing `@@bazel_tools//tools/python` BUILD content, but did not
-prove the constructor path executed. M7A remains partial.
+WP833 at `6a9a0960f` accepted the exact selected seven-file
+`@@bazel_tools//tools/python` runtime source/Loading closure. Its
+authentic `//:probe` replay first stopped at
+`@@platforms//:BUILD:21` with `Variable module_version not found`;
+parallel Loading does not prove the rules_python constructor path ran.
 
-## Acceptance (2026-09-24 17:41 UTC)
+## Acceptance (2026-09-24)
 
-Independent DESIGN and FINAL reviews ACCEPT the selected source/Loading
-slice. All seven local runtime files compare byte-for-byte to pinned Bazel
-9.2 Git objects, preserve nonexecutable modes and match catalog SHA-256;
-`BUILD.tools` is runtime `BUILD`, not Bazel's source-tree BUILD. A
-single-path Git whitespace attribute preserves its upstream blank EOF line
-without changing bytes or weakening checks on other files. An
-ignored-RC/no-fetch Bazel 9.2 `query @bazel_tools//tools/python:all`
-reported the eight selected rule names/kinds; direct private-export Query
-reported a source file in the parent package. Six exact Bzlmod integration,
-four Bzlmod library and four Loading library focused/protected tests passed
-after Cargo JSON `--no-run` builds and exact nonignored preflight. Those
-tests cover catalog bytes/modes, sorted listing, Slug-native manifest hash,
-package marker/subtree boundaries, all eight rule targets and six parent
-exports. Direct Bzlmod/Loading checks, rebuilt CLI, pinned rustfmt,
-diff hygiene, plan/archive checks and post-smoke `slugd` absence pass.
+Independent DESIGN and FINAL reviews ACCEPT the bounded exact metadata
+slice. Stage 5 projects evaluated declared name/normalized version from
+tracked root/selected module owners, not selected lookup or repository
+spelling; existing structural route equality remains complete and route
+hashing includes the borrowed declaration. Stage 4 reads that caller BUILD
+context for bare globals and loaded-macro `native` methods. Wrong-context
+bindings and generated/direct-local/builtin calls fail closed. Root package
+Loading and selected-canonical nonregistry route tests prove same-DICE
+A/B/A declaration invalidation/restoration; selected-registry
+apparent/canonical agreement, context/arity and mapping controls pass.
+The nonregistry proof is route-level, not public package-loading parity.
 
-Before ingress, an isolated Slug exact-target Query failed with the missing
-`@@bazel_tools//tools/python` BUILD error; after rebuilding, the same Query
-returned `_python_version_flag rule`. Slug's external `:all` Query pattern
-remains deferred; the Loading test proves the complete selected inventory.
-The normalized-PATH authentic `//:probe` replay first reported missing
-`module_version()` at `@@platforms//:BUILD:21`. Parallel loading does not
-prove the WP832 rules_python constructor path executed. A scratch root
-`construct_config_settings` Build ended at `analysis_not_implemented`, so it
-is inconclusive and not counted as constructor evidence. This packet took
-roughly 25 minutes wall time, with source research and review overlapping
-implementation; the authentic replay took about 35 seconds. Complete
-Python/root bootstrap and M7A remain open.
+The five-row, seven-file offline fixture passes fresh ignored-RC Bazel 9.2
+generation, independent Bazel verification and rebuilt Slug replay. Its
+exact-target names distinguish root BUILD globals from a foreign loaded
+macro's caller across a version A→empty→A edit; authentic selected-module
+purls and pinned source support the nonroot boundary. The required Stage 1
+fixture-growth checkpoint is ACCEPT with explicit weak-row debt. Pinned
+rustfmt, dependent checks, diff/plan/archive hygiene and `slugd` cleanup
+pass. Rebuilt authentic `//:probe` moves past `@@platforms//:BUILD:21` and
+first stops inside `@@package_metadata+//licenses/rules:license.bzl:106`:
+`license()` rejects `visibility` as not a list of labels. Parallel Loading
+does not establish that every other path completed. That separate Loading
+gap, public direct-local/generated/builtin metadata, full root build and
+M7A remain open.

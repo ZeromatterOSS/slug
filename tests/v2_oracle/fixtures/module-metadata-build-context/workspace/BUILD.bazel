@@ -1,0 +1,10 @@
+load("@dep//:macro.bzl", "emit")
+
+filegroup(
+    name = "direct_%s_%s" % (
+        module_name(),
+        module_version().replace(".", "_") or "empty",
+    ),
+)
+
+emit()

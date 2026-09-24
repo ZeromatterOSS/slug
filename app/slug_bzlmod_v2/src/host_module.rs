@@ -805,6 +805,24 @@ impl fmt::Debug for RootModuleLoadingAnchor {
 }
 
 impl RootModuleLoadingAnchor {
+    /// Declared module identity for a BUILD package in the root repository.
+    /// The root MODULE file may omit `module()` entirely.
+    pub fn associated_module_metadata(&self) -> (&str, &str) {
+        let module = &self
+            .carrier
+            .as_ref()
+            .as_ref()
+            .expect("root module loading anchor retains a successful carrier")
+            .module;
+        match module.header.as_ref() {
+            Some(header) => (
+                header.name.as_str(),
+                header.version.as_deref().unwrap_or(""),
+            ),
+            None => ("", ""),
+        }
+    }
+
     pub fn registrations(&self) -> &RootModuleRegistrations {
         &self
             .carrier
@@ -1221,6 +1239,10 @@ fn hash_repo_spec<H: Hasher>(spec: &RepoSpec, state: &mut H) {
 
 impl Hash for SelectedRegistryRepositoryRoute {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        self.definition
+            .view()
+            .associated_module_metadata()
+            .hash(state);
         hash_repo_spec(&self.repo_spec, state);
         self.local_path_policy.hash(state);
         self.mapping.hash(state);
@@ -1348,6 +1370,20 @@ impl RootRepositoryRoute {
 
     pub fn module_name(&self) -> &str {
         self.module_name.as_str()
+    }
+
+    /// The selected module's evaluated declaration, not its lookup key or
+    /// the apparent repository name. Other route kinds have no admitted
+    /// associated-module projection.
+    pub fn associated_module_metadata(&self) -> Option<(&str, &str)> {
+        match &self.source {
+            RootRepositorySource::SelectedRegistry(route) => {
+                Some(route.definition.view().associated_module_metadata())
+            }
+            RootRepositorySource::DirectLocal(_)
+            | RootRepositorySource::BuiltinBazelTools(_)
+            | RootRepositorySource::Generated { .. } => None,
+        }
     }
 
     pub fn workspace(&self) -> &NormalizedAbsolutePath {
@@ -2840,6 +2876,36 @@ mod tests {
     }
 
     #[test]
+    fn loading_anchor_projects_declared_root_metadata_and_empty_defaults() {
+        let anchor = |value| RootModuleLoadingAnchor {
+            carrier: Arc::new(Ok(value)),
+        };
+        assert_eq!(anchor(empty_value()).associated_module_metadata(), ("", ""));
+
+        let mut versioned = empty_value();
+        versioned.module.header = Some(crate::module_eval::RootModuleHeader {
+            name: "root".into(),
+            version: Some("1.2".into()),
+            repo_name: None,
+        });
+        assert_eq!(
+            anchor(versioned).associated_module_metadata(),
+            ("root", "1.2")
+        );
+
+        let mut unversioned = empty_value();
+        unversioned.module.header = Some(crate::module_eval::RootModuleHeader {
+            name: "root".into(),
+            version: None,
+            repo_name: None,
+        });
+        assert_eq!(
+            anchor(unversioned).associated_module_metadata(),
+            ("root", "")
+        );
+    }
+
+    #[test]
     fn loading_anchor_identity_equality_and_opacity_are_exact() {
         let key = RootModuleLoadingAnchorKey::new(workspace());
         assert_eq!(key, RootModuleLoadingAnchorKey::new(workspace()));
@@ -2909,6 +2975,7 @@ mod tests {
         let route = route.as_ref().as_ref().unwrap();
         assert_eq!(route.apparent_repo().as_str(), "dep_alias");
         assert_eq!(route.module_name(), "dep");
+        assert_eq!(route.associated_module_metadata(), None);
         assert_eq!(route.canonical_repo().as_str(), "dep+");
         assert_eq!(route.workspace(), &workspace());
         let hash = |route: &super::RootRepositoryRoute| {
@@ -3409,6 +3476,7 @@ mod tests {
         let other_workspace = RootRepositoryRoute::builtin_for_test(
             NormalizedAbsolutePath::new("/other-workspace").unwrap(),
         );
+        assert_eq!(other_workspace.associated_module_metadata(), None);
         assert_ne!(first, other_workspace);
         assert_eq!(first.source(), other_workspace.source());
     }

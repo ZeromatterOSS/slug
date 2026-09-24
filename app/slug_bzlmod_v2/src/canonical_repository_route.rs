@@ -222,6 +222,18 @@ impl<'a> HostCanonicalRepositoryRouteView<'a> {
         }
     }
 
+    /// Module declaration associated with a selected repository. Builtin and
+    /// generated routes need separate provenance before exposing this value.
+    pub fn associated_module_metadata(self) -> Option<(&'a str, &'a str)> {
+        match &self.route.source {
+            HostCanonicalRepositoryRouteSource::Selected(definition) => {
+                Some(definition.view().associated_module_metadata())
+            }
+            HostCanonicalRepositoryRouteSource::Builtin(_)
+            | HostCanonicalRepositoryRouteSource::Generated(_) => None,
+        }
+    }
+
     pub fn workspace(self) -> &'a NormalizedAbsolutePath {
         &self.route.workspace
     }
@@ -358,6 +370,7 @@ impl Hash for HostCanonicalRepositoryRoute {
             }
             HostCanonicalRepositoryRouteSource::Selected(definition) => {
                 let view = definition.view();
+                view.associated_module_metadata().hash(state);
                 view.local_path_policy().hash(state);
                 if let Some(spec) = view.repo_spec() {
                     hash_repo_spec(spec, state);
@@ -381,12 +394,19 @@ mod tests {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::Hash;
     use std::hash::Hasher;
+    use std::sync::Arc;
 
+    use slug_identity_v2::CanonicalLabel;
+    use slug_identity_v2::CanonicalRepoName;
     use slug_workspace_v2::NormalizedAbsolutePath;
+    use starlark_map::small_map::SmallMap;
 
     use super::HostCanonicalRepositoryRoute;
     use super::HostCanonicalRepositoryRouteKind;
     use crate::HostBuiltinBazelToolsRepositoryMapping;
+    use crate::HostSelectedExtensionOwner;
+    use crate::RepoRuleId;
+    use crate::RepoSpec;
 
     #[test]
     fn builtin_route_is_canonical_and_structural() {
@@ -410,6 +430,7 @@ mod tests {
         assert_eq!(first.view().canonical_repo().as_str(), "bazel_tools");
         assert_eq!(first.view().workspace(), &workspace);
         assert!(first.view().builtin_identity().is_some());
+        assert_eq!(first.view().associated_module_metadata(), None);
         assert!(first.view().generated_effect_seed().is_none());
         assert_eq!(first, warm);
         assert_ne!(first, other);
@@ -420,6 +441,33 @@ mod tests {
         };
         assert_eq!(digest(&first), digest(&warm));
         assert_ne!(digest(&first), digest(&other));
+    }
+
+    #[test]
+    fn generated_route_has_no_associated_module_metadata() {
+        let canonical_repo = CanonicalRepoName::new("generated+").unwrap();
+        let route = HostCanonicalRepositoryRoute::generated(
+            NormalizedAbsolutePath::new("/canonical-route").unwrap(),
+            canonical_repo.clone(),
+            Arc::new(HostSelectedExtensionOwner::testing("+extension")),
+            0,
+            "generated",
+            RepoSpec {
+                rule_id: RepoRuleId {
+                    bzl_file: CanonicalLabel::parse("@@//:repo.bzl").unwrap(),
+                    rule_name: "repo".into(),
+                },
+                attributes: Arc::new(SmallMap::new()),
+            },
+            canonical_repo,
+            SmallMap::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            route.view().kind(),
+            HostCanonicalRepositoryRouteKind::Generated
+        );
+        assert_eq!(route.view().associated_module_metadata(), None);
     }
 
     #[test]

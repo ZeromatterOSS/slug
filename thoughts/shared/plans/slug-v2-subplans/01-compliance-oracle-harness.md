@@ -1536,3 +1536,34 @@ definition loading, producer-local self/mapped recursive source views and a
 clean extension export. Harness normalization remains **Slug-native**. Actual
 rules_rust declarations/schemas/effects and Slug activation remain
 unsupported/deferred. The fixture is packet one after reset `3ac0a85b`.
+
+### Fixture-growth hygiene checkpoint (2026-09-24, WP834)
+
+Review from reset `3ac0a85b` through the WP834 candidate is ACCEPT. The
+physical fixture tree grows from 1,244 regular files/24 symlinks/46,109
+newline bytes to 1,402/24/89,581. The unchanged canonical payload adds 168
+logical files/1,424 lines at both ends, so logical totals grow from 1,412
+files/47,533 lines/959 command rows to 1,570/91,005/1,031:
++158 files, +43,472 lines and +72 rows. This crosses the +100-file and
++10,000-line triggers. The tracked path delta is 151 additions and four
+modifications; WP834 contributes seven new files/259 lines/five rows.
+Ignored `__pycache__` files are excluded.
+
+The 31-file `configured-cli-authentic` fixture accounts for 39,276 physical
+newline bytes, mostly seven mirrored archives and a registry metadata
+archive; its hash/size/URL manifest objects are consumed by offline assembly
+and source proof, with no generic command rows. New command rows retain
+distinct owner demands; the WP834 root/macro A→empty→A Query rows pass fresh
+Bazel generation, independent Bazel verification and rebuilt Slug replay.
+The duplicate-blob inventory rises from 115 groups/551 members to 122/596;
+new copies are attributed license texts, small source/build scaffolds and
+registry/archive MODULE pairs, not duplicate fixture TOML or oracle JSON.
+No empty new file, new symlink, materially prunable row or asset was found.
+Pruning allowlist and checkpoint-induced replay set are both none.
+
+Validation debt is explicit: 26 affected `message_shape` rows assert only
+exit status. In particular, two configured-dependency cqueries and five
+positive registration-pattern queries do not enforce their recorded output;
+their owning future packets must add focused shape assertions before citing
+those rows for topology or expansion. Other accepted evidence is unchanged.
+This checkpoint resets the fixture-growth trigger after WP834 acceptance.

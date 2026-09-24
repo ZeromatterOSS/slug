@@ -1396,6 +1396,7 @@ pub(crate) struct PackageRecorder {
     package: CompactString,
     package_identifier: PackageIdentifier,
     repository_mapping: PackageRecorderRepositoryMapping,
+    associated_module_metadata: Option<(CompactString, CompactString)>,
     bzl_call_sources: Option<Arc<[(CompactString, BzlModuleSourceProvenance)]>>,
     print_capture: Option<Rc<LoadingPrintCapture>>,
     state: RefCell<PackageState>,
@@ -1413,6 +1414,7 @@ impl PackageRecorder {
             ),
             package,
             repository_mapping: PackageRecorderRepositoryMapping::Legacy(Arc::from([])),
+            associated_module_metadata: None,
             bzl_call_sources: None,
             print_capture: None,
             state: RefCell::new(PackageState::default()),
@@ -1433,6 +1435,7 @@ impl PackageRecorder {
             package,
             package_identifier,
             repository_mapping: PackageRecorderRepositoryMapping::Complete(repository_mapping),
+            associated_module_metadata: None,
             bzl_call_sources: None,
             print_capture: None,
             state: RefCell::new(PackageState::default()),
@@ -1443,6 +1446,25 @@ impl PackageRecorder {
         self.state.borrow_mut().feature_defaults =
             crate::package_features::PackageFeatureDefaults::new(features);
         self
+    }
+
+    pub(crate) fn with_associated_module_metadata(
+        mut self,
+        metadata: Option<(CompactString, CompactString)>,
+    ) -> Self {
+        self.associated_module_metadata = metadata;
+        self
+    }
+
+    fn associated_module_metadata(&self) -> anyhow::Result<(&str, &str)> {
+        self.associated_module_metadata
+            .as_ref()
+            .map(|(name, version)| (name.as_str(), version.as_str()))
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "module_name() and module_version() are unsupported for this repository source"
+                )
+            })
     }
 
     pub(crate) fn with_bzl_call_sources(
@@ -10207,9 +10229,18 @@ fn select_globals(builder: &mut GlobalsBuilder) {
 struct NativeModule;
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct BzlNativeModule;
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct BzlmodNativeModule;
 
 impl fmt::Display for NativeModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("native")
+    }
+}
+
+impl fmt::Display for BzlNativeModule {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("native")
     }
@@ -10222,6 +10253,44 @@ impl fmt::Display for BzlmodNativeModule {
 }
 
 static NATIVE_METHODS: MethodsStatic = MethodsStatic::new();
+
+#[starlark_module]
+fn module_metadata_native_methods(builder: &mut MethodsBuilder) {
+    fn module_name<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<String> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        PackageRecorder::label_source_identity_for_call(eval)?;
+        Ok(recorder.associated_module_metadata()?.0.to_owned())
+    }
+
+    fn module_version<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<String> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        PackageRecorder::label_source_identity_for_call(eval)?;
+        Ok(recorder.associated_module_metadata()?.1.to_owned())
+    }
+}
+
+#[starlark_module]
+fn build_module_metadata_globals(builder: &mut GlobalsBuilder) {
+    fn module_name<'v>(eval: &mut Evaluator<'v, '_, '_>) -> anyhow::Result<String> {
+        Ok(PackageRecorder::from_evaluator(eval)?
+            .associated_module_metadata()?
+            .0
+            .to_owned())
+    }
+
+    fn module_version<'v>(eval: &mut Evaluator<'v, '_, '_>) -> anyhow::Result<String> {
+        Ok(PackageRecorder::from_evaluator(eval)?
+            .associated_module_metadata()?
+            .1
+            .to_owned())
+    }
+}
 
 fn genrule_global<'v>(
     name: &str,
@@ -10658,11 +10727,23 @@ impl<'v> StarlarkValue<'v> for NativeModule {
 }
 
 #[starlark_value(type = "native")]
+impl<'v> StarlarkValue<'v> for BzlNativeModule {
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(|builder| {
+            NATIVE_METHODS.populate(native_methods, builder);
+            module_metadata_native_methods(builder);
+        })
+    }
+}
+
+#[starlark_value(type = "native")]
 impl<'v> StarlarkValue<'v> for BzlmodNativeModule {
     fn get_methods() -> Option<&'static Methods> {
         static METHODS: MethodsStatic = MethodsStatic::new();
         METHODS.methods(|builder| {
             NATIVE_METHODS.populate(native_methods, builder);
+            module_metadata_native_methods(builder);
             builder.set_attribute(
                 "bazel_version",
                 BuiltinBazelToolsSnapshot::CURRENT.bazel_version(),
@@ -10673,6 +10754,12 @@ impl<'v> StarlarkValue<'v> for BzlmodNativeModule {
 }
 
 impl AllocFrozenValue for NativeModule {
+    fn alloc_frozen_value(self, heap: &FrozenHeap) -> FrozenValue {
+        heap.alloc_simple(self)
+    }
+}
+
+impl AllocFrozenValue for BzlNativeModule {
     fn alloc_frozen_value(self, heap: &FrozenHeap) -> FrozenValue {
         heap.alloc_simple(self)
     }
@@ -10787,6 +10874,8 @@ fn complete_loading_globals(
     LibraryExtension::Json.add(&mut globals);
     if bzlmod_native {
         globals.set("native", BzlmodNativeModule);
+    } else if bool_config {
+        globals.set("native", BzlNativeModule);
     } else {
         globals.set("native", NativeModule);
     }
@@ -10820,6 +10909,7 @@ fn complete_loading_globals(
     } else {
         globals.set("config", BuildFileConfigModule);
         build_genrule_globals(&mut globals);
+        build_module_metadata_globals(&mut globals);
     }
     globals.set("platform_common", PlatformCommonModule);
     globals.set("depset", AnalysisBuiltinCallable::new("depset"));

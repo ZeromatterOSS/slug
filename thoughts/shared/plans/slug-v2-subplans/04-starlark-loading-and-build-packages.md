@@ -9764,3 +9764,15 @@ missing `@@bazel_tools//tools/python` BUILD content and did not report WP831's
 constructor error, but parallel loading does not establish constructor-path
 passage. Native `config_feature_flag`, Starlark `config.label`, nested
 transport, complete Python/root bootstrap and M7A remain open.
+
+### BUILD module metadata accepted (WP834, 2026-09-24)
+
+Bazel 9.2 BUILD `module_name()` / `module_version()` and loaded-macro
+`native.module_*` read the calling package's tracked root/selected Bzlmod
+declaration. BUILD native methods, .bzl bare globals, top-level .bzl calls
+and direct MODULE bindings remain absent; generated/direct-local/builtin
+calls fail closed. Evaluator-scoped compact string copies do not become
+DICE-retained state. Root package A/B/A, selected-registry caller-context,
+negative-binding and unsupported-route tests pass, alongside five portable
+Bazel/Slug Query rows. The authentic replay advances to the separate
+`package_metadata` license visibility stop; complete root bootstrap is open.

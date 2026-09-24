@@ -689,6 +689,7 @@ struct ForceRootPackageObservationOuter(ObservedPathFrontierError);
 #[allow(dead_code)]
 struct HostPackageAttemptInput<'a> {
     repository_features: Arc<[CompactString]>,
+    associated_module_metadata: Option<(CompactString, CompactString)>,
     workspace: NormalizedAbsolutePath,
     logical_package_root: NormalizedAbsolutePath,
     package: PackagePath,
@@ -778,6 +779,7 @@ fn evaluate_host_package_attempt(
         input.package_identifier.clone(),
         repository_mapping,
     )
+    .with_associated_module_metadata(input.associated_module_metadata.clone())
     .with_repository_features(input.repository_features.dupe())
     .with_bzl_call_sources(package_bzl_call_sources(input.loaded_modules))
     .with_print_capture(print_capture.clone());
@@ -5832,14 +5834,19 @@ async fn compute_root_package(
         }
         SourcePreparationOutcome::Complete(Ok(value)) => value,
     };
-    if let Err(error) = anchor {
-        return root_package_driver_complete(
-            Err(RootPackageLoadError::new(
-                RootPackageLoadErrorInner::RootModule(error),
-            )),
-            observations,
-        );
-    }
+    let anchor = match anchor {
+        Ok(anchor) => anchor,
+        Err(error) => {
+            return root_package_driver_complete(
+                Err(RootPackageLoadError::new(
+                    RootPackageLoadErrorInner::RootModule(error),
+                )),
+                observations,
+            );
+        }
+    };
+    let (module_name, module_version) = anchor.associated_module_metadata();
+    let associated_module_metadata = Some((module_name.into(), module_version.into()));
 
     let source = match mode {
         HostPackageLoadMode::Legacy => host_dice_invariant(
@@ -6011,6 +6018,7 @@ async fn compute_root_package(
         ctx,
         HostPackageAttemptInput {
             repository_features: source.repository_features().dupe(),
+            associated_module_metadata,
             workspace: key.workspace.dupe(),
             logical_package_root: source.package_root().dupe(),
             package: key.package.clone(),
@@ -6811,6 +6819,13 @@ async fn evaluate_repository_package(
     };
     let input = HostPackageAttemptInput {
         repository_features: prepared.repository_features,
+        associated_module_metadata: match &key.route {
+            HostRepositorySourceRoute::Root(route) => route.associated_module_metadata(),
+            HostRepositorySourceRoute::Canonical(input) => {
+                input.view().route().view().associated_module_metadata()
+            }
+        }
+        .map(|(name, version)| (name.into(), version.into())),
         workspace: key.route.workspace().dupe(),
         logical_package_root,
         package: key.package.clone(),

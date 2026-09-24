@@ -513,6 +513,18 @@ this materialization stop and reaches protobuf's distinct `proto`
 configuration-fragment Loading boundary. Other archive modes/types and full
 repository/Loading closure remain deferred; M7A is partial.
 
+### Associated module declaration projection accepted (WP834, 2026-09-24)
+
+The root Loading anchor and selected canonical/selected-registry routes
+expose borrowed evaluated declared name/version to caller BUILD Loading.
+The selected nonregistry declaration may differ from its empty lookup-key
+version; route equality retains the whole definition and hash projections
+include the declaration. Same-DICE selected nonregistry A/B/A and
+selected-registry apparent/canonical tests pass. Generated, direct-local and
+builtin routes project no admitted metadata; no new key, source read or
+retained owner is introduced. Public nonregistry package-loading parity is
+not claimed by this route proof.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

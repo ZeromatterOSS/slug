@@ -3028,6 +3028,25 @@ impl<'a> HostCanonicalSelectedModuleDefinitionView<'a> {
     pub fn kind(self) -> HostCanonicalSelectedModuleKind {
         self.kind
     }
+
+    /// The module's evaluated declaration can differ from its selected
+    /// lookup key, particularly for a nonregistry override.
+    pub fn associated_module_metadata(self) -> (&'a str, &'a str) {
+        match &self.route.entry.source {
+            HostGraphModuleSource::Root(module) => match module.header.as_ref() {
+                Some(header) => (
+                    header.name.as_str(),
+                    header.version.as_deref().unwrap_or(""),
+                ),
+                None => ("", ""),
+            },
+            HostGraphModuleSource::Discovered(module) => (
+                module.module.base.declared_name.as_str(),
+                module.module.base.declared_version.as_str(),
+            ),
+        }
+    }
+
     pub fn identity(self) -> HostCanonicalSelectedModuleIdentity<'a> {
         match &self.route.entry.key {
             HostGraphModuleKey::Root => HostCanonicalSelectedModuleIdentity::Root,
@@ -10031,6 +10050,84 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn nonregistry_declared_version_invalidates_selected_canonical_metadata() {
+        const ROOT: &str = "module(name='bazel_tools')\n\
+            local_path_override(module_name='local', path='local')\n\
+            bazel_dep(name='local', version='1')\n";
+        const LOCAL_A: &str = "module(name='local', version='1')\n\
+            p=use_extension('//:local.bzl','shared')\n\
+            use_repo(p,'generated')\n";
+        const LOCAL_B: &str = "module(name='local', version='2')\n\
+            p=use_extension('//:local.bzl','shared')\n\
+            use_repo(p,'generated')\n";
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let canonical = CanonicalRepoName::new("local+").unwrap();
+        let observed_key = HostCanonicalSelectedModuleDefinitionObservationKey::new(
+            workspace.dupe(),
+            canonical.clone(),
+        );
+        let legacy_key = HostCanonicalSelectedModuleDefinitionKey::new(workspace.dupe(), canonical);
+        let mut transaction = real_transaction(&dice, ROOT, 1, &[], true).await;
+        let mut selected = Vec::new();
+        let mut routes = Vec::new();
+        let mut observed_values = Vec::new();
+        for (declared, expected) in [(LOCAL_A, "1"), (LOCAL_B, "2"), (LOCAL_A, "1")] {
+            let mut updater = transaction.into_updater();
+            updater
+                .changed_to(vec![(
+                    PathObservationEpochKey,
+                    host_epoch(ROOT, Some(declared)),
+                )])
+                .unwrap();
+            transaction = updater.commit().await;
+            let observed = complete_observed_selected_definition(
+                &transaction.compute(&observed_key).await.unwrap(),
+            );
+            let legacy = transaction.compute(&legacy_key).await.unwrap();
+            let SourcePreparationOutcome::Complete(legacy) = legacy else {
+                panic!("nonregistry selected definition must complete");
+            };
+            assert_eq!(observed.result(), &legacy);
+            let definition = observed.result().as_ref().as_ref().unwrap().clone();
+            assert_eq!(
+                definition.view().kind(),
+                HostCanonicalSelectedModuleKind::SelectedNonregistry
+            );
+            assert!(matches!(
+                definition.view().identity(),
+                HostCanonicalSelectedModuleIdentity::Module {
+                    normalized_version: "",
+                    ..
+                }
+            ));
+            assert_eq!(
+                definition.view().associated_module_metadata(),
+                ("local", expected)
+            );
+            let route = crate::HostCanonicalRepositoryRoute::from_selected(
+                workspace.dupe(),
+                definition.clone(),
+            );
+            assert_eq!(
+                route.view().associated_module_metadata(),
+                Some(("local", expected))
+            );
+            let global = transaction.compute(&PathObservationEpochKey).await.unwrap();
+            assert_selected_epoch_subset(&observed, &global);
+            selected.push(definition);
+            routes.push(route);
+            observed_values.push(observed);
+        }
+        assert_ne!(selected[0], selected[1]);
+        assert_eq!(selected[0], selected[2]);
+        assert_ne!(routes[0], routes[1]);
+        assert_eq!(routes[0], routes[2]);
+        assert_ne!(observed_values[0].result(), observed_values[1].result());
+        assert_eq!(observed_values[0].result(), observed_values[2].result());
+    }
+
+    #[tokio::test]
     async fn real_canonical_selected_definition_classifies_and_reuses() {
         const MODULE_URL: &str = "https://registry.invalid/modules/dep/1/MODULE.bazel";
         const MODULE_2_URL: &str = "https://registry.invalid/modules/dep/2/MODULE.bazel";
@@ -10075,6 +10172,16 @@ mod tests {
             panic!("root definition must complete")
         };
         let root_value = root_value.as_ref().as_ref().unwrap();
+        assert_eq!(root_value.view().associated_module_metadata(), ("root", ""));
+        assert_eq!(
+            crate::HostCanonicalRepositoryRoute::from_selected(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                root_value.clone(),
+            )
+            .view()
+            .associated_module_metadata(),
+            Some(("root", ""))
+        );
         assert_external_error::<crate::HostCanonicalSelectedModuleDefinitionError>();
         let root_snapshot = external_style_snapshot(root_value);
         assert_eq!(root_snapshot.kind, HostCanonicalSelectedModuleKind::Root);
@@ -10113,6 +10220,25 @@ mod tests {
         };
         let registry = registry.as_ref().as_ref().unwrap();
         let registry_view = registry.view();
+        assert_eq!(registry_view.associated_module_metadata(), ("dep", "1"));
+        assert_eq!(
+            crate::HostCanonicalRepositoryRoute::from_selected(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                registry.clone(),
+            )
+            .view()
+            .associated_module_metadata(),
+            Some(("dep", "1"))
+        );
+        let apparent = crate::RootRepositoryRoute::for_selected_extension_definition(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            &HostSelectedExtensionDefinitionSource::Selected {
+                definition: registry.clone(),
+                apparent_repo: ApparentRepoName::new("dep_alias").unwrap(),
+            },
+        )
+        .unwrap();
+        assert_eq!(apparent.associated_module_metadata(), Some(("dep", "1")));
         assert_eq!(
             registry_view.kind(),
             HostCanonicalSelectedModuleKind::SelectedRegistry
@@ -10143,6 +10269,48 @@ mod tests {
             panic!("nonregistry definition must complete")
         };
         let local = local.as_ref().as_ref().unwrap();
+        assert_eq!(local.view().associated_module_metadata(), ("local", ""));
+        assert_eq!(
+            crate::HostCanonicalRepositoryRoute::from_selected(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                local.clone(),
+            )
+            .view()
+            .associated_module_metadata(),
+            Some(("local", ""))
+        );
+        let mut changed = local.clone();
+        let routes = changed.routes.as_ref().as_ref().unwrap();
+        let mut entries = routes.entries.to_vec();
+        let HostGraphModuleSource::Discovered(module) = &mut entries[changed.ordinal].entry.source
+        else {
+            panic!("nonregistry route must retain its evaluated module")
+        };
+        Arc::make_mut(module).module.base.declared_version = "2".into();
+        let extension_projection = routes.extension_projection.clone();
+        changed.routes = Arc::new(Ok(HostSelectedModuleRoutes {
+            entries: entries.into(),
+            extension_projection,
+        }));
+        assert!(matches!(
+            changed.view().identity(),
+            HostCanonicalSelectedModuleIdentity::Module {
+                normalized_version: "",
+                ..
+            }
+        ));
+        assert_eq!(changed.view().associated_module_metadata(), ("local", "2"));
+        assert_ne!(local, &changed);
+        let route_hash = |definition: HostCanonicalSelectedModuleDefinition| {
+            let route = crate::HostCanonicalRepositoryRoute::from_selected(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                definition,
+            );
+            let mut state = DefaultHasher::new();
+            route.hash(&mut state);
+            state.finish()
+        };
+        assert_ne!(route_hash(local.clone()), route_hash(changed));
         let local_snapshot = external_style_snapshot(local);
         assert_eq!(
             local_snapshot.kind,
@@ -10256,6 +10424,46 @@ mod tests {
         assert!(HostCanonicalSelectedModuleDefinitionKey::equality(
             &mapping_a, &version_a
         ));
+        let registry_projection = |value: &HostCanonicalSelectedModuleDefinitionOutcome| {
+            let SourcePreparationOutcome::Complete(value) = value else {
+                panic!("registry selected definition must complete");
+            };
+            let definition = value.as_ref().as_ref().unwrap().clone();
+            let canonical = crate::HostCanonicalRepositoryRoute::from_selected(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                definition.clone(),
+            );
+            let apparent = crate::RootRepositoryRoute::for_selected_extension_definition(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                &HostSelectedExtensionDefinitionSource::Selected {
+                    definition,
+                    apparent_repo: ApparentRepoName::new("dep_alias").unwrap(),
+                },
+            )
+            .unwrap();
+            (canonical, apparent)
+        };
+        let registry_a = registry_projection(&mapping_a);
+        let registry_b = registry_projection(&version_b);
+        let registry_restored = registry_projection(&version_a);
+        assert_eq!(
+            registry_a.0.view().associated_module_metadata(),
+            Some(("dep", "1"))
+        );
+        assert_eq!(
+            registry_a.1.associated_module_metadata(),
+            Some(("dep", "1"))
+        );
+        assert_eq!(
+            registry_b.0.view().associated_module_metadata(),
+            Some(("dep", "2"))
+        );
+        assert_eq!(
+            registry_b.1.associated_module_metadata(),
+            Some(("dep", "2"))
+        );
+        assert_ne!(registry_a, registry_b);
+        assert_eq!(registry_a, registry_restored);
 
         let local_a = compute_real_selected_definition(&dice, &root, 7, "local+", true).await;
         let local_b = compute_real_selected_definition(

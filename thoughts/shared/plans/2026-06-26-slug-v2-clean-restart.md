@@ -29,18 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-133-m7a-builtin-python-package-source-r1
+Packet: WP-7-134-m7a-build-module-metadata-r1
 Status: ACCEPTED; M7A remains partial
 
-WP833 accepts the exact selected seven-file Bazel 9.2 runtime source/Loading
-slice for `@@bazel_tools//tools/python`, using Stage 5's immutable catalog
-and runtime `BUILD.tools`-to-BUILD mapping. Fourteen focused/protected tests
-and independent DESIGN/FINAL reviews pass; isolated exact-target Slug Query
-now resolves `python_version`. The authentic `//:probe` replay first reports
-missing `module_version()` in `@@platforms//:BUILD:21`, without proving every
-parallel rules_python path completed. The broader embedded Python archive,
-configured Python behavior, full root build and M7A remain open. WP832 is
-`e054b08f5`.
+WP834 accepts exact Bazel 9.2 BUILD `module_name()` / `module_version()`
+and loaded-macro `native.module_*` values for root and selected Bzlmod
+module repositories. Stage 5 projects evaluated declarations from tracked
+selected routes/root anchor into the caller BUILD package context. Five
+portable oracle rows pass fresh Bazel 9.2 generation, independent Bazel
+verification and rebuilt Slug replay; focused DICE/context/fail-closed
+tests and independent DESIGN/FINAL reviews pass. The authentic `//:probe`
+advances beyond `@@platforms` 1.1.0 `BUILD:21` and first stops in the
+separate `package_metadata` `license()` visibility boundary. Generated,
+direct-local and builtin metadata, full Python/root bootstrap and M7A
+remain open. WP833 is `6a9a0960f`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

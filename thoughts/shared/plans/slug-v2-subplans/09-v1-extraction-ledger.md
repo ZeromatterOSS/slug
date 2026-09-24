@@ -2912,3 +2912,11 @@ existing Arc/Dupe/Allocative ownership and equality. The cold source-catalog
 ingress does not warrant a benchmark. Byte/mode, listing, route identity,
 parent-package Loading and direct Query regressions cover the boundary;
 broader embedded Python files remain deferred.
+
+WP834 reuses retained root-anchor and selected-route Arc/Dupe/Allocative
+owners and existing compact strings. The route Hash projections now include
+borrowed declared module metadata already covered by structural Eq; no new
+retained collection, interner, cache, DICE key, lock, digest or V1/Buck2
+import is needed. Stage 4 makes only evaluator-scoped compact-string copies
+and ordinary returned strings. This cold Loading projection does not warrant
+a benchmark; focused A/B/A, caller-context and fail-closed tests cover it.

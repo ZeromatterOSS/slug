@@ -83,6 +83,7 @@ impl Key for HostPackageAttemptTestKey {
             ctx,
             HostPackageAttemptInput {
                 repository_features: Arc::from(["repo".into()]),
+                associated_module_metadata: Some(("root".into(), "".into())),
                 workspace: path("/workspace"),
                 logical_package_root: path("/workspace"),
                 package: self.package.clone(),
@@ -107,6 +108,89 @@ impl Key for HostPackageAttemptTestKey {
 
     fn validity(value: &Self::Value) -> bool {
         value.is_complete()
+    }
+}
+
+#[test]
+fn build_module_metadata_accepts_empty_root_projection() {
+    let package = PackagePath::parse("pkg").unwrap();
+    let input = HostPackageAttemptInput {
+        repository_features: Arc::from([]),
+        associated_module_metadata: Some(("".into(), "".into())),
+        workspace: path("/workspace"),
+        logical_package_root: path("/workspace"),
+        package: package.clone(),
+        package_identifier: PackageIdentifier::new(CanonicalRepoName::root(), package.clone()),
+        package_dir: package_dir(&package),
+        build_file: package_dir(&package).join("BUILD.bazel"),
+        source: Arc::new(
+            "filegroup(name='empty_' + module_name() + module_version())\n".to_owned(),
+        ),
+        package_label: package.as_str().into(),
+        loaded_modules: &[],
+        capture_events: false,
+    };
+    let HostPackageAttemptStep::Terminal(terminal) = evaluate_host_package_attempt(
+        &input,
+        Arc::new(SmallMap::new()),
+        Arc::new(RunfilesRepositoryMapping::empty()),
+    ) else {
+        panic!("BUILD module metadata must not request a glob");
+    };
+    let loaded = terminal.result.unwrap();
+    assert_eq!(
+        loaded
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["empty_"]
+    );
+}
+
+#[test]
+fn build_module_metadata_calls_fail_closed_for_generated_and_builtin_repositories() {
+    // Generated and builtin routes project no associated module metadata. Keep
+    // both BUILD globals callable, but reject their use rather than treating
+    // the absent declaration as an empty name or version.
+    for repository in ["+extension+generated", "bazel_tools"] {
+        for call in ["module_name()", "module_version()"] {
+            let package = PackagePath::root();
+            let input = HostPackageAttemptInput {
+                repository_features: Arc::from([]),
+                associated_module_metadata: None,
+                workspace: path("/workspace"),
+                logical_package_root: path("/workspace"),
+                package: package.clone(),
+                package_identifier: PackageIdentifier::new(
+                    CanonicalRepoName::new(repository).unwrap(),
+                    package.clone(),
+                ),
+                package_dir: PathBuf::from("/workspace"),
+                build_file: PathBuf::from("/workspace/BUILD.bazel"),
+                source: Arc::new(format!("filegroup(name={call})\n")),
+                package_label: package.as_str().into(),
+                loaded_modules: &[],
+                capture_events: false,
+            };
+            let HostPackageAttemptStep::Terminal(terminal) = evaluate_host_package_attempt(
+                &input,
+                Arc::new(SmallMap::new()),
+                Arc::new(RunfilesRepositoryMapping::empty()),
+            ) else {
+                panic!("metadata call must terminate without requesting a glob");
+            };
+            let Err(HostPackageAttemptError::Loading(error)) = terminal.result else {
+                panic!("{repository} {call} must fail closed");
+            };
+            assert!(
+                error
+                    .message
+                    .contains("unsupported for this repository source"),
+                "{repository} {call}: {}",
+                error.message
+            );
+        }
     }
 }
 

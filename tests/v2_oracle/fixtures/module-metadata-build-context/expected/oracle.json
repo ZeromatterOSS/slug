@@ -1,0 +1,176 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "//:direct_root_3_4_5",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:direct_root_3_4_5",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "root_build_globals",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:direct_root_3_4_5",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//:direct_root_3_4_5\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:macro_root_3_4_5",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:macro_root_3_4_5",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "root_macro_uses_caller",
+      "normalized_stderr": "Loading: 0 packages loaded",
+      "normalized_stdout": "//:macro_root_3_4_5",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\n",
+      "stdout": "//:macro_root_3_4_5\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:direct_root_empty",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:direct_root_empty",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "version = \"3.4.5\"",
+          "old_digest_hint": "138",
+          "path": "MODULE.bazel",
+          "replace": "version = \"\""
+        }
+      ],
+      "name": "root_empty_version",
+      "normalized_stderr": "no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:direct_root_empty",
+      "startup_argv": [],
+      "stderr": " no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//:direct_root_empty\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:macro_root_empty",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:macro_root_empty",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "root_macro_empty_version",
+      "normalized_stderr": "Loading: 0 packages loaded",
+      "normalized_stdout": "//:macro_root_empty",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\n",
+      "stdout": "//:macro_root_empty\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:direct_root_3_4_5",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:direct_root_3_4_5",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "version = \"\"",
+          "old_digest_hint": "133",
+          "path": "MODULE.bazel",
+          "replace": "version = \"3.4.5\""
+        }
+      ],
+      "name": "root_version_restored",
+      "normalized_stderr": "no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:direct_root_3_4_5",
+      "startup_argv": [],
+      "stderr": " no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//:direct_root_3_4_5\n"
+    }
+  ],
+  "fixture": "module-metadata-build-context",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
