@@ -7243,10 +7243,18 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] allow_rules: Option<Value<'v>>,
         #[starlark(require = named)] providers: Option<Value<'v>>,
         #[starlark(require = named)] cfg: Option<Value<'v>>,
+        #[starlark(require = named)] aspects: Option<Value<'v>>,
         #[starlark(require = named)] flags: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         discard_attribute_doc(doc)?;
+        if let Some(aspects) = aspects {
+            let aspects = ListRef::from_value(aspects)
+                .ok_or_else(|| anyhow::anyhow!("label_keyed_string_dict aspects must be a list"))?;
+            if !aspects.is_empty() {
+                anyhow::bail!("nonempty label_keyed_string_dict aspects are unsupported");
+            }
+        }
         let mut definition = attribute_definition_before_later_properties(
             AttributeKind::LabelKeyedStringDict,
             mandatory.unwrap_or(false),

@@ -9537,3 +9537,18 @@ pass, Core/CLI compile and the CLI rebuild succeed, and the authentic build
 clears the prior cardinality stop. It now stops separately on
 `attr.label_keyed_string_dict(aspects=[])` in rules_python. Broader attr-family
 aspects, configured aspect traversal and M7A close remain deferred.
+
+### Empty label-keyed dictionary aspects accepted (2026-09-24)
+
+WP818 adds the named `aspects` argument only to Loading's
+`attr.label_keyed_string_dict` and accepts literal `[]` as no attached aspect,
+matching Bazel 9.2's default-empty sequence and zero-iteration factory.
+Nonempty input fails closed rather than being discarded; direct `None` and
+wrong types remain errors. The existing frozen schema keeps
+`attached_aspect=None`; dictionary default, provider and label-coercion
+behavior is unchanged. No DICE key, retained representation, cache or lock
+changes. A pre-fix exact regression failed, then four selected Loading tests,
+Core/CLI compile and the CLI rebuild passed. The authentic build clears this
+keyword stop and next fails separately on `attr.label(aspects=[])` in
+rules_python. Nonempty dictionary-key aspects, configured propagation and
+M7A close remain deferred.

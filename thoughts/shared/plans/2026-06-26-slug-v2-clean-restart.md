@@ -29,15 +29,15 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-117-m7a-label-list-empty-aspects-r1
+Packet: WP-7-118-m7a-label-keyed-dict-empty-aspects-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP817 admits empty `attr.label_list(aspects=[])` as zero attached aspects,
-matching Bazel 9.2; the four selected Loading tests, Core/CLI compile and
-rebuilt authentic smoke pass the previous cardinality stop. The smoke now
-stops separately at `attr.label_keyed_string_dict(aspects=[])` in rules_python.
-The prior cardinality diagnostic alone did not establish multiple aspects.
-WP816 was accepted at `0f832b895`; multi-aspect behavior, Python-helper
+WP818 admits rules_python's forwarded empty `aspects=[]` on
+`attr.label_keyed_string_dict` as zero attached aspects. Pinned Bazel 9.2
+source and offline query/build oracle establish omission equivalence; four
+focused/protected tests and the rebuilt authentic smoke clear the keyword
+stop. The next independent stop is `attr.label(aspects=[])`. WP817 was
+accepted at `a89845c02`; nonempty dictionary-key aspects, Python-helper
 invocation and M7A close remain deferred.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

@@ -33349,6 +33349,38 @@ fn rustfmt_test_aspect_rejects_invalid_provides_shapes() {
 }
 
 #[test]
+fn rustfmt_test_label_keyed_string_dict_empty_aspects() {
+    for arguments in ["", "aspects=[]"] {
+        let source = format!(
+            "def impl(ctx): return []\nR=rule(implementation=impl, attrs={{'values': attr.label_keyed_string_dict({arguments})}})"
+        );
+        let module = eval_global(&source, &loading_globals()).unwrap();
+        let rule = module
+            .get("R")
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        assert!(
+            rule.schema
+                .iter()
+                .find(|schema| schema.name == "values")
+                .unwrap()
+                .attached_aspect
+                .is_none(),
+            "{source}"
+        );
+    }
+    for source in [
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'values': attr.label_keyed_string_dict(aspects=None)})",
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'values': attr.label_keyed_string_dict(aspects=1)})",
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'values': attr.label_keyed_string_dict(aspects=['not an aspect'])})",
+        "def aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'values': attr.label_keyed_string_dict(aspects=[A])})",
+    ] {
+        assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
+    }
+}
+
+#[test]
 fn rustfmt_test_rule_validates_admitted_dependency_schemas() {
     eval_global(
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(doc=None)})",
