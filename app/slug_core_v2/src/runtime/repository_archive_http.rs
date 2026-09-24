@@ -292,6 +292,26 @@ pub(super) fn capture_selected_bcr(
     capture_selected_bcr_with(plan, runtime, active, &environment)
 }
 
+/// Capture one SHA-pinned generated-repository archive without retaining its
+/// bytes in the DICE effect plan. The caller owns the returned temporary file.
+pub(super) fn capture_selected_generated_archive(
+    urls: &[String],
+    sha256: [u8; 32],
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    let environment = NativeEnvironment::new();
+    capture_urls(
+        urls,
+        sha256,
+        environment.limits().capture_bytes,
+        "generated archive",
+        runtime,
+        active,
+        &environment,
+    )
+}
+
 fn capture_selected_bcr_with(
     plan: &SelectedBcrArchive,
     runtime: &tokio::runtime::Runtime,

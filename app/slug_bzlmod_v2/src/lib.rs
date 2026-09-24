@@ -85,6 +85,12 @@ pub use dice::digest_registry_source_specs;
 pub use dice::digest_repo_mapping_entries;
 pub use dice::digest_repo_mappings;
 #[doc(hidden)]
+pub use generated_repository_file_effect::GeneratedRepositoryArchiveEffect;
+#[doc(hidden)]
+pub use generated_repository_file_effect::GeneratedRepositoryArchiveFormat;
+#[doc(hidden)]
+pub use generated_repository_file_effect::GeneratedRepositoryArchiveOutput;
+#[doc(hidden)]
 pub use generated_repository_file_effect::GeneratedRepositoryFileEffect;
 #[doc(hidden)]
 pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlan;
@@ -92,6 +98,12 @@ pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlan;
 pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlanBuilder;
 #[doc(hidden)]
 pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlanError;
+#[doc(hidden)]
+pub use generated_repository_file_effect::GeneratedRepositoryOrderedEffectRef;
+#[doc(hidden)]
+pub use generated_repository_file_effect::generated_repository_archive_sha256_hex;
+#[doc(hidden)]
+pub use generated_repository_file_effect::generated_repository_archive_sha256_sri;
 pub use host_external_package_boundary::HostExternalPackageBoundary;
 pub use host_external_package_boundary::HostExternalPackageBoundaryError;
 pub use host_external_package_boundary::HostExternalPackageBoundaryKey;

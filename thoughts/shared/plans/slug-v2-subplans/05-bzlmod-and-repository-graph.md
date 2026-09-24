@@ -424,6 +424,26 @@ compile/preparation and 12-second/15-second absolute runtime limits. This
 accepted capture contract does not prove the complete CLI source closure or
 combined R2 sharing gates.
 
+### Selected generated archive effects (WP796)
+
+The authenticated `rust_toolchain_tools_repository` definition in pinned
+rules_rust 0.73.0 may publish the six audited Linux x86_64 host-tools
+`download_and_extract` intents only in their exact URL/SHA/stripPrefix order,
+followed by final file effects. The selected DICE owner validates that ordered
+shape before publishing its structural plan. Core captures each archive into
+SHA-verified bounded scratch, streams XZ/TAR into one provisional root,
+applies Bazel-compatible regular-file overwrite and executable mode, then
+publishes only after every effect succeeds. Archive URL/order/SHA/prefix and
+final file bytes/modes belong to structural source identity; captured bytes and
+temporary roots do not enter DICE. Unknown generated-path observations,
+unaudited entries, auth and changed source tuples fail closed. The selected
+rule's 18-key fallback reproducibility dictionary is validated and discarded
+as a Slug-native metadata branch; Bazel 9.2 `repo_metadata` and its cache
+semantics are not admitted. An innate `use_repo_rule` source-authentic smoke
+reaches materialization, while the original module-extension route remains
+blocked by OS/architecture-dependent factors and the generated BUILD later
+stops at `iso_date=None` Loading.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

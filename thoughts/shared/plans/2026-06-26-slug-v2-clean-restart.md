@@ -29,24 +29,25 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-95-m7a-selected-repository-host-path-exists-r1
-Status: FINAL ACCEPT for bounded path/environment behavior; root archive reachability deferred
+Packet: WP-7-96-m7a-selected-rust-host-tools-archive-effects-r1
+Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP795 selects the prerequisite absolute host-path existence observation
-for the generated `rust_host_tools` repository. Before any archive call,
-rules_rust probes `HOME/.netrc` through
-`repository_ctx.path(absolute_string).exists`; Slug currently rejects
-that path. The packet keeps this Boolean DICE-observed and scoped to the
-selected repository rule, with present-file reads and auth deferred. The
-local path is absent (existence only checked; no contents read). The
-source-derived host-tools archives and generated
-`module_ctx.path(Label)` remain later gates. A fresh production-root build
-stops first at the generated `slug_crates` Label boundary, and the focused
-rules-rust toolchain fixture stops at an independent rules_shell `which`
-limit; neither proves host-tools archive reachability. WP795 therefore admits
-the bounded path/environment behavior only, with root integration deferred.
-Independent FINAL review ACCEPTED the narrowed claim after focused tests and
-fresh CLI, formatting, diff, archive and plan checks passed.
+WP796 accepts the six audited, SHA-pinned `rust_host_tools` tar.xz archive
+effects through an authentic innate `use_repo_rule` route. The selected DICE
+owner retains their exact ordered URL/SHA/stripPrefix plan; Core verifies,
+extracts and merges them before final generated file writes. Bazel 9.2's
+focused tar.xz oracle, 18 focused Rust tests, fresh CLI build and independent
+DESIGN/FINAL reviews passed. The source-authentic Slug smoke completes
+materialization, then stops in generated `BUILD.bazel:131` at the separate
+`rust_toolchain(iso_date=None)` attribute-schema boundary; the matching Bazel
+fixture builds. The original module-extension owner remains gated by
+OS/architecture-dependent factors. Slug validates and discards this rule's
+legacy fallback dictionary; Bazel 9.2 instead uses opaque `repo_metadata`, so
+metadata/reproducibility caching remains Slug-native/deferred.
+This packet does not admit netrc auth, arbitrary archives, cross-owner
+`module_ctx.path(Label)` or rules_shell `which`. WP795's selected absolute
+host-path existence behavior was accepted at 2cf074303; production root
+integration remains gated independently.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

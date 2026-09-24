@@ -21,7 +21,10 @@ use async_trait::async_trait;
 use dice::DiceDataBuilder;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_bzlmod_v2::GeneratedRepositoryArchiveFormat;
+use slug_bzlmod_v2::GeneratedRepositoryArchiveOutput;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
+use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef;
 use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::RepositoryIo;
@@ -1385,6 +1388,38 @@ fn generated_repository_file_effect_source_association(
     plan: &GeneratedRepositoryFileEffectPlan,
 ) -> Arc<str> {
     let mut digest = Sha256::new();
+    if plan.has_archives() {
+        digest.update(b"slug.generated-repository-ordered-effects.v1\0");
+        for effect in plan.ordered_effects() {
+            match effect {
+                GeneratedRepositoryOrderedEffectRef::File(file) => {
+                    digest.update(b"file\0");
+                    for bytes in [file.path().as_bytes(), file.content()] {
+                        digest.update((bytes.len() as u64).to_be_bytes());
+                        digest.update(bytes);
+                    }
+                    digest.update([u8::from(file.executable())]);
+                }
+                GeneratedRepositoryOrderedEffectRef::Archive(archive) => {
+                    match (archive.format(), archive.output()) {
+                        (
+                            GeneratedRepositoryArchiveFormat::TarXz,
+                            GeneratedRepositoryArchiveOutput::RepositoryRoot,
+                        ) => digest.update(b"tar-xz-root\0"),
+                    }
+                    digest.update((archive.urls().len() as u64).to_be_bytes());
+                    for url in archive.urls() {
+                        digest.update((url.len() as u64).to_be_bytes());
+                        digest.update(url.as_bytes());
+                    }
+                    digest.update(archive.sha256());
+                    digest.update((archive.strip_prefix().len() as u64).to_be_bytes());
+                    digest.update(archive.strip_prefix().as_bytes());
+                }
+            }
+        }
+        return Arc::from(hex::encode(digest.finalize()));
+    }
     digest.update(b"slug.generated-repository-file-effects.v1\\0");
     for effect in plan.effects() {
         for bytes in [effect.path().as_bytes(), effect.content()] {
@@ -1466,11 +1501,129 @@ fn materialize_generated_repository_file_effects(
     }
 }
 
+fn materialize_generated_repository_archive_effects(
+    plan: &GeneratedRepositoryFileEffectPlan,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+) -> Result<Materialized, ArchiveMaterializationError> {
+    if !plan.has_archives() || !generated_repository_file_effect_paths_are_valid(plan) {
+        return Err(ArchiveMaterializationError::spec(
+            "invalid generated repository archive-effect plan",
+        ));
+    }
+    let root = tempfile::tempdir().map_err(|error| {
+        ArchiveMaterializationError::materialization(format!(
+            "creating generated repository root: {error}"
+        ))
+    })?;
+    let mut aggregate_decoded = 0u64;
+    for effect in plan.ordered_effects() {
+        if !active() {
+            return Err(ArchiveMaterializationError::materialization(
+                "repository session is no longer active",
+            ));
+        }
+        match effect {
+            GeneratedRepositoryOrderedEffectRef::Archive(archive) => {
+                match (archive.format(), archive.output()) {
+                    (
+                        GeneratedRepositoryArchiveFormat::TarXz,
+                        GeneratedRepositoryArchiveOutput::RepositoryRoot,
+                    ) => {}
+                }
+                let urls = archive
+                    .urls()
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+                let capture = super::repository_archive_http::capture_selected_generated_archive(
+                    &urls,
+                    archive.sha256(),
+                    runtime,
+                    active,
+                )?;
+                super::repository_generated_archive::extract_selected_generated_archive(
+                    capture.as_file(),
+                    root.path(),
+                    archive.strip_prefix(),
+                    active,
+                    &mut aggregate_decoded,
+                )?;
+                capture.close().map_err(|error| {
+                    ArchiveMaterializationError::materialization(format!(
+                        "deleting verified generated archive capture: {error}"
+                    ))
+                })?;
+            }
+            GeneratedRepositoryOrderedEffectRef::File(file) => {
+                let target = root.path().join(file.path());
+                if let Some(parent) = target.parent() {
+                    std::fs::create_dir_all(parent).map_err(|error| {
+                        ArchiveMaterializationError::materialization(format!(
+                            "creating generated file parent: {error}"
+                        ))
+                    })?;
+                }
+                match std::fs::symlink_metadata(&target) {
+                    Ok(metadata) if !metadata.file_type().is_file() => {
+                        return Err(ArchiveMaterializationError::materialization(
+                            "generated file effect collides with a non-regular archive entry",
+                        ));
+                    }
+                    Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                        return Err(ArchiveMaterializationError::materialization(format!(
+                            "checking generated file target: {error}"
+                        )));
+                    }
+                    _ => {}
+                }
+                let mut output = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(&target)
+                    .map_err(|error| {
+                        ArchiveMaterializationError::materialization(format!(
+                            "writing generated file: {error}"
+                        ))
+                    })?;
+                output.write_all(file.content()).map_err(|error| {
+                    ArchiveMaterializationError::materialization(format!(
+                        "writing generated file bytes: {error}"
+                    ))
+                })?;
+                output.flush().map_err(|error| {
+                    ArchiveMaterializationError::materialization(format!(
+                        "flushing generated file: {error}"
+                    ))
+                })?;
+                NativeGeneratedRepositoryFileEffectsIo
+                    .set_mode(&target, file.executable())
+                    .map_err(ArchiveMaterializationError::materialization)?;
+            }
+        }
+    }
+    if !active() {
+        return Err(ArchiveMaterializationError::materialization(
+            "repository session is no longer active",
+        ));
+    }
+    Ok(Materialized::AssociatedImmutable {
+        source_identity: generated_repository_file_effect_source_association(plan),
+        root,
+    })
+}
+
 fn materialize_native_attempt(
     workspace: &Path,
     request: &RepositoryMaterializationRequest,
 ) -> RepositoryMaterializationAttempt {
     if let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind {
+        if plan.has_archives() {
+            return RepositoryMaterializationAttempt::SpecError(
+                "generated repository archive effects require runtime capture".into(),
+            );
+        }
         return materialize_generated_repository_file_effects(
             plan,
             &mut NativeGeneratedRepositoryFileEffectsIo,
@@ -1505,6 +1658,13 @@ fn materialize_native_attempt_with_runtime(
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
 ) -> RepositoryMaterializationAttempt {
+    if let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind
+        && plan.has_archives()
+    {
+        return materialized_attempt(materialize_generated_repository_archive_effects(
+            plan, runtime, active,
+        ));
+    }
     if request.repo_spec.rule_id.bzl_file.to_string()
         == "@@bazel_tools//tools/build_defs/repo:http.bzl"
         && request.repo_spec.rule_id.rule_name.as_str() == "http_archive"
@@ -1977,6 +2137,146 @@ mod tests {
             },
         ))
         .unwrap()
+    }
+
+    fn selected_archive_bytes(prefix: &str, files: &[(&str, &[u8], u32)]) -> Vec<u8> {
+        let mut builder = tar::Builder::new(Vec::new());
+        let mut directory = tar::Header::new_gnu();
+        directory.set_path(prefix).unwrap();
+        directory.set_entry_type(tar::EntryType::Directory);
+        directory.set_size(0);
+        directory.set_mode(0o755);
+        directory.set_mtime(0);
+        directory.set_cksum();
+        builder.append(&directory, std::io::empty()).unwrap();
+        for (path, bytes, mode) in files {
+            let mut header = tar::Header::new_gnu();
+            header.set_path(format!("{prefix}/{path}")).unwrap();
+            header.set_entry_type(tar::EntryType::Regular);
+            header.set_size(bytes.len() as u64);
+            header.set_mode(*mode);
+            header.set_mtime(0);
+            header.set_cksum();
+            builder.append(&header, *bytes).unwrap();
+        }
+        let tar = builder.into_inner().unwrap();
+        let mut encoder = xz2::write::XzEncoder::new(Vec::new(), 6);
+        encoder.write_all(&tar).unwrap();
+        encoder.finish().unwrap()
+    }
+
+    #[test]
+    fn generated_archive_effects_capture_merge_and_file_overwrite_atomically() {
+        let fixture = tempfile::tempdir().unwrap();
+        let first = selected_archive_bytes(
+            "first/component",
+            &[
+                ("shared.txt", b"first\n", 0o644),
+                ("only-a.txt", b"a\n", 0o644),
+            ],
+        );
+        let second = selected_archive_bytes(
+            "second/component",
+            &[
+                ("shared.txt", b"second\n", 0o644),
+                ("tool.sh", b"tool\n", 0o755),
+            ],
+        );
+        let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+        for (name, bytes, prefix) in [
+            ("first.tar.xz", first, "first/component"),
+            ("second.tar.xz", second, "second/component"),
+        ] {
+            let path = fixture.path().join(name);
+            std::fs::write(&path, &bytes).unwrap();
+            let url = url::Url::from_file_path(&path).unwrap().to_string();
+            builder
+                .push_archive(
+                    Arc::from([CompactString::new(url)]),
+                    Sha256::digest(&bytes).into(),
+                    CompactString::new(prefix),
+                )
+                .unwrap();
+        }
+        builder
+            .push(
+                CompactString::new("shared.txt"),
+                Arc::from(&b"final\n"[..]),
+                false,
+            )
+            .unwrap();
+        let plan = builder.finish();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let materialized =
+            materialize_generated_repository_archive_effects(&plan, &runtime, &|| true).unwrap();
+        let Materialized::AssociatedImmutable {
+            source_identity,
+            root,
+        } = materialized
+        else {
+            panic!("expected associated immutable root");
+        };
+        assert_eq!(
+            source_identity,
+            generated_repository_file_effect_source_association(&plan)
+        );
+        assert_eq!(
+            std::fs::read(root.path().join("shared.txt")).unwrap(),
+            b"final\n"
+        );
+        assert_eq!(
+            std::fs::read(root.path().join("only-a.txt")).unwrap(),
+            b"a\n"
+        );
+        assert_eq!(
+            std::fs::read(root.path().join("tool.sh")).unwrap(),
+            b"tool\n"
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            assert_eq!(
+                std::fs::metadata(root.path().join("shared.txt"))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o644
+            );
+            assert_eq!(
+                std::fs::metadata(root.path().join("tool.sh"))
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o755
+            );
+        }
+
+        let mut wrong_sha = GeneratedRepositoryFileEffectPlan::builder();
+        wrong_sha
+            .push_archive(
+                Arc::from([CompactString::new(
+                    url::Url::from_file_path(fixture.path().join("first.tar.xz"))
+                        .unwrap()
+                        .to_string(),
+                )]),
+                [0; 32],
+                CompactString::new("first/component"),
+            )
+            .unwrap();
+        let error = materialize_generated_repository_archive_effects(
+            &wrong_sha.finish(),
+            &runtime,
+            &|| true,
+        )
+        .err()
+        .expect("mismatched SHA must fail before publication");
+        assert_eq!(error.stage, ArchiveFailureStage::Transport);
     }
 
     #[derive(Clone, Copy)]

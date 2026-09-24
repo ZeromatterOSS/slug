@@ -47,6 +47,7 @@ tempfile = { workspace = true }
 tokio = { workspace = true }
 tokio-rustls = { version = "0.26.4", default-features = false }
 url = { workspace = true }
+xz2 = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }

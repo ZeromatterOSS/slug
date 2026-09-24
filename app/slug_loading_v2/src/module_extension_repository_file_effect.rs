@@ -20,6 +20,7 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanError;
+use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef;
 use slug_bzlmod_v2::HostRepositoryLabelPathError;
 use slug_bzlmod_v2::HostRepositoryLabelPathKey;
 use slug_bzlmod_v2::HostRepositoryLabelPathObservationKey;
@@ -73,6 +74,60 @@ use crate::repository_rule_context::invoke_repository_rule_with_host_paths;
 
 struct RepositoryEffectLimits;
 #[rustfmt::skip] impl RepositoryEffectLimits { const LABEL_PATHS: usize = 256; const WHICH_CANDIDATES: usize = 64; const HOST_PATHS: usize = 64; }
+
+// Pinned rules_rust 0.73.0 rust/private/repositories.bzl:397-462 and
+// repository_utils.bzl:845-1009. These are the only audited Linux x86_64
+// rust_host_tools archive calls; changed module tags or upstream sources fail
+// before a generated repository effect can be published.
+const SELECTED_HOST_TOOLS_ARCHIVES: [(&str, &str, &str); 6] = [
+    (
+        "https://static.rust-lang.org/dist/rustc-1.97.1-x86_64-unknown-linux-gnu.tar.xz",
+        "9819d0a32d56bd339585319c80260e332779f5541fd66838ab7e016d6c814819",
+        "rustc-1.97.1-x86_64-unknown-linux-gnu/rustc",
+    ),
+    (
+        "https://static.rust-lang.org/dist/clippy-1.97.1-x86_64-unknown-linux-gnu.tar.xz",
+        "3441df8fb54db985f8c8a3e8356b8874a3f92cc8cca8565cfe36f1dc15935e72",
+        "clippy-1.97.1-x86_64-unknown-linux-gnu/clippy-preview",
+    ),
+    (
+        "https://static.rust-lang.org/dist/cargo-1.97.1-x86_64-unknown-linux-gnu.tar.xz",
+        "e1be5f5ff7f7f80ca506fb65770b759edbdc6d303781ed71c5de8ec8a8394779",
+        "cargo-1.97.1-x86_64-unknown-linux-gnu/cargo",
+    ),
+    (
+        "https://static.rust-lang.org/dist/2026-07-16/rustfmt-nightly-x86_64-unknown-linux-gnu.tar.xz",
+        "bb48a8124f84818dab540701952e4cf5506045000baa975b6046d54aeac87d5d",
+        "rustfmt-nightly-x86_64-unknown-linux-gnu/rustfmt-preview",
+    ),
+    (
+        "https://static.rust-lang.org/dist/llvm-tools-1.97.1-x86_64-unknown-linux-gnu.tar.xz",
+        "3e7a1c596a42dea6bf625ec6f006ce2fbcf5d1ff892f082828eb182a5d483b95",
+        "llvm-tools-1.97.1-x86_64-unknown-linux-gnu/llvm-tools-preview",
+    ),
+    (
+        "https://static.rust-lang.org/dist/rust-std-1.97.1-x86_64-unknown-linux-gnu.tar.xz",
+        "1c1e704ae80126b7de34f72ea2825f7fd01736dec20732faed47374b95282fba",
+        "rust-std-1.97.1-x86_64-unknown-linux-gnu/rust-std-x86_64-unknown-linux-gnu",
+    ),
+];
+
+fn matches_selected_host_tools_archives(plan: &GeneratedRepositoryFileEffectPlan) -> bool {
+    let mut effects = plan.ordered_effects();
+    for (url, sha256, strip_prefix) in SELECTED_HOST_TOOLS_ARCHIVES {
+        let Some(GeneratedRepositoryOrderedEffectRef::Archive(archive)) = effects.next() else {
+            return false;
+        };
+        if archive.urls().len() != 1
+            || archive.urls()[0].as_str() != url
+            || archive.sha256_hex() != sha256
+            || archive.strip_prefix() != strip_prefix
+        {
+            return false;
+        }
+    }
+    effects.all(|effect| matches!(effect, GeneratedRepositoryOrderedEffectRef::File(_)))
+}
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -1333,6 +1388,11 @@ fn terminal_repository_rule_invocation_error(
         }
         RepositoryRuleInvocationError::WhichArgument(message) => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message },
         RepositoryRuleInvocationError::WhichLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.which invocation exceeds the admitted Unix limits".into() },
+        RepositoryRuleInvocationError::ArchiveArgument => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract arguments are outside the selected SHA-pinned tar.xz surface".into() },
+        RepositoryRuleInvocationError::ArchiveAuth => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract auth is unsupported".into() },
+        RepositoryRuleInvocationError::ArchiveLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract exceeds the selected limits".into() },
+        RepositoryRuleInvocationError::ArchiveIncomplete => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "selected rust_host_tools repository requires six ordered archives".into() },
+        RepositoryRuleInvocationError::ArchivePathObservation => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "generated path may depend on an unmaterialized archive".into() },
         RepositoryRuleInvocationError::Plan(error) => HostSelectedRepositoryFileEffectError::Path {
             certificate: certificate.clone(),
             ordinal,
@@ -1621,6 +1681,13 @@ async fn compute_effect(
         Err(error) => return complete_effect_error(error, observations),
     };
     let (canonical_name, spec) = repository.spec_parts();
+    // The archive effect is admitted only for the authenticated rules_rust
+    // host-tools rule, not for other generated repository rules that happen to
+    // call a method with the same name.
+    let archive_owner = repository.generated_name() == "rust_host_tools"
+        && repository.call().definition.defining_label.to_string()
+            == "@@rules_rust+//rust/private:repositories.bzl"
+        && repository.call().definition.exported_name == "rust_toolchain_tools_repository";
     let input = match RepositoryRuleInvocationInput::new(
         canonical_name.as_str().into(),
         Some(repository.generated_name().into()),
@@ -1638,6 +1705,11 @@ async fn compute_effect(
                 observations,
             );
         }
+    };
+    let input = if archive_owner {
+        input.with_archive_owner()
+    } else {
+        input
     };
     let transaction = match ctx
         .per_transaction_data()
@@ -1749,6 +1821,16 @@ async fn compute_effect(
             );
         }
     };
+    if archive_owner && !matches_selected_host_tools_archives(&invocation.plan) {
+        return complete_effect_error(
+            terminal_repository_rule_invocation_error(
+                &certificate,
+                key.ordinal,
+                RepositoryRuleInvocationError::ArchiveIncomplete,
+            ),
+            observations,
+        );
+    }
     if let Some(capture) = capture {
         ctx.store_evaluation_data(capture.into_batch())
             .expect("repository-file invocation stores one local Complete event batch");
@@ -4099,6 +4181,33 @@ ext = module_extension(implementation = impl)
         };
         let certificate = certificate.dupe();
         let certificate_value = Arc::new(certificate.result().as_ref().as_ref().unwrap().clone());
+        for (error, expected) in [
+            (
+                RepositoryRuleInvocationError::ArchiveArgument,
+                "repository_ctx.download_and_extract arguments are outside the selected SHA-pinned tar.xz surface",
+            ),
+            (
+                RepositoryRuleInvocationError::ArchiveAuth,
+                "repository_ctx.download_and_extract auth is unsupported",
+            ),
+            (
+                RepositoryRuleInvocationError::ArchiveLimit,
+                "repository_ctx.download_and_extract exceeds the selected limits",
+            ),
+            (
+                RepositoryRuleInvocationError::ArchiveIncomplete,
+                "selected rust_host_tools repository requires six ordered archives",
+            ),
+            (
+                RepositoryRuleInvocationError::ArchivePathObservation,
+                "generated path may depend on an unmaterialized archive",
+            ),
+        ] {
+            assert!(matches!(
+                terminal_repository_rule_invocation_error(&certificate_value, 0, error),
+                HostSelectedRepositoryFileEffectError::Invocation { message, .. } if message == expected
+            ));
+        }
         let repository = certificate_value.repository(0).unwrap();
         let RepositoryDefinitionLabel::Root(label) =
             definition_label(&certificate_value, 0, repository).unwrap()
@@ -4721,6 +4830,105 @@ ext=module_extension(implementation=impl)
                 .collect::<Vec<_>>(),
             ["repository-file-effect"]
         );
+    }
+
+    #[test]
+    fn selected_host_tools_archive_guard_requires_exact_six_ordered_tuples() {
+        let digest = |hex: &str| {
+            let mut bytes = [0u8; 32];
+            for (index, byte) in bytes.iter_mut().enumerate() {
+                *byte = u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).unwrap();
+            }
+            bytes
+        };
+        let build = |order: &[usize], corrupt: Option<usize>| {
+            let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+            for (ordinal, index) in order.iter().enumerate() {
+                let (url, sha256, prefix) = SELECTED_HOST_TOOLS_ARCHIVES[*index];
+                builder
+                    .push_archive(
+                        Arc::from([CompactString::new(url)]),
+                        if corrupt == Some(ordinal) {
+                            [0u8; 32]
+                        } else {
+                            digest(sha256)
+                        },
+                        prefix.into(),
+                    )
+                    .unwrap();
+            }
+            builder.finish()
+        };
+        let all = [0, 1, 2, 3, 4, 5];
+        assert!(matches_selected_host_tools_archives(&build(&all, None)));
+        assert!(!matches_selected_host_tools_archives(&build(
+            &all[..5],
+            None
+        )));
+        assert!(!matches_selected_host_tools_archives(&build(
+            &[1, 0, 2, 3, 4, 5],
+            None
+        )));
+        assert!(!matches_selected_host_tools_archives(&build(&all, Some(4))));
+        let mut wrong_url = GeneratedRepositoryFileEffectPlan::builder();
+        let mut wrong_prefix = GeneratedRepositoryFileEffectPlan::builder();
+        for (ordinal, (url, sha256, prefix)) in SELECTED_HOST_TOOLS_ARCHIVES.iter().enumerate() {
+            wrong_url
+                .push_archive(
+                    Arc::from([CompactString::new(if ordinal == 0 {
+                        "https://static.rust-lang.org/dist/other.tar.xz"
+                    } else {
+                        *url
+                    })]),
+                    digest(sha256),
+                    (*prefix).into(),
+                )
+                .unwrap();
+            wrong_prefix
+                .push_archive(
+                    Arc::from([CompactString::new(url)]),
+                    digest(sha256),
+                    if ordinal == 2 {
+                        "cargo-1.97.1-x86_64-unknown-linux-gnu/other"
+                    } else {
+                        *prefix
+                    }
+                    .into(),
+                )
+                .unwrap();
+        }
+        assert!(!matches_selected_host_tools_archives(&wrong_url.finish()));
+        assert!(!matches_selected_host_tools_archives(
+            &wrong_prefix.finish()
+        ));
+
+        let with_file = |file_at: usize| {
+            let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+            for (ordinal, (url, sha256, prefix)) in SELECTED_HOST_TOOLS_ARCHIVES.iter().enumerate()
+            {
+                if ordinal == file_at {
+                    builder
+                        .push("generated".into(), Arc::from(b"content".as_slice()), false)
+                        .unwrap();
+                }
+                builder
+                    .push_archive(
+                        Arc::from([CompactString::new(url)]),
+                        digest(sha256),
+                        (*prefix).into(),
+                    )
+                    .unwrap();
+            }
+            if file_at == SELECTED_HOST_TOOLS_ARCHIVES.len() {
+                builder
+                    .push("generated".into(), Arc::from(b"content".as_slice()), false)
+                    .unwrap();
+            }
+            builder.finish()
+        };
+        assert!(matches_selected_host_tools_archives(&with_file(6)));
+        assert!(!matches_selected_host_tools_archives(&with_file(0)));
+        assert!(!matches_selected_host_tools_archives(&with_file(3)));
     }
 
     #[tokio::test]

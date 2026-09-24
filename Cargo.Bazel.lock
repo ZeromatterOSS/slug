@@ -1,5 +1,5 @@
 {
-  "checksum": "9dba5c5f9c3177be22cc463c0daf131fe8dc2b6d57f3d2072efe11213297f1d8",
+  "checksum": "66a517493d65a880c5e02786a58084d322302bc04aa3613f6de3e689bb6e5f8f",
   "crates": {
     "Inflector 0.11.4": {
       "name": "Inflector",
@@ -12703,6 +12703,97 @@
       ],
       "license_file": "LICENSE"
     },
+    "lzma-sys 0.1.20": {
+      "name": "lzma-sys",
+      "version": "0.1.20",
+      "package_url": "https://github.com/alexcrichton/xz2-rs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/lzma-sys/0.1.20/download",
+          "sha256": "5fda04ab3764e6cde78b9974eec4f779acaba7c4e84b36eca3cf77c581b85d27"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "lzma_sys",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        },
+        {
+          "BuildScript": {
+            "crate_name": "build_script_build",
+            "crate_root": "build.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "lzma_sys",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "libc 0.2.189",
+              "target": "libc"
+            }
+          ],
+          "selects": {}
+        },
+        "extra_deps": {
+          "common": [
+            ":build_script_build"
+          ],
+          "selects": {}
+        },
+        "edition": "2018",
+        "version": "0.1.20"
+      },
+      "build_script_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "compile_data_glob_excludes": [
+          "**/*.rs"
+        ],
+        "data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "cc 1.3.0",
+              "target": "cc"
+            },
+            {
+              "id": "pkg-config 0.3.34",
+              "target": "pkg_config"
+            }
+          ],
+          "selects": {}
+        },
+        "links": "lzma"
+      },
+      "license": "MIT/Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "mac_address 1.1.8": {
       "name": "mac_address",
       "version": "1.1.8",
@@ -16085,6 +16176,45 @@
         "version": "0.2.17"
       },
       "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "pkg-config 0.3.34": {
+      "name": "pkg-config",
+      "version": "0.3.34",
+      "package_url": "https://github.com/rust-lang/pkg-config-rs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/pkg-config/0.3.34/download",
+          "sha256": "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "pkg_config",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "pkg_config",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "edition": "2021",
+        "version": "0.3.34"
+      },
+      "license": "MIT OR Apache-2.0",
       "license_ids": [
         "Apache-2.0",
         "MIT"
@@ -21504,6 +21634,10 @@
             {
               "id": "fxhash 0.2.1",
               "target": "fxhash"
+            },
+            {
+              "id": "sha2 0.10.9",
+              "target": "sha2"
             }
           ],
           "selects": {}
@@ -21650,6 +21784,15 @@
             {
               "id": "tokio 1.53.1",
               "target": "tokio"
+            }
+          ],
+          "selects": {}
+        },
+        "deps_dev": {
+          "common": [
+            {
+              "id": "serde_json 1.0.151",
+              "target": "serde_json"
             }
           ],
           "selects": {}
@@ -21864,6 +22007,10 @@
             {
               "id": "url 2.5.8",
               "target": "url"
+            },
+            {
+              "id": "xz2 0.1.7",
+              "target": "xz2"
             }
           ],
           "selects": {
@@ -30376,6 +30523,54 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
+    "xz2 0.1.7": {
+      "name": "xz2",
+      "version": "0.1.7",
+      "package_url": "https://github.com/alexcrichton/xz2-rs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/xz2/0.1.7/download",
+          "sha256": "388c44dc09d76f1536602ead6d325eb532f5c122f17782bd57fb47baeeb767e2"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "xz2",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "xz2",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "lzma-sys 0.1.20",
+              "target": "lzma_sys"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2018",
+        "version": "0.1.7"
+      },
+      "license": "MIT/Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "yoke 0.8.3": {
       "name": "yoke",
       "version": "0.8.3",
@@ -31394,7 +31589,8 @@
     "typed-arena 2.0.2",
     "unicode-segmentation 1.13.3",
     "url 2.5.8",
-    "walkdir 2.5.0"
+    "walkdir 2.5.0",
+    "xz2 0.1.7"
   ],
   "direct_dev_deps": [
     "assert_matches 1.5.0",
