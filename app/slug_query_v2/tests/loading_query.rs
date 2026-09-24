@@ -5122,6 +5122,177 @@ async fn external_owner_dispatches_siblings_rdeps_and_loading_files_without_root
 }
 
 #[tokio::test]
+async fn java_plugins_flag_alias_projects_root_class_empty_edges_and_native_attributes() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = 'root')\n");
+    let build = workspace.join("pkg/BUILD.bazel");
+    let source = "package(default_visibility = ['//visibility:public'])\njava_plugins_flag_alias(name = 'plugins')\n";
+    write(&build, source);
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let graph = transaction
+        .compute(&UnconfiguredPackageGraphKey {
+            workspace: workspace.clone(),
+            package: PathBuf::from("pkg"),
+        })
+        .await
+        .unwrap();
+    let graph = graph.as_ref().as_ref().unwrap();
+    let node = graph
+        .nodes
+        .values()
+        .find(|node| node.label.to_string() == "//pkg:plugins")
+        .unwrap();
+    assert_eq!(
+        node.kind,
+        QueryNodeKind::Rule("java_plugins_flag_alias rule".into())
+    );
+    assert!(node.edges.is_empty());
+    assert_eq!(node.effective_visibility, RuleVisibility::Public);
+    assert_eq!(
+        node.attributes
+            .iter()
+            .map(|attribute| attribute.name.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "name",
+            "visibility",
+            "transitive_configs",
+            "deprecation",
+            "tags",
+            "generator_name",
+            "generator_function",
+            "generator_location",
+            "testonly",
+            "features",
+            ":action_listener",
+            "compatible_with",
+            "restricted_to",
+            "$config_dependencies",
+            "package_metadata",
+            "aspect_hints",
+            "licenses",
+            "distribs",
+            "target_compatible_with",
+            ":java_plugins",
+        ]
+    );
+    let plugins = node.attributes.last().unwrap();
+    assert!(!plugins.explicit);
+    assert!(plugins.labels.is_empty());
+    assert!(matches!(
+        plugins.value.as_ref().map(|value| &value.value),
+        Some(CoercedAttributeValue::LabelList(labels)) if labels.is_empty()
+    ));
+    for (expression, expected) in [
+        ("deps(//pkg:plugins, 1)", "//pkg:plugins\n"),
+        ("labels(':java_plugins', //pkg:plugins)", ""),
+    ] {
+        let result = evaluate_loading_query(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Auto,
+        )
+        .await
+        .unwrap();
+        assert_eq!(result.stdout(), expected, "{expression}");
+    }
+    let kind = evaluate_loading_query_with_policy_and_output_completion(
+        &mut transaction,
+        workspace.clone(),
+        "//pkg:plugins",
+        QueryOrder::Auto,
+        QueryPolicy::default(),
+        QueryOutputCompletion::LabelKind,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        kind.label_kind_stdout(),
+        "java_plugins_flag_alias rule //pkg:plugins\n"
+    );
+}
+
+#[tokio::test]
+async fn java_plugins_flag_alias_projects_external_class_attrs_and_source_restoration() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let source = "package(default_visibility = ['//visibility:public'])\njava_plugins_flag_alias(name = 'plugins')\n";
+    let mut transaction = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_visibility_package(310, "dep", source).build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    for (expression, expected) in [
+        (
+            "kind('java_plugins_flag_alias rule', @dep//:plugins)",
+            &["@dep//:plugins"][..],
+        ),
+        ("deps(@dep//:plugins, 1)", &["@dep//:plugins"][..]),
+        ("labels(':java_plugins', @dep//:plugins)", &[][..]),
+        (
+            "attr(':java_plugins', '^\\[\\]$', @dep//:plugins)",
+            &["@dep//:plugins"][..],
+        ),
+        (
+            "attr('tags', '^\\[\\]$', @dep//:plugins)",
+            &["@dep//:plugins"][..],
+        ),
+        (
+            "visible(@dep//viewer:caller, @dep//:plugins)",
+            &["@dep//:plugins"][..],
+        ),
+    ] {
+        let labels = root_query_labels(&mut transaction, expression)
+            .await
+            .unwrap();
+        let labels = labels.iter().map(String::as_str).collect::<Vec<_>>();
+        assert_eq!(labels.as_slice(), expected, "{expression}");
+    }
+
+    let mut changed = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_visibility_package(
+            311,
+            "dep",
+            "filegroup(name = 'plugins')\n",
+        )
+        .build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    assert_eq!(
+        root_query_labels(&mut changed, "kind('filegroup rule', @dep//:plugins)")
+            .await
+            .unwrap(),
+        ["@dep//:plugins"]
+    );
+
+    let mut restored = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_visibility_package(312, "dep", source).build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    assert_eq!(
+        root_query_labels(
+            &mut restored,
+            "kind('java_plugins_flag_alias rule', @dep//:plugins)"
+        )
+        .await
+        .unwrap(),
+        ["@dep//:plugins"]
+    );
+    assert_eq!(
+        root_query_labels(&mut restored, "deps(@dep//:plugins, 1)")
+            .await
+            .unwrap(),
+        ["@dep//:plugins"]
+    );
+}
+
+#[tokio::test]
 async fn native_toolchain_targets_project_root_and_external_declaration_graphs() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
 

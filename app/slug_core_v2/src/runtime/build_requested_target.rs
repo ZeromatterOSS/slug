@@ -359,6 +359,7 @@ pub(super) async fn compute_loaded_build_branch(
             || matches!(
                 target.kind,
                 PackageTargetKind::StarlarkRule(_)
+                    | PackageTargetKind::JavaPluginsFlagAlias
                     | PackageTargetKind::LabelFlag(_)
                     | PackageTargetKind::Alias { .. }
                     | PackageTargetKind::GeneratedFile { .. }

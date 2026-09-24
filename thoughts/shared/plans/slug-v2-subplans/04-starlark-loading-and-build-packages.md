@@ -9704,3 +9704,24 @@ clears protobuf's PHP `native.filegroup(testonly=1)` and next stops at
 missing `@@bazel_tools//tools/jdk` BUILD content. Direct native parameters,
 configured test policy and that built-in repository content are separate
 surfaces; M7A remains partial.
+
+### Native Java plugins flag alias declaration accepted (2026-09-24)
+
+WP830 records Bazel 9.2's `java_plugins_flag_alias` as a distinct native
+rule with the exact selected 20-slot Loading schema: 19 inherited attributes
+followed by an implicit `:java_plugins` label list whose Loading default is
+empty. BUILD and `.bzl native` calls share existing override, generator and
+source ownership. Root/external Query reports the native class with no
+default plugin dependency, and direct Build fails at configured analysis
+instead of falsely succeeding as loaded-only. The existing Slug-native
+inherited license rendering and diagnostics remain unchanged. Pinned source,
+an ignored-RC/no-fetch Bazel oracle, 11 focused/protected tests and an
+independent final `ACCEPT` support only this Loading/Query boundary.
+
+The rebuilt `//:probe` replay first reports missing rules_python
+`config_common.FeatureFlagInfo`; parallel package-load order does not prove
+the JDK path from that result alone. A direct authentic JDK Slug query
+evaluates beyond `java_plugins_flag_alias` at BUILD lines 48-50 and fails
+later on `proguard_allowlister` at line 140. The full JDK package, configured
+`--plugin`, JavaPluginInfo merge and Java actions remain deferred. M7A is
+partial.

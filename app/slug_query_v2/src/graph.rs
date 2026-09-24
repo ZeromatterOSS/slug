@@ -1074,6 +1074,11 @@ fn package_graph_from_loaded(
                 visibility_edges,
                 Vec::new(),
             ),
+            PackageTargetKind::JavaPluginsFlagAlias => (
+                QueryNodeKind::Rule("java_plugins_flag_alias rule".into()),
+                visibility_edges,
+                Vec::new(),
+            ),
             PackageTargetKind::Genrule(_) => {
                 return Err(QueryError::unsupported_feature(
                     "native genrule query projection is unsupported",
@@ -1574,6 +1579,11 @@ fn external_package_graph_from_targets(
             PackageTargetKind::NativeToolchain(native) => (
                 QueryNodeKind::Rule(CompactString::new(format!("{} rule", native.rule_class()))),
                 Arc::from([]),
+                Arc::from([]),
+            ),
+            PackageTargetKind::JavaPluginsFlagAlias => (
+                QueryNodeKind::Rule("java_plugins_flag_alias rule".into()),
+                visibility_query_edges(&effective_visibility),
                 Arc::from([]),
             ),
             PackageTargetKind::Genrule(_) => {

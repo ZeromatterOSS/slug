@@ -900,6 +900,31 @@ native_schema!(TOOLCHAIN_SCHEMA = [
     "target_settings": LabelList, Ordered, Callable;
 ]);
 
+// Bazel 9.2 JavaPluginsFlagAliasRule adds one private late-bound label list to
+// NativeBuildRule. LabelListLateBoundDefault supplies [] during Loading.
+native_schema!(JAVA_PLUGINS_FLAG_ALIAS_SCHEMA = [
+    "name": String, Ordered, Callable;
+    "visibility": LabelList, OrderIndependent, Callable;
+    "transitive_configs": LabelList, OrderIndependent, Callable;
+    "deprecation": String, Ordered, Callable;
+    "tags": StringList, OrderIndependent, Callable;
+    "generator_name": String, Ordered, Callable;
+    "generator_function": String, Ordered, Callable;
+    "generator_location": String, Ordered, Callable;
+    "testonly": Boolean, Ordered, Callable;
+    "features": StringList, OrderIndependent, Callable;
+    ":action_listener": LabelList, Ordered, Implicit;
+    "compatible_with": LabelList, Ordered, Callable;
+    "restricted_to": LabelList, Ordered, Callable;
+    "$config_dependencies": LabelList, Ordered, Implicit;
+    "package_metadata": LabelList, Ordered, Callable;
+    "aspect_hints": LabelList, Ordered, Callable;
+    "licenses": StringList, Ordered, Callable;
+    "distribs": StringList, Ordered, Callable;
+    "target_compatible_with": LabelList, Ordered, Callable;
+    ":java_plugins": LabelList, Ordered, Implicit;
+]);
+
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
 pub enum NativeRuleClass {
@@ -913,6 +938,7 @@ pub enum NativeRuleClass {
     Platform,
     ToolchainType,
     Toolchain,
+    JavaPluginsFlagAlias,
 }
 
 impl NativeRuleClass {
@@ -928,6 +954,7 @@ impl NativeRuleClass {
             Self::Platform => PLATFORM_SCHEMA,
             Self::ToolchainType => TOOLCHAIN_TYPE_SCHEMA,
             Self::Toolchain => TOOLCHAIN_SCHEMA,
+            Self::JavaPluginsFlagAlias => JAVA_PLUGINS_FLAG_ALIAS_SCHEMA,
         }
     }
 
@@ -1759,6 +1786,7 @@ mod tests {
             (NativeRuleClass::Platform, 23),
             (NativeRuleClass::ToolchainType, 17),
             (NativeRuleClass::Toolchain, 21),
+            (NativeRuleClass::JavaPluginsFlagAlias, 20),
         ];
         for (class, expected) in classes {
             let schema = class.schema();

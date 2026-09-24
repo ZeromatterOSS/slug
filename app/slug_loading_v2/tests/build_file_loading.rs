@@ -2149,6 +2149,207 @@ fn native_toolchain_targets_fail_closed_for_wrong_shapes_and_name_collisions() {
 }
 
 #[test]
+fn java_plugins_flag_alias_retains_native_loading_rule_and_empty_private_default() {
+    // Bazel 9.2 JavaPluginsFlagAliasRule.java:47-69 adds :java_plugins to
+    // NativeBuildRule; Attribute.java:1788-1805 loads [] for its late-bound default.
+    let workspace = scratch("java-plugins-flag-alias-loading");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def emit(name):\n    native.java_plugins_flag_alias(name = name, tags = ['z', 'a'])\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        concat!(
+            "load(':defs.bzl', 'emit')\n",
+            "package(default_visibility = ['//visibility:public'])\n",
+            "java_plugins_flag_alias(name = 'direct')\n",
+            "java_plugins_flag_alias(name = 'private', visibility = ['//visibility:private'])\n",
+            "emit(name = 'macro_case')\n",
+        ),
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    assert_eq!(loaded.default_visibility, RuleVisibility::Public);
+    let expected_slots = [
+        "name",
+        "visibility",
+        "transitive_configs",
+        "deprecation",
+        "tags",
+        "generator_name",
+        "generator_function",
+        "generator_location",
+        "testonly",
+        "features",
+        ":action_listener",
+        "compatible_with",
+        "restricted_to",
+        "$config_dependencies",
+        "package_metadata",
+        "aspect_hints",
+        "licenses",
+        "distribs",
+        "target_compatible_with",
+        ":java_plugins",
+    ];
+    for name in ["direct", "private", "macro_case"] {
+        let target = loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap();
+        assert!(matches!(
+            target.kind,
+            PackageTargetKind::JavaPluginsFlagAlias
+        ));
+        let capability = target.rule_capability().unwrap();
+        assert_eq!(capability.rule_class, "java_plugins_flag_alias");
+        assert!(!capability.executable && capability.test_kind.is_none());
+
+        let attributes = loaded.native_attributes(name).unwrap();
+        assert_eq!(
+            attributes
+                .iter()
+                .map(|(schema, _)| schema.query_name())
+                .collect::<Vec<_>>(),
+            expected_slots
+        );
+        let plugins = attributes.get(":java_plugins").unwrap().1;
+        assert_eq!(plugins.provenance, AttributeProvenance::Implicit);
+        assert!(
+            matches!(&plugins.value, CoercedAttributeValue::LabelList(values) if values.is_empty())
+        );
+        assert_eq!(
+            target.visibility,
+            if name == "private" {
+                VisibilitySource::Declared(RuleVisibility::Private)
+            } else {
+                VisibilitySource::PackageDefault
+            }
+        );
+    }
+
+    let direct = loaded.native_attributes("direct").unwrap();
+    let private = loaded.native_attributes("private").unwrap();
+    let macro_case = loaded.native_attributes("macro_case").unwrap();
+    assert!(matches!(
+        &direct.get("visibility").unwrap().1.value,
+        CoercedAttributeValue::LabelList(values)
+            if values.as_ref() == [CanonicalLabel::parse("@@//visibility:public").unwrap()]
+    ));
+    assert_eq!(
+        direct.get("visibility").unwrap().1.provenance,
+        AttributeProvenance::Default
+    );
+    assert!(matches!(
+        &private.get("visibility").unwrap().1.value,
+        CoercedAttributeValue::LabelList(values)
+            if values.as_ref() == [CanonicalLabel::parse("@@//visibility:private").unwrap()]
+    ));
+    assert_eq!(
+        private.get("visibility").unwrap().1.provenance,
+        AttributeProvenance::Explicit
+    );
+    assert!(
+        matches!(&direct.get("generator_name").unwrap().1.value, CoercedAttributeValue::String(value) if value.is_empty())
+    );
+    assert!(
+        matches!(&macro_case.get("generator_name").unwrap().1.value, CoercedAttributeValue::String(value) if value == "macro_case")
+    );
+    assert!(
+        matches!(&macro_case.get("generator_function").unwrap().1.value, CoercedAttributeValue::String(value) if value == "emit")
+    );
+    assert!(
+        matches!(&macro_case.get("generator_location").unwrap().1.value, CoercedAttributeValue::String(value) if value.starts_with("pkg/BUILD.bazel:") && !value.ends_with(":0"))
+    );
+    assert_eq!(
+        macro_case.get("tags").unwrap().1.provenance,
+        AttributeProvenance::Explicit
+    );
+    assert!(
+        matches!(&macro_case.get("tags").unwrap().1.value, CoercedAttributeValue::StringList(values) if values.as_ref() == ["a", "z"])
+    );
+}
+
+#[test]
+fn java_plugins_flag_alias_rejects_duplicate_unknown_and_private_attributes() {
+    let workspace = scratch("java-plugins-flag-alias-invalid");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    for (source, diagnostic) in [
+        (
+            "java_plugins_flag_alias(name = 'same')\njava_plugins_flag_alias(name = 'same')\n",
+            "declared more than once",
+        ),
+        (
+            "java_plugins_flag_alias(name = 'bad', data = [])\n",
+            "not declared by rule 'java_plugins_flag_alias'",
+        ),
+        (
+            "java_plugins_flag_alias(name = 'bad', **{':java_plugins': []})\n",
+            "implicit and cannot be set",
+        ),
+    ] {
+        fs::write(package.join(BUILD_FILE_PRIMARY), source).unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(diagnostic), "{source}: {error}");
+    }
+}
+
+#[test]
+fn java_plugins_flag_alias_imported_source_restores_on_same_dice() {
+    let workspace = scratch("java-plugins-flag-alias-source-aba");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(':defs.bzl', 'emit')\nemit(name = 'subject')\n",
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load = |tag: &str| {
+        fs::write(
+            package.join("defs.bzl"),
+            format!("def emit(name):\n    native.java_plugins_flag_alias(name = name, tags = ['{tag}'])\n"),
+        )
+        .unwrap();
+        runtime
+            .block_on(load_package_with_retained_dice(&dice, &workspace, &package))
+            .unwrap()
+    };
+    let first = load("one");
+    let changed = load("two");
+    let restored = load("one");
+    let tags = |loaded: &slug_loading_v2::LegacyLoadedPackage| {
+        loaded
+            .native_attributes("subject")
+            .unwrap()
+            .get("tags")
+            .unwrap()
+            .1
+            .clone()
+    };
+    assert!(
+        matches!(&tags(&first).value, CoercedAttributeValue::StringList(values) if values.as_ref() == ["one"])
+    );
+    assert!(
+        matches!(&tags(&changed).value, CoercedAttributeValue::StringList(values) if values.as_ref() == ["two"])
+    );
+    assert_ne!(first, changed);
+    assert_eq!(first, restored);
+}
+
+#[test]
 fn visibility_and_package_group_shapes_retain_bazel_producer_provenance() {
     let workspace = scratch("typed-visibility");
     let package = workspace.join("pkg");

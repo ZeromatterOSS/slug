@@ -2865,3 +2865,14 @@ sidecar, new DICE key, cache or interner. The cold BUILD-global/recorder seam
 does not merit a performance benchmark. Same-DICE explicit/default A/B/A and
 protected Query/Analysis rejection prove the retained boundary; configured
 genrule work remains separate.
+
+WP830 appends a static Java plugins flag alias `NativeRuleClass` and a unit
+`PackageTargetKind`, reusing the single existing Arc-backed native attribute
+slice, `CompactString`, package recorder, structural equality and source-owned
+DICE invalidation. The implicit empty `:java_plugins` list is a schema
+default, not an allocated plugin carrier. No V1/Buck2 utility extraction,
+interner, retained map, new DICE key, lock, cache, evaluator borrow or action
+representation is introduced. Its cold declaration seam does not warrant a
+new benchmark. Focused same-DICE source A/B/A, root/external Query and
+configured Build failure tests prove the retained boundary; configured Java
+behavior is deferred.

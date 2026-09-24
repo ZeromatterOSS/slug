@@ -29,17 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-129-m7a-java-launcher-field-declaration-r1
-Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
+Packet: WP-7-130-m7a-java-plugins-flag-alias-loading-r1
+Status: ACCEPTED; M7A remains partial
 
-WP829 admits Bazel 9.2 Loading of the JDK Bzl's private `java.launcher`
-configuration-field declaration through the existing one-byte typed carrier.
-Configured `--java_launcher` and provider resolution stay fail-closed. Pinned
-Bazel source, an ignored-RC/no-fetch authentic oracle, focused tests and
-independent reviews support the selected Loading boundary. The rebuilt
-authentic replay clears the launcher stop and reaches missing
-`java_plugins_flag_alias` in the JDK BUILD. Accepted WP828 at `e9011177f`
-was the immediate predecessor; M7A is partial.
+WP830 accepts Bazel 9.2 Loading of the JDK BUILD's native
+`java_plugins_flag_alias` declaration, exact empty late-bound Loading default,
+and source-owned rule identity. Configured `--plugin` dependencies and Java
+providers remain fail-closed. Pinned source and an ignored-RC/no-fetch
+authentic oracle establish the selected declaration. A direct authentic JDK
+Slug query passes the former BUILD:48 stop and reaches the later
+`proguard_allowlister` executable-rule gate; the broader `//:probe` replay
+first reports missing rules_python `config_common.FeatureFlagInfo` and cannot
+alone establish package ordering. Eleven selected tests and an independent
+FINAL `ACCEPT` support the bounded result. Accepted WP829 at `8c22cc128` is
+the immediate predecessor. M7A remains partial.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

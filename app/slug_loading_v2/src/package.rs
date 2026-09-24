@@ -432,6 +432,11 @@ static GENRULE_RULE_CAPABILITY: RuleCapability = RuleCapability {
     executable: false,
     test_kind: None,
 };
+static JAVA_PLUGINS_FLAG_ALIAS_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("java_plugins_flag_alias"),
+    executable: false,
+    test_kind: None,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct TestMetadata {
@@ -596,6 +601,9 @@ pub enum PackageTargetKind {
     /// Stage 4 records the declaration and retains the frozen implementation.
     /// Stage 6 owns evaluating it with a configured target context.
     StarlarkRule(StarlarkRuleImplementation),
+    /// Native JDK rule with an empty Loading default for `:java_plugins`.
+    /// Configured `--plugin` resolution remains outside Loading.
+    JavaPluginsFlagAlias,
 }
 
 impl PackageTargetKind {
@@ -617,6 +625,7 @@ impl PackageTargetKind {
             Self::Alias { .. } => Some(&ALIAS_RULE_CAPABILITY),
             Self::LabelFlag(_) => Some(&LABEL_FLAG_RULE_CAPABILITY),
             Self::ConfigSetting { .. } => Some(&CONFIG_SETTING_RULE_CAPABILITY),
+            Self::JavaPluginsFlagAlias => Some(&JAVA_PLUGINS_FLAG_ALIAS_RULE_CAPABILITY),
             Self::NativeToolchain(target) => Some(target.rule_capability()),
             Self::TestSuite { .. } => Some(&TEST_SUITE_RULE_CAPABILITY),
             Self::Genrule(_) => Some(&GENRULE_RULE_CAPABILITY),
@@ -1742,6 +1751,18 @@ impl PackageRecorder {
         )
     }
 
+    fn java_plugins_flag_alias(
+        &self,
+        name: String,
+        visibility: Option<Vec<VisibilityArgument>>,
+    ) -> anyhow::Result<()> {
+        self.record_target(
+            name,
+            PackageTargetKind::JavaPluginsFlagAlias,
+            self.visibility_source(visibility, VisibilitySource::PackageDefault)?,
+        )
+    }
+
     fn native_toolchain_target(
         &self,
         name: String,
@@ -2517,6 +2538,7 @@ fn native_rule_class(kind: &PackageTargetKind) -> Option<NativeRuleClass> {
         PackageTargetKind::Alias { .. } => NativeRuleClass::Alias,
         PackageTargetKind::LabelFlag(_) => NativeRuleClass::LabelFlag,
         PackageTargetKind::ConfigSetting { .. } => NativeRuleClass::ConfigSetting,
+        PackageTargetKind::JavaPluginsFlagAlias => NativeRuleClass::JavaPluginsFlagAlias,
         PackageTargetKind::TestSuite { .. } => NativeRuleClass::TestSuite,
         PackageTargetKind::NativeToolchain(native) => match native {
             NativeToolchainTarget::ConstraintSetting { .. } => NativeRuleClass::ConstraintSetting,
@@ -2761,6 +2783,7 @@ fn native_rule_attributes(
                 CoercedAttributeValue::LabelList(setting.constraint_values.value.clone()),
             );
         }
+        PackageTargetKind::JavaPluginsFlagAlias => {}
         PackageTargetKind::TestSuite { membership, tags } => {
             set_native_value(
                 class,
@@ -3405,6 +3428,19 @@ fn filegroup_global<'v>(
         .transpose()?;
     recorder.filegroup(name.to_owned(), srcs, visibility.map(|value| value.items))?;
     recorder.set_native_generator_from_evaluator(name, eval)?;
+    Ok(NoneType)
+}
+
+fn java_plugins_flag_alias_global<'v>(
+    name: &str,
+    visibility: Option<UnpackVisibility>,
+    kwargs: SmallMap<String, Value<'v>>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> anyhow::Result<NoneType> {
+    let recorder = PackageRecorder::from_evaluator(eval)?;
+    recorder.java_plugins_flag_alias(name.to_owned(), visibility.map(|value| value.items))?;
+    recorder.set_native_generator_from_evaluator(name, eval)?;
+    recorder.set_native_overrides(name, kwargs)?;
     Ok(NoneType)
 }
 
@@ -9573,6 +9609,15 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
+    fn java_plugins_flag_alias<'v>(
+        name: &str,
+        visibility: Option<UnpackVisibility>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        java_plugins_flag_alias_global(name, visibility, kwargs, eval)
+    }
+
     fn test_suite<'v>(
         name: &str,
         tests: Option<Value<'v>>,
@@ -10345,6 +10390,16 @@ fn native_methods(builder: &mut MethodsBuilder) {
         let recorder = PackageRecorder::from_evaluator(eval)?;
         recorder.set_native_overrides(name, kwargs)?;
         Ok(NoneType)
+    }
+
+    fn java_plugins_flag_alias<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        name: &str,
+        visibility: Option<UnpackVisibility>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        java_plugins_flag_alias_global(name, visibility, kwargs, eval)
     }
 
     fn test_suite<'v>(

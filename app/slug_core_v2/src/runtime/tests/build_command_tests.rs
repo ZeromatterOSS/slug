@@ -1803,6 +1803,53 @@ async fn build_command_root_real_branches_use_no_legacy_keys_and_structure_missi
 }
 
 #[tokio::test]
+async fn java_plugins_flag_alias_direct_build_fails_configured_analysis() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(LegacyBuildTracker::default());
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let source = "java_plugins_flag_alias(name = 'plugins')\n";
+    for (variant, contents, configuration) in [
+        (41, source, build_test_configuration("target")),
+        (
+            42,
+            "# A changed BUILD still declares the same native rule\njava_plugins_flag_alias(name = 'plugins')\n",
+            build_test_configuration_with_root_setting("changed"),
+        ),
+        (41, source, build_test_configuration("target")),
+    ] {
+        let key = BuildCommandRootKey::new(
+            workspace.clone(),
+            &[TargetPattern::parse("//native:plugins").unwrap()],
+            configuration,
+        )
+        .unwrap();
+        let mut epoch = BuildRootEpoch::base(variant);
+        epoch.package("native", contents, variant);
+        let user_data = UserComputationData {
+            activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        let mut transaction =
+            build_root_transaction_with_data(&dice, epoch.build(), user_data).await;
+        let value = compute_build_root(&mut transaction, &key, &tracker).await;
+        assert!(
+            matches!(
+                value,
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref result)
+                    if matches!(
+                        result.as_ref(),
+                        Err(BuildCommandError {
+                            kind: BuildCommandErrorKind::Analysis(error),
+                        }) if error.to_string().contains("is not a Starlark rule")
+                    )
+            ),
+            "native Java plugins flag alias must not complete as LoadedOnly: {value:?}"
+        );
+    }
+    assert_eq!(tracker.forbidden.load(Ordering::Relaxed), 0);
+}
+
+#[tokio::test]
 async fn build_command_root_replays_root_module_and_build_create_edit_delete_restore() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();

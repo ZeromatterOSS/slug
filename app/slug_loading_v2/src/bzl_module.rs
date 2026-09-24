@@ -6164,10 +6164,10 @@ fn loaded_external_target_kind(
         | PackageTargetKind::Alias { .. }
         | PackageTargetKind::LabelFlag(_)
         | PackageTargetKind::ConfigSetting { .. } => None,
-        // Native toolchain targets are retained as typed native targets even
+        // Native toolchain and Java plugin alias targets remain typed native
         // when the external BUILD uses `load()`. The load gate only protects
         // target kinds whose loaded form is not yet represented.
-        PackageTargetKind::NativeToolchain(_) => None,
+        PackageTargetKind::NativeToolchain(_) | PackageTargetKind::JavaPluginsFlagAlias => None,
         PackageTargetKind::Genrule(_) => None,
         PackageTargetKind::TestSuite { .. } => Some("test_suite"),
         PackageTargetKind::PackageGroup { .. } => Some("package_group"),
