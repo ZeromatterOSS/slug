@@ -482,6 +482,102 @@ java_no_initializer_rule = rule(implementation = _java_impl, attrs = JAVA_ATTRS)
 }
 
 #[test]
+fn apple_xcode_configuration_field_freezes_as_a_private_label_default() {
+    let workspace = scratch("apple-xcode-field");
+    let package = workspace.join("swift/toolchains");
+    write(
+        &package.join("xcode_swift_toolchain.bzl"),
+        r#"
+# rules_swift 3.1.2 swift/toolchains/xcode_swift_toolchain.bzl:968-974
+# SHA-256: 3d1e1ec71dbce9262ce75bf456fbf62c1625ad4005b0efa354df6f93bfe5ed30
+def _impl(ctx):
+    fail("loading must not invoke the Swift toolchain implementation")
+
+xcode_swift_toolchain = rule(
+    implementation = _impl,
+    attrs = {
+        "_xcode_config": attr.label(
+            default = configuration_field(
+                name = "xcode_config_label",
+                fragment = "apple",
+            ),
+        ),
+    },
+)
+"#,
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "load(':xcode_swift_toolchain.bzl', 'xcode_swift_toolchain')\nxcode_swift_toolchain(name = 'toolchain')\n",
+    );
+
+    let loaded = load_package(&workspace, &package);
+    let rule = starlark_rule(&loaded, "toolchain");
+    assert!(rule.required_fragments().is_empty());
+    assert_eq!(
+        rule.late_bound_rule_attributes().collect::<Vec<_>>(),
+        [("_xcode_config", "xcode_config_label")]
+    );
+    let configured = rule.configured_dependency_attributes().collect::<Vec<_>>();
+    assert_eq!(configured.len(), 1);
+    let attribute = configured[0];
+    assert_eq!(attribute.name(), "_xcode_config");
+    assert_eq!(attribute.user_name(), None);
+    assert_eq!(attribute.kind(), AttributeKind::Label);
+    assert!(!attribute.is_hidden());
+    let ConfiguredDependencyDefault::ConfigurationField(identity) = attribute.default() else {
+        panic!("Swift Xcode private label default lost its typed field identity")
+    };
+    assert_eq!(identity.field().fragment_name(), "apple");
+    assert_eq!(identity.field().field_name(), "xcode_config_label");
+    assert_eq!(identity.tools_repository().as_str(), "bazel_tools");
+
+    for (name, source, expected) in [
+        (
+            "unknown-apple-fragment",
+            "X = configuration_field(fragment = 'apple_missing', name = 'xcode_config_label')\n",
+            "invalid configuration fragment name 'apple_missing'",
+        ),
+        (
+            "unknown-apple-field",
+            "X = configuration_field(fragment = 'apple', name = 'xcode_missing')\n",
+            "invalid configuration field name 'xcode_missing' on fragment 'apple'",
+        ),
+        (
+            "public-apple-attribute",
+            "def impl(ctx): return []\nbad = rule(implementation = impl, attrs = {'xcode_config': attr.label(default = configuration_field(fragment = 'apple', name = 'xcode_config_label'))})\n",
+            "the attribute must be private (i.e. start with '_'). Found 'xcode_config'",
+        ),
+        (
+            "non-label-apple-attribute",
+            "def impl(ctx): return []\nbad = rule(implementation = impl, attrs = {'_xcode_config': attr.string(default = configuration_field(fragment = 'apple', name = 'xcode_config_label'))})\n",
+            "configuration_field may only be the default of attr.label",
+        ),
+    ] {
+        let package = workspace.join(name);
+        write(&package.join("defs.bzl"), source);
+        write(&package.join("BUILD.bazel"), "load(':defs.bzl', 'bad')\n");
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "{name}: {error}");
+    }
+
+    let build_only = workspace.join("build-apple-field");
+    write(
+        &build_only.join("BUILD.bazel"),
+        "X = configuration_field(fragment = 'apple', name = 'xcode_config_label')\n",
+    );
+    let error = try_load_package(&workspace, &build_only)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("configuration_field") && error.contains("not found"),
+        "{error}"
+    );
+}
+
+#[test]
 fn subrule_declaration_validation_matches_the_admitted_bazel_matrix() {
     let cases = [
         (

@@ -1043,6 +1043,61 @@ mod command_configuration_tests {
     }
 
     #[test]
+    fn selected_apple_xcode_field_is_typed_compact_and_fails_closed() {
+        assert!(ConfigurationField::is_fragment_name("apple"));
+        assert_eq!(size_of::<ConfigurationField>(), 1);
+        #[cfg(target_pointer_width = "64")]
+        assert_eq!(size_of::<ConfigurationFieldIdentity>(), 32);
+
+        let field = ConfigurationField::from_starlark_names("apple", "xcode_config_label")
+            .expect("the Bazel 9.2 Apple Xcode field is admitted");
+        assert_eq!(field, ConfigurationField::AppleXcodeConfigLabel);
+        assert_eq!(field.fragment_name(), "apple");
+        assert_eq!(field.field_name(), "xcode_config_label");
+        assert_eq!(field.cpp_field(), None);
+        assert_eq!(field.coverage_field(), None);
+        assert_eq!(field.java_field(), None);
+        assert_eq!(
+            ConfigurationField::from_starlark_names("apple", "missing"),
+            None
+        );
+        assert_eq!(
+            ConfigurationField::from_starlark_names("cpp", "xcode_config_label"),
+            None
+        );
+        assert_eq!(
+            ConfigurationField::from_starlark_names("unknown", "xcode_config_label"),
+            None
+        );
+
+        let identity = |field, tools| {
+            ConfigurationFieldIdentity::new(field, CanonicalRepoName::new(tools).unwrap())
+        };
+        let first = identity(field, "bazel_tools+one");
+        let restored = identity(field, "bazel_tools+one");
+        let remapped = identity(field, "bazel_tools+two");
+        let proto = identity(ConfigurationField::ProtoToolchainForJava, "bazel_tools+one");
+        let hash = |value: &ConfigurationFieldIdentity| {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        };
+        assert_eq!(first, restored);
+        assert_eq!(hash(&first), hash(&restored));
+        assert_ne!(first, remapped);
+        assert_ne!(first, proto);
+        assert_eq!(first.field(), field);
+        assert_eq!(first.tools_repository().as_str(), "bazel_tools+one");
+        assert_eq!(
+            configuration()
+                .configuration_field_label(&first)
+                .unwrap_err()
+                .to_string(),
+            "configuration_field(fragment = \"apple\", name = \"xcode_config_label\") configured resolution is unsupported"
+        );
+    }
+
+    #[test]
     fn coverage_command_override_observes_mapping_last_wins_and_boolean_independence() {
         let base = configuration();
         let mapping = mapping();

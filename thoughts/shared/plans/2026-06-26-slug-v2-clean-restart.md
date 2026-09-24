@@ -29,21 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-111-m7a-apple-common-platform-struct-r1
+Packet: WP-7-112-m7a-apple-configuration-field-declaration-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP811 admits the load-time `apple_common.platform` struct demanded by
-authenticated rules_swift 3.1.2 at registration row 56. Pinned Bazel 9.2
-builtins source and an offline oracle establish ten structural, hashable
-platform values, nine read eagerly by `target_triples.bzl`. The bounded
-Apple facade extension uses existing Starlark structs; their generic text
-formatting is explicitly Slug-native. Three focused/protected tests and
-independent final reviews pass. The rebuilt authentic smoke clears the old
-platform absence and reaches a separate
-`configuration_field(fragment = "apple")` error at
-`swift/toolchains:xcode_swift_toolchain.bzl:970`. Apple configuration, Xcode,
-configured Swift and M7A close remain deferred. WP810 was accepted at
-`4272bd781`.
+WP812 admits only load-time recognition and typed private-label-default
+retention for `configuration_field(fragment = "apple", name =
+"xcode_config_label")`. Pinned Bazel 9.2 source and offline positive/negative
+oracle support the finite declaration; focused Core/Loading and safe-lifetime
+same-DICE tests pass. The rebuilt authentic smoke clears the rules_swift
+row-56 Apple stop and reaches a distinct rules_rust/bazel_skylib
+`native.alias(visibility = None)` error. Two additional old whole-rule DICE
+tests failed during diagnostics and remain unresolved, not accepted as
+passing. Configured Apple/Xcode, default-label package edges, Swift actions,
+remote transport and M7A close remain deferred. WP811 was accepted at
+`580dee127`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

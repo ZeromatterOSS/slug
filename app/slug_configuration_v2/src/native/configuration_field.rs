@@ -127,6 +127,7 @@ pub enum ConfigurationField {
     ProtoToolchainForJavaLite,
     ProtoToolchainForJava,
     ProtoToolchainForCc,
+    AppleXcodeConfigLabel,
 }
 
 impl ConfigurationField {
@@ -174,12 +175,13 @@ impl ConfigurationField {
                 "proto_toolchain_for_cc" => Some(Self::ProtoToolchainForCc),
                 _ => None,
             },
+            "apple" => (name == "xcode_config_label").then_some(Self::AppleXcodeConfigLabel),
             _ => None,
         }
     }
 
     pub fn is_fragment_name(fragment: &str) -> bool {
-        matches!(fragment, "cpp" | "coverage" | "java" | "proto")
+        matches!(fragment, "cpp" | "coverage" | "java" | "proto" | "apple")
     }
 
     pub const fn fragment_name(self) -> &'static str {
@@ -191,6 +193,7 @@ impl ConfigurationField {
             Self::ProtoToolchainForJavaLite
             | Self::ProtoToolchainForJava
             | Self::ProtoToolchainForCc => "proto",
+            Self::AppleXcodeConfigLabel => "apple",
             _ => "cpp",
         }
     }
@@ -203,6 +206,7 @@ impl ConfigurationField {
             Self::ProtoToolchainForJavaLite => return "proto_toolchain_for_java_lite",
             Self::ProtoToolchainForJava => return "proto_toolchain_for_java",
             Self::ProtoToolchainForCc => return "proto_toolchain_for_cc",
+            Self::AppleXcodeConfigLabel => return "xcode_config_label",
             _ => {}
         }
         match (self.cpp_field(), self.coverage_field()) {
@@ -230,7 +234,8 @@ impl ConfigurationField {
             | Self::JavaLocalOptimizationConfiguration
             | Self::ProtoToolchainForJavaLite
             | Self::ProtoToolchainForJava
-            | Self::ProtoToolchainForCc => return None,
+            | Self::ProtoToolchainForCc
+            | Self::AppleXcodeConfigLabel => return None,
         })
     }
 

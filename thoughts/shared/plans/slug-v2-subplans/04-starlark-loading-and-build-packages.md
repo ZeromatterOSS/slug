@@ -9450,3 +9450,26 @@ are not exact claims. The rebuilt authentic build clears the former
 error in `@@rules_swift+//swift/toolchains:xcode_swift_toolchain.bzl:970`.
 The remaining outer Apple facade, Xcode/toolchain/configuration behavior,
 repository materialization, configured Swift and M7A close remain deferred.
+
+### Apple configuration-field declaration accepted (2026-09-24)
+
+WP812 extends the existing one-byte typed `ConfigurationField` with Bazel
+9.2's sole `apple` field, `xcode_config_label`, for `.bzl` initialization and
+private `attr.label` defaults. The source-mapped field-plus-tools-repository
+identity already freezes in Loading and participates structurally in rule
+schemas; no new DICE key, lock, parser, string fallback or retained collection
+is introduced. The sole configured projection now explicitly refuses the
+Apple field before dependency resolution. The pinned annotation, Bazel
+late-bound-default source and offline private-attribute positive/four-negative
+query oracle support only the constructor/schema admission, not the Bazel
+loading default-label query edge or configured Xcode alias/option resolution.
+
+Focused Core, Swift-shaped Loading, direct tools-mapping A/B/A and same-DICE
+Apple-source A/B/A tests pass. The latter retains the loaded package while
+extracting only an owned field identity. Two old generic/full-rule DICE tests
+failed when run diagnostically, including one with a plausible stale frozen
+value lifetime; they are unresolved and not acceptance evidence. The rebuilt
+authentic build clears the row-56 Apple-field error and reaches a separate
+rules_rust/bazel_skylib `native.alias(visibility = None)` Loading failure.
+Generated Xcode targets, Apple configuration, Swift analysis/actions and M7A
+close remain deferred.

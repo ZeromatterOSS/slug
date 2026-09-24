@@ -340,6 +340,7 @@ pub enum SlugConfigurationError {
     InvalidCppConfiguration { reason: &'static str },
     UnsupportedJavaConfigurationField { field: ConfigurationField },
     UnsupportedProtoConfigurationField { field: ConfigurationField },
+    UnsupportedAppleConfigurationField { field: ConfigurationField },
     ActionEnvironment { reason: &'static str },
 }
 
@@ -425,6 +426,11 @@ impl fmt::Display for SlugConfigurationError {
             Self::UnsupportedProtoConfigurationField { field } => write!(
                 formatter,
                 "configuration_field(fragment = \"proto\", name = \"{}\") configured resolution is unsupported",
+                field.field_name()
+            ),
+            Self::UnsupportedAppleConfigurationField { field } => write!(
+                formatter,
+                "configuration_field(fragment = \"apple\", name = \"{}\") configured resolution is unsupported",
                 field.field_name()
             ),
             Self::ActionEnvironment { reason } => {
@@ -1091,6 +1097,11 @@ impl SlugConfiguration {
     ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
         if identity.field().java_field().is_some() {
             return Err(SlugConfigurationError::UnsupportedJavaConfigurationField {
+                field: identity.field(),
+            });
+        }
+        if identity.field() == ConfigurationField::AppleXcodeConfigLabel {
+            return Err(SlugConfigurationError::UnsupportedAppleConfigurationField {
                 field: identity.field(),
             });
         }

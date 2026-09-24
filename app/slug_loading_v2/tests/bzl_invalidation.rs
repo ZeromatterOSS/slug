@@ -28,6 +28,7 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_loading_v2::BzlModuleEvaluator;
+use slug_loading_v2::ConfiguredDependencyDefault;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::bzl_load_cycle_detector;
 use slug_loading_v2::keys::BzlModuleEvalKey;
@@ -1925,6 +1926,62 @@ fn toolchain_requirements_have_definition_lifecycle_and_semantic_equality() {
     write(&defs, &definitions(":type_a", "initial"));
     let marker_restored = load();
     assert_eq!(restored, marker_restored);
+}
+
+#[test]
+fn same_dice_apple_configuration_field_source_restores_typed_identity() {
+    let workspace = scratch("apple-configuration-field-identity");
+    let package = workspace.join("pkg");
+    let defs = package.join("defs.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = 'loading')\n",
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "load(':defs.bzl', 'probe')\nprobe(name = 'subject')\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load_identity = |fragment: &str, field: &str| {
+        write(
+            &defs,
+            &format!(
+                "def _impl(ctx): return []\nprobe = rule(implementation = _impl, attrs = {{'_xcode': attr.label(default = configuration_field(fragment = '{fragment}', name = '{field}'))}})\n"
+            ),
+        );
+        let loaded = load_package(
+            &dice,
+            &runtime,
+            &workspace,
+            &package,
+            std::slice::from_ref(&defs),
+        )
+        .unwrap();
+        let rule = loaded
+            .targets
+            .iter()
+            .find_map(|target| match &target.kind {
+                PackageTargetKind::StarlarkRule(rule) if target.name == "subject" => Some(rule),
+                _ => None,
+            })
+            .unwrap();
+        let attribute = rule
+            .configured_dependency_attributes()
+            .find(|attribute| attribute.name() == "_xcode")
+            .unwrap();
+        let ConfiguredDependencyDefault::ConfigurationField(identity) = attribute.default() else {
+            panic!("private Xcode default lost its typed field")
+        };
+        identity.clone()
+    };
+
+    let initial = load_identity("apple", "xcode_config_label");
+    assert_eq!(initial.field().fragment_name(), "apple");
+    let changed = load_identity("cpp", "fdo_profile");
+    assert_ne!(initial, changed);
+    let restored = load_identity("apple", "xcode_config_label");
+    assert_eq!(initial, restored);
 }
 
 #[test]

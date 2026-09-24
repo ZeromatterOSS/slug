@@ -36397,7 +36397,7 @@ fn bazel_configuration_field_is_bzl_only_and_fails_closed() {
 }
 
 #[test]
-fn proto_configuration_fields_retain_private_defaults_and_tools_mapping() {
+fn proto_and_apple_configuration_fields_retain_private_defaults_and_tools_mapping() {
     const SOURCE: &str = r#"
 def _aspect_impl(target, ctx): return []
 def _if_legacy_toolchain(attrs): return {}
@@ -36408,6 +36408,7 @@ FIELDS = aspect(implementation = _aspect_impl, attrs = {
     "_lite": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java_lite")),
     "_java": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java")),
     "_cc": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_cc")),
+    "_xcode": attr.label(default = configuration_field(fragment = "apple", name = "xcode_config_label")),
 })
 "#;
     let owner = |label: &str, tools: &str| BzlModuleIdentity {
@@ -36430,7 +36431,7 @@ FIELDS = aspect(implementation = _aspect_impl, attrs = {
             .unwrap()
             .downcast::<FrozenAspectDefinition>()
             .unwrap();
-        assert_eq!(aspect.late_bound_attributes.len(), 3);
+        assert_eq!(aspect.late_bound_attributes.len(), 4);
         aspect
             .late_bound_attributes
             .iter()
@@ -36467,14 +36468,16 @@ FIELDS = aspect(implementation = _aspect_impl, attrs = {
         [
             "proto_toolchain_for_java_lite",
             "proto_toolchain_for_java",
-            "proto_toolchain_for_cc"
+            "proto_toolchain_for_cc",
+            "xcode_config_label"
         ]
     );
     assert!(
-        first
+        first[..3]
             .iter()
             .all(|identity| identity.field().fragment_name() == "proto")
     );
+    assert_eq!(first[3].field().fragment_name(), "apple");
     assert!(
         first
             .iter()
