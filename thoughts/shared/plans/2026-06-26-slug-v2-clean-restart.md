@@ -29,19 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-142-m7a-repository-path-dirname-r1
+Packet: WP-7-143-m7a-repository-gcc-include-prefix-r1
 Status: ACCEPTED; M7A remains partial
 
-WP842 admits Bazel 9.2 lexical parent on Which-origin executable and
-observed-present Host paths, with root `None`, path-valued equality and
-plain Host text. Missing Host, Label and Generated dirname origins remain
-deferred. Fresh three-row Bazel/Slug evidence passes; authentic cquery
-clears the line-500 `dirname` error and next reaches Core's separate
-prefix guard after a seventh source-authored
-`builtin_include_directory_paths` effect. Independent FINAL review
-accepted the bounded path slice.
-WP841's six-effect GCC prefix and Homebrew gate remain accepted at
-`962dbd2ed`; full rules_cc toolchain/root Build remain deferred. See
+WP843 adds only the source-authored seventh, executable
+`builtin_include_directory_paths` effect after WP841's six-effect GCC
+prefix, with Slug-native shape-only Core admission and finite byte cap;
+the execute grammar is unchanged. Focused Core tests and fresh three-row
+Bazel/Slug evidence pass. Authentic cquery now clears GCC prefix/probes and
+stops at Loading's missing `native.cc_toolchain_suite` in generated rules_cc
+`BUILD`; independent FINAL review accepted the bounded slice. WP842 dirname remains
+accepted at `97dd73e9e`; full rules_cc toolchain/root Build remain deferred. See
 `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

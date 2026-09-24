@@ -101,8 +101,10 @@ mod linux {
         "cc_wrapper.sh",
         "deps_scanner_wrapper.sh",
     ];
+    const INCLUDE_PATH_EFFECT: &str = "builtin_include_directory_paths";
     const MAX_TEMPLATE_EFFECT_BYTES: usize = 64 * 1024;
     const MAX_TEMPLATE_PREFIX_BYTES: usize = 128 * 1024;
+    const MAX_INCLUDE_PATH_EFFECT_BYTES: usize = 64 * 1024;
     const MAX_STREAM_BYTES: usize = 1024 * 1024;
     const MAX_STATUS_BYTES: u64 = 4096;
     const TMPFS_BYTES: &str = "67108864";
@@ -387,10 +389,32 @@ mod linux {
             }
             template_bytes += file.content().len();
         }
-        if template_effects.next().is_some() || template_bytes > MAX_TEMPLATE_PREFIX_BYTES {
+        if template_bytes > MAX_TEMPLATE_PREFIX_BYTES {
             return Err(RepositoryProcessError::Policy(
-                "generated GCC template prefix has an unexpected effect or exceeds the byte limit",
+                "generated GCC template prefix exceeds the byte limit",
             ));
+        }
+        if let Some(effect) = template_effects.next() {
+            let GeneratedRepositoryOrderedEffectRef::File(file) = effect else {
+                return Err(RepositoryProcessError::Policy(
+                    "generated GCC include-path effect has an unexpected kind",
+                ));
+            };
+            if file.path() != INCLUDE_PATH_EFFECT || !file.executable() {
+                return Err(RepositoryProcessError::Policy(
+                    "generated GCC include-path destination or mode is unsupported",
+                ));
+            }
+            if file.content().len() > MAX_INCLUDE_PATH_EFFECT_BYTES {
+                return Err(RepositoryProcessError::Policy(
+                    "generated GCC include-path effect exceeds the byte limit",
+                ));
+            }
+            if template_effects.next().is_some() {
+                return Err(RepositoryProcessError::Policy(
+                    "generated GCC prefix has an unexpected eighth effect",
+                ));
+            }
         }
         Ok(true)
     }
@@ -1455,6 +1479,74 @@ mod linux {
                 false
             );
             assert_eq!(validate_prefix(&template_prefix(&FILES)).unwrap(), true);
+            let with_include = [
+                FILES[0],
+                FILES[1],
+                FILES[2],
+                (super::INCLUDE_PATH_EFFECT, &b"include paths"[..], true),
+            ];
+            assert_eq!(
+                validate_prefix(&template_prefix(&with_include)).unwrap(),
+                true
+            );
+            let maximum_include = vec![b'x'; super::MAX_INCLUDE_PATH_EFFECT_BYTES];
+            let at_include_cap = [
+                FILES[0],
+                FILES[1],
+                FILES[2],
+                (super::INCLUDE_PATH_EFFECT, maximum_include.as_slice(), true),
+            ];
+            assert_eq!(
+                validate_prefix(&template_prefix(&at_include_cap)).unwrap(),
+                true
+            );
+            let oversized_include = vec![b'x'; super::MAX_INCLUDE_PATH_EFFECT_BYTES + 1];
+            let over_include_cap = [
+                FILES[0],
+                FILES[1],
+                FILES[2],
+                (
+                    super::INCLUDE_PATH_EFFECT,
+                    oversized_include.as_slice(),
+                    true,
+                ),
+            ];
+            assert!(matches!(
+                validate_prefix(&template_prefix(&over_include_cap)),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let wrong_include_path = [FILES[0], FILES[1], FILES[2], ("other", &b"x"[..], true)];
+            assert!(matches!(
+                validate_prefix(&template_prefix(&wrong_include_path)),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let wrong_include_mode = [
+                FILES[0],
+                FILES[1],
+                FILES[2],
+                (super::INCLUDE_PATH_EFFECT, &b"x"[..], false),
+            ];
+            assert!(matches!(
+                validate_prefix(&template_prefix(&wrong_include_mode)),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let mut wrong_include_order = with_include;
+            wrong_include_order.swap(2, 3);
+            assert!(matches!(
+                validate_prefix(&template_prefix(&wrong_include_order)),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let eighth = [
+                FILES[0],
+                FILES[1],
+                FILES[2],
+                (super::INCLUDE_PATH_EFFECT, &b"x"[..], true),
+                ("extra", &b"x"[..], true),
+            ];
+            assert!(matches!(
+                validate_prefix(&template_prefix(&eighth)),
+                Err(RepositoryProcessError::Policy(_))
+            ));
             assert!(matches!(
                 validate_prefix(&template_prefix(&FILES[..2])),
                 Err(RepositoryProcessError::Policy(_))
@@ -1517,6 +1609,35 @@ mod linux {
                 validate_prefix(&wrong_kind.finish()),
                 Err(RepositoryProcessError::Policy(_))
             ));
+            let mut wrong_include_kind = GeneratedRepositoryFileEffectPlan::builder();
+            for destination in ["cc_toolchain_config.bzl", "armeabi_cc_toolchain_config.bzl"] {
+                wrong_include_kind
+                    .push_symlink(destination.into(), source_link(), Arc::from(&b"source"[..]))
+                    .unwrap();
+            }
+            wrong_include_kind
+                .push(
+                    "tools/cpp/empty.cc".into(),
+                    Arc::from(&b"int main() {}"[..]),
+                    true,
+                )
+                .unwrap();
+            for (path, content, executable) in FILES {
+                wrong_include_kind
+                    .push(path.into(), Arc::from(content), executable)
+                    .unwrap();
+            }
+            wrong_include_kind
+                .push_symlink(
+                    super::INCLUDE_PATH_EFFECT.into(),
+                    source_link(),
+                    Arc::from(&b"source"[..]),
+                )
+                .unwrap();
+            assert!(matches!(
+                validate_prefix(&wrong_include_kind.finish()),
+                Err(RepositoryProcessError::Policy(_))
+            ));
             let mut archive = GeneratedRepositoryFileEffectPlan::builder();
             archive
                 .push_archive(
@@ -1540,21 +1661,39 @@ mod linux {
         }
 
         #[tokio::test]
-        async fn generated_gcc_templates_remain_inert_for_guarded_compiler_argv() {
+        async fn generated_gcc_prefix_files_remain_inert_for_guarded_compiler_argv() {
             assert!(
                 bwrap().is_file(),
                 "Linux sandbox prerequisite is unavailable"
             );
             let workspace = tempfile::tempdir_in("/tmp").unwrap();
-            let marker = workspace.path().join("template-executed");
-            let adversarial = format!(
+            let template_marker = workspace.path().join("template-executed");
+            let include_marker = workspace.path().join("include-executed");
+            let adversarial_template = format!(
                 "#!/bin/sh\nprintf wrapper-executed >&2\nprintf wrapper-executed > '{}'\n",
-                marker.display()
+                template_marker.display()
+            );
+            let adversarial_include = format!(
+                "#!/bin/sh\nprintf include-executed\nprintf include-executed >&2\nprintf include-executed > '{}'\n",
+                include_marker.display()
             );
             let files = [
-                ("validate_static_library.sh", adversarial.as_bytes(), true),
-                ("cc_wrapper.sh", adversarial.as_bytes(), true),
-                ("deps_scanner_wrapper.sh", adversarial.as_bytes(), true),
+                (
+                    "validate_static_library.sh",
+                    adversarial_template.as_bytes(),
+                    true,
+                ),
+                ("cc_wrapper.sh", adversarial_template.as_bytes(), true),
+                (
+                    "deps_scanner_wrapper.sh",
+                    adversarial_template.as_bytes(),
+                    true,
+                ),
+                (
+                    super::INCLUDE_PATH_EFFECT,
+                    adversarial_include.as_bytes(),
+                    true,
+                ),
             ];
             let prefix = template_prefix(&files);
             assert_eq!(validate_prefix(&prefix).unwrap(), true);
@@ -1565,6 +1704,50 @@ mod linux {
                 )
                 .unwrap();
             let logical_source = "@@selected//tools/cpp/empty.cc";
+            assert!(matches!(
+                match_form(
+                    &["-Wthread-safety", "-o", "/dev/null", "-c", logical_source,],
+                    logical_source,
+                ),
+                Ok(ProbeForm::Compiler)
+            ));
+            let argv = [
+                OsString::from("/usr/bin/gcc"),
+                OsString::from("-Wthread-safety"),
+                OsString::from("-o"),
+                OsString::from("/dev/null"),
+                OsString::from("-c"),
+                OsString::from("/exec/tools/cpp/empty.cc"),
+            ];
+            let (_status, stdout, stderr) =
+                run_sandboxed(bwrap(), staged.path(), &argv, Duration::from_secs(10))
+                    .await
+                    .unwrap();
+            assert!(!template_marker.exists());
+            assert!(!include_marker.exists());
+            for sentinel in [&b"wrapper-executed"[..], &b"include-executed"[..]] {
+                assert!(
+                    !stdout
+                        .windows(sentinel.len())
+                        .any(|bytes| bytes == sentinel)
+                );
+                assert!(
+                    !stderr
+                        .windows(sentinel.len())
+                        .any(|bytes| bytes == sentinel)
+                );
+            }
+
+            // Keep the previously accepted six-effect linker-discovery
+            // nonexecution proof alongside the new seven-effect compiler form.
+            let six_effect_prefix = template_prefix(&files[..3]);
+            assert_eq!(validate_prefix(&six_effect_prefix).unwrap(), true);
+            let six_effect_staged =
+                super::super::super::repository_io::stage_generated_repository_file_effect_prefix(
+                    &six_effect_prefix,
+                    workspace.path(),
+                )
+                .unwrap();
             assert!(matches!(
                 match_form(
                     &[
@@ -1580,7 +1763,7 @@ mod linux {
                 ),
                 Ok(ProbeForm::LinkerDiscovery("lld"))
             ));
-            let argv = [
+            let linker_argv = [
                 OsString::from("/usr/bin/gcc"),
                 OsString::from("/exec/tools/cpp/empty.cc"),
                 OsString::from("-o"),
@@ -1590,11 +1773,15 @@ mod linux {
                 OsString::from("-fuse-ld=lld"),
                 OsString::from("-v"),
             ];
-            let (_status, stdout, stderr) =
-                run_sandboxed(bwrap(), staged.path(), &argv, Duration::from_secs(10))
-                    .await
-                    .unwrap();
-            assert!(!marker.exists());
+            let (_status, stdout, stderr) = run_sandboxed(
+                bwrap(),
+                six_effect_staged.path(),
+                &linker_argv,
+                Duration::from_secs(10),
+            )
+            .await
+            .unwrap();
+            assert!(!template_marker.exists());
             assert!(
                 !stdout
                     .windows(b"wrapper-executed".len())

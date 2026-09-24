@@ -2983,3 +2983,15 @@ Allocative shape and retained collections are unchanged. The direct
 path-provenance controls, protected Loading tests and independent fresh
 Bazel/Slug dirname row discriminate the change. No memory or performance
 gain is claimed; missing-path and other-origin dirname stay deferred.
+
+WP843 retains one additional source-authored include-path file in the
+existing Arc-backed ordered effect plan, with a 64-KiB seventh-file cap
+and unchanged 128-KiB three-wrapper aggregate cap. Core's staged file is
+private request scratch and inert under the finite GCC grammar. Structural
+path/bytes/mode equality, selected environment and execute transcript
+remain the DICE owners; no new key, collection, interner, hash shortcut,
+global cache, lock or memory-accounting shape is introduced. The extra
+bounded staging/retention cost is not a speedup claim. Focused Core tests,
+an independent fresh Bazel/Slug row and authentic progression to generated
+rules_cc `BUILD` loading discriminate the change; toolchain closure and
+an exact call-14 argv transcript remain open.

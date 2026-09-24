@@ -601,6 +601,20 @@ rows. Authentic cquery clears `path.dirname` and reaches a separate Core
 prefix stop after the source-authored `builtin_include_directory_paths`
 effect; full toolchain and M7A remain open.
 
+### Selected GCC include-path prefix accepted (WP843, 2026-09-24)
+
+After the six-effect rules_cc prefix, Core now admits only one executable
+regular file named `builtin_include_directory_paths`, capped at 64 KiB;
+wrong kind, order, mode, destination, eighth effect and overflow fail before
+staging. Existing 128-KiB wrapper aggregate, Homebrew gate and finite GCC
+argv grammar remain unchanged. Loading's selected repository-rule owner
+retains the file's exact bytes/mode in its ordered DICE transcript; Core
+attests only shape, with a Slug-native cap and confined read-only staging.
+A fresh independent seven-effect Bazel/Slug row and adversarial inert-file
+test pass. Authentic cquery clears the GCC probes and reaches generated
+rules_cc `BUILD` loading, where `native.cc_toolchain_suite` is unsupported;
+call-14 argv was not separately captured and full toolchain/M7A remain open.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

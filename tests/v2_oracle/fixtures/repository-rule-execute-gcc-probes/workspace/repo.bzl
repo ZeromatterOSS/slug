@@ -58,3 +58,35 @@ def _prefix_impl(ctx):
     ctx.file("BUILD.bazel", "filegroup(name = 'linker_prefix_probe')\n")
 
 gcc_prefix_repo = repository_rule(implementation = _prefix_impl, environ = ["PATH", "LC_ALL"])
+
+def _include_prefix_impl(ctx):
+    source = ctx.path(Label("@@prefix_source+//:source.bzl"))
+    ctx.symlink(source, "cc_toolchain_config.bzl")
+    ctx.symlink(source, "armeabi_cc_toolchain_config.bzl")
+    ctx.file("tools/cpp/empty.cc", "int main() {}")
+
+    cc = ctx.which("gcc")
+    if cc == None:
+        fail("gcc was not found through the fixture PATH")
+
+    ctx.file("validate_static_library.sh", "# inert offline prefix\n", executable = True)
+    ctx.file("cc_wrapper.sh", "# inert offline prefix\n", executable = True)
+    ctx.file("deps_scanner_wrapper.sh", "# inert offline prefix\n", executable = True)
+    ctx.file("builtin_include_directory_paths", "synthetic offline include paths\n/usr/include\n")
+
+    option_probe = ctx.execute([
+        cc,
+        "-Wthread-safety",
+        "-o",
+        "/dev/null",
+        "-c",
+        str(ctx.path("tools/cpp/empty.cc")),
+    ])
+    if option_probe.stdout != "":
+        fail("unexpected gcc compiler-option stdout: %r" % option_probe.stdout)
+    if option_probe.return_code != 0 and option_probe.stderr == "":
+        fail("gcc compiler-option failure had no diagnostic")
+
+    ctx.file("BUILD.bazel", "filegroup(name = 'include_prefix_probe')\n")
+
+gcc_include_prefix_repo = repository_rule(implementation = _include_prefix_impl, environ = ["PATH", "LC_ALL"])

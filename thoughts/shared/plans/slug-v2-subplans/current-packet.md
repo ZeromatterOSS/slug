@@ -1,176 +1,172 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-142-m7a-repository-path-dirname-r1
+Packet: WP-7-143-m7a-repository-gcc-include-prefix-r1
 Status: ACCEPTED; M7A remains partial
 
 ## Outcome and compatibility
 
 Advance the authentic Rust-toolchain `cquery //:probe --output=label` past
-the first post-WP841 stop, `Object of type path has no attribute dirname`
-at pinned rules_cc `unix_cc_configure.bzl:500`, then report the first new
-stop. Admit only lexical `dirname` on a selected
-`repository_ctx.which` executable path or an already observed-present
-absolute Host path, returning a path-valued parent (root returns `None`).
-Do not claim arbitrary repository paths, linker success, generated
-toolchain bytes, root C++ analysis or M7A closure.
+Core's post-WP842 rejection of the seven-effect selected rules_cc GCC
+prefix, then report its first new stop. Admit precisely one ordered,
+regular, executable `builtin_include_directory_paths` file after the
+accepted two symlinks, `tools/cpp/empty.cc`, and three generated wrapper
+files, preceding an already-admitted finite GCC execute form. Do not
+claim the eventual `BUILD.tpl` render, toolchain closure, root C++ analysis,
+arbitrary repository file prefixes, or M7A closure.
 
-The Bazel 9.2 Unix lexical parent spelling, path-valued result, root
-`None`, equality of admitted parent paths, and plain valid-Unicode Host
-path text are **exact**. The parent
-object reuses Slug's Host path identity and its already-known existence;
-Rust Host observations, generated-repository display/path tokens and
-bounded selected-owner execution remain **Slug-native**. `dirname` on a
-missing Host path, Label-source path or generated-repository path, other
-new path methods and Windows path behavior are **unsupported/deferred**.
-Prior WP838/840 `which` lookup and WP839/841 GCC execute/effect slices
-stay exact within their accepted boundaries. Do not widen them to make
-this packet pass.
+The source-authored ordered effect kind, destination, default-executable
+mode and first following `-Wthread-safety` compiler-option argv are
+**exact** within pinned Bazel 9.2/rules_cc 0.2.17 and the selected Linux
+GCC branch. Core's shape-only admission cannot independently attest
+Starlark source provenance: it also allows this prefix before any of the
+already-admitted finite GCC probe forms. That policy, the size cap,
+confined execution, Rust Host observation and generated-repository
+display/path identity are **Slug-native**. The generated file's actual
+bytes remain owned by Loading's existing Starlark execution and DICE
+transcript. Arbitrary headers contents/size, extra effects, changed
+order/mode, Clang/Darwin/Windows branches, arbitrary execute argv and full
+rules_cc/Bazel toolchain bytes are **unsupported/deferred**. WP839/841
+execute and prefix slices and WP842 dirname remain unchanged.
 
-## Source basis and next boundary
+## Source basis and boundary
 
-Pinned Bazel 9.2
-`StarlarkPath.java:127-136` returns a new path from
-`Path.getParentDirectory()`; pinned `Path.java:139-151` returns no
-parent for root. This is lexical and does not stat, resolve symlinks or
-read contents. `StarlarkBaseExternalContext.java:1545-1575` passes an
-existing path object through `repository_ctx.path`, and lines
-2304-2352 author `which`. Pinned rules_cc 0.2.17
-`unix_cc_configure.bzl:493-523` first stringifies
-`cc_path.dirname` at line 500 for `-B`. If neither lld nor gold is
-found, lines 505-507 compare `ld_path.dirname` to
-`cc_path.dirname` and may stringify the former. `cc_path` comes from
-`which`; the fallback `ld_path` is a path from a discovered Host
-string. No recursive dirname, `get_child`, `exists` query or new file
-effect is demanded before the following linker-option execute.
+Pinned rules_cc `unix_cc_configure.bzl:362-372,430-470` authors the
+accepted six effects. `lib_cc_configure.bzl:282-303` writes
+`builtin_include_directory_paths` with `repository_ctx.file` and no
+explicit mode; pinned Bazel 9.2
+`StarlarkBaseExternalContext.java:1444-1503` defaults it executable
+(the annotation is at lines 1462-1465).
+The content derives from `cc`, compiler-reported include directories,
+and `BAZEL_IGNORE_SYSTEM_HEADERS_VERSIONS`, or a fixed ignore-headers
+branch. `unix_cc_configure.bzl:627` invokes the writer; line 628 starts
+`repository_ctx.template("BUILD", ..., substitutions)`. Before that
+template effect is emitted, the `compile_flags` substitution at lines
+660-669 evaluates `_add_compiler_option_if_supported`; its first execute
+uses `-Wthread-safety` with `empty.cc` as at lines 144-154. There is no
+intervening source-authored effect. The next rejected argv was not captured
+by the prior diagnostic, so its identification remains source-order
+inference until authentic replay.
 
-Slug's `RepositoryStarlarkPath` at
-`repository_rule_context.rs:513-602` currently exposes only `exists`
-for Generated/Host and `get_child` for Generated. Its `Which` value
-comes from an observed executable; `repository_ctx.path(which_value)`
-returns the same object at lines 912-927. The selected Which resolution
-and present Host-path observation already own ancestor state through
-DICE (`module_extension_repository_file_effect.rs:1221-1330`).
-The current Host text arm at `repository_rule_context.rs:556-557`
-uses `NormalizedAbsolutePath::Display`, which writes debug-quoted path
-text (`path_observation.rs:221-224`). Correct only that Host text arm to
-plain valid-Unicode Unix spelling; do not change the general path
-Display, hash or equality implementation.
-The first authentic error is an absent attribute, not evidence that a
-later linker-option argv or toolchain action already succeeded.
+The preceding authentic stop identified call index 14 with seven effects,
+4,145 aggregate file bytes, and `builtin_include_directory_paths` last.
+That observation is not a general maximum: header-path output varies by
+host and environment. Core currently rejects every effect after the three
+wrappers (`repository_process.rs:306-397`); its finite compiler-option
+grammar already includes `-Wthread-safety`. Loading already captures
+`repository_ctx.file` bytes/mode and immutable prefix per execute, and the
+existing structural DICE/replay owner includes environment and ordered
+effects. No new Loading implementation, key, lock or filesystem probe is
+required.
 
-## Owner, policy and memory
+## Core policy, ownership and memory
 
-Keep the selected repository-rule invocation and existing Which/Host
-observations as semantic owners. For a `Which` path proved executable
-or a Host path whose observed `exists` is true, compute its normalized
-lexical parent and expose it as the existing
-`RepositoryStarlarkPath::Host { path: parent, exists: true }`; successful
-observation of the child implies parent existence. At root return
-`None`. A missing Host child does not imply its parent exists or is
-missing: do not manufacture a parent snapshot or return a false
-`exists` value. Reject that branch, and reject Label/Generated origins
-instead of laundering their template/symlink or generated-path
-provenance into a Host object. `dirname` must not turn a derived parent
-into a `Which` executable or a Label source.
+Extend only Core's selected generated-GCC prefix validator. Preserve the
+existing sole `empty.cc`, two-link-plus-source, and exact six-effect forms.
+After the three wrappers, permit either end-of-effects or exactly one
+`File` at `builtin_include_directory_paths`, executable, content at most
+64 KiB; reject archives, wrong kind/path/order/mode, an eighth effect,
+or overflow before staging. Keep each wrapper at most 64 KiB and their
+combined cap at most 128 KiB; the full admitted regular-file prefix is
+therefore at most 192 KiB plus the fixed source. Do not parse, rewrite,
+retain a second copy of, or claim parity for the seventh file's bytes.
+Retain the current Homebrew-presence gate for expanded prefixes and the
+unchanged finite argv, environment, timeout, output and sandbox policies.
 
-Reuse current path hash/equality and Allocative shape; correct Host
-text only at the existing path-value seam. The new parent is evaluator
-scratch only. The observed child path and PATH/raw
-environment cells already structurally invalidate a derived parent
-across request and DICE replay. No DICE key, lock, filesystem probe,
-new retained variant/collection, byte-hash identity, interner,
-materializer or Core policy is admitted. Keep the change at the
-repository-path attribute seam; the large owner file is a size-review
-trigger, not permission to split semantic ownership.
+The selected repository-rule invocation remains the semantic owner.
+The existing Arc-backed immutable effect plan and structural byte/mode
+identity invalidate DICE replay. The prefix materializer stages ordered
+effects into a private read-only `/exec`; the bounded GCC argv only names
+`empty.cc`, not the seventh file. No representation, interner, new retained
+collection, hashing scheme, action/cache transport or path identity changes
+are admitted. The byte cap prevents unbounded staging while preserving
+source-authored content below it; over-cap authentic hosts fail closed.
 
-## Proof, validation and scope
+## Evidence and validation
 
-Add one independent query row to the existing
-`repository-rule-which-normalized-path` fixture. Its rule uses fixed
-`PATH=/usr/../bin` and asserts
-`str(ctx.path(ctx.which("sh")).dirname) == "/bin"`, that parent equals
-`ctx.path("/bin")` as a path value, that direct
-`str(ctx.path("/bin")) == "/bin"` has no debug quotes, that
-observed-present Host `str(ctx.path("/bin").dirname) == "/"`,
-that `str(ctx.path("/")) == "/"`, and that
-`ctx.path("/").dirname == None`. The old two query rows and expected
-results remain unchanged. This is a small offline discriminator for
-the authentic Which→path→dirname chain and parent comparison; it does
-not require GCC or a remote service. Regenerate and independently
-verify Bazel 9.2 expected results in fresh ignored-RC roots without
-reading credentials; replay all three rows with a rebuilt Slug CLI.
-Do not add copied upstream assets, arbitrary path operations or a
-nondiscriminating assertion.
+Add an independent third query row to
+`repository-rule-execute-gcc-probes`, preserving the original two rows
+and expected objects. Its local-override symlink source, fixed PATH and
+six inert preceding effects match the accepted row; it then writes a small
+default-executable `builtin_include_directory_paths`, executes precisely
+`[cc, "-Wthread-safety", "-o", "/dev/null", "-c",
+str(ctx.path("tools/cpp/empty.cc"))]`, checks stable result fields without
+assuming flag support or host-specific diagnostics, and emits a distinct
+filegroup. The synthetic file proves shape/staging, not authentic generated
+header bytes. Generate and independently verify Bazel 9.2 expected output
+in fresh ignored-RC roots, without reading credentials, then replay all
+three rows through a rebuilt Slug CLI.
 
-Focused Loading tests must cover Which and observed-present Host
-lexical parent text, path type, equality, root `None`, implied
-`exists=true`, and fail-closed missing Host/Label/Generated origins.
-Reuse existing selected PATH/raw-observation and Host-path A→B→A DICE
-tests unless a demonstrated gap requires a new same-DICE discriminator.
-The authentic smoke must clear the old `dirname` error and reach a
-source-attributed first new stop; a resource failure or earlier-owner
-error is diagnostic only, not acceptance. Record host resource state
-and avoid an identical retry.
+Focused Core tests must prove exact seven-effect shape acceptance and
+fail-closed wrong path/kind/order/mode, eighth effect, seventh-file oversize
+and existing six-effect preservation. Add a confined execution test for the
+admitted compiler-option form after seven effects: executable seventh-file
+content must try an unconditional stdout/stderr sentinel and a host marker
+write, with neither output nor marker observed. Existing tests protect the
+prior argv/environment/sandbox forms. Run exact test preflight, focused Cargo
+tests, CLI build, offline fixture, and an authentic cquery. The authentic
+smoke must clear the former seven-effect guard and reach a source-attributed
+first new stop; resource errors or the same guard are diagnostic only, not
+acceptance. Record resource state; do not blindly retry. Serialize Cargo,
+clean stale `slugd` before and after daemon-sensitive tests, and run format,
+diff, plan-status, archive and fixture hygiene.
 
-Resolve the pinned toolchain; compile Loading with JSON `--no-run`,
-preflight exact selected tests, run them, then rebuild
-`slug_cli_v2` before offline Slug and authentic replay. Serialize
-Cargo. Clean stale `slugd` before/after daemon-sensitive checks.
-Run format, diff, plan-status, archive and fixture hygiene. Independent
-DESIGN review must accept the implied-parent-existence and provenance
-boundary before production edits; FINAL review checks the actual
-diff/evidence. Update compact Stage 5/9 owner notes only after
+Independent DESIGN review must accept the effect cap and provenance before
+production edits. Independent FINAL review verifies actual diff, tests,
+fresh oracle and authentic result. Update compact Stage 5/9 notes only after
 acceptance.
 
-Allowlist: this manifest and canonical Current;
-`app/slug_loading_v2/src/repository_rule_context.rs` and colocated
-tests, with `module_extension_repository_file_effect.rs` only if a
-demonstrated selected-DICE gap requires a focused test;
-`tests/v2_oracle/fixtures/repository-rule-which-normalized-path/{fixture.toml,
+Allowlist: this packet and canonical Current; Core
+`app/slug_core_v2/src/runtime/repository_process.rs` and colocated tests;
+`tests/v2_oracle/fixtures/repository-rule-execute-gcc-probes/{fixture.toml,
 expected/oracle.json,workspace/MODULE.bazel,workspace/repo.bzl}`;
-compact Stage 5/9 notes after acceptance. No general path Display or
-representation, Bzlmod key, Core linker grammar/process, repository IO,
-action, cache transport or other fixture change.
+compact Stage 5/9 notes after acceptance. No Loading, repository IO,
+materializer, DICE, action, remote-cache or other fixture edits.
 
-`REPLAN` if Which/present-Host observations do not actually imply
-lexical-parent existence and invalidation, if authentic source requires
-dirname on a missing/Label/Generated origin before the next stop, if
-parent equality requires a new identity domain or retained variant, or
-if admission needs a new owner or filesystem observation. A later
-unadmitted GCC argv/effect is the next packet's stop, not a reason to
-silently widen this one.
+`REPLAN` if the seventh effect is not a default-executable regular file in
+the selected source branch, if authentic call14 requires a new argv form
+or other effect before this one, if bounded content cannot stage safely,
+if the existing Loading/DICE owner does not structurally own its bytes and
+mode, or if a source-authored over-cap file prevents the authentic replay.
+Any later unadmitted effect/argv is a new packet boundary, not permission
+to widen this one.
 
 ## Acceptance receipt
 
-Independent DESIGN review ACCEPT followed correction of the Host text
-contract. Pinned nightly toolchain resolved. Loading JSON `--no-run`
-passed (10.7 s); exact preflight verified six nonignored new/protected
-tests, and all 6/6 passed. `cargo build -p slug_cli_v2` passed after
-the Loading production edit (8.31 s). Fresh ignored-RC Bazel 9.2
-generation and independent verification passed all three rows
-(10.2/4.5 s), with the original two expected command objects unchanged.
-The rebuilt Slug CLI passed all three rows. The non-instrumented
-authentic cquery cleared the former `path.dirname` error, exited 2 and
-stopped at Core's generated GCC prefix guard. A temporary redacted
-diagnostic replay identified selected `local_config_cc` execute call
-index 14 with seven effects and only 4,145 total file bytes; the last
-effect is `builtin_include_directory_paths`, not an over-cap template.
-Pinned `lib_cc_configure.bzl:282-310` authors that file at
-`unix_cc_configure.bzl:627` before later `BUILD.tpl` substitution
-probes. The precise rejected argv was not captured and is an inference
-from source order. The diagnostic was removed with no Core diff; the
-production CLI was rebuilt and the three-row Slug fixture passed again.
-No `slugd` remained. Independent FINAL review ACCEPT found the seventh
-effect source-attributed while leaving the rejected argv unproved.
-Packet elapsed was roughly 24 minutes from WP841 acceptance through
-FINAL review. No compiler-option or toolchain closure is claimed.
+Independent DESIGN review ACCEPT followed explicit classification of Core's
+shape-only admission as Slug-native and a required adversarial inert-file
+test. The pinned Bazel `repository_ctx.file` executable default was
+independently corrected to `StarlarkBaseExternalContext.java:1462-1465`.
+Core JSON `--no-run` passed (14.7 s); exact test preflight found both
+selected tests, which passed 2/2, and the full Core repository-process
+module passed 20/20. The rebuilt `slug_cli_v2` completed after the Core
+production edit. Fresh ignored-RC Bazel 9.2 generation and independent
+verification passed all three GCC fixture rows (4.43/4.38 s), with the
+original two expected command objects unchanged; the rebuilt Slug CLI
+passed all three rows (9.5 s). The authentic Rust-toolchain alias workspace
+`cquery //:probe --output=label` exited 2 after about 62 s, clearing the
+seven-effect guard and all subsequent GCC execute probes through rules_cc's
+`BUILD` template emission. Its new first stop is generated
+`@@rules_cc++cc_configure_extension+local_config_cc//:BUILD:84` invoking
+the pinned rules_cc `cc/toolchains/cc_toolchain_suite.bzl:18` wrapper, where
+Loading lacks `native.cc_toolchain_suite`. The actual call-14 argv still
+was not separately logged; the source-order inference is strengthened by
+progression, not represented as a captured transcript. Host had 30 GiB
+available `/tmp` and 28 GiB available RAM during the replay; no `slugd`
+remained afterward. Format, diff, plan-status and archive checks passed;
+fixture has no copied upstream asset, credential RC or downloaded module.
+Independent FINAL review ACCEPT verified the bounded guard, adversarial
+nonexecution proof, source default-mode anchor, fresh offline evidence and
+authentic new stop, while retaining the uncaptured-argv caveat. Compact
+Stage 5/9 owner and memory notes were updated after acceptance. Packet
+elapsed was roughly 20 minutes from WP842 acceptance through FINAL review.
 
 ## Immediate predecessor
 
-WP841 at `962dbd2ed` accepted the bounded three-template
-six-effect prefix, selected pre-render Homebrew-presence gate, fresh
-two-row Bazel/Slug evidence and independent FINAL review. Authentic
-cquery advanced beyond the former Core prefix rejection to the
-`path.dirname` error at `unix_cc_configure.bzl:500`; M7A remains
-partial. The complete WP841 contract and receipt remain in that
+WP842 at `97dd73e9e` accepted selected `path.dirname` for Which and
+observed-present Host origins with fresh three-row Bazel/Slug evidence,
+focused Loading tests and independent FINAL review. Authentic cquery
+advanced from the line-500 dirname error to Core's seven-effect prefix
+guard. Its temporary diagnostic identified the seventh effect but did not
+capture the rejected argv; the diagnostic was removed and Core remained
+unchanged. M7A remains partial. The full WP842 receipt remains in that
 commit's `current-packet.md`.

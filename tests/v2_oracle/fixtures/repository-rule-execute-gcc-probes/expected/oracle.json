@@ -69,6 +69,41 @@
       "startup_argv": [],
       "stderr": "",
       "stdout": "@prefix_selected//:linker_prefix_probe\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@include_prefix_selected//:include_prefix_probe",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@include_prefix_selected//:include_prefix_probe",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin"
+      },
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "gcc_compiler_option_after_seven_effect_prefix",
+      "normalized_stderr": "",
+      "normalized_stdout": "@include_prefix_selected//:include_prefix_probe",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@include_prefix_selected//:include_prefix_probe\n"
     }
   ],
   "fixture": "repository-rule-execute-gcc-probes",
