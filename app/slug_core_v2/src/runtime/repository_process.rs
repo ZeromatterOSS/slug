@@ -96,6 +96,13 @@ mod linux {
     const EXEC_SOURCE: &str = "/exec/tools/cpp/empty.cc";
     const SOURCE_EFFECT: &str = "tools/cpp/empty.cc";
     const SOURCE_BYTES: &[u8] = b"int main() {}";
+    const TEMPLATE_EFFECTS: [&str; 3] = [
+        "validate_static_library.sh",
+        "cc_wrapper.sh",
+        "deps_scanner_wrapper.sh",
+    ];
+    const MAX_TEMPLATE_EFFECT_BYTES: usize = 64 * 1024;
+    const MAX_TEMPLATE_PREFIX_BYTES: usize = 128 * 1024;
     const MAX_STREAM_BYTES: usize = 1024 * 1024;
     const MAX_STATUS_BYTES: u64 = 4096;
     const TMPFS_BYTES: &str = "67108864";
@@ -203,7 +210,8 @@ mod linux {
                 "invalid generated repository name",
             ));
         }
-        validate_prefix(request.prefix())?;
+        let expanded_prefix = validate_prefix(request.prefix())?;
+        validate_template_environment(request.environment(), expanded_prefix)?;
         let Some(RepositoryExecuteArg::Which(compiler)) = request.argv().first() else {
             return Err(RepositoryProcessError::Policy(
                 "compiler is not a which-origin path",
@@ -283,9 +291,21 @@ mod linux {
         Ok(())
     }
 
+    fn validate_template_environment(
+        environment: &RepositoryEnvironmentSnapshot,
+        expanded_prefix: bool,
+    ) -> Result<(), RepositoryProcessError> {
+        if expanded_prefix && environment.get("HOMEBREW_RUBY_PATH").is_some() {
+            return Err(RepositoryProcessError::Policy(
+                "generated GCC template prefix with Homebrew environment is unsupported",
+            ));
+        }
+        Ok(())
+    }
+
     fn validate_prefix(
         prefix: &GeneratedRepositoryFileEffectPlan,
-    ) -> Result<(), RepositoryProcessError> {
+    ) -> Result<bool, RepositoryProcessError> {
         if prefix.has_archives() {
             return Err(RepositoryProcessError::Policy(
                 "archive effects cannot precede GCC probes",
@@ -295,8 +315,8 @@ mod linux {
         // authors precisely these two links, in order. Reject every other
         // effect before the writer can materialize it.
         let mut effects = prefix.ordered_effects();
-        let source_effect = match effects.next() {
-            Some(GeneratedRepositoryOrderedEffectRef::File(file)) => file,
+        let (source_effect, has_source_links) = match effects.next() {
+            Some(GeneratedRepositoryOrderedEffectRef::File(file)) => (file, false),
             Some(GeneratedRepositoryOrderedEffectRef::Symlink(first))
                 if first.path() == "cc_toolchain_config.bzl" =>
             {
@@ -316,7 +336,7 @@ mod linux {
                         "missing generated GCC probe source",
                     ));
                 };
-                file
+                (file, true)
             }
             _ => {
                 return Err(RepositoryProcessError::Policy(
@@ -324,7 +344,7 @@ mod linux {
                 ));
             }
         };
-        if source_effect.path() != SOURCE_EFFECT || effects.next().is_some() {
+        if source_effect.path() != SOURCE_EFFECT {
             return Err(RepositoryProcessError::Policy(
                 "generated GCC probe prefix has an unexpected effect",
             ));
@@ -334,7 +354,45 @@ mod linux {
                 "generated GCC probe source differs from the audited file",
             ));
         }
-        Ok(())
+        let Some(first_template) = effects.next() else {
+            return Ok(false);
+        };
+        if !has_source_links {
+            return Err(RepositoryProcessError::Policy(
+                "generated GCC probe prefix has an unexpected effect",
+            ));
+        }
+        let mut template_effects = std::iter::once(first_template).chain(effects);
+        let mut template_bytes = 0;
+        for destination in TEMPLATE_EFFECTS {
+            let Some(effect) = template_effects.next() else {
+                return Err(RepositoryProcessError::Policy(
+                    "generated GCC template prefix is incomplete",
+                ));
+            };
+            let GeneratedRepositoryOrderedEffectRef::File(file) = effect else {
+                return Err(RepositoryProcessError::Policy(
+                    "generated GCC template prefix has an unexpected effect",
+                ));
+            };
+            if file.path() != destination || !file.executable() {
+                return Err(RepositoryProcessError::Policy(
+                    "generated GCC template destination or mode is unsupported",
+                ));
+            }
+            if file.content().len() > MAX_TEMPLATE_EFFECT_BYTES {
+                return Err(RepositoryProcessError::Policy(
+                    "generated GCC template effect exceeds the byte limit",
+                ));
+            }
+            template_bytes += file.content().len();
+        }
+        if template_effects.next().is_some() || template_bytes > MAX_TEMPLATE_PREFIX_BYTES {
+            return Err(RepositoryProcessError::Policy(
+                "generated GCC template prefix has an unexpected effect or exceeds the byte limit",
+            ));
+        }
+        Ok(true)
     }
 
     #[derive(Clone, Copy)]
@@ -1044,6 +1102,7 @@ mod linux {
 
     #[cfg(test)]
     mod tests {
+        use std::ffi::OsString;
         use std::os::fd::AsRawFd;
         use std::path::Path;
         use std::sync::Arc;
@@ -1068,6 +1127,7 @@ mod linux {
         use super::validate_environment;
         use super::validate_launcher;
         use super::validate_prefix;
+        use super::validate_template_environment;
 
         fn bwrap() -> &'static Path {
             if Path::new("/usr/bin/bwrap").is_file() {
@@ -1095,6 +1155,28 @@ mod linux {
             builder
                 .push("tools/cpp/empty.cc".into(), Arc::from(source), executable)
                 .unwrap();
+            builder.finish()
+        }
+
+        fn template_prefix(files: &[(&str, &[u8], bool)]) -> GeneratedRepositoryFileEffectPlan {
+            let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+            for destination in ["cc_toolchain_config.bzl", "armeabi_cc_toolchain_config.bzl"] {
+                builder
+                    .push_symlink(destination.into(), source_link(), Arc::from(&b"source"[..]))
+                    .unwrap();
+            }
+            builder
+                .push(
+                    "tools/cpp/empty.cc".into(),
+                    Arc::from(&b"int main() {}"[..]),
+                    true,
+                )
+                .unwrap();
+            for (path, content, executable) in files {
+                builder
+                    .push((*path).into(), Arc::from(*content), *executable)
+                    .unwrap();
+            }
             builder.finish()
         }
 
@@ -1359,6 +1441,170 @@ mod linux {
                 validate_prefix(&wrong_link.finish()),
                 Err(RepositoryProcessError::Policy(_))
             ));
+        }
+
+        #[test]
+        fn generated_gcc_template_prefix_is_exact_and_bounded() {
+            const FILES: [(&str, &[u8], bool); 3] = [
+                ("validate_static_library.sh", b"inert one", true),
+                ("cc_wrapper.sh", b"inert two", true),
+                ("deps_scanner_wrapper.sh", b"inert three", true),
+            ];
+            assert_eq!(
+                validate_prefix(&probe_prefix(b"int main() {}", true)).unwrap(),
+                false
+            );
+            assert_eq!(validate_prefix(&template_prefix(&FILES)).unwrap(), true);
+            assert!(matches!(
+                validate_prefix(&template_prefix(&FILES[..2])),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let mut swapped = FILES;
+            swapped.swap(0, 1);
+            assert!(matches!(
+                validate_prefix(&template_prefix(&swapped)),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let mut wrong_mode = FILES;
+            wrong_mode[1].2 = false;
+            assert!(matches!(
+                validate_prefix(&template_prefix(&wrong_mode)),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let extra = [
+                FILES[0],
+                FILES[1],
+                FILES[2],
+                ("unexpected.sh", &b"extra"[..], true),
+            ];
+            assert!(matches!(
+                validate_prefix(&template_prefix(&extra)),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let oversized = vec![b'x'; super::MAX_TEMPLATE_EFFECT_BYTES + 1];
+            let one_large = [FILES[0], (FILES[1].0, oversized.as_slice(), true), FILES[2]];
+            assert!(matches!(
+                validate_prefix(&template_prefix(&one_large)),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let maximum = vec![b'x'; super::MAX_TEMPLATE_EFFECT_BYTES];
+            let aggregate_large = [
+                (FILES[0].0, maximum.as_slice(), true),
+                (FILES[1].0, maximum.as_slice(), true),
+                (FILES[2].0, &b"x"[..], true),
+            ];
+            assert!(matches!(
+                validate_prefix(&template_prefix(&aggregate_large)),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let mut wrong_kind = GeneratedRepositoryFileEffectPlan::builder();
+            for destination in ["cc_toolchain_config.bzl", "armeabi_cc_toolchain_config.bzl"] {
+                wrong_kind
+                    .push_symlink(destination.into(), source_link(), Arc::from(&b"source"[..]))
+                    .unwrap();
+            }
+            wrong_kind
+                .push(
+                    "tools/cpp/empty.cc".into(),
+                    Arc::from(&b"int main() {}"[..]),
+                    true,
+                )
+                .unwrap();
+            wrong_kind
+                .push_symlink(FILES[0].0.into(), source_link(), Arc::from(&b"source"[..]))
+                .unwrap();
+            assert!(matches!(
+                validate_prefix(&wrong_kind.finish()),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let mut archive = GeneratedRepositoryFileEffectPlan::builder();
+            archive
+                .push_archive(
+                    Arc::from(["https://example.invalid/archive.tar.xz".into()]),
+                    [0; 32],
+                    "archive".into(),
+                )
+                .unwrap();
+            assert!(matches!(
+                validate_prefix(&archive.finish()),
+                Err(RepositoryProcessError::Policy(_))
+            ));
+            let homebrew = RepositoryEnvironmentSnapshot::from_canonical(Arc::from([
+                RepositoryEnvironmentEntry::new("HOMEBREW_RUBY_PATH", "private-sentinel"),
+            ]))
+            .unwrap();
+            assert!(validate_template_environment(&homebrew, false).is_ok());
+            let rejection = validate_template_environment(&homebrew, true).unwrap_err();
+            assert!(matches!(rejection, RepositoryProcessError::Policy(_)));
+            assert!(!rejection.to_string().contains("private-sentinel"));
+        }
+
+        #[tokio::test]
+        async fn generated_gcc_templates_remain_inert_for_guarded_compiler_argv() {
+            assert!(
+                bwrap().is_file(),
+                "Linux sandbox prerequisite is unavailable"
+            );
+            let workspace = tempfile::tempdir_in("/tmp").unwrap();
+            let marker = workspace.path().join("template-executed");
+            let adversarial = format!(
+                "#!/bin/sh\nprintf wrapper-executed >&2\nprintf wrapper-executed > '{}'\n",
+                marker.display()
+            );
+            let files = [
+                ("validate_static_library.sh", adversarial.as_bytes(), true),
+                ("cc_wrapper.sh", adversarial.as_bytes(), true),
+                ("deps_scanner_wrapper.sh", adversarial.as_bytes(), true),
+            ];
+            let prefix = template_prefix(&files);
+            assert_eq!(validate_prefix(&prefix).unwrap(), true);
+            let staged =
+                super::super::super::repository_io::stage_generated_repository_file_effect_prefix(
+                    &prefix,
+                    workspace.path(),
+                )
+                .unwrap();
+            let logical_source = "@@selected//tools/cpp/empty.cc";
+            assert!(matches!(
+                match_form(
+                    &[
+                        logical_source,
+                        "-o",
+                        "/dev/null",
+                        "-Wl,--start-lib",
+                        "-Wl,--end-lib",
+                        "-fuse-ld=lld",
+                        "-v",
+                    ],
+                    logical_source,
+                ),
+                Ok(ProbeForm::LinkerDiscovery("lld"))
+            ));
+            let argv = [
+                OsString::from("/usr/bin/gcc"),
+                OsString::from("/exec/tools/cpp/empty.cc"),
+                OsString::from("-o"),
+                OsString::from("/dev/null"),
+                OsString::from("-Wl,--start-lib"),
+                OsString::from("-Wl,--end-lib"),
+                OsString::from("-fuse-ld=lld"),
+                OsString::from("-v"),
+            ];
+            let (_status, stdout, stderr) =
+                run_sandboxed(bwrap(), staged.path(), &argv, Duration::from_secs(10))
+                    .await
+                    .unwrap();
+            assert!(!marker.exists());
+            assert!(
+                !stdout
+                    .windows(b"wrapper-executed".len())
+                    .any(|bytes| bytes == b"wrapper-executed")
+            );
+            assert!(
+                !stderr
+                    .windows(b"wrapper-executed".len())
+                    .any(|bytes| bytes == b"wrapper-executed")
+            );
         }
 
         #[tokio::test]

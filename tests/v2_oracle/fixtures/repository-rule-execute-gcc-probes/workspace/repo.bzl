@@ -27,3 +27,34 @@ def _impl(ctx):
     ctx.file("BUILD.bazel", "filegroup(name = 'gcc_probes')\n")
 
 gcc_repo = repository_rule(implementation = _impl, environ = ["PATH", "LC_ALL"])
+
+def _prefix_impl(ctx):
+    source = ctx.path(Label("@@prefix_source+//:source.bzl"))
+    ctx.symlink(source, "cc_toolchain_config.bzl")
+    ctx.symlink(source, "armeabi_cc_toolchain_config.bzl")
+    ctx.file("tools/cpp/empty.cc", "int main() {}")
+
+    cc = ctx.which("gcc")
+    if cc == None:
+        fail("gcc was not found through the fixture PATH")
+
+    ctx.file("validate_static_library.sh", "# inert offline prefix\n", executable = True)
+    ctx.file("cc_wrapper.sh", "# inert offline prefix\n", executable = True)
+    ctx.file("deps_scanner_wrapper.sh", "# inert offline prefix\n", executable = True)
+
+    linker_probe = ctx.execute([
+        cc,
+        str(ctx.path("tools/cpp/empty.cc")),
+        "-o",
+        "/dev/null",
+        "-Wl,--start-lib",
+        "-Wl,--end-lib",
+        "-fuse-ld=lld",
+        "-v",
+    ])
+    if linker_probe.stdout != "" or "gcc version " not in linker_probe.stderr:
+        fail("unexpected gcc linker probe result: rc=%s, stdout=%r, stderr=%r" % (linker_probe.return_code, linker_probe.stdout, linker_probe.stderr))
+
+    ctx.file("BUILD.bazel", "filegroup(name = 'linker_prefix_probe')\n")
+
+gcc_prefix_repo = repository_rule(implementation = _prefix_impl, environ = ["PATH", "LC_ALL"])

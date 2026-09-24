@@ -2962,3 +2962,14 @@ recorded as a residual, not a speedup claim. The 65th, 832nd and 833rd
 boundaries, beyond-old-cap A→B→A and fresh two-row Bazel/Slug fixture
 discriminate the change; authentic cquery reaches a later guarded prefix
 stop. No hot-path benchmark claim is made from these unequal smoke runs.
+
+WP841 retains three rendered template files in the existing Arc-backed
+ordered effect plan, capped at 128 KiB aggregate per plan, while Core's
+materialized prefix remains request scratch. The selected Homebrew-presence
+gate uses the existing declared-environment observation and input equality;
+no DICE key, interner, collection, hash identity, global cache, lock or
+memory-accounting shape changes. Focused Core/Loading tests, same-DICE
+absent→present→absent replay, fresh two-row Bazel/Slug evidence and authentic
+progression to the separate `path.dirname` boundary discriminate the change.
+The bound is a Slug-native limit, not a hot-path benchmark or exact Bazel
+template-byte claim.

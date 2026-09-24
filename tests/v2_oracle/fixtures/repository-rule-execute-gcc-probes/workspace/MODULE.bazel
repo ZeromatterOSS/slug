@@ -1,4 +1,10 @@
 module(name = "gcc_execute_probe")
 
+bazel_dep(name = "prefix_source", version = "1.0.0")
+local_path_override(module_name = "prefix_source", path = "modules/prefix_source")
+
 gcc_repo = use_repo_rule("//:repo.bzl", "gcc_repo")
 gcc_repo(name = "selected")
+
+gcc_prefix_repo = use_repo_rule("//:repo.bzl", "gcc_prefix_repo")
+gcc_prefix_repo(name = "prefix_selected")

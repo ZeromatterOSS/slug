@@ -29,16 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-140-m7a-which-aggregate-budget-r1
+Packet: WP-7-141-m7a-gcc-template-prefix-r1
 Status: ACCEPTED; M7A remains partial
 
-WP840 accepts a source-bounded 832-candidate selected-invocation
-`repository_ctx.which` budget after a diagnostic retry confirmed the prior
-64-candidate stop. Per-call PATH limits, DICE ownership and execute semantics
-remain unchanged. A fresh two-row Bazel 9.2/Slug fixture passes; authentic
-cquery now stops at Core's separate generated GCC-prefix policy. That later
-execute request is source-order inference, not a captured argv/owner trace.
-Full rules_cc toolchain/root Build remain deferred; see
+WP841 admits the bounded source-ordered three-template file prefix after
+the two links and exact `empty.cc`, with a pre-render Homebrew-presence
+gate and unchanged guarded GCC argv/read-only staging. Fresh two-row
+Bazel 9.2 generation/verification and rebuilt Slug pass; authentic cquery
+clears the prior prefix stop and next fails at unsupported `path.dirname`
+in `unix_cc_configure.bzl:500`. Independent FINAL review accepted the
+bounded packet. Full
+rules_cc toolchain/root Build remain deferred; see
 `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

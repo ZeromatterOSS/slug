@@ -1,10 +1,10 @@
 [fixture]
 name = "repository-rule-execute-gcc-probes"
-description = "Bazel 9.2 repository_ctx.execute exposes GCC version streams and reads a preceding generated source file."
+description = "Bazel 9.2 repository_ctx.execute reads generated GCC source before and after an ordered six-effect prefix."
 comparison = "semantic"
 startup_argv = ["--ignore_all_rc_files"]
 env = { PATH = "/usr/bin:/bin", LC_ALL = "C" }
-oracle_notes = "Offline Linux GCC probe with a bounded PATH. A repository rule writes tools/cpp/empty.cc, then executes the source-authenticated rules_cc GCC -v, --version, and compiler-option probe argv forms. It checks result fields before writing the queried target. No module download, credential RC, copied upstream archive, or temporary Bazel output base is included."
+oracle_notes = "Offline Linux GCC probes with bounded PATH. The original repository writes tools/cpp/empty.cc and executes the source-authenticated GCC -v, --version, and compiler-option forms. An independent repository links an exported file from a local-override source module twice, writes the same empty.cc and three inert executable file effects, then executes rules_cc's lld-discovery argv. It checks stable result fields without requiring linker success. No module download, credential RC, copied upstream archive, or temporary Bazel output base is included."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -13,9 +13,11 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java:1898-1922,1939-2075 (execute arguments, defaults, path conversion, local execution)",
   "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkExecutionResult.java:59-111,192-250 (return_code/stdout/stderr and nonzero-as-result)",
   "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java:1444-1503 (preceding repository_ctx.file)",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryContext.java:259-358 (template output is executable by default)",
   "rules_cc 0.2.17 cc/private/toolchain/unix_cc_configure.bzl:144-154,216-235,273-283,372,561-566 (GCC argv forms and generated empty.cc)",
+  "rules_cc 0.2.17 cc/private/toolchain/unix_cc_configure.bzl:166-190,362-372,430-495 (ordered symlink/file/template prefix and lld-discovery argv)",
 ]
-translation_notes = "The fixture uses a minimal local repository rule instead of the complete rules_cc local_config_cc graph. It fixes PATH to find the host GCC and checks only stable fields: -v succeeds with version text on stderr, --version succeeds with GCC text on stdout, and the exact -fno-canonical-system-headers compiler-option probe succeeds with empty stdout after reading generated empty.cc. The source-authenticated option probe writes only /dev/null. Nonzero result fields, other GCC flags, custom execution options, Clang, arbitrary executables, host process output bytes, and toolchain closure are outside this oracle row."
+translation_notes = "The original row remains unchanged: its minimal local rule fixes PATH, checks stable GCC version/result fields, and compiles generated empty.cc to /dev/null. The new independent row uses one tiny local-override module as the external symlink source and synthetic inert ctx.file contents at the three source-named template destinations. It proves ordered six-effect staging and the authentic lld argv/result protocol, not rules_cc template-source provenance or byte-for-byte rendered scripts. The linker return code may vary by host. Other GCC flags, custom execution options, Clang, arbitrary executables, host process output bytes, and full toolchain closure remain outside these rows."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture repository-rule-execute-gcc-probes --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture repository-rule-execute-gcc-probes --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
 
@@ -24,3 +26,9 @@ name = "gcc_execute_generated_file_and_result_fields"
 argv = ["query", "@selected//:gcc_probes", "--output=label", "--noshow_progress"]
 expected_exit = 0
 stdout_patterns = ['\A@selected//:gcc_probes\n?\Z']
+
+[[commands]]
+name = "gcc_linker_probe_after_ordered_template_prefix"
+argv = ["query", "@prefix_selected//:linker_prefix_probe", "--output=label", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\A@prefix_selected//:linker_prefix_probe\n?\Z']

@@ -573,6 +573,20 @@ pass. Authentic cquery passes the prior limit and reaches Core's separate
 generated GCC-prefix policy, without establishing the next probe's argv or
 full toolchain. No new DICE key, cache or path owner is introduced.
 
+### Selected generated GCC template prefix accepted (WP841, 2026-09-24)
+
+The selected rules_cc `cc_autoconf` owner now rejects a present declared
+`HOMEBREW_RUBY_PATH` before its first template can render raw environment
+values; the two earlier GCC `-v` requests remain replayable. Core admits
+only the source-ordered two links, exact executable `empty.cc`, and three
+named executable rendered files before its existing guarded GCC argv, with
+64-KiB-per-file and 128-KiB-total Slug-native caps. Loading owns rendered
+bytes and source/environment DICE observations; Core attests only ordered
+shape, not template provenance. The original offline GCC row and a fresh
+six-effect Bazel/Slug row pass. Authentic cquery clears the former prefix
+rejection and next stops at unsupported `path.dirname` in pinned
+`unix_cc_configure.bzl:500`; full toolchain and M7A remain open.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

@@ -77,6 +77,7 @@ pub(crate) struct RepositoryRuleInvocationInput {
     attributes: Arc<SmallMap<CompactString, OverrideAttributeValue>>,
     declaration: Arc<[RepositoryRuleAttribute]>,
     archive_owner: bool,
+    homebrew_template_guard: bool,
     execute_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>,
     execute_transcript: RepositoryExecuteTranscript,
 }
@@ -141,6 +142,7 @@ impl RepositoryRuleInvocationInput {
             attributes,
             declaration,
             archive_owner: false,
+            homebrew_template_guard: false,
             execute_owner: None,
             execute_transcript: RepositoryExecuteTranscript::empty(),
         })
@@ -150,6 +152,13 @@ impl RepositoryRuleInvocationInput {
     /// selected effect. Ordinary generated repository rules remain file-only.
     pub(crate) fn with_archive_owner(mut self) -> Self {
         self.archive_owner = true;
+        self
+    }
+
+    /// The authenticated rules_cc cc_autoconf owner must stop before its
+    /// Homebrew branch can render raw environment values into wrapper files.
+    pub(crate) fn with_homebrew_template_guard(mut self) -> Self {
+        self.homebrew_template_guard = true;
         self
     }
 
@@ -461,7 +470,7 @@ impl RepositoryRuleHostObservation {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), HostPathNeed(NormalizedAbsolutePath), ReadArgument, ReadLimit, TemplateDestinationArgument, TemplateSourceArgument, SymlinkArgument, RepositorySourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), ExecuteArgument, ExecuteOptions, ExecuteLimit, ExecuteNeed(Arc<RepositoryExecuteRequest>), ExecuteReplay, ArchiveArgument, ArchiveAuth, ArchiveLimit, ArchiveIncomplete, ArchivePathObservation, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
+pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), HostPathNeed(NormalizedAbsolutePath), ReadArgument, ReadLimit, TemplateDestinationArgument, TemplateSourceArgument, HomebrewTemplateEnvironment, SymlinkArgument, RepositorySourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), ExecuteArgument, ExecuteOptions, ExecuteLimit, ExecuteNeed(Arc<RepositoryExecuteRequest>), ExecuteReplay, ArchiveArgument, ArchiveAuth, ArchiveLimit, ArchiveIncomplete, ArchivePathObservation, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
 
 #[rustfmt::skip]
 pub(crate) struct RepositoryRuleInvocation { pub(crate) plan: GeneratedRepositoryFileEffectPlan, pub(crate) dynamic_environment: Arc<[CompactString]>, pub(crate) execute_transcript: RepositoryExecuteTranscript }
@@ -950,9 +959,14 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         #[starlark(default = true)] executable: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        RepositoryRuleContext::from_value(this)
+        let context = RepositoryRuleContext::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
         let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        if context.input.homebrew_template_guard
+            && context.snapshot.get("HOMEBREW_RUBY_PATH").is_some()
+        {
+            return Err(state.fail(RepositoryRuleInvocationError::HomebrewTemplateEnvironment));
+        }
         let Some(destination) = path.unpack_str() else {
             return Err(state.fail(RepositoryRuleInvocationError::TemplateDestinationArgument));
         };
@@ -3073,6 +3087,88 @@ def implementation(ctx):
             ),
             Err(RepositoryRuleInvocationError::Evaluation(_))
         ));
+    }
+
+    #[test]
+    fn selected_homebrew_template_gate_preempts_source_and_keeps_other_rules_unchanged() {
+        #[derive(Default)]
+        struct CapturedPrints(RefCell<Vec<String>>);
+
+        impl PrintHandler for CapturedPrints {
+            fn println(&self, _: starlark::PrintLocation, text: &str) -> starlark::Result<()> {
+                self.0.borrow_mut().push(text.to_owned());
+                Ok(())
+            }
+        }
+
+        const SENTINEL: &str = "homebrew-private-sentinel-841";
+        let source = "def implementation(ctx):\n    print('before-template')\n    ctx.template('wrapper', Label('@@dep+//pkg:template'))\n";
+        let manifest = invocation_manifest();
+        let module = freeze_bzl(&manifest, source, None);
+        let implementation = unsafe {
+            module
+                .get("implementation")
+                .unwrap()
+                .unchecked_frozen_value()
+        };
+        let ordinary = RepositoryRuleInvocationInput::new(
+            "repo".into(),
+            None,
+            Arc::new(SmallMap::new()),
+            Arc::from([]),
+        )
+        .unwrap();
+        let guarded = ordinary.clone().with_homebrew_template_guard();
+        assert_ne!(ordinary, guarded);
+        let present =
+            RepositoryEnvironmentSnapshot::from_canonical([RepositoryEnvironmentEntry::new(
+                "HOMEBREW_RUBY_PATH",
+                SENTINEL,
+            )])
+            .unwrap();
+        let empty_present =
+            RepositoryEnvironmentSnapshot::from_canonical([RepositoryEnvironmentEntry::new(
+                "HOMEBREW_RUBY_PATH",
+                "",
+            )])
+            .unwrap();
+        let prints = CapturedPrints::default();
+        let invoke = |input, snapshot| {
+            invoke_repository_rule(
+                implementation,
+                &manifest,
+                &SmallMap::new(),
+                &SmallMap::new(),
+                &SmallMap::new(),
+                input,
+                RepositoryPlatform::new("linux", "x86_64"),
+                snapshot,
+                Some(&prints),
+            )
+        };
+        for snapshot in [present.clone(), empty_present] {
+            let Err(error) = invoke(guarded.clone(), snapshot) else {
+                panic!("Homebrew-present template unexpectedly completed")
+            };
+            assert_eq!(
+                error,
+                RepositoryRuleInvocationError::HomebrewTemplateEnvironment
+            );
+            assert!(!format!("{error:?}").contains(SENTINEL));
+        }
+        let source_need = RepositoryLabelPathAddress::from_label(
+            &CanonicalLabel::parse("@@dep+//pkg:template").unwrap(),
+        );
+        assert!(matches!(
+            invoke(ordinary, present),
+            Err(RepositoryRuleInvocationError::LabelPathNeed(need)) if need == source_need
+        ));
+        assert!(matches!(
+            invoke(guarded, RepositoryEnvironmentSnapshot::empty()),
+            Err(RepositoryRuleInvocationError::LabelPathNeed(need)) if need == source_need
+        ));
+        assert_eq!(prints.0.borrow().as_slice(), ["before-template"; 4]);
+        assert!(!format!("{:?}", prints.0.borrow()).contains(SENTINEL));
     }
 
     #[test]

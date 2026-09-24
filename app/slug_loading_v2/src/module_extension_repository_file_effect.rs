@@ -1437,6 +1437,13 @@ fn terminal_repository_rule_invocation_error(
                 message: "repository_ctx.template invocation is unsupported".into(),
             }
         }
+        RepositoryRuleInvocationError::HomebrewTemplateEnvironment => {
+            HostSelectedRepositoryFileEffectError::Invocation {
+                certificate: certificate.clone(),
+                ordinal,
+                message: "rules_cc cc_autoconf HOMEBREW_RUBY_PATH-present template branch is unsupported".into(),
+            }
+        }
         RepositoryRuleInvocationError::SymlinkArgument => {
             HostSelectedRepositoryFileEffectError::Invocation {
                 certificate: certificate.clone(),
@@ -1803,6 +1810,10 @@ async fn compute_effect(
         && repository.call().definition.defining_label.to_string()
             == "@@rules_rust+//rust/private:repositories.bzl"
         && repository.call().definition.exported_name == "rust_toolchain_tools_repository";
+    let homebrew_template_owner = repository.generated_name() == "local_config_cc"
+        && repository.call().definition.defining_label.to_string()
+            == "@@rules_cc+//cc/private/toolchain:cc_configure.bzl"
+        && repository.call().definition.exported_name == "cc_autoconf";
     let input = match RepositoryRuleInvocationInput::new(
         canonical_name.as_str().into(),
         Some(repository.generated_name().into()),
@@ -1846,6 +1857,20 @@ async fn compute_effect(
         .iter()
         .cloned()
         .collect::<Vec<_>>();
+    if homebrew_template_owner
+        && !declared
+            .iter()
+            .any(|name| name.as_str() == "HOMEBREW_RUBY_PATH")
+    {
+        return complete_effect_error(
+            host_input_error(
+                &certificate,
+                key.ordinal,
+                "rules_cc cc_autoconf lacks its declared Homebrew environment observation",
+            ),
+            observations,
+        );
+    }
     let unknown = declared
         .iter()
         .filter(|name| !transaction.frontier().contains(name))
@@ -1888,6 +1913,11 @@ async fn compute_effect(
                 );
             }
         };
+    let input = if homebrew_template_owner {
+        input.with_homebrew_template_guard()
+    } else {
+        input
+    };
     let capture_enabled = ctx
         .per_transaction_data()
         .data
@@ -2307,6 +2337,17 @@ cc_configure = repository_rule(
     implementation = _cc_configure_impl,
     attrs = {"_template": attr.label(default = "//cc/private/toolchain:BUILD.toolchains.tpl")},
 )
+
+def _cc_autoconf_impl(ctx):
+    cc = ctx.which("tool")
+    ctx.execute([cc, "-v"])
+    ctx.execute([cc, "-v"])
+    ctx.template("validate_static_library.sh", Label("//cc/private/toolchain:BUILD.toolchains.tpl"))
+
+cc_autoconf = repository_rule(
+    implementation = _cc_autoconf_impl,
+    environ = ["PATH", "HOMEBREW_RUBY_PATH"],
+)
 "#;
     const TEMPLATE_PATH: &str = "cc/private/toolchain/BUILD.toolchains.tpl";
     const TEMPLATE_A: &[u8] = b"toolchain=%{name}\nraw=\xff\n";
@@ -2667,13 +2708,17 @@ cc_configure = repository_rule(
                 observations.retain(|(current, _)| current != demand);
                 observations.push((
                     demand.dupe(),
-                    Arc::new(fixture_result_with_template(
-                        demand,
-                        instance,
-                        logical_root,
-                        fixture_root,
-                        TEMPLATE_A,
-                    )),
+                    Arc::new(if demand.namespace() == PathObservationNamespace::Host {
+                        which_observation(demand)
+                    } else {
+                        fixture_result_with_template(
+                            demand,
+                            instance,
+                            logical_root,
+                            fixture_root,
+                            TEMPLATE_A,
+                        )
+                    }),
                 ));
             }
             updater
@@ -4359,6 +4404,175 @@ ext = module_extension(implementation = impl)
             tracker,
             instance,
         }
+    }
+
+    async fn converge_homebrew_template_probe(
+        mut transaction: dice::DiceTransaction,
+        key: &HostSelectedRepositoryFileEffectObservationKey,
+        workspace: &NormalizedAbsolutePath,
+        snapshot: RepositoryEnvironmentSnapshot,
+        frontier: &RepositoryEnvironmentNameFrontier,
+        nonce: u64,
+    ) -> (
+        dice::DiceTransaction,
+        ObservedHostSelectedRepositoryFileEffect,
+    ) {
+        let logical_root = PathBuf::from("/template-rules-cc");
+        let fixture_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(
+            "../../tests/v2_oracle/fixtures/nonroot-module-extension-semantics/workspace/registry/modules/rules_cc/0.2.17",
+        );
+        let instance = PathObservationInstanceId::new(952);
+        let global = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        let mut observations = global
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .collect::<Vec<_>>();
+        let mut transcript = RepositoryExecuteTranscript::empty();
+        let mut epoch = RepositoryExecuteEpoch::active(nonce, transcript.clone());
+        transaction = with_execute_epoch(
+            transaction,
+            workspace.dupe(),
+            snapshot.clone(),
+            frontier.clone(),
+            epoch.clone(),
+        )
+        .await;
+        for _ in 0..64 {
+            match transaction.compute(key).await.unwrap() {
+                SourcePreparationOutcome::Need(need) if !need.repository_executes().is_empty() => {
+                    let request = need.repository_executes().values().next().unwrap();
+                    assert_eq!(need.repository_executes().len(), 1);
+                    assert_eq!(request.id().call_index(), transcript.records().len());
+                    assert!(request.id().call_index() < 2);
+                    assert!(matches!(
+                        request.argv(),
+                        [slug_bzlmod_v2::RepositoryExecuteArg::Which(_), slug_bzlmod_v2::RepositoryExecuteArg::String(value)] if value == "-v"
+                    ));
+                    transcript = transcript
+                        .append(RepositoryExecuteRecord::new(
+                            request.clone(),
+                            RepositoryExecuteResult::new(
+                                0,
+                                Arc::from(&b""[..]),
+                                Arc::from(&b"gcc version 12"[..]),
+                            ),
+                        ))
+                        .unwrap();
+                    epoch = RepositoryExecuteEpoch::active(nonce, transcript.clone());
+                    transaction = with_execute_epoch(
+                        transaction,
+                        workspace.dupe(),
+                        snapshot.clone(),
+                        frontier.clone(),
+                        epoch.clone(),
+                    )
+                    .await;
+                }
+                SourcePreparationOutcome::Need(need)
+                    if need.path_observations().is_some()
+                        || !need.repository_materializations().is_empty() =>
+                {
+                    transaction = update_template_need(
+                        transaction,
+                        workspace,
+                        &need,
+                        &mut observations,
+                        &logical_root,
+                        &fixture_root,
+                        instance,
+                    )
+                    .await;
+                    transaction = with_execute_epoch(
+                        transaction,
+                        workspace.dupe(),
+                        snapshot.clone(),
+                        frontier.clone(),
+                        epoch.clone(),
+                    )
+                    .await;
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => {
+                    assert_eq!(transcript.records().len(), 2);
+                    return (transaction, observed);
+                }
+                terminal => panic!("Homebrew template probe did not converge: {terminal:?}"),
+            }
+        }
+        panic!("Homebrew template probe exceeded its retry bound")
+    }
+
+    #[tokio::test]
+    async fn selected_cc_autoconf_homebrew_gate_preserves_two_probes_and_restores_a_b_a() {
+        use crate::canonical_repository_route_tests::tests::WORKSPACE as BUILTIN_WORKSPACE;
+        use crate::canonical_repository_route_tests::tests::builtin_graph_dice;
+        use crate::canonical_repository_route_tests::tests::builtin_graph_module;
+        use crate::canonical_repository_route_tests::tests::transaction as builtin_transaction;
+
+        const SENTINEL: &str = "homebrew-private-sentinel-841";
+        let dice = builtin_graph_dice();
+        let workspace = NormalizedAbsolutePath::new(BUILTIN_WORKSPACE).unwrap();
+        let mut module = builtin_graph_module();
+        module.push_str("\nrepo=use_repo_rule('@rules_cc//cc/private/toolchain:cc_configure.bzl','cc_autoconf')\nrepo(name='local_config_cc')\n");
+        let transaction = builtin_transaction(&dice, &module, "", false, None).await;
+        let absent = environment_snapshot(&[("PATH", "/which/target")]);
+        let frontier = environment_frontier(&["PATH", "HOMEBREW_RUBY_PATH"]);
+        let mut transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            absent.clone(),
+            frontier.clone(),
+        )
+        .await;
+        let owner = owner_named(
+            &mut transaction,
+            workspace.dupe(),
+            "+cc_autoconf+local_config_cc",
+        )
+        .await;
+        let key = HostSelectedRepositoryFileEffectObservationKey::new(workspace.dupe(), owner, 0);
+
+        let (transaction, first) = converge_homebrew_template_probe(
+            transaction,
+            &key,
+            &workspace,
+            absent.clone(),
+            &frontier,
+            841,
+        )
+        .await;
+        let first_effect = first.result().as_ref().as_ref().unwrap();
+        assert_eq!(first_effect.plan().effects().len(), 1);
+        assert_eq!(
+            first_effect.plan().effects()[0].path(),
+            "validate_static_library.sh"
+        );
+        assert_eq!(first_effect.plan().effects()[0].content(), TEMPLATE_A);
+
+        let present =
+            environment_snapshot(&[("HOMEBREW_RUBY_PATH", SENTINEL), ("PATH", "/which/target")]);
+        let (transaction, blocked) = converge_homebrew_template_probe(
+            transaction,
+            &key,
+            &workspace,
+            present,
+            &frontier,
+            842,
+        )
+        .await;
+        assert!(matches!(
+            blocked.result().as_ref(),
+            Err(HostSelectedRepositoryFileEffectError::Invocation { message, .. })
+                if message == "rules_cc cc_autoconf HOMEBREW_RUBY_PATH-present template branch is unsupported"
+        ));
+        assert!(!format!("{blocked:?}").contains(SENTINEL));
+
+        let (_, restored) =
+            converge_homebrew_template_probe(transaction, &key, &workspace, absent, &frontier, 843)
+                .await;
+        assert_eq!(first.result(), restored.result());
     }
 
     fn assert_template_result(fixture: &TemplateEffectFixture) {

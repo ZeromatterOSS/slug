@@ -34,6 +34,41 @@
       "startup_argv": [],
       "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n",
       "stdout": "@selected//:gcc_probes\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@prefix_selected//:linker_prefix_probe",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@prefix_selected//:linker_prefix_probe",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin"
+      },
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "gcc_linker_probe_after_ordered_template_prefix",
+      "normalized_stderr": "",
+      "normalized_stdout": "@prefix_selected//:linker_prefix_probe",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@prefix_selected//:linker_prefix_probe\n"
     }
   ],
   "fixture": "repository-rule-execute-gcc-probes",
