@@ -29,15 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-116-m7a-python-internal-guarded-global-r1
+Packet: WP-7-117-m7a-label-list-empty-aspects-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP816 admits Bazel 9.2's defining-source guard and 26-field frozen
-`py_internal` Loading namespace. Five focused/protected tests, including
-same-DICE export A/B/A, pass; the rebuilt authentic smoke clears the
-undefined global and reaches a separate rules_python multiple-required-aspect
-Loading stop. Python-helper invocation, full rules_python behavior and M7A
-close remain deferred. WP815 was accepted at `7bb492885`.
+WP817 admits empty `attr.label_list(aspects=[])` as zero attached aspects,
+matching Bazel 9.2; the four selected Loading tests, Core/CLI compile and
+rebuilt authentic smoke pass the previous cardinality stop. The smoke now
+stops separately at `attr.label_keyed_string_dict(aspects=[])` in rules_python.
+The prior cardinality diagnostic alone did not establish multiple aspects.
+WP816 was accepted at `0f832b895`; multi-aspect behavior, Python-helper
+invocation and M7A close remain deferred.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

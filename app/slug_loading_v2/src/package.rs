@@ -4909,6 +4909,9 @@ fn aspect_required_aspect(value: Option<Value>) -> anyhow::Result<Option<Value>>
     };
     let values = ListRef::from_value(value)
         .ok_or_else(|| anyhow::anyhow!("aspect requires must be a list"))?;
+    if values.is_empty() {
+        return Ok(None);
+    }
     let [required] = values.content() else {
         anyhow::bail!("only one required aspect is supported");
     };

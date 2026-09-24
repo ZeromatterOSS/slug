@@ -9520,5 +9520,20 @@ there is no new key, lock or cache.
 The offline Bazel 9.2 guard/shape oracle, five focused/protected Slug tests
 (including a real same-DICE export A/B/A), Core/CLI compile and rebuilt
 authentic smoke support this slice. The authentic build clears undefined
-`py_internal` and now stops at a separate `attr.label_list` multiple-required-
-aspect declaration in rules_python. M7A remains partial.
+`py_internal` and now stops at a separate `attr.label_list` aspect-cardinality
+error in rules_python. Source inspection identifies the selected builder's
+actual argument as `aspects=[]`, not a multiple-aspect declaration. M7A
+remains partial.
+
+### Empty label-list aspects accepted (2026-09-24)
+
+WP817 admits explicit `attr.label_list(aspects=[])` as zero attached aspects,
+matching Bazel 9.2's default-empty sequence and zero-iteration builder path.
+The existing optional attached-aspect schema freezes `None`; singleton
+handling and rejection of two or more aspects remain unchanged. No retained
+representation, DICE key, cache or lock changes. A pre-fix selected regression
+failed on this exact empty value; after the guard, four selected Loading tests
+pass, Core/CLI compile and the CLI rebuild succeed, and the authentic build
+clears the prior cardinality stop. It now stops separately on
+`attr.label_keyed_string_dict(aspects=[])` in rules_python. Broader attr-family
+aspects, configured aspect traversal and M7A close remain deferred.

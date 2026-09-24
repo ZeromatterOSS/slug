@@ -33355,6 +33355,24 @@ fn rustfmt_test_rule_validates_admitted_dependency_schemas() {
         &loading_globals(),
     )
     .unwrap();
+    let empty = eval_global(
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[])})",
+        &loading_globals(),
+    )
+    .unwrap();
+    let rule = empty
+        .get("R")
+        .unwrap()
+        .downcast::<FrozenRuleDefinition>()
+        .unwrap();
+    assert!(
+        rule.schema
+            .iter()
+            .find(|schema| schema.name == "targets")
+            .unwrap()
+            .attached_aspect
+            .is_none()
+    );
     for source in [
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[])})",
         "P=provider()\nQ=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[P, Q])})",
@@ -33367,7 +33385,7 @@ fn rustfmt_test_rule_validates_admitted_dependency_schemas() {
     for source in [
         "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(doc=1)})",
         "def make_provider(): return provider()\nQ=provider()\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(providers=[[make_provider()], [Q]])})",
-        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[])})",
+        "def impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=None)})",
         "def aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\nB=aspect(implementation=aspect_impl)\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[A, B])})",
         "def aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[A, A])})",
         "def aspect_impl(target, ctx): return []\nA=aspect(implementation=aspect_impl)\nB=aspect(implementation=aspect_impl, requires=[A])\ndef impl(ctx): return []\nR=rule(implementation=impl, attrs={'targets': attr.label_list(aspects=[B, A])})",
