@@ -29,26 +29,25 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-91-m7a-selected-extension-tag-list-concat-r1
-Status: accepted; independent design and final reviews ACCEPT
+Packet: WP-7-92-m7a-selected-extension-root-label-watch-r1
+Status: accepted; independent design and final review ACCEPT
 
-WP791 targets the next authentic root stop in rules_rust 0.73.0: its selected
-`crate` extension adds immutable `mod.tags.from_cargo` and
-`mod.tags.from_specs` views at `extensions.bzl:1129`. Materialize native
-immutable evaluation-local tag lists over the existing Arc-owned tags so
-vendored `+` returns a fresh mutable ordered result and `+=` on a source
-view rejects; preflight a conservative tag-count cap before invocation.
-Do not claim general list arithmetic parity.
-Pinned Bazel 9.2 list-concat source and tests support this selected slice.
-WP790 at `fc3319670` independently accepted verified generator acquisition;
-the real root passed path/download and reached this addition. Focused
-and all 24 module-extension tests pass; the broader Loading suite has
-no new failing test names against the pre-change WP790 binary. A fresh
-CLI smoke passed list addition and stopped at `module_ctx.watch` for
-`cfg.cargo_lockfile` in `extensions.bzl:1153`. Other `+=`, general
-custom-list operators, physical-path watch/execute and M7A closure
-remain deferred. Independent final review ACCEPTED the corrected
-two-entry cap and selected list behavior.
+WP792 targets the next authentic root stop in rules_rust 0.73.0: its
+selected `crate` extension explicitly watches the root Label
+`//:Cargo.lock` at `extensions.bzl:1153`. Admit a bounded selected
+root-Label regular/missing-file watch by composing existing observed
+package/selected-root resolution and file-digest DICE inputs; no-op
+watching is forbidden. Defer String/path/external Label, directory and
+symlink cases. Do not publish invocation effects before all called
+watches are observed; preserve Need/replay, warm invalidation and the
+unchanged selected-snapshot restoration machinery. Loading's 30 focused
+tests and three reused Core path/selected-snapshot checks pass. A fresh
+rebuilt CLI passes both root Cargo watches and stops at rules_rust
+`extensions.bzl:877,1159` on `module_ctx.path(host_tools_repo)`, whose
+operand is a Label beyond the admitted string path slice. WP791 at
+`c52b3b691` independently accepted native immutable tag-list
+concatenation. path(Label), physical reads, generator execution and M7A
+closure remain deferred; no watch-specific end-to-end deselection claim.
 
 WP785 at `9931f6a2d` accepted bounded Linux `run_shell` execution through
 fresh NativeLink 1.7.1: one REAPI action, zero direct-local actions and exact

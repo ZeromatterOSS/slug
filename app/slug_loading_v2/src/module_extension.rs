@@ -26,6 +26,7 @@ use dupe::Dupe;
 use slug_bzlmod_v2::FactNumber;
 use slug_bzlmod_v2::FactValue;
 use slug_bzlmod_v2::Facts;
+use slug_bzlmod_v2::HostRepositoryLabelPathObservationKey;
 use slug_bzlmod_v2::HostRepositoryRelativePath;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionSource;
@@ -41,6 +42,7 @@ use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
 use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
 use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
 use slug_bzlmod_v2::RepositoryHostInputTransaction;
+use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_bzlmod_v2::RepositoryPlatform;
 use slug_bzlmod_v2::RepositoryPlatformKey;
 use slug_bzlmod_v2::RootModuleExtensionUsage;
@@ -59,11 +61,17 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
-#[cfg(test)]
 use slug_identity_v2::CanonicalLabel;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathFileDigest;
+use slug_workspace_v2::PathFileDigestObservationKey;
+use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationEpoch;
+use slug_workspace_v2::PathObservationNamespace;
+use slug_workspace_v2::PathOutcome;
+use slug_workspace_v2::ResolvedPathObservationKey;
+use slug_workspace_v2::ResolvedPathState;
 use starlark::PrintHandler;
 use starlark::PrintLocation;
 use starlark::any::ProvidesStaticType;
@@ -907,6 +915,147 @@ async fn owner_bzl(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOw
     }
 }
 
+async fn observe_selected_watches(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedExtensionOwnerPureKey,
+    inputs: &Arc<HostSelectedExtensionOwnerInputs>,
+    first: &Arc<OwnerProjection>,
+    calls: &Arc<[RepositoryRuleCallRecord]>,
+    labels: &[CanonicalLabel],
+    mut observations: PathObservationEpoch,
+) -> Result<PathObservationEpoch, OwnerPureDriver> {
+    macro_rules! merge {
+        ($incoming:expr) => {
+            observations = union_pure_observations(&observations, $incoming).map_err(|error| {
+                SourcePreparationOutcome::Complete(Err(
+                    HostSelectedExtensionOwnerPureObservationError::Merge {
+                        inputs: inputs.clone(),
+                        first: Some(first.clone()),
+                        error,
+                    },
+                ))
+            })?;
+        };
+    }
+    macro_rules! fail {
+        ($message:expr) => {
+            return Err(owner_complete(
+                Err(owner_after(inputs, calls.clone(), $message)),
+                observations,
+            ))
+        };
+    }
+    for label in labels {
+        let address = RepositoryLabelPathAddress::from_label(label);
+        let label_key =
+            match HostRepositoryLabelPathObservationKey::new_root(key.workspace.dupe(), address) {
+                Ok(key) => key,
+                Err(error) => fail!(format!("module_ctx.watch Label is unsupported: {error:?}")),
+            };
+        let observed = match ctx.compute(&label_key).await {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return Err(SourcePreparationOutcome::Need(need));
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return Err(SourcePreparationOutcome::Complete(Err(
+                    HostSelectedExtensionOwnerPureObservationError::Merge {
+                        inputs: inputs.clone(),
+                        first: Some(first.clone()),
+                        error,
+                    },
+                )));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => observed,
+            Err(error) => fail!(format!("module_ctx.watch Label lookup failed: {error}")),
+        };
+        merge!(observed.observations());
+        let path = match observed.result().as_ref() {
+            Ok(value) => value,
+            Err(error) => fail!(format!("module_ctx.watch Label path failed: {error:?}")),
+        };
+        if !path.path().as_path().starts_with(key.workspace.as_path()) {
+            fail!("module_ctx.watch Label resolves outside the root workspace");
+        }
+        if path.namespace() != PathObservationNamespace::Host {
+            fail!("module_ctx.watch Label has an unsupported path namespace");
+        }
+        let logical_path = path.path().dupe();
+        let resolved = match ctx
+            .compute(&ResolvedPathObservationKey::new(
+                PathObservationNamespace::Host,
+                logical_path.dupe(),
+            ))
+            .await
+        {
+            Ok(PathOutcome::Need(need)) => {
+                return Err(SourcePreparationOutcome::Need(
+                    SourcePreparationNeeds::path(need),
+                ));
+            }
+            Ok(PathOutcome::Complete(Err(error))) => {
+                return Err(SourcePreparationOutcome::Complete(Err(
+                    HostSelectedExtensionOwnerPureObservationError::Merge {
+                        inputs: inputs.clone(),
+                        first: Some(first.clone()),
+                        error,
+                    },
+                )));
+            }
+            Ok(PathOutcome::Complete(Ok(observed))) => observed,
+            Err(error) => fail!(format!("module_ctx.watch path resolution failed: {error}")),
+        };
+        merge!(resolved.observations());
+        let resolved = match resolved.result() {
+            Ok(value) => value,
+            Err(error) => fail!(format!(
+                "module_ctx.watch path resolution failed: {error:?}"
+            )),
+        };
+        if !resolved.symlinks().is_empty() {
+            fail!("module_ctx.watch does not support symlink paths");
+        }
+        match resolved.state() {
+            ResolvedPathState::Missing => {}
+            ResolvedPathState::Present(lstat) if lstat.kind() == PathNodeKind::RegularFile => {}
+            ResolvedPathState::Present(_) => {
+                fail!("module_ctx.watch supports only regular or missing files");
+            }
+        }
+        let digest = match ctx
+            .compute(&PathFileDigestObservationKey::new(
+                PathObservationNamespace::Host,
+                logical_path,
+            ))
+            .await
+        {
+            Ok(PathOutcome::Need(need)) => {
+                return Err(SourcePreparationOutcome::Need(
+                    SourcePreparationNeeds::path(need),
+                ));
+            }
+            Ok(PathOutcome::Complete(Err(error))) => {
+                return Err(SourcePreparationOutcome::Complete(Err(
+                    HostSelectedExtensionOwnerPureObservationError::Merge {
+                        inputs: inputs.clone(),
+                        first: Some(first.clone()),
+                        error,
+                    },
+                )));
+            }
+            Ok(PathOutcome::Complete(Ok(observed))) => observed,
+            Err(error) => fail!(format!("module_ctx.watch file digest failed: {error}")),
+        };
+        merge!(digest.observations());
+        match (resolved.state(), digest.result()) {
+            (ResolvedPathState::Missing, Ok(PathFileDigest::Missing))
+            | (ResolvedPathState::Present(_), Ok(PathFileDigest::Present(_))) => {}
+            (_, Ok(_)) => fail!("module_ctx.watch file changed during observation"),
+            (_, Err(error)) => fail!(format!("module_ctx.watch file digest failed: {error:?}")),
+        }
+    }
+    Ok(observations)
+}
+
 #[rustfmt::skip]
 async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerPureKey, mode: PureInvocationsMode) -> OwnerPureDriver {
     let (inputs, observations) = match mode {
@@ -946,7 +1095,7 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         Ok(ready) => ready,
         Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
     };
-    let (module, observations) = match owner_bzl(ctx, key, &inputs, Some(&first), first_module.1, mode).await { Ok(value) => value, Err(outcome) => return outcome };
+    let (module, mut observations) = match owner_bzl(ctx, key, &inputs, Some(&first), first_module.1, mode).await { Ok(value) => value, Err(outcome) => return outcome };
     let second = match owner_projection(&module, inputs.request()) {
         Ok(value) => value,
         Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
@@ -955,6 +1104,7 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         return owner_complete(Err(owner_after(&inputs, Arc::from([]), "reacquired selected module extension differs")), observations);
     }
     let selected_download = Arc::new(SelectedDownloadInvocation::new(key.workspace.dupe(), key.owner.clone(), ready));
+    let selected_watch = Arc::new(SelectedWatchInvocation::new());
     let definition = module.module.get_assigned(inputs.request().parts().1).expect("projection authenticated export").0.downcast::<FrozenModuleExtensionDefinition>().expect("projection authenticated kind");
     let root_usage = inputs.root_proxies().map(|proxies| RootModuleExtensionUsage::new(
         proxies.iter().any(|proxy| !proxy.dev_dependency),
@@ -968,7 +1118,7 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
             .map(|module| module.materialize(invocation_module.frozen_heap()))
             .collect::<Vec<_>>()
             .into();
-        let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage, Some(host)).with_selected_download(selected_download.clone()));
+        let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage, Some(host)).with_selected_download(selected_download.clone()).with_selected_watch(selected_watch.clone()));
         let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);
         let repository_rules = RepositoryRuleInvocationState::new();
         let mut evaluator = Evaluator::new(&invocation_module);
@@ -991,7 +1141,8 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         (returned, repository_rules.records(), capture)
     };
     // A successful download is part of the selected closure even when later
-    // Starlark evaluation fails. Unused preflighted content does not enter it.
+    // Starlark evaluation or a later watch fails. Unused preflighted content
+    // does not enter it.
     let used = match selected_download.used() {
         Ok(used) => used,
         Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
@@ -1001,6 +1152,14 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
             return owner_complete(Err(owner_after(&inputs, calls, error.to_string())), observations);
         }
     }
+    let watched = match selected_watch.called() {
+        Ok(watched) => watched,
+        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+    };
+    observations = match observe_selected_watches(ctx, key, &inputs, &first, &calls, &watched, observations).await {
+        Ok(observations) => observations,
+        Err(terminal) => return terminal,
+    };
     let request = inputs.request().clone();
     let result = match returned {
         Err(error) => Err(owner_after(&inputs, calls, error)),
@@ -1359,8 +1518,48 @@ struct InvocationContext {
     root_usage: Option<RootModuleExtensionUsage>,
     os: Option<ModuleExtensionOs>,
     selected_download: Option<Arc<SelectedDownloadInvocation>>,
+    selected_watch: Option<Arc<SelectedWatchInvocation>>,
     #[allocative(skip)]
     owner: Arc<()>,
+}
+
+const MAX_SELECTED_WATCHES: usize = 8;
+
+#[derive(Debug, Allocative)]
+struct SelectedWatchInvocation {
+    called: Mutex<SmallSet<CanonicalLabel>>,
+}
+
+impl SelectedWatchInvocation {
+    fn new() -> Self {
+        Self {
+            called: Mutex::new(SmallSet::new()),
+        }
+    }
+
+    fn call(&self, label: &CanonicalLabel) -> anyhow::Result<()> {
+        if !label.package().repo().is_root() {
+            anyhow::bail!("module_ctx.watch supports only root repository Labels");
+        }
+        let mut called = self
+            .called
+            .lock()
+            .map_err(|_| anyhow::anyhow!("selected module extension watch scratch unavailable"))?;
+        if !called.contains(label) && called.len() == MAX_SELECTED_WATCHES {
+            anyhow::bail!(
+                "module_ctx.watch supports at most {MAX_SELECTED_WATCHES} distinct Labels"
+            );
+        }
+        called.insert(label.clone());
+        Ok(())
+    }
+
+    fn called(&self) -> Result<Vec<CanonicalLabel>, CompactString> {
+        self.called
+            .lock()
+            .map(|called| called.iter().cloned().collect())
+            .map_err(|_| "selected module extension watch scratch unavailable".into())
+    }
 }
 
 #[derive(Debug, Allocative)]
@@ -1537,12 +1736,18 @@ impl InvocationContext {
             root_usage,
             os,
             selected_download: None,
+            selected_watch: None,
             owner: owner.clone(),
         }
     }
 
     fn with_selected_download(mut self, download: Arc<SelectedDownloadInvocation>) -> Self {
         self.selected_download = Some(download);
+        self
+    }
+
+    fn with_selected_watch(mut self, watch: Arc<SelectedWatchInvocation>) -> Self {
+        self.selected_watch = Some(watch);
         self
     }
 }
@@ -1577,6 +1782,20 @@ impl<'v> StarlarkValue<'v> for InvocationContext {
 
 #[starlark_module]
 fn invocation_context_methods(builder: &mut MethodsBuilder) {
+    fn watch<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] label: Value<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        let this = InvocationContext::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
+        let watch = this.selected_watch.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("module_ctx.watch is only supported for a selected module extension")
+        })?;
+        let label = StarlarkLabel::from_value(label)
+            .ok_or_else(|| anyhow::anyhow!("module_ctx.watch requires a Label"))?;
+        watch.call(label.canonical())?;
+        Ok(Value::new_none())
+    }
     fn path(
         this: Value,
         #[starlark(require = pos)] path: &str,
@@ -2236,6 +2455,7 @@ mod tests {
             root_usage: None,
             os: None,
             selected_download: None,
+            selected_watch: None,
             owner: owner.clone(),
         };
         let modules = call("def f(ctx):\n  ctx.modules.append(1)\n", |module| {
@@ -2286,6 +2506,7 @@ mod tests {
             root_usage: None,
             os: None,
             selected_download: None,
+            selected_watch: None,
             owner: owner.clone(),
         };
         let foreign_heap = FrozenHeap::new();
@@ -2354,6 +2575,7 @@ mod tests {
             root_usage: None,
             os: None,
             selected_download: None,
+            selected_watch: None,
             owner: owner.clone(),
         };
         let value = call(
@@ -2392,6 +2614,7 @@ mod tests {
             root_usage: None,
             os: None,
             selected_download: None,
+            selected_watch: None,
             owner,
         };
         let result = call(
@@ -2452,6 +2675,7 @@ mod tests {
             root_usage: None,
             os: None,
             selected_download: None,
+            selected_watch: None,
             owner,
         };
         for name in [
@@ -2463,7 +2687,6 @@ mod tests {
             "file",
             "getenv",
             "read",
-            "watch",
             "report_progress",
             "os",
             "execute",
@@ -2480,6 +2703,21 @@ mod tests {
                 .contains("has no attribute")
             );
         }
+        let label = StarlarkLabel::new(CanonicalLabel::parse("@@//:watched").unwrap());
+        let error = call(
+            "def f(ctx, label):\n  return ctx.watch(label)\n",
+            |module| {
+                vec![
+                    module.heap().alloc_simple(context.clone()),
+                    module.heap().alloc_simple(label),
+                ]
+            },
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("only supported for a selected module extension"),
+            "{error}"
+        );
         for source in [
             "def f(ctx):\n  return ctx.path('cargo-bazel')\n",
             "def f(ctx):\n  return ctx.download(url='file:///artifact', output='cargo-bazel', sha256='0000000000000000000000000000000000000000000000000000000000000000')\n",
@@ -2515,6 +2753,7 @@ mod tests {
             root_usage: None,
             os: None,
             selected_download: None,
+            selected_watch: None,
             owner: other_owner,
         };
         for method in ["is_dev_dependency", "tag_sort_key"] {
@@ -2554,6 +2793,7 @@ mod tests {
             root_usage: Some(RootModuleExtensionUsage::new(true, true)),
             os: None,
             selected_download: None,
+            selected_watch: None,
             owner,
         };
         let none = metadata_call("def f(ctx):\n  return None\n", context.clone()).unwrap();
@@ -2678,6 +2918,7 @@ mod tests {
                 root_usage: usage,
                 os: None,
                 selected_download: None,
+                selected_watch: None,
                 owner: owner.clone(),
             };
             assert_eq!(
@@ -2786,6 +3027,7 @@ mod tests {
             root_usage: Some(RootModuleExtensionUsage::new(true, false)),
             os: None,
             selected_download: None,
+            selected_watch: None,
             owner,
         };
         let value = call("def f(ctx, tag):\n  label=tag.target\n  return [len(ctx.modules), ctx.modules[0].name, ctx.modules[0].version, ctx.modules[0].is_root, ctx.is_dev_dependency(tag), label.name, label.package, label.repo_name, label.workspace_name, str(label), repr(label), '%s' % label, '%r' % label, '{}'.format(label), '{!s}'.format(label), '{!r}'.format(label), label.same_package_label('other').name, {label: 1}[label], label == label]\n", |module| vec![module.heap().alloc_simple(context), module.heap().alloc_simple(tag)]).unwrap();
@@ -3951,6 +4193,157 @@ mod tests {
         PathObservationEpoch::from_shared(rows).unwrap()
     }
 
+    fn selected_watch_epoch_named(
+        module_source: &str,
+        extension_source: &str,
+        name: &str,
+        content: Option<&[u8]>,
+    ) -> PathObservationEpoch {
+        let path = NormalizedAbsolutePath::new(format!("{REPO_RULE_WORKSPACE}/{name}")).unwrap();
+        let demand = |operation| {
+            PathObservationDemand::new(PathObservationNamespace::Host, path.dupe(), operation)
+        };
+        let lstat = content.map_or(PathOperationResult::Missing, |bytes| {
+            PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                bytes.len() as i64,
+                1,
+                1,
+                301,
+                0o644,
+            ))
+        });
+        let digest = content.map_or(PathOperationResult::Missing, |bytes| {
+            PathOperationResult::Present(
+                slug_workspace_v2::FileContentDigest::new(
+                    Sha256::digest(bytes).into(),
+                    bytes.len() as u64,
+                )
+                .unwrap(),
+            )
+        });
+        PathObservationEpoch::from_shared(
+            selected_factor_epoch(module_source, extension_source)
+                .observations()
+                .iter()
+                .map(|(demand, result)| (demand.dupe(), result.dupe()))
+                .chain([
+                    (
+                        demand(PathObservationOperation::Lstat),
+                        Arc::new(PathObservationResult::Lstat(lstat)),
+                    ),
+                    (
+                        demand(PathObservationOperation::FileDigest),
+                        Arc::new(PathObservationResult::FileDigest(digest)),
+                    ),
+                ]),
+        )
+        .unwrap()
+    }
+
+    fn selected_watch_epoch(
+        module_source: &str,
+        extension_source: &str,
+        content: Option<&[u8]>,
+    ) -> PathObservationEpoch {
+        selected_watch_epoch_named(module_source, extension_source, "watch.txt", content)
+    }
+
+    async fn selected_watch_observations(
+        transaction: dice::DiceTransaction,
+        epoch: PathObservationEpoch,
+    ) -> dice::DiceTransaction {
+        let mut updater = transaction.into_updater();
+        updater.changed_to(path_observation_shards(&epoch)).unwrap();
+        updater
+            .changed_to([(PathObservationEpochKey, epoch)])
+            .unwrap();
+        updater.commit().await
+    }
+
+    fn selected_watch_symlink_epoch(
+        module_source: &str,
+        extension_source: &str,
+        ancestor: bool,
+        dangling: bool,
+    ) -> PathObservationEpoch {
+        let demand = |name: &str, operation| {
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(format!("{REPO_RULE_WORKSPACE}/{name}")).unwrap(),
+                operation,
+            )
+        };
+        let lstat = |kind, size, id| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                kind, size, 1, 1, id, 0o755,
+            )))
+        };
+        let mut rows = selected_factor_epoch(module_source, extension_source)
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .collect::<Vec<_>>();
+        let link = if ancestor { "nested" } else { "watch.txt" };
+        let target = if ancestor { "actual" } else { "actual.txt" };
+        rows.push((
+            demand(link, PathObservationOperation::Lstat),
+            Arc::new(lstat(PathNodeKind::Symlink, target.len() as i64, 401)),
+        ));
+        rows.push((
+            demand(link, PathObservationOperation::ReadLink),
+            Arc::new(PathObservationResult::ReadLink(
+                PathOperationResult::Present(Arc::new(PathBuf::from(target))),
+            )),
+        ));
+        if ancestor {
+            rows.push((
+                demand("actual", PathObservationOperation::Lstat),
+                Arc::new(lstat(PathNodeKind::Directory, 0, 402)),
+            ));
+        }
+        rows.push((
+            demand(
+                if ancestor {
+                    "actual/watch.txt"
+                } else {
+                    "actual.txt"
+                },
+                PathObservationOperation::Lstat,
+            ),
+            Arc::new(if dangling {
+                PathObservationResult::Lstat(PathOperationResult::Missing)
+            } else {
+                lstat(PathNodeKind::RegularFile, 1, 403)
+            }),
+        ));
+        PathObservationEpoch::from_shared(rows).unwrap()
+    }
+
+    fn selected_watch_directory_epoch(
+        module_source: &str,
+        extension_source: &str,
+    ) -> PathObservationEpoch {
+        PathObservationEpoch::from_shared(
+            selected_factor_epoch(module_source, extension_source)
+                .observations()
+                .iter()
+                .map(|(demand, result)| (demand.dupe(), result.dupe()))
+                .chain([(
+                    PathObservationDemand::new(
+                        PathObservationNamespace::Host,
+                        NormalizedAbsolutePath::new(format!("{REPO_RULE_WORKSPACE}/watch.txt"))
+                            .unwrap(),
+                        PathObservationOperation::Lstat,
+                    ),
+                    Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                        PathLstat::new(PathNodeKind::Directory, 0, 1, 1, 501, 0o755),
+                    ))),
+                )]),
+        )
+        .unwrap()
+    }
+
     async fn selected_factor_transaction(
         dice: &Arc<Dice>,
         module_source: &str,
@@ -4463,6 +4856,442 @@ ext = module_extension(implementation = impl, environ = ['FACTOR', 'MISSING', 'F
     }
 
     #[tokio::test]
+    async fn selected_external_owner_watch_label_need_replay_and_content_invalidation() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.watch(file='//:watch.txt')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None)
+watch_tag = tag_class(attrs = {'file': attr.label()})
+def impl(ctx):
+    for mod in ctx.modules:
+        for tag in mod.tags.watch:
+            print('before-watch')
+            ctx.watch(tag.file)
+            ctx.watch(tag.file)
+    repo(name='proof')
+    print('after-watch')
+ext = module_extension(implementation=impl, tag_classes={'watch': watch_tag}, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (base, owner) =
+            selected_factor_transaction(&dice, MODULE, EXTENSION, tracker.clone(), true).await;
+        tracker.take();
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let key = HostSelectedExtensionOwnerPureObservationKey::new(workspace.dupe(), owner);
+        let frontier = RepositoryEnvironmentNameFrontier::from_unsorted([
+            CompactString::new("FACTOR"),
+            CompactString::new("MISSING"),
+        ]);
+        let mut transaction = selected_factor_host_inputs(
+            base,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            frontier,
+        )
+        .await;
+        let SourcePreparationOutcome::Need(need) = transaction.compute(&key).await.unwrap() else {
+            panic!("cold selected watch must return Need");
+        };
+        assert!(need.path_observations().is_some(), "{need:?}");
+        let rows = tracker.take();
+        assert!(
+            rows.iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+        assert!(
+            rows.iter()
+                .flat_map(|row| row.batch.as_ref())
+                .flat_map(EventBatch::events)
+                .all(|event| !format!("{event:?}").contains("before-watch"))
+        );
+
+        for (content, expected_kind) in [
+            (Some(&b"A"[..]), ActivationKind::Evaluated),
+            (Some(&b"B"[..]), ActivationKind::Evaluated),
+            (Some(&b"A"[..]), ActivationKind::Evaluated),
+            (None, ActivationKind::Evaluated),
+            (Some(&b"A"[..]), ActivationKind::Evaluated),
+        ] {
+            transaction = selected_watch_observations(
+                transaction,
+                selected_watch_epoch(MODULE, EXTENSION, content),
+            )
+            .await;
+            let outcome = transaction.compute(&key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                panic!("selected watch replay did not complete: {outcome:?}");
+            };
+            let result = observed.result().as_ref().as_ref().unwrap();
+            assert_eq!(result.receipt.repository_rule_calls.len(), 1);
+            assert_eq!(result.receipt.repository_rule_calls[0].name, "proof");
+            assert_eq!(
+                observed
+                    .observations()
+                    .observations()
+                    .iter()
+                    .filter(|(demand, _)| {
+                        demand.path().as_path().ends_with("watch.txt")
+                            && demand.operation() == PathObservationOperation::FileDigest
+                    })
+                    .count(),
+                usize::from(content.is_some())
+            );
+            let rows = tracker.take();
+            assert!(
+                rows.iter()
+                    .any(|row| row.key == key.to_string() && row.kind == expected_kind),
+                "{rows:?}"
+            );
+            assert!(
+                rows.iter()
+                    .flat_map(|row| row.batch.as_ref())
+                    .flat_map(EventBatch::events)
+                    .any(|event| format!("{event:?}").contains("after-watch"))
+            );
+            let warm = transaction.compute(&key).await.unwrap();
+            assert!(matches!(warm, SourcePreparationOutcome::Complete(Ok(_))));
+            assert!(
+                tracker
+                    .take()
+                    .iter()
+                    .any(|row| row.key == key.to_string() && row.kind == ActivationKind::Reused)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_watch_set_changes_with_selected_tags() {
+        const EXTENSION: &str = r#"
+watch_tag = tag_class(attrs = {'file': attr.label()})
+def impl(ctx):
+    for mod in ctx.modules:
+        for tag in mod.tags.watch:
+            ctx.watch(tag.file)
+ext = module_extension(implementation=impl, tag_classes={'watch': watch_tag}, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let mut prior_owner = None;
+        for name in ["watch.txt", "other.txt", "watch.txt"] {
+            let module = format!(
+                "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.watch(file='//:{name}')\nuse_repo(e, proof='proof')\n"
+            );
+            let (base, owner) =
+                selected_factor_transaction(&dice, &module, EXTENSION, tracker.clone(), true).await;
+            if let Some(previous) = &prior_owner {
+                assert_eq!(previous, &owner);
+            }
+            prior_owner = Some(owner.clone());
+            tracker.take();
+            let base = selected_factor_host_inputs(
+                base,
+                tracker.clone(),
+                RepositoryPlatform::new("linux", "x86_64"),
+                RepositoryEnvironmentSnapshot::empty(),
+                RepositoryEnvironmentNameFrontier::from_unsorted([
+                    CompactString::new("FACTOR"),
+                    CompactString::new("MISSING"),
+                ]),
+            )
+            .await;
+            let mut transaction = selected_watch_observations(
+                base,
+                selected_watch_epoch_named(&module, EXTENSION, name, Some(b"x")),
+            )
+            .await;
+            let key = HostSelectedExtensionOwnerPureObservationKey::new(
+                NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap(),
+                owner,
+            );
+            let outcome = transaction.compute(&key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                panic!("changed watch set did not complete: {outcome:?}");
+            };
+            assert!(observed.result().as_ref().is_ok());
+            let digests = observed
+                .observations()
+                .observations()
+                .iter()
+                .filter(|(demand, _)| demand.operation() == PathObservationOperation::FileDigest)
+                .map(|(demand, _)| {
+                    demand
+                        .path()
+                        .as_path()
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(digests, [name]);
+            assert!(
+                tracker
+                    .take()
+                    .iter()
+                    .any(|row| row.key == key.to_string() && row.kind == ActivationKind::Evaluated)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_watch_refuses_direct_and_ancestor_symlinks() {
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None)
+watch_tag = tag_class(attrs = {'file': attr.label()})
+def impl(ctx):
+    for mod in ctx.modules:
+        for tag in mod.tags.watch:
+            print('before-symlink-watch')
+            ctx.watch(tag.file)
+    repo(name='proof')
+ext = module_extension(implementation=impl, tag_classes={'watch': watch_tag}, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        for ancestor in [false, true] {
+            for dangling in [false, true] {
+                let label = if ancestor {
+                    "//:nested/watch.txt"
+                } else {
+                    "//:watch.txt"
+                };
+                let module = format!(
+                    "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.watch(file='{label}')\nuse_repo(e, proof='proof')\n"
+                );
+                let mut builder = Dice::builder();
+                install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+                let dice = Arc::new(builder.build(DetectCycles::Enabled));
+                let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+                let (base, owner) =
+                    selected_factor_transaction(&dice, &module, EXTENSION, tracker.clone(), true)
+                        .await;
+                tracker.take();
+                let base = selected_factor_host_inputs(
+                    base,
+                    tracker.clone(),
+                    RepositoryPlatform::new("linux", "x86_64"),
+                    RepositoryEnvironmentSnapshot::empty(),
+                    RepositoryEnvironmentNameFrontier::from_unsorted([
+                        CompactString::new("FACTOR"),
+                        CompactString::new("MISSING"),
+                    ]),
+                )
+                .await;
+                let mut transaction = selected_watch_observations(
+                    base,
+                    selected_watch_symlink_epoch(&module, EXTENSION, ancestor, dangling),
+                )
+                .await;
+                let key = HostSelectedExtensionOwnerPureObservationKey::new(
+                    NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap(),
+                    owner,
+                );
+                let outcome = transaction.compute(&key).await.unwrap();
+                let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                    panic!("symlink case returned an unexpected Need: {outcome:?}");
+                };
+                let error = observed.result().as_ref().as_ref().unwrap_err();
+                let diagnostic = format!("{error:?}");
+                assert!(
+                    diagnostic.contains("does not support symlink paths"),
+                    "{ancestor} {dangling}: {diagnostic}"
+                );
+                let rows = tracker.take();
+                assert!(
+                    rows.iter()
+                        .filter(|row| row.key == key.to_string())
+                        .all(|row| row.batch.is_none())
+                );
+                assert!(
+                    rows.iter()
+                        .flat_map(|row| row.batch.as_ref())
+                        .flat_map(EventBatch::events)
+                        .all(|event| !format!("{event:?}").contains("before-symlink-watch"))
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_watch_refuses_directory() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.watch(file='//:watch.txt')\nuse_repo(e, proof='proof')\n";
+        const BYTES: &[u8] = b"selected-watch-download";
+        let checksum = format!("{:x}", Sha256::digest(BYTES));
+        let extension = format!(
+            "watch_tag=tag_class(attrs={{'file':attr.label()}})\ndef impl(ctx):\n  output=ctx.path('generator')\n  ctx.download(url='file:///selected-watch-download',output=output,sha256='{checksum}')\n  for mod in ctx.modules:\n    for tag in mod.tags.watch:\n      ctx.watch(tag.file)\next=module_extension(implementation=impl,tag_classes={{'watch':watch_tag}},environ=['FACTOR','MISSING','FACTOR'])\n"
+        );
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (base, owner) =
+            selected_factor_transaction(&dice, MODULE, &extension, tracker.clone(), true).await;
+        tracker.take();
+        let base = selected_factor_host_inputs(
+            base,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::from_unsorted([
+                CompactString::new("FACTOR"),
+                CompactString::new("MISSING"),
+            ]),
+        )
+        .await;
+        let mut transaction =
+            selected_watch_observations(base, selected_watch_directory_epoch(MODULE, &extension))
+                .await;
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let key =
+            HostSelectedExtensionOwnerPureObservationKey::new(workspace.dupe(), owner.clone());
+        let SourcePreparationOutcome::Need(need) = transaction.compute(&key).await.unwrap() else {
+            panic!("selected download must be prepared before the directory watch");
+        };
+        let request = need
+            .selected_extension_downloads()
+            .iter()
+            .next()
+            .unwrap()
+            .1
+            .clone();
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+        let verified =
+            Arc::new(SelectedExtensionDownloadVerified::new(request, Arc::from(BYTES)).unwrap());
+        transaction = selected_factor_host_inputs_with_download(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::from_unsorted([
+                CompactString::new("FACTOR"),
+                CompactString::new("MISSING"),
+            ]),
+            SelectedExtensionDownloadTransaction::new(
+                workspace.dupe(),
+                [owner.clone()],
+                [verified.clone()],
+            )
+            .unwrap(),
+            Some((owner, SelectedExtensionDownloadEpoch::Ready(verified))),
+        )
+        .await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("directory watch returned an unexpected Need: {outcome:?}");
+        };
+        assert!(
+            format!("{:?}", observed.result().as_ref().as_ref().unwrap_err())
+                .contains("only regular or missing files")
+        );
+        let rows = tracker.take();
+        assert!(
+            rows.iter()
+                .any(|row| row.key.starts_with("used-selected-extension-download:")),
+            "{rows:?}"
+        );
+        assert!(
+            rows.iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_keeps_watch_dependency_after_starlark_error() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.watch(file='//:watch.txt')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = r#"
+watch_tag = tag_class(attrs = {'file': attr.label()})
+def impl(ctx):
+    for mod in ctx.modules:
+        for tag in mod.tags.watch:
+            ctx.watch(tag.file)
+    print('watched-before-failure')
+    fail('later-failure')
+ext = module_extension(implementation=impl, tag_classes={'watch': watch_tag}, environ=['FACTOR','MISSING','FACTOR'])
+"#;
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (base, owner) =
+            selected_factor_transaction(&dice, MODULE, EXTENSION, tracker.clone(), true).await;
+        tracker.take();
+        let base = selected_factor_host_inputs(
+            base,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::from_unsorted([
+                CompactString::new("FACTOR"),
+                CompactString::new("MISSING"),
+            ]),
+        )
+        .await;
+        let key = HostSelectedExtensionOwnerPureObservationKey::new(
+            NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap(),
+            owner,
+        );
+        let mut transaction = base;
+        assert!(matches!(
+            transaction.compute(&key).await.unwrap(),
+            SourcePreparationOutcome::Need(_)
+        ));
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+        for content in [&b"A"[..], &b"B"[..]] {
+            transaction = selected_watch_observations(
+                transaction,
+                selected_watch_epoch(MODULE, EXTENSION, Some(content)),
+            )
+            .await;
+            let outcome = transaction.compute(&key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                panic!("post-watch error did not complete: {outcome:?}");
+            };
+            assert!(
+                format!("{:?}", observed.result().as_ref().as_ref().unwrap_err())
+                    .contains("later-failure")
+            );
+            assert!(
+                observed
+                    .observations()
+                    .observations()
+                    .iter()
+                    .any(|(demand, _)| {
+                        demand.path().as_path().ends_with("watch.txt")
+                            && demand.operation() == PathObservationOperation::FileDigest
+                    })
+            );
+            let rows = tracker.take();
+            assert!(
+                rows.iter()
+                    .any(|row| row.key == key.to_string() && row.kind == ActivationKind::Evaluated)
+            );
+            assert!(
+                rows.iter()
+                    .flat_map(|row| row.batch.as_ref())
+                    .flat_map(EventBatch::events)
+                    .any(|event| format!("{event:?}").contains("watched-before-failure"))
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn selected_external_owner_rejects_unsupported_factors_before_invocation() {
         const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
         for factor in [
@@ -4791,6 +5620,73 @@ ext = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTO
         );
         assert_eq!(completed.used().unwrap(), Some(request));
         assert!(completed.need().unwrap().is_none());
+    }
+
+    #[test]
+    fn selected_module_watch_rejects_unmodeled_arguments_and_caps_distinct_labels() {
+        let owner = Arc::new(());
+        let watch = Arc::new(SelectedWatchInvocation::new());
+        let context =
+            InvocationContext::new_modules(Arc::from([empty_module(&owner)]), &owner, None, None)
+                .with_selected_watch(watch.clone());
+        let root = StarlarkLabel::new(CanonicalLabel::parse("@@//:watch.txt").unwrap());
+        assert_eq!(
+            call(
+                "def f(ctx, label):\n  return ctx.watch(label)\n",
+                |module| vec![
+                    module.heap().alloc_simple(context.clone()),
+                    module.heap().alloc_simple(root.clone()),
+                ]
+            )
+            .unwrap(),
+            "None"
+        );
+        assert_eq!(watch.called().unwrap().len(), 1);
+        let error = call(
+            "def f(ctx):\n  return ctx.watch('//:watch.txt')\n",
+            |module| vec![module.heap().alloc_simple(context.clone())],
+        )
+        .unwrap_err();
+        assert!(error.contains("requires a Label"), "{error}");
+        let scratch_path = SelectedModuleScratchPath {
+            relative: selected_scratch_relative("watch.txt").unwrap(),
+            owner: owner.clone(),
+        };
+        let error = call("def f(ctx, path):\n  return ctx.watch(path)\n", |module| {
+            vec![
+                module.heap().alloc_simple(context.clone()),
+                module.heap().alloc_simple(scratch_path),
+            ]
+        })
+        .unwrap_err();
+        assert!(error.contains("requires a Label"), "{error}");
+        let external = StarlarkLabel::new(CanonicalLabel::parse("@@dep+//:watch.txt").unwrap());
+        let error = call(
+            "def f(ctx, label):\n  return ctx.watch(label)\n",
+            |module| {
+                vec![
+                    module.heap().alloc_simple(context.clone()),
+                    module.heap().alloc_simple(external),
+                ]
+            },
+        )
+        .unwrap_err();
+        assert!(error.contains("root repository Labels"), "{error}");
+        assert_eq!(watch.called().unwrap().len(), 1);
+        for index in 1..MAX_SELECTED_WATCHES {
+            watch
+                .call(&CanonicalLabel::parse(&format!("@@//:watch{index}.txt")).unwrap())
+                .unwrap();
+        }
+        watch.call(root.canonical()).unwrap();
+        let error = watch
+            .call(&CanonicalLabel::parse("@@//:overflow.txt").unwrap())
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("at most 8 distinct Labels"),
+            "{error}"
+        );
+        assert_eq!(watch.called().unwrap().len(), MAX_SELECTED_WATCHES);
     }
 
     #[test]
