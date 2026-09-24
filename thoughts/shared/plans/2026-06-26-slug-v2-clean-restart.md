@@ -29,21 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-109-m7a-frozen-bzl-select-attribute-r1
-Status: ACCEPTED 2026-09-24; M7A remains partial
+Packet: WP-7-110-m7a-module-extension-label-caller-context-r1
+Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP809 selects the rules_kotlin 1.9.6 top-level `.bzl` `_DEBUG_SELECT`, a
-two-part ordered string-list `select(...) + select(...)` passed to a
-configurable Starlark-rule BUILD attribute at `toolchains.bzl:320`. Slug's
-current attribute owner handles fresh selectors but explicitly rejects the
-frozen loaded-module variant. Pinned Bazel 9.2 source and a fresh offline
-oracle establish the selected Loading/coercion contract and four configured
-Bazel control outputs. Independent design/final reviews accepted the bounded
-change. Five focused tests and a rebuilt authentic smoke cleared the old
-stop and reached separate rules_swift module-extension `Label()` at row 56.
-Existing structural selector values and Bzl/package observations remain the
-only owners. Configured choice, downstream rules_swift and M7A close remain
-deferred. WP808 is accepted at `5fe759ed5`.
+WP810 admits `Label()` in a loaded `.bzl` function invoked by a Bzlmod
+module extension, including a transitive imported helper. Pinned Bazel 9.2
+source and a two-base cross-repository oracle establish the innermost
+executing `.bzl` module's package and mapping. Slug now uses the reacquired
+recursive Bzl manifest for a Label-only invocation context; unrelated
+`.bzl`-only APIs remain closed. Six focused/protected tests and independent
+final reviews pass. The rebuilt authentic build clears rules_swift's prior
+registration-row-56 `Label()` error and reaches an independent
+`apple_common.platform` absence in `swift/internal:target_triples.bzl:21`.
+Repository materialization, configured Swift and M7A close remain deferred.
+WP809 is accepted at `1171116a5`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

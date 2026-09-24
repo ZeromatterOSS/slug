@@ -9398,3 +9398,28 @@ the old Kotlin frozen-selector stop and reaches separate rules_swift
 module-extension `Label()` context at registration row 56. `None` branches,
 other frozen kinds, configured branch choice, full Kotlin behavior and M7A
 close remain deferred.
+
+### Module-extension `Label()` caller context accepted (2026-09-24)
+
+WP810 admits `Label(string)` inside a loaded `.bzl` function invoked by a
+Bzlmod module extension, including an imported helper. Pinned Bazel 9.2
+source and a two-base offline oracle distinguish the helper's defining
+repository/package and apparent mapping from the extension entrypoint.
+Slug's extension repository-call state now carries the already reacquired
+recursive Bzl manifest as invocation-only scratch; `Label()` alone uses it
+to authenticate the innermost caller source and reuse the existing resolver.
+An existing Label input still passes through before context lookup. A string
+without a `.bzl` function frame, an unmanifested source or an invisible
+apparent repository fails closed. The generic Bzl-context projector remains
+unchanged, so other `.bzl`-only APIs are not admitted in extension execution.
+
+Four focused tests cover the imported source and mapping, typed calls,
+fail-closed controls, pure preflight, and selected-owner helper-source A/B/A;
+two protected tests pass. The rebuilt authentic build clears the prior
+rules_swift registration-row-56 `Label()` error and reaches an independent
+`apple_common.platform` absence in
+`@@rules_swift+//swift/internal:target_triples.bzl:21`. The manifest's
+source/route observations continue to own DICE invalidation; no retained
+key, call field, cache or lock was added. Rust source lookup and diagnostics
+are Slug-native. Apple provider breadth, repository materialization,
+configured Swift and M7A close remain deferred.

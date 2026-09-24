@@ -37,6 +37,9 @@ use starlark_map::small_set::SmallSet;
 use crate::attrs::AttributeKind;
 use crate::attrs::CoercedAttributeValue;
 use crate::attrs::FileAdmissibility;
+use crate::bzl_module::BzlLoadManifest;
+use crate::bzl_module::BzlModuleIdentity;
+use crate::provider::BzlEvaluationContext;
 use crate::starlark_label::StarlarkLabel;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -102,13 +105,38 @@ pub(crate) struct RepositoryRuleCallRecord {
 #[derive(Debug, ProvidesStaticType)]
 pub(crate) struct RepositoryRuleInvocationState {
     records: RefCell<Vec<RepositoryRuleCallRecord>>,
+    bzl: Option<BzlEvaluationContext>,
 }
 
 impl RepositoryRuleInvocationState {
     pub(crate) fn new() -> Self {
         Self {
             records: RefCell::new(Vec::new()),
+            bzl: None,
         }
+    }
+
+    /// Source context is private to `Label()` during this invocation; generic
+    /// `.bzl` declarations must not become available to extension functions.
+    pub(crate) fn with_bzl_manifest(mut self, manifest: &BzlLoadManifest) -> Self {
+        self.bzl = Some(BzlEvaluationContext::from_manifest(manifest));
+        self
+    }
+
+    pub(crate) fn label_source_identity_for_call<'a>(
+        eval: &'a Evaluator<'_, '_, '_>,
+    ) -> Option<anyhow::Result<&'a BzlModuleIdentity>> {
+        let state = eval.extra?.downcast_ref::<Self>()?;
+        Some((|| {
+            if eval.native_caller_function_filename().is_none() {
+                anyhow::bail!("Label() requires a loaded .bzl function caller");
+            }
+            state
+                .bzl
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Label() has no recursive Bzl source manifest"))?
+                .source_identity_for_call(eval)
+        })())
     }
 
     pub(crate) fn records(&self) -> Arc<[RepositoryRuleCallRecord]> {

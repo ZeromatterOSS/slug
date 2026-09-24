@@ -348,6 +348,7 @@ struct PurePreflight {
     module: starlark::environment::FrozenModule,
     implementation: starlark::values::FrozenValue,
     tag_classes: Arc<[CompactString]>,
+    manifest: crate::bzl_module::BzlLoadManifest,
 }
 
 type PureHostBzlChild = SourcePreparationOutcome<
@@ -480,6 +481,7 @@ async fn preflight_pure_invocations(ctx: &mut DiceComputations<'_>, workspace: &
         preflight.push(PurePreflight {
             module: module.module.dupe(),
             implementation: definition.implementation,
+            manifest: module.manifest.clone(),
             tag_classes: loaded_definition
                 .tag_classes
                 .iter()
@@ -525,7 +527,8 @@ fn invoke_pure_preflight(prepared: Arc<HostPreparedModuleExtensionInputs>, prefl
             .expect("invocation context was just allocated")
             .root_usage;
         let capture = capture_events.then(InvocationPrintCapture::default);
-        let repository_rules = RepositoryRuleInvocationState::new();
+        let repository_rules = RepositoryRuleInvocationState::new()
+            .with_bzl_manifest(&preflight.manifest);
         let returned = {
             let mut evaluator = Evaluator::new(&invocation_module);
             evaluator.extra = Some(&repository_rules);
@@ -1402,7 +1405,8 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
                 .into();
             let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage, Some(host.clone())).with_selected_download(selected_download.clone()).with_selected_watch(selected_watch.clone()).with_selected_path(selected_path.clone()).with_selected_getenv(selected_getenv.clone()));
             let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);
-            let repository_rules = RepositoryRuleInvocationState::new();
+            let repository_rules = RepositoryRuleInvocationState::new()
+                .with_bzl_manifest(&module.manifest);
             let mut evaluator = Evaluator::new(&invocation_module);
             evaluator.extra = Some(&repository_rules);
             if let Some(capture) = capture.as_ref() {
@@ -2798,6 +2802,10 @@ pub(crate) mod test_support {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "module_extension_label_tests.rs"]
+mod label_tests;
 
 #[cfg(test)]
 mod tests {
@@ -4707,6 +4715,90 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn pure_preflight_label_uses_loaded_helper_and_does_not_publish_failed_invocation() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let extension = "load(':helper.bzl', 'helper_label')\nrepo=repository_rule(lambda ctx: None, attrs={'value':attr.label()})\ndef impl(ctx):\n    repo(name='proof', value=helper_label())\next=module_extension(implementation=impl)\n";
+        let helper = "def helper_label():\n    return Label('//third_party:overlay')\n";
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let mut transaction = repository_rule_sources_transaction(
+            &dice,
+            module,
+            &[("ext.bzl", Some(extension)), ("helper.bzl", Some(helper))],
+            0,
+            None,
+        )
+        .await;
+        let epoch = repository_rule_epoch(
+            module,
+            &[("ext.bzl", Some(extension)), ("helper.bzl", Some(helper))],
+            0,
+        );
+        let mut updater = transaction.into_updater();
+        updater.changed_to(path_observation_shards(&epoch)).unwrap();
+        transaction = updater.commit().await;
+        let outcome = transaction
+            .compute(&HostPureModuleExtensionInvocationsKey::new(
+                workspace.dupe(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(value) = outcome else {
+            panic!("pure extension Label invocation returned Need");
+        };
+        let calls = &value.as_ref().as_ref().unwrap().invoked[0].repository_rule_calls;
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0].kwargs.iter().any(|(name, value)| {
+            name == "value"
+                && matches!(value, crate::module_extension_repository_rule::RepositoryRuleCallValue::Label(label)
+                    if label.to_string() == "@@//third_party:overlay")
+        }));
+
+        let bad_helper = "def helper_label():\n    return Label('@missing//pkg:target')\n";
+        let mut failed = repository_rule_sources_transaction(
+            &dice,
+            module,
+            &[
+                ("ext.bzl", Some(extension)),
+                ("helper.bzl", Some(bad_helper)),
+            ],
+            0,
+            None,
+        )
+        .await;
+        let epoch = repository_rule_epoch(
+            module,
+            &[
+                ("ext.bzl", Some(extension)),
+                ("helper.bzl", Some(bad_helper)),
+            ],
+            0,
+        );
+        let mut updater = failed.into_updater();
+        updater.changed_to(path_observation_shards(&epoch)).unwrap();
+        failed = updater.commit().await;
+        let outcome = failed
+            .compute(&HostPureModuleExtensionInvocationsKey::new(workspace))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(value) = outcome else {
+            panic!("invalid helper mapping returned Need");
+        };
+        let HostPureModuleExtensionInvocationsError::AfterPrepared {
+            completed,
+            current_calls,
+            error: HostPureModuleExtensionInvocationError::Invocation(error),
+            ..
+        } = value.as_ref().as_ref().unwrap_err()
+        else {
+            panic!("invalid helper mapping had the wrong terminal");
+        };
+        assert!(completed.is_empty());
+        assert!(current_calls.is_empty());
+        assert!(error.contains("not visible"), "{error}");
+    }
+
+    #[tokio::test]
     async fn real_repository_rule_failure_retains_completed_and_current_prefixes() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nb=use_extension('//:ext.bzl','second')\n";
@@ -5424,6 +5516,110 @@ ext = module_extension(
             panic!("selected tag-list concat lost its tag value");
         };
         assert_eq!(value.as_str(), "left");
+    }
+
+    #[tokio::test]
+    async fn selected_owner_imported_label_helper_source_changes_a_b_a() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
+        const INITIAL: &str = "repo=repository_rule(lambda ctx: None, attrs={'value':attr.label()})\ndef impl(ctx):\n    repo(name='proof', value=None)\next=module_extension(implementation=impl, environ=['FACTOR','MISSING','FACTOR'])\n";
+        const WITH_HELPER: &str = "load(':helper.bzl', 'make_label')\nrepo=repository_rule(lambda ctx: None, attrs={'value':attr.label()})\ndef impl(ctx):\n    repo(name='proof', value=make_label())\next=module_extension(implementation=impl, environ=['FACTOR','MISSING','FACTOR'])\n";
+        fn epoch(helper_target: &str) -> PathObservationEpoch {
+            let mut rows = selected_factor_epoch(MODULE, WITH_HELPER)
+                .observations()
+                .iter()
+                .map(|(demand, result)| (demand.dupe(), result.dupe()))
+                .collect::<Vec<_>>();
+            let namespace =
+                PathObservationNamespace::Materialization(PathObservationInstanceId::new(77));
+            let path = NormalizedAbsolutePath::new("/registry-dep/helper.bzl").unwrap();
+            rows.push((
+                PathObservationDemand::new(
+                    namespace.clone(),
+                    path.dupe(),
+                    PathObservationOperation::Lstat,
+                ),
+                Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                    PathLstat::new(PathNodeKind::RegularFile, 85, 1, 1, 1, 0o644),
+                ))),
+            ));
+            rows.push((
+                PathObservationDemand::new(namespace, path, PathObservationOperation::FileBytes),
+                Arc::new(PathObservationResult::FileBytes(
+                    PathOperationResult::Present(Arc::from(
+                        format!("def make_label():\n    return Label('//:{helper_target}')\n")
+                            .into_bytes(),
+                    )),
+                )),
+            ));
+            PathObservationEpoch::from_shared(rows).unwrap()
+        }
+        fn label(outcome: &<HostSelectedExtensionOwnerPureObservationKey as Key>::Value) -> String {
+            let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                panic!("selected helper owner did not complete: {outcome:?}");
+            };
+            let calls = &observed
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .receipt
+                .repository_rule_calls;
+            assert_eq!(calls.len(), 1);
+            let (_, crate::module_extension_repository_rule::RepositoryRuleCallValue::Label(label)) =
+                calls[0]
+                    .kwargs
+                    .iter()
+                    .find(|(name, _)| name == "value")
+                    .unwrap()
+            else {
+                panic!("selected imported Label did not reach repository call");
+            };
+            label.to_string()
+        }
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (transaction, owner) =
+            selected_factor_transaction(&dice, MODULE, INITIAL, tracker.clone(), true).await;
+        let mut transaction = selected_factor_host_inputs(
+            transaction,
+            tracker,
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::from_unsorted([
+                CompactString::new("FACTOR"),
+                CompactString::new("MISSING"),
+            ]),
+        )
+        .await;
+        let key = HostSelectedExtensionOwnerPureObservationKey::new(
+            NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap(),
+            owner,
+        );
+        let mut results = Vec::new();
+        for target in ["one", "two", "one"] {
+            let changed = epoch(target);
+            let mut updater = transaction.into_updater();
+            updater
+                .changed_to(path_observation_shards(&changed))
+                .unwrap();
+            updater
+                .changed_to([(PathObservationEpochKey, changed)])
+                .unwrap();
+            transaction = updater.commit().await;
+            let result = transaction.compute(&key).await.unwrap();
+            assert_eq!(label(&result), format!("@@dep+//:{target}"));
+            results.push(result);
+        }
+        assert!(!HostSelectedExtensionOwnerPureObservationKey::equality(
+            &results[0],
+            &results[1]
+        ));
+        assert!(HostSelectedExtensionOwnerPureObservationKey::equality(
+            &results[0],
+            &results[2]
+        ));
     }
 
     #[tokio::test]
