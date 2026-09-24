@@ -1,0 +1,13 @@
+module(name = "module_extension_host_factors", version = "0.0.0")
+
+both = use_extension("//:both.bzl", "both")
+use_repo(both, both_repo = "probe")
+
+os_only = use_extension("//:other.bzl", "os_only")
+use_repo(os_only, os_repo = "probe")
+
+arch_only = use_extension("//:other.bzl", "arch_only")
+use_repo(arch_only, arch_repo = "probe")
+
+general = use_extension("//:other.bzl", "general")
+use_repo(general, general_repo = "probe")

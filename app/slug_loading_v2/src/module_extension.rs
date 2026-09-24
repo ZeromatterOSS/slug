@@ -665,10 +665,30 @@ impl Key for HostPureModuleExtensionInvocationsObservationKey {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) struct HostSelectedExtensionOwnerPureResult { pub(crate) inputs: Arc<HostSelectedExtensionOwnerInputs>, pub(crate) receipt: HostPureModuleExtensionInvocationReceipt }
+pub(crate) struct HostSelectedExtensionOwnerPureResult { pub(crate) inputs: Arc<HostSelectedExtensionOwnerInputs>, pub(crate) factors: Arc<SelectedExtensionEvalFactors>, pub(crate) receipt: HostPureModuleExtensionInvocationReceipt }
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct SelectedExtensionEvalFactors {
+    operating_system: Option<CompactString>,
+    architecture: Option<CompactString>,
+}
+impl SelectedExtensionEvalFactors {
+    fn from_host(
+        definition: &ModuleExtensionDefinitionProjection,
+        host: &ModuleExtensionOs,
+    ) -> Self {
+        Self {
+            operating_system: definition
+                .os_dependent
+                .then(|| CompactString::new(host.platform.os_name())),
+            architecture: definition
+                .arch_dependent
+                .then(|| CompactString::new(host.platform.arch())),
+        }
+    }
+}
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) enum HostSelectedExtensionOwnerPureError { Inputs(HostSelectedExtensionOwnerInputsError), Compute(CompactString), AfterInputs { inputs: Arc<HostSelectedExtensionOwnerInputs>, request: HostSelectedExtensionDefinitionLoadRequest, current_calls: Arc<[RepositoryRuleCallRecord]>, message: CompactString } }
+pub(crate) enum HostSelectedExtensionOwnerPureError { Inputs(HostSelectedExtensionOwnerInputsError), Compute(CompactString), AfterInputs { inputs: Arc<HostSelectedExtensionOwnerInputs>, request: HostSelectedExtensionDefinitionLoadRequest, current_calls: Arc<[RepositoryRuleCallRecord]>, message: CompactString }, Factored { factors: Arc<SelectedExtensionEvalFactors>, error: Arc<HostSelectedExtensionOwnerPureError> } }
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(crate) struct HostSelectedExtensionOwnerPureKey { workspace: NormalizedAbsolutePath, owner: Arc<HostSelectedExtensionOwner> }
@@ -694,7 +714,7 @@ impl ObservedHostSelectedExtensionOwnerPure { pub(crate) fn result(&self) -> &Ow
 pub(crate) struct OwnerProjection { manifest: crate::bzl_module::BzlLoadManifest, definition: ModuleExtensionDefinitionProjection }
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-pub(crate) enum HostSelectedExtensionOwnerPureObservationError { Inputs(HostSelectedExtensionOwnerInputsObservationError), HostBzl { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError }, Demand { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Arc<OwnerProjection>, error: HostSelectedExtensionDemandObservationError }, CanonicalRoute { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Arc<OwnerProjection>, error: Arc<HostCanonicalRepositoryLoadRouteObservationError> }, Merge { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError } }
+pub(crate) enum HostSelectedExtensionOwnerPureObservationError { Inputs(HostSelectedExtensionOwnerInputsObservationError), HostBzl { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError }, Demand { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Arc<OwnerProjection>, error: HostSelectedExtensionDemandObservationError }, CanonicalRoute { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Arc<OwnerProjection>, error: Arc<HostCanonicalRepositoryLoadRouteObservationError> }, Merge { inputs: Arc<HostSelectedExtensionOwnerInputs>, first: Option<Arc<OwnerProjection>>, error: ObservedPathFrontierError }, Factored { factors: Arc<SelectedExtensionEvalFactors>, error: Arc<HostSelectedExtensionOwnerPureObservationError> } }
 impl HostSelectedExtensionOwnerPureObservationError {
     pub(crate) fn selected_frontier(&self) -> slug_bzlmod_v2::HostSelectedObservationFrontier {
         match self {
@@ -704,6 +724,7 @@ impl HostSelectedExtensionOwnerPureObservationError {
             Self::HostBzl { error, .. } | Self::Merge { error, .. } => {
                 slug_bzlmod_v2::HostSelectedObservationFrontier::Path(error.clone())
             }
+            Self::Factored { error, .. } => error.selected_frontier(),
         }
     }
 }
@@ -715,12 +736,38 @@ fn owner_complete(value: Result<HostSelectedExtensionOwnerPureResult, HostSelect
 #[rustfmt::skip]
 fn owner_after(inputs: &Arc<HostSelectedExtensionOwnerInputs>, calls: Arc<[RepositoryRuleCallRecord]>, message: impl Into<CompactString>) -> HostSelectedExtensionOwnerPureError { HostSelectedExtensionOwnerPureError::AfterInputs { inputs: inputs.clone(), request: inputs.request().clone(), current_calls: calls, message: message.into() } }
 
+fn factor_owner_terminal(
+    factors: &Arc<SelectedExtensionEvalFactors>,
+    terminal: OwnerPureDriver,
+) -> OwnerPureDriver {
+    match terminal {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(Err(
+            HostSelectedExtensionOwnerPureObservationError::Factored {
+                factors: factors.clone(),
+                error: Arc::new(error),
+            },
+        )),
+        SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+            let result = if let Err(error) = result.as_ref() {
+                Arc::new(Err(HostSelectedExtensionOwnerPureError::Factored {
+                    factors: factors.clone(),
+                    error: Arc::new(error.clone()),
+                }))
+            } else {
+                result
+            };
+            SourcePreparationOutcome::Complete(Ok((result, observations)))
+        }
+    }
+}
+
 #[rustfmt::skip]
 fn owner_projection(module: &FrozenBzlModule, request: &HostSelectedExtensionDefinitionLoadRequest) -> Result<OwnerProjection, CompactString> {
     let (export, _visibility) = module.module.get_assigned(request.parts().1).map_err(|error| CompactString::from(error.to_string()))?;
     let definition = export.downcast::<FrozenModuleExtensionDefinition>().map_err(|_| CompactString::from("selected export is not module_extension"))?;
     let projection = definition.projection();
-    if projection.os_dependent || projection.arch_dependent || projection.facts_version != 0 {
+    if projection.facts_version != 0 {
         return Err("selected module extension has unsupported factors".into());
     }
     Ok(OwnerProjection { manifest: module.manifest.clone(), definition: projection })
@@ -1229,22 +1276,23 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         SourcePreparationOutcome::Complete(Err(error)) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
         SourcePreparationOutcome::Complete(Ok(host)) => host,
     };
+    let factors = Arc::new(SelectedExtensionEvalFactors::from_host(&first.definition, &host));
     let owner = Arc::new(());
     let modules = match owner_invocation_modules(&inputs, &first, &owner, MAX_INVOCATION_TAGS_PER_MODULE) {
         Ok(value) => value,
-        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
+        Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1)),
     };
     let ready = match selected_download_preflight(ctx, key).await {
         Ok(ready) => ready,
-        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
+        Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1)),
     };
-    let (module, mut observations) = match owner_bzl(ctx, key, &inputs, Some(&first), first_module.1, mode).await { Ok(value) => value, Err(outcome) => return outcome };
+    let (module, mut observations) = match owner_bzl(ctx, key, &inputs, Some(&first), first_module.1, mode).await { Ok(value) => value, Err(outcome) => return factor_owner_terminal(&factors, outcome) };
     let second = match owner_projection(&module, inputs.request()) {
         Ok(value) => value,
-        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+        Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
     };
     if second != *first {
-        return owner_complete(Err(owner_after(&inputs, Arc::from([]), "reacquired selected module extension differs")), observations);
+        return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), "reacquired selected module extension differs")), observations));
     }
     let definition = module.module.get_assigned(inputs.request().parts().1).expect("projection authenticated export").0.downcast::<FrozenModuleExtensionDefinition>().expect("projection authenticated kind");
     let root_usage = inputs.root_proxies().map(|proxies| RootModuleExtensionUsage::new(
@@ -1277,14 +1325,14 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
             let returned = evaluator.eval_function(definition.implementation.to_value(), &[context], &[]);
             let pending = match selected_download.need() {
                 Ok(pending) => pending,
-                Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+                Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
             };
             if let Some(need) = pending {
                 return SourcePreparationOutcome::Need(SourcePreparationNeeds::selected_extension_download((*need).clone()));
             }
             let pending_path = match selected_path.pending() {
                 Ok(pending) => pending,
-                Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+                Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
             };
             let returned = returned
                 .map_err(|error| CompactString::from(error.to_string()))
@@ -1296,25 +1344,25 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         // later Starlark evaluation, watch or Label preparation fails.
         let used = match selected_download.used() {
             Ok(used) => used,
-            Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+            Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
         };
         if let Some(used) = used {
             if let Err(error) = ctx.compute(&UsedDownloadRequestKey::new(used)).await {
-                return owner_complete(Err(owner_after(&inputs, calls, error.to_string())), observations);
+                return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, calls, error.to_string())), observations));
             }
         }
         let watched = match selected_watch.called() {
             Ok(watched) => watched,
-            Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+            Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
         };
         observations = match observe_selected_watches(ctx, key, &inputs, &first, &calls, &watched, observations).await {
             Ok(observations) => observations,
-            Err(terminal) => return terminal,
+            Err(terminal) => return factor_owner_terminal(&factors, terminal),
         };
         if let Some(label) = pending_path {
             let (path, next_observations) = match observe_selected_path_label(ctx, key, &inputs, &first, &calls, &label, observations).await {
                 Ok(value) => value,
-                Err(terminal) => return terminal,
+                Err(terminal) => return factor_owner_terminal(&factors, terminal),
             };
             observations = next_observations;
             ready_paths.push((label, path));
@@ -1326,6 +1374,7 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
             Ok(metadata) => match metadata {
                 metadata if metadata.facts().is_empty() => Ok(HostSelectedExtensionOwnerPureResult {
                     inputs,
+                    factors: factors.clone(),
                     receipt: HostPureModuleExtensionInvocationReceipt { request, repository_rule_calls: calls, metadata, root_usage },
                 }),
                 _ => Err(owner_after(&inputs, calls, "nonempty module extension facts require the deferred lockfile lifecycle")),
@@ -1334,7 +1383,7 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         if let Some(capture) = capture {
             ctx.store_evaluation_data(capture.into_batch()).expect("selected owner invocation stores one local Complete event batch");
         }
-        return owner_complete(result, observations);
+        return factor_owner_terminal(&factors, owner_complete(result, observations));
     }
 }
 
@@ -6360,13 +6409,9 @@ ext = module_extension(implementation=impl, tag_classes={'watch': watch_tag}, en
     }
 
     #[tokio::test]
-    async fn selected_external_owner_rejects_unsupported_factors_before_invocation() {
+    async fn selected_external_owner_rejects_facts_version_before_invocation() {
         const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
-        for factor in [
-            "os_dependent=True",
-            "arch_dependent=True",
-            "facts_version=1",
-        ] {
+        for factor in ["facts_version=1"] {
             let extension = format!(
                 "def impl(ctx):\n    print('selected-invoked')\next = module_extension(implementation=impl, environ=['FACTOR'], {factor})\n"
             );
@@ -6418,6 +6463,323 @@ ext = module_extension(implementation=impl, tag_classes={'watch': watch_tag}, en
                 "{factor}: selected implementation ran"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_conditional_host_factors_preserve_structural_identity() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
+        fn value(
+            outcome: &<HostSelectedExtensionOwnerPureObservationKey as Key>::Value,
+        ) -> &HostSelectedExtensionOwnerPureResult {
+            let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                panic!("selected factor owner did not complete: {outcome:?}")
+            };
+            observed.result().as_ref().as_ref().unwrap()
+        }
+        for (flags, select_os, select_arch) in [
+            ("", false, false),
+            (", os_dependent=True", true, false),
+            (", arch_dependent=True", false, true),
+            (", os_dependent=True, arch_dependent=True", true, true),
+        ] {
+            let extension = format!(
+                "repo = repository_rule(lambda ctx: None)\ndef impl(ctx):\n    repo(name='proof')\next = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTOR']{flags})\n"
+            );
+            let mut builder = Dice::builder();
+            install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+            let dice = Arc::new(builder.build(DetectCycles::Enabled));
+            let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+            let (base, owner) =
+                selected_factor_transaction(&dice, MODULE, &extension, tracker.clone(), true).await;
+            let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+            let key =
+                HostSelectedExtensionOwnerPureObservationKey::new(workspace.dupe(), owner.clone());
+            let legacy_key =
+                HostSelectedExtensionOwnerPureKey::new(workspace.dupe(), owner.clone());
+            let certificate_key = crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationKey::new(workspace, owner);
+            let frontier = RepositoryEnvironmentNameFrontier::from_unsorted([
+                CompactString::new("FACTOR"),
+                CompactString::new("MISSING"),
+            ]);
+            let mut transaction = selected_factor_host_inputs(
+                base,
+                tracker.clone(),
+                RepositoryPlatform::new("linux", "x86_64"),
+                RepositoryEnvironmentSnapshot::empty(),
+                frontier.clone(),
+            )
+            .await;
+            let a = transaction.compute(&key).await.unwrap();
+            assert_eq!(
+                value(&a).factors.operating_system.as_deref(),
+                select_os.then_some("linux")
+            );
+            assert_eq!(
+                value(&a).factors.architecture.as_deref(),
+                select_arch.then_some("x86_64")
+            );
+            let calls = value(&a).receipt.repository_rule_calls.clone();
+            assert_eq!(calls.len(), 1);
+            let SourcePreparationOutcome::Complete(legacy_a) =
+                transaction.compute(&legacy_key).await.unwrap()
+            else {
+                panic!("legacy selected owner returned Need")
+            };
+            assert_eq!(
+                legacy_a.as_ref().as_ref().unwrap().factors,
+                value(&a).factors
+            );
+            let certificate_a = transaction.compute(&certificate_key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(certificate_a_value)) = &certificate_a else {
+                panic!("selected owner certificate did not complete: {certificate_a:?}")
+            };
+            let generated_a = certificate_a_value
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|(canonical, _, generated, mapping)| {
+                    (
+                        canonical.as_str().to_owned(),
+                        generated.to_owned(),
+                        mapping.context_repo().as_str().to_owned(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(generated_a.len(), 1);
+
+            transaction = selected_factor_host_inputs(
+                transaction,
+                tracker.clone(),
+                RepositoryPlatform::new("mac os x", "x86_64"),
+                RepositoryEnvironmentSnapshot::empty(),
+                frontier.clone(),
+            )
+            .await;
+            let changed_os = transaction.compute(&key).await.unwrap();
+            assert_eq!(value(&changed_os).receipt.repository_rule_calls, calls);
+            let certificate_changed_os = transaction.compute(&certificate_key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(certificate_changed_os_value)) =
+                &certificate_changed_os
+            else {
+                panic!("selected owner certificate changed shape: {certificate_changed_os:?}")
+            };
+            let generated_changed_os = certificate_changed_os_value
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|(canonical, _, generated, mapping)| {
+                    (
+                        canonical.as_str().to_owned(),
+                        generated.to_owned(),
+                        mapping.context_repo().as_str().to_owned(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(generated_a, generated_changed_os);
+            assert_eq!(
+                HostSelectedExtensionOwnerPureObservationKey::equality(&a, &changed_os),
+                !select_os,
+                "OS participation for {flags}"
+            );
+            assert_eq!(
+                crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationKey::equality(&certificate_a, &certificate_changed_os),
+                !select_os,
+                "certificate OS participation for {flags}"
+            );
+
+            transaction = selected_factor_host_inputs(
+                transaction,
+                tracker.clone(),
+                RepositoryPlatform::new("linux", "aarch64"),
+                RepositoryEnvironmentSnapshot::empty(),
+                frontier.clone(),
+            )
+            .await;
+            let changed_arch = transaction.compute(&key).await.unwrap();
+            assert_eq!(value(&changed_arch).receipt.repository_rule_calls, calls);
+            assert_eq!(
+                HostSelectedExtensionOwnerPureObservationKey::equality(&a, &changed_arch),
+                !select_arch,
+                "architecture participation for {flags}"
+            );
+
+            transaction = selected_factor_host_inputs(
+                transaction,
+                tracker,
+                RepositoryPlatform::new("linux", "x86_64"),
+                RepositoryEnvironmentSnapshot::empty(),
+                frontier,
+            )
+            .await;
+            let restored = transaction.compute(&key).await.unwrap();
+            assert!(HostSelectedExtensionOwnerPureObservationKey::equality(
+                &a, &restored
+            ));
+            if flags.is_empty() {
+                let with_os = "repo = repository_rule(lambda ctx: None)\ndef impl(ctx):\n    repo(name='proof')\next = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTOR'], os_dependent=True)\n";
+                let changed = selected_factor_epoch(MODULE, with_os);
+                let mut updater = transaction.into_updater();
+                updater
+                    .changed_to(path_observation_shards(&changed))
+                    .unwrap();
+                updater
+                    .changed_to([(PathObservationEpochKey, changed)])
+                    .unwrap();
+                transaction = updater.commit().await;
+                let changed_declaration = transaction.compute(&key).await.unwrap();
+                assert_eq!(
+                    value(&changed_declaration)
+                        .factors
+                        .operating_system
+                        .as_deref(),
+                    Some("linux")
+                );
+                assert!(!HostSelectedExtensionOwnerPureObservationKey::equality(
+                    &a,
+                    &changed_declaration
+                ));
+
+                let original = selected_factor_epoch(MODULE, &extension);
+                let mut updater = transaction.into_updater();
+                updater
+                    .changed_to(path_observation_shards(&original))
+                    .unwrap();
+                updater
+                    .changed_to([(PathObservationEpochKey, original)])
+                    .unwrap();
+                transaction = updater.commit().await;
+                let source_restored = transaction.compute(&key).await.unwrap();
+                assert!(HostSelectedExtensionOwnerPureObservationKey::equality(
+                    &a,
+                    &source_restored
+                ));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_retains_factors_on_identical_error_and_observation_terminal() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = "def impl(ctx):\n    fail('same failure')\next = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTOR'], os_dependent=True, arch_dependent=True)\n";
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (base, owner) =
+            selected_factor_transaction(&dice, MODULE, EXTENSION, tracker.clone(), true).await;
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let key = HostSelectedExtensionOwnerPureObservationKey::new(workspace.dupe(), owner);
+        let frontier = RepositoryEnvironmentNameFrontier::from_unsorted([
+            CompactString::new("FACTOR"),
+            CompactString::new("MISSING"),
+        ]);
+        let mut transaction = selected_factor_host_inputs(
+            base,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            frontier.clone(),
+        )
+        .await;
+        let a = transaction.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = &a else {
+            panic!("selected failure did not complete: {a:?}")
+        };
+        let HostSelectedExtensionOwnerPureError::Factored {
+            factors: a_factors,
+            error,
+        } = observed.result().as_ref().as_ref().unwrap_err()
+        else {
+            panic!("selected failure lost its factors")
+        };
+        assert_eq!(a_factors.operating_system.as_deref(), Some("linux"));
+        assert_eq!(a_factors.architecture.as_deref(), Some("x86_64"));
+        assert!(format!("{error:?}").contains("same failure"));
+        let inputs = match error.as_ref() {
+            HostSelectedExtensionOwnerPureError::AfterInputs { inputs, .. } => inputs.clone(),
+            _ => panic!("selected failure lost owner inputs"),
+        };
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("mac os x", "aarch64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            frontier.clone(),
+        )
+        .await;
+        let b = transaction.compute(&key).await.unwrap();
+        assert!(!HostSelectedExtensionOwnerPureObservationKey::equality(
+            &a, &b
+        ));
+        transaction = selected_factor_host_inputs(
+            transaction,
+            tracker,
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            frontier,
+        )
+        .await;
+        let restored = transaction.compute(&key).await.unwrap();
+        assert!(HostSelectedExtensionOwnerPureObservationKey::equality(
+            &a, &restored
+        ));
+
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            workspace,
+            PathObservationOperation::FileBytes,
+        );
+        let lower = ObservedPathFrontierError::from(PathObservationEpochError::OperationMismatch {
+            demand,
+            result_operation: PathObservationOperation::Lstat,
+        });
+        let outer = || -> OwnerPureDriver {
+            SourcePreparationOutcome::Complete(Err(
+                HostSelectedExtensionOwnerPureObservationError::Merge {
+                    inputs: inputs.clone(),
+                    first: None,
+                    error: lower.clone(),
+                },
+            ))
+        };
+        fn observed_outer(
+            terminal: OwnerPureDriver,
+        ) -> <HostSelectedExtensionOwnerPureObservationKey as Key>::Value {
+            let SourcePreparationOutcome::Complete(Err(error)) = terminal else {
+                panic!("expected a complete observed outer terminal")
+            };
+            SourcePreparationOutcome::Complete(Err(error))
+        }
+        let factored_a = observed_outer(factor_owner_terminal(a_factors, outer()));
+        let b_factors = Arc::new(SelectedExtensionEvalFactors {
+            operating_system: Some("mac os x".into()),
+            architecture: Some("aarch64".into()),
+        });
+        let factored_b = observed_outer(factor_owner_terminal(&b_factors, outer()));
+        let factored_restored = observed_outer(factor_owner_terminal(a_factors, outer()));
+        assert!(!HostSelectedExtensionOwnerPureObservationKey::equality(
+            &factored_a,
+            &factored_b
+        ));
+        assert!(HostSelectedExtensionOwnerPureObservationKey::equality(
+            &factored_a,
+            &factored_restored
+        ));
+        let SourcePreparationOutcome::Complete(Err(
+            HostSelectedExtensionOwnerPureObservationError::Factored { factors, error },
+        )) = factored_a
+        else {
+            panic!("outer observation error lost selected factors")
+        };
+        assert_eq!(factors.as_ref(), a_factors.as_ref());
+        assert!(matches!(
+            error.as_ref(),
+            HostSelectedExtensionOwnerPureObservationError::Merge { .. }
+        ));
     }
 
     #[tokio::test]

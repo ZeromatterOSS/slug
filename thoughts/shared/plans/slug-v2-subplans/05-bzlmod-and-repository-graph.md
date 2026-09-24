@@ -440,9 +440,22 @@ unaudited entries, auth and changed source tuples fail closed. The selected
 rule's 18-key fallback reproducibility dictionary is validated and discarded
 as a Slug-native metadata branch; Bazel 9.2 `repo_metadata` and its cache
 semantics are not admitted. An innate `use_repo_rule` source-authentic smoke
-reaches materialization, while the original module-extension route remains
-blocked by OS/architecture-dependent factors and the generated BUILD later
-stops at `iso_date=None` Loading.
+reaches materialization; WP797 also admits the original module-extension
+route. Both stop later at generated BUILD `iso_date=None` Loading.
+
+### Selected module-extension Host factors (WP797)
+
+For a DICE-owned selected extension, declared `os_dependent` and
+`arch_dependent` flags select independent structural Rust Host observations.
+Only the declared components enter the retained pure result and post-host
+Complete errors, including outer observation terminals. The selected owner
+keeps its existing `RepositoryPlatformKey` dependency and canonical
+generated-repository name; Need remains transient. The global pure-extension
+aggregate, nonzero `facts_version`, nonempty facts and exact Bazel lockfile
+factor replay remain unsupported. Bazel 9.2's conditional flag participation
+and stable repository naming are exact; raw JVM architecture factor bytes are
+not. A source-authentic rules_rust 0.73 smoke reaches WP796's archive
+materializer before the independent generated BUILD Loading stop.
 
 ## Historical evidence
 

@@ -1,207 +1,172 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-96-m7a-selected-rust-host-tools-archive-effects-r1
+Packet: WP-7-97-m7a-selected-module-extension-host-factors-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit the source-selected `rust_host_tools` generated repository's six ordered,
-SHA-pinned `repository_ctx.download_and_extract` effects on Linux x86_64 and
-materialize their merged `.tar.xz` contents before its final `ctx.file` calls.
-This is the independent generated owner demanded by pinned rules_rust 0.73;
-production-root `slug_crates` Label and rules_shell `which` prerequisites are
-separate stops. No root-build success is claimed by this packet.
+Admit declared OS and architecture evaluation factors for DICE-owned selected
+module-extension owners. The source-authentic rules_rust 0.73
+`rust_host_tools` extension must advance through its selected owner and the
+accepted WP796 archive materializer; the generated BUILD
+`rust_toolchain(iso_date=None)` Loading stop remains a separate next packet.
+This advances the authentic M7A source closure, not root-build readiness.
 
-Exact Bazel 9.2 is claimed for the six selected URL/SHA/stripPrefix calls,
-ordered regular-file bytes and executable modes, and last-writer merge only
-after the audited six-archive source set and discriminating Bazel oracle or
-pinned-source regression. Retained structural plan identity, observation,
-capture limits, cancellation, and the selected rule's legacy reproducibility
-metadata return are Slug-native. Bazel 9.2 uses opaque `ctx.repo_metadata`;
-Slug validates and discards the pinned 18-key fallback dictionary without
-claiming Bazel metadata parity. Unsupported/deferred:
-unpinned downloads, nonempty auth/netrc, product URLs other than the six
-selected static.rust-lang.org objects, other formats/options,
-links, special entries, unmodeled archive-path observations, malformed or
-unaudited archives, and broader repository-rule use. Never read a netrc or
-forward credentials. If exact extraction evidence remains incomplete, narrow
-the claim and REPLAN before landing a success path.
+Exact Bazel 9.2 behavior claimed here: declaration flags independently select
+OS and architecture factor participation; unchanged extension ID retains the
+same canonical generated-repository name; on this Linux x86_64 host, the pinned
+rules_rust extension selects the host-tools repository rule and source-derived
+Rust 1.97.1/nightly rustfmt attributes. Slug-native: Rust Host observations
+and structural factor strings/identity, rather than Bazel's raw JVM
+`os.arch`/HotSpot bytes or exact hidden-lockfile key spelling. Unsupported/
+deferred: global pure-extension aggregation with factors, `facts_version`
+or nonempty facts, exact visible/hidden lockfile factor replay and error-mode
+reuse, cross-host Bazel factor-byte parity, unaudited generated-repository
+effects, and any unrelated extension method or root-build claim. These
+boundaries must fail closed; no Bazel/JVM semantic execution enters Slug.
 
 ## Source, owner and decision
 
-Pinned rules_rust `rust/private/repositories.bzl:397-462` invokes rustc,
-clippy, cargo, rustfmt, llvm-tools, rust-std in that order; rustfmt is nightly
-2026-07-16, the others are Rust 1.97.1. `repository_utils.bzl:845-1009`
-passes `urls`, a `known_shas.bzl` SHA-256, empty auth here, and a
-`<archive-stem>/<component>` stripPrefix, leaving output and type at Bazel's
-defaults. Pinned Bazel 9.2 `StarlarkBaseExternalContext.java:541-565,1070-1172`,
-`TarXzFunction.java`, and `CompressedTarFunction.java:75-158` establish
-result binding, tar order, prefix filtering, regular-file overwrite, mode
-(`archive mode | 0400`), and mtime. Bazel's symlink/hardlink handling is not
-admitted. The six selected archives were audited: 168,875,656 compressed bytes
-total (largest call 81,050,916), 859,069,440 full decoded TAR bytes
-(largest call 407,661,056),
-858,348,847 stripped regular payload bytes, 380 physical headers/296 logical
-entries, largest regular entry 199,494,192 bytes, longest path 167 bytes,
-only regular files/directories
-with modes 0644/0755 and no links/PAX. GNU longname headers occur in three
-archives. `manifest.in` is the one cross-archive stripped path collision,
-present in all six; no file/directory collision or within-archive duplicate.
-A focused Bazel 9.2 local tar.xz merge oracle must cover ordering, overwrite,
-prefix and executable mode without relying on a huge network run. Accepted
-BCR SHA capture/strict TAR tests may be reused, but are not evidence for
-xz/ordered merge. No V1/Buck2 donor is a semantic authority; reuse current
-bounded transport/parser concepts, not a side cache or shell extractor.
+Pinned Bazel 9.2 `RegularRunnableExtension.java:201-205` derives only the
+declared factors from host OS and raw architecture.
+`ModuleExtensionEvalFactors.java:32-97` keeps conditional components and
+renders OS before architecture. `ModuleExtensionId.java:29-43`,
+`BazelDepGraphFunction.java:170-215`, `SingleExtensionValue.java:68-74`,
+and `SingleExtensionEvalFunction.java:139-303` separate extension ID,
+generated repo name, factor-keyed evaluation and lockfile selection.
+`BazelLockFileModule.java:157-310` puts reproducible entries in Bazel's
+hidden output-base lockfile and retains/replaces other factor entries by
+dependency shape. Pinned rules_rust
+`rust/extensions.bzl:327-366` declares both flags, computes its host
+triple through `module_ctx.os`, calls `rust_toolchain_tools_repository`,
+and returns reproducible metadata; its MODULE self-use supplies the tag.
+Accepted WP796 proved the six resulting Linux x86_64 archive effects.
 
-The selected `HostSelectedRepositoryFileEffectObservationKey` remains the
-DICE producer; its owner certificate, full authenticated repository input,
-observed source/environment/path cells and an ordered structural effect plan
-determine the value. Admit the archive method only when the authenticated
-rule's defining label is `@@rules_rust+//rust/private:repositories.bzl`,
-exported name is `rust_toolchain_tools_repository`, and generated name is
-`rust_host_tools`. The selected DICE effect producer validates all six exact
-ordered URL/SHA/stripPrefix tuples from the audited receipt below, with no
-missing/extra archive calls, before publishing its result; changed tool
-versions or mirrors fail closed until reaudited. Other repository rules fail
-closed even for the same call shape. Local `file://` objects are a
-checksum-pinned unit/Core oracle carrier: the production selected DICE owner
-rejects them before publication. Extend the current
-`GeneratedRepositoryFileEffectPlan`
-with archive intents (ordered URLs, SHA, stripPrefix, format) interleaved with
-file writes, preserving existing file-only API behavior. No captured bytes or
-temp root enter DICE. Source identity for the materialized root frames every
-ordered effect, including archive URL order/SHA/prefix and file path/bytes/mode,
-in a domain separate from repository, Bazel and REAPI hashes. The Core
-materializer alone owns verified capture and physical staging. Keep it in a
-fresh temporary root, apply effects sequentially, publish only after all
-captures, extraction and final files succeed; abort/cancellation drops staging.
-Never hold a lock across DICE compute. Changed SHA, URL, prefix, order,
-contents, source, environment or owner must invalidate/retry via the current
-observation and materialization flow; A/B/A restoration must preserve identity.
+The selected `HostSelectedExtensionOwnerPureObservationKey` is the semantic
+producer. Its existing owner inputs, authenticated first/reacquired .bzl
+projection, observed `RepositoryPlatformKey`, environment/download/path
+frontiers, and invocation calls remain its dependencies. Add one compact
+structural factor projection: OS only when `os_dependent`, architecture only
+when `arch_dependent`; retain declaration shape and selected host values in
+the pure result, post-host pure errors, and post-host outer observation errors
+so DICE equality cannot cut off a factor change with identical repository
+calls or identical error text.
+The owner certificate inherits that value. Keep the factor distinct from
+`module_ctx.os`'s displayed host values, toolchain triple, repository
+mapping, and canonical generated name. No command-side source inference,
+process-global cache, new DICE key, or lock held across a DICE computation.
 
-Choose an in-process xz decoder and a bounded TAR reader. Reuse the existing
-streamed SHA-verified temp capture and parser safety checks, parameterizing
-limits only for this audited selected class; do not loosen BCR's policy.
-Cap XZ decoder memory at 136 MiB: the audited maximum is 134,283,320 bytes
-for rustc, llvm-tools and rust-std, just above 128 MiB.
-Reject path escape, links/special nodes, unsupported modes or ambiguous
-file/dir collisions before a root is published. Preserve ordered
-archive-to-archive regular-file replacement and final `ctx.file` overwrite
-of an archive file; repeated `ctx.file` paths remain unsupported. A generated-path
-`exists`/read that would require extracted state must fail closed rather than
-return a fabricated absence; this selected owner rejects unknown generated
-path construction and child paths before an archive as well, preventing a
-precreated handle or `hasattr` bypass. The source-selected rule must reach all six calls
-and its final BUILD/WORKSPACE files; unrelated rules remain unsupported.
+The selected owner may admit the four flag combinations for existing
+supported `RepositoryPlatform` values. The legacy aggregate
+`HostPureModuleExtensionInvocationsKey` keeps its current factor rejection.
+Existing host observation and authenticated re-acquisition precede evaluation;
+missing or changed injected host input remains Need/typed terminal, not an
+ambient OS read. Changed declaration, source, host platform, tags, environment,
+mapping or owner must recompute or fail closed under existing
+observation/promotion rules. A/B/A restoration must recover the original
+factor and generated spec; output equality may cut off only when every
+declared factor-relevant structural input matches. Bazel's
+reproducibility/lockfile lifetime is not
+silently simulated.
 
-The source-authentic direct smoke uses root `use_repo_rule` with the pinned
-`@rules_rust//rust/private:repositories.bzl` export, so it exercises the same
-repository-rule implementation and selected DICE effect/materializer but has
-an innate owner. The original rules_rust `rust_host_tools` module-extension
-owner remains stopped earlier by unadmitted `os_dependent`/`arch_dependent`
-factors. A later generated BUILD Loading stop is not archive-effect failure.
+The retained factor is at most two compact strings plus declaration presence
+in the DICE-owned result/error; no retained archive, evaluator value, temp root
+or extra service cache. The Starlark invocation remains phase scratch, released
+on Need/error/cancellation. The existing immutable materialization and
+selected-download owners keep their publication and cleanup rules. The
+large `module_extension.rs` file remains the cohesive selected-owner
+implementation and colocated test owner; a short factor type/helper may live
+there, but do not add a second broad extension driver.
 
-Audited pinned archive receipt (order; SHA-256; compressed/full decoded TAR
-bytes; physical headers):
+## Evidence and validation
 
-| Component | SHA-256 | Compressed | Decoded | Headers |
-|---|---|---:|---:|---:|
-| rustc | `9819d0a32d56bd339585319c80260e332779f5541fd66838ab7e016d6c814819` | 81,050,916 | 407,661,056 | 71 |
-| clippy | `3441df8fb54db985f8c8a3e8356b8874a3f92cc8cca8565cfe36f1dc15935e72` | 4,935,556 | 23,790,080 | 22 |
-| cargo | `e1be5f5ff7f7f80ca506fb65770b759edbdc6d303781ed71c5de8ec8a8394779` | 11,150,208 | 43,520,512 | 68 |
-| rustfmt | `bb48a8124f84818dab540701952e4cf5506045000baa975b6046d54aeac87d5d` | 2,473,860 | 7,398,400 | 22 |
-| llvm-tools | `3e7a1c596a42dea6bf625ec6f006ce2fbcf5d1ff892f082828eb182a5d483b95` | 39,156,716 | 207,548,416 | 51 |
-| rust-std | `1c1e704ae80126b7de34f72ea2825f7fd01736dec20732faed47374b95282fba` | 30,108,400 | 169,150,976 | 146 |
+Reuse pinned Bazel sources and WP796's authentic
+`@@rules_rust++rust_host_tools+rust_host_tools` mapping/RepoSpec evidence.
+Bazel 9.2 `mod show_extension`, `dump_repo_mapping` and `show_repo`
+on the genuine rules_rust 0.73 module pass without fetching archives.
+`--host_cpu=aarch64` does not alter extension Host factors, so it is not
+a cross-host oracle. Add a small Stage 1 self-contained nonreproducible
+four-export fixture only for the demonstrated conditional-factor gap: both,
+OS-only, architecture-only and general keys, stable generated names, and a
+fresh-output-base missing-factor error-mode negative. Record provenance and
+use message-shape/structured-semantic comparison for host-dependent text.
+Do not claim a multi-OS oracle from this one host. The authentic rules_rust
+lane is source-pinned and checked by the direct smoke; no copied upstream
+archive or credential material belongs in the fixture.
 
-## Scope, resources and stops
+Focused Rust tests must cover four factor selections, declaration change,
+platform OS-only/arch-only/both A/B/A with identical repository calls,
+post-host identical-error factor discrimination in both pure and outer
+observation terminals, owner certificate/repository
+mapping stability, and preserved arbitrary-owner `facts_version`/legacy
+aggregate rejection. Include observed and legacy selected views, Need/error
+and event nonpublication at the existing boundaries. Build with the pinned
+Rust toolchain: JSON `--no-run`, exact-selector preflight, serial Cargo,
+direct Loading/Bzlmod/Core compile dependents, and a fresh
+`cargo build -p slug_cli_v2` before any `SLUG_V2_BIN` or CLI smoke. Clean
+stale `slugd` before/after. The original `rust_host_tools` extension smoke
+must reach the accepted archive behavior; a separately typed earlier source
+prerequisite is diagnostic evidence for scope correction or REPLAN, not an
+acceptance substitute. Do not pass an unsupported factor by fiat.
+Run format, diff, archive and plan status checks; obtain independent DESIGN
+review before Rust edits and FINAL review of the actual diff. No broad suite
+or M7A close is selected.
 
-Base clean main at 2cf074303. Allowlist: this manifest, canonical Current
-paragraph and Stage 5/9 only for accepted owner/reuse decisions;
-`app/slug_bzlmod_v2/src/generated_repository_file_effect.rs` and lib export;
-`app/slug_loading_v2/src/repository_rule_context.rs`,
-`module_extension_repository_file_effect.rs`,
-`registration_diagnostic.rs` for exhaustive typed archive-plan diagnostics,
-and colocated tests;
-`app/slug_core_v2/src/runtime/repository_archive_http.rs`,
-`repository_archive_realize.rs` or a cohesive sibling selected-effect
-extractor, `repository_io.rs`, direct tests and module registration;
-`app/slug_core_v2/Cargo.toml`, Cargo.lock and Cargo.Bazel.lock for xz2.
-No MODULE/lockfile-auth, Bazel vendoring, NativeLink, BuildBuddy configuration,
-external credentials, generic repository downloads, cross-owner Label or
-rules_shell changes. Existing Core and Loading files above 2,000 lines are
-cohesive owners; put a substantial decoder in a sibling rather than expanding
-their existing giant methods. REPLAN if selected source includes unsupported
-entry/collision semantics, needs auth/secret access, a new semantic owner, or
-requires broader URL/method options. Do not silently widen caps to accommodate
-an unknown object.
+## Scope and stops
 
-Retained memory is a compact ordered archive intent plus existing file bytes
-in DICE; `Arc`/compact strings/SmallMap patterns suffice, no new interner or
-retained artifact cache. A verified compressed archive occupies at most one
-transfer-owned temp file per sequential effect (128 MiB existing capture cap);
-stream decoded bytes directly into the materialization root with explicit
-audited caps: 512 MiB full decoded TAR stream per call, 256 MiB per regular
-entry, 1 GiB full decoded stream across six, 1024 physical headers per call,
-256-byte
-paths and 32 path components. Reject duplicate stripped destinations within
-one archive but permit audited cross-archive regular-file replacement.
-Per-effect scratch
-and staging release on success/error/cancellation; request/source arcs release
-under normal DICE invalidation/eviction. No performance claim.
-
-## Validation
-
-Independent DESIGN review before Rust edits and FINAL review of the actual
-diff. Record six SHA hashes and per-archive header counts with the audit;
-compare against the source-selected objects. Add a small fixture under
-Stage 1 provenance only for a demonstrated oracle gap: local `file://`
-tar.xz with two ordered archives, same-path overwrite, stripPrefix filtering,
-executable mode and GNU longname, plus a negative SHA case. Compare Bazel 9.2
-and the Slug Core materializer output bytes/modes and SHA failure class.
-The production DICE owner admits only the six source-derived tuples.
-Path escape, link and
-special entries receive Slug-only fail-closed tests and pinned-source
-classification, not an exact diagnostic claim. Focused tests cover structural
-order/identity, result return, Need/error/cancel, capture SHA/cap, xz decode
-limits, path confinement, archive+file overwrites, atomic publication and
-cold/warm/A/B/A reuse. Run direct Bzlmod, Loading, Core and CLI compile
-dependents with pinned Rust toolchain; JSON `--no-run` and exact-selector
-preflight, serial Cargo, fresh `slug_cli_v2` build before smokes, and
-stale-slugd cleanup before/after. A direct selected-owner smoke must reach
-the archive behavior; production-root earlier stops are recorded, not
-bypassed. Run format, diff, archive and plan status checks. Normal Bazel RC
-discovery may pick up BuildBuddy auth; never inspect or print `~/.bazelrc`
-or netrc material.
+Base clean main `1ecf53a8b`. Allowlist: this manifest, canonical Current
+paragraph and Stage 5 owner contract only for accepted changes;
+`app/slug_loading_v2/src/module_extension.rs` with colocated tests;
+`app/slug_loading_v2/src/registration_diagnostic.rs` only to unwrap the
+new structural selected-error carrier without changing displayed diagnostics;
+`tests/v2_oracle/fixtures/module-extension-host-factors/` for the small
+oracle fixture and its generated expectation. No Bzlmod lockfile parser or
+writer, Core Host observer, global extension driver, repository materializer,
+NativeLink/BuildBuddy configuration, credential file, target-pattern support,
+generated BUILD attribute schema, or generic source acquisition change.
+If factor retention requires altering a different DICE/public owner, source
+proves a different factor domain, ordinary selected evaluation needs a
+lockfile lifecycle to be correct, or authentic rules_rust requires an
+unmodeled method before archive effects, stop for reviewed scope correction
+or REPLAN. Do not weaken the prior arbitrary-factor rejection test without
+its positive factor/identity replacements. Normal Bazel RC discovery may
+pick up user auth when explicitly needed; never inspect or print
+`~/.bazelrc` or netrc contents.
 
 ## Acceptance receipt
 
-Independent DESIGN and post-correction FINAL reviews returned ACCEPT. The
-Bazel 9.2 local tar.xz oracle covered two ordered extracts, shared-path
-last-writer bytes, final `ctx.file` overwrite, stripPrefix, executable mode,
-GNU longname and wrong-SHA failure. The six pinned archives' source hashes,
-sizes, modes, entry types and `manifest.in` collision were audited above.
-Pinned-toolchain JSON no-run compile succeeded for Bzlmod, Loading and Core;
-exact nonignored selector preflight preceded 5/5 Bzlmod, 5/5 Loading and 8/8
-Core focused tests. A fresh `slug_cli_v2` build succeeded. `cargo fmt --check`,
-`git diff --check`, Cargo/Bazel lock coherence and plan/archive checks passed.
-No broad suite or root build is claimed. The packet ran from the 03:20 UTC
-WP795 base through the 04:22 UTC final checks, about 62 minutes elapsed;
-focused compile/rebuild calls were serial, with the longest JSON no-run about
-50 seconds and the first CLI rebuild about 26 seconds. No speedup claim.
+Independent DESIGN and FINAL reviews returned ACCEPT. A reviewed compile
+correction added only the selected-error display unwrapping in
+`registration_diagnostic.rs`; the structural factor remains in DICE equality.
+Bazel 9.2's self-contained nonreproducible oracle passed generation and
+independent replay in separate fresh roots: four visible factor shapes,
+stable generated names, and a same-extension-ID missing-factor error after
+an isolated declaration change and output-base expunge. The observed JVM
+architecture factor was `amd64`; Slug's Rust Host projection was `x86_64`,
+so no raw-factor-byte parity is claimed. Bazel's authentic offline
+`//:probe` build passed for the dependency-owned rules_rust extension.
 
-The authentic innate `use_repo_rule` fixture at
-`/tmp/slug-wp796-direct-ZUzVoG` uses the pinned rules_rust export and Linux
-x86_64 Rust 1.97.1/nightly rustfmt values. Bazel 9.2 `build //:probe`
-succeeded. Fresh Slug `build //:probe`, with HOME/NETRC unset and no `slugd`,
-completed archive materialization and then failed while Loading the generated
-`BUILD.bazel:131`: `rust_toolchain(iso_date=None)` was rejected as a label
-attribute. The original module-extension fixture separately stops before this
-owner on unadmitted OS/architecture-dependent factors. These are next-packet
-stops, not WP796 archive parity or root-bootstrap success. No credential file
-was inspected, copied or committed.
+Pinned-toolchain JSON `--no-run` passed for Loading, Bzlmod and Core. Exact
+selector preflight preceded 3/3 new tests, the existing global-factor guard,
+and the existing selected Host-input test; all five passed. A fresh
+`cargo build -p slug_cli_v2` passed. The original rules_rust `rust_host_tools`
+extension smoke, in a new workspace with HOME/NETRC unset, passed the former
+factor stop and WP796 materialization, then stopped at generated
+`BUILD.bazel:131` because `rust_toolchain(iso_date=None)` is rejected by
+Loading. No `slugd` process remained before or after. Format, diff, V1
+archive and plan-status checks passed. No broad suite or root-build success
+is claimed.
+
+Two older `registration_diagnostic` tests were run and failed because their
+unchanged owner fixture omits `RepositoryHostInputTransaction` and
+`RepositoryPlatformKey`; the pre-WP797 selected owner already required those
+inputs. Those broad diagnostic fixtures remain an independent validation gap,
+not passing evidence for this packet. They were not silently repaired or
+counted as passing tests.
 
 ## Immediate predecessor
 
-WP795 at 2cf074303 accepted bounded selected absolute-host-path `exists`
-with DICE-observed environment/path; production root still stops at generated
-`slug_crates` Label and toolchain fixture at independent rules_shell `which`.
+WP796 at `1ecf53a8b` accepted the six source-selected host-tools tar.xz
+effects and bounded materialization. An innate `use_repo_rule` route reaches
+the generated BUILD, then stops at `iso_date=None` Loading; the original
+module-extension route still stops at declared OS/architecture factors.

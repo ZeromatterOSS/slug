@@ -29,25 +29,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-96-m7a-selected-rust-host-tools-archive-effects-r1
+Packet: WP-7-97-m7a-selected-module-extension-host-factors-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP796 accepts the six audited, SHA-pinned `rust_host_tools` tar.xz archive
-effects through an authentic innate `use_repo_rule` route. The selected DICE
-owner retains their exact ordered URL/SHA/stripPrefix plan; Core verifies,
-extracts and merges them before final generated file writes. Bazel 9.2's
-focused tar.xz oracle, 18 focused Rust tests, fresh CLI build and independent
-DESIGN/FINAL reviews passed. The source-authentic Slug smoke completes
-materialization, then stops in generated `BUILD.bazel:131` at the separate
-`rust_toolchain(iso_date=None)` attribute-schema boundary; the matching Bazel
-fixture builds. The original module-extension owner remains gated by
-OS/architecture-dependent factors. Slug validates and discards this rule's
-legacy fallback dictionary; Bazel 9.2 instead uses opaque `repo_metadata`, so
-metadata/reproducibility caching remains Slug-native/deferred.
-This packet does not admit netrc auth, arbitrary archives, cross-owner
-`module_ctx.path(Label)` or rules_shell `which`. WP795's selected absolute
-host-path existence behavior was accepted at 2cf074303; production root
-integration remains gated independently.
+WP797 selects declared OS/architecture factors for the original rules_rust
+0.73 `rust_host_tools` extension. Its DICE-owned selected result and
+post-host terminals now retain only the declared Rust Host components;
+canonical generated-repository names remain independent of factors. Bazel
+9.2's four-factor oracle, focused Rust checks and independent reviews passed.
+The authentic extension advances through WP796's six archive effects and
+stops at the separate generated BUILD `iso_date=None` Loading boundary.
+Exact Bazel JVM factor bytes, lockfile replay, unrelated owners and root
+bootstrap remain deferred. Two older diagnostic tests with missing Host
+fixture inputs remain an unrelated validation gap; see the packet receipt.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

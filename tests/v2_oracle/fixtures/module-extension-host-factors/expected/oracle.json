@@ -1,0 +1,197 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@both_repo",
+        "@os_repo",
+        "@arch_repo",
+        "@general_repo",
+        "--lockfile_mode=update",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@both_repo",
+        "@os_repo",
+        "@arch_repo",
+        "@general_repo",
+        "--lockfile_mode=update",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [
+        {
+          "digest": "3424cc5027e2f2e63016d84f6bff9dd350d932e542b3b7047245c80f5bfa38cc",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 52316,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "prime_four_factor_entries",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n no actions running\n no actions running\n no actions running\n no actions running\n no actions running\n no actions running\n no actions running",
+      "normalized_stdout": "## @both_repo:\nload(\"@@//:repo.bzl\", \"_probe\")\n_probe(\n  name = \"+both+probe\",\n  _original_name = \"probe\",\n)\n\n## @os_repo:\nload(\"@@//:repo.bzl\", \"_probe\")\n_probe(\n  name = \"+os_only+probe\",\n  _original_name = \"probe\",\n)\n\n## @arch_repo:\nload(\"@@//:repo.bzl\", \"_probe\")\n_probe(\n  name = \"+arch_only+probe\",\n  _original_name = \"probe\",\n)\n\n## @general_repo:\nload(\"@@//:repo.bzl\", \"_probe\")\n_probe(\n  name = \"+general+probe\",\n  _original_name = \"probe\",\n)",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n no actions running\n no actions running\n no actions running\n no actions running\n no actions running\n no actions running\n no actions running\n",
+      "stdout": "## @both_repo:\nload(\"@@//:repo.bzl\", \"_probe\")\n_probe(\n  name = \"+both+probe\",\n  _original_name = \"probe\",\n)\n\n## @os_repo:\nload(\"@@//:repo.bzl\", \"_probe\")\n_probe(\n  name = \"+os_only+probe\",\n  _original_name = \"probe\",\n)\n\n## @arch_repo:\nload(\"@@//:repo.bzl\", \"_probe\")\n_probe(\n  name = \"+arch_only+probe\",\n  _original_name = \"probe\",\n)\n\n## @general_repo:\nload(\"@@//:repo.bzl\", \"_probe\")\n_probe(\n  name = \"+general+probe\",\n  _original_name = \"probe\",\n)\n\n"
+    },
+    {
+      "argv": [
+        "run",
+        "//:factor_report",
+        "--lockfile_mode=error",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "run",
+        "//:factor_report",
+        "--lockfile_mode=error",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "report_visible_factor_keys",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:factor_report (5 packages loaded, 6 targets configured)\nAnalyzing: target //:factor_report (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:factor_report (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:factor_report up-to-date:\n  bazel-bin/factor_report.py\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 6 processes: 6 internal.\nINFO: Build completed successfully, 6 total actions\nINFO: Running command line: bazel-bin/factor_report.py",
+      "normalized_stdout": "both=os:linux,arch:amd64\nos_only=os:linux\narch_only=arch:amd64\ngeneral=general",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:factor_report (5 packages loaded, 6 targets configured)\nAnalyzing: target //:factor_report (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:factor_report (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:factor_report up-to-date:\n  bazel-bin/factor_report.py\nINFO: Elapsed time: 0.264s, Critical Path: 0.01s\nINFO: 6 processes: 6 internal.\nINFO: Build completed successfully, 6 total actions\nINFO: Running command line: bazel-bin/factor_report.py\n",
+      "stdout": "both=os:linux,arch:amd64\nos_only=os:linux\narch_only=arch:amd64\ngeneral=general\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "dump_repo_mapping",
+        "",
+        "--lockfile_mode=error",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "dump_repo_mapping",
+        "",
+        "--lockfile_mode=error",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "confirm_stable_canonical_names",
+      "normalized_stderr": "",
+      "normalized_stdout": "{\"both_repo\":\"+both+probe\",\"os_repo\":\"+os_only+probe\",\"arch_repo\":\"+arch_only+probe\",\"general_repo\":\"+general+probe\",\"\":\"\",\"module_extension_host_factors\":\"\",\"bazel_tools\":\"bazel_tools\"}",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "{\"both_repo\":\"+both+probe\",\"os_repo\":\"+os_only+probe\",\"arch_repo\":\"+arch_only+probe\",\"general_repo\":\"+general+probe\",\"\":\"\",\"module_extension_host_factors\":\"\",\"bazel_tools\":\"bazel_tools\"}\n"
+    },
+    {
+      "argv": [
+        "clean",
+        "--expunge"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "clean",
+        "--expunge"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "clear_output_base_before_missing_factor",
+      "normalized_stderr": "INFO: Starting clean (this may take a while). Use --async if the clean takes more than several minutes.",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "INFO: Starting clean (this may take a while). Use --async if the clean takes more than several minutes.\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@both_repo",
+        "--lockfile_mode=error",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@both_repo",
+        "--lockfile_mode=error",
+        "--repository_disable_download"
+      ],
+      "exit_code": 2,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "both = module_extension(\n    implementation = _impl,\n    os_dependent = True,\n    arch_dependent = True,\n)",
+          "old_digest_hint": "165",
+          "path": "both.bzl",
+          "replace": "both = module_extension(\n    implementation = _impl,\n    os_dependent = True,\n)"
+        }
+      ],
+      "name": "reject_changed_same_id_factor",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n no actions running\nERROR: The module extension '@@//:both.bzl%both' for platform os:linux does not exist in the lockfile\nERROR: The module extension '@@//:both.bzl%both' for platform os:linux does not exist in the lockfile. Type 'bazel help mod' for syntax and help.",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n no actions running\nERROR: The module extension '@@//:both.bzl%both' for platform os:linux does not exist in the lockfile\nERROR: The module extension '@@//:both.bzl%both' for platform os:linux does not exist in the lockfile. Type 'bazel help mod' for syntax and help.\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "module-extension-host-factors",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

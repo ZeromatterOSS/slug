@@ -1,0 +1,3 @@
+load(":factor_report.bzl", "factor_report")
+
+factor_report(name = "factor_report")

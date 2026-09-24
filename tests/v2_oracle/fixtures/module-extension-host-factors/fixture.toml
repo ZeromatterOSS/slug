@@ -1,0 +1,61 @@
+[fixture]
+name = "module-extension-host-factors"
+description = "Bazel 9.2 module-extension OS/architecture factor selection with unchanged repository calls."
+comparison = "message_shape"
+required_host_os = "linux"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Four local nonreproducible exports share one repository call. The reporter checks visible lockfile factor structure and generated names without assuming JVM architecture bytes. A clean expunge and same-ID declaration mutation precede the missing-factor ERROR check while preserving registry checksums. This fixture is Linux-host only and does not prove cross-OS Bazel behavior."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegularRunnableExtension.java#getEvalFactors",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionEvalFactors.java#toString",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java#compute",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionValue.java#repositoryName",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java#combineModuleExtensions",
+]
+translation_notes = "A self-contained nonreproducible control exposes the visible factor keys omitted by reproducible rules_rust rust_host_tools. The four exports call one unchanged repository rule. The Bazel lockfile reporter validates OS/architecture components structurally; regex comparison accepts host-specific JVM bytes. The negative changes the declaration for the same extension ID, not the lockfile key or generated repo name."
+generation_command = "SLUG_V2_ORACLE_ROOT=/tmp/slug-wp797-factor-oracle.UeXZZL python3 -B -m tools.v2_oracle run --fixture module-extension-host-factors --tool bazel --bazel bazel --update-expected"
+verification_command = "SLUG_V2_ORACLE_ROOT=/tmp/slug-wp797-factor-oracle.DzePAP python3 -B -m tools.v2_oracle run --fixture module-extension-host-factors --tool bazel --bazel bazel"
+
+[[commands]]
+name = "prime_four_factor_entries"
+argv = ["mod", "show_repo", "@both_repo", "@os_repo", "@arch_repo", "@general_repo", "--lockfile_mode=update", "--repository_disable_download"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["## @both_repo:", "## @os_repo:", "## @arch_repo:", "## @general_repo:", 'name = "+both+probe"', 'name = "+os_only+probe"', 'name = "+arch_only+probe"', 'name = "+general+probe"']
+manifest_roots = ["MODULE.bazel.lock"]
+
+[[commands]]
+name = "report_visible_factor_keys"
+argv = ["run", "//:factor_report", "--lockfile_mode=error", "--repository_disable_download"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["(?s)\\Aboth=os:[^,\\n]+,arch:[^,\\n]+\\nos_only=os:[^,\\n]+\\narch_only=arch:[^,\\n]+\\ngeneral=general\\n?\\Z"]
+
+[[commands]]
+name = "confirm_stable_canonical_names"
+argv = ["mod", "dump_repo_mapping", "", "--lockfile_mode=error", "--repository_disable_download"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ['"both_repo":"+both+probe"', '"os_repo":"+os_only+probe"', '"arch_repo":"+arch_only+probe"', '"general_repo":"+general+probe"']
+
+[[commands]]
+name = "clear_output_base_before_missing_factor"
+argv = ["clean", "--expunge"]
+compare = "message_shape"
+expected_exit = 0
+
+[[commands]]
+name = "reject_changed_same_id_factor"
+argv = ["mod", "show_repo", "@both_repo", "--lockfile_mode=error", "--repository_disable_download"]
+compare = "message_shape"
+expected_exit = 2
+stderr_patterns = ["The module extension '@@//:both\\.bzl%both' for platform os:[^,\\s]+ does not exist in the lockfile"]
+
+  [[commands.mutations]]
+  path = "both.bzl"
+  find = "both = module_extension(\n    implementation = _impl,\n    os_dependent = True,\n    arch_dependent = True,\n)"
+  replace = "both = module_extension(\n    implementation = _impl,\n    os_dependent = True,\n)"

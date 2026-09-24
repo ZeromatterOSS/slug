@@ -285,11 +285,16 @@ fn walk(out: &mut Buffer, mut node: Node<'_>) -> fmt::Result {
                 }
             }
             Node::Pure(error) => {
+                let mut error = error;
+                while let Pure::Factored { error: inner, .. } = error {
+                    error = inner.as_ref();
+                }
                 out.write_str("Pure: ")?;
                 match error {
                     Pure::Inputs(error) => { out.write_str("Inputs: ")?; return error.write_registration_diagnostic(out); }
                     Pure::Compute(message) => return write!(out, "Compute: {message}"),
                     Pure::AfterInputs { message, .. } => return write!(out, "AfterInputs: {message}"),
+                    Pure::Factored { .. } => unreachable!("factored selected error was unwrapped"),
                 }
             }
             Node::Innate(error) => {
