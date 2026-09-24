@@ -29,20 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-135-m7a-starlark-rule-none-visibility-r1
+Packet: WP-7-136-m7a-configured-condition-alias-r1
 Status: ACCEPTED; M7A remains partial
 
-WP835 accepts Bazel 9.2's known Starlark-rule `visibility=None` omission:
-the authentic `package_metadata` 0.0.3 legacy `license()` wrapper forwards
-that value to `_license = rule(...)`, and Slug now applies the caller
-package default with default attribute provenance. Two offline oracle rows
-pass fresh Bazel generation, independent verification and rebuilt Slug
-replay; focused same-DICE/negative tests and independent DESIGN/FINAL
-reviews pass. The authentic `//:probe` first stops later on a separate
-generated `rules_java` target that is not a `config_setting`. No additional
-native-rule or symbolic-macro surface, full license semantics or M7A is
-admitted here. Existing accepted slices remain exact.
-WP834's module metadata slice was accepted at `ac3710b76`.
+WP836 accepts the authentic generated `rules_java` 9.1.0 toolchain
+`target_settings` alias within the existing admitted configuration family.
+Analysis matches its selected `config_setting`, retains requested selector
+identity, and DICE-tracks selected-leaf declarations even when truth is
+unchanged. Four new and three protected selectors pass; the authentic
+`//:probe` first stop moves to generated `rules_cc`'s unsupported
+`repository_ctx.symlink`. Generic alias-provider inspection, exact Bazel
+configuration/output bytes, remote JDK fetching, full C++ toolchain and root
+Build remain deferred. M7A remains partial. The broader Analysis binary's
+two unrelated action-output-path assertion failures are recorded in the
+current packet; no clean-main baseline claim is made.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

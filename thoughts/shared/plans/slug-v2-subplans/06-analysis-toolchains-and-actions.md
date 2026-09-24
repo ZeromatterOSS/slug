@@ -1844,6 +1844,23 @@ stops during later rules_java loading at rule-initializer invocation. Stage 6
 adds no initializer owner; the R2/group/alias stack remains atomic and
 unaccepted while Stage 4 freezes the successor.
 
+## Configured condition alias for toolchain settings (2026-09-24)
+
+WP836 admits the exact selected-condition truth and toolchain eligibility
+needed by generated `rules_java` 9.1.0 `target_settings` aliases. The existing
+configured condition owner and declaration parent both walk native alias
+`actual` through current selector preparation, DICE-load each visited package,
+and require a selected `config_setting`; the requested label remains the
+selector/toolchain edge while the selected declaration supplies truth and
+specialization. The parent directly depends on alias/leaf packages so an
+equal-truth selected-leaf switch still invalidates. A transient visited set
+rejects cycles in plain alias chains; the existing configured cycle detector
+covers selector-condition recursion. No new key, retained representation, generic provider
+projection or configuration identity is admitted. Focused target/exec,
+toolchain, wrong-kind, cycle and A/B/A tests pass; authentic bootstrap proceeds
+to generated `rules_cc`'s unsupported `repository_ctx.symlink`. M7A remains
+partial.
+
 ## Configured constraint-setting defaults
 
 WP814 admits the Bazel 9.2 NODEP default for configured constraint settings

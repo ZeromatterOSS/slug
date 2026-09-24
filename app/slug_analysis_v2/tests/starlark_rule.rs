@@ -915,6 +915,7 @@ async fn configured_condition_request_with_inputs(
 ) -> Result<ConfiguredConditionMatch, String> {
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker),
+        cycle_detector: Some(analysis_cycle_detector()),
         ..Default::default()
     });
     inject_root_target_inputs(&mut updater, workspace, epoch, repositories);
@@ -2370,6 +2371,282 @@ async fn configurable_toolchain_target_settings_use_distinct_selector_and_select
             expected
         );
     }
+}
+
+#[tokio::test]
+async fn configurable_alias_target_settings_match_selected_leaf_only() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), TOOLCHAIN_MODULE).unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        format!(
+            "{TOOLCHAIN_DEFS}\ndef _mode(ctx): return []\nmode = rule(implementation = _mode, build_setting = config.string(flag = True))\n"
+        ),
+    )
+    .unwrap();
+    let build = TOOLCHAIN_BUILD.replace(
+        "exec_compatible_with = [\":linux\"])",
+        "exec_compatible_with = [\":linux\"], target_settings = [\":selected_mode\"])",
+    );
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        format!(
+            "load(':defs.bzl', 'mode')\n{build}\nmode(name='mode', build_setting_default='unused')\n\
+             config_setting(name='alpha', flag_values={{':mode':'alpha'}})\n\
+             config_setting(name='beta', flag_values={{':mode':'beta'}})\n\
+             alias(name='selected_mode', actual=select({{':alpha':':alpha', '//conditions:default':':beta'}}))\n"
+        ),
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    for (mode, expected) in [
+        ("alpha", ConfiguredConditionMatch::Match),
+        ("beta", ConfiguredConditionMatch::Match),
+        ("gamma", ConfiguredConditionMatch::NoMatch),
+    ] {
+        let configuration =
+            test_configuration().with_starlark_option(string_option("@@//:mode", mode));
+        assert_eq!(
+            configured_condition_request(
+                &dice,
+                &workspace,
+                "@@//:selected_mode",
+                configuration.clone()
+            )
+            .await
+            .unwrap(),
+            expected,
+            "{mode} condition"
+        );
+        let result = root_target_request_with_configuration(
+            &dice,
+            &workspace,
+            "@@//:request",
+            configuration,
+            Arc::new(RootActivationTracker::default()),
+        )
+        .await;
+        if mode == "gamma" {
+            let error = result.unwrap_err();
+            assert!(error.contains("no compatible toolchain"), "{error}");
+        } else {
+            assert_eq!(
+                selected_toolchain(&result.unwrap())
+                    .declaration()
+                    .to_string(),
+                "@@//:second",
+                "{mode} toolchain"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn configured_condition_alias_selects_target_and_exec_leaves_and_restores() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name='root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "def _mode(ctx): return []\nmode = rule(implementation=_mode, build_setting=config.string(flag=True))\n",
+    )
+    .unwrap();
+    let build = workspace.join("BUILD.bazel");
+    let original = r#"load(':defs.bzl', 'mode')
+mode(name='mode', build_setting_default='unused')
+platform(name='platform')
+config_setting(name='choose_alpha', flag_values={':mode':'alpha'})
+config_setting(name='leaf_alpha', flag_values={':mode':'alpha'})
+config_setting(name='leaf_beta', flag_values={':mode':'beta'})
+alias(name='selected', actual=select({':choose_alpha':':leaf_alpha', '//conditions:default':':leaf_beta'}))
+"#;
+    fs::write(&build, original).unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    for (mode, expected) in [
+        ("alpha", ConfiguredConditionMatch::Match),
+        ("beta", ConfiguredConditionMatch::Match),
+        ("gamma", ConfiguredConditionMatch::NoMatch),
+    ] {
+        let target = test_configuration().with_starlark_option(string_option("@@//:mode", mode));
+        let exec = ConfigurationKey::from_slug(
+            target
+                .slug_configuration()
+                .unwrap()
+                .to_exec_for_platform(&CanonicalLabel::parse("@@//:platform").unwrap())
+                .unwrap(),
+        );
+        for (kind, configuration) in [("target", target), ("exec", exec)] {
+            assert_eq!(
+                configured_condition_request(&dice, &workspace, "@@//:selected", configuration)
+                    .await
+                    .unwrap(),
+                expected,
+                "{mode} {kind}"
+            );
+        }
+    }
+
+    let alpha = test_configuration().with_starlark_option(string_option("@@//:mode", "alpha"));
+    fs::write(
+        &build,
+        original.replace(
+            "name='leaf_alpha', flag_values={':mode':'alpha'}",
+            "name='leaf_alpha', flag_values={':mode':'gamma'}",
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        configured_condition_request(&dice, &workspace, "@@//:selected", alpha.clone())
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::NoMatch
+    );
+    fs::write(&build, original).unwrap();
+    assert_eq!(
+        configured_condition_request(&dice, &workspace, "@@//:selected", alpha)
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+}
+
+#[tokio::test]
+async fn configured_condition_alias_chains_and_rejects_bad_selected_leaves() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name='root')\n").unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"config_setting(name='leaf', values={'compilation_mode':'fastbuild'})
+config_setting(name='false_leaf', values={'compilation_mode':'opt'})
+alias(name='middle', actual=':leaf')
+alias(name='chain', actual=':middle')
+filegroup(name='ordinary', srcs=[])
+alias(name='wrong_kind', actual=':ordinary')
+alias(name='wrong_selected', actual=select({':leaf':':ordinary', '//conditions:default':':leaf'}))
+alias(name='wrong_unselected', actual=select({':leaf':':leaf', '//conditions:default':':ordinary'}))
+alias(name='selected_false', actual=select({':leaf':':false_leaf', '//conditions:default':':leaf'}))
+alias(name='missing', actual=':absent')
+alias(name='cycle_a', actual=':cycle_b')
+alias(name='cycle_b', actual=':cycle_a')
+alias(name='selector_cycle', actual=select({':selector_cycle':':leaf', '//conditions:default':':leaf'}))
+"#,
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    assert_eq!(
+        configured_condition_request(&dice, &workspace, "@@//:chain", test_configuration())
+            .await
+            .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+    assert_eq!(
+        configured_condition_request(
+            &dice,
+            &workspace,
+            "@@//:wrong_unselected",
+            test_configuration()
+        )
+        .await
+        .unwrap(),
+        ConfiguredConditionMatch::Match
+    );
+    assert_eq!(
+        configured_condition_request(
+            &dice,
+            &workspace,
+            "@@//:selected_false",
+            test_configuration()
+        )
+        .await
+        .unwrap(),
+        ConfiguredConditionMatch::NoMatch
+    );
+    for (target, expected) in [
+        ("wrong_kind", "not a config_setting"),
+        ("wrong_selected", "not a config_setting"),
+        ("missing", "was not found"),
+        ("cycle_a", "cycle"),
+        ("selector_cycle", "cycle"),
+    ] {
+        let error = configured_condition_request(
+            &dice,
+            &workspace,
+            &format!("@@//:{target}"),
+            test_configuration(),
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains(expected), "{target}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn configured_condition_alias_equal_truth_leaf_switch_invalidates_specialization() {
+    let workspace = scratch();
+    fs::create_dir(workspace.join("conditions")).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name='root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"Selected = provider(fields={'value':''})
+def _mode(ctx): return []
+mode = rule(implementation=_mode, build_setting=config.string(flag=True))
+def _probe(ctx): return [Selected(value=ctx.attr.text)]
+probe = rule(implementation=_probe, attrs={'text':attr.string()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(':defs.bzl', 'mode', 'probe')
+mode(name='mode', build_setting_default='unused')
+config_setting(name='base', flag_values={':mode':'alpha'})
+probe(name='probe', text=select({'//conditions:selected':'specific', ':base':'base'}))
+"#,
+    )
+    .unwrap();
+    let conditions = workspace.join("conditions/BUILD.bazel");
+    let original = r#"config_setting(name='choose', flag_values={'//:mode':'alpha'})
+config_setting(name='specific', values={'compilation_mode':'fastbuild'}, flag_values={'//:mode':'alpha'})
+config_setting(name='equal', flag_values={'//:mode':'alpha'})
+alias(name='selected', actual=select({':choose':':specific', '//conditions:default':':equal'}), visibility=['//visibility:public'])
+"#;
+    fs::write(&conditions, original).unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let configuration =
+        test_configuration().with_starlark_option(string_option("@@//:mode", "alpha"));
+    let condition = || {
+        configured_condition_request(
+            &dice,
+            &workspace,
+            "@@//conditions:selected",
+            configuration.clone(),
+        )
+    };
+    let probe = || {
+        root_target_request_with_configuration(
+            &dice,
+            &workspace,
+            "@@//:probe",
+            configuration.clone(),
+            Arc::new(RootActivationTracker::default()),
+        )
+    };
+    let selected = ProviderId::new("//:defs.bzl", "Selected").unwrap();
+    assert_eq!(condition().await.unwrap(), ConfiguredConditionMatch::Match);
+    let first = probe().await.unwrap();
+    assert_eq!(provider_value(&first, &selected), "specific");
+
+    fs::write(
+        &conditions,
+        original.replace("':choose':':specific'", "':choose':':equal'"),
+    )
+    .unwrap();
+    assert_eq!(condition().await.unwrap(), ConfiguredConditionMatch::Match);
+    let error = probe().await.unwrap_err();
+    assert!(error.contains("ambiguous matching conditions"), "{error}");
+
+    fs::write(&conditions, original).unwrap();
+    assert_eq!(condition().await.unwrap(), ConfiguredConditionMatch::Match);
+    assert_eq!(probe().await.unwrap(), first);
 }
 
 #[tokio::test]

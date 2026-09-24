@@ -11,7 +11,9 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::future::Future;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -888,28 +890,125 @@ async fn build_setting_declaration(
     analysis_semantic_complete(Ok(declaration))
 }
 
+/// Keep this walk separate from configured-node analysis: a condition alias
+/// must reject a selected non-setting without analyzing that arbitrary rule.
+/// The caller directly observes every visited package, including when two
+/// selected leaves have the same condition truth.
+fn resolve_configured_condition_target<'a>(
+    ctx: &'a mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &'a NormalizedAbsolutePath,
+    configuration: &'a ConfigurationKey,
+    requested: &'a CanonicalLabel,
+) -> Pin<
+    Box<
+        dyn Future<Output = AnalysisSemanticOutcome<(CanonicalLabel, ConfiguredPackageValue)>>
+            + Send
+            + 'a,
+    >,
+> {
+    Box::pin(async move {
+        let mut visited = SmallSet::new();
+        let mut label = requested.clone();
+        loop {
+            if !visited.insert(label.clone()) {
+                return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                    "configured condition alias cycle at {label}"
+                ))));
+            }
+            let inventory = semantic_value!(
+                compute_configured_package_input(
+                    ctx,
+                    mode,
+                    workspace.dupe(),
+                    label.package().clone(),
+                    "loading configured condition target package through DICE",
+                )
+                .await
+            );
+            let package = match inventory.loaded() {
+                Ok(package) => package,
+                Err(error) => {
+                    return analysis_semantic_complete(Err(package_inventory_error(error)));
+                }
+            };
+            let Some(target) = package
+                .targets
+                .iter()
+                .find(|target| target.name == label.target().as_str())
+            else {
+                return analysis_semantic_complete(Err(AnalysisError::target_not_found(
+                    label,
+                    package.build_file.clone(),
+                )));
+            };
+            match &target.kind {
+                PackageTargetKind::ConfigSetting { .. } => {
+                    return analysis_semantic_complete(Ok((label, inventory)));
+                }
+                PackageTargetKind::Alias { actual } => {
+                    let actual = match actual {
+                        slug_loading_v2::package::AliasActual::Visible(actual) => actual,
+                        slug_loading_v2::package::AliasActual::NonVisible(actual) => {
+                            return analysis_semantic_complete(Err(AnalysisError::message(
+                                format!("native alias actual repository is not visible: {actual}"),
+                            )));
+                        }
+                    };
+                    let selector_labels = actual
+                        .selector_key_labels()
+                        .into_iter()
+                        .collect::<SmallSet<_>>()
+                        .into_iter()
+                        .collect();
+                    let conditions = semantic_value!(
+                        prepare_configured_attribute_conditions(
+                            ctx,
+                            mode,
+                            workspace,
+                            configuration,
+                            selector_labels,
+                        )
+                        .await
+                    );
+                    label = match resolve_configured_attribute(actual, &conditions.values) {
+                        Ok(CoercedAttributeValue::Label(selected)) => selected,
+                        Ok(_) => {
+                            return analysis_semantic_complete(Err(AnalysisError::message(
+                                "native alias actual must resolve to a label",
+                            )));
+                        }
+                        Err(error) => {
+                            return analysis_semantic_complete(Err(AnalysisError::message(
+                                format!("resolving native alias actual: {error}"),
+                            )));
+                        }
+                    };
+                }
+                _ => {
+                    return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                        "target {requested} is not a config_setting"
+                    ))));
+                }
+            }
+        }
+    })
+}
+
 async fn compute_configured_condition(
     ctx: &mut DiceComputations<'_>,
     key: &ConfiguredConditionKey,
 ) -> AnalysisSemanticOutcome<ConfiguredConditionMatch> {
-    let package_inventory = match compute_configured_package_input(
-        ctx,
-        ConfiguredAnalysisMode::Observed,
-        key.workspace.dupe(),
-        key.target.label().package().clone(),
-        "loading config_setting target package through DICE",
-    )
-    .await
-    {
-        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
-        LoadingPreparationOutcome::Complete(Err(error)) => {
-            return LoadingPreparationOutcome::Complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
-            return analysis_semantic_complete(Err(error));
-        }
-        LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
-    };
+    let (selected, package_inventory) = semantic_value!(
+        resolve_configured_condition_target(
+            ctx,
+            ConfiguredAnalysisMode::Observed,
+            &key.workspace,
+            key.target.configuration(),
+            key.target.label(),
+        )
+        .await
+    );
     let package = match package_inventory.loaded() {
         Ok(package) => package,
         Err(error) => return analysis_semantic_complete(Err(package_inventory_error(error))),
@@ -917,10 +1016,10 @@ async fn compute_configured_condition(
     let Some(target) = package
         .targets
         .iter()
-        .find(|target| target.name == key.target.label().target().as_str())
+        .find(|target| target.name == selected.target().as_str())
     else {
         return analysis_semantic_complete(Err(AnalysisError::target_not_found(
-            key.target.label().clone(),
+            selected.clone(),
             package.build_file.clone(),
         )));
     };
@@ -1263,30 +1362,26 @@ async fn load_configured_condition_declarations(
     labels: Vec<CanonicalLabel>,
     truth: &SmallMap<CanonicalLabel, bool>,
 ) -> AnalysisSemanticOutcome<PreparedConfiguredConditions> {
-    let packages = labels
-        .iter()
-        .map(|label| label.package().clone())
-        .collect::<SmallSet<_>>();
     let outcomes = ctx
-        .compute_join(packages, |ctx, package| {
+        .compute_join(labels.iter().cloned(), |ctx, label| {
             Box::pin(async move {
-                let outcome = compute_configured_package_input(
+                let outcome = resolve_configured_condition_target(
                     ctx,
                     mode,
-                    workspace.dupe(),
-                    package.clone(),
-                    "loading configured selector declaration through DICE",
+                    workspace,
+                    configuration,
+                    &label,
                 )
                 .await;
-                (package, outcome)
+                (label, outcome)
             })
         })
         .await;
     let mut all_need: Option<LoadingPreparationNeeds> = None;
     let mut first_outer = None;
     let mut first_error = None;
-    let mut loaded_packages = Vec::with_capacity(outcomes.len());
-    for (package, outcome) in outcomes {
+    let mut resolved = Vec::with_capacity(outcomes.len());
+    for (label, outcome) in outcomes {
         match outcome {
             LoadingPreparationOutcome::Need(need) => {
                 all_need = Some(match all_need {
@@ -1308,8 +1403,8 @@ async fn load_configured_condition_declarations(
                     first_error = Some(error);
                 }
             }
-            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => {
-                loaded_packages.push((package, value))
+            LoadingPreparationOutcome::Complete(Ok(Ok((selected, inventory)))) => {
+                resolved.push((label, selected, inventory));
             }
         }
     }
@@ -1324,13 +1419,7 @@ async fn load_configured_condition_declarations(
     }
 
     let mut conditions = Vec::with_capacity(labels.len());
-    for label in labels {
-        let Some((_, inventory)) = loaded_packages
-            .iter()
-            .find(|(package, _)| package == label.package())
-        else {
-            unreachable!("every selector package completed")
-        };
+    for (label, selected, inventory) in resolved {
         let loaded = match inventory.loaded() {
             Ok(loaded) => loaded,
             Err(error) => return analysis_semantic_complete(Err(package_inventory_error(error))),
@@ -1338,10 +1427,10 @@ async fn load_configured_condition_declarations(
         let Some(target) = loaded
             .targets
             .iter()
-            .find(|target| target.name == label.target().as_str())
+            .find(|target| target.name == selected.target().as_str())
         else {
             return analysis_semantic_complete(Err(AnalysisError::target_not_found(
-                label,
+                selected,
                 loaded.build_file.clone(),
             )));
         };
