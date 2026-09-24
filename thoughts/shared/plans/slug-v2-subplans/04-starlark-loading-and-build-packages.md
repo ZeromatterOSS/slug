@@ -9423,3 +9423,30 @@ source/route observations continue to own DICE invalidation; no retained
 key, call field, cache or lock was added. Rust source lookup and diagnostics
 are Slug-native. Apple provider breadth, repository materialization,
 configured Swift and M7A close remain deferred.
+
+### Apple platform loading structs accepted (2026-09-24)
+
+WP811 admits `apple_common.platform` during ordinary and Bzlmod `.bzl`
+loading as the ten-member ordinary Starlark struct in Bazel 9.2's active
+`builtins_bzl/common/objc/apple_platform.bzl`, not the parallel Java
+`ApplePlatform` migration enum. Each member has the source-defined `name`,
+`name_in_plist`, `platform_type` and `is_device` fields. The existing
+`AllocStruct` provides structural equality, hashability, reconstructed-key
+lookup and attribute discovery; macOS and Catalyst remain distinct despite
+sharing plist text. A frozen namespace child lives on the same globals heap
+as the Apple facade and survives module freeze. No DICE key, new value type,
+cache, lock or configured Apple owner was added.
+
+Pinned Bazel source and an offline query oracle establish the ten-field
+namespace and four-field values; three focused/protected Slug tests pass,
+including the authenticated rules_swift nine-entry load-time table and
+post-globals-drop access. Bazel's struct `repr` sorts and spaces fields,
+whereas the generic Rust Starlark struct prints insertion order without
+those spaces. Namespace/value `repr`, `str` and derived formatting are
+explicitly Slug-native; numeric hash bytes and text-derived build outputs
+are not exact claims. The rebuilt authentic build clears the former
+`apple_common.platform` failure and reaches a separate
+`configuration_field(fragment = "apple", name = "xcode_config_label")`
+error in `@@rules_swift+//swift/toolchains:xcode_swift_toolchain.bzl:970`.
+The remaining outer Apple facade, Xcode/toolchain/configuration behavior,
+repository materialization, configured Swift and M7A close remain deferred.

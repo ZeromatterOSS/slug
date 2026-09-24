@@ -1,167 +1,157 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-110-m7a-module-extension-label-caller-context-r1
+Packet: WP-7-111-m7a-apple-common-platform-struct-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit `Label()` in a loaded `.bzl` function invoked by a selected Bzlmod
-module extension, including a transitive imported helper. Authenticated
-rules_swift 3.1.2 `swift/extensions.bzl:17-21` calls its imported
-`swift/repositories.bzl:112-121` helper, which supplies
-`Label('//third_party:com_github_apple_swift_protobuf/BUILD.overlay')` as
-`http_archive(build_file = ...)`. This must resolve in the rules_swift
-repository from the helper's defining `.bzl` module, not the extension
-entrypoint, root module or generated repository. The rebuilt normalized-PATH
-authentic `slug build //:probe` must pass the current top-level-only
-`Label()` error at toolchain registration row 56; a later independently
-typed stop is acceptable. HTTP archive execution, Swift toolchain semantics,
-target success and M7A close are not claimed.
+Admit the load-time `apple_common.platform` struct and its platform-value
+structs in ordinary and Bzlmod-loaded `.bzl` files. Authenticated
+rules_swift 3.1.2 `swift/internal/target_triples.bzl:20-30` eagerly reads
+nine members into a dict while loading registration-row-56 toolchain Bzl.
+The rebuilt authentic `slug build //:probe` must clear the current
+`apple_common.platform` absence in that file; a later independently typed
+stop is acceptable. Configured Apple/Xcode or Swift behavior, toolchain
+selection, repository materialization and M7A close are not claimed.
 
-Exact Bazel 9.2 slice: during a loaded `.bzl` function call from a selected
-module-extension implementation, `Label(string)` uses the innermost
-executing `.bzl` module's package and repository mapping; an existing Label
-input is returned unchanged even without source-context lookup. Relative
-`:`, same-repository `//`, apparent `@` and canonical `@@` forms retain their
-already admitted Label grammar.
-Slug-native: the existing `BzlLoadManifest`/`BzlEvaluationContext` Rust
-source carrier, lexical Starlark source lookup, DICE observation equality and
-error text. Unsupported/deferred: direct MODULE or non-`.bzl` invocation
-contexts, unmanifested source frames, broader module-extension effects,
-repository materialization and configured Swift behavior.
+Exact Bazel 9.2 slice: `apple_common.platform` is a struct containing ten
+members, including `catalyst`; each member is a hashable ordinary struct
+with `name`, `name_in_plist`, `platform_type` and `is_device` fields matching
+the pinned builtins table. Their type, structural equality, hashability
+and equivalent dict-key lookup (not numeric hash bytes), and
+`dir`/`getattr` surface match the focused oracle. The `macos` and
+`catalyst` values remain distinct despite sharing plist name `MacOSX`.
+Direct BUILD files do not gain the `apple_common` global. Slug-native:
+the deliberately restricted outer Apple facade, diagnostic wording and
+the existing Rust Starlark namespace/value struct stringification
+(`repr`, `str` and formatting derived from them), including field
+order/spacing;
+unsupported/deferred: its other absent members including
+`apple_common.platform_type`, Apple configuration/Xcode operations,
+toolchain methods, configured Swift and cross-evaluator pointer identity.
+Platform-text-derived build output or semantic use also remains deferred.
+No Java or Bazel runtime enters Slug.
 
 ## Source, owner and decision
 
-Pinned Bazel 9.2 `StarlarkRuleClassFunctions.java:2121-2140` passes an
-existing Label through before context lookup, then selects the innermost
-calling `.bzl` module for a string. `BazelModuleContext.java:163-185,206-208`
-supplies that module context or fails. `Label.java:210-245` resolves source
-repository/package and apparent
-mapping, with canonical spelling bypassing mapping;
-`ModuleExtensionResolutionTest.java:740-792` checks Label construction in
-module-extension invocation with its repository mapping. The authenticated
-rules_swift source is the selected case, but its entrypoint and imported
-helper share package `swift` and its `//third_party` label cannot alone
-discriminate wrong source selection. An offline Bazel 9.2 scratch oracle at
-`/tmp/slug-wp810-imported-label-Lc6aZI` imports a helper from a different
-repository/package with its own `@alias` mapping. Two fresh output bases
-query the generated BUILD: the helper produces
-`@@producer+//owner:local`, `@@producer+//third_party:overlay` and
-`@@dep+//mapped:target`, while direct entrypoint `Label(':caller')` produces
-`@@//ext:caller`. Direct `Label()` in BUILD and MODULE is unbound in
-separate negative queries. Scratch stays outside this checkout and proves
-no downstream Slug repository effects or configured Swift semantics.
+Pinned Bazel 9.2 HEAD `8220c6198837d5c13d53fea211cf3282aa12408a`
+owns the observed representation in
+`src/main/starlark/builtins_bzl/common/objc/apple_platform.bzl:47-66`
+and `apple_common.bzl:18-40`, exported by `bazel/exports.bzl:19,50`.
+The parallel `ApplePlatform.java` enum is a migration duplicate, not the
+Starlark value seen by the oracle. The authenticated cached rules_swift
+`swift/internal/target_triples.bzl` SHA-256 is
+`fd276e157ed241d5d704c659b53a5863d00a721f406465a1d539b8028a7edf43`.
+Its later `.name_in_plist` use in
+`swift/toolchains/xcode_swift_toolchain.bzl:127` is outside this
+load-time acceptance.
 
-`app/slug_loading_v2/src/starlark_label.rs::Label` and its resolver already
-own grammar, idempotence and source-specific mapping. The selected
-`module_extension.rs` invocation currently installs
-`module_extension_repository_rule::RepositoryRuleInvocationState` as the
-evaluator extra, so the existing `BzlEvaluationContext::from_evaluator`
-cannot see the already reacquired `FrozenBzlModule.manifest`, and fallback
-`PackageRecorder` reports the top-level-only error. Nest a manifest-derived
-`BzlEvaluationContext` in that invocation-only state, then add a dedicated
-extension-state branch only in `starlark_label.rs::Label` to obtain its
-source identity. Do not expose this context through generic
-`BzlEvaluationContext::from_evaluator`: doing so would admit unrelated
-Bzl-only declarations and constructors in extension execution. Reuse the
-existing `source_identity_for_call` and `resolve_label` methods unchanged.
-Require an actual `.bzl` caller frame before using the extension-runtime
-context for a string; the existing context resolver otherwise defaults to
-its root source when no filename exists. Direct `Label()` inside the
-extension implementation's
-loaded `.bzl` function is valid, while no-frame native callbacks remain
-outside the admitted string slice. Wire both selected-owner retries and the
-pure preflight invocation route, carrying the reacquired manifest through
-`PurePreflight` as invocation scratch. Do not
-derive package/mapping from the extension root label, call-site location,
-root module or filesystem, and do not add a new resolver, DICE key, retained
-call projection, mutable global context or lock. The existing recursive
-manifest source digests/mappings and selected-owner observed source/route
-dependencies own source changes, Need/error, retry and A/B/A restoration;
-the context is synchronous evaluator scratch and drops before DICE awaits.
-The pure-preflight manifest clone is immutable transfer-owned async scratch
-from the already retained Arc-backed carrier: it may span preflight awaits,
-but never evaluator execution across an await or publication in a new DICE
-value. The accepted repository-rule Label runtime-context pattern in Stage 4
-is the precedent, not a donor fallback.
-Manifest cloning shares its reachable/direct-child Arc slices; the existing
-context constructor copies one flat source-filename table in
-O(reachable sources) per invocation attempt and drops it with the evaluator,
-rather than retaining a parallel index or scanning the filesystem.
+A fresh offline Bazel 9.2 scratch oracle at
+`/tmp/slug-wp811-apple-platform` ran with ignored RCs and disabled
+repository downloads. Its positive `query --output=xml //:proof` exits 0:
+all nine Swift-consumed values have `type=struct`, the `ios_device` repr is
+`struct(is_device = True, name = "ios_device", name_in_plist = "iPhoneOS", platform_type = "ios")`,
+ten namespace members include `catalyst`, reconstructed same-field structs
+compare equal and retrieve the same dict key, while distinct members do
+not compare equal. Separate invalid namespace and member queries exit 7
+and list their respective allowed fields. This discriminates a string or
+Java-enum-like placeholder from the actual source-defined struct. Scratch
+remains outside this checkout and proves no configured Swift behavior.
+Slug's existing `AllocStruct` prints that value as
+`struct(name="ios_device", name_in_plist="iPhoneOS", platform_type="ios", is_device=True)`;
+the generic formatter's insertion order and spacing are a recorded
+Slug-native stringification difference, not an exact text claim. Changing
+the shared Starlark formatter or inventing a one-off platform type is
+outside this packet. A later consumer requiring exact platform text remains
+deferred and must be separately evidenced.
+
+`app/slug_loading_v2/src/apple_common.rs` is the sole production owner.
+Extend its existing Bzl-only global with one `FrozenValue` for the platform
+namespace allocated on the same `GlobalsBuilder` frozen heap. Build the ten
+members with the existing Starlark `AllocStruct` representation and source
+table, and return the same namespace value for repeated access within a
+globals instance. This avoids a new value type, registry, semantic key,
+cache, lock or manual hash/equality algorithm. The ordinary Bzl and Bzlmod
+global routes share the existing installation; the direct BUILD route
+remains unchanged. The fixed eleven-struct allocation is globals-instance
+memory; a loaded Bzl may retain a value through its already owned frozen
+module. Existing Bzl source manifests and DICE observations own source
+identity, errors, invalidation and A/B/A restoration; no new semantic input
+or retained projection is introduced. The current facade's provider tokens
+and opaque `apple_toolchain()` behavior remain untouched.
+
+The child is a `FrozenValue`, not a live `Value<'v>` requiring GC tracing.
+Allocate the child on `GlobalsBuilder::frozen_heap` before installing the
+`AppleCommon` wrapper on that same heap; `Globals::build` retains the heap
+and module evaluation keeps it reachable after the temporary globals object
+drops. The existing `TestingModule` and `CoverageCommonModule` in
+`testing_bootstrap.rs:122-173` use the same frozen-child
+`starlark_simple_value!` pattern. Do not store a live evaluator-heap value
+in the wrapper. Test repeated `platform` access and use after freezing and
+dropping the globals source; if that pattern cannot safely satisfy the
+Starlark lifetime contract, choose a bounded traced/frozen complex carrier
+within this owner rather than a cross-heap reference.
 
 ## Evidence and validation
 
-Add a focused invocation test with a root entrypoint `.bzl` and an imported
-helper in another repository/package with a deliberately different `@alias`
-mapping; have the helper call `Label()` for `:`, `//`, apparent and canonical
-labels and pass typed results to a repository-rule call record. Assert the
-helper's defining package/mapping, Label-input
-idempotence, ordered records and no successful owner publication on invalid
-mapping or an unmanifested caller; a diagnostic `current_calls` prefix may
-remain after a later error. Include a no-frame string fail-closed control.
-In the selected owner DICE route, mutate the loaded helper source A/B/A and
-assert call identity/restoration;
-cover the pure preflight route if the selected test does not execute it.
-Reuse the accepted repository-rule Label context evidence and existing
-module-extension source fixtures; add a new Stage 1 fixture only for a
-demonstrated gap. Compile Loading library tests with pinned Cargo JSON
-`--no-run`, preflight exact nonignored selectors, run selected tests serially,
-rebuild `slug_cli_v2` before the authentic smoke and check/clean `slugd`
-before and after. Run format, archive, diff and plan-status checks; obtain
-independent DESIGN and FINAL reviews. No broad suite or remote-service gate
-is selected, and no `~/.bazelrc` contents, BuildBuddy credentials,
-NativeLink or remote transport enter this Loading packet.
+Update the colocated `apple_common.rs` protected test that currently
+requires `platform` to be absent. Add a source-shaped loading test that
+constructs the nine-entry dict, checks `dir`/`getattr`, all ten four-field
+values and exact type/Slug-native repr, structural equality and reconstructed-key
+lookup, including the macOS/Catalyst discriminator. Freeze the module and
+check the values survive. Keep negative tests for unknown namespace/member,
+calling the namespace/value, direct BUILD global absence, and still-absent
+outer members (`platform_type`, configured methods). Reuse the existing
+provider-identity test; add a Stage 1 fixture only for a demonstrated
+oracle-reproduction gap. Compile the Loading library tests with pinned
+Cargo JSON `--no-run`, preflight exact nonignored selectors, run them
+serially, rebuild `slug_cli_v2` before authentic smoke, and check/clean
+`slugd` before and after. Run format, archive, diff and plan-status checks
+and independent DESIGN/FINAL reviews. No broad suite or remote-service gate
+is selected, and no `~/.bazelrc` contents, BuildBuddy credential,
+NativeLink or remote transport enters this Loading packet.
 
 ## Scope and stops
 
-Base clean main `1171116a5`. Allowlist: this manifest and canonical Current
-paragraph; Stage 4 module-extension Label owner contract after acceptance;
-production `app/slug_loading_v2/src/module_extension_repository_rule.rs`,
-`app/slug_loading_v2/src/module_extension.rs` and
-`app/slug_loading_v2/src/starlark_label.rs`; focused tests in those modules,
-including new `app/slug_loading_v2/src/module_extension_label_tests.rs`.
-Production growth under
-roughly 45 lines and proof under roughly 180 lines are review triggers, not
-permission ceilings. REPLAN if Bazel binds Label to extension entrypoint
-rather than the innermost imported function, the manifest lacks that
-function's source/mapping, selected replay cannot authenticate its source,
-new retained semantic identity is required, or the authentic stop cannot
-clear without unrelated repository effects.
+Base clean main `4272bd781`. Allowlist: this manifest and canonical Current
+paragraph; Stage 4 Apple facade owner contract after acceptance; production
+and focused tests in `app/slug_loading_v2/src/apple_common.rs` only.
+Approximate production/proof growth of 60/100 lines is a review trigger,
+not a permission ceiling. The existing globals and Apple facade stay
+cohesive; do not split them for this fixed constant table. REPLAN if the
+actual Bazel value is not a Starlark struct, `AllocStruct` cannot preserve
+the admitted hash/equality surface, the cached namespace needs a new
+retained owner, or clearing the authentic stop requires configured Apple
+semantics. Do not paper over a new independent stop.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviews each returned ACCEPT. Pinned Bazel 9.2
-source and two fresh offline output bases at
-`/tmp/slug-wp810-imported-label-Lc6aZI` establish imported-helper package,
-repository and apparent mapping. The final pinned-nightly Cargo JSON Loading
-library `--no-run` succeeds with zero compiler errors; selector preflight
-verifies six exact nonignored tests and all six pass serially (four WP810,
-two protected). The selected-owner test changes the imported helper source
-A/B/A in one DICE graph and proves receipt equality/restoration; the pure
-route has a successful typed Label receipt and a failed mapping terminal
-without a successful invocation publication. Formatting, diff, archive,
-plan-status and pre/post-smoke `slugd` checks pass.
-The proof exceeds the packet's approximate 180-line review trigger because
-it separately exercises direct imported-source context, pure preflight and
-selected-owner invalidation; all three independent FINAL reviews accepted
-that scope.
+Independent DESIGN and FINAL reviews returned ACCEPT after the structural
+versus text-class correction. The Bazel 9.2 offline scratch oracle at
+`/tmp/slug-wp811-apple-platform` distinguishes ordinary struct values,
+four-field contents, structural equality/hashable key lookup and ten-member
+attribute discovery from a Java-enum or string placeholder. The final
+pinned-nightly Cargo JSON Loading library `--no-run` succeeds with zero
+compiler errors (about 4.4 seconds); preflight verifies three exact
+nonignored tests and all three pass serially in under one second. The
+source-shaped test uses nine Swift table keys, checks all ten platform
+values, same-instance namespace reuse, macOS/Catalyst distinction and
+post-globals-drop frozen access. Protected facade/provider negatives pass.
 
-The CLI was rebuilt with `cargo build -p slug_cli_v2` before the normalized-
-PATH authentic one-shot smoke. That smoke clears the prior rules_swift
-registration-row-56 `Label()` error and stops later at
-`@@rules_swift+//swift/internal:target_triples.bzl:21` because
-`apple_common.platform` is absent. This is a separate Loading surface, not
-proof of configured Swift or repository materialization. The focused test
-run is under one second; the final JSON compile took about seven seconds
-and the CLI rebuild about sixteen seconds. The packet took roughly eighteen
-minutes elapsed including design review, implementation and final review.
-No remote transport or credentials were used.
+The CLI rebuild succeeds before the normalized-PATH authentic one-shot
+smoke. That smoke clears `apple_common.platform` at row 56 and stops at
+`@@rules_swift+//swift/toolchains:xcode_swift_toolchain.bzl:970` on
+`configuration_field(name = "xcode_config_label", fragment = "apple")`.
+This is a separate Loading surface, not configured Apple or Swift parity.
+Format, diff, archive, plan-status and pre/post-smoke `slugd` hygiene checks
+pass. Packet research/design, implementation and review took roughly
+twenty minutes elapsed. No remote transport or credentials were used.
 
 ## Immediate predecessor
 
-WP809 accepted at `1171116a5`: frozen top-level `.bzl` two-part
-string-list selectors now reuse the ordered BUILD-attribute coercer under a
-frozen-only kind/nested-value gate. Five focused tests and the rebuilt
-authentic smoke passed its Kotlin stop and reached this independent
-rules_swift `Label()` module-extension context error at registration row 56.
-M7A remains partial.
+WP810 accepted at `4272bd781`: extension-invoked loaded `.bzl` functions
+now resolve `Label()` against their own manifest-authenticated source,
+including imported helpers. Six focused/protected tests and independent
+reviews pass; the rebuilt authentic smoke clears the row-56 `Label()` error
+and reaches this separate `apple_common.platform` absence. M7A remains
+partial.

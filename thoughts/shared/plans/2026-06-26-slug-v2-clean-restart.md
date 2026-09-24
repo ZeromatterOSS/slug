@@ -29,20 +29,21 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-110-m7a-module-extension-label-caller-context-r1
+Packet: WP-7-111-m7a-apple-common-platform-struct-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP810 admits `Label()` in a loaded `.bzl` function invoked by a Bzlmod
-module extension, including a transitive imported helper. Pinned Bazel 9.2
-source and a two-base cross-repository oracle establish the innermost
-executing `.bzl` module's package and mapping. Slug now uses the reacquired
-recursive Bzl manifest for a Label-only invocation context; unrelated
-`.bzl`-only APIs remain closed. Six focused/protected tests and independent
-final reviews pass. The rebuilt authentic build clears rules_swift's prior
-registration-row-56 `Label()` error and reaches an independent
-`apple_common.platform` absence in `swift/internal:target_triples.bzl:21`.
-Repository materialization, configured Swift and M7A close remain deferred.
-WP809 is accepted at `1171116a5`.
+WP811 admits the load-time `apple_common.platform` struct demanded by
+authenticated rules_swift 3.1.2 at registration row 56. Pinned Bazel 9.2
+builtins source and an offline oracle establish ten structural, hashable
+platform values, nine read eagerly by `target_triples.bzl`. The bounded
+Apple facade extension uses existing Starlark structs; their generic text
+formatting is explicitly Slug-native. Three focused/protected tests and
+independent final reviews pass. The rebuilt authentic smoke clears the old
+platform absence and reaches a separate
+`configuration_field(fragment = "apple")` error at
+`swift/toolchains:xcode_swift_toolchain.bzl:970`. Apple configuration, Xcode,
+configured Swift and M7A close remain deferred. WP810 was accepted at
+`4272bd781`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
