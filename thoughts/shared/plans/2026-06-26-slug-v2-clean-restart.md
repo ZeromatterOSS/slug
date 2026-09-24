@@ -29,17 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-127-m7a-native-kwargs-none-boolean-r1
+Packet: WP-7-128-m7a-builtin-jdk-source-catalog-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP827 admits Bazel 9.2 Loading/ordinary Query semantics for validated
-native RuleClass kwargs: direct None is omission, while Boolean attrs accept
-`False`/`True` and integer `0`/`1`. The authentic protobuf PHP path passes
-integer 1 to `native.filegroup(testonly=...)`; pinned source, an
-ignored-RC/no-fetch filegroup/alias oracle and 13 focused/protected tests
-support this slice. The rebuilt replay clears protobuf.bzl:729 and next
-stops at missing `@@bazel_tools//tools/jdk` BUILD content. Configured native
-test policy remains deferred. Accepted WP826 at `de50a3a9b` was the
+WP828 ports the exact 13-file Bazel 9.2 runtime `@@bazel_tools//tools/jdk`
+source subtree into Stage 5's immutable catalog. The runtime BUILD comes
+from upstream `BUILD.tools`, not source-tree `BUILD`; all entries are
+non-executable. Independent reviews ACCEPTED 5 catalog and 6 protected tests,
+the 13-file Bazel Rustc input closure, parent filegroup build, and authentic
+replay clearing the missing BUILD stop. Full Bazel Rust build hit its 180-second
+cap and remains unproved. The next distinct Loading stop is Java's `launcher`
+configuration field in `launcher_flag_alias.bzl`; package evaluation and
+configured JDK remain deferred. Accepted WP827 at `ff9e3ee45` is the
 immediate predecessor; M7A is partial.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

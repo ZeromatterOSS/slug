@@ -291,6 +291,71 @@ const FILES: &[(&str, &str, bool)] = &[
         false,
     ),
     (
+        "tools/jdk/BUILD",
+        "0ea0dae7e42fdfb3f2fbe945fae3e84e57e263ac6affd4dc6a74b351868832a6",
+        false,
+    ),
+    (
+        "tools/jdk/BUILD.java_tools",
+        "dffe53e6c4c3445fdcf14965ffdd104f439727185c34cfe7c3f9c6ea9b4f116a",
+        false,
+    ),
+    (
+        "tools/jdk/BUILD.java_tools_prebuilt",
+        "aebb48b76036e56140be4559504d5b3f8ca054ab673eff08ba1ba4d73f38c42e",
+        false,
+    ),
+    (
+        "tools/jdk/default_java_toolchain.bzl",
+        "94baf15d9c6998411a211630cc56a421b6d4b99415850b422be0371e431443fb",
+        false,
+    ),
+    (
+        "tools/jdk/java_toolchain_alias.bzl",
+        "96f7baca9fc31f01ebe780d3e94169b57542424f3a851215348565935e6cfaee",
+        false,
+    ),
+    (
+        "tools/jdk/launcher_flag_alias.bzl",
+        "9c4f1a4656abb69476f0b1f3f39c06a28d7115342ee65598285e208d67a8c545",
+        false,
+    ),
+    (
+        "tools/jdk/local_java_repository.bzl",
+        "0fb433f59ccc627f52313c12e8ea0607bc5539ddee98f310decaf787b1024c76",
+        false,
+    ),
+    (
+        "tools/jdk/nosystemjdk/README",
+        "1df3fa40d06cd46928f7b7046d47eca8a278b38034e87946685d4492a1cf4ba8",
+        false,
+    ),
+    (
+        "tools/jdk/proguard_allowlister.py",
+        "665481fd85cf41360680b9b7b1c136eb9eee56132f936f0e983bb51f54560bcb",
+        false,
+    ),
+    (
+        "tools/jdk/proguard_allowlister_test.py",
+        "433ad2fb428f361523915a8c94c97ea6963e906a9b9ee708356249fdc9adb1d6",
+        false,
+    ),
+    (
+        "tools/jdk/proguard_allowlister_test_input.pgcfg",
+        "cdcee843bedc114f941a3eed56938e4c8c1ec82a576ef857a188da90d3e021b3",
+        false,
+    ),
+    (
+        "tools/jdk/remote_java_repository.bzl",
+        "ae5ca42c5d33cfb988221e578273f53f83846786296a488604c6877cb4217f88",
+        false,
+    ),
+    (
+        "tools/jdk/toolchain_utils.bzl",
+        "f8979c720fcdc1cb62fbf184aa6e667abc1343fdc22302c7d37c329f6d0b7b09",
+        false,
+    ),
+    (
         "tools/launcher/BUILD",
         "aa1b943956b6a7c3044f73583f5bc972bfc658607f7a3b745d51c7e7d016aab7",
         false,
@@ -380,6 +445,19 @@ async fn exact_catalog_bytes_digests_and_archive_modes_are_owned() {
 }
 
 #[tokio::test]
+async fn runtime_jdk_build_uses_build_tools_bytes_not_source_tree_wrapper() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let build = read(&dice, "tools/jdk/BUILD").await.unwrap();
+    assert_eq!(build.bytes().len(), 5_438);
+    // Bazel 9.2.0 source-tree tools/jdk/BUILD is an 864-byte packaging manifest;
+    // embedded_tools instead renames tools/jdk/BUILD.tools to this runtime path.
+    assert_ne!(
+        hex::encode(build.sha256()),
+        "718a647c5763ccb0f370aa1b2526c6e387168ba0fba91d19e8ba163732dbe373"
+    );
+}
+
+#[tokio::test]
 async fn invalid_wrong_kind_and_unsupported_catalog_are_distinct() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     for path in [
@@ -415,6 +493,19 @@ async fn invalid_wrong_kind_and_unsupported_catalog_are_distinct() {
             ..
         })
     ));
+    assert!(matches!(
+        read(&dice, "tools/jdk").await,
+        Err(BuiltinBazelToolsSourceFileError::WrongKind {
+            actual: BuiltinBazelToolsSourceKind::Directory,
+            ..
+        })
+    ));
+    for path in ["tools/jdk/BUILD.tools", "tools/jdk/not-in-archive.bzl"] {
+        assert!(matches!(
+            read(&dice, path).await,
+            Err(BuiltinBazelToolsSourceFileError::UnsupportedCatalog { .. })
+        ));
+    }
     for path in [
         "tools/cpp/modules_tools/aggregate-ddi.exe",
         "tools/cpp/modules_tools/generate-modmap.exe",
@@ -463,9 +554,9 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
         if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-            "77d037eb62f01ada4046310894bd00bd784480a0c8bebbcfeb46127e469711a7"
+            "a68101afc04f6c48b65f432975245b69b3873792ca2a339b0375a59705e8b655"
         } else {
-            "d614eabb9f52bb03a0c51a96cc942c8dadb669929b18a9338ae7286d23d6fa40"
+            "de2a4424c8a43911b76ba2875446a30a40560af64cb4782cc582d1d3bbdaad7e"
         }
     );
 }
@@ -489,6 +580,7 @@ fn embedded_catalog_paths_remain_exact_with_bazel_input_metadata() {
         "tools/build_defs/repo/BUILD.bazel",
         "tools/cpp/BUILD.bazel",
         "tools/cpp/modules_tools/BUILD.bazel",
+        "tools/jdk/BUILD.bazel",
         "tools/launcher/BUILD.bazel",
         "tools/res/BUILD.bazel",
         "tools/test/BUILD.bazel",

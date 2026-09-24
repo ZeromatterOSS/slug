@@ -442,6 +442,86 @@ const CATALOG: &[CatalogEntry] = &[
         executable: false,
     },
     CatalogEntry {
+        path: "tools/jdk/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/BUILD"),
+        expected_sha256: "0ea0dae7e42fdfb3f2fbe945fae3e84e57e263ac6affd4dc6a74b351868832a6",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/BUILD.java_tools",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/BUILD.java_tools"),
+        expected_sha256: "dffe53e6c4c3445fdcf14965ffdd104f439727185c34cfe7c3f9c6ea9b4f116a",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/BUILD.java_tools_prebuilt",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/BUILD.java_tools_prebuilt"),
+        expected_sha256: "aebb48b76036e56140be4559504d5b3f8ca054ab673eff08ba1ba4d73f38c42e",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/default_java_toolchain.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/default_java_toolchain.bzl"),
+        expected_sha256: "94baf15d9c6998411a211630cc56a421b6d4b99415850b422be0371e431443fb",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/java_toolchain_alias.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/java_toolchain_alias.bzl"),
+        expected_sha256: "96f7baca9fc31f01ebe780d3e94169b57542424f3a851215348565935e6cfaee",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/launcher_flag_alias.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/launcher_flag_alias.bzl"),
+        expected_sha256: "9c4f1a4656abb69476f0b1f3f39c06a28d7115342ee65598285e208d67a8c545",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/local_java_repository.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/local_java_repository.bzl"),
+        expected_sha256: "0fb433f59ccc627f52313c12e8ea0607bc5539ddee98f310decaf787b1024c76",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/nosystemjdk/README",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/nosystemjdk/README"),
+        expected_sha256: "1df3fa40d06cd46928f7b7046d47eca8a278b38034e87946685d4492a1cf4ba8",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/proguard_allowlister.py",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/proguard_allowlister.py"),
+        expected_sha256: "665481fd85cf41360680b9b7b1c136eb9eee56132f936f0e983bb51f54560bcb",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/proguard_allowlister_test.py",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/proguard_allowlister_test.py"),
+        expected_sha256: "433ad2fb428f361523915a8c94c97ea6963e906a9b9ee708356249fdc9adb1d6",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/proguard_allowlister_test_input.pgcfg",
+        bytes: include_bytes!(
+            "../builtin/bazel_tools/tools/jdk/proguard_allowlister_test_input.pgcfg"
+        ),
+        expected_sha256: "cdcee843bedc114f941a3eed56938e4c8c1ec82a576ef857a188da90d3e021b3",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/remote_java_repository.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/remote_java_repository.bzl"),
+        expected_sha256: "ae5ca42c5d33cfb988221e578273f53f83846786296a488604c6877cb4217f88",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/jdk/toolchain_utils.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/toolchain_utils.bzl"),
+        expected_sha256: "f8979c720fcdc1cb62fbf184aa6e667abc1343fdc22302c7d37c329f6d0b7b09",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/launcher/BUILD",
         bytes: include_bytes!("../builtin/bazel_tools/tools/launcher/BUILD"),
         expected_sha256: "aa1b943956b6a7c3044f73583f5bc972bfc658607f7a3b745d51c7e7d016aab7",
@@ -1050,6 +1130,7 @@ mod tests {
                 ("build_defs".to_owned(), PathDirectoryEntryKind::Directory),
                 ("build_defs.bzl".to_owned(), PathDirectoryEntryKind::File),
                 ("cpp".to_owned(), PathDirectoryEntryKind::Directory),
+                ("jdk".to_owned(), PathDirectoryEntryKind::Directory),
                 ("launcher".to_owned(), PathDirectoryEntryKind::Directory),
                 ("osx".to_owned(), PathDirectoryEntryKind::Directory),
                 ("res".to_owned(), PathDirectoryEntryKind::Directory),
@@ -1127,6 +1208,58 @@ mod tests {
         assert_eq!(
             listing_rows("tools/cpp/modules_tools"),
             [("BUILD".to_owned(), PathDirectoryEntryKind::File)]
+        );
+        assert_eq!(
+            listing_rows("tools/jdk"),
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("BUILD.java_tools".to_owned(), PathDirectoryEntryKind::File),
+                (
+                    "BUILD.java_tools_prebuilt".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+                (
+                    "default_java_toolchain.bzl".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+                (
+                    "java_toolchain_alias.bzl".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+                (
+                    "launcher_flag_alias.bzl".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+                (
+                    "local_java_repository.bzl".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+                ("nosystemjdk".to_owned(), PathDirectoryEntryKind::Directory),
+                (
+                    "proguard_allowlister.py".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+                (
+                    "proguard_allowlister_test.py".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+                (
+                    "proguard_allowlister_test_input.pgcfg".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+                (
+                    "remote_java_repository.bzl".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+                (
+                    "toolchain_utils.bzl".to_owned(),
+                    PathDirectoryEntryKind::File
+                ),
+            ]
+        );
+        assert_eq!(
+            listing_rows("tools/jdk/nosystemjdk"),
+            [("README".to_owned(), PathDirectoryEntryKind::File)]
         );
         assert_eq!(
             listing_rows("tools/launcher"),
@@ -1304,9 +1437,9 @@ mod tests {
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
             if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-                "77d037eb62f01ada4046310894bd00bd784480a0c8bebbcfeb46127e469711a7"
+                "a68101afc04f6c48b65f432975245b69b3873792ca2a339b0375a59705e8b655"
             } else {
-                "d614eabb9f52bb03a0c51a96cc942c8dadb669929b18a9338ae7286d23d6fa40"
+                "de2a4424c8a43911b76ba2875446a30a40560af64cb4782cc582d1d3bbdaad7e"
             }
         );
         assert_eq!(value.module_sha256, source.sha256());

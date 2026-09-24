@@ -1,125 +1,128 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-127-m7a-native-kwargs-none-boolean-r1
+Packet: WP-7-128-m7a-builtin-jdk-source-catalog-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Clear the authenticated protobuf v33.4 `native.filegroup(testonly = 1)`
-Loading stop at `@@protobuf+//:protobuf.bzl:729`. Exact selected Bazel 9.2
-Loading slice: for a validated callable native RuleClass kwarg in Slug's
-`coerce_native_overrides` path, direct `None` leaves the attribute unset so
-its existing default and default provenance apply; a Boolean-typed kwarg
-accepts `False`/`True` and integer `0`/`1` as the same typed Boolean value,
-with concrete inputs explicitly sourced. The oracle directly covers
-`filegroup.testonly`, `alias.testonly`, and filegroup `tags`/`data` omission;
-the generic branch follows Bazel's common `AttributeProvider` and `Type`
-source, not a claim of all native rule behavior. Slug-native: existing
-diagnostic wording and unsupported native configured capabilities.
-Unsupported/deferred: direct native builtin parameters outside this kwargs
-owner, selectors for nonconfigurable `testonly`, configured filegroup
-`testonly=True`, test-policy propagation, and unprobed native rule semantics.
-Unknown/implicit/forced attribute names must not become admissible via None.
+Make the Bazel 9.2 embedded `@@bazel_tools//tools/jdk` runtime subtree a
+complete, immutable Slug source-catalog package. Exact to the pinned archive:
+the 13 file paths, bytes and executable bits; full Unix permission bits are
+not a catalog representation. Slug-native: sorted catalog-derived directory
+listings, typed source errors and domain-separated immutable DICE route
+identity. Unsupported/
+deferred: evaluating every rule in the JDK BUILD, configured JDK toolchains,
+the full `@bazel_tools` archive, Java execution, and other package families.
+The authentic `//:probe` replay must clear the missing-JDK-BUILD diagnostic;
+a later Loading stop cannot widen this packet.
 
 ## Source, owner and decision
 
-The exact BCR protobuf 33.4 release artifact's root `BUILD.bazel:763-765`
-passes integer `testonly = 1` through `protobuf.bzl:754-769,656-665` to
-`native.filegroup` at `:729-735`; the observed value is not None. Bazel 9.2
-`Type.java:379-399` and `TypeTest.java:102-134` accept only Boolean and
-integer 0/1, rejecting strings and other integers. `RuleFactory.java:283-303`
-passes native kwargs to `AttributeProvider.java:189-223,231-269`, which
-validates names, ignores direct None, then converts supplied values; missing
-values take defaults at `:281-295,376-411`. `BaseRuleClasses.java:62-69,
-245-247,297-300` owns package-default `testonly` for native rules, including
-`FilegroupRule.java:69-75`. `PackageFactoryTest.java:867-887` proves native
-filegroup omitted/testonly=0 package-default behavior. A minimal ignored-RC,
-no-fetch Bazel 9.2 oracle at `/tmp/slug-wp827-filegroup-XgygHU` proves
-direct and loaded-macro filegroup/alias 0/1/None/omission under false/true
-package defaults, non-Boolean filegroup tags/data None versus explicit [],
-and invalid 2/string/selector negatives. Authenticated protobuf query
-reports effective true and no unconfigured path from `//:probe` or protoc
-to the PHP target; this is another loaded-package breadth obstacle.
+Pinned Bazel 9.2.0 source commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` in
+`src/create_embedded_tools.py:27-30,63-87` maps `tools/jdk/BUILD.tools` to
+runtime `tools/jdk/BUILD` and drops the distinct source-tree BUILD.
+`tools/jdk/BUILD.tools:1-5,119-123` loads rules_java/rules_python and its
+local `launcher_flag_alias.bzl`, and glob-selects all six local Bzl files.
+The pinned Bazel 9.2.0 binary at the Bazelisk SHA-256 `7668a95d...c99048694`
+contains precisely 13 `embedded_tools/tools/jdk/*` entries, all regular
+0644. `BUILD` is 5,438 bytes with SHA-256
+`0ea0dae7e42fdfb3f2fbe945fae3e84e57e263ac6affd4dc6a74b351868832a6`,
+matching `BUILD.tools` upstream. Ignored-RC/no-fetch Bazel query proves the
+JDK target family and `:bzl_srcs` inclusion of all six local `.bzl` files.
+The 13-entry JDK ZIP subtree is the byte/executable-bit authority; never use the installed tree's
+extraction permissions or the legacy 9.0 sync script.
 
-`app/slug_loading_v2/src/package.rs::coerce_native_overrides` is the
-producer-owned seam used by bare and loaded-macro native calls. Resolve the
-canonical slot and callable policy before skipping None. For Boolean kind,
-coerce bool or integer 0/1 to `CoercedAttributeValue::Boolean`; reject all
-other values without Rust truthiness. Keep other kind coercion and order
-normalization unchanged. Existing `NativeTargetAttributes` stores the typed
-value and explicit/default provenance in package structural equality; its
-late package default already supplies omitted `testonly`. No new DICE key,
-lock, side registry, retained representation, schema entry or Query graph
-edge. Same-DICE A/B/A must demonstrate source and normalized value
-invalidation/restoration. The large `package.rs` remains the cohesive native
-invocation/target-publication owner; this edits only its existing coercer.
+Stage 5's `app/slug_bzlmod_v2/src/builtin_repository.rs::CATALOG` is the
+natural immutable source owner. Its catalog-derived source-key value, directory
+listing and manifest SHA-256 already provide typed missing/wrong-kind errors,
+structural route identity and source observation. Append only the exact sorted
+JDK entries and checked-in verbatim bytes under
+`app/slug_bzlmod_v2/builtin/bazel_tools/tools/jdk/`; the current snapshot
+identity changes deterministically with the expanded catalog. The runtime
+`BUILD` creates a Bazel package boundary: a separate `BUILD.bazel` sidecar
+uses the existing `slug_builtin_catalog_files` macro, and the parent
+`builtin_bazel_tools_files` compile-data group must depend on it. The sidecar
+is Slug build metadata, not a runtime catalog file. No DICE key, lock, side
+cache, host filesystem fallback, or repository mapping changes.
+The static source bytes are service/DICE-retained; no command scratch is
+captured. This packet does not synthesize a smaller BUILD or claim that source
+availability alone yields package-loading compatibility.
 
 ## Evidence and validation
 
-First compile and exact-preflight a source-shaped loaded-macro
-`native.filegroup(testonly = 1)` Loading regression on clean base; it must
-fail at the current `native attribute testonly must be a bool` guard.
-Then cover direct and loaded-macro filegroup and alias 0/1/bool/None/omitted
-under both package defaults, including late `package()` placement; assert
-typed values, explicit/default provenance and `None` versus explicit false.
-Cover filegroup `tags`/`data` None versus explicit empty, unknown kwarg None,
-invalid integer/string/selector, and a same-DICE 1/0/1 restoration. Query
-must prove selected effective `testonly` and unchanged ordinary target
-projection without inventing configured support. Reuse the existing native
-filegroup Analysis rejection test for `testonly=True`. No Stage 1 fixture is
-needed; pinned source and accepted local oracle are discriminating.
-
-Resolve the pinned nightly toolchain. Compile selected Loading and Query
-binaries with Cargo JSON `--no-run`, exact nonignored preflight and run
-focused/protected tests serially. Direct Loading/Query/Analysis/Core/CLI
-compiles and rebuilt CLI precede one normalized-PATH authentic `//:probe`
-smoke. That replay proves only that the filegroup Loading stop cleared;
-it cannot prove configured filegroup test-policy behavior. Check/clean
-`slugd` before/after. Run pinned rustfmt, `git diff --check`, plan/archive
-checks and independent DESIGN/FINAL review of the shared coercion boundary.
+Pre-change, assert the source key rejects `tools/jdk/BUILD` as outside catalog
+and listing `tools/jdk` is Missing; the rebuilt authentic smoke already stops
+with missing `@@bazel_tools//tools/jdk` BUILD. Then verify all 13 values against
+the pinned ZIP paths/SHA-256/executable bits, the exact checked-in-path list, sorted
+direct-child listings for `tools`/`tools/jdk`/`tools/jdk/nosystemjdk`, an
+unsupported JDK sibling negative, deterministic two-DICE route identity, and
+an explicit assertion that runtime BUILD matches BUILD.tools but differs from
+source-tree BUILD. Exclude only the sidecar from the exact runtime catalog
+path-list test. Reuse existing source-catalog test harness rather than adding
+a Stage 1 fixture. Run selected Bzlmod tests with Cargo JSON `--no-run`, exact
+nonignored preflight, focused/protected execution, direct dependent compiles
+including Bazel's `//app/slug_bzlmod_v2:slug_bzlmod_v2` compile-data closure,
+rebuilt CLI, and one normalized-PATH authentic `//:probe` replay.
+Refresh the two existing exact route-manifest expectations in
+`builtin_repository.rs` and `host_module.rs`, and run their protected tests.
+The replay only proves the missing-content stop cleared. Check `slugd`
+before/after; run pinned rustfmt, diff, plan and archive checks.
 
 ## Scope and stops
 
-Base clean main `de50a3a9b`. Allowlist: this manifest, canonical Current,
-compact Stage 4 owner note after acceptance; production
-`app/slug_loading_v2/src/package.rs`; focused tests in
-`app/slug_loading_v2/tests/build_file_loading.rs` and
-`app/slug_query_v2/tests/loading_query.rs` (or a colocated existing test
-only when needed). Rough growth 45 production/180 proof lines is a review
-trigger, not a license for unrelated native-rule work. REPLAN if the
-authentic value is not integer 1, direct None differs from omission in the
-shared native kwargs owner, package equality misses source/value changes,
-or passing protobuf's stop requires selected configured filegroup work.
-A later authentic failure cannot widen this packet.
+Base clean main `ff9e3ee45`. Allowlist: this manifest, canonical Current,
+compact Stage 5 owner note after acceptance; 13 verbatim files under the JDK
+builtin subtree; its noncatalog `BUILD.bazel` sidecar;
+`app/slug_bzlmod_v2/BUILD.bazel` compile-data group;
+`app/slug_bzlmod_v2/src/builtin_repository.rs` catalog/listing test;
+`app/slug_bzlmod_v2/src/host_module.rs` one route-identity test expectation;
+`app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs` source/manifest tests.
+Catalog file is already large but remains the cohesive immutable embedded
+source owner; no representation or key redesign. Expected production growth
+about 78 catalog lines plus verbatim upstream bytes; test growth about 80
+lines is a review trigger. Independent DESIGN and FINAL review required for
+shared route identity. REPLAN if the binary archive differs from the pinned
+source mapping, the 13-file subtree is incomplete for the declared runtime
+package, or exposing it requires a new source/identity owner. Do not implement
+the anticipated `java_plugins_flag_alias` Loading boundary here.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviews ACCEPT. A protobuf-shaped loaded-macro
-Loading test compiled with Cargo JSON `--no-run`, exact-preflight selected
-one nonignored test and failed on clean base at the prior native Boolean
-guard; the new Query test independently failed at the same Loading guard.
-After the change, JSON `--no-run` compiled Loading, Query and Analysis test
-binaries. Exact preflight selected 9/2/2 nonignored tests and all 13 passed:
-the Loading set includes five new value/default/invalid/invalidation gates
-and four protected native/genrule/alias gates; Query covers effective
-values/provenance and ordinary edges; Analysis preserves configured native
-filegroup rejection. Direct Loading/Query/Analysis/Core/CLI checks and
-`cargo build -p slug_cli_v2` passed. Pinned rustfmt, diff, plan and archive
-checks passed; no stale `slugd` existed before or after the smoke. The
-normalized-PATH authentic `//:probe` replay cleared protobuf.bzl:729 and
-exited 2 later with `no such package '@@bazel_tools//tools/jdk': BUILD file
-not found`. That distinct source-verbatim content boundary is not part of
-WP827 and cannot prove configured native test policy. The 282 proof lines
-exceeded the rough 180 review trigger; FINAL review found them proportionate
-to five distinct Loading gates and one Query gate. The recorded packet window
-was at least 14:45-14:53 UTC; research began before the first timestamp and
-individual compile/test/review wall times were not separately instrumented.
+Independent DESIGN review first found the Bazel package-boundary sidecar gap;
+the bounded contract correction was rereviewed and ACCEPTED. Independent FINAL
+review ACCEPTED the actual bytes, catalog, route identity and build-input
+closure. Before the catalog change, Cargo JSON `--no-run` compiled the selected
+source-catalog test; exact nonignored preflight selected one test and it failed
+at `UnsupportedCatalog { path: "tools/jdk/BUILD" }`. After the change, all 13
+checked-in files matched the pinned Bazel archive SHA-256 and non-executable
+bits; the runtime BUILD matches upstream `BUILD.tools`, not source-tree BUILD.
+The integration test binary selected/passed 5/5, and the library unit binary
+selected/passed 6/6 protected module/listing/route tests. The domain-separated
+manifest is `a68101afc04f6c48b65f432975245b69b3873792ca2a339b0375a59705e8b655`
+on Linux x86-64 and `de2a4424c8a43911b76ba2875446a30a40560af64cb4782cc582d1d3bbdaad7e`
+otherwise, independently recomputed from the catalog.
+
+Direct Cargo checks for Bzlmod/Loading/CLI and rebuilt CLI passed. Bazel query
+resolved the JDK sidecar filegroup and all 13 inputs; with the required nightly
+Rust toolchain setting, Bazel aquery showed all 13 as `:slug_bzlmod_v2` Rustc
+action inputs. The parent `builtin_bazel_tools_files` Bazel build passed. A
+full BuildBuddy RBE Bazel Rust-library build made 649 processes (318 remote)
+but hit the packet's 180-second validation cap; it is unproved, not a pass or
+a source-content failure. Normalized-PATH authentic `//:probe` exited 2 after
+clearing the missing JDK BUILD stop; its next distinct Loading error is
+`launcher_flag_alias.bzl:36` rejecting `configuration_field(fragment =
+"java", name = "launcher")`. No configured JDK or full package evaluation is
+admitted. No stale `slugd` existed before or after. Pinned rustfmt, diff,
+plan and archive checks passed. The packet window was at least 15:00-15:19
+UTC; the full Bazel build cap was 180 seconds, while other individual operation
+times were not separately instrumented. The 137-line catalog/listing delta
+and 96-line external test delta exceeded rough growth estimates, and FINAL
+review found the full 13-file and package-boundary coverage proportionate.
 M7A remains partial.
 
 ## Immediate predecessor
 
-WP826 accepted at `de50a3a9b`: exact Loading/ordinary Query retains one
-nonempty aspect-bearing dependency while selected configured Analysis fails
-closed. Seven focused tests and rebuilt authentic smoke cleared protobuf
-BUILD:682; the next stop is this native filegroup `testonly=1` call. M7A
-remains partial.
+WP827 accepted at `ff9e3ee45`: native kwargs direct None omission and
+Boolean 0/1 acceptance cleared protobuf's filegroup Loading stop. The next
+authentic failure is the missing JDK built-in BUILD; M7A remains partial.

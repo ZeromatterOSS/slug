@@ -75,6 +75,15 @@ request/generation isolation, final reobservation and atomic publication. An
 error renderer is a borrowed projection of the retained typed error; bounded
 text never substitutes for equality or canonical source identity.
 
+The accepted WP828 built-in source catalog now includes the complete 13-file
+Bazel 9.2 runtime `tools/jdk` subtree, with `BUILD.tools` mapped verbatim to
+runtime `BUILD` and all executable bits false. Stage 5 owns the pinned bytes,
+sorted catalog-derived listings and Slug-native manifest route identity;
+`tools/jdk/BUILD.bazel` is only Slug's Bazel compile-data sidecar. The source
+route does not admit JDK BUILD Loading, configured Java toolchains or the full
+embedded-tools archive. The next authentic Loading stop belongs to Stage 4's
+Java `launcher` configuration-field semantics, not source materialization.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
