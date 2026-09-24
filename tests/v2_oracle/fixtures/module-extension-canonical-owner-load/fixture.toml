@@ -1,0 +1,45 @@
+[fixture]
+name = "module-extension-canonical-owner-load"
+description = "Bazel 9.2 generated BUILD loads an owner module .bzl by explicit canonical repository name."
+comparison = "message_shape"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Self-contained Bazel-only canonical load evidence. The root uses a local_path_override for producer; the generated hub BUILD loads @@producer+//:suite.bzl, whose macro alone declares :loaded. A second generated BUILD loads a missing canonical file and must fail. The producer package does not export suite.bzl as a target. This fixture selects the nonroot canonical BUILD-load edge, not Python toolchain analysis or broader generated-macro behavior."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/cmdline/Label.java:176-191",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageFunction.java:1104-1155",
+  "src/main/java/com/google/devtools/build/lib/skyframe/BzlLoadFunction.java:663-731,797-831,923-925,1282-1318",
+  "rules_python 1.7.0 python/private/pythons_hub.bzl:26-45,81-103",
+]
+translation_notes = "The local producer extension emits one successful and one missing-file generated BUILD. The explicit @@producer+ load models rules_python's generated hub loading @@rules_python+ without copying upstream source. dump_repo_mapping verifies producer+ and producer++ext+hub/broken are the canonical names for this local override; the target output alone does not prove mapping bypass, which is source-backed. All commands are offline and run in one isolated output base per fixture run."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture module-extension-canonical-owner-load --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture module-extension-canonical-owner-load --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
+
+[[commands]]
+name = "verify_canonical_repo_mapping"
+argv = ["mod", "dump_repo_mapping", "", "producer+", "--lockfile_mode=off", "--repository_disable_download", "--noshow_progress"]
+expected_exit = 0
+stdout_contains = [
+  '"producer":"producer+"',
+  '"hub":"producer++ext+hub"',
+  '"broken":"producer++ext+broken"',
+]
+
+[[commands]]
+name = "generated_build_loads_canonical_owner_bzl"
+argv = ["query", "@hub//:loaded", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A@hub//:loaded\n?\Z']
+
+[[commands]]
+name = "generated_build_missing_canonical_owner_bzl"
+argv = ["query", "@broken//:loaded", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 7
+stdout_patterns = ['\A\Z']
+stderr_contains = [
+  "error loading package '@@producer++ext+broken//'",
+  "cannot load '@@producer+//:missing.bzl': no such file",
+]

@@ -9231,3 +9231,17 @@ its next stop is the separately typed `RULES_PYTHON_REPO_DEBUG` environment
 observation. Additional private kinds, nonordinary schemas, Bazel's native
 `$x` representation, Python repository effects and configured behavior remain
 outside this exact observable slice.
+
+### Generated BUILD explicit canonical `.bzl` loads accepted (2026-09-24)
+
+WP801 admits nonroot `@@canonical//package:file.bzl` loads from canonical
+external BUILD or `.bzl` sources. The spelling bypasses apparent repository
+mapping; self-loads reuse the current route and foreign loads use the
+existing observed canonical child route. Source existence, containing BUILD
+package, load visibility, Need/replay, terminal errors and DICE observations
+remain with their accepted owners. The rules_python generated `pythons_hub`
+BUILD now loads `@@rules_python+//python/private:py_toolchain_suite.bzl`;
+the authentic build proceeds to the separately typed
+`native.package_relative_label` call in bazel_skylib. Explicit `@@//` main,
+broader label grammar, Python toolchain analysis and root bootstrap remain
+deferred.

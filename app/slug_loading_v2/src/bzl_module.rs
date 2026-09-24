@@ -1320,6 +1320,32 @@ pub(crate) fn resolve_canonical_external_bzl_load_label(
         )
         .map(|label| (None, label));
     }
+    if load.starts_with("@@") {
+        let canonical =
+            CanonicalLabel::parse(load).map_err(|message| ExternalLoadLabelError::Invalid {
+                load: Arc::from(load),
+                message: Arc::from(message),
+            })?;
+        let child_repo = canonical.package().repo();
+        if child_repo.is_root() {
+            return Err(ExternalLoadLabelError::Invalid {
+                load: Arc::from(load),
+                message: Arc::from("canonical main-repository loads are not supported here"),
+            });
+        }
+        let child = (child_repo != route.view().route().view().canonical_repo())
+            .then(|| child_repo.clone());
+        return RepositoryBzlLabel::new(
+            canonical.package().package().clone(),
+            RootPackageBzlTarget::parse(canonical.target().as_str()).map_err(|error| {
+                ExternalLoadLabelError::Target {
+                    load: Arc::from(load),
+                    error,
+                }
+            })?,
+        )
+        .map(|label| (child, label));
+    }
     let apparent =
         ApparentLabel::parse(load).map_err(|message| ExternalLoadLabelError::Invalid {
             load: Arc::from(load),

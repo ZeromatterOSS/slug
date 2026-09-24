@@ -29,19 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-100-m7a-selected-module-getenv-r1
+Packet: WP-7-101-m7a-canonical-generated-build-bzl-load-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP800 admits selected `module_ctx.getenv` over tracked per-name DICE cells,
-including undeclared names, raw absent/empty/present structural identity,
-Need/replay and redacted Complete terminals. Bazel 9.2's seven-row fixture
-passed generation and fresh replay; eight focused Rust tests and independent
-design/final reviews passed. The fresh authentic rules_python 1.7.0 smoke
-passes `RULES_PYTHON_REPO_DEBUG` and stops at a distinct generated hub
-LoadLabel boundary. Declared-only `module_ctx.os.environ` remains unchanged;
-lockfile replay, Python repository effects, toolchain analysis and root
-bootstrap remain deferred. WP799 is accepted at `f0bddcce3`; WP798 at
-`50d282a2e`.
+WP801 admits the source-authentic generated `pythons_hub` BUILD load of
+`@@rules_python+//python/private:py_toolchain_suite.bzl`. Explicit nonroot
+canonical `.bzl` loads bypass apparent mapping while retaining the existing
+canonical child route and source/package/visibility owners. A three-row
+Bazel 9.2 fixture passed generation and fresh replay; eleven focused Rust
+tests and independent design/final reviews passed. The rebuilt authentic
+smoke passed the old LoadLabel stop and reached `bazel_skylib`'s separate
+`native.package_relative_label` boundary. Three older single-`@` route tests
+remain known preexisting debt, recorded in the packet receipt. Python
+repository effects, toolchain analysis, `@@//` root-canonical loads and root
+bootstrap remain deferred. WP800 is accepted at `d88bec975`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
