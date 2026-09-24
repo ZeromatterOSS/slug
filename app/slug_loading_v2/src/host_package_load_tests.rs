@@ -34206,6 +34206,127 @@ async fn string_allowed_values_enforce_configurable_candidates() {
 }
 
 #[tokio::test]
+async fn frozen_bzl_string_list_select_retains_ordered_parts_and_matches_live_build_select() {
+    const DEFS: &str = r#"def _impl(ctx): fail('implementation must stay lazy')
+probe = rule(implementation = _impl, attrs = {'debug': attr.string_list()})
+DEBUG = select({str(Label(':trace')): ['trace'], '//conditions:default': []}) + select({str(Label(':timings')): ['timings'], '//conditions:default': []})
+def emit(): probe(name = 'frozen', debug = DEBUG, visibility = ['//visibility:public'])
+"#;
+    const BUILD: &str = r#"load(':defs.bzl', 'emit', 'probe')
+emit()
+probe(name = 'live', debug = select({':trace': ['trace'], '//conditions:default': []}) + select({':timings': ['timings'], '//conditions:default': []}), visibility = ['//visibility:public'])
+"#;
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let outcome = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources("", BUILD, &[("defs.bzl", DEFS)], 1109).build(),
+        package_policy(),
+    )
+    .await;
+    let package = terminal_package(&outcome);
+    let frozen = starlark_attr(package, "frozen", "debug");
+    let live = starlark_attr(package, "live", "debug");
+    assert_eq!(frozen, live);
+
+    let CoercedAttributeValue::Concatenation(first, second) = &frozen.value else {
+        panic!(
+            "frozen selector lost its two ordered parts: {:?}",
+            frozen.value
+        );
+    };
+    for (part, condition, item) in [
+        (first.as_ref(), "@@//pkg:trace", "trace"),
+        (second.as_ref(), "@@//pkg:timings", "timings"),
+    ] {
+        let CoercedAttributeValue::Selector { branches, default } = part else {
+            panic!("selector part was flattened: {part:?}");
+        };
+        assert_eq!(branches.len(), 1);
+        assert_eq!(branches[0].0.to_string(), condition);
+        assert_eq!(
+            branches[0].1.as_ref(),
+            &CoercedAttributeValue::StringList(Arc::from([item.into()]))
+        );
+        assert_eq!(
+            default.as_ref().map(AsRef::as_ref),
+            Some(&CoercedAttributeValue::StringList(Arc::from([])))
+        );
+    }
+}
+
+#[tokio::test]
+async fn frozen_bzl_select_preserves_nonconfigurable_type_and_other_kind_boundaries() {
+    const DEFS: &[u8] = br#"def _impl(ctx): fail('implementation must stay lazy')
+probe = rule(implementation = _impl, attrs = {'debug': attr.string_list(), 'flag': attr.bool()})
+TAGS = select({'//conditions:default': ['tag']})
+WRONG = select({'//conditions:default': 'not-a-list'})
+FLAG = select({'//conditions:default': True})
+NESTED = select({'//:trace': select({'//conditions:default': ['nested']}), '//conditions:default': []})
+"#;
+    for (variant, call, expected) in [
+        (1110, "probe(name = 'bad', tags = TAGS)", "not configurable"),
+        (
+            1111,
+            "probe(name = 'bad', debug = WRONG)",
+            "must be a list of strings",
+        ),
+        (
+            1112,
+            "probe(name = 'bad', flag = FLAG)",
+            "frozen select values are not valid BUILD attribute values",
+        ),
+        (
+            1116,
+            "probe(name = 'bad', debug = NESTED)",
+            "nested frozen select values",
+        ),
+    ] {
+        let build =
+            format!("load(':defs.bzl', 'probe', 'TAGS', 'WRONG', 'FLAG', 'NESTED')\n{call}\n");
+        let outcome = load_repository_package_fixture(
+            &[("BUILD.bazel", build.as_bytes()), ("defs.bzl", DEFS)],
+            variant,
+        )
+        .await;
+        let error = repository_package_error(&outcome);
+        assert!(error.contains(expected), "{call}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn frozen_bzl_string_list_select_replays_source_a_b_a_on_same_dice() {
+    const BUILD: &str = "load(':defs.bzl', 'emit')\nemit()\n";
+    const DEFS_A: &str = "def _impl(ctx): fail('lazy')\nprobe=rule(implementation=_impl,attrs={'debug':attr.string_list()})\nDEBUG=select({'//pkg:trace':['trace'],'//conditions:default':[]})\ndef emit(): probe(name='subject',debug=DEBUG,visibility=['//visibility:public'])\n";
+    const DEFS_B: &str = "def _impl(ctx): fail('lazy')\nprobe=rule(implementation=_impl,attrs={'debug':attr.string_list()})\nDEBUG=select({'//pkg:trace':['trace-edited'],'//conditions:default':[]})\ndef emit(): probe(name='subject',debug=DEBUG,visibility=['//visibility:public'])\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let a = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources("", BUILD, &[("defs.bzl", DEFS_A)], 1113).build(),
+        package_policy(),
+    )
+    .await;
+    let b = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources("", BUILD, &[("defs.bzl", DEFS_B)], 1114).build(),
+        package_policy(),
+    )
+    .await;
+    let restored = compute_package(
+        &dice,
+        EpochBuilder::workspace_sources("", BUILD, &[("defs.bzl", DEFS_A)], 1115).build(),
+        package_policy(),
+    )
+    .await;
+    let a_value = starlark_attr(terminal_package(&a), "subject", "debug");
+    let b_value = starlark_attr(terminal_package(&b), "subject", "debug");
+    let restored_value = starlark_attr(terminal_package(&restored), "subject", "debug");
+    assert_ne!(a_value, b_value);
+    assert_eq!(a_value, restored_value);
+    assert!(!RootPackageLoadKey::equality(&a, &b));
+    assert!(RootPackageLoadKey::equality(&a, &restored));
+}
+
+#[tokio::test]
 async fn public_starlark_rule_direct_none_uses_all_five_rust_toolchain_defaults() {
     const DEFS: &[u8] = br#"def _impl(ctx): fail('implementation must stay lazy')
 rust_toolchain = rule(implementation = _impl, attrs = {

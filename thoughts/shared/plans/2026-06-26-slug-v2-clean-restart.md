@@ -29,22 +29,21 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-108-m7a-native-package-name-build-context-r1
+Packet: WP-7-109-m7a-frozen-bzl-select-attribute-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP808 selects zero-argument `native.package_name()` in an ordinary loaded
-`.bzl` macro called from a BUILD package. The authenticated
-rules_kotlin 1.9.6 macro in `kotlin/internal:toolchains.bzl` expects exactly
-`kotlin/internal` from its external BUILD caller. Pinned Bazel 9.2 source
-uses caller package context, and Slug already retains that identity in its
-package recorder. A fresh offline oracle proves caller-package results and
-that Bazel leaves `native` unbound directly in BUILD; the new method must
-fail closed there. Independent design/final reviews accepted the bounded
-change. Five focused tests, a rebuilt CLI and the authentic smoke passed the
-old stop; the next independent error is frozen `select` BUILD attribute
-values at `toolchains.bzl:320`. Bare-global exposure, non-package contexts,
-downstream Kotlin semantics and M7A close remain deferred. WP807 is accepted
-at `7e6920923`.
+WP809 selects the rules_kotlin 1.9.6 top-level `.bzl` `_DEBUG_SELECT`, a
+two-part ordered string-list `select(...) + select(...)` passed to a
+configurable Starlark-rule BUILD attribute at `toolchains.bzl:320`. Slug's
+current attribute owner handles fresh selectors but explicitly rejects the
+frozen loaded-module variant. Pinned Bazel 9.2 source and a fresh offline
+oracle establish the selected Loading/coercion contract and four configured
+Bazel control outputs. Independent design/final reviews accepted the bounded
+change. Five focused tests and a rebuilt authentic smoke cleared the old
+stop and reached separate rules_swift module-extension `Label()` at row 56.
+Existing structural selector values and Bzl/package observations remain the
+only owners. Configured choice, downstream rules_swift and M7A close remain
+deferred. WP808 is accepted at `5fe759ed5`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

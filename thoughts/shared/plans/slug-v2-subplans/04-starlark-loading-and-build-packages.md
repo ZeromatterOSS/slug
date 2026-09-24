@@ -9378,3 +9378,23 @@ stop and reaches a separate frozen-`select` BUILD-attribute-value error in
 `toolchains.bzl:320`. Symbolic macros, the broader preexisting BUILD
 `native` namespace, bare-global `package_name()`, exact invalid-context
 diagnostics, downstream Kotlin and M7A close remain deferred.
+
+### Frozen `.bzl` string-list selectors in BUILD attributes accepted (2026-09-24)
+
+WP809 admits the authenticated rules_kotlin top-level two-part
+`_DEBUG_SELECT = select(...) + select(...)` value as a configurable
+`attr.string_list` BUILD attribute. Pinned Bazel 9.2 source and a fresh
+offline oracle establish ordered trace/timings list branches, empty defaults
+and resolved condition Labels; four configured Bazel outputs match a fresh
+BUILD selector. Slug's single attribute coercer now visits both live and
+frozen selector parts through the same ordered path, while admitting frozen
+values only for `StringList` and rejecting nested frozen selector members.
+The existing nonconfigurable, type and other-kind guards remain closed.
+Existing structural attribute values and package/Bzl-source DICE
+observations own identity and A/B/A restoration; no new retained selector,
+cache or key was added. Five focused/protected tests pass. Root Host tests
+prove the retained shape, while the rebuilt authentic external build clears
+the old Kotlin frozen-selector stop and reaches separate rules_swift
+module-extension `Label()` context at registration row 56. `None` branches,
+other frozen kinds, configured branch choice, full Kotlin behavior and M7A
+close remain deferred.

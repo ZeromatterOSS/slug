@@ -3902,97 +3902,24 @@ fn coerce_starlark_value(
                 "attribute `{attribute_name}` is not configurable and cannot use select()"
             );
         }
-        let selector = match selector {
-            starlark::__macro_refs::Either::Left(selector) => selector,
+        return match selector {
+            starlark::__macro_refs::Either::Left(selector) => coerce_selector_value(
+                recorder,
+                kind,
+                attribute_name,
+                configurable,
+                false,
+                selector,
+            ),
+            starlark::__macro_refs::Either::Right(selector)
+                if kind == AttributeKind::StringList =>
+            {
+                coerce_selector_value(recorder, kind, attribute_name, configurable, true, selector)
+            }
             starlark::__macro_refs::Either::Right(_) => {
                 anyhow::bail!("frozen select values are not valid BUILD attribute values")
             }
         };
-        let mut result: Option<CoercedAttributeValue> = None;
-        for part in &selector.parts {
-            let mut branches = Vec::new();
-            let mut default = None;
-            for branch in part.branches.iter() {
-                if matches!(
-                    &branch.condition,
-                    SelectorCondition::Raw(condition) if condition == "//conditions:default"
-                ) || matches!(
-                    &branch.condition,
-                    SelectorCondition::Canonical(condition) if condition == "@@//conditions:default"
-                ) {
-                    default = Some(Arc::new(coerce_starlark_value(
-                        recorder,
-                        kind,
-                        attribute_name,
-                        configurable,
-                        branch.value,
-                    )?));
-                } else {
-                    let condition = match &branch.condition {
-                        SelectorCondition::Raw(condition) => {
-                            recorder.dependency_label(condition)?
-                        }
-                        SelectorCondition::Canonical(condition) => {
-                            CanonicalLabel::parse(condition).map_err(anyhow::Error::msg)?
-                        }
-                    };
-                    branches.push((
-                        condition,
-                        Arc::new(coerce_starlark_value(
-                            recorder,
-                            kind,
-                            attribute_name,
-                            configurable,
-                            branch.value,
-                        )?),
-                    ));
-                }
-            }
-            let selected = CoercedAttributeValue::Selector {
-                branches: branches.into(),
-                default,
-            };
-            let selected =
-                part.prefix
-                    .iter()
-                    .rev()
-                    .copied()
-                    .try_fold(selected, |selected, prefix| {
-                        Ok::<_, anyhow::Error>(CoercedAttributeValue::Concatenation(
-                            Arc::new(coerce_starlark_value(
-                                recorder,
-                                kind,
-                                attribute_name,
-                                configurable,
-                                prefix,
-                            )?),
-                            Arc::new(selected),
-                        ))
-                    })?;
-            let selected = part
-                .suffix
-                .iter()
-                .copied()
-                .try_fold(selected, |selected, suffix| {
-                    Ok::<_, anyhow::Error>(CoercedAttributeValue::Concatenation(
-                        Arc::new(selected),
-                        Arc::new(coerce_starlark_value(
-                            recorder,
-                            kind,
-                            attribute_name,
-                            configurable,
-                            suffix,
-                        )?),
-                    ))
-                })?;
-            result = Some(match result {
-                Some(left) => {
-                    CoercedAttributeValue::Concatenation(Arc::new(left), Arc::new(selected))
-                }
-                None => selected,
-            });
-        }
-        return result.ok_or_else(|| anyhow::anyhow!("select() requires at least one branch"));
     }
     if kind == AttributeKind::Label && value.is_none() {
         return Ok(CoercedAttributeValue::None);
@@ -4012,6 +3939,115 @@ fn coerce_starlark_value(
         anyhow::anyhow!("attribute `{attribute_name}` must contain only string labels")
     })?;
     coerce_raw_value(RawLabelContext::Package(recorder), kind, &raw)
+}
+
+fn coerce_selector_value<'v, V: ValueLike<'v>>(
+    recorder: &PackageRecorder,
+    kind: AttributeKind,
+    attribute_name: &str,
+    configurable: bool,
+    frozen: bool,
+    selector: &SelectorValueGen<V>,
+) -> anyhow::Result<CoercedAttributeValue> {
+    let mut result: Option<CoercedAttributeValue> = None;
+    for part in &selector.parts {
+        let mut branches = Vec::new();
+        let mut default = None;
+        for branch in part.branches.iter() {
+            if matches!(
+                &branch.condition,
+                SelectorCondition::Raw(condition) if condition == "//conditions:default"
+            ) || matches!(
+                &branch.condition,
+                SelectorCondition::Canonical(condition) if condition == "@@//conditions:default"
+            ) {
+                default = Some(Arc::new(coerce_selector_member(
+                    recorder,
+                    kind,
+                    attribute_name,
+                    configurable,
+                    frozen,
+                    branch.value.to_value(),
+                )?));
+            } else {
+                let condition = match &branch.condition {
+                    SelectorCondition::Raw(condition) => recorder.dependency_label(condition)?,
+                    SelectorCondition::Canonical(condition) => {
+                        CanonicalLabel::parse(condition).map_err(anyhow::Error::msg)?
+                    }
+                };
+                branches.push((
+                    condition,
+                    Arc::new(coerce_selector_member(
+                        recorder,
+                        kind,
+                        attribute_name,
+                        configurable,
+                        frozen,
+                        branch.value.to_value(),
+                    )?),
+                ));
+            }
+        }
+        let selected = CoercedAttributeValue::Selector {
+            branches: branches.into(),
+            default,
+        };
+        let selected =
+            part.prefix
+                .iter()
+                .rev()
+                .copied()
+                .try_fold(selected, |selected, prefix| {
+                    Ok::<_, anyhow::Error>(CoercedAttributeValue::Concatenation(
+                        Arc::new(coerce_selector_member(
+                            recorder,
+                            kind,
+                            attribute_name,
+                            configurable,
+                            frozen,
+                            prefix.to_value(),
+                        )?),
+                        Arc::new(selected),
+                    ))
+                })?;
+        let selected = part
+            .suffix
+            .iter()
+            .copied()
+            .try_fold(selected, |selected, suffix| {
+                Ok::<_, anyhow::Error>(CoercedAttributeValue::Concatenation(
+                    Arc::new(selected),
+                    Arc::new(coerce_selector_member(
+                        recorder,
+                        kind,
+                        attribute_name,
+                        configurable,
+                        frozen,
+                        suffix.to_value(),
+                    )?),
+                ))
+            })?;
+        result = Some(match result {
+            Some(left) => CoercedAttributeValue::Concatenation(Arc::new(left), Arc::new(selected)),
+            None => selected,
+        });
+    }
+    result.ok_or_else(|| anyhow::anyhow!("select() requires at least one branch"))
+}
+
+fn coerce_selector_member(
+    recorder: &PackageRecorder,
+    kind: AttributeKind,
+    attribute_name: &str,
+    configurable: bool,
+    frozen: bool,
+    value: Value,
+) -> anyhow::Result<CoercedAttributeValue> {
+    if frozen && SelectorValue::from_value(value).is_some() {
+        anyhow::bail!("nested frozen select values are not valid BUILD attribute values");
+    }
+    coerce_starlark_value(recorder, kind, attribute_name, configurable, value)
 }
 
 fn coerce_native_direct_label(
