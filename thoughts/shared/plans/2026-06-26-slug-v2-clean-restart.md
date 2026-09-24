@@ -29,17 +29,28 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-94-m7a-selected-file-effect-fixture-download-input-r1
-Status: accepted; independent DESIGN and FINAL review ACCEPT
+Packet: WP-7-95-m7a-selected-repository-host-path-exists-r1
+Status: FINAL ACCEPT for bounded path/environment behavior; root archive reachability deferred
 
-WP794 repairs the shared selected repository-file-effect test fixture's
-missing `SelectedExtensionDownloadTransaction` input. The unchanged
-suite previously passed 6/19 because its selected-owner certificate
-path reached the accepted download preflight without that input. An
-empty unauthorized transaction for the exact fixture workspace restores
-19/19, and WP793's selected-owner group still passes 39/39. Production
-semantics and compatibility classes do not change. Generated host-tools
-execution and M7A closure remain separate work.
+WP795 selects the prerequisite absolute host-path existence observation
+for the generated `rust_host_tools` repository. Before any archive call,
+rules_rust probes `HOME/.netrc` through
+`repository_ctx.path(absolute_string).exists`; Slug currently rejects
+that path. The packet keeps this Boolean DICE-observed and scoped to the
+selected repository rule, with present-file reads and auth deferred. The
+local path is absent (existence only checked; no contents read). The
+source-derived host-tools archives and generated
+`module_ctx.path(Label)` remain later gates. A fresh production-root build
+stops first at the generated `slug_crates` Label boundary, and the focused
+rules-rust toolchain fixture stops at an independent rules_shell `which`
+limit; neither proves host-tools archive reachability. WP795 therefore admits
+the bounded path/environment behavior only, with root integration deferred.
+Independent FINAL review ACCEPTED the narrowed claim after focused tests and
+fresh CLI, formatting, diff, archive and plan checks passed.
+
+WP794 at `38dec0791` repaired the shared selected file-effect fixture's
+empty download transaction, restoring 19/19 file-effect tests while WP793's
+selected-owner group still passes 39/39. No production behavior changed.
 
 WP793 at `3e9a895a6` accepted bounded selected `module_ctx.path(Label)`
 for root/non-generated external packages, lexical dirname/get_child,

@@ -1,98 +1,134 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-94-m7a-selected-file-effect-fixture-download-input-r1
-Status: accepted; independent DESIGN and FINAL review ACCEPT
+Packet: WP-7-95-m7a-selected-repository-host-path-exists-r1
+Status: FINAL ACCEPT for bounded path/environment behavior; root archive reachability deferred
 
 ## Outcome and compatibility
 
-Restore the 13 older selected repository-file-effect tests that now fail
-because their shared test transaction omits the selected-download input
-installed for selected-owner execution. This is a fixture-only repair:
-inject an empty, unauthorized `SelectedExtensionDownloadTransaction` for
-the fixture workspace. Do not alter production preflight, selected
-download authorization, generated repository effects or any admitted
-runtime behavior.
+Admit repository_ctx.path(absolute_string).exists for a selected generated
+repository rule, using the repository host-input snapshot and DICE-observed
+host path state. The immediate production consumer is rules_rust 0.73
+rust_host_tools: before any archive call, its auth helper uses HOME to probe
+HOME/.netrc. In this environment that path is absent (existence only was
+checked; no content or credential was read). This packet owns the path and
+environment semantics needed by that helper, but does not claim the production
+root has reached its archive effect: fresh CLI smokes stop at independent
+generated `slug_crates` Label and rules_shell `which` boundaries first.
 
-No compatibility surface changes. Existing exact Bazel 9 slices stay
-exact, existing Slug-native physical/configuration/action identity
-divergences stay Slug-native, and generated `rust_host_tools`
-`download_and_extract`/path, physical reads and generator execution
-remain unsupported/deferred. This packet's test input models an
-extension that does not call `module_ctx.download`; it is not an oracle
-or a new parity claim.
+Exact Bazel 9.2 behavior is claimed only for normalized absolute paths
+whose resolution is missing without a symlink traversal or terminates in an
+ordinary file/directory
+(including a symlink chain to one): the Boolean exists result matches.
+Dangling symlink and cycle/error cases fail closed as unsupported until a
+pinned-source regression admits their exact behavior. Tracked invalidation is Slug-native and
+stricter than Bazel's un-watched path.exists observation. Relative generated
+paths and accepted Label/which path behavior stay unchanged. Reading a
+present host file, netrc parsing/auth forwarding, other host path methods,
+archive download/extraction and generated module_ctx.path(Label) remain
+unsupported/deferred. Never suppress HOME or fabricate an absent netrc.
 
-## Evidence and semantic owner
+## Evidence, owner and decision
 
-WP793 at `3e9a895a6` independently accepted selected root and
-non-generated external `module_ctx.path(Label)`; 39/39 owner tests,
-three Core checks and four Bzlmod label-path tests pass. Its fresh root
-smoke reaches the honest generated-Label refusal at rules_rust's
-`@rust_host_tools` operand. The unchanged
-`module_extension_repository_file_effect::tests::` suite instead passes
-6/19, with 13 terminals reaching `selected module extension download
-inputs unavailable`. The preflight is already in the accepted HEAD
-`module_extension.rs`, and all selected-owner transactions in that test
-module pass through `with_host_inputs_for` in
-`module_extension_repository_file_effect.rs`. That helper installs the
-host-input transaction, platform and environment cells but not the
-selected-download transaction. An empty transaction for the exact
-workspace is the correct no-download fixture state: no owner is
-authorized, so the preflight returns no ready download without
-relaxing the production invariant.
+Pinned Bazel 9.2 StarlarkBaseExternalContext.java:1544-1580 accepts a
+string path; StarlarkPath.java:159-170 returns its existence. Vendored
+@bazel_tools//tools/build_defs/repo/utils.bzl:491-508 obtains HOME from
+ctx.os.environ and probes ctx.path(HOME + "/.netrc").exists before reading
+that file. Pinned rules_rust repository_utils.bzl:1005-1042 calls this
+helper when auth is empty, before its download_and_extract calls. Its own
+MODULE.bazel:55-61 selects host_tools version 1.97.1; root MODULE's
+nightly toolchain pins are a different owner. Current
+repository_rule_context.rs:462-476,721-732 rejects all absolute strings
+as generated-relative paths, so root archive work is not yet reachable.
 
-No additional Bazel oracle is needed for test-fixture plumbing; the
-accepted WP793 regression remains the semantic evidence. The fixture
-may expose further independent failures after the input is installed;
-report them separately and do not claim all 13 share a cause until the
-full suite passes.
+The selected repository-file-effect observation key remains the semantic
+producer. Its owner certificate, full repository-environment snapshot,
+a normalized absolute path, a tracked ResolvedPathObservationKey result,
+and merged PathObservationEpoch determine this Boolean. The current eager
+ctx.os.environ dict records no DICE dependency; rules_rust reads NETRC
+membership and HOME through it. Add a workspace-scoped injected
+RepositoryEnvironmentSnapshotKey sharing the immutable request Arc. Record
+whether invocation accesses ctx.os.environ, then compute and verify this
+whole-snapshot key before publishing that result. Structural equality
+covers changed values, added/removed names and absent-name lookups; direct
+ctx.getenv retains its narrower existing cell owner. Invocation prepared
+values are retry scratch, not a second semantic cache. No ambient stat or
+global registry may bypass the observed path frontier. Full path identity,
+present/missing state and environment projection participate in
+invalidation/restoration; observation Need and error remain typed.
+Existing which-candidate host-path preparation is a reuse candidate, but
+its executable classification is not the exists semantic owner. Do not
+hold a lock across DICE compute.
 
-## Scope, stops and validation
+## Scope and stops
 
-Base clean `main` at `3e9a895a6`. Root owns the one-file fixture edit,
-serial Cargo validation, documentation receipt and commit. Test-only
-allowlist: `app/slug_loading_v2/src/module_extension_repository_file_effect.rs`
-under `#[cfg(test)]`; scheduling allowlist: this manifest and the
-canonical Current paragraph. No production, Core/Bzlmod/DICE API,
-repository-rule, MODULE/lockfile, vendor, transport or NativeLink
-change. The Buck2 hot-path utility skill creates no action here.
+Base clean main at 38dec0791. Production allowlist:
+app/slug_bzlmod_v2/src/repository_host_input.rs and its lib.rs export;
+app/slug_core_v2/src/runtime/repository_host_input.rs plus direct request
+injection tests; app/slug_loading_v2/src/repository_rule_context.rs and
+app/slug_loading_v2/src/module_extension_repository_file_effect.rs.
+Direct colocated tests may change in those files. One focused Stage 1
+fixture may be added only if pinned-source regression cannot discriminate
+absolute/relative/existence behavior. Scheduling allowlist is this
+manifest and the canonical Current paragraph; update Stage 5/9 only for
+an accepted ownership decision. No Core transport, archive, MODULE,
+lockfile, NativeLink, Bazel vendoring, auth file or BuildBuddy change.
 
-Obtain independent DESIGN ACCEPT before editing the fixture and
-independent FINAL review of the actual diff. Preflight exact
-nonignored selectors for the 19 file-effect tests, run the full group,
-and rerun WP793's 39 selected-owner tests to guard the shared
-preflight. If failures remain, determine whether they are separate
-fixture/input defects; do not broaden the packet to production
-semantics without design correction. Run `cargo fmt --all -- --check`,
-`git diff --check`, archive status and plan status. A CLI rebuild or
-root smoke is not necessary for a test-only change. Preserve ordinary
-Bazel RC discovery; never inspect/copy/print `~/.bazelrc`.
+Accept normalized absolute host paths only for this selected path.exists
+surface. Preserve repository-relative generated path behavior. Reject
+non-Unicode/unnormalized paths and unsupported path methods without
+accessing them. Cap distinct prepared host paths per invocation. A present
+netrc may return exists=True, but the subsequent read must fail closed
+without leaking content or credentials; this packet does not authorize
+netrc parsing. If the actual selected request cannot model the host
+environment/path source, or the work requires a new secret-bearing input
+owner, REPLAN before widening scope.
 
-Stop and `REPLAN` if the empty transaction would authorize any owner,
-change a production input path, or fail to restore the intended tests
-without a bounded fixture-only explanation. Larger generated host-tools
-work and public `@bazel_tools` query breadth remain separate M7A
-packets.
+New memory is a compact path/state entry in invocation scratch, existing
+DICE-retained path observations and one Arc clone of the already-captured
+environment snapshot in the injected key. That key can retain environment
+values longer than the request; redact its Debug and never print values,
+including error paths. It releases with normal DICE invalidation/eviction;
+invocation scratch releases on success, Need, error or cancellation. No
+archive bytes, new interner or cache. Existing Arc/Dupe/Allocative and
+SmallMap patterns suffice; no Buck2/V1 donor import or performance claim.
+The large selected-effect module stays the existing cohesive DICE owner;
+split only if the new path branch would duplicate its observation driver.
+
+## Validation
+
+Independent DESIGN review before Rust edits and FINAL review of actual
+diff. Pin the source behavior above in regression tests. Prove absent,
+present, file/directory and symlink-to-present; classify dangling symlink
+and cycle with a pinned-source regression or explicit unsupported terminal;
+reject unnormalized host operands; preserve
+generated-relative and Label paths. Prove HOME A/B/A and absent→present→
+absent same-DICE replay with distinct observed generations, missing/present
+NETRC and HOME snapshot changes, Need propagation, no ambient stat and no
+secret bytes/events. Attempt selected host-tools invocation with a fresh CLI
+binary and record the first honest stop. Reaching its archive refusal is a
+successor integration gate if an earlier independent boundary stops the smoke;
+do not claim generated repository completion.
+
+Use pinned Rust toolchain, JSON --no-run exact-selector preflight, serial
+Cargo and named direct dependents. Rebuild slug_cli_v2 before smoke; clean
+stale slugd before/after. Run cargo fmt --all -- --check, git diff --check,
+archive status and plan status. Ordinary Bazel RC discovery may use the
+user's BuildBuddy auth; never inspect, print or copy ~/.bazelrc. Do not
+inspect any netrc contents. A root smoke that stops elsewhere is evidence
+to diagnose, not permission to alter another semantic boundary here.
+
+Validation receipt: pinned JSON `--no-run` and exact-selector preflight passed
+for the Bzlmod snapshot key, Core host-input lifecycle, and five new Loading
+selectors. Bzlmod 1/1, Core host-input 4/4, Loading selected-owner 59/59 and
+direct path 1/1 passed. A fresh `cargo build -p slug_cli_v2` passed. The
+production root `slug build //app/slug_cli_v2:slug` stopped at generated
+`slug_crates` `module_ctx.path(Label)`; the rules-rust toolchain fixture build
+stopped at rules_shell local_config_shell `repository_ctx.which` Unix limits.
+Neither invoked the host-tools archive, so root reachability remains deferred.
+Independent FINAL review ACCEPTED this narrowed claim after the focused gates,
+format, diff, archive and plan checks passed.
 
 ## Immediate predecessor
 
-WP793 at `3e9a895a6` independently accepted bounded selected
-`path(Label)` and lexical dirname/get_child while explicitly refusing
-generated-owner routes before DICE recursion.
-
-## Validation receipt
-
-Independent DESIGN ACCEPT: the empty transaction has no authorized
-owners or verified downloads, and the selected preflight returns before
-reading any download epoch for unauthorized owners. The fixture helper
-is the shared owner for these tests. One test-only import and one
-test-helper insertion use `workspace.dupe()`; no production code or
-download epoch changed.
-
-Exact nonignored preflight finds 19 file-effect selectors. The full
-`module_extension_repository_file_effect::tests::` group passes 19/19,
-restoring all 13 formerly red cases. The WP793 selected-owner group
-passes 39/39 after the fixture repair. `cargo fmt --all -- --check`,
-`git diff --check`, archive status and plan status pass. No CLI rebuild,
-root smoke, NativeLink or BuildBuddy transport was needed for this
-test-only packet. Independent FINAL ACCEPT of the actual one-helper diff
-and scoped receipt.
+WP794 at 38dec0791 repaired only selected file-effect test input: 19/19
+file-effect and 39/39 selected-owner tests pass; production is unchanged.

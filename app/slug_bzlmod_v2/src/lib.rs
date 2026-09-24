@@ -315,6 +315,8 @@ pub use repository_host_input::RepositoryEnvironmentNameFrontier;
 #[doc(hidden)]
 pub use repository_host_input::RepositoryEnvironmentSnapshot;
 #[doc(hidden)]
+pub use repository_host_input::RepositoryEnvironmentSnapshotKey;
+#[doc(hidden)]
 pub use repository_host_input::RepositoryHostInputTransaction;
 #[doc(hidden)]
 pub use repository_host_input::RepositoryPlatform;

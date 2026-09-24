@@ -7,6 +7,7 @@ use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
 use slug_bzlmod_v2::RepositoryEnvironmentEntry;
 use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
 use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
+use slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey;
 use slug_bzlmod_v2::RepositoryHostInputTransaction;
 use slug_bzlmod_v2::RepositoryPlatformKey;
 use slug_bzlmod_v2::SourcePreparationNeeds;
@@ -70,6 +71,57 @@ impl Key for RepositoryEnvironmentProbeKey {
     ) -> Self::Value {
         self.evaluations.fetch_add(1, Ordering::SeqCst);
         ctx.compute(&self.cell).await.unwrap()
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(Debug, Clone, Allocative)]
+struct RepositoryEnvironmentSnapshotProbeKey {
+    snapshot: RepositoryEnvironmentSnapshotKey,
+    #[allocative(skip)]
+    evaluations: Arc<AtomicUsize>,
+}
+
+impl PartialEq for RepositoryEnvironmentSnapshotProbeKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.snapshot == other.snapshot && Arc::ptr_eq(&self.evaluations, &other.evaluations)
+    }
+}
+
+impl Eq for RepositoryEnvironmentSnapshotProbeKey {}
+
+impl Hash for RepositoryEnvironmentSnapshotProbeKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.snapshot.hash(state);
+        Arc::as_ptr(&self.evaluations).hash(state);
+    }
+}
+
+impl fmt::Display for RepositoryEnvironmentSnapshotProbeKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "repository-environment-snapshot-probe:{}:{:p}",
+            self.snapshot,
+            Arc::as_ptr(&self.evaluations)
+        )
+    }
+}
+
+#[async_trait]
+impl Key for RepositoryEnvironmentSnapshotProbeKey {
+    type Value = RepositoryEnvironmentSnapshot;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        self.evaluations.fetch_add(1, Ordering::SeqCst);
+        ctx.compute(&self.snapshot).await.unwrap()
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -208,6 +260,75 @@ fn repository_environment_cells_cut_off_unrelated_changes_and_track_all_states()
 }
 
 #[test]
+fn repository_environment_snapshot_tracks_full_a_b_a_and_empty_revisions() {
+    let workspace = tempfile::tempdir().unwrap();
+    let runtime = test_runtime(workspace.path()).unwrap();
+    let normalized = NormalizedAbsolutePath::new(runtime.workspace.clone()).unwrap();
+    let evaluations = Arc::new(AtomicUsize::new(0));
+    let probe = RepositoryEnvironmentSnapshotProbeKey {
+        snapshot: RepositoryEnvironmentSnapshotKey::new(normalized.clone()),
+        evaluations: evaluations.clone(),
+    };
+    let inject = |snapshot: RepositoryEnvironmentSnapshot| {
+        runtime.runtime.block_on(async {
+            let data = runtime
+                .user_computation_data_with_repository_host_inputs(
+                    None,
+                    snapshot.clone(),
+                    snapshot.present_name_frontier(),
+                )
+                .unwrap();
+            let mut updater = runtime.dice.updater_with_data(data);
+            crate::runtime::repository_host_input::inject_repository_host_inputs(
+                &mut updater,
+                &normalized,
+                runtime.process_host.repository_platform().unwrap(),
+                &snapshot,
+                &snapshot.present_name_frontier(),
+                &RepositoryEnvironmentNameFrontier::empty(),
+            )
+            .unwrap();
+            let mut transaction = updater.commit().await;
+            let observed = transaction.compute(&probe).await.unwrap();
+            assert_eq!(observed, snapshot);
+            observed
+        })
+    };
+
+    let a = environment_snapshot(&[("HOME", "/one"), ("NETRC", "sentinel-secret")]);
+    let first = inject(a.clone());
+    assert_eq!(first.get("HOME").unwrap().as_ref(), "/one");
+    assert_eq!(evaluations.load(Ordering::SeqCst), 1);
+    let equal = inject(a.clone());
+    assert_eq!(equal, first);
+    assert_eq!(evaluations.load(Ordering::SeqCst), 1);
+
+    let b = inject(environment_snapshot(&[
+        ("HOME", "/two"),
+        ("NETRC", "sentinel-secret"),
+    ]));
+    assert_eq!(b.get("HOME").unwrap().as_ref(), "/two");
+    assert_eq!(evaluations.load(Ordering::SeqCst), 2);
+    let added = inject(environment_snapshot(&[
+        ("HOME", "/two"),
+        ("NETRC", "sentinel-secret"),
+        ("OTHER", "added"),
+    ]));
+    assert_eq!(added.get("OTHER").unwrap().as_ref(), "added");
+    assert_eq!(evaluations.load(Ordering::SeqCst), 3);
+    let removed = inject(environment_snapshot(&[("HOME", "/two")]));
+    assert!(removed.get("NETRC").is_none());
+    assert_eq!(evaluations.load(Ordering::SeqCst), 4);
+    let empty = inject(RepositoryEnvironmentSnapshot::empty());
+    assert!(empty.is_empty());
+    assert_eq!(evaluations.load(Ordering::SeqCst), 5);
+    let restored = inject(a);
+    assert_eq!(restored, first);
+    assert_eq!(evaluations.load(Ordering::SeqCst), 6);
+    assert!(!format!("{restored:?} {probe:?}").contains("sentinel-secret"));
+}
+
+#[test]
 fn repository_environment_need_retry_and_rejection_restore_the_accepted_snapshot() {
     let workspace = tempfile::tempdir().unwrap();
     let root = workspace.path().canonicalize().unwrap();
@@ -295,6 +416,13 @@ fn repository_environment_need_retry_and_rejection_restore_the_accepted_snapshot
             transaction.compute(&cold_probe).await.unwrap(),
             RepositoryEnvironmentCell::observed(None)
         );
+        assert!(
+            transaction
+                .compute(&RepositoryEnvironmentSnapshotKey::new(normalized.clone()))
+                .await
+                .unwrap()
+                .is_empty()
+        );
     });
     assert_eq!(cold_evaluations.load(Ordering::SeqCst), 1);
     let restored_host_inputs = guard.discard().unwrap();
@@ -327,6 +455,13 @@ fn repository_environment_need_retry_and_rejection_restore_the_accepted_snapshot
         assert_eq!(
             transaction.compute(&cold_probe).await.unwrap(),
             RepositoryEnvironmentCell::Unauthorized
+        );
+        assert_eq!(
+            transaction
+                .compute(&RepositoryEnvironmentSnapshotKey::new(normalized.clone()))
+                .await
+                .unwrap(),
+            accepted_environment
         );
     });
     assert_eq!(
@@ -370,10 +505,17 @@ fn cancelled_command_revokes_a_current_only_present_name() {
         let mut transaction = runtime.dice.updater_with_data(data).existing_state().await;
         assert_eq!(
             transaction
-                .compute(&RepositoryEnvironmentCellKey::new(normalized, "X"))
+                .compute(&RepositoryEnvironmentCellKey::new(normalized.clone(), "X"))
                 .await
                 .unwrap(),
             RepositoryEnvironmentCell::Unauthorized
+        );
+        assert!(
+            transaction
+                .compute(&RepositoryEnvironmentSnapshotKey::new(normalized))
+                .await
+                .unwrap()
+                .is_empty()
         );
     });
 }

@@ -34,6 +34,7 @@ use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
 use slug_bzlmod_v2::ObservedHostRepositoryLabelPath;
 use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
 use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
+use slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey;
 use slug_bzlmod_v2::RepositoryHostInputTransaction;
 use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_bzlmod_v2::RepositoryPlatformKey;
@@ -67,11 +68,11 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateKey;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationError;
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateObservationKey;
-#[rustfmt::skip] use crate::repository_rule_context::{PreparedRepositoryLabelPaths, PreparedRepositoryLabelSources, PreparedRepositoryWhichCandidates, RepositoryRuleHostObservation, RepositoryRuleInvocationError, RepositoryRuleInvocationInput, RepositoryWhichCandidate};
-use crate::repository_rule_context::invoke_repository_rule;
+#[rustfmt::skip] use crate::repository_rule_context::{PreparedRepositoryHostPaths, PreparedRepositoryLabelPaths, PreparedRepositoryLabelSources, PreparedRepositoryWhichCandidates, RepositoryRuleHostObservation, RepositoryRuleInvocationError, RepositoryRuleInvocationInput, RepositoryWhichCandidate};
+use crate::repository_rule_context::invoke_repository_rule_with_host_paths;
 
 struct RepositoryEffectLimits;
-#[rustfmt::skip] impl RepositoryEffectLimits { const LABEL_PATHS: usize = 256; const WHICH_CANDIDATES: usize = 64; }
+#[rustfmt::skip] impl RepositoryEffectLimits { const LABEL_PATHS: usize = 256; const WHICH_CANDIDATES: usize = 64; const HOST_PATHS: usize = 64; }
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -502,6 +503,35 @@ async fn verified_environment(
 async fn verify_which_environment(ctx: &mut DiceComputations<'_>, key: &HostSelectedRepositoryFileEffectKey, certificate: &Arc<HostSelectedExtensionOwnerCertificate>, transaction: &RepositoryHostInputTransaction, observations: &PathObservationEpoch) -> Result<(), EffectDriver> {
     if !transaction.frontier().contains("PATH") { return Err(SourcePreparationOutcome::Need(environment_need(key.workspace.dupe(), [CompactString::new("PATH")]))); }
     if let Err(message) = verified_environment(ctx, &key.workspace, transaction, [CompactString::new("PATH")]).await { return Err(complete_effect_error(host_input_error(certificate, key.ordinal, message), observations.dupe())); }
+    Ok(())
+}
+
+async fn verify_enumerated_environment(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    transaction: &RepositoryHostInputTransaction,
+    observations: &PathObservationEpoch,
+) -> Result<(), EffectDriver> {
+    let observed = ctx
+        .compute(&RepositoryEnvironmentSnapshotKey::new(key.workspace.dupe()))
+        .await
+        .map_err(|error| {
+            complete_effect_error(
+                host_input_error(certificate, key.ordinal, error.to_string()),
+                observations.dupe(),
+            )
+        })?;
+    if &observed != transaction.snapshot() {
+        return Err(complete_effect_error(
+            host_input_error(
+                certificate,
+                key.ordinal,
+                "repository environment snapshot differs from request",
+            ),
+            observations.dupe(),
+        ));
+    }
     Ok(())
 }
 
@@ -1171,6 +1201,97 @@ async fn resolve_which_candidate(
     }
 }
 
+fn classify_host_path_exists(
+    result: &Result<ResolvedPath, PathResolutionError>,
+) -> Result<bool, CompactString> {
+    match result {
+        Ok(path) => match path.state() {
+            ResolvedPathState::Missing if path.symlinks().is_empty() => Ok(false),
+            ResolvedPathState::Missing => {
+                Err("repository_ctx.path host exists does not support a dangling symlink".into())
+            }
+            ResolvedPathState::Present(metadata)
+                if matches!(
+                    metadata.kind(),
+                    PathNodeKind::RegularFile | PathNodeKind::Directory
+                ) =>
+            {
+                Ok(true)
+            }
+            ResolvedPathState::Present(_) => {
+                Err("repository_ctx.path host exists does not support this file type".into())
+            }
+        },
+        Err(PathResolutionError::Cycle { .. } | PathResolutionError::InfiniteExpansion { .. }) => {
+            Err("repository_ctx.path host exists does not support symlink cycles".into())
+        }
+        Err(error) => {
+            Err(format!("repository_ctx.path host exists resolution failed: {error:?}").into())
+        }
+    }
+}
+
+async fn resolve_host_path_exists(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    path: NormalizedAbsolutePath,
+    mode: EffectMode,
+    mut observations: PathObservationEpoch,
+) -> Result<(bool, PathObservationEpoch), EffectDriver> {
+    let fail = |message, observations| {
+        complete_effect_error(
+            host_input_error(certificate, key.ordinal, message),
+            observations,
+        )
+    };
+    match mode {
+        EffectMode::Legacy => match ctx
+            .compute(&ResolvedPathKey::new(PathObservationNamespace::Host, path))
+            .await
+        {
+            Ok(PathOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(
+                SourcePreparationNeeds::path(need),
+            )),
+            Ok(PathOutcome::Complete(result)) => classify_host_path_exists(&result)
+                .map(|value| (value, observations.dupe()))
+                .map_err(|message| fail(message, observations)),
+            Err(error) => Err(fail(error.to_string().into(), observations)),
+        },
+        EffectMode::Observed => match ctx
+            .compute(&ResolvedPathObservationKey::new(
+                PathObservationNamespace::Host,
+                path,
+            ))
+            .await
+        {
+            Ok(PathOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(
+                SourcePreparationNeeds::path(need),
+            )),
+            Ok(PathOutcome::Complete(Err(error))) => Err(SourcePreparationOutcome::Complete(Err(
+                HostSelectedRepositoryFileEffectObservationError::Merge {
+                    certificate: certificate.clone(),
+                    ordinal: key.ordinal,
+                    error,
+                },
+            ))),
+            Ok(PathOutcome::Complete(Ok(observed))) => {
+                observations = merge_definition_observations(
+                    mode,
+                    certificate,
+                    key.ordinal,
+                    observations,
+                    observed.observations(),
+                )?;
+                classify_host_path_exists(observed.result())
+                    .map(|value| (value, observations.dupe()))
+                    .map_err(|message| fail(message, observations))
+            }
+            Err(error) => Err(fail(error.to_string().into(), observations)),
+        },
+    }
+}
+
 #[rustfmt::skip]
 fn terminal_repository_rule_invocation_error(
     certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
@@ -1189,7 +1310,7 @@ fn terminal_repository_rule_invocation_error(
             HostSelectedRepositoryFileEffectError::Invocation {
                 certificate: certificate.clone(),
                 ordinal,
-                message: "repository_ctx.path argument must be an admitted Label, relative string, or path".into(),
+                message: "repository_ctx.path argument must be an admitted Label, normalized string, or path".into(),
             }
         }
         RepositoryRuleInvocationError::ReadArgument
@@ -1232,6 +1353,7 @@ fn terminal_repository_rule_invocation_error(
             }
         }
         RepositoryRuleInvocationError::LabelPathNeed(_)
+        | RepositoryRuleInvocationError::HostPathNeed(_)
         | RepositoryRuleInvocationError::RepositorySourceNeed(_)
         | RepositoryRuleInvocationError::WhichNeed(_) => unreachable!(),
     }
@@ -1260,19 +1382,26 @@ async fn invoke_repository_rule_with_label_paths(
     let mut prepared_paths = PreparedRepositoryLabelPaths::new();
     let mut prepared_sources = PreparedRepositoryLabelSources::new();
     let mut prepared_which = PreparedRepositoryWhichCandidates::new();
+    let mut prepared_host_paths = PreparedRepositoryHostPaths::new();
     loop {
         let capture = capture_enabled.then(InvocationPrintCapture::default);
-        match invoke_repository_rule(
+        let attempt = invoke_repository_rule_with_host_paths(
             implementation,
             &module.manifest,
             &prepared_paths,
             &prepared_sources,
             &prepared_which,
+            &prepared_host_paths,
             input.clone(),
             platform.clone(),
             transaction.snapshot().dupe(),
             capture.as_ref().map(|capture| capture as &dyn PrintHandler),
-        ) {
+        );
+        if attempt.environment_enumerated {
+            verify_enumerated_environment(ctx, key, certificate, transaction, &observations)
+                .await?;
+        }
+        match attempt.result {
             Ok(invocation) => return Ok((invocation, capture, observations)),
             Err(RepositoryRuleInvocationError::LabelPathNeed(address)) => {
                 if prepared_paths.contains_key(&address)
@@ -1306,6 +1435,32 @@ async fn invoke_repository_rule_with_label_paths(
                 .await?;
                 observations = next_observations;
                 prepared_paths.insert(address, value);
+            }
+            Err(RepositoryRuleInvocationError::HostPathNeed(path)) => {
+                if prepared_host_paths.contains_key(&path)
+                    || prepared_host_paths.len() == RepositoryEffectLimits::HOST_PATHS
+                {
+                    return Err(complete_effect_error(
+                        HostSelectedRepositoryFileEffectError::Invocation {
+                            certificate: certificate.clone(),
+                            ordinal: key.ordinal,
+                            message: "repository_ctx.path repeated or exceeded its host path limit"
+                                .into(),
+                        },
+                        observations,
+                    ));
+                }
+                let (exists, next_observations) = resolve_host_path_exists(
+                    ctx,
+                    key,
+                    certificate,
+                    path.clone(),
+                    mode,
+                    observations,
+                )
+                .await?;
+                observations = next_observations;
+                prepared_host_paths.insert(path, exists);
             }
             Err(RepositoryRuleInvocationError::RepositorySourceNeed(address)) => {
                 if prepared_sources.contains_key(&address)
@@ -1757,6 +1912,12 @@ mod tests {
             .changed_to(vec![(
                 RepositoryPlatformKey::new(workspace.dupe()),
                 platform,
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryEnvironmentSnapshotKey::new(workspace.dupe()),
+                snapshot.clone(),
             )])
             .unwrap();
         updater
@@ -2452,6 +2613,378 @@ ext = module_extension(implementation = impl)
                 .collect::<Vec<_>>(),
             ["local-java-exists=False"]
         );
+    }
+
+    #[tokio::test]
+    async fn repository_os_environ_tracks_membership_and_values_across_a_b_a() {
+        const ENV_EXTENSION: &str = r#"
+def write(ctx):
+    env = ctx.os.environ
+    ctx.file("env", "%s|%s" % (env.get("HOME", ""), "NETRC" in env))
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let tracker = Arc::new(EffectTracker::default());
+        let base =
+            base_transaction_with_tracker(&dice, MODULE, ENV_EXTENSION, true, tracker.clone())
+                .await;
+        let mut transaction = with_host_inputs_for(
+            base,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            environment_snapshot(&[("HOME", "/host/a")]),
+            RepositoryEnvironmentNameFrontier::empty(),
+        )
+        .await;
+        let owner = owner(&mut transaction).await;
+        let key = HostSelectedRepositoryFileEffectObservationKey::new(workspace.dupe(), owner, 0);
+        let contents = |outcome: SourcePreparationOutcome<
+            Result<ObservedHostSelectedRepositoryFileEffect, _>,
+        >| {
+            let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+                panic!("environment result did not complete")
+            };
+            observed
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .plan()
+                .effects()[0]
+                .content()
+                .to_vec()
+        };
+        assert_eq!(
+            contents(transaction.compute(&key).await.unwrap()),
+            b"/host/a|False"
+        );
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            environment_snapshot(&[("HOME", "/host/b"), ("NETRC", "/host/b/.netrc")]),
+            RepositoryEnvironmentNameFrontier::empty(),
+        )
+        .await;
+        assert_eq!(
+            contents(transaction.compute(&key).await.unwrap()),
+            b"/host/b|True"
+        );
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace,
+            Some(tracker),
+            RepositoryPlatform::new("linux", "x86_64"),
+            environment_snapshot(&[("HOME", "/host/a")]),
+            RepositoryEnvironmentNameFrontier::empty(),
+        )
+        .await;
+        assert_eq!(
+            contents(transaction.compute(&key).await.unwrap()),
+            b"/host/a|False"
+        );
+    }
+
+    fn host_exists_observation(
+        demand: &PathObservationDemand,
+        direct_kind: Option<PathNodeKind>,
+        link_target: &str,
+    ) -> PathObservationResult {
+        assert_eq!(demand.namespace(), PathObservationNamespace::Host);
+        let path = demand.path().as_path();
+        match demand.operation() {
+            PathObservationOperation::Lstat => {
+                let kind = if ["/", "/host", "/host/a", "/host/b"]
+                    .iter()
+                    .any(|candidate| path == Path::new(candidate))
+                {
+                    Some(PathNodeKind::Directory)
+                } else if path == Path::new("/host/a/.netrc") {
+                    direct_kind
+                } else if path == Path::new("/host/b/.netrc") {
+                    Some(PathNodeKind::Symlink)
+                } else if path == Path::new("/host/b/authfile") {
+                    Some(PathNodeKind::RegularFile)
+                } else {
+                    None
+                };
+                match kind {
+                    Some(kind) => PathObservationResult::Lstat(PathOperationResult::Present(
+                        PathLstat::new(kind, 1, 2, 3, 4, 0o755),
+                    )),
+                    None => PathObservationResult::Lstat(PathOperationResult::Missing),
+                }
+            }
+            PathObservationOperation::ReadLink if path == Path::new("/host/b/.netrc") => {
+                PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(
+                    PathBuf::from(link_target),
+                )))
+            }
+            operation => panic!("unexpected host path observation: {operation:?}"),
+        }
+    }
+
+    async fn update_host_exists_need(
+        mut transaction: dice::DiceTransaction,
+        need: &SourcePreparationNeeds,
+        direct_kind: Option<PathNodeKind>,
+        link_target: &str,
+    ) -> dice::DiceTransaction {
+        let epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        let mut observations = epoch
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .collect::<Vec<_>>();
+        for demand in need.path_observations().unwrap().demands() {
+            observations.retain(|(current, _)| current != demand);
+            observations.push((
+                demand.dupe(),
+                Arc::new(host_exists_observation(demand, direct_kind, link_target)),
+            ));
+        }
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::from_shared(observations).unwrap(),
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+
+    async fn revise_host_exists_lstat(
+        mut transaction: dice::DiceTransaction,
+        kind: Option<PathNodeKind>,
+    ) -> dice::DiceTransaction {
+        let epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        let mut found = false;
+        let observations = epoch
+            .observations()
+            .iter()
+            .map(|(demand, result)| {
+                if demand.path().as_path() == Path::new("/host/a/.netrc") {
+                    found = true;
+                    (
+                        demand.dupe(),
+                        Arc::new(host_exists_observation(demand, kind, "authfile")),
+                    )
+                } else {
+                    (demand.dupe(), result.dupe())
+                }
+            })
+            .collect::<Vec<_>>();
+        assert!(found, "same-path observation must already be registered");
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::from_shared(observations).unwrap(),
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+
+    #[tokio::test]
+    async fn selected_repository_host_path_exists_replays_home_and_path_a_b_a() {
+        const EXTENSION: &str = r#"
+def write(ctx):
+    home = ctx.os.environ.get("HOME", "")
+    ctx.file("exists", str(ctx.path(home + "/.netrc").exists))
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let tracker = Arc::new(EffectTracker::default());
+        let base =
+            base_transaction_with_tracker(&dice, MODULE, EXTENSION, true, tracker.clone()).await;
+        let mut transaction = with_host_inputs_for(
+            base,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            environment_snapshot(&[("HOME", "/host/a")]),
+            RepositoryEnvironmentNameFrontier::empty(),
+        )
+        .await;
+        let owner = owner(&mut transaction).await;
+        let key = HostSelectedRepositoryFileEffectObservationKey::new(workspace.dupe(), owner, 0);
+        for (home, expected) in [
+            ("/host/a", b"False".as_slice()),
+            ("/host/b", b"True".as_slice()),
+            ("/host/a", b"False".as_slice()),
+        ] {
+            transaction = with_host_inputs_for(
+                transaction,
+                workspace.dupe(),
+                Some(tracker.clone()),
+                RepositoryPlatform::new("linux", "x86_64"),
+                environment_snapshot(&[("HOME", home)]),
+                RepositoryEnvironmentNameFrontier::empty(),
+            )
+            .await;
+            let observed = loop {
+                match transaction.compute(&key).await.unwrap() {
+                    SourcePreparationOutcome::Need(need) => {
+                        assert!(need.repository_environment().is_none());
+                        transaction =
+                            update_host_exists_need(transaction, &need, None, "authfile").await;
+                    }
+                    SourcePreparationOutcome::Complete(Ok(value)) => break value,
+                    terminal => panic!("host path exists failed: {terminal:?}"),
+                }
+            };
+            assert_eq!(
+                observed
+                    .result()
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .plan()
+                    .effects()[0]
+                    .content(),
+                expected
+            );
+            assert!(
+                observed.observations().observations().keys().any(|demand| {
+                    demand.path().as_path() == Path::new(&format!("{home}/.netrc"))
+                })
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn selected_repository_host_path_exists_replays_same_path_absent_file_directory_absent() {
+        const EXTENSION: &str = r#"
+def write(ctx):
+    ctx.file("exists", str(ctx.path(ctx.os.environ["HOME"] + "/.netrc").exists))
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let tracker = Arc::new(EffectTracker::default());
+        let base =
+            base_transaction_with_tracker(&dice, MODULE, EXTENSION, true, tracker.clone()).await;
+        let mut transaction = with_host_inputs_for(
+            base,
+            workspace.dupe(),
+            Some(tracker),
+            RepositoryPlatform::new("linux", "x86_64"),
+            environment_snapshot(&[("HOME", "/host/a")]),
+            RepositoryEnvironmentNameFrontier::empty(),
+        )
+        .await;
+        let owner = owner(&mut transaction).await;
+        let key = HostSelectedRepositoryFileEffectObservationKey::new(workspace, owner, 0);
+        for (index, (kind, expected)) in [
+            (None, b"False".as_slice()),
+            (Some(PathNodeKind::RegularFile), b"True".as_slice()),
+            (Some(PathNodeKind::Directory), b"True".as_slice()),
+            (None, b"False".as_slice()),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            if index > 0 {
+                transaction = revise_host_exists_lstat(transaction, kind).await;
+            }
+            let observed = loop {
+                match transaction.compute(&key).await.unwrap() {
+                    SourcePreparationOutcome::Need(need) => {
+                        transaction =
+                            update_host_exists_need(transaction, &need, kind, "authfile").await;
+                    }
+                    SourcePreparationOutcome::Complete(Ok(value)) => break value,
+                    terminal => panic!("same-path exists failed: {terminal:?}"),
+                }
+            };
+            assert_eq!(
+                observed
+                    .result()
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .plan()
+                    .effects()[0]
+                    .content(),
+                expected,
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn selected_repository_host_path_exists_rejects_dangling_and_cycle() {
+        const EXTENSION: &str = r#"
+def write(ctx):
+    ctx.file("exists", str(ctx.path(ctx.os.environ["HOME"] + "/.netrc").exists))
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        for link_target in ["missingfile", ".netrc"] {
+            let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+            let tracker = Arc::new(EffectTracker::default());
+            let base =
+                base_transaction_with_tracker(&dice, MODULE, EXTENSION, true, tracker.clone())
+                    .await;
+            let mut transaction = with_host_inputs_for(
+                base,
+                workspace.dupe(),
+                Some(tracker),
+                RepositoryPlatform::new("linux", "x86_64"),
+                environment_snapshot(&[("HOME", "/host/b")]),
+                RepositoryEnvironmentNameFrontier::empty(),
+            )
+            .await;
+            let owner = owner(&mut transaction).await;
+            let key = HostSelectedRepositoryFileEffectObservationKey::new(workspace, owner, 0);
+            let mut rejected = false;
+            for _ in 0..32 {
+                match transaction.compute(&key).await.unwrap() {
+                    SourcePreparationOutcome::Need(need) => {
+                        transaction =
+                            update_host_exists_need(transaction, &need, None, link_target).await;
+                    }
+                    SourcePreparationOutcome::Complete(Ok(value))
+                        if matches!(
+                            value.result().as_ref(),
+                            Err(HostSelectedRepositoryFileEffectError::HostInput { message, .. })
+                                if message.to_string() == if link_target == "missingfile" {
+                                    "repository_ctx.path host exists does not support a dangling symlink"
+                                } else {
+                                    "repository_ctx.path host exists does not support symlink cycles"
+                                }
+                        ) =>
+                    {
+                        rejected = true;
+                        break;
+                    }
+                    SourcePreparationOutcome::Complete(Ok(value)) => panic!(
+                        "{link_target} unexpectedly completed with {:?}",
+                        value.result().as_ref().as_ref().unwrap().plan().effects()[0].content()
+                    ),
+                    terminal => panic!("{link_target} did not complete: {terminal:?}"),
+                }
+            }
+            assert!(
+                rejected,
+                "{link_target} did not reach an unsupported terminal"
+            );
+        }
     }
 
     fn which_observation(demand: &PathObservationDemand) -> PathObservationResult {
@@ -4231,7 +4764,8 @@ ext=module_extension(implementation=impl)
             "SourcePreparationOutcome::Complete(Err(error))",
             "RepositoryEnvironmentCellKey::new(",
             "RepositoryPlatformKey::new(",
-            "invoke_repository_rule(",
+            "invoke_repository_rule_with_host_paths(",
+            "RepositoryEnvironmentSnapshotKey::new(",
             "HostCanonicalRepositoryLoadRouteKey::new(",
             "HostRepositoryLabelPathObservationKey::new_",
             "PreparedRepositoryLabelPaths::new()",

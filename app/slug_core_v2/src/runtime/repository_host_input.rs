@@ -10,10 +10,12 @@
 
 use dice::DiceTransactionUpdater;
 use dice::UserComputationData;
+use dupe::Dupe;
 use slug_bzlmod_v2::RepositoryEnvironmentCell;
 use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
 use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
 use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
+use slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey;
 use slug_bzlmod_v2::RepositoryHostInputTransaction;
 use slug_bzlmod_v2::RepositoryPlatform;
 use slug_bzlmod_v2::RepositoryPlatformKey;
@@ -46,6 +48,16 @@ pub(super) fn inject_repository_host_inputs(
     updater
         .changed_to([(RepositoryPlatformKey::new(workspace.clone()), platform)])
         .map_err(|error| format!("injecting repository Host platform: {error}"))?;
+
+    // Every request or revision installs the complete snapshot, including an
+    // empty one. Eager `repository_ctx.os.environ` projections must never
+    // inherit a prior request's environment through DICE.
+    updater
+        .changed_to([(
+            RepositoryEnvironmentSnapshotKey::new(workspace.clone()),
+            snapshot.dupe(),
+        )])
+        .map_err(|error| format!("injecting repository environment snapshot: {error}"))?;
 
     let observed = desired_frontier
         .iter()

@@ -172,6 +172,39 @@ impl fmt::Debug for RepositoryEnvironmentSnapshot {
     }
 }
 
+/// The complete command repository environment for one workspace. Consumers
+/// of `repository_ctx.os.environ` depend on this key, including membership and
+/// absent-name lookups that cannot be represented by the narrower cell keys.
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub struct RepositoryEnvironmentSnapshotKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl RepositoryEnvironmentSnapshotKey {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+
+    pub fn workspace(&self) -> &NormalizedAbsolutePath {
+        &self.workspace
+    }
+}
+
+impl fmt::Display for RepositoryEnvironmentSnapshotKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "repository-environment-snapshot:{}", self.workspace)
+    }
+}
+
+impl InjectedKey for RepositoryEnvironmentSnapshotKey {
+    type Value = RepositoryEnvironmentSnapshot;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 /// Immutable repository Host inputs installed for one DICE transaction.
 ///
 /// This type is shared below core so the loading-owned repository context can
@@ -549,6 +582,15 @@ mod tests {
         let foreign = RepositoryEnvironmentCellKey::new(workspace("/two"), "A");
         assert_ne!(key_a, key_b);
         assert_ne!(key_a, foreign);
+        let snapshot_key = RepositoryEnvironmentSnapshotKey::new(workspace("/one"));
+        assert_eq!(
+            snapshot_key,
+            RepositoryEnvironmentSnapshotKey::new(workspace("/one"))
+        );
+        assert_ne!(
+            snapshot_key,
+            RepositoryEnvironmentSnapshotKey::new(workspace("/two"))
+        );
         let platform = RepositoryPlatformKey::new(workspace("/one"));
         assert_eq!(platform, RepositoryPlatformKey::new(workspace("/one")));
         assert_ne!(platform, RepositoryPlatformKey::new(workspace("/two")));
@@ -560,6 +602,47 @@ mod tests {
             RepositoryPlatform::new("linux", "x86_64"),
             RepositoryPlatform::new("linux", "aarch64")
         );
+    }
+
+    #[test]
+    fn full_snapshot_key_compares_values_names_and_absence_without_debug_leaks() {
+        let secret: Arc<str> = "sentinel-secret".into();
+        let first = RepositoryEnvironmentSnapshot::from_canonical(Arc::from([
+            RepositoryEnvironmentEntry::new("HOME", secret.clone()),
+            RepositoryEnvironmentEntry::new("NETRC", ""),
+        ]))
+        .unwrap();
+        let equal = first.dupe();
+        let changed = RepositoryEnvironmentSnapshot::from_canonical(Arc::from([
+            RepositoryEnvironmentEntry::new("HOME", "other"),
+            RepositoryEnvironmentEntry::new("NETRC", ""),
+        ]))
+        .unwrap();
+        let removed = RepositoryEnvironmentSnapshot::from_canonical(Arc::from([
+            RepositoryEnvironmentEntry::new("HOME", secret.clone()),
+        ]))
+        .unwrap();
+        let added = RepositoryEnvironmentSnapshot::from_canonical(Arc::from([
+            RepositoryEnvironmentEntry::new("HOME", secret.clone()),
+            RepositoryEnvironmentEntry::new("NETRC", ""),
+            RepositoryEnvironmentEntry::new("OTHER", "present"),
+        ]))
+        .unwrap();
+        let empty = RepositoryEnvironmentSnapshot::empty();
+        assert!(Arc::ptr_eq(
+            first.get("HOME").unwrap(),
+            equal.get("HOME").unwrap()
+        ));
+        assert!(<RepositoryEnvironmentSnapshotKey as InjectedKey>::equality(
+            &first, &equal
+        ));
+        for different in [&changed, &removed, &added, &empty] {
+            assert!(
+                !<RepositoryEnvironmentSnapshotKey as InjectedKey>::equality(&first, different)
+            );
+        }
+        let key = RepositoryEnvironmentSnapshotKey::new(workspace("/one"));
+        assert!(!format!("{first:?} {key:?}").contains("sentinel-secret"));
     }
 
     #[test]
