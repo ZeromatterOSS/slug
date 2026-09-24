@@ -1859,6 +1859,80 @@ async fn labels_projects_supported_native_filegroup_and_alias_attributes() {
 }
 
 #[tokio::test]
+async fn native_filegroup_and_alias_testonly_kwargs_project_effective_value() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = 'root')\n");
+    write(
+        workspace.join("pkg/defs.bzl"),
+        "def emit_filegroup(name, testonly = None):\n    native.filegroup(name = name, testonly = testonly)\ndef emit_alias(name, testonly = None):\n    native.alias(name = name, actual = ':leaf', testonly = testonly)\n",
+    );
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "load(':defs.bzl', 'emit_filegroup', 'emit_alias')\nfilegroup(name = 'leaf')\nfilegroup(name = 'direct_one', testonly = 1)\nfilegroup(name = 'direct_zero', testonly = 0)\nfilegroup(name = 'direct_none', testonly = None)\nfilegroup(name = 'direct_omitted')\nemit_filegroup(name = 'macro_one', testonly = 1)\nemit_filegroup(name = 'macro_none')\nalias(name = 'alias_direct_zero', actual = ':leaf', testonly = 0)\nalias(name = 'alias_direct_none', actual = ':leaf', testonly = None)\nemit_alias(name = 'alias_macro_one', testonly = 1)\nemit_alias(name = 'alias_macro_none')\npackage(default_testonly = True)\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let graph = transaction
+        .compute(&UnconfiguredPackageGraphKey {
+            workspace: workspace.clone(),
+            package: PathBuf::from("pkg"),
+        })
+        .await
+        .unwrap();
+    let graph = graph.as_ref().as_ref().unwrap();
+    for (name, effective, explicit) in [
+        ("direct_one", true, true),
+        ("direct_zero", false, true),
+        ("direct_none", true, false),
+        ("direct_omitted", true, false),
+        ("macro_one", true, true),
+        ("macro_none", true, false),
+        ("alias_direct_zero", false, true),
+        ("alias_direct_none", true, false),
+        ("alias_macro_one", true, true),
+        ("alias_macro_none", true, false),
+    ] {
+        let node = graph
+            .nodes
+            .values()
+            .find(|node| node.label.to_string() == format!("//pkg:{name}"))
+            .unwrap();
+        let testonly = node
+            .attributes
+            .iter()
+            .find(|attribute| attribute.name == "testonly")
+            .unwrap();
+        assert!(
+            matches!(
+                testonly.value.as_ref().map(|value| &value.value),
+                Some(CoercedAttributeValue::Boolean(value)) if *value == effective
+            ),
+            "{name}: {testonly:?}"
+        );
+        assert_eq!(testonly.explicit, explicit, "{name}");
+    }
+    for (expression, expected) in [
+        ("deps(//pkg:direct_one, 1)", "//pkg:direct_one\n"),
+        ("deps(//pkg:macro_one, 1)", "//pkg:macro_one\n"),
+        ("labels(actual, //pkg:alias_macro_one)", "//pkg:leaf\n"),
+        (
+            "deps(//pkg:alias_macro_one, 1)",
+            "//pkg:alias_macro_one\n//pkg:leaf\n",
+        ),
+    ] {
+        let output = evaluate_loading_query(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Auto,
+        )
+        .await
+        .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+}
+
+#[tokio::test]
 async fn configurable_alias_projects_branch_and_condition_edges() {
     let workspace = scratch();
     write(workspace.join("MODULE.bazel"), "module(name = 'root')\n");

@@ -9677,3 +9677,19 @@ tests, direct checks and rebuilt authentic smoke support this bounded slice.
 The replay clears protobuf BUILD:682 and next stops at
 `protobuf.bzl:729` on `native.filegroup`'s non-boolean `testonly`. M7A
 remains partial.
+
+### Native RuleClass kwargs None/Boolean Loading accepted (2026-09-24)
+
+WP827 applies Bazel 9.2's common native-attribute conversion at Slug's
+existing `coerce_native_overrides` seam. After validating a known callable
+attribute, direct None leaves no override and retains its late package
+default/provenance; Boolean attrs accept bool and integer 0/1 as typed
+Boolean with explicit provenance. Invalid integers, strings, selectors and
+unknown-attribute None remain rejected. The accepted filegroup/alias oracle
+and 13 focused/protected Loading/Query/Analysis tests cover default true/
+false, direct/macro calls, non-Boolean None, source A/B/A and unchanged
+configured filegroup rejection. The rebuilt authentic `//:probe` replay
+clears protobuf's PHP `native.filegroup(testonly=1)` and next stops at
+missing `@@bazel_tools//tools/jdk` BUILD content. Direct native parameters,
+configured test policy and that built-in repository content are separate
+surfaces; M7A remains partial.

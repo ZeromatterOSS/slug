@@ -29,19 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-126-m7a-lazy-attached-aspect-target-r1
+Packet: WP-7-127-m7a-native-kwargs-none-boolean-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP826 admits exact Loading/ordinary Query for protobuf's nonempty
-`cc_proto_library.deps` attachment, which Bazel query proves is in the
-loaded package but absent from `//:probe`'s selected dependency path.
-Producer-owned aspect identity/callable is retained in one sparse target
-row; selected configured analysis fails before plain dependency/provider
-use. Seven focused tests, direct compiles and rebuilt authentic smoke pass
-their bounded gates. The replay clears protobuf BUILD:682 and next stops at
-`protobuf.bzl:729` on a `native.filegroup(testonly = testonly)` non-boolean
-value. Actual aspect propagation, providers/actions and C++ remain deferred.
-Accepted WP825 at `5153bbc11` was the immediate predecessor. M7A is partial.
+WP827 admits Bazel 9.2 Loading/ordinary Query semantics for validated
+native RuleClass kwargs: direct None is omission, while Boolean attrs accept
+`False`/`True` and integer `0`/`1`. The authentic protobuf PHP path passes
+integer 1 to `native.filegroup(testonly=...)`; pinned source, an
+ignored-RC/no-fetch filegroup/alias oracle and 13 focused/protected tests
+support this slice. The rebuilt replay clears protobuf.bzl:729 and next
+stops at missing `@@bazel_tools//tools/jdk` BUILD content. Configured native
+test policy remains deferred. Accepted WP826 at `de50a3a9b` was the
+immediate predecessor; M7A is partial.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

@@ -3616,12 +3616,20 @@ fn coerce_native_overrides<'v>(
                     )
                 }
             }
-            if name == PACKAGE_METADATA_ATTRIBUTE && value.is_none() {
+            // Bazel validates the attribute name before treating direct None
+            // as omission. Keep the declaration's existing default and
+            // provenance rather than publishing an explicit override.
+            if value.is_none() {
                 return Ok(None);
             }
             let mut value = match schema.kind() {
                 AttributeKind::Boolean => value
                     .unpack_bool()
+                    .or_else(|| match value.unpack_i32() {
+                        Some(0) => Some(false),
+                        Some(1) => Some(true),
+                        _ => None,
+                    })
                     .map(CoercedAttributeValue::Boolean)
                     .ok_or_else(|| anyhow::anyhow!("native attribute `{name}` must be a bool"))?,
                 AttributeKind::Integer => value

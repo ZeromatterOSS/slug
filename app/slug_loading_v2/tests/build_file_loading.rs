@@ -5934,6 +5934,214 @@ fn initializer_imported_selector_source_restores_on_same_dice() {
 }
 
 #[test]
+fn protobuf_php_filegroup_macro_accepts_integer_testonly() {
+    let workspace = scratch("protobuf-php-filegroup-testonly");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("protobuf.bzl"),
+        "def internal_php_proto_library(name, testonly = None):\n    native.filegroup(name = name, srcs = [], testonly = testonly)\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(':protobuf.bzl', 'internal_php_proto_library')\ninternal_php_proto_library(name = 'test_messages_proto3_php_proto', testonly = 1)\n",
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let testonly = loaded
+        .native_attributes("test_messages_proto3_php_proto")
+        .unwrap()
+        .get("testonly")
+        .unwrap()
+        .1;
+    assert_eq!(testonly.provenance, AttributeProvenance::Explicit);
+    assert_eq!(testonly.value, CoercedAttributeValue::Boolean(true));
+}
+
+#[test]
+fn native_filegroup_and_alias_testonly_kwargs_keep_values_and_default_provenance() {
+    let workspace = scratch("native-testonly-kwargs");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def emit_filegroup(name, **kwargs):\n    native.filegroup(name = name, **kwargs)\n\ndef emit_alias(name, **kwargs):\n    native.alias(name = name, actual = ':leaf', **kwargs)\n",
+    )
+    .unwrap();
+    let build_file = package.join(BUILD_FILE_PRIMARY);
+    let cases = [
+        ("zero", Some("0"), Some(false)),
+        ("one", Some("1"), Some(true)),
+        ("false", Some("False"), Some(false)),
+        ("true", Some("True"), Some(true)),
+        ("none", Some("None"), None),
+        ("omitted", None, None),
+    ];
+    let routes = [
+        ("filegroup", "direct_filegroup", false),
+        ("alias", "direct_alias", true),
+        ("emit_filegroup", "macro_filegroup", false),
+        ("emit_alias", "macro_alias", false),
+    ];
+    for default in [false, true] {
+        let mut source = String::from(
+            "load(':defs.bzl', 'emit_filegroup', 'emit_alias')\nfilegroup(name = 'leaf')\n",
+        );
+        for (callable, prefix, needs_actual) in routes {
+            for (case, argument, _) in cases {
+                let actual = if needs_actual {
+                    ", actual = ':leaf'"
+                } else {
+                    ""
+                };
+                let testonly =
+                    argument.map_or(String::new(), |value| format!(", testonly = {value}"));
+                source.push_str(&format!(
+                    "{callable}(name = '{prefix}_{case}'{actual}{testonly})\n"
+                ));
+            }
+        }
+        source.push_str(&format!(
+            "package(default_testonly = {})\n",
+            if default { "True" } else { "False" }
+        ));
+        fs::write(&build_file, source).unwrap();
+        let loaded = load_package(&workspace, &package);
+        for (_, prefix, _) in routes {
+            for (case, _, supplied) in cases {
+                let name = format!("{prefix}_{case}");
+                let attribute = loaded
+                    .native_attributes(&name)
+                    .unwrap()
+                    .get("testonly")
+                    .unwrap()
+                    .1;
+                assert_eq!(
+                    attribute.value,
+                    CoercedAttributeValue::Boolean(supplied.unwrap_or(default)),
+                    "{name} with package default {default}"
+                );
+                assert_eq!(
+                    attribute.provenance,
+                    if supplied.is_some() {
+                        AttributeProvenance::Explicit
+                    } else {
+                        AttributeProvenance::Default
+                    },
+                    "{name} with package default {default}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn native_filegroup_none_kwargs_inherit_and_empty_kwargs_remain_explicit() {
+    let workspace = scratch("native-filegroup-none-kwargs");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "filegroup(name = 'none', tags = None, data = None)\nfilegroup(name = 'empty', tags = [], data = [])\n",
+    )
+    .unwrap();
+    let loaded = load_package(&workspace, &package);
+    for (name, provenance) in [
+        ("none", AttributeProvenance::Default),
+        ("empty", AttributeProvenance::Explicit),
+    ] {
+        let attributes = loaded.native_attributes(name).unwrap();
+        let tags = attributes.get("tags").unwrap().1;
+        let data = attributes.get("data").unwrap().1;
+        assert_eq!(tags.provenance, provenance, "{name} tags");
+        assert_eq!(data.provenance, provenance, "{name} data");
+        assert!(
+            matches!(&tags.value, CoercedAttributeValue::StringList(values) if values.is_empty())
+        );
+        assert!(
+            matches!(&data.value, CoercedAttributeValue::LabelList(values) if values.is_empty())
+        );
+    }
+}
+
+#[test]
+fn native_testonly_kwargs_reject_invalid_values_and_unknown_none() {
+    let workspace = scratch("native-testonly-invalid-kwargs");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    let build_file = package.join(BUILD_FILE_PRIMARY);
+    for (source, diagnostic) in [
+        ("filegroup(name = 'bad', testonly = 2)", "must be a bool"),
+        ("filegroup(name = 'bad', testonly = -1)", "must be a bool"),
+        ("filegroup(name = 'bad', testonly = '1')", "must be a bool"),
+        (
+            "alias(name = 'bad', actual = ':leaf', testonly = 2)",
+            "must be a bool",
+        ),
+        (
+            "filegroup(name = 'bad', testonly = select({'//conditions:default': True}))",
+            "must be a bool",
+        ),
+        ("filegroup(name = 'bad', unknown = None)", "not declared"),
+    ] {
+        fs::write(&build_file, source).unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(diagnostic), "{source}: {error}");
+    }
+}
+
+#[test]
+fn native_filegroup_testonly_integer_source_restores_on_same_dice() {
+    let workspace = scratch("native-filegroup-testonly-aba");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = 'root')\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def emit(testonly):\n    native.filegroup(name = 'subject', testonly = testonly)\n",
+    )
+    .unwrap();
+    let build_file = package.join(BUILD_FILE_PRIMARY);
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load = |testonly| {
+        fs::write(
+            &build_file,
+            format!("load(':defs.bzl', 'emit')\nemit(testonly = {testonly})\n"),
+        )
+        .unwrap();
+        runtime
+            .block_on(load_package_with_retained_dice(&dice, &workspace, &package))
+            .unwrap()
+    };
+    let first = load(1);
+    let changed = load(0);
+    let restored = load(1);
+    let value = |loaded: &slug_loading_v2::LegacyLoadedPackage| {
+        loaded
+            .native_attributes("subject")
+            .unwrap()
+            .get("testonly")
+            .unwrap()
+            .1
+            .clone()
+    };
+    assert_eq!(value(&first).value, CoercedAttributeValue::Boolean(true));
+    assert_eq!(value(&changed).value, CoercedAttributeValue::Boolean(false));
+    assert_eq!(value(&first).provenance, AttributeProvenance::Explicit);
+    assert_ne!(first, changed);
+    assert_eq!(first, restored);
+}
+
+#[test]
 fn build_file_genrule_retains_protobuf_declaration_and_effective_testonly() {
     let workspace = scratch("build-file-genrule");
     let package = workspace.join("protobuf");
