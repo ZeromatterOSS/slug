@@ -9164,7 +9164,12 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 definition.named_exec_group.as_deref(),
                 "repository_rule",
             )?;
-            if definition.configurable_set
+            if (name.starts_with('_')
+                && !matches!(
+                    definition.kind,
+                    AttributeKind::String | AttributeKind::Label
+                ))
+                || definition.configurable_set
                 || definition.late_bound_default.is_some()
                 || definition.computed_default.is_some()
                 || definition.transition.is_some()
@@ -9885,10 +9890,12 @@ fn aspect_globals(builder: &mut GlobalsBuilder) {
 }
 
 fn is_repository_rule_attribute_name(name: &str) -> bool {
-    name.bytes()
-        .enumerate()
-        .all(|(index, byte)| byte.is_ascii_alphanumeric() || (index > 0 && byte == b'_'))
-        && name.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
+    let name = name.strip_prefix('_').unwrap_or(name);
+    name.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
+        && name
+            .bytes()
+            .skip(1)
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
 }
 
 #[starlark_module]

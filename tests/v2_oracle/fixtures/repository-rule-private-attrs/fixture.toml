@@ -1,0 +1,87 @@
+[fixture]
+name = "repository-rule-private-attrs"
+description = "Bazel 9.2 private repository_rule string and label defaults, overrides, None, and invalid concrete arguments."
+comparison = "message_shape"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Self-contained Loading/repository-definition evidence. Private string and label values are observed through repository_ctx.attr in generated BUILD target names. The label override is called from a .bzl module extension because Label() is not available in MODULE.bazel. Wrong-type and unknown-concrete arguments are isolated after all positive rows by MODULE mutations. No network, upstream source copy, or credential is used."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryModule.java#repositoryRule",
+  "src/main/java/com/google/devtools/build/lib/packages/AttributeValueSource.java#convertToNativeName",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/RepoRule.java#instantiate",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/AttributeUtils.java#typeCheckAttrValues",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/RepoDefinition.java#getValue",
+  "rules_python 1.7.0 python/private/python_repository.bzl:352 (_rule_name)",
+  "rules_python 1.7.0 python/private/pythons_hub.bzl:186 (private label default)",
+]
+translation_notes = "The local string declaration follows the source-selected _rule_name kind/default, without copying upstream code. Its generated target name makes default-versus-override visible. The label rule reads distinct fixture-local files to distinguish typed default and concrete override. Unknown None is accepted before attribute-name lookup; concrete invalid arguments fail during module evaluation. This fixture does not claim Slug Query parity or Python toolchain execution."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture repository-rule-private-attrs --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture repository-rule-private-attrs --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
+
+[[commands]]
+name = "omitted_private_string_uses_default"
+argv = ["query", "@omitted//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A@omitted//:value_python_repository\n?\Z']
+
+[[commands]]
+name = "concrete_private_string_override"
+argv = ["query", "@concrete//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A@concrete//:value_override\n?\Z']
+
+[[commands]]
+name = "direct_none_uses_private_string_default"
+argv = ["query", "@direct_none//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A@direct_none//:value_python_repository\n?\Z']
+
+[[commands]]
+name = "unknown_none_is_ignored_before_name_lookup"
+argv = ["query", "@unknown_none//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A@unknown_none//:value_python_repository\n?\Z']
+
+[[commands]]
+name = "private_label_default_is_read"
+argv = ["query", "@label_default//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A@label_default//:label_MARKER\n?\Z']
+
+[[commands]]
+name = "concrete_private_label_override_is_read"
+argv = ["query", "@label_override//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 0
+stdout_patterns = ['\A@label_override//:label_OTHER\n?\Z']
+
+[[commands]]
+name = "wrong_concrete_private_string_type_fails"
+argv = ["query", "@omitted//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 7
+stdout_patterns = ['\A\Z']
+stderr_contains = ["expected value of type 'string' for attribute '_rule_name', but got 7 (int)"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = 'string_repo(name = "concrete", _rule_name = "override")'
+  replace = 'string_repo(name = "concrete", _rule_name = 7)'
+
+[[commands]]
+name = "unknown_concrete_private_name_fails"
+argv = ["query", "@omitted//:all", "--output=label", "--noshow_progress", "--lockfile_mode=off", "--repository_disable_download"]
+expected_exit = 7
+stdout_patterns = ['\A\Z']
+stderr_contains = ["unknown attribute '_rule_typo' provided", "did you mean '_rule_name'?"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = 'string_repo(name = "concrete", _rule_name = 7)'
+  replace = 'string_repo(name = "concrete", _rule_name = "override")'
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = 'string_repo(name = "unknown_none", _rule_typo = None)'
+  replace = 'string_repo(name = "unknown_none", _rule_typo = "override")'

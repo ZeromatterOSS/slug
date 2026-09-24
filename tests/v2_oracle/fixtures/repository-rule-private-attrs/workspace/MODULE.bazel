@@ -1,0 +1,10 @@
+module(name = "private_repo_attr_probe")
+
+string_repo = use_repo_rule("//:repo.bzl", "string_repo")
+string_repo(name = "omitted")
+string_repo(name = "concrete", _rule_name = "override")
+string_repo(name = "direct_none", _rule_name = None)
+string_repo(name = "unknown_none", _rule_typo = None)
+
+labels = use_extension("//:ext.bzl", "labels")
+use_repo(labels, "label_default", "label_override")

@@ -1,0 +1,320 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "@omitted//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@omitted//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "omitted_private_string_uses_default",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...",
+      "normalized_stdout": "@omitted//:value_python_repository",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n",
+      "stdout": "@omitted//:value_python_repository\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@concrete//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@concrete//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "concrete_private_string_override",
+      "normalized_stderr": "",
+      "normalized_stdout": "@concrete//:value_override",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@concrete//:value_override\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@direct_none//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@direct_none//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "direct_none_uses_private_string_default",
+      "normalized_stderr": "",
+      "normalized_stdout": "@direct_none//:value_python_repository",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@direct_none//:value_python_repository\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@unknown_none//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@unknown_none//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "unknown_none_is_ignored_before_name_lookup",
+      "normalized_stderr": "",
+      "normalized_stdout": "@unknown_none//:value_python_repository",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@unknown_none//:value_python_repository\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@label_default//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@label_default//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "private_label_default_is_read",
+      "normalized_stderr": "",
+      "normalized_stdout": "@label_default//:label_MARKER",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@label_default//:label_MARKER\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@label_override//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@label_override//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "concrete_private_label_override_is_read",
+      "normalized_stderr": "",
+      "normalized_stdout": "@label_override//:label_OTHER",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@label_override//:label_OTHER\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@omitted//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@omitted//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "string_repo(name = \"concrete\", _rule_name = \"override\")",
+          "old_digest_hint": "393",
+          "path": "MODULE.bazel",
+          "replace": "string_repo(name = \"concrete\", _rule_name = 7)"
+        }
+      ],
+      "name": "wrong_concrete_private_string_type_fails",
+      "normalized_stderr": "ERROR: <workspace>/MODULE.bazel:5:12: Traceback (most recent call last):\n\tFile \"<workspace>/MODULE.bazel\", line 5, column 12, in <toplevel>\n\t\tstring_repo(name = \"concrete\", _rule_name = 7)\nError: in call to 'string_repo' repo rule with name 'concrete', expected value of type 'string' for attribute '_rule_name', but got 7 (int)\nERROR: Target parsing failed due to unexpected exception: Traceback (most recent call last):\n\tFile \"<workspace>/MODULE.bazel\", line 5, column 12, in <toplevel>\n\t\tstring_repo(name = \"concrete\", _rule_name = 7)\nError: in call to 'string_repo' repo rule with name 'concrete', expected value of type 'string' for attribute '_rule_name', but got 7 (int)",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "ERROR: /tmp/slug-wp799-fixture-gen-VsplYs/runs/repository-rule-private-attrs/20260923-222857-1217962-bazel/workspace/MODULE.bazel:5:12: Traceback (most recent call last):\n\tFile \"/tmp/slug-wp799-fixture-gen-VsplYs/runs/repository-rule-private-attrs/20260923-222857-1217962-bazel/workspace/MODULE.bazel\", line 5, column 12, in <toplevel>\n\t\tstring_repo(name = \"concrete\", _rule_name = 7)\nError: in call to 'string_repo' repo rule with name 'concrete', expected value of type 'string' for attribute '_rule_name', but got 7 (int)\nERROR: Target parsing failed due to unexpected exception: Traceback (most recent call last):\n\tFile \"/tmp/slug-wp799-fixture-gen-VsplYs/runs/repository-rule-private-attrs/20260923-222857-1217962-bazel/workspace/MODULE.bazel\", line 5, column 12, in <toplevel>\n\t\tstring_repo(name = \"concrete\", _rule_name = 7)\nError: in call to 'string_repo' repo rule with name 'concrete', expected value of type 'string' for attribute '_rule_name', but got 7 (int)\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "@omitted//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@omitted//:all",
+        "--output=label",
+        "--noshow_progress",
+        "--lockfile_mode=off",
+        "--repository_disable_download"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "string_repo(name = \"concrete\", _rule_name = 7)",
+          "old_digest_hint": "384",
+          "path": "MODULE.bazel",
+          "replace": "string_repo(name = \"concrete\", _rule_name = \"override\")"
+        },
+        {
+          "find": "string_repo(name = \"unknown_none\", _rule_typo = None)",
+          "old_digest_hint": "393",
+          "path": "MODULE.bazel",
+          "replace": "string_repo(name = \"unknown_none\", _rule_typo = \"override\")"
+        }
+      ],
+      "name": "unknown_concrete_private_name_fails",
+      "normalized_stderr": "ERROR: <workspace>/MODULE.bazel:7:12: Traceback (most recent call last):\n\tFile \"<workspace>/MODULE.bazel\", line 7, column 12, in <toplevel>\n\t\tstring_repo(name = \"unknown_none\", _rule_typo = \"override\")\nError: in call to 'string_repo' repo rule with name 'unknown_none', unknown attribute '_rule_typo' provided (did you mean '_rule_name'?)\nERROR: Target parsing failed due to unexpected exception: Traceback (most recent call last):\n\tFile \"<workspace>/MODULE.bazel\", line 7, column 12, in <toplevel>\n\t\tstring_repo(name = \"unknown_none\", _rule_typo = \"override\")\nError: in call to 'string_repo' repo rule with name 'unknown_none', unknown attribute '_rule_typo' provided (did you mean '_rule_name'?)",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "ERROR: /tmp/slug-wp799-fixture-gen-VsplYs/runs/repository-rule-private-attrs/20260923-222857-1217962-bazel/workspace/MODULE.bazel:7:12: Traceback (most recent call last):\n\tFile \"/tmp/slug-wp799-fixture-gen-VsplYs/runs/repository-rule-private-attrs/20260923-222857-1217962-bazel/workspace/MODULE.bazel\", line 7, column 12, in <toplevel>\n\t\tstring_repo(name = \"unknown_none\", _rule_typo = \"override\")\nError: in call to 'string_repo' repo rule with name 'unknown_none', unknown attribute '_rule_typo' provided (did you mean '_rule_name'?)\nERROR: Target parsing failed due to unexpected exception: Traceback (most recent call last):\n\tFile \"/tmp/slug-wp799-fixture-gen-VsplYs/runs/repository-rule-private-attrs/20260923-222857-1217962-bazel/workspace/MODULE.bazel\", line 7, column 12, in <toplevel>\n\t\tstring_repo(name = \"unknown_none\", _rule_typo = \"override\")\nError: in call to 'string_repo' repo rule with name 'unknown_none', unknown attribute '_rule_typo' provided (did you mean '_rule_name'?)\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "repository-rule-private-attrs",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

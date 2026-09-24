@@ -1172,6 +1172,105 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn private_repository_defaults_remain_in_definition_while_overrides_enter_spec() {
+        let defaults = |rule_name: &str, label: &str| {
+            [
+                schema(
+                    "_rule_name",
+                    AttributeKind::String,
+                    false,
+                    Some(CoercedAttributeValue::String(rule_name.into())),
+                ),
+                schema(
+                    "_private_label",
+                    AttributeKind::Label,
+                    false,
+                    Some(CoercedAttributeValue::Label(
+                        CanonicalLabel::parse(label).unwrap(),
+                    )),
+                ),
+            ]
+        };
+        let omitted = |attributes| {
+            call(
+                attributes,
+                [("name", RepositoryRuleCallValue::String("generated".into()))],
+            )
+        };
+        let a = omitted(defaults("python_repository", "@@dep+//:marker.txt"));
+        let b = omitted(defaults("other_repository", "@@dep+//:other.txt"));
+        let restored = omitted(defaults("python_repository", "@@dep+//:marker.txt"));
+        assert_ne!(a.definition, b.definition);
+        assert_eq!(a.definition, restored.definition);
+        let a_spec = instantiate_call(&a, &mapping()).unwrap();
+        let b_spec = instantiate_call(&b, &mapping()).unwrap();
+        assert!(a_spec.attributes.is_empty());
+        assert_eq!(a_spec, b_spec, "RepoSpec contains only supplied overrides");
+
+        let none = call(
+            defaults("python_repository", "@@dep+//:marker.txt"),
+            [
+                ("name", RepositoryRuleCallValue::String("generated".into())),
+                ("_rule_name", RepositoryRuleCallValue::None),
+                ("_private_label", RepositoryRuleCallValue::None),
+                ("_unknown", RepositoryRuleCallValue::None),
+            ],
+        );
+        assert!(
+            instantiate_call(&none, &mapping())
+                .unwrap()
+                .attributes
+                .is_empty()
+        );
+
+        let override_label = CanonicalLabel::parse("@@other+//:other.txt").unwrap();
+        let concrete = call(
+            defaults("python_repository", "@@dep+//:marker.txt"),
+            [
+                ("name", RepositoryRuleCallValue::String("generated".into())),
+                (
+                    "_rule_name",
+                    RepositoryRuleCallValue::String("override".into()),
+                ),
+                (
+                    "_private_label",
+                    RepositoryRuleCallValue::Label(override_label.clone()),
+                ),
+            ],
+        );
+        let concrete_spec = instantiate_call(&concrete, &mapping()).unwrap();
+        assert_eq!(
+            concrete_spec.attributes.get("_rule_name"),
+            Some(&OverrideAttributeValue::String("override".into()))
+        );
+        assert_eq!(
+            concrete_spec.attributes.get("_private_label"),
+            Some(&OverrideAttributeValue::Label(override_label))
+        );
+
+        let wrong_type = call(
+            defaults("python_repository", "@@dep+//:marker.txt"),
+            [
+                ("name", RepositoryRuleCallValue::String("generated".into())),
+                ("_rule_name", RepositoryRuleCallValue::Int(7)),
+            ],
+        );
+        assert!(instantiate_call(&wrong_type, &mapping()).is_err());
+        let unknown_concrete = call(
+            defaults("python_repository", "@@dep+//:marker.txt"),
+            [
+                ("name", RepositoryRuleCallValue::String("generated".into())),
+                ("_unknown", RepositoryRuleCallValue::String("value".into())),
+            ],
+        );
+        assert!(
+            instantiate_call(&unknown_concrete, &mapping())
+                .unwrap_err()
+                .contains("unknown attribute '_unknown'")
+        );
+    }
+
+    #[test]
     fn complete_repository_attribute_family_coerces_recursively() {
         let sequence = |values: Vec<_>| RepositoryRuleCallValue::Sequence(values.into());
         let map = |values| RepositoryRuleCallValue::Map(Arc::from(values));

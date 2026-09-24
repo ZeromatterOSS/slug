@@ -9216,3 +9216,18 @@ normalized `PATH` cleared it and reached rules_python's unsupported
 repository-rule `_rule_name` declaration at toolchain registration row 53.
 Selector-branch `None`, private and built-in attributes, native rules,
 initializer changes and configured semantics remain outside this exact slice.
+
+### Private repository-rule string/label attributes accepted (2026-09-24)
+
+WP799 admits a single leading-underscore private `repository_rule` attribute
+name for ordinary `attr.string` and `attr.label` descriptors. The Loading
+definition keeps typed defaults under public Starlark spelling, while the
+retained call definition—not override-only `RepoSpec`—owns default identity.
+Concrete call-site values remain type checked and structural; direct `None`
+and unknown-name `None` are ignored before lookup, as in Bazel 9.2. The
+repository context exposes the resulting default or override through
+`rctx.attr._x`. The authentic rules_python `_rule_name` declaration now loads;
+its next stop is the separately typed `RULES_PYTHON_REPO_DEBUG` environment
+observation. Additional private kinds, nonordinary schemas, Bazel's native
+`$x` representation, Python repository effects and configured behavior remain
+outside this exact observable slice.

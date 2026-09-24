@@ -944,6 +944,105 @@ def run():
     }
 
     #[test]
+    fn private_repository_rule_string_and_label_defaults_survive_freeze_and_calls() {
+        const SOURCE: &str = r#"
+def impl(ctx): pass
+repo = repository_rule(impl, attrs = {
+    "_rule_name": attr.string(default = "python_repository"),
+    "_tool": attr.label(default = "//:default_tool"),
+    "public": attr.string(default = "ordinary"),
+})
+def run(tool):
+    repo(name = "omitted")
+    repo(name = "concrete", _rule_name = "custom", _tool = tool)
+    repo(name = "none", _rule_name = None, _tool = None)
+    repo(name = "unknown_none", _unknown = None)
+"#;
+        let loaded = load(SOURCE).unwrap();
+        let definition = projection(&loaded, "repo");
+        assert_eq!(
+            definition
+                .attributes
+                .iter()
+                .map(|attribute| attribute.name.as_str())
+                .collect::<Vec<_>>(),
+            ["_rule_name", "_tool", "public"]
+        );
+        assert_eq!(definition.attributes[0].kind, AttributeKind::String);
+        assert_eq!(
+            definition.attributes[0].default,
+            Some(CoercedAttributeValue::String("python_repository".into()))
+        );
+        assert_eq!(definition.attributes[1].kind, AttributeKind::Label);
+        assert_eq!(
+            definition.attributes[1].default,
+            Some(CoercedAttributeValue::Label(
+                CanonicalLabel::parse("@@//:default_tool").unwrap()
+            ))
+        );
+        let tool = CanonicalLabel::parse("@@dep+//pkg:override_tool").unwrap();
+        let (result, calls) = invoke(&loaded, "run", |module| {
+            vec![module.heap().alloc_simple(StarlarkLabel::new(tool.clone()))]
+        });
+        assert_eq!(result.unwrap(), "None");
+        assert_eq!(calls.len(), 4);
+        assert_eq!(
+            calls
+                .iter()
+                .map(|call| call.name.as_str())
+                .collect::<Vec<_>>(),
+            ["omitted", "concrete", "none", "unknown_none"]
+        );
+        for call in calls.iter() {
+            assert_eq!(call.definition.attributes, definition.attributes);
+            assert!(Arc::ptr_eq(
+                &call.definition.attributes,
+                &definition.attributes
+            ));
+        }
+        assert_eq!(calls[0].kwargs.len(), 1);
+        assert_eq!(
+            calls[1]
+                .kwargs
+                .iter()
+                .skip(1)
+                .map(|(name, value)| (name.as_str(), value))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    "_rule_name",
+                    &RepositoryRuleCallValue::String("custom".into())
+                ),
+                ("_tool", &RepositoryRuleCallValue::Label(tool)),
+            ]
+        );
+        assert!(
+            calls[2]
+                .kwargs
+                .iter()
+                .skip(1)
+                .all(|(_, value)| { matches!(value, RepositoryRuleCallValue::None) })
+        );
+        assert_eq!(
+            calls[3].kwargs[1],
+            ("_unknown".into(), RepositoryRuleCallValue::None)
+        );
+
+        let changed_string = projection(
+            &load(&SOURCE.replace("python_repository", "other_repository")).unwrap(),
+            "repo",
+        );
+        let changed_label = projection(
+            &load(&SOURCE.replace("//:default_tool", "//:other_tool")).unwrap(),
+            "repo",
+        );
+        let restored = projection(&load(SOURCE).unwrap(), "repo");
+        assert_ne!(definition, changed_string);
+        assert_ne!(definition, changed_label);
+        assert_eq!(definition, restored);
+    }
+
+    #[test]
     fn definition_surface_accepts_metadata_and_rejects_deferred_families() {
         for source in [
             "def impl(ctx): pass\nr=repository_rule(impl)\n",
@@ -1013,8 +1112,20 @@ def run():
                 "must use attr.*()",
             ),
             (
-                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'_private':attr.string()})\n",
+                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'_1private':attr.string()})\n",
                 "unsupported repository_rule attribute name",
+            ),
+            (
+                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'__private':attr.string()})\n",
+                "unsupported repository_rule attribute name",
+            ),
+            (
+                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'_private':attr.bool()})\n",
+                "unsupported repository_rule attribute schema",
+            ),
+            (
+                "def impl(ctx): pass\nr=repository_rule(impl, attrs={'_private':attr.label_list()})\n",
+                "unsupported repository_rule attribute schema",
             ),
             (
                 "def impl(ctx): pass\nr=repository_rule(impl, attrs={'x':attr.string(configurable=False)})\n",

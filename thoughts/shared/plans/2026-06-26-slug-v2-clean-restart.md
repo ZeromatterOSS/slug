@@ -29,21 +29,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-98-m7a-starlark-rule-direct-none-default-r1
+Packet: WP-7-99-m7a-private-repository-rule-attrs-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP798 admits Bazel 9.2 direct-`None` defaulting for known ordinary public
-declared Starlark-rule attributes; private attributes remain deferred. The
-authentic rules_rust 0.73 generated `rust_toolchain` passes five such values:
-two labels, two string dictionaries and string `iso_date`. All now use their
-declared defaults without explicit provenance. Bazel's eight-command fixture,
-focused Loading proofs and independent reviews passed. The authentic Slug
-smoke passes the former `iso_date=None` stop. Under the already validated
-normalized `PATH`, it clears the transient `rules_shell` `which` limit and
-reaches rules_python's unsupported repository-rule `_rule_name` declaration
-at toolchain registration row 53. This is not root-build readiness.
-Selector-branch `None`, callable built-ins, native
-rules, exact JVM factor bytes and lockfile replay remain deferred.
+WP799 admits ordinary private `repository_rule` string/label declarations and
+typed defaults for the source-authentic rules_python 1.7.0 Loading boundary.
+Concrete overrides remain checked; direct and unknown-name `None` retain
+Bazel 9.2's omission behavior. Its eight-row Bazel fixture, six focused Rust
+tests and independent reviews passed. The authentic normalized-PATH smoke
+passes `_rule_name` and reaches a separate rules_python module-extension
+environment lookup error for undeclared `RULES_PYTHON_REPO_DEBUG`.
+Structural repository identity is preserved; Python repository effects,
+toolchain analysis, native `$` name bytes and root bootstrap remain deferred.
+WP798 is accepted at `50d282a2e`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

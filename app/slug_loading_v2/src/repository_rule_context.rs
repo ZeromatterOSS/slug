@@ -1553,6 +1553,101 @@ def implementation(ctx):
     }
 
     #[test]
+    fn private_repository_attributes_expose_defaults_and_concrete_overrides() {
+        let declaration: Arc<[RepositoryRuleAttribute]> = [
+            schema(
+                "_rule_name",
+                AttributeKind::String,
+                false,
+                Some(CoercedAttributeValue::String("python_repository".into())),
+            ),
+            schema(
+                "_private_label",
+                AttributeKind::Label,
+                false,
+                Some(CoercedAttributeValue::Label(
+                    CanonicalLabel::parse("@@dep+//:marker.txt").unwrap(),
+                )),
+            ),
+        ]
+        .into();
+        let default_input = RepositoryRuleInvocationInput::new(
+            "generated".into(),
+            None,
+            attributes([
+                ("_rule_name".into(), OverrideAttributeValue::None),
+                ("_unknown".into(), OverrideAttributeValue::None),
+            ]),
+            declaration.clone(),
+        )
+        .unwrap();
+        let default_invocation = invoke_input(
+            r#"def implementation(ctx):
+    if ctx.attr._rule_name != "python_repository": fail("private string default")
+    if ctx.attr._private_label.repo_name != "dep+": fail("private label default")
+    if "_rule_name" not in dir(ctx.attr) or "_private_label" not in dir(ctx.attr): fail("private reflection")
+    ctx.file("ok")
+"#,
+            default_input,
+        )
+        .unwrap();
+        assert_eq!(default_invocation.plan.effects().len(), 1);
+
+        let override_input = RepositoryRuleInvocationInput::new(
+            "generated".into(),
+            None,
+            attributes([
+                (
+                    "_rule_name".into(),
+                    OverrideAttributeValue::String("override".into()),
+                ),
+                (
+                    "_private_label".into(),
+                    OverrideAttributeValue::Label(
+                        CanonicalLabel::parse("@@other+//:other.txt").unwrap(),
+                    ),
+                ),
+            ]),
+            declaration.clone(),
+        )
+        .unwrap();
+        let override_invocation = invoke_input(
+            r#"def implementation(ctx):
+    if ctx.attr._rule_name != "override": fail("private string override")
+    if ctx.attr._private_label.repo_name != "other+": fail("private label override")
+    ctx.file("ok")
+"#,
+            override_input,
+        )
+        .unwrap();
+        assert_eq!(override_invocation.plan.effects().len(), 1);
+
+        assert!(
+            RepositoryRuleInvocationInput::new(
+                "generated".into(),
+                None,
+                attributes([(
+                    "_unknown".into(),
+                    OverrideAttributeValue::String("x".into())
+                )]),
+                declaration.clone(),
+            )
+            .unwrap_err()
+            .contains("unknown repository-rule attribute '_unknown'")
+        );
+        assert!(
+            RepositoryRuleInvocationInput::new(
+                "generated".into(),
+                None,
+                attributes([("_rule_name".into(), OverrideAttributeValue::Int(7))]),
+                declaration,
+            )
+            .unwrap_err()
+            .contains("wrong kind")
+        );
+    }
+
+    #[test]
     fn repository_context_projects_all_declared_default_kinds_and_order() {
         let label_z = CanonicalLabel::parse("@@dep+//pkg:z").unwrap();
         let label_a = CanonicalLabel::parse("@@dep+//pkg:a").unwrap();
