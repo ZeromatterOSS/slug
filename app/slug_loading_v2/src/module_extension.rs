@@ -83,6 +83,7 @@ use starlark::values::ValueLike;
 use starlark::values::dict::AllocDict;
 use starlark::values::dict::DictRef;
 use starlark::values::float::StarlarkFloat;
+use starlark::values::list::AllocImmutableList;
 use starlark::values::list::AllocList;
 use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
@@ -476,7 +477,7 @@ async fn preflight_pure_invocations(ctx: &mut DiceComputations<'_>, workspace: &
 }
 
 #[rustfmt::skip]
-fn invoke_pure_preflight(prepared: Arc<HostPreparedModuleExtensionInputs>, preflight: Vec<PurePreflight>, observations: PathObservationEpoch, capture_events: bool, event_batch: &mut EventBatch) -> PureInvocationsDriverOutcome {
+fn invoke_pure_preflight(prepared: Arc<HostPreparedModuleExtensionInputs>, preflight: Vec<PurePreflight>, observations: PathObservationEpoch, capture_events: bool, event_batch: &mut EventBatch, max_tag_count: usize) -> PureInvocationsDriverOutcome {
     let after = |request: Option<&HostSelectedExtensionDefinitionLoadRequest>,
                  completed: &[HostPureModuleExtensionInvocationReceipt],
                  current_calls: Arc<[RepositoryRuleCallRecord]>,
@@ -489,6 +490,9 @@ fn invoke_pure_preflight(prepared: Arc<HostPreparedModuleExtensionInputs>, prefl
             error,
         }
     };
+    if let Err(error) = validate_invocation_tag_counts(prepared.inputs.iter().map(|input| input.tags.len()), max_tag_count) {
+        return pure_complete(Err(after(None, &[], Arc::from([]), HostPureModuleExtensionInvocationError::Invocation(error))), observations);
+    }
     let mut invoked = Vec::with_capacity(prepared.inputs.len());
     for (input, preflight) in prepared.inputs.iter().zip(preflight) {
         let _module_lifetime = preflight.module;
@@ -574,6 +578,7 @@ async fn compute_pure_invocations(
             observations,
             capture_events,
             &mut event_batch,
+            MAX_INVOCATION_TAGS_PER_MODULE,
         ),
         Err(terminal) => terminal,
     };
@@ -826,14 +831,33 @@ async fn selected_download_preflight(
     }
 }
 
+const MAX_INVOCATION_TAGS_PER_MODULE: usize = 1 << 20;
+
+fn validate_invocation_tag_count(count: usize, max_tag_count: usize) -> Result<(), CompactString> {
+    if count > max_tag_count {
+        return Err(format!("module extension has more than {max_tag_count} tags").into());
+    }
+    Ok(())
+}
+
+fn validate_invocation_tag_counts(
+    counts: impl IntoIterator<Item = usize>,
+    max_tag_count: usize,
+) -> Result<(), CompactString> {
+    counts
+        .into_iter()
+        .try_for_each(|count| validate_invocation_tag_count(count, max_tag_count))
+}
+
 #[rustfmt::skip]
-fn owner_invocation_modules(inputs: &HostSelectedExtensionOwnerInputs, projection: &OwnerProjection, owner: &Arc<()>) -> Result<Arc<[PreparedInvocationModule]>, CompactString> {
+fn owner_invocation_modules(inputs: &HostSelectedExtensionOwnerInputs, projection: &OwnerProjection, owner: &Arc<()>, max_tag_count: usize) -> Result<Arc<[PreparedInvocationModule]>, CompactString> {
     for (_, schema) in projection.definition.tag_classes.iter() {
         validate_module_extension_tag_schema(schema).map_err(|error| CompactString::from(error.to_string()))?;
     }
     let classes: Arc<[CompactString]> = projection.definition.tag_classes.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>().into();
     inputs.modules().iter().enumerate().map(|(module_index, input)| {
         let (context_repo, name, version, is_root, mapping, tags) = input.parts();
+        validate_invocation_tag_count(tags.len(), max_tag_count)?;
         let tags = tags.iter().enumerate().map(|(tag_index, tag)| {
             let schema = projection.definition.tag_classes.iter().find_map(|(name, schema)| (name == &tag.tag_class).then_some(schema.as_ref())).ok_or_else(|| CompactString::from(format!("unknown tag class '{}'", tag.tag_class)))?;
             let attributes = prepare_module_extension_tag_attributes(schema, &tag.attributes, context_repo, mapping).map_err(|error| CompactString::from(error.to_string()))?;
@@ -914,7 +938,7 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         SourcePreparationOutcome::Complete(Ok(host)) => host,
     };
     let owner = Arc::new(());
-    let modules = match owner_invocation_modules(&inputs, &first, &owner) {
+    let modules = match owner_invocation_modules(&inputs, &first, &owner, MAX_INVOCATION_TAGS_PER_MODULE) {
         Ok(value) => value,
         Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
     };
@@ -1714,13 +1738,8 @@ starlark::starlark_simple_value!(InvocationTags);
 impl<'v> StarlarkValue<'v> for InvocationTags {
     fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         self.classes.iter().any(|class| class == name).then(|| {
-            heap.alloc_simple(InvocationTagList(
-                self.tags
-                    .iter()
-                    .filter(|tag| tag.class == name)
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .into(),
+            heap.alloc(AllocImmutableList(
+                self.tags.iter().filter(|tag| tag.class == name).cloned(),
             ))
         })
     }
@@ -1893,39 +1912,6 @@ impl<'v> StarlarkValue<'v> for InvocationModuleList {
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct InvocationTagList(Arc<[InvocationTag]>);
-impl fmt::Display for InvocationTagList {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("[<bazel_module_tag>]")
-    }
-}
-starlark::starlark_simple_value!(InvocationTagList);
-#[starlark_value(type = "list")]
-impl<'v> StarlarkValue<'v> for InvocationTagList {
-    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let index = index
-            .unpack_i32()
-            .ok_or_else(|| starlark::Error::new_other(anyhow::anyhow!("list index must be int")))?;
-        self.0
-            .get(list_index(index, self.0.len())?)
-            .cloned()
-            .map(|v| heap.alloc_simple(v))
-            .ok_or_else(|| starlark::Error::new_other(anyhow::anyhow!("list index out of range")))
-    }
-    fn length(&self) -> starlark::Result<i32> {
-        Ok(self.0.len() as i32)
-    }
-    fn iterate_collect(&self, heap: Heap<'v>) -> starlark::Result<Vec<Value<'v>>> {
-        Ok(self
-            .0
-            .iter()
-            .cloned()
-            .map(|v| heap.alloc_simple(v))
-            .collect())
-    }
-}
-
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct InvocationTagSortKey(usize, usize);
 impl fmt::Display for InvocationTagSortKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -2003,6 +1989,7 @@ pub(crate) mod test_support {
                     observations,
                     true,
                     &mut events,
+                    MAX_INVOCATION_TAGS_PER_MODULE,
                 ),
                 Err(terminal) => terminal,
             };
@@ -2330,24 +2317,31 @@ mod tests {
             |module| {
                 vec![
                     module.heap().alloc_simple(modules.clone()),
-                    module.heap().alloc_simple(InvocationTagList(tags.clone())),
+                    module
+                        .heap()
+                        .alloc(AllocImmutableList(tags.iter().cloned())),
                 ]
             },
         )
         .unwrap();
         assert_eq!(value, "[\"root\", \"v1\", \"v0\"]");
-        for source in [
-            "def f(modules, tags):\n  return modules[-2]\n",
-            "def f(modules, tags):\n  return tags[-3]\n",
+        for (source, expected) in [
+            (
+                "def f(modules, tags):\n  return modules[-2]\n",
+                "list index out of range",
+            ),
+            ("def f(modules, tags):\n  return tags[-3]\n", "out of bound"),
         ] {
             let error = call(source, |module| {
                 vec![
                     module.heap().alloc_simple(modules.clone()),
-                    module.heap().alloc_simple(InvocationTagList(tags.clone())),
+                    module
+                        .heap()
+                        .alloc(AllocImmutableList(tags.iter().cloned())),
                 ]
             })
             .unwrap_err();
-            assert!(error.contains("list index out of range"), "{error}");
+            assert!(error.contains(expected), "{error}");
         }
         let context = InvocationContext {
             modules: Arc::from([InvocationModule {
@@ -2371,6 +2365,82 @@ mod tests {
     }
 
     #[test]
+    fn native_immutable_tag_views_concat_to_fresh_mutable_list() {
+        let owner = Arc::new(());
+        let frozen_heap = FrozenHeap::new();
+        let tags: Arc<[InvocationTag]> = (0..3)
+            .map(|index| {
+                let mut value = tag(&owner, index, false, &frozen_heap);
+                value.class = if index == 2 {
+                    "from_specs".into()
+                } else {
+                    "from_cargo".into()
+                };
+                value
+            })
+            .collect::<Vec<_>>()
+            .into();
+        let context = InvocationContext {
+            modules: Arc::from([InvocationModule {
+                tag_classes: Arc::from([
+                    CompactString::from("from_cargo"),
+                    CompactString::from("from_specs"),
+                ]),
+                tags,
+                ..empty_module(&owner)
+            }]),
+            root_usage: None,
+            os: None,
+            selected_download: None,
+            owner,
+        };
+        let result = call(
+            "def f(ctx):\n  tags = ctx.modules[0].tags\n  left = tags.from_cargo\n  right = tags.from_specs\n  joined = left + right\n  joined.append('tail')\n  return [joined[0].value, joined[1].value, joined[2].value, joined[3], len(left), len(right)]\n",
+            |module| vec![module.heap().alloc_simple(context.clone())],
+        )
+        .unwrap();
+        assert_eq!(result, "[\"v0\", \"v1\", \"v2\", \"tail\", 2, 1]");
+
+        let result = call(
+            "def f(ctx):\n  tags = ctx.modules[0].tags\n  return [len(tags.from_specs + tags.from_cargo), len(tags.from_cargo)]\n",
+            |module| vec![module.heap().alloc_simple(context.clone())],
+        )
+        .unwrap();
+        assert_eq!(result, "[3, 2]");
+
+        let error = call(
+            "def f(ctx):\n  tags = ctx.modules[0].tags\n  left = tags.from_cargo\n  left += tags.from_specs\n",
+            |module| vec![module.heap().alloc_simple(context.clone())],
+        )
+        .unwrap_err();
+        assert!(error.contains("Immutable"), "{error}");
+
+        let error = call(
+            "def f(ctx):\n  return ctx.modules[0].tags.from_cargo + ()\n",
+            |module| vec![module.heap().alloc_simple(context)],
+        )
+        .unwrap_err();
+        assert!(error.contains("list") && error.contains("tuple"), "{error}");
+    }
+
+    #[test]
+    fn invocation_tag_count_preflight_covers_entire_legacy_batch() {
+        assert!(
+            validate_invocation_tag_counts(
+                [1, MAX_INVOCATION_TAGS_PER_MODULE],
+                MAX_INVOCATION_TAGS_PER_MODULE
+            )
+            .is_ok()
+        );
+        let error = validate_invocation_tag_counts(
+            [1, MAX_INVOCATION_TAGS_PER_MODULE + 1],
+            MAX_INVOCATION_TAGS_PER_MODULE,
+        )
+        .unwrap_err();
+        assert!(error.contains("more than 1048576 tags"), "{error}");
+    }
+
+    #[test]
     fn forbidden_abi_and_cross_context_captured_tags_fail_closed() {
         let owner = Arc::new(());
         let frozen_heap = FrozenHeap::new();
@@ -2388,12 +2458,10 @@ mod tests {
             "facts",
             "is_isolated",
             "wait",
-            "download",
             "download_and_extract",
             "extract",
             "file",
             "getenv",
-            "path",
             "read",
             "watch",
             "report_progress",
@@ -2410,6 +2478,19 @@ mod tests {
                 ])
                 .unwrap_err()
                 .contains("has no attribute")
+            );
+        }
+        for source in [
+            "def f(ctx):\n  return ctx.path('cargo-bazel')\n",
+            "def f(ctx):\n  return ctx.download(url='file:///artifact', output='cargo-bazel', sha256='0000000000000000000000000000000000000000000000000000000000000000')\n",
+        ] {
+            let error = call(source, |module| {
+                vec![module.heap().alloc_simple(context.clone())]
+            })
+            .unwrap_err();
+            assert!(
+                error.contains("only supported for a selected module extension"),
+                "{error}"
             );
         }
         for source in [
@@ -2450,15 +2531,19 @@ mod tests {
             assert!(error.contains("another module_ctx"), "{error}");
         }
         let label = StarlarkLabel::new(CanonicalLabel::parse("@@//pkg:item").unwrap());
-        for name in ["workspace_root", "relative"] {
-            let source = format!("def f(label):\n  return label.{name}\n");
-            assert!(
-                call(&source, |module| vec![
-                    module.heap().alloc_simple(label.clone())
-                ])
-                .is_err()
-            );
-        }
+        assert_eq!(
+            call("def f(label):\n  return label.workspace_root\n", |module| {
+                vec![module.heap().alloc_simple(label.clone())]
+            })
+            .unwrap(),
+            "\"\""
+        );
+        assert!(
+            call("def f(label):\n  return label.relative\n", |module| {
+                vec![module.heap().alloc_simple(label)]
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -3150,6 +3235,7 @@ mod tests {
         prepared: Arc<HostPreparedModuleExtensionInputs>,
         observations: PathObservationEpoch,
         id: u64,
+        tag_limit: usize,
     }
     #[rustfmt::skip]
     impl PartialEq for ObservePreparedKey { fn eq(&self, other: &Self) -> bool { self.id == other.id } }
@@ -3165,9 +3251,10 @@ mod tests {
         async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
             let mut events = EventBatch::empty();
             let outcome = match preflight_pure_invocations(ctx, &self.workspace, &self.prepared, self.observations.dupe(), PureInvocationsMode::Observed).await {
-                Ok((preflight, observations)) => invoke_pure_preflight(self.prepared.clone(), preflight, observations, true, &mut events),
+                Ok((preflight, observations)) => invoke_pure_preflight(self.prepared.clone(), preflight, observations, true, &mut events, self.tag_limit),
                 Err(terminal) => terminal,
             };
+            if self.tag_limit != MAX_INVOCATION_TAGS_PER_MODULE { assert!(events.events().is_empty(), "oversized later module emitted earlier invocation events"); }
             match outcome {
                 SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
                 SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(
@@ -3178,6 +3265,69 @@ mod tests {
         }
         fn equality(x: &Self::Value, y: &Self::Value) -> bool { x.complete_eq(y) }
         fn validity(value: &Self::Value) -> bool { value.is_complete() }
+    }
+
+    #[tokio::test]
+    async fn oversized_later_legacy_tag_stops_before_earlier_invocation() {
+        let module = "module(name='bazel_tools')\na=use_extension('//:first.bzl','first')\nb=use_extension('//:second.bzl','second')\nb.tag(value='second')\n";
+        let first = "def impl(ctx):\n    print('first-invoked')\nfirst=module_extension(implementation=impl)\n";
+        let second = "tag=tag_class(attrs={'value':attr.string()})\ndef impl(ctx):\n    print('second-invoked')\nsecond=module_extension(implementation=impl,tag_classes={'tag':tag})\n";
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let mut transaction = repository_rule_sources_transaction(
+            &dice,
+            module,
+            &[("first.bzl", Some(first)), ("second.bzl", Some(second))],
+            0,
+            None,
+        )
+        .await;
+        let prepared = transaction
+            .compute(&HostPreparedModuleExtensionInputsObservationKey::new(
+                workspace.dupe(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(prepared)) = prepared else {
+            panic!("legacy prepared inputs did not complete");
+        };
+        let prepared = Arc::new(prepared.result().as_ref().as_ref().unwrap().clone());
+        assert_eq!(
+            prepared
+                .inputs
+                .iter()
+                .map(|input| input.tags.len())
+                .collect::<Vec<_>>(),
+            [0, 1]
+        );
+        let outcome = transaction
+            .compute(&ObservePreparedKey {
+                workspace,
+                prepared,
+                observations: PathObservationEpoch::empty(),
+                id: 71,
+                tag_limit: 0,
+            })
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("oversized later legacy module did not fail closed");
+        };
+        let error = observed.result().as_ref().as_ref().unwrap_err();
+        let HostPureModuleExtensionInvocationsError::AfterPrepared {
+            request,
+            completed,
+            current_calls,
+            error: HostPureModuleExtensionInvocationError::Invocation(message),
+            ..
+        } = error
+        else {
+            panic!("oversized later legacy module had the wrong terminal: {error:?}");
+        };
+        assert!(request.is_none());
+        assert!(completed.is_empty());
+        assert!(current_calls.is_empty());
+        assert!(message.contains("more than 0 tags"));
     }
 
     #[rustfmt::skip]
@@ -3332,7 +3482,7 @@ mod tests {
         for (id, replacement, terminal) in [(1, second.replace("invoke-second", "drifted").replace("print('load-second')", "print('changed-load')"), "drift"), (2, "this is not valid Starlark".to_owned(), "bzl")] {
             let injected_tracker = Arc::new(RepositoryRuleActivationTracker::default());
             let mut injected = repository_rule_sources_transaction(&dice, module, &[("first.bzl", Some(first)), ("second.bzl", Some(&replacement))], 0, Some(injected_tracker.clone())).await;
-            let observed_injected = injected.compute(&ObservePreparedKey { workspace: workspace.dupe(), prepared: prepared_value.dupe(), observations: PathObservationEpoch::empty(), id }).await.unwrap();
+            let observed_injected = injected.compute(&ObservePreparedKey { workspace: workspace.dupe(), prepared: prepared_value.dupe(), observations: PathObservationEpoch::empty(), id, tag_limit: MAX_INVOCATION_TAGS_PER_MODULE }).await.unwrap();
             let legacy_injected = injected.compute(&test_support::InvokePreparedKey { workspace: workspace.dupe(), prepared: prepared_value.dupe(), id: id + 10 }).await.unwrap();
             let observed_result = observed_pure_carrier(&observed_injected).result();
             let SourcePreparationOutcome::Complete(legacy_result) = &legacy_injected.outcome else { panic!("legacy injection must complete") };
@@ -4018,6 +4168,101 @@ mod tests {
                 .unwrap();
         }
         updater.commit_with_data(data).await
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_concatenates_native_immutable_tag_views() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\ne.from_cargo(value='left')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = r#"
+repo = repository_rule(lambda ctx: None, attrs = {'value': attr.string()})
+from_cargo = tag_class(attrs = {'value': attr.string()})
+from_specs = tag_class(attrs = {'value': attr.string()})
+def impl(ctx):
+    for mod in ctx.modules:
+        for cfg in mod.tags.from_cargo + mod.tags.from_specs:
+            repo(name = 'proof', value = cfg.value)
+ext = module_extension(
+    implementation = impl,
+    tag_classes = {'from_cargo': from_cargo, 'from_specs': from_specs},
+    environ = ['FACTOR', 'MISSING', 'FACTOR'],
+)
+"#;
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (mut base, owner) =
+            selected_factor_transaction(&dice, MODULE, EXTENSION, tracker.clone(), true).await;
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let inputs = base
+            .compute(&HostSelectedExtensionOwnerInputsKey::new(
+                workspace.dupe(),
+                owner.clone(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(inputs) = inputs else {
+            panic!("selected owner inputs did not complete");
+        };
+        let inputs = inputs.as_ref().as_ref().unwrap();
+        let route = RootRepositoryRoute::for_selected_extension_definition(
+            workspace.dupe(),
+            inputs.request().source(),
+        )
+        .unwrap();
+        let target =
+            RootPackageBzlTarget::parse(inputs.request().parts().0.target().as_str()).unwrap();
+        let label = RepositoryBzlLabel::new(
+            inputs.request().parts().0.package().package().clone(),
+            target,
+        )
+        .unwrap();
+        let bzl = base
+            .compute(&ExternalBzlModuleEvalKey::new_bzlmod(route, label))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(bzl) = bzl else {
+            panic!("selected external Bzl did not complete");
+        };
+        let projection =
+            owner_projection(bzl.as_ref().as_ref().unwrap(), inputs.request()).unwrap();
+        let error = owner_invocation_modules(inputs, &projection, &Arc::new(()), 0).unwrap_err();
+        assert!(error.contains("more than 0 tags"), "{error}");
+        let mut transaction = selected_factor_host_inputs(
+            base,
+            tracker,
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            RepositoryEnvironmentNameFrontier::from_unsorted([
+                CompactString::new("FACTOR"),
+                CompactString::new("MISSING"),
+            ]),
+        )
+        .await;
+        let key = HostSelectedExtensionOwnerPureObservationKey::new(workspace, owner);
+        let SourcePreparationOutcome::Complete(Ok(observed)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("selected tag-list concat did not complete");
+        };
+        let calls = &observed
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .receipt
+            .repository_rule_calls;
+        assert_eq!(calls.len(), 1);
+        let (_, crate::module_extension_repository_rule::RepositoryRuleCallValue::String(value)) =
+            calls[0]
+                .kwargs
+                .iter()
+                .find(|(name, _)| name == "value")
+                .unwrap()
+        else {
+            panic!("selected tag-list concat lost its tag value");
+        };
+        assert_eq!(value.as_str(), "left");
     }
 
     #[tokio::test]

@@ -29,25 +29,26 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-90-m7a-selected-extension-generator-acquisition-r1
+Packet: WP-7-91-m7a-selected-extension-tag-list-concat-r1
 Status: accepted; independent design and final reviews ACCEPT
 
-WP790 targets the next authentic root stop in rules_rust 0.73.0: its selected
-`crate` extension calls `module_ctx.path("cargo-bazel")` and immediately
-downloads the checksum-pinned generator there. Admit this paired,
-owner-scoped logical path and verified raw-artifact Need/replay through the
-selected-owner DICE input; retain verified bytes, not a temporary filename,
-so warm reuse and abort restoration remain sound. Reject unsigned or
-unmodeled effects. A fresh root smoke must report the next honest terminal;
-physical path reads, watch/execute and M7A closure remain deferred. WP789 at
-`83de69964` accepted tracked declared Host inputs and passed the factor
-guard, reaching the path call. Independent design review ACCEPTED the
-bounded byte ownership and selected-closure contract. Focused Bzlmod,
-Loading, Core transport and same-DICE lifecycle tests pass; a fresh CLI
-build passes. The authentic root now passes path/download and stops at
-rules_rust `extensions.bzl:1129` on deferred Starlark `list + list`.
-Independent final review ACCEPTED the bounded owner, revocation and restore
-behavior. No configured-root/M7A closure claim.
+WP791 targets the next authentic root stop in rules_rust 0.73.0: its selected
+`crate` extension adds immutable `mod.tags.from_cargo` and
+`mod.tags.from_specs` views at `extensions.bzl:1129`. Materialize native
+immutable evaluation-local tag lists over the existing Arc-owned tags so
+vendored `+` returns a fresh mutable ordered result and `+=` on a source
+view rejects; preflight a conservative tag-count cap before invocation.
+Do not claim general list arithmetic parity.
+Pinned Bazel 9.2 list-concat source and tests support this selected slice.
+WP790 at `fc3319670` independently accepted verified generator acquisition;
+the real root passed path/download and reached this addition. Focused
+and all 24 module-extension tests pass; the broader Loading suite has
+no new failing test names against the pre-change WP790 binary. A fresh
+CLI smoke passed list addition and stopped at `module_ctx.watch` for
+`cfg.cargo_lockfile` in `extensions.bzl:1153`. Other `+=`, general
+custom-list operators, physical-path watch/execute and M7A closure
+remain deferred. Independent final review ACCEPTED the corrected
+two-entry cap and selected list behavior.
 
 WP785 at `9931f6a2d` accepted bounded Linux `run_shell` execution through
 fresh NativeLink 1.7.1: one REAPI action, zero direct-local actions and exact
