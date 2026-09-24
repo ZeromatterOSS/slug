@@ -82,6 +82,7 @@ impl CoverageConfigurationField {
 pub(super) enum JavaConfigurationField {
     JavaToolchainBytecodeOptimizer,
     LocalJavaOptimizationConfiguration,
+    JavaLauncher,
 }
 
 impl JavaConfigurationField {
@@ -91,6 +92,7 @@ impl JavaConfigurationField {
             "local_java_optimization_configuration" => {
                 Some(Self::LocalJavaOptimizationConfiguration)
             }
+            "launcher" => Some(Self::JavaLauncher),
             _ => None,
         }
     }
@@ -99,6 +101,7 @@ impl JavaConfigurationField {
         match self {
             Self::JavaToolchainBytecodeOptimizer => "java_toolchain_bytecode_optimizer",
             Self::LocalJavaOptimizationConfiguration => "local_java_optimization_configuration",
+            Self::JavaLauncher => "launcher",
         }
     }
 }
@@ -129,6 +132,7 @@ pub enum ConfigurationField {
     ProtoToolchainForCc,
     AppleXcodeConfigLabel,
     ProtoCompiler,
+    JavaLauncher,
 }
 
 impl ConfigurationField {
@@ -162,6 +166,7 @@ impl ConfigurationField {
             JavaConfigurationField::LocalJavaOptimizationConfiguration => {
                 Self::JavaLocalOptimizationConfiguration
             }
+            JavaConfigurationField::JavaLauncher => Self::JavaLauncher,
         }
     }
 
@@ -189,9 +194,9 @@ impl ConfigurationField {
     pub const fn fragment_name(self) -> &'static str {
         match self {
             Self::CoverageOutputGenerator => "coverage",
-            Self::JavaToolchainBytecodeOptimizer | Self::JavaLocalOptimizationConfiguration => {
-                "java"
-            }
+            Self::JavaToolchainBytecodeOptimizer
+            | Self::JavaLocalOptimizationConfiguration
+            | Self::JavaLauncher => "java",
             Self::ProtoToolchainForJavaLite
             | Self::ProtoToolchainForJava
             | Self::ProtoToolchainForCc
@@ -236,6 +241,7 @@ impl ConfigurationField {
             Self::CoverageOutputGenerator
             | Self::JavaToolchainBytecodeOptimizer
             | Self::JavaLocalOptimizationConfiguration
+            | Self::JavaLauncher
             | Self::ProtoToolchainForJavaLite
             | Self::ProtoToolchainForJava
             | Self::ProtoToolchainForCc
@@ -259,6 +265,7 @@ impl ConfigurationField {
             Self::JavaLocalOptimizationConfiguration => {
                 Some(JavaConfigurationField::LocalJavaOptimizationConfiguration)
             }
+            Self::JavaLauncher => Some(JavaConfigurationField::JavaLauncher),
             _ => None,
         }
     }

@@ -335,14 +335,20 @@ malloc_rule = rule(
 # 5ad6511cdef925246961c7e7a9039475c192371fedbf909c63cf92334779e875
 JAVA_BYTECODE = configuration_field(fragment = "java", name = "java_toolchain_bytecode_optimizer")
 JAVA_LOCAL = configuration_field("java", "local_java_optimization_configuration")
+# Bazel 9.2 embedded tools/jdk/launcher_flag_alias.bzl:35-39 SHA-256:
+# 9c4f1a4656abb69476f0b1f3f39c06a28d7115342ee65598285e208d67a8c545
+JAVA_LAUNCHER = configuration_field(fragment = "java", name = "launcher")
 def _check_java():
     if JAVA_BYTECODE == JAVA_LOCAL: fail("selected Java fields collapsed")
+    if JAVA_LAUNCHER != configuration_field("java", "launcher"): fail("launcher identity changed")
+    if JAVA_LAUNCHER == JAVA_BYTECODE: fail("selected Java fields collapsed")
 _check_java()
 def _java_impl(ctx): fail("Java toolchain implementation ran during loading")
 def _java_initializer(**kwargs): fail("selected Java initializer ran during declaration")
 JAVA_ATTRS = {
     "_bytecode_optimizer": attr.label(default = JAVA_BYTECODE, cfg = "exec", executable = True),
     "_local_java_optimization_configuration": attr.label(default = JAVA_LOCAL, cfg = "exec", allow_files = True),
+    "_launcher": attr.label(default = JAVA_LAUNCHER),
 }
 java_toolchain = rule(implementation = _java_impl, initializer = _java_initializer, attrs = JAVA_ATTRS)
 java_no_initializer_rule = rule(implementation = _java_impl, attrs = JAVA_ATTRS)
@@ -395,6 +401,7 @@ java_no_initializer_rule = rule(implementation = _java_impl, attrs = JAVA_ATTRS)
     }
 
     let java = starlark_rule(&loaded, "java_no_initializer");
+    assert!(java.dependencies().is_empty()); // Null Loading default, not an ordinary label edge.
     assert_eq!(
         java.late_bound_rule_attributes().collect::<Vec<_>>(),
         [
@@ -403,18 +410,28 @@ java_no_initializer_rule = rule(implementation = _java_impl, attrs = JAVA_ATTRS)
                 "_local_java_optimization_configuration",
                 "local_java_optimization_configuration",
             ),
+            ("_launcher", "launcher"),
         ]
     );
     let java = java.configured_dependency_attributes().collect::<Vec<_>>();
-    assert_eq!(java.len(), 2);
+    assert_eq!(java.len(), 3);
     assert!(java[0].exec_configuration() && java[0].executable());
     assert!(java[1].exec_configuration());
     assert!(java[1].file_admissibility().is_any_file());
-    for attribute in java {
+    assert_eq!(java[2].name(), "_launcher");
+    assert_eq!(java[2].user_name(), None);
+    assert_eq!(java[2].kind(), AttributeKind::Label);
+    assert!(!java[2].exec_configuration());
+    for (attribute, expected_field) in java.iter().zip([
+        "java_toolchain_bytecode_optimizer",
+        "local_java_optimization_configuration",
+        "launcher",
+    ]) {
         let ConfiguredDependencyDefault::ConfigurationField(identity) = attribute.default() else {
             panic!("selected Java dependency lost typed field identity")
         };
         assert_eq!(identity.field().fragment_name(), "java");
+        assert_eq!(identity.field().field_name(), expected_field);
         assert_eq!(identity.tools_repository().as_str(), "bazel_tools");
     }
 
@@ -439,6 +456,16 @@ java_no_initializer_rule = rule(implementation = _java_impl, attrs = JAVA_ATTRS)
             "X = configuration_field(fragment = 'coverage', name = 'output_generator')\ndef impl(ctx): return []\nbad = rule(implementation = impl, attrs = {'_coverage': attr.string(default = X)})\n",
             "configuration_field may only be the default of attr.label",
         ),
+        (
+            "public-java-launcher",
+            "X = configuration_field(fragment = 'java', name = 'launcher')\ndef impl(ctx): return []\nbad = rule(implementation = impl, attrs = {'launcher': attr.label(default = X)})\n",
+            "the attribute must be private (i.e. start with '_'). Found 'launcher'",
+        ),
+        (
+            "non-label-java-launcher",
+            "X = configuration_field(fragment = 'java', name = 'launcher')\ndef impl(ctx): return []\nbad = rule(implementation = impl, attrs = {'_launcher': attr.string(default = X)})\n",
+            "configuration_field may only be the default of attr.label",
+        ),
     ] {
         let package = workspace.join(name);
         write(&package.join("defs.bzl"), source);
@@ -449,7 +476,7 @@ java_no_initializer_rule = rule(implementation = _java_impl, attrs = JAVA_ATTRS)
         assert!(error.contains(expected), "{name}: {error}");
     }
 
-    for field in ["launcher", "proguard_top", "bytecode_optimizer", "missing"] {
+    for field in ["proguard_top", "bytecode_optimizer", "missing"] {
         let package = workspace.join(field);
         write(
             &package.join("defs.bzl"),

@@ -1659,6 +1659,9 @@ async fn java_configuration_fields_fail_before_dependency_toolchain_or_implement
         "java_toolchain_bytecode_optimizer",
         "local_java_optimization_configuration",
         "java_toolchain_bytecode_optimizer",
+        "launcher",
+        "local_java_optimization_configuration",
+        "launcher",
     ];
     for route in [AnalysisRoute::Legacy, AnalysisRoute::Observed] {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -1693,6 +1696,15 @@ async fn java_configuration_fields_fail_before_dependency_toolchain_or_implement
         }
         assert_eq!(errors[0], errors[2], "{route:?}: A/B/A did not restore");
         assert_ne!(errors[0], errors[1], "{route:?}: Java fields collapsed");
+        assert_eq!(
+            errors[3], errors[5],
+            "{route:?}: launcher A/B/A did not restore"
+        );
+        assert_ne!(errors[0], errors[3], "{route:?}: launcher field collapsed");
+        assert_ne!(
+            errors[3], errors[4],
+            "{route:?}: launcher and other field collapsed"
+        );
     }
 }
 

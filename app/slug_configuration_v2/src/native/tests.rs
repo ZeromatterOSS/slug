@@ -924,6 +924,7 @@ mod command_configuration_tests {
                 "local_java_optimization_configuration",
                 JavaConfigurationField::LocalJavaOptimizationConfiguration,
             ),
+            ("launcher", JavaConfigurationField::JavaLauncher),
         ];
         for (name, java) in selected {
             let field = ConfigurationField::from_starlark_names("java", name).unwrap();
@@ -946,7 +947,7 @@ mod command_configuration_tests {
                 )
             );
         }
-        for name in ["launcher", "proguard_top", "bytecode_optimizer", "missing"] {
+        for name in ["proguard_top", "bytecode_optimizer", "missing"] {
             assert_eq!(ConfigurationField::from_starlark_names("java", name), None);
         }
         assert!(ConfigurationField::is_fragment_name("java"));
@@ -968,12 +969,20 @@ mod command_configuration_tests {
         };
         let first = identity(selected[0].0, "bazel_tools+");
         let changed_field = identity(selected[1].0, "bazel_tools+");
+        let launcher = identity("launcher", "bazel_tools+");
+        let launcher_changed_tools = identity("launcher", "bazel_tools+next");
+        let launcher_restored = identity("launcher", "bazel_tools+");
         let changed_tools = identity(selected[0].0, "bazel_tools+next");
         let restored = identity(selected[0].0, "bazel_tools+");
         assert_eq!(first, restored);
         assert_eq!(hash(&first), hash(&restored));
         assert_ne!(first, changed_field);
+        assert_ne!(first, launcher);
+        assert_ne!(changed_field, launcher);
         assert_ne!(first, changed_tools);
+        assert_eq!(launcher, launcher_restored);
+        assert_eq!(hash(&launcher), hash(&launcher_restored));
+        assert_ne!(launcher, launcher_changed_tools);
     }
 
     #[test]

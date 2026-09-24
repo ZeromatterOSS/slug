@@ -29,19 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-128-m7a-builtin-jdk-source-catalog-r1
+Packet: WP-7-129-m7a-java-launcher-field-declaration-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews ACCEPT; M7A remains partial
 
-WP828 ports the exact 13-file Bazel 9.2 runtime `@@bazel_tools//tools/jdk`
-source subtree into Stage 5's immutable catalog. The runtime BUILD comes
-from upstream `BUILD.tools`, not source-tree `BUILD`; all entries are
-non-executable. Independent reviews ACCEPTED 5 catalog and 6 protected tests,
-the 13-file Bazel Rustc input closure, parent filegroup build, and authentic
-replay clearing the missing BUILD stop. Full Bazel Rust build hit its 180-second
-cap and remains unproved. The next distinct Loading stop is Java's `launcher`
-configuration field in `launcher_flag_alias.bzl`; package evaluation and
-configured JDK remain deferred. Accepted WP827 at `ff9e3ee45` is the
-immediate predecessor; M7A is partial.
+WP829 admits Bazel 9.2 Loading of the JDK Bzl's private `java.launcher`
+configuration-field declaration through the existing one-byte typed carrier.
+Configured `--java_launcher` and provider resolution stay fail-closed. Pinned
+Bazel source, an ignored-RC/no-fetch authentic oracle, focused tests and
+independent reviews support the selected Loading boundary. The rebuilt
+authentic replay clears the launcher stop and reaches missing
+`java_plugins_flag_alias` in the JDK BUILD. Accepted WP828 at `e9011177f`
+was the immediate predecessor; M7A is partial.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

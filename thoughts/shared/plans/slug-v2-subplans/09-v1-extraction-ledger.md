@@ -2791,6 +2791,14 @@ source/mapping restoration and fail-before-dependency behavior; authentic
 protobuf Loading advances to a separate missing-`genrule` stop. This cold
 enum extension makes no memory or performance improvement claim.
 
+WP829 appends `JavaLauncher` to the same one-byte Java and flattened field
+enums for the embedded JDK's selected declaration. It preserves the 32-byte
+field-plus-tools-repository identity and frozen private-label late-bound
+carrier, with no new allocation, interner, DICE key or Buck2/V1 extraction.
+Configured launcher resolution remains fail-closed; the authentic replay
+advances to a distinct missing `java_plugins_flag_alias` Loading stop. The
+independent retained-representation review accepts this no-extraction reuse.
+
 `WP-7-105-m7a-exported-provider-constructor-dict-keys-r1` reuses the
 existing `ProviderId` `Arc`/`Dupe` structural source-label/export-name
 identity, `CompactString`, Starlark hashing and Allocative coverage for both

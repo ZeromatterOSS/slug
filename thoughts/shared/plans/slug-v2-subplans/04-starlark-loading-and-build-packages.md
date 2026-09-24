@@ -8697,6 +8697,17 @@ without invoking the selected initializer-bearing rule. Commit `4d59d7451`
 terminally accepts the unchanged five-file implementation at 75/205/280 gross
 production/proof/total additions.
 
+WP829 later admits the separate Bazel 9.2 embedded JDK `java.launcher`
+declaration as a third selected Java configuration field. The accepted
+two-field packet above remains historical; the current declaration set is
+`java_toolchain_bytecode_optimizer`,
+`local_java_optimization_configuration`, and `launcher`. The other two Java
+fields, `proguard_top` and `bytecode_optimizer`, remain unsupported, as do
+configured `--java_launcher` and provider semantics. The existing one-byte
+field-plus-tools-repository identity and private late-bound rule slices remain
+the only Loading owners. The authentic replay clears the launcher declaration
+and next stops at missing `java_plugins_flag_alias` in the JDK BUILD.
+
 ### BUILD calls into imported-Bzl Label provenance audit (2026-09-03)
 
 Replay of `4d59d7451` clears both Java declarations, then
