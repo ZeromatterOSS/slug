@@ -2950,3 +2950,15 @@ hash shortcut, global process cache, lock, V1/Buck2 import or hot-path
 benchmark claim is made. The cold boundary is covered by 18 focused runner
 tests, offline Bazel/Slug fixture evidence and authentic advancement through
 two GCC `-v` calls; later tool lookups and full toolchain remain deferred.
+
+WP840 enlarges only the selected invocation's existing `SmallMap` of
+prepared normalized Host candidates from 64 to a source-bounded 832-entry
+budget. This map is evaluation scratch, rebuilt/released with each selected
+invocation rather than DICE-retained state; the raw PATH cell and individual
+resolved-path observations still own semantic invalidation. No new retained
+collection, interner, hash shortcut, cache, lock, V1/Buck2 import or memory
+accounting shape is introduced. The larger replay clone/evaluator cost is
+recorded as a residual, not a speedup claim. The 65th, 832nd and 833rd
+boundaries, beyond-old-cap A→B→A and fresh two-row Bazel/Slug fixture
+discriminate the change; authentic cquery reaches a later guarded prefix
+stop. No hot-path benchmark claim is made from these unequal smoke runs.

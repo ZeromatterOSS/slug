@@ -558,6 +558,21 @@ Rust-toolchain cquery advances through two GCC `-v` probes before the
 pre-existing WP838 `which` candidate cap. Later probes and M7A closure remain
 open.
 
+### Selected repository which aggregate budget accepted (WP840, 2026-09-24)
+
+Selected Loading now distinguishes a repeated prepared candidate from an
+exhausted aggregate budget without printing host paths. It permits at most
+832 distinct ordered candidates across one repository-rule invocation,
+derived from the pinned Linux rules_cc phase's 13 possible tool names and
+WP838's existing 64-candidate per-call bound. The larger aggregate budget
+is Slug-native; exact first-hit/None lookup behavior within the admitted
+Unix slice, raw PATH-cell and observed Host-path DICE dependencies remain
+unchanged. The existing normalized-path fixture gained one independent
+65-miss-plus-`sh` row; Bazel generation/verification and rebuilt Slug replay
+pass. Authentic cquery passes the prior limit and reaches Core's separate
+generated GCC-prefix policy, without establishing the next probe's argv or
+full toolchain. No new DICE key, cache or path owner is introduced.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

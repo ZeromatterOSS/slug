@@ -2,3 +2,6 @@ module(name = "which_normalized_path_probe")
 
 which_repo = use_repo_rule("//:repo.bzl", "which_repo")
 which_repo(name = "selected")
+
+aggregate_which_repo = use_repo_rule("//:repo.bzl", "aggregate_which_repo")
+aggregate_which_repo(name = "aggregate_selected")

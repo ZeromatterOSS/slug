@@ -33,6 +33,40 @@
       "startup_argv": [],
       "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n",
       "stdout": "@selected//:normalized_sh\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@aggregate_selected//:aggregate_which",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@aggregate_selected//:aggregate_which",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "PATH": "/usr/../bin"
+      },
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "aggregate_candidates_continue_past_sixty_four",
+      "normalized_stderr": "",
+      "normalized_stdout": "@aggregate_selected//:aggregate_which",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@aggregate_selected//:aggregate_which\n"
     }
   ],
   "fixture": "repository-rule-which-normalized-path",

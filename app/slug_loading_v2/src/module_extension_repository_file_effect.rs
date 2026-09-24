@@ -76,7 +76,9 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 use crate::repository_rule_context::invoke_repository_rule_with_host_paths;
 
 struct RepositoryEffectLimits;
-#[rustfmt::skip] impl RepositoryEffectLimits { const LABEL_PATHS: usize = 256; const WHICH_CANDIDATES: usize = 64; const HOST_PATHS: usize = 64; }
+// Pinned rules_cc 0.2.17 unix_cc_configure.bzl:68-87,332-417 can probe
+// 13 distinct tools, each within repository_ctx.which's 64-candidate limit.
+#[rustfmt::skip] impl RepositoryEffectLimits { const LABEL_PATHS: usize = 256; const WHICH_CANDIDATES: usize = 13 * 64; const HOST_PATHS: usize = 64; }
 
 // Pinned rules_rust 0.73.0 rust/private/repositories.bzl:397-462 and
 // repository_utils.bzl:845-1009. These are the only audited Linux x86_64
@@ -1292,6 +1294,19 @@ async fn resolve_which_candidate(
     }
 }
 
+fn which_candidate_retry_error(
+    prepared: &PreparedRepositoryWhichCandidates,
+    candidate: &NormalizedAbsolutePath,
+) -> Option<&'static str> {
+    if prepared.contains_key(candidate) {
+        Some("repository_ctx.which repeated an already prepared candidate")
+    } else if prepared.len() == RepositoryEffectLimits::WHICH_CANDIDATES {
+        Some("repository_ctx.which exceeded its per-invocation candidate limit")
+    } else {
+        None
+    }
+}
+
 fn classify_host_path_exists(
     result: &Result<ResolvedPath, PathResolutionError>,
 ) -> Result<bool, CompactString> {
@@ -1618,16 +1633,12 @@ async fn invoke_repository_rule_with_label_paths(
                 prepared_sources.insert(address, bytes);
             }
             Err(RepositoryRuleInvocationError::WhichNeed(candidate)) => {
-                if prepared_which.contains_key(&candidate)
-                    || prepared_which.len() == RepositoryEffectLimits::WHICH_CANDIDATES
-                {
+                if let Some(message) = which_candidate_retry_error(&prepared_which, &candidate) {
                     return Err(complete_effect_error(
                         HostSelectedRepositoryFileEffectError::Invocation {
                             certificate: certificate.clone(),
                             ordinal: key.ordinal,
-                            message:
-                                "repository_ctx.which repeated or exceeded its candidate limit"
-                                    .into(),
+                            message: message.into(),
                         },
                         observations,
                     ));
@@ -3399,6 +3410,123 @@ ext = module_extension(implementation = impl)
         assert!(classify_which_candidate(&Err(inconsistent)).is_err());
     }
 
+    #[test]
+    fn repository_which_retry_distinguishes_repeated_candidate_from_aggregate_limit() {
+        let mut prepared = PreparedRepositoryWhichCandidates::new();
+        for index in 0..RepositoryEffectLimits::WHICH_CANDIDATES {
+            let candidate = NormalizedAbsolutePath::new(format!("/which/tool-{index}")).unwrap();
+            assert_eq!(which_candidate_retry_error(&prepared, &candidate), None);
+            prepared.insert(candidate, RepositoryWhichCandidate::Miss);
+        }
+        assert_eq!(prepared.len(), 832);
+        let repeated = NormalizedAbsolutePath::new("/which/tool-0").unwrap();
+        let fresh = NormalizedAbsolutePath::new("/which/fresh").unwrap();
+        assert_eq!(
+            which_candidate_retry_error(&prepared, &repeated),
+            Some("repository_ctx.which repeated an already prepared candidate")
+        );
+        assert_eq!(
+            which_candidate_retry_error(&prepared, &fresh),
+            Some("repository_ctx.which exceeded its per-invocation candidate limit")
+        );
+        let empty = PreparedRepositoryWhichCandidates::new();
+        assert_eq!(which_candidate_retry_error(&empty, &fresh), None);
+    }
+
+    #[tokio::test]
+    async fn repository_which_observes_candidate_beyond_old_budget_a_b_a() {
+        const WHICH_EXTENSION: &str = r#"
+def write(ctx):
+    for index in range(65):
+        if ctx.which("slug_v2_which_absent_" + str(index)) != None:
+            fail("unexpected executable")
+    ctx.file("resolved", str(ctx.which("tool")), executable = False)
+repo = repository_rule(implementation = write)
+def impl(ctx):
+    repo(name = "first")
+ext = module_extension(implementation = impl)
+"#;
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let base = base_transaction_untracked(&dice, MODULE, WHICH_EXTENSION, true).await;
+        let mut transaction = with_host_inputs_for(
+            base,
+            workspace.dupe(),
+            None,
+            RepositoryPlatform::new("linux", "x86_64"),
+            environment_snapshot(&[("PATH", "/which")]),
+            environment_frontier(&["PATH"]),
+        )
+        .await;
+        let selected_owner = owner(&mut transaction).await;
+        let key = HostSelectedRepositoryFileEffectObservationKey::new(workspace, selected_owner, 0);
+        let original = loop {
+            match transaction.compute(&key).await.unwrap() {
+                SourcePreparationOutcome::Need(need) if need.path_observations().is_some() => {
+                    transaction = update_which_need(transaction, &need).await;
+                }
+                SourcePreparationOutcome::Complete(Ok(value)) => break value,
+                terminal => panic!("extended which lookup did not complete: {terminal:?}"),
+            }
+        };
+        assert_eq!(
+            original
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .plan()
+                .effects()[0]
+                .content(),
+            b"None"
+        );
+        for candidate in ["/which/slug_v2_which_absent_64", "/which/tool"] {
+            assert!(original.observations().observations().keys().any(|demand| {
+                demand.operation() == PathObservationOperation::Lstat
+                    && demand.path().as_path() == Path::new(candidate)
+            }));
+        }
+        let original_epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
+        let executable_epoch = replace_which_lstat(
+            &original_epoch,
+            "/which/tool",
+            PathNodeKind::RegularFile,
+            0o100,
+        );
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, executable_epoch)])
+            .unwrap();
+        transaction = updater.commit().await;
+        let SourcePreparationOutcome::Complete(Ok(executable)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("candidate beyond old budget did not invalidate to executable")
+        };
+        assert_eq!(
+            executable
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .plan()
+                .effects()[0]
+                .content(),
+            b"/which/tool"
+        );
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, original_epoch)])
+            .unwrap();
+        transaction = updater.commit().await;
+        let SourcePreparationOutcome::Complete(Ok(restored)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("candidate beyond old budget did not restore to missing")
+        };
+        assert_eq!(restored, original);
+    }
+
     #[tokio::test]
     async fn repository_which_verifies_path_then_tracks_order_kind_mode_and_frontier() {
         const WHICH_EXTENSION: &str = r#"
@@ -3675,7 +3803,8 @@ def write(ctx):
     first = ctx.execute([cc, "-v"])
     ctx.file("middle", "yes" if first.stderr == "A\377" else "no")
     second = ctx.execute([cc, "-v"])
-    ctx.file("result", "%s|%s|%s" % (first.stderr == "A\377", second.return_code, second.stdout == "B\377"))
+    post = ctx.which("post")
+    ctx.file("result", "%s|%s|%s|%s" % (first.stderr == "A\377", second.return_code, second.stdout == "B\377", post))
 repo = repository_rule(implementation = write)
 def impl(ctx):
     repo(name = "first")
@@ -3862,8 +3991,12 @@ ext = module_extension(implementation = impl)
             panic!("prepared execute transcript did not complete")
         };
         let effect = observed.result().as_ref().as_ref().unwrap();
-        assert_eq!(effect.plan().effects()[2].content(), b"True|7|True");
+        assert_eq!(effect.plan().effects()[2].content(), b"True|7|True|None");
         assert_eq!(effect.host().execute_transcript().records().len(), 2);
+        assert!(observed.observations().observations().keys().any(|demand| {
+            demand.operation() == PathObservationOperation::Lstat
+                && demand.path().as_path() == Path::new("/which/target/post")
+        }));
     }
 
     #[tokio::test]
