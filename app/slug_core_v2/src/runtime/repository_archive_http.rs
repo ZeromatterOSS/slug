@@ -1,5 +1,7 @@
 use std::cell::OnceCell;
 use std::io;
+use std::io::Read;
+use std::io::Seek;
 use std::io::Write;
 use std::net::SocketAddr;
 use std::net::ToSocketAddrs;
@@ -34,6 +36,7 @@ const CAPTURE_LIMIT: u64 = 128 * 1024 * 1024;
 const MODULE_CAPTURE_LIMIT: u64 = 1024 * 1024;
 const PATCH_CAPTURE_LIMIT: u64 = 8 * 1024 * 1024;
 const OVERLAY_CAPTURE_LIMIT: u64 = 64 * 1024 * 1024;
+const SELECTED_EXTENSION_CAPTURE_LIMIT: u64 = 32 * 1024 * 1024;
 const MAX_ADDRESSES: usize = 64;
 const MAX_REDIRECTS: usize = 39;
 
@@ -355,6 +358,100 @@ pub(super) fn capture_selected_bcr_patch(
         active,
         &environment,
     )
+}
+
+/// Capture one checksum-pinned module-extension artifact without giving the
+/// extension a repository or a physical output path. The temporary capture is
+/// unlinked when the verified bytes have been transferred to the caller.
+pub(super) fn capture_selected_extension_artifact(
+    url: &str,
+    sha256: [u8; 32],
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+) -> Result<Arc<[u8]>, String> {
+    let environment = NativeEnvironment::new();
+    capture_selected_extension_artifact_with(url, sha256, runtime, active, &environment)
+}
+
+fn capture_selected_extension_artifact_with(
+    url: &str,
+    sha256: [u8; 32],
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+    environment: &impl Environment,
+) -> Result<Arc<[u8]>, String> {
+    if !active() {
+        return Err("selected extension artifact capture cancelled".into());
+    }
+    let mut capture = capture_one(
+        url,
+        sha256,
+        SELECTED_EXTENSION_CAPTURE_LIMIT,
+        "selected extension artifact",
+        runtime,
+        active,
+        environment,
+    )
+    .map_err(selected_extension_capture_error)?;
+    let size = capture
+        .as_file()
+        .metadata()
+        .map_err(|_| "selected extension artifact capture unreadable")?
+        .len();
+    if size > SELECTED_EXTENSION_CAPTURE_LIMIT {
+        return Err("selected extension artifact exceeds 33554432 byte capture limit".into());
+    }
+    capture
+        .as_file_mut()
+        .rewind()
+        .map_err(|_| "selected extension artifact capture unreadable")?;
+    let mut bytes = Vec::with_capacity(size as usize);
+    let mut buffer = [0u8; 64 * 1024];
+    let mut hasher = Sha256::new();
+    loop {
+        if !active() {
+            return Err("selected extension artifact capture cancelled".into());
+        }
+        let count = match capture.as_file_mut().read(&mut buffer) {
+            Ok(count) => count,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(_) => return Err("selected extension artifact capture unreadable".into()),
+        };
+        if count == 0 {
+            break;
+        }
+        let next = bytes
+            .len()
+            .checked_add(count)
+            .filter(|size| *size as u64 <= SELECTED_EXTENSION_CAPTURE_LIMIT)
+            .ok_or("selected extension artifact exceeds 33554432 byte capture limit")?;
+        bytes.extend_from_slice(&buffer[..count]);
+        debug_assert_eq!(bytes.len(), next);
+        hasher.update(&buffer[..count]);
+    }
+    if !active() {
+        return Err("selected extension artifact capture cancelled".into());
+    }
+    if hasher.finalize().as_slice() != sha256 {
+        return Err("selected extension artifact SHA-256 mismatch".into());
+    }
+    Ok(Arc::from(bytes))
+}
+
+// The transport may have seen a URL query or file pathname. Do not propagate
+// either through a selected-extension diagnostic, including parse/IO errors.
+fn selected_extension_capture_error(error: String) -> String {
+    if error.contains("no longer active") {
+        "selected extension artifact capture cancelled".into()
+    } else if error.contains("SHA-256 SRI mismatch") {
+        "selected extension artifact SHA-256 mismatch".into()
+    } else if error.contains("byte capture limit") {
+        "selected extension artifact exceeds 33554432 byte capture limit".into()
+    } else if error.contains("redirect") || error.contains("Redirect") {
+        "selected extension artifact redirect failed".into()
+    } else {
+        "selected extension artifact transport failed".into()
+    }
 }
 
 fn capture_urls(

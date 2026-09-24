@@ -29,24 +29,25 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-89-m7a-selected-extension-declared-host-environment-r1
-Status: accepted; independent design and final ACCEPT
+Packet: WP-7-90-m7a-selected-extension-generator-acquisition-r1
+Status: accepted; independent design and final reviews ACCEPT
 
-WP789 targets the fresh authentic root cquery Loading stop in rules_rust 0.73.0:
-the selected `crate` module extension declares an ordered `environ` factor,
-which Slug currently rejects. Observe those declared names and Host platform
-through existing repository Host DICE cells, then admit the bounded
-`module_ctx.os` name/arch and declared-name environment membership/get view
-needed by the selected implementation. Undeclared environment lookups and
-other unmodeled factors remain fail-closed; this does not claim complete
-extension execution, configured root coverage or M7A closure. WP788 at
-`66d29e2fe` accepted module-tag `allow_files` descriptors and moved the root
-request to this factor boundary. Focused selected-owner and Host-view tests,
-direct dependent, fresh CLI build and root smoke pass the factor guard; the
-root now stops at the separate unsupported `module_ctx.path` effect in
-rules_rust `extensions.bzl:851`. A selected external-route negative test proves
-OS/arch/facts declarations still fail before invocation; independent design
-and final reviews ACCEPTED the packet.
+WP790 targets the next authentic root stop in rules_rust 0.73.0: its selected
+`crate` extension calls `module_ctx.path("cargo-bazel")` and immediately
+downloads the checksum-pinned generator there. Admit this paired,
+owner-scoped logical path and verified raw-artifact Need/replay through the
+selected-owner DICE input; retain verified bytes, not a temporary filename,
+so warm reuse and abort restoration remain sound. Reject unsigned or
+unmodeled effects. A fresh root smoke must report the next honest terminal;
+physical path reads, watch/execute and M7A closure remain deferred. WP789 at
+`83de69964` accepted tracked declared Host inputs and passed the factor
+guard, reaching the path call. Independent design review ACCEPTED the
+bounded byte ownership and selected-closure contract. Focused Bzlmod,
+Loading, Core transport and same-DICE lifecycle tests pass; a fresh CLI
+build passes. The authentic root now passes path/download and stops at
+rules_rust `extensions.bzl:1129` on deferred Starlark `list + list`.
+Independent final review ACCEPTED the bounded owner, revocation and restore
+behavior. No configured-root/M7A closure claim.
 
 WP785 at `9931f6a2d` accepted bounded Linux `run_shell` execution through
 fresh NativeLink 1.7.1: one REAPI action, zero direct-local actions and exact

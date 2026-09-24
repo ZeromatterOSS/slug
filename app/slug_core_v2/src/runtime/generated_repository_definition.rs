@@ -22,6 +22,7 @@ pub(super) mod tests {
     use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
     use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
     use slug_bzlmod_v2::RootPackagePolicyInputs;
+    use slug_bzlmod_v2::SelectedExtensionDownloadTransaction;
     use slug_bzlmod_v2::SourcePreparationOutcome;
     use slug_events_v2::CaptureEvaluationEvents;
     use slug_identity_v2::CanonicalRepoName;
@@ -193,6 +194,11 @@ ext=module_extension(implementation=impl)
             ..Default::default()
         };
         user_data.data.set(CaptureEvaluationEvents);
+        user_data
+            .data
+            .set(SelectedExtensionDownloadTransaction::empty(
+                workspace.dupe(),
+            ));
         let mut updater = dice.updater_with_data(user_data);
         updater
             .changed_to(vec![(

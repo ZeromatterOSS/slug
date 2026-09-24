@@ -12,7 +12,9 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt;
 use std::hash::Hash;
+use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use allocative::Allocative;
 use async_trait::async_trait;
@@ -24,6 +26,7 @@ use dupe::Dupe;
 use slug_bzlmod_v2::FactNumber;
 use slug_bzlmod_v2::FactValue;
 use slug_bzlmod_v2::Facts;
+use slug_bzlmod_v2::HostRepositoryRelativePath;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionSource;
 use slug_bzlmod_v2::HostSelectedExtensionOwner;
@@ -43,8 +46,15 @@ use slug_bzlmod_v2::RepositoryPlatformKey;
 use slug_bzlmod_v2::RootModuleExtensionUsage;
 use slug_bzlmod_v2::RootPackageBzlTarget;
 use slug_bzlmod_v2::RootRepositoryRoute;
+use slug_bzlmod_v2::SelectedExtensionDownloadEpoch;
+use slug_bzlmod_v2::SelectedExtensionDownloadEpochKey;
+use slug_bzlmod_v2::SelectedExtensionDownloadRequest;
+use slug_bzlmod_v2::SelectedExtensionDownloadTransaction;
+use slug_bzlmod_v2::SelectedExtensionDownloadVerified;
 use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_bzlmod_v2::UsedDownloadRequestKey;
+use slug_bzlmod_v2::host_repository_relative_path;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
@@ -76,6 +86,7 @@ use starlark::values::float::StarlarkFloat;
 use starlark::values::list::AllocList;
 use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
+use starlark::values::structs::AllocStruct;
 use starlark::values::tuple::TupleRef;
 use starlark_map::small_set::SmallSet;
 use starlark_map::sorted_map::SortedMap;
@@ -774,6 +785,47 @@ async fn observe_selected_host(
     }))
 }
 
+/// Authenticate the injected download cell before entering synchronous
+/// Starlark. A cold owner has no authorized cell to read: its call discovers
+/// the request through a transient Need instead.
+async fn selected_download_preflight(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedExtensionOwnerPureKey,
+) -> Result<Option<Arc<SelectedExtensionDownloadVerified>>, CompactString> {
+    let transaction = ctx
+        .per_transaction_data()
+        .data
+        .get::<SelectedExtensionDownloadTransaction>()
+        .map_err(|_| CompactString::from("selected module extension download inputs unavailable"))?
+        .clone();
+    if transaction.workspace() != &key.workspace {
+        return Err("selected module extension download workspace differs from request".into());
+    }
+    if !transaction.is_authorized(&key.owner) {
+        return Ok(None);
+    }
+    let epoch = ctx
+        .compute(&SelectedExtensionDownloadEpochKey::new(
+            key.workspace.dupe(),
+            key.owner.clone(),
+        ))
+        .await
+        .map_err(|_| CompactString::from("selected module extension download cell unavailable"))?;
+    let expected = transaction.get(&key.owner);
+    match epoch {
+        SelectedExtensionDownloadEpoch::Ready(actual)
+            if expected.is_some_and(|expected| expected == &actual) =>
+        {
+            Ok(Some(actual))
+        }
+        SelectedExtensionDownloadEpoch::AuthorizedEmpty if expected.is_none() => Ok(None),
+        SelectedExtensionDownloadEpoch::Unauthorized => {
+            Err("selected module extension download cell unauthorized".into())
+        }
+        _ => Err("selected module extension download cell differs from request".into()),
+    }
+}
+
 #[rustfmt::skip]
 fn owner_invocation_modules(inputs: &HostSelectedExtensionOwnerInputs, projection: &OwnerProjection, owner: &Arc<()>) -> Result<Arc<[PreparedInvocationModule]>, CompactString> {
     for (_, schema) in projection.definition.tag_classes.iter() {
@@ -866,6 +918,10 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         Ok(value) => value,
         Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
     };
+    let ready = match selected_download_preflight(ctx, key).await {
+        Ok(ready) => ready,
+        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
+    };
     let (module, observations) = match owner_bzl(ctx, key, &inputs, Some(&first), first_module.1, mode).await { Ok(value) => value, Err(outcome) => return outcome };
     let second = match owner_projection(&module, inputs.request()) {
         Ok(value) => value,
@@ -874,40 +930,62 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
     if second != *first {
         return owner_complete(Err(owner_after(&inputs, Arc::from([]), "reacquired selected module extension differs")), observations);
     }
+    let selected_download = Arc::new(SelectedDownloadInvocation::new(key.workspace.dupe(), key.owner.clone(), ready));
     let definition = module.module.get_assigned(inputs.request().parts().1).expect("projection authenticated export").0.downcast::<FrozenModuleExtensionDefinition>().expect("projection authenticated kind");
-    let invocation_module = Module::new();
-    let modules = modules
-        .iter()
-        .cloned()
-        .map(|module| module.materialize(invocation_module.frozen_heap()))
-        .collect::<Vec<_>>()
-        .into();
     let root_usage = inputs.root_proxies().map(|proxies| RootModuleExtensionUsage::new(
         proxies.iter().any(|proxy| !proxy.dev_dependency),
         proxies.iter().any(|proxy| proxy.dev_dependency),
     ));
-    let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage, Some(host)));
-    let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);
-    let repository_rules = RepositoryRuleInvocationState::new();
-    let returned = {
+    let (returned, calls, capture) = {
+        let invocation_module = Module::new();
+        let modules = modules
+            .iter()
+            .cloned()
+            .map(|module| module.materialize(invocation_module.frozen_heap()))
+            .collect::<Vec<_>>()
+            .into();
+        let context = invocation_module.heap().alloc_simple(InvocationContext::new_modules(modules, &owner, root_usage, Some(host)).with_selected_download(selected_download.clone()));
+        let capture = ctx.per_transaction_data().data.get::<CaptureEvaluationEvents>().is_ok().then(InvocationPrintCapture::default);
+        let repository_rules = RepositoryRuleInvocationState::new();
         let mut evaluator = Evaluator::new(&invocation_module);
         evaluator.extra = Some(&repository_rules);
         if let Some(capture) = capture.as_ref() {
             evaluator.set_print_handler(capture);
         }
-        evaluator.eval_function(definition.implementation.to_value(), &[context], &[])
+        let returned = evaluator.eval_function(definition.implementation.to_value(), &[context], &[]);
+        let pending = match selected_download.need() {
+            Ok(pending) => pending,
+            Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+        };
+        if let Some(need) = pending {
+            return SourcePreparationOutcome::Need(SourcePreparationNeeds::selected_extension_download((*need).clone()));
+        }
+        let returned = returned
+            .map_err(|error| CompactString::from(error.to_string()))
+            .and_then(|value| returned_metadata(value).map_err(|error| CompactString::from(error.to_string())));
+        drop(evaluator);
+        (returned, repository_rules.records(), capture)
     };
-    let calls = repository_rules.records();
+    // A successful download is part of the selected closure even when later
+    // Starlark evaluation fails. Unused preflighted content does not enter it.
+    let used = match selected_download.used() {
+        Ok(used) => used,
+        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations),
+    };
+    if let Some(used) = used {
+        if let Err(error) = ctx.compute(&UsedDownloadRequestKey::new(used)).await {
+            return owner_complete(Err(owner_after(&inputs, calls, error.to_string())), observations);
+        }
+    }
     let request = inputs.request().clone();
     let result = match returned {
-        Err(error) => Err(owner_after(&inputs, calls, error.to_string())),
-        Ok(value) => match returned_metadata(value) {
-            Ok(metadata) if metadata.facts().is_empty() => Ok(HostSelectedExtensionOwnerPureResult {
+        Err(error) => Err(owner_after(&inputs, calls, error)),
+        Ok(metadata) => match metadata {
+            metadata if metadata.facts().is_empty() => Ok(HostSelectedExtensionOwnerPureResult {
                 inputs,
                 receipt: HostPureModuleExtensionInvocationReceipt { request, repository_rule_calls: calls, metadata, root_usage },
             }),
-            Ok(_) => Err(owner_after(&inputs, calls, "nonempty module extension facts require the deferred lockfile lifecycle")),
-            Err(error) => Err(owner_after(&inputs, calls, error.to_string())),
+            _ => Err(owner_after(&inputs, calls, "nonempty module extension facts require the deferred lockfile lifecycle")),
         },
     };
     if let Some(capture) = capture {
@@ -1256,8 +1334,133 @@ struct InvocationContext {
     modules: Arc<[InvocationModule]>,
     root_usage: Option<RootModuleExtensionUsage>,
     os: Option<ModuleExtensionOs>,
+    selected_download: Option<Arc<SelectedDownloadInvocation>>,
     #[allocative(skip)]
     owner: Arc<()>,
+}
+
+#[derive(Debug, Allocative)]
+struct SelectedDownloadInvocation {
+    workspace: NormalizedAbsolutePath,
+    selected_owner: Arc<HostSelectedExtensionOwner>,
+    ready: Option<Arc<SelectedExtensionDownloadVerified>>,
+    scratch: Mutex<SelectedDownloadScratch>,
+}
+
+#[derive(Debug, Default, Allocative)]
+struct SelectedDownloadScratch {
+    first: Option<Arc<SelectedExtensionDownloadRequest>>,
+    need: Option<Arc<SelectedExtensionDownloadRequest>>,
+    used: Option<Arc<SelectedExtensionDownloadRequest>>,
+}
+
+impl SelectedDownloadInvocation {
+    fn new(
+        workspace: NormalizedAbsolutePath,
+        selected_owner: Arc<HostSelectedExtensionOwner>,
+        ready: Option<Arc<SelectedExtensionDownloadVerified>>,
+    ) -> Self {
+        Self {
+            workspace,
+            selected_owner,
+            ready,
+            scratch: Mutex::new(SelectedDownloadScratch::default()),
+        }
+    }
+
+    fn call(&self, request: Arc<SelectedExtensionDownloadRequest>) -> anyhow::Result<()> {
+        let mut scratch = self.scratch.lock().map_err(|_| {
+            anyhow::anyhow!("selected module extension download scratch unavailable")
+        })?;
+        if let Some(first) = &scratch.first {
+            if first != &request {
+                anyhow::bail!("multiple distinct module extension downloads are unsupported");
+            }
+        } else {
+            scratch.first = Some(request.clone());
+        }
+        if self
+            .ready
+            .as_ref()
+            .is_some_and(|ready| ready.request() == &request)
+        {
+            scratch.used = Some(request);
+            Ok(())
+        } else {
+            scratch.need = Some(request);
+            anyhow::bail!("selected module extension download requires preparation")
+        }
+    }
+
+    fn need(&self) -> Result<Option<Arc<SelectedExtensionDownloadRequest>>, CompactString> {
+        self.scratch
+            .lock()
+            .map(|scratch| scratch.need.clone())
+            .map_err(|_| "selected module extension download scratch unavailable".into())
+    }
+
+    fn used(&self) -> Result<Option<Arc<SelectedExtensionDownloadRequest>>, CompactString> {
+        self.scratch
+            .lock()
+            .map(|scratch| scratch.used.clone())
+            .map_err(|_| "selected module extension download scratch unavailable".into())
+    }
+}
+
+/// A logical extension-workdir path. It deliberately does not expose a host
+/// filesystem path or implement the physical path operations of Bazel's
+/// repository context.
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct SelectedModuleScratchPath {
+    relative: HostRepositoryRelativePath,
+    #[allocative(skip)]
+    owner: Arc<()>,
+}
+
+impl fmt::Display for SelectedModuleScratchPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.relative.as_path().display().fmt(f)
+    }
+}
+starlark::starlark_simple_value!(SelectedModuleScratchPath);
+
+#[starlark_value(type = "module_extension_scratch_path")]
+impl<'v> StarlarkValue<'v> for SelectedModuleScratchPath {}
+
+fn selected_scratch_relative(path: &str) -> anyhow::Result<HostRepositoryRelativePath> {
+    // PathBuf's component iterator normalizes some spellings, so check the
+    // spelling as well as the repository-relative path invariant.
+    if path.is_empty()
+        || path.contains('\\')
+        || path.contains('\0')
+        || path
+            .split('/')
+            .any(|component| component.is_empty() || component == "." || component == "..")
+        || path
+            .split('/')
+            .next()
+            .is_some_and(|component| component.ends_with(':'))
+    {
+        anyhow::bail!("module_ctx.path requires a normalized relative string");
+    }
+    let relative = host_repository_relative_path(PathBuf::from(path))
+        .map_err(|_| anyhow::anyhow!("module_ctx.path requires a normalized relative string"))?;
+    if relative.as_path().to_str() != Some(path) {
+        anyhow::bail!("module_ctx.path requires a normalized relative string");
+    }
+    Ok(relative)
+}
+
+fn selected_download_sha256(text: &str) -> anyhow::Result<[u8; 32]> {
+    if text.len() != 64 || !text.as_bytes().iter().all(u8::is_ascii_hexdigit) {
+        anyhow::bail!("module_ctx.download requires a 64-digit SHA-256 checksum");
+    }
+    let mut bytes = [0u8; 32];
+    for (index, byte) in bytes.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&text[index * 2..index * 2 + 2], 16)
+            .expect("validated ASCII hex pair");
+    }
+    Ok(bytes)
 }
 
 impl InvocationContext {
@@ -1309,8 +1512,14 @@ impl InvocationContext {
             modules,
             root_usage,
             os,
+            selected_download: None,
             owner: owner.clone(),
         }
+    }
+
+    fn with_selected_download(mut self, download: Arc<SelectedDownloadInvocation>) -> Self {
+        self.selected_download = Some(download);
+        self
     }
 }
 
@@ -1344,6 +1553,55 @@ impl<'v> StarlarkValue<'v> for InvocationContext {
 
 #[starlark_module]
 fn invocation_context_methods(builder: &mut MethodsBuilder) {
+    fn path(
+        this: Value,
+        #[starlark(require = pos)] path: &str,
+    ) -> anyhow::Result<SelectedModuleScratchPath> {
+        let this = InvocationContext::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
+        if this.selected_download.is_none() {
+            anyhow::bail!("module_ctx.path is only supported for a selected module extension");
+        }
+        Ok(SelectedModuleScratchPath {
+            relative: selected_scratch_relative(path)?,
+            owner: this.owner.clone(),
+        })
+    }
+    fn download<'v>(
+        this: Value<'v>,
+        #[starlark(require = named)] url: &str,
+        #[starlark(require = named)] output: Value<'v>,
+        #[starlark(require = named)] sha256: &str,
+        #[starlark(require = named, default = false)] executable: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        let this = InvocationContext::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
+        let download = this.selected_download.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("module_ctx.download is only supported for a selected module extension")
+        })?;
+        let path = SelectedModuleScratchPath::from_value(output).ok_or_else(|| {
+            anyhow::anyhow!("module_ctx.download output must be a module_ctx.path value")
+        })?;
+        if !Arc::ptr_eq(&this.owner, &path.owner) {
+            anyhow::bail!("module_ctx.download output belongs to another module_ctx");
+        }
+        let request = Arc::new(SelectedExtensionDownloadRequest::new(
+            download.workspace.dupe(),
+            download.selected_owner.clone(),
+            path.relative.clone(),
+            url,
+            selected_download_sha256(sha256)?,
+            executable,
+        )?);
+        download.call(request.clone())?;
+        let heap = eval.heap();
+        Ok(heap.alloc(AllocStruct([
+            ("success", heap.alloc(true)),
+            ("sha256", heap.alloc(request.sha256_hex())),
+            ("integrity", heap.alloc(request.sha256_sri())),
+        ])))
+    }
     fn extension_metadata<'v>(
         this: Value<'v>,
         #[starlark(require = named)] root_module_direct_deps: Option<Value<'v>>,
@@ -1823,6 +2081,8 @@ mod tests {
     use dice::DynKey;
     use dice::RichActivation;
     use dice::UserComputationData;
+    use sha2::Digest;
+    use sha2::Sha256;
     use slug_bzlmod_v2::BzlmodCommandPolicyKey;
     use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
     use slug_bzlmod_v2::HostRepositoryMaterializationDisposition;
@@ -1988,6 +2248,7 @@ mod tests {
             modules: Arc::from([empty_module(&owner)]),
             root_usage: None,
             os: None,
+            selected_download: None,
             owner: owner.clone(),
         };
         let modules = call("def f(ctx):\n  ctx.modules.append(1)\n", |module| {
@@ -2037,6 +2298,7 @@ mod tests {
             }]),
             root_usage: None,
             os: None,
+            selected_download: None,
             owner: owner.clone(),
         };
         let foreign_heap = FrozenHeap::new();
@@ -2097,6 +2359,7 @@ mod tests {
             }]),
             root_usage: None,
             os: None,
+            selected_download: None,
             owner: owner.clone(),
         };
         let value = call(
@@ -2118,6 +2381,7 @@ mod tests {
             }]),
             root_usage: None,
             os: None,
+            selected_download: None,
             owner,
         };
         for name in [
@@ -2169,6 +2433,7 @@ mod tests {
             }]),
             root_usage: None,
             os: None,
+            selected_download: None,
             owner: other_owner,
         };
         for method in ["is_dev_dependency", "tag_sort_key"] {
@@ -2203,6 +2468,7 @@ mod tests {
             modules: Arc::from([empty_module(&owner)]),
             root_usage: Some(RootModuleExtensionUsage::new(true, true)),
             os: None,
+            selected_download: None,
             owner,
         };
         let none = metadata_call("def f(ctx):\n  return None\n", context.clone()).unwrap();
@@ -2326,6 +2592,7 @@ mod tests {
                 modules: Arc::from([empty_module(&owner)]),
                 root_usage: usage,
                 os: None,
+                selected_download: None,
                 owner: owner.clone(),
             };
             assert_eq!(
@@ -2433,6 +2700,7 @@ mod tests {
             }]),
             root_usage: Some(RootModuleExtensionUsage::new(true, false)),
             os: None,
+            selected_download: None,
             owner,
         };
         let value = call("def f(ctx, tag):\n  label=tag.target\n  return [len(ctx.modules), ctx.modules[0].name, ctx.modules[0].version, ctx.modules[0].is_root, ctx.is_dev_dependency(tag), label.name, label.package, label.repo_name, label.workspace_name, str(label), repr(label), '%s' % label, '%r' % label, '{}'.format(label), '{!s}'.format(label), '{!r}'.format(label), label.same_package_label('other').name, {label: 1}[label], label == label]\n", |module| vec![module.heap().alloc_simple(context), module.heap().alloc_simple(tag)]).unwrap();
@@ -3688,6 +3956,31 @@ mod tests {
         frontier: RepositoryEnvironmentNameFrontier,
     ) -> dice::DiceTransaction {
         let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        selected_factor_host_inputs_with_download(
+            transaction,
+            tracker,
+            platform,
+            snapshot,
+            frontier,
+            SelectedExtensionDownloadTransaction::empty(workspace),
+            None,
+        )
+        .await
+    }
+
+    async fn selected_factor_host_inputs_with_download(
+        transaction: dice::DiceTransaction,
+        tracker: Arc<RepositoryRuleActivationTracker>,
+        platform: RepositoryPlatform,
+        snapshot: RepositoryEnvironmentSnapshot,
+        frontier: RepositoryEnvironmentNameFrontier,
+        download: SelectedExtensionDownloadTransaction,
+        epoch: Option<(
+            Arc<HostSelectedExtensionOwner>,
+            SelectedExtensionDownloadEpoch,
+        )>,
+    ) -> dice::DiceTransaction {
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
         let mut data = UserComputationData {
             cycle_detector: Some(crate::cycle_detector::bzl_load_cycle_detector()),
             activation_tracker: Some(tracker),
@@ -3698,6 +3991,7 @@ mod tests {
             snapshot.clone(),
             frontier.clone(),
         ));
+        data.data.set(download);
         let mut updater = transaction.into_updater();
         updater
             .changed_to([(RepositoryPlatformKey::new(workspace.dupe()), platform)])
@@ -3715,6 +4009,14 @@ mod tests {
                     .collect::<Vec<_>>(),
             )
             .unwrap();
+        if let Some((owner, epoch)) = epoch {
+            updater
+                .changed_to([(
+                    SelectedExtensionDownloadEpochKey::new(workspace, owner),
+                    epoch,
+                )])
+                .unwrap();
+        }
         updater.commit_with_data(data).await
     }
 
@@ -3974,6 +4276,276 @@ ext = module_extension(implementation = impl, environ = ['FACTOR', 'MISSING', 'F
                 "{factor}: selected implementation ran"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn selected_external_owner_download_need_replay_and_used_request() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
+        const BYTES: &[u8] = b"selected-generator-fixture\n";
+        let checksum = format!("{:x}", Sha256::digest(BYTES));
+        let extension = format!(
+            r#"
+repo = repository_rule(lambda ctx: None, attrs = {{'value': attr.string()}})
+def impl(ctx):
+    output = ctx.path('cargo-bazel')
+    print('before-selected-download')
+    result = ctx.download(url='file:///selected-generator-fixture', output=output, executable=True, sha256='{checksum}')
+    repo(name='proof', value=result.sha256 + '|' + result.integrity + '|' + str(output))
+    print('after-selected-download')
+ext = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTOR'])
+"#
+        );
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (base, owner) =
+            selected_factor_transaction(&dice, MODULE, &extension, tracker.clone(), true).await;
+        tracker.take();
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let key =
+            HostSelectedExtensionOwnerPureObservationKey::new(workspace.dupe(), owner.clone());
+        let frontier = RepositoryEnvironmentNameFrontier::from_unsorted([
+            CompactString::new("FACTOR"),
+            CompactString::new("MISSING"),
+        ]);
+        let mut transaction = selected_factor_host_inputs(
+            base,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            frontier.clone(),
+        )
+        .await;
+        let SourcePreparationOutcome::Need(need) = transaction.compute(&key).await.unwrap() else {
+            panic!("cold selected download must return Need");
+        };
+        let requests = need.selected_extension_downloads();
+        assert_eq!(requests.len(), 1);
+        let request = requests.iter().next().unwrap().1.clone();
+        assert_eq!(request.owner(), &owner);
+        assert_eq!(request.url(), "file:///selected-generator-fixture");
+        assert_eq!(request.output().as_path().to_str(), Some("cargo-bazel"));
+        assert_eq!(request.sha256_hex(), checksum);
+        assert!(request.executable());
+        let rows = tracker.take();
+        assert!(
+            rows.iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+        assert!(
+            rows.iter()
+                .flat_map(|row| row.batch.as_ref())
+                .flat_map(EventBatch::events)
+                .all(|event| !format!("{event:?}").contains("selected-download"))
+        );
+
+        let verified = Arc::new(
+            SelectedExtensionDownloadVerified::new(request.clone(), Arc::from(BYTES)).unwrap(),
+        );
+        transaction = selected_factor_host_inputs_with_download(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            frontier.clone(),
+            SelectedExtensionDownloadTransaction::new(
+                workspace.dupe(),
+                [owner.clone()],
+                [verified.clone()],
+            )
+            .unwrap(),
+            Some((
+                owner.clone(),
+                SelectedExtensionDownloadEpoch::Ready(verified.clone()),
+            )),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(observed)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("selected download replay did not complete");
+        };
+        let result = observed.result().as_ref().as_ref().unwrap();
+        let call = &result.receipt.repository_rule_calls[0];
+        let (_, crate::module_extension_repository_rule::RepositoryRuleCallValue::String(value)) =
+            call.kwargs
+                .iter()
+                .find(|(name, _)| name == "value")
+                .unwrap()
+        else {
+            panic!("selected repository call lost download result");
+        };
+        assert_eq!(
+            value.as_str(),
+            format!(
+                "{}|{}|cargo-bazel",
+                request.sha256_hex(),
+                request.sha256_sri()
+            )
+        );
+        let rows = tracker.take();
+        assert!(
+            rows.iter()
+                .any(|row| row.key.starts_with("used-selected-extension-download:"))
+        );
+        assert!(
+            rows.iter()
+                .flat_map(|row| row.batch.as_ref())
+                .flat_map(EventBatch::events)
+                .any(|event| format!("{event:?}").contains("after-selected-download"))
+        );
+        let warm = transaction.compute(&key).await.unwrap();
+        assert!(matches!(warm, SourcePreparationOutcome::Complete(Ok(_))));
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .any(|row| row.key == key.to_string() && row.kind == ActivationKind::Reused)
+        );
+
+        transaction = selected_factor_host_inputs_with_download(
+            transaction,
+            tracker.clone(),
+            RepositoryPlatform::new("linux", "x86_64"),
+            RepositoryEnvironmentSnapshot::empty(),
+            frontier,
+            SelectedExtensionDownloadTransaction::new(workspace, [owner.clone()], [verified])
+                .unwrap(),
+            Some((owner, SelectedExtensionDownloadEpoch::AuthorizedEmpty)),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(observed)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("mismatched selected download cell must be a complete terminal");
+        };
+        let diagnostic = format!("{:?}", observed.result().as_ref().as_ref().unwrap_err());
+        assert!(diagnostic.contains("differs from request"), "{diagnostic}");
+        assert!(
+            !diagnostic.contains("selected-generator-fixture"),
+            "{diagnostic}"
+        );
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .filter(|row| row.key == key.to_string())
+                .all(|row| row.batch.is_none())
+        );
+    }
+
+    #[tokio::test]
+    async fn selected_module_path_and_download_reject_unmodeled_arguments() {
+        const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\n";
+        const EXTENSION: &str = "ext=module_extension(implementation=lambda ctx: None, environ=['FACTOR','MISSING','FACTOR'])\n";
+        let mut builder = Dice::builder();
+        install_registry_io(&mut builder, Arc::new(SelectedFactorRegistryIo));
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let (_, selected_owner) =
+            selected_factor_transaction(&dice, MODULE, EXTENSION, tracker, true).await;
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let owner = Arc::new(());
+        let scratch = Arc::new(SelectedDownloadInvocation::new(
+            workspace.dupe(),
+            selected_owner.clone(),
+            None,
+        ));
+        let context =
+            InvocationContext::new_modules(Arc::from([empty_module(&owner)]), &owner, None, None)
+                .with_selected_download(scratch.clone());
+        assert_eq!(
+            call(
+                "def f(ctx):\n  return str(ctx.path('cargo-bazel'))\n",
+                |module| vec![module.heap().alloc_simple(context.clone())]
+            )
+            .unwrap(),
+            "\"cargo-bazel\""
+        );
+        for path in [
+            "",
+            "../escape",
+            "/absolute",
+            "a/../b",
+            "a//b",
+            "a\\b",
+            "a/./b",
+        ] {
+            let source = format!("def f(ctx):\n  return ctx.path({path:?})\n");
+            let error = call(&source, |module| {
+                vec![module.heap().alloc_simple(context.clone())]
+            })
+            .unwrap_err();
+            assert!(
+                error.contains("normalized relative string"),
+                "{path:?}: {error}"
+            );
+        }
+        for source in [
+            "def f(ctx):\n  return ctx.download(url='file:///x', output='x', sha256='00' * 32)\n",
+            "def f(ctx):\n  return ctx.download(url=['file:///x'], output=ctx.path('x'), sha256='00' * 32)\n",
+            "def f(ctx):\n  return ctx.download(url='file:///x', output=ctx.path('x'), sha256='bad')\n",
+            "def f(ctx):\n  return ctx.download(url='file:///x', output=ctx.path('x'), sha256='00' * 32, allow_fail=True)\n",
+            "def f(ctx):\n  return ctx.download(url='file:///x', output=ctx.path('x'))\n",
+        ] {
+            assert!(
+                call(source, |module| vec![
+                    module.heap().alloc_simple(context.clone())
+                ])
+                .is_err(),
+                "{source}"
+            );
+        }
+        let other_owner = Arc::new(());
+        let other = InvocationContext::new_modules(
+            Arc::from([empty_module(&other_owner)]),
+            &other_owner,
+            None,
+            None,
+        )
+        .with_selected_download(scratch.clone());
+        let foreign = call(
+            "def f(ctx, other):\n  return ctx.download(url='file:///x', output=other.path('x'), sha256='00' * 32)\n",
+            |module| vec![module.heap().alloc_simple(context.clone()), module.heap().alloc_simple(other)],
+        ).unwrap_err();
+        assert!(foreign.contains("another module_ctx"), "{foreign}");
+        assert!(scratch.need().unwrap().is_none());
+
+        let checksum = format!("{:x}", Sha256::digest(b"x"));
+        let request = Arc::new(
+            SelectedExtensionDownloadRequest::new(
+                workspace.dupe(),
+                selected_owner.clone(),
+                selected_scratch_relative("first").unwrap(),
+                "file:///x",
+                selected_download_sha256(&checksum).unwrap(),
+                true,
+            )
+            .unwrap(),
+        );
+        let ready = Arc::new(
+            SelectedExtensionDownloadVerified::new(request.clone(), Arc::from(&b"x"[..])).unwrap(),
+        );
+        let completed = Arc::new(SelectedDownloadInvocation::new(
+            workspace,
+            selected_owner,
+            Some(ready),
+        ));
+        let context =
+            InvocationContext::new_modules(Arc::from([empty_module(&owner)]), &owner, None, None)
+                .with_selected_download(completed.clone());
+        let source = format!(
+            "def f(ctx):\n  ctx.download(url='file:///x', output=ctx.path('first'), sha256='{checksum}', executable=True)\n  return ctx.download(url='file:///x', output=ctx.path('second'), sha256='{checksum}', executable=True)\n"
+        );
+        let error = call(&source, |module| vec![module.heap().alloc_simple(context)]).unwrap_err();
+        assert!(
+            error.contains("multiple distinct module extension downloads"),
+            "{error}"
+        );
+        assert_eq!(completed.used().unwrap(), Some(request));
+        assert!(completed.need().unwrap().is_none());
     }
 
     #[test]

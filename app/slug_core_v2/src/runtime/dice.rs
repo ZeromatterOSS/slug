@@ -95,6 +95,7 @@ use slug_bzlmod_v2::HostRepositorySourceObservationEpochKey;
 use slug_bzlmod_v2::HostRepositorySourceObservationError;
 use slug_bzlmod_v2::HostRepositorySourceObservationKey;
 use slug_bzlmod_v2::HostRepositorySourceRoute;
+use slug_bzlmod_v2::HostSelectedExtensionOwner;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RegistryRequestGeneration;
 use slug_bzlmod_v2::RegistryRequestGenerationKey;
@@ -121,6 +122,11 @@ use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::RootRepositoryRouteKey;
 #[cfg(test)]
 use slug_bzlmod_v2::RootRepositoryRouteObservationKey;
+use slug_bzlmod_v2::SelectedExtensionDownloadEpoch;
+use slug_bzlmod_v2::SelectedExtensionDownloadEpochKey;
+use slug_bzlmod_v2::SelectedExtensionDownloadRequest;
+use slug_bzlmod_v2::SelectedExtensionDownloadTransaction;
+use slug_bzlmod_v2::SelectedExtensionDownloadVerified;
 use slug_bzlmod_v2::SourcePreparationOutcome as PreparationOutcome;
 use slug_bzlmod_v2::host_repository_relative_path;
 use slug_bzlmod_v2::inject_registry_request_inputs;
@@ -780,6 +786,8 @@ struct AcceptedNativeDemandSnapshot {
     repository_results: RepositoryMaterializationResultEpoch,
     path_observations: PathObservationEpoch,
     repository_environment_frontier: slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
+    download_results:
+        SmallMap<Arc<HostSelectedExtensionOwner>, Arc<SelectedExtensionDownloadVerified>>,
     selected: SelectedWorkspaceDemands,
     events: AcceptedEventEpoch,
 }
@@ -825,6 +833,14 @@ enum NativeDemandSessionError {
     ConflictingRepository(slug_identity_v2::CanonicalRepoName),
     RepositoryInternalNonProgress,
     EnvironmentInternalNonProgress,
+    DownloadInternalNonProgress,
+    DownloadRequestConflict(slug_identity_v2::CanonicalRepoName),
+    ForeignDownloadWorkspace {
+        expected: NormalizedAbsolutePath,
+        actual: NormalizedAbsolutePath,
+    },
+    DownloadCapture(String),
+    MissingSelectedDownload(slug_identity_v2::CanonicalRepoName),
     ForeignEnvironmentWorkspace {
         expected: NormalizedAbsolutePath,
         actual: NormalizedAbsolutePath,
@@ -862,6 +878,25 @@ impl fmt::Display for NativeDemandSessionError {
             }
             Self::EnvironmentInternalNonProgress => {
                 f.write_str("repository environment preparation made no progress")
+            }
+            Self::DownloadInternalNonProgress => {
+                f.write_str("selected extension download preparation made no progress")
+            }
+            Self::DownloadRequestConflict(owner) => {
+                write!(
+                    f,
+                    "conflicting selected extension download requests for {owner}"
+                )
+            }
+            Self::ForeignDownloadWorkspace { expected, actual } => write!(
+                f,
+                "selected extension download need belongs to {actual}, expected {expected}"
+            ),
+            Self::DownloadCapture(category) => {
+                write!(f, "selected extension download capture failed: {category}")
+            }
+            Self::MissingSelectedDownload(owner) => {
+                write!(f, "selected extension {owner} download was not prepared")
             }
             Self::ForeignEnvironmentWorkspace { expected, actual } => write!(
                 f,
@@ -917,6 +952,7 @@ impl std::error::Error for NativeDemandSessionError {}
 enum NativeDemandProgress {
     Repositories,
     Environment,
+    Downloads,
     Paths,
 }
 
@@ -935,6 +971,10 @@ struct NativeDemandCommand<'a> {
     repository_results: RepositoryMaterializationResultEpoch,
     path_observations: PathObservationEpoch,
     repository_environment_frontier: slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
+    download_results:
+        SmallMap<Arc<HostSelectedExtensionOwner>, Arc<SelectedExtensionDownloadVerified>>,
+    issued_downloads:
+        SmallMap<Arc<HostSelectedExtensionOwner>, Arc<SelectedExtensionDownloadRequest>>,
     #[cfg(test)]
     restoration_host_inputs: Option<slug_bzlmod_v2::RepositoryHostInputTransaction>,
 }
@@ -2402,6 +2442,7 @@ impl NativeDemandSessionOwner {
                     path_observations: PathObservationEpoch::empty(),
                     repository_environment_frontier:
                         slug_bzlmod_v2::RepositoryEnvironmentNameFrontier::empty(),
+                    download_results: SmallMap::new(),
                     selected: SelectedWorkspaceDemands::empty(),
                     events: AcceptedEventEpoch::empty(),
                 },
@@ -6185,6 +6226,7 @@ impl WorkspaceRuntime {
                 &inputs.request.repository_environment,
                 &prior.repository_environment_frontier,
             );
+        let download_results = prior.download_results.clone();
         Ok(NativeDemandPreflight {
             command: NativeDemandCommand {
                 runtime: self,
@@ -6202,6 +6244,8 @@ impl WorkspaceRuntime {
                 repository_results: preflight.repository_results().clone(),
                 path_observations,
                 repository_environment_frontier,
+                download_results,
+                issued_downloads: SmallMap::new(),
                 #[cfg(test)]
                 restoration_host_inputs: None,
             },
@@ -7438,13 +7482,21 @@ impl NativeDemandCommand<'_> {
         if !Arc::ptr_eq(&self.effects, &attempt.effects) {
             return Err(NativeDemandSessionError::ForeignEffects);
         }
-        self.runtime
+        let mut data = self
+            .runtime
             .user_computation_data_with_repository_host_inputs(
                 Some(attempt.tracker.clone()),
                 self.inputs.request.repository_environment.clone(),
                 self.repository_environment_frontier.clone(),
             )
-            .map_err(NativeDemandSessionError::Effect)
+            .map_err(NativeDemandSessionError::Effect)?;
+        install_selected_extension_download_transaction(
+            &mut data,
+            &self.runtime.workspace,
+            &self.download_results,
+        )
+        .map_err(NativeDemandSessionError::Injection)?;
+        Ok(data)
     }
 
     fn inject_attempt(
@@ -7459,6 +7511,13 @@ impl NativeDemandCommand<'_> {
             self.path_observations.clone(),
             &self.repository_environment_frontier,
             &self.prior.repository_environment_frontier,
+        )
+        .map_err(NativeDemandSessionError::Injection)?;
+        inject_selected_extension_downloads(
+            updater,
+            &self.runtime.workspace,
+            &self.download_results,
+            &self.prior.download_results,
         )
         .map_err(NativeDemandSessionError::Injection)
     }
@@ -7554,6 +7613,70 @@ impl NativeDemandCommand<'_> {
             return Ok(NativeDemandProgress::Environment);
         }
 
+        if !needs.selected_extension_downloads().is_empty() {
+            let expected =
+                NormalizedAbsolutePath::new(self.runtime.workspace.clone()).map_err(|error| {
+                    NativeDemandSessionError::Injection(anyhow::anyhow!(error.to_string()))
+                })?;
+            let mut requests = needs
+                .selected_extension_downloads()
+                .values()
+                .cloned()
+                .collect::<Vec<_>>();
+            requests
+                .sort_by(|left, right| left.owner().unique_name().cmp(right.owner().unique_name()));
+            let mut advanced = false;
+            for request in requests {
+                if request.workspace() != &expected {
+                    return Err(NativeDemandSessionError::ForeignDownloadWorkspace {
+                        expected,
+                        actual: request.workspace().clone(),
+                    });
+                }
+                let owner = request.owner();
+                match self.issued_downloads.get(owner) {
+                    Some(issued) if issued != &request => {
+                        return Err(NativeDemandSessionError::DownloadRequestConflict(
+                            owner.unique_name().clone(),
+                        ));
+                    }
+                    Some(_) => continue,
+                    None => {}
+                }
+                if self
+                    .download_results
+                    .get(owner)
+                    .is_some_and(|known| known.request() == &request)
+                {
+                    continue;
+                }
+                let bytes = super::repository_archive_http::capture_selected_extension_artifact(
+                    request.url(),
+                    *request.sha256(),
+                    &self.runtime.runtime,
+                    &|| {
+                        self.runtime
+                            .repository_materializer
+                            .session_is_active(self.repository_session)
+                    },
+                )
+                .map_err(NativeDemandSessionError::DownloadCapture)?;
+                let verified = SelectedExtensionDownloadVerified::new(request.clone(), bytes)
+                    .map_err(|error| {
+                        NativeDemandSessionError::DownloadCapture(error.to_string())
+                    })?;
+                self.download_results
+                    .insert(owner.clone(), Arc::new(verified));
+                self.issued_downloads.insert(owner.clone(), request);
+                advanced = true;
+            }
+            return if advanced {
+                Ok(NativeDemandProgress::Downloads)
+            } else {
+                Err(NativeDemandSessionError::DownloadInternalNonProgress)
+            };
+        }
+
         begin_probe_phase!(need_phase, self.runtime, NeedPath);
         let Some(path_needs) = needs.path_observations() else {
             return Err(NativeDemandSessionError::PathInternalNonProgress);
@@ -7611,17 +7734,23 @@ impl NativeDemandCommand<'_> {
         }
         let prior = self.prior.clone();
         self.runtime.runtime.block_on(async {
-            let mut updater = self.runtime.dice.updater_with_data(
-                self.runtime
-                    .user_computation_data_with_repository_host_inputs(
-                        None,
-                        prior.inputs.request.repository_environment.clone(),
-                        prior.repository_environment_frontier.clone(),
-                    )
-                    .map_err(|error| {
-                        NativeDemandSessionError::Restoration(anyhow::anyhow!(error.to_string()))
-                    })?,
-            );
+            let mut data = self
+                .runtime
+                .user_computation_data_with_repository_host_inputs(
+                    None,
+                    prior.inputs.request.repository_environment.clone(),
+                    prior.repository_environment_frontier.clone(),
+                )
+                .map_err(|error| {
+                    NativeDemandSessionError::Restoration(anyhow::anyhow!(error.to_string()))
+                })?;
+            install_selected_extension_download_transaction(
+                &mut data,
+                &self.runtime.workspace,
+                &prior.download_results,
+            )
+            .map_err(NativeDemandSessionError::Restoration)?;
+            let mut updater = self.runtime.dice.updater_with_data(data);
             inject_native_demand_snapshot(
                 &mut updater,
                 self.runtime,
@@ -7630,6 +7759,13 @@ impl NativeDemandCommand<'_> {
                 prior.path_observations,
                 &prior.repository_environment_frontier,
                 &self.repository_environment_frontier,
+            )
+            .map_err(NativeDemandSessionError::Restoration)?;
+            inject_selected_extension_downloads(
+                &mut updater,
+                &self.runtime.workspace,
+                &prior.download_results,
+                &self.download_results,
             )
             .map_err(NativeDemandSessionError::Restoration)?;
             #[allow(unused_mut)]
@@ -7731,12 +7867,25 @@ impl NativeDemandCommand<'_> {
                 super::repository_io::RepositoryValidation::new(request, observations)
             })
             .collect();
+        let mut download_results = SmallMap::new();
+        for request in selected.download_requests() {
+            let owner = request.owner();
+            let verified = self
+                .download_results
+                .get(owner)
+                .filter(|verified| verified.request() == request)
+                .ok_or_else(|| {
+                    NativeDemandSessionError::MissingSelectedDownload(owner.unique_name().clone())
+                })?;
+            download_results.insert(owner.clone(), verified.clone());
+        }
         Ok((
             AcceptedNativeDemandSnapshot {
                 inputs: self.inputs.clone(),
                 repository_results,
                 path_observations,
                 repository_environment_frontier: self.repository_environment_frontier.clone(),
+                download_results,
                 selected,
                 events: self.prior.events.dupe(),
             },
@@ -8323,18 +8472,21 @@ fn prepare_selected_native_demand_snapshot(
             "forced selected snapshot injection failure"
         )));
     }
-    let mut updater = command.runtime.dice.updater_with_data(
-        command
-            .runtime
-            .user_computation_data_with_repository_host_inputs(
-                None,
-                snapshot.inputs.request.repository_environment.clone(),
-                snapshot.repository_environment_frontier.clone(),
-            )
-            .map_err(|error| {
-                NativeDemandSessionError::Injection(anyhow::anyhow!(error.to_string()))
-            })?,
-    );
+    let mut data = command
+        .runtime
+        .user_computation_data_with_repository_host_inputs(
+            None,
+            snapshot.inputs.request.repository_environment.clone(),
+            snapshot.repository_environment_frontier.clone(),
+        )
+        .map_err(|error| NativeDemandSessionError::Injection(anyhow::anyhow!(error.to_string())))?;
+    install_selected_extension_download_transaction(
+        &mut data,
+        &command.runtime.workspace,
+        &snapshot.download_results,
+    )
+    .map_err(NativeDemandSessionError::Injection)?;
+    let mut updater = command.runtime.dice.updater_with_data(data);
     inject_native_demand_snapshot(
         &mut updater,
         command.runtime,
@@ -8343,6 +8495,13 @@ fn prepare_selected_native_demand_snapshot(
         snapshot.path_observations.clone(),
         &snapshot.repository_environment_frontier,
         &command.prior.repository_environment_frontier,
+    )
+    .map_err(NativeDemandSessionError::Injection)?;
+    inject_selected_extension_downloads(
+        &mut updater,
+        &command.runtime.workspace,
+        &snapshot.download_results,
+        &command.download_results,
     )
     .map_err(NativeDemandSessionError::Injection)?;
     // Keep the provisional terminal alive until its prepared updater reaches
@@ -8367,6 +8526,53 @@ async fn commit_prepared_native_demand_snapshot(
         .native_demand_sessions
         .record_trace(NativeDemandTestTrace::SelectedInjectionCommitted);
     Ok(())
+}
+
+fn install_selected_extension_download_transaction(
+    data: &mut UserComputationData,
+    workspace: &Path,
+    results: &SmallMap<Arc<HostSelectedExtensionOwner>, Arc<SelectedExtensionDownloadVerified>>,
+) -> anyhow::Result<()> {
+    let workspace = NormalizedAbsolutePath::new(workspace.to_path_buf())
+        .context("normalizing selected extension download workspace")?;
+    let transaction = SelectedExtensionDownloadTransaction::new(
+        workspace,
+        results.keys().cloned(),
+        results.values().cloned(),
+    )
+    .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    data.data.set(transaction);
+    Ok(())
+}
+
+fn inject_selected_extension_downloads(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &Path,
+    desired: &SmallMap<Arc<HostSelectedExtensionOwner>, Arc<SelectedExtensionDownloadVerified>>,
+    replaced: &SmallMap<Arc<HostSelectedExtensionOwner>, Arc<SelectedExtensionDownloadVerified>>,
+) -> anyhow::Result<()> {
+    let workspace = NormalizedAbsolutePath::new(workspace.to_path_buf())
+        .context("normalizing selected extension download workspace")?;
+    let mut epochs = SmallMap::new();
+    for (owner, verified) in desired {
+        epochs.insert(
+            owner.clone(),
+            SelectedExtensionDownloadEpoch::Ready(verified.clone()),
+        );
+    }
+    for owner in replaced.keys() {
+        if !epochs.contains_key(owner) {
+            epochs.insert(owner.clone(), SelectedExtensionDownloadEpoch::Unauthorized);
+        }
+    }
+    updater
+        .changed_to(epochs.into_iter().map(move |(owner, epoch)| {
+            (
+                SelectedExtensionDownloadEpochKey::new(workspace.clone(), owner),
+                epoch,
+            )
+        }))
+        .context("injecting selected extension download epochs")
 }
 
 #[allow(dead_code)]
@@ -9020,6 +9226,86 @@ mod tests {
 
         fn provide<'a>(&'a self, demand: &mut dice::Demand<'a>) {
             demand.provide_value_with(|| self.requests[0].clone());
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+    struct NativeDownloadHandshakeKey {
+        request: Arc<SelectedExtensionDownloadRequest>,
+    }
+
+    impl fmt::Display for NativeDownloadHandshakeKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(
+                f,
+                "native-download-handshake:{}",
+                self.request.owner().unique_name()
+            )
+        }
+    }
+
+    #[async_trait]
+    impl Key for NativeDownloadHandshakeKey {
+        type Value = slug_bzlmod_v2::SourcePreparationOutcome<Arc<str>>;
+
+        async fn compute(
+            &self,
+            ctx: &mut DiceComputations,
+            _cancellations: &CancellationContext,
+        ) -> Self::Value {
+            let transaction = ctx
+                .per_transaction_data()
+                .data
+                .get::<SelectedExtensionDownloadTransaction>()
+                .expect("native command installs selected download transaction")
+                .clone();
+            assert_eq!(transaction.workspace(), self.request.workspace());
+            if !transaction.is_authorized(self.request.owner()) {
+                return slug_bzlmod_v2::SourcePreparationOutcome::Need(
+                    slug_bzlmod_v2::SourcePreparationNeeds::selected_extension_download(
+                        (*self.request).clone(),
+                    ),
+                );
+            }
+            let epoch = ctx
+                .compute(&SelectedExtensionDownloadEpochKey::new(
+                    self.request.workspace().clone(),
+                    self.request.owner().clone(),
+                ))
+                .await
+                .expect("authorized native command injects selected download epoch");
+            match epoch {
+                SelectedExtensionDownloadEpoch::Ready(verified)
+                    if verified.request() == &self.request =>
+                {
+                    assert_eq!(transaction.get(self.request.owner()), Some(&verified));
+                    ctx.compute(&slug_bzlmod_v2::UsedDownloadRequestKey::new(
+                        self.request.clone(),
+                    ))
+                    .await
+                    .expect("used request marker computes");
+                    slug_bzlmod_v2::SourcePreparationOutcome::Complete("downloaded".into())
+                }
+                SelectedExtensionDownloadEpoch::Ready(_)
+                | SelectedExtensionDownloadEpoch::AuthorizedEmpty => {
+                    slug_bzlmod_v2::SourcePreparationOutcome::Need(
+                        slug_bzlmod_v2::SourcePreparationNeeds::selected_extension_download(
+                            (*self.request).clone(),
+                        ),
+                    )
+                }
+                SelectedExtensionDownloadEpoch::Unauthorized => {
+                    panic!("authorized frontier cannot contain unauthorized download epoch")
+                }
+            }
+        }
+
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            x.complete_eq(y)
+        }
+
+        fn validity(value: &Self::Value) -> bool {
+            value.is_complete()
         }
     }
 
@@ -11518,6 +11804,330 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .into_command(),
         );
         final_command.discard().unwrap();
+    }
+
+    #[test]
+    fn native_selected_download_need_accept_warm_revoke_and_abort() {
+        use sha2::Digest;
+
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        let runtime = test_runtime(&root).unwrap();
+        let owner = runtime.runtime.block_on(async {
+            let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let source_workspace = NormalizedAbsolutePath::new(
+                crate::runtime::generated_repository_definition::tests::WORKSPACE,
+            )
+            .unwrap();
+            let mut transaction =
+                crate::runtime::generated_repository_definition::tests::transaction(
+                    &dice,
+                    crate::runtime::generated_repository_definition::tests::MODULE,
+                    crate::runtime::generated_repository_definition::tests::EXTENSION_A,
+                    true,
+                    None,
+                )
+                .await;
+            let mapping = transaction
+                .compute(&slug_bzlmod_v2::HostRootRepositoryMappingKey::new(
+                    source_workspace.clone(),
+                ))
+                .await
+                .unwrap();
+            let slug_bzlmod_v2::SourcePreparationOutcome::Complete(mapping) = mapping else {
+                panic!("source fixture mapping unexpectedly needs preparation")
+            };
+            let requested = mapping
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .view()
+                .unwrap()
+                .mapping()
+                .find(|(name, _)| name.as_str() == "first")
+                .unwrap()
+                .1
+                .clone();
+            let demand = transaction
+                .compute(&slug_bzlmod_v2::HostSelectedExtensionDemandKey::new(
+                    source_workspace,
+                    requested,
+                ))
+                .await
+                .unwrap();
+            let slug_bzlmod_v2::SourcePreparationOutcome::Complete(demand) = demand else {
+                panic!("source fixture owner unexpectedly needs preparation")
+            };
+            demand.as_ref().as_ref().unwrap().owner().clone()
+        });
+        let content = b"portable-generator-proof";
+        let artifact = root.join("generator.bin");
+        fs::write(&artifact, content).unwrap();
+        let mut sha256 = [0u8; 32];
+        sha256.copy_from_slice(sha2::Sha256::digest(content).as_slice());
+        let request = Arc::new(
+            SelectedExtensionDownloadRequest::new(
+                NormalizedAbsolutePath::new(root.clone()).unwrap(),
+                owner.clone(),
+                host_repository_relative_path(PathBuf::from("cargo-bazel")).unwrap(),
+                url::Url::from_file_path(&artifact).unwrap().to_string(),
+                sha256,
+                true,
+            )
+            .unwrap(),
+        );
+        let key = NativeDownloadHandshakeKey {
+            request: request.clone(),
+        };
+
+        let mut command = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        command.begin_attempt().unwrap();
+        let first_need = runtime.runtime.block_on(async {
+            let mut updater = runtime
+                .dice
+                .updater_with_data(command.attempt_user_computation_data().unwrap());
+            command.inject_attempt(&mut updater).unwrap();
+            let mut transaction = updater.commit().await;
+            let outcome = transaction.compute(&key).await.unwrap();
+            let slug_bzlmod_v2::SourcePreparationOutcome::Need(need) = outcome else {
+                panic!("cold selected download unexpectedly completed")
+            };
+            command.seal_retry().unwrap();
+            drop(transaction);
+            need
+        });
+        assert_eq!(first_need.selected_extension_downloads().len(), 1);
+        assert_eq!(
+            command.progress(&first_need).unwrap(),
+            NativeDemandProgress::Downloads
+        );
+        let captured = command
+            .command()
+            .download_results
+            .get(&owner)
+            .unwrap()
+            .clone();
+        assert_eq!(captured.bytes().as_ref(), content);
+
+        command.begin_attempt().unwrap();
+        let prepared = runtime.runtime.block_on(async {
+            let mut updater = runtime
+                .dice
+                .updater_with_data(command.attempt_user_computation_data().unwrap());
+            command.inject_attempt(&mut updater).unwrap();
+            let mut transaction = updater.commit().await;
+            assert!(matches!(
+                transaction.compute(&key).await.unwrap(),
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref result)
+                    if result.as_ref() == "downloaded"
+            ));
+            let sealed = command.seal_terminal().unwrap();
+            let selection = sealed.select(&transaction).await.unwrap();
+            assert_eq!(
+                selection.sidecars().demands().download_requests(),
+                &[request.clone()]
+            );
+            let mut prepared = command
+                .prepare_accept(selection, &transaction)
+                .await
+                .unwrap();
+            commit_prepared_native_demand_snapshot(command.command(), &mut prepared)
+                .await
+                .unwrap();
+            drop(transaction);
+            prepared
+        });
+        command.accept_prepared(prepared, "accepted").unwrap();
+
+        let replace = |replacement: Arc<SelectedExtensionDownloadRequest>| {
+            let key = NativeDownloadHandshakeKey {
+                request: replacement.clone(),
+            };
+            let mut command = NativeDemandAbortGuard::new(
+                runtime
+                    .begin_native_demand_command()
+                    .unwrap()
+                    .into_command(),
+            );
+            command.begin_attempt().unwrap();
+            let need = runtime.runtime.block_on(async {
+                let mut updater = runtime
+                    .dice
+                    .updater_with_data(command.attempt_user_computation_data().unwrap());
+                command.inject_attempt(&mut updater).unwrap();
+                let mut transaction = updater.commit().await;
+                let outcome = transaction.compute(&key).await.unwrap();
+                let slug_bzlmod_v2::SourcePreparationOutcome::Need(need) = outcome else {
+                    panic!("changed download request reused stale bytes")
+                };
+                command.seal_retry().unwrap();
+                drop(transaction);
+                need
+            });
+            assert_eq!(
+                command.progress(&need).unwrap(),
+                NativeDemandProgress::Downloads
+            );
+            command.begin_attempt().unwrap();
+            let prepared = runtime.runtime.block_on(async {
+                let mut updater = runtime
+                    .dice
+                    .updater_with_data(command.attempt_user_computation_data().unwrap());
+                command.inject_attempt(&mut updater).unwrap();
+                let mut transaction = updater.commit().await;
+                assert!(matches!(
+                    transaction.compute(&key).await.unwrap(),
+                    slug_bzlmod_v2::SourcePreparationOutcome::Complete(_)
+                ));
+                let sealed = command.seal_terminal().unwrap();
+                let selection = sealed.select(&transaction).await.unwrap();
+                assert_eq!(
+                    selection.sidecars().demands().download_requests(),
+                    &[replacement.clone()]
+                );
+                let mut prepared = command
+                    .prepare_accept(selection, &transaction)
+                    .await
+                    .unwrap();
+                commit_prepared_native_demand_snapshot(command.command(), &mut prepared)
+                    .await
+                    .unwrap();
+                drop(transaction);
+                prepared
+            });
+            command.accept_prepared(prepared, "replaced").unwrap();
+            accepted_native_snapshot(&runtime)
+                .download_results
+                .get(replacement.owner())
+                .unwrap()
+                .clone()
+        };
+        let other_bytes = b"portable-generator-B";
+        let other_artifact = root.join("generator-b.bin");
+        fs::write(&other_artifact, other_bytes).unwrap();
+        let mut other_sha = [0u8; 32];
+        other_sha.copy_from_slice(sha2::Sha256::digest(other_bytes).as_slice());
+        let other_request = Arc::new(
+            SelectedExtensionDownloadRequest::new(
+                request.workspace().clone(),
+                owner.clone(),
+                request.output().clone(),
+                url::Url::from_file_path(&other_artifact)
+                    .unwrap()
+                    .to_string(),
+                other_sha,
+                true,
+            )
+            .unwrap(),
+        );
+        let b = replace(other_request);
+        assert_eq!(b.bytes().as_ref(), other_bytes);
+        let restored_a = replace(request.clone());
+        assert_eq!(restored_a.bytes().as_ref(), content);
+        assert!(!Arc::ptr_eq(&captured, &restored_a));
+
+        let mut warm = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        assert!(Arc::ptr_eq(
+            warm.command().download_results.get(&owner).unwrap(),
+            &restored_a
+        ));
+        warm.begin_attempt().unwrap();
+        runtime.runtime.block_on(async {
+            let mut updater = runtime
+                .dice
+                .updater_with_data(warm.attempt_user_computation_data().unwrap());
+            warm.inject_attempt(&mut updater).unwrap();
+            let mut transaction = updater.commit().await;
+            assert!(matches!(
+                transaction.compute(&key).await.unwrap(),
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(_)
+            ));
+            warm.seal_retry().unwrap();
+            drop(transaction);
+        });
+        warm.discard().unwrap();
+
+        let mut deselect = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        deselect.begin_attempt().unwrap();
+        let prepared = runtime.runtime.block_on(async {
+            let mut updater = runtime
+                .dice
+                .updater_with_data(deselect.attempt_user_computation_data().unwrap());
+            deselect.inject_attempt(&mut updater).unwrap();
+            let mut transaction = updater.commit().await;
+            assert!(transaction.compute(&NativeTerminalProbeKey).await.unwrap());
+            let sealed = deselect.seal_terminal().unwrap();
+            let selection = sealed.select(&transaction).await.unwrap();
+            assert!(
+                selection
+                    .sidecars()
+                    .demands()
+                    .download_requests()
+                    .is_empty()
+            );
+            let mut prepared = deselect
+                .prepare_accept(selection, &transaction)
+                .await
+                .unwrap();
+            commit_prepared_native_demand_snapshot(deselect.command(), &mut prepared)
+                .await
+                .unwrap();
+            drop(transaction);
+            prepared
+        });
+        deselect.accept_prepared(prepared, "deselected").unwrap();
+        assert!(
+            accepted_native_snapshot(&runtime)
+                .download_results
+                .is_empty()
+        );
+
+        let mut reselected = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        reselected.begin_attempt().unwrap();
+        let need = runtime.runtime.block_on(async {
+            let mut updater = runtime
+                .dice
+                .updater_with_data(reselected.attempt_user_computation_data().unwrap());
+            reselected.inject_attempt(&mut updater).unwrap();
+            let mut transaction = updater.commit().await;
+            let outcome = transaction.compute(&key).await.unwrap();
+            let slug_bzlmod_v2::SourcePreparationOutcome::Need(need) = outcome else {
+                panic!("deselected download leaked into a warm DICE owner")
+            };
+            reselected.seal_retry().unwrap();
+            drop(transaction);
+            need
+        });
+        assert_eq!(
+            reselected.progress(&need).unwrap(),
+            NativeDemandProgress::Downloads
+        );
+        reselected.discard().unwrap();
+        assert!(
+            accepted_native_snapshot(&runtime)
+                .download_results
+                .is_empty()
+        );
     }
 
     #[test]

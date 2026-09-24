@@ -29,8 +29,10 @@ use dice::UserComputationData;
 use dupe::Dupe;
 use slug_bzlmod_v2::RepositoryMaterializationRequest;
 use slug_bzlmod_v2::RepositoryMaterializationRequestId;
+use slug_bzlmod_v2::SelectedExtensionDownloadRequest;
 use slug_bzlmod_v2::source_preparation::RepositorySourceScope;
 use slug_events_v2::CaptureEvaluationEvents;
+use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathObservationDemand;
 use starlark_map::small_map::SmallMap;
@@ -44,6 +46,7 @@ enum DemandNodeMetadata {
     Path(PathObservationDemand),
     Repository(Arc<RepositoryMaterializationRequest>),
     Source(RepositorySourceScope),
+    Download(Arc<SelectedExtensionDownloadRequest>),
 }
 
 #[derive(Debug)]
@@ -78,6 +81,9 @@ pub(super) enum DemandProvenanceError {
     },
     RepositoryRequestConflict {
         id: RepositoryMaterializationRequestId,
+    },
+    DownloadRequestConflict {
+        owner: CanonicalRepoName,
     },
     ClosureNodeMissing {
         node: DiceNodeId,
@@ -119,6 +125,10 @@ impl fmt::Display for DemandProvenanceError {
                 f,
                 "repository {} has conflicting exact materialization requests",
                 id.canonical_repo
+            ),
+            Self::DownloadRequestConflict { owner } => write!(
+                f,
+                "selected extension {owner} has conflicting download requests"
             ),
             Self::ClosureNodeMissing { node } => {
                 write!(f, "activation closure omitted dependency node {node:?}")
@@ -181,6 +191,7 @@ pub(super) struct SelectedWorkspaceDemands {
     repository_requests: Arc<[Arc<RepositoryMaterializationRequest>]>,
     repository_validations: Arc<[SelectedRepositoryValidation]>,
     unscoped_paths: Arc<[PathObservationDemand]>,
+    download_requests: Arc<[Arc<SelectedExtensionDownloadRequest>]>,
 }
 
 impl SelectedWorkspaceDemands {
@@ -189,6 +200,7 @@ impl SelectedWorkspaceDemands {
             repository_requests: Arc::from([]),
             repository_validations: Arc::from([]),
             unscoped_paths: Arc::from([]),
+            download_requests: Arc::from([]),
         }
     }
 
@@ -213,6 +225,7 @@ impl SelectedWorkspaceDemands {
             repository_requests: repository_requests.into(),
             repository_validations: Arc::from([]),
             unscoped_paths: unscoped_paths.into(),
+            download_requests: Arc::from([]),
         }
     }
 
@@ -233,6 +246,7 @@ impl SelectedWorkspaceDemands {
                 paths: Arc::from([validation_path]),
             }]),
             unscoped_paths: Arc::from([]),
+            download_requests: Arc::from([]),
         }
     }
 
@@ -246,6 +260,10 @@ impl SelectedWorkspaceDemands {
 
     pub(super) fn unscoped_paths(&self) -> &[PathObservationDemand] {
         &self.unscoped_paths
+    }
+
+    pub(super) fn download_requests(&self) -> &[Arc<SelectedExtensionDownloadRequest>] {
+        &self.download_requests
     }
 }
 
@@ -312,16 +330,19 @@ impl WorkspaceDemandOwner {
         let path = key.request_value::<PathObservationDemand>();
         let repository = key.request_value::<Arc<RepositoryMaterializationRequest>>();
         let source = key.request_value::<RepositorySourceScope>();
+        let download = key.request_value::<Arc<SelectedExtensionDownloadRequest>>();
         let supplied = usize::from(path.is_some())
             + usize::from(repository.is_some())
-            + usize::from(source.is_some());
+            + usize::from(source.is_some())
+            + usize::from(download.is_some());
         if supplied > 1 {
             return Err(DemandProvenanceError::MultipleKeyMetadata { node });
         }
         let metadata = path
             .map(DemandNodeMetadata::Path)
             .or_else(|| repository.map(DemandNodeMetadata::Repository))
-            .or_else(|| source.map(DemandNodeMetadata::Source));
+            .or_else(|| source.map(DemandNodeMetadata::Source))
+            .or_else(|| download.map(DemandNodeMetadata::Download));
         match &metadata {
             Some(DemandNodeMetadata::Repository(request))
                 if request.id.workspace != self.workspace =>
@@ -329,6 +350,11 @@ impl WorkspaceDemandOwner {
                 Err(DemandProvenanceError::MetadataWorkspaceMismatch { node })
             }
             Some(DemandNodeMetadata::Source(scope)) if scope.workspace != self.workspace => {
+                Err(DemandProvenanceError::MetadataWorkspaceMismatch { node })
+            }
+            Some(DemandNodeMetadata::Download(request))
+                if request.workspace() != &self.workspace =>
+            {
                 Err(DemandProvenanceError::MetadataWorkspaceMismatch { node })
             }
             _ => Ok(metadata),
@@ -446,6 +472,7 @@ fn select_demands(
     let mut nodes: SmallMap<DiceNodeId, &ActivationClosureNode> =
         SmallMap::with_capacity(closure.nodes().len());
     let mut requests = SmallMap::new();
+    let mut downloads = SmallMap::<CanonicalRepoName, Arc<SelectedExtensionDownloadRequest>>::new();
     for node in closure.nodes() {
         nodes.insert(node.node(), node);
         if let Some(DemandNodeMetadata::Repository(request)) = catalogue.get(&node.node()) {
@@ -458,6 +485,20 @@ fn select_demands(
                 Some(_) => {}
                 None => {
                     requests.insert(request.id.clone(), request.dupe());
+                }
+            }
+        }
+        if let Some(DemandNodeMetadata::Download(request)) = catalogue.get(&node.node()) {
+            let owner = request.owner().unique_name();
+            match downloads.get(owner) {
+                Some(existing) if existing != request => {
+                    return Err(DemandProvenanceError::DownloadRequestConflict {
+                        owner: owner.clone(),
+                    });
+                }
+                Some(_) => {}
+                None => {
+                    downloads.insert(owner.clone(), request.dupe());
                 }
             }
         }
@@ -514,7 +555,7 @@ fn select_demands(
                     anchor.requests.insert(request.id.clone(), request.dupe());
                 }
             }
-            Some(DemandNodeMetadata::Source(_)) | None => {}
+            Some(DemandNodeMetadata::Source(_)) | Some(DemandNodeMetadata::Download(_)) | None => {}
         }
         let closure_node = nodes
             .get(&node)
@@ -597,10 +638,17 @@ fn select_demands(
     let mut unscoped_paths = unscoped_paths.into_iter().collect::<Vec<_>>();
     unscoped_paths.sort_unstable();
     unscoped_paths.dedup();
+    let mut download_requests = downloads.into_values().collect::<Vec<_>>();
+    download_requests.sort_by(|left, right| {
+        left.workspace()
+            .cmp(right.workspace())
+            .then_with(|| left.owner().unique_name().cmp(right.owner().unique_name()))
+    });
     Ok(SelectedWorkspaceDemands {
         repository_requests: repository_requests.into(),
         repository_validations: repository_validations.into(),
         unscoped_paths: unscoped_paths.into(),
+        download_requests: download_requests.into(),
     })
 }
 

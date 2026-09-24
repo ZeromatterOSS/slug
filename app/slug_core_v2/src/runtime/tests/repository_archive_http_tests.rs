@@ -424,6 +424,117 @@ fn assert_captures_deleted(environment: &TestEnvironment) {
     assert!(captures.iter().all(|path| !path.exists()), "{captures:?}");
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn selected_extension_file_capture_retains_only_verified_bytes() {
+    let mut source = tempfile::NamedTempFile::new().unwrap();
+    source.write_all(b"generator bytes").unwrap();
+    let file = url::Url::from_file_path(source.path()).unwrap().to_string();
+    let digest = Sha256::digest(b"generator bytes").into();
+    let environment = TestEnvironment::new([]);
+    let bytes =
+        capture_selected_extension_artifact_with(&file, digest, &runtime(), &|| true, &environment)
+            .unwrap();
+    assert_eq!(&*bytes, b"generator bytes");
+    assert_captures_deleted(&environment);
+
+    let error =
+        capture_selected_extension_artifact(&file, [0; 32], &runtime(), &|| true).unwrap_err();
+    assert_eq!(error, "selected extension artifact SHA-256 mismatch");
+
+    source
+        .as_file()
+        .set_len(SELECTED_EXTENSION_CAPTURE_LIMIT + 1)
+        .unwrap();
+    let error =
+        capture_selected_extension_artifact(&file, digest, &runtime(), &|| true).unwrap_err();
+    assert_eq!(
+        error,
+        "selected extension artifact exceeds 33554432 byte capture limit"
+    );
+}
+
+#[test]
+fn selected_extension_redirect_capture_is_single_url_and_checksum_pinned() {
+    let body = b"redirected generator";
+    let server = Server::new(vec![
+        Reply::redirect(302, "/artifact"),
+        Reply::fixed(200, body),
+    ]);
+    let environment = TestEnvironment::new([("artifact.test".into(), vec![server.address])]);
+    let bytes = capture_selected_extension_artifact_with(
+        &url("artifact.test", &server, "/first"),
+        Sha256::digest(body).into(),
+        &runtime(),
+        &|| true,
+        &environment,
+    )
+    .unwrap();
+    assert_eq!(&*bytes, body);
+    assert_eq!(server.requests().len(), 2);
+    assert_eq!(environment.captures().len(), 1);
+    assert_captures_deleted(&environment);
+}
+
+#[test]
+fn selected_extension_capture_redacts_url_and_cleans_on_cancellation() {
+    let environment = TestEnvironment::new([]);
+    let credential_url = "https://user:credential@secret.test/artifact?token=hidden";
+    let error = capture_selected_extension_artifact_with(
+        credential_url,
+        [0; 32],
+        &runtime(),
+        &|| true,
+        &environment,
+    )
+    .unwrap_err();
+    assert_eq!(error, "selected extension artifact transport failed");
+    assert!(!error.contains("credential"));
+    assert!(!error.contains("hidden"));
+    assert_captures_deleted(&environment);
+
+    let server = Server::new(vec![Reply::fixed(200, b"uncaptured")]);
+    let environment = TestEnvironment::new([("cancel.test".into(), vec![server.address])]);
+    let probes = AtomicUsize::new(0);
+    let error = capture_selected_extension_artifact_with(
+        &url("cancel.test", &server, "/artifact"),
+        Sha256::digest(b"uncaptured").into(),
+        &runtime(),
+        &|| probes.fetch_add(1, Ordering::SeqCst) < 3,
+        &environment,
+    )
+    .unwrap_err();
+    assert_eq!(error, "selected extension artifact capture cancelled");
+    assert_captures_deleted(&environment);
+}
+
+#[test]
+fn selected_extension_capture_rejects_declared_http_oversize_without_bytes() {
+    let server = Server::new(vec![Reply {
+        head: format!(
+            "HTTP/1.1 200 ok\r\nContent-Length: {}\r\n\r\n",
+            SELECTED_EXTENSION_CAPTURE_LIMIT + 1
+        ),
+        head_delay: Duration::ZERO,
+        chunks: Vec::new(),
+        hold: Duration::ZERO,
+    }]);
+    let environment = TestEnvironment::new([("large.test".into(), vec![server.address])]);
+    let error = capture_selected_extension_artifact_with(
+        &url("large.test", &server, "/artifact"),
+        [0; 32],
+        &runtime(),
+        &|| true,
+        &environment,
+    )
+    .unwrap_err();
+    assert_eq!(
+        error,
+        "selected extension artifact exceeds 33554432 byte capture limit"
+    );
+    assert_captures_deleted(&environment);
+}
+
 #[test]
 fn streams_host_origin_query_and_deletes_verified_capture() {
     let body = b"two streamed frames";

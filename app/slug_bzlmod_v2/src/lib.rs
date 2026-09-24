@@ -40,6 +40,7 @@ mod repository_ignore;
 mod repository_label_path;
 pub mod resolution;
 mod root_bootstrap;
+mod selected_extension_download;
 mod selected_graph;
 mod selected_repo_spec;
 pub mod source_preparation;
@@ -346,6 +347,22 @@ pub use root_bootstrap::RootModuleBootstrapApplyResult;
 pub use root_bootstrap::RootModuleBootstrapCreateError;
 pub use root_bootstrap::RootModuleBootstrapRequest;
 pub use root_bootstrap::RootModuleBootstrapWarning;
+#[doc(hidden)]
+pub use selected_extension_download::SELECTED_EXTENSION_DOWNLOAD_LIMIT;
+#[doc(hidden)]
+pub use selected_extension_download::SelectedExtensionDownloadEpoch;
+#[doc(hidden)]
+pub use selected_extension_download::SelectedExtensionDownloadEpochKey;
+#[doc(hidden)]
+pub use selected_extension_download::SelectedExtensionDownloadError;
+#[doc(hidden)]
+pub use selected_extension_download::SelectedExtensionDownloadRequest;
+#[doc(hidden)]
+pub use selected_extension_download::SelectedExtensionDownloadTransaction;
+#[doc(hidden)]
+pub use selected_extension_download::SelectedExtensionDownloadVerified;
+#[doc(hidden)]
+pub use selected_extension_download::UsedDownloadRequestKey;
 #[doc(hidden)]
 pub use selected_repo_spec::HostBuiltinBazelToolsRepositoryMapping;
 #[doc(hidden)]

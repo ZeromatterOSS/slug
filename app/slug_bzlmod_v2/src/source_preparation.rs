@@ -177,13 +177,24 @@ pub struct SourcePreparationNeeds {
     path_observations: Option<NeedPathObservations>,
     repository_materializations:
         Arc<SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>>>,
+    selected_extension_downloads: Arc<
+        SmallMap<
+            Arc<crate::HostSelectedExtensionOwner>,
+            Arc<crate::SelectedExtensionDownloadRequest>,
+        >,
+    >,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum SourcePreparationNeedsError {
     ConflictingRootModuleBootstrap,
     RepositoryEnvironment(crate::RepositoryEnvironmentCanonicalError),
-    ConflictingRepositoryRequest { canonical_repo: CanonicalRepoName },
+    ConflictingRepositoryRequest {
+        canonical_repo: CanonicalRepoName,
+    },
+    ConflictingSelectedExtensionDownload {
+        owner: Arc<crate::HostSelectedExtensionOwner>,
+    },
 }
 
 impl SourcePreparationNeeds {
@@ -193,6 +204,7 @@ impl SourcePreparationNeeds {
             repository_environment: None,
             path_observations: None,
             repository_materializations: Arc::new(SmallMap::new()),
+            selected_extension_downloads: Arc::new(SmallMap::new()),
         }
     }
 
@@ -202,6 +214,7 @@ impl SourcePreparationNeeds {
             repository_environment: None,
             path_observations: Some(need),
             repository_materializations: Arc::new(SmallMap::new()),
+            selected_extension_downloads: Arc::new(SmallMap::new()),
         }
     }
 
@@ -213,6 +226,20 @@ impl SourcePreparationNeeds {
             repository_environment: None,
             path_observations: None,
             repository_materializations: Arc::new(repository_materializations),
+            selected_extension_downloads: Arc::new(SmallMap::new()),
+        }
+    }
+
+    pub fn selected_extension_download(request: crate::SelectedExtensionDownloadRequest) -> Self {
+        let owner = request.owner().clone();
+        let mut selected_extension_downloads = SmallMap::new();
+        selected_extension_downloads.insert(owner, Arc::new(request));
+        Self {
+            root_module_bootstrap: None,
+            repository_environment: None,
+            path_observations: None,
+            repository_materializations: Arc::new(SmallMap::new()),
+            selected_extension_downloads: Arc::new(selected_extension_downloads),
         }
     }
 
@@ -230,6 +257,7 @@ impl SourcePreparationNeeds {
             repository_environment: Some(request),
             path_observations: None,
             repository_materializations: Arc::new(SmallMap::new()),
+            selected_extension_downloads: Arc::new(SmallMap::new()),
         }
     }
 
@@ -241,6 +269,15 @@ impl SourcePreparationNeeds {
         &self,
     ) -> &SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>> {
         &self.repository_materializations
+    }
+
+    pub fn selected_extension_downloads(
+        &self,
+    ) -> &SmallMap<
+        Arc<crate::HostSelectedExtensionOwner>,
+        Arc<crate::SelectedExtensionDownloadRequest>,
+    > {
+        &self.selected_extension_downloads
     }
 
     pub fn try_union(&self, other: &Self) -> Result<Self, SourcePreparationNeedsError> {
@@ -272,6 +309,22 @@ impl SourcePreparationNeeds {
                 }
             }
         }
+        let mut selected_extension_downloads = (*self.selected_extension_downloads).clone();
+        for (owner, request) in other.selected_extension_downloads.iter() {
+            match selected_extension_downloads.get(owner) {
+                Some(existing) if existing == request => {}
+                Some(_) => {
+                    return Err(
+                        SourcePreparationNeedsError::ConflictingSelectedExtensionDownload {
+                            owner: owner.clone(),
+                        },
+                    );
+                }
+                None => {
+                    selected_extension_downloads.insert(owner.clone(), request.clone());
+                }
+            }
+        }
         let root_module_bootstrap =
             match (&self.root_module_bootstrap, &other.root_module_bootstrap) {
                 (Some(left), Some(right)) if left == right => Some(left.dupe()),
@@ -286,12 +339,14 @@ impl SourcePreparationNeeds {
                 || repository_environment.is_some()
                 || path_observations.is_some()
                 || !requests.is_empty()
+                || !selected_extension_downloads.is_empty()
         );
         Ok(Self {
             root_module_bootstrap,
             repository_environment,
             path_observations,
             repository_materializations: Arc::new(requests),
+            selected_extension_downloads: Arc::new(selected_extension_downloads),
         })
     }
 }
