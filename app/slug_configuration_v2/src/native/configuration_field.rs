@@ -124,6 +124,9 @@ pub enum ConfigurationField {
     CoverageOutputGenerator,
     JavaToolchainBytecodeOptimizer,
     JavaLocalOptimizationConfiguration,
+    ProtoToolchainForJavaLite,
+    ProtoToolchainForJava,
+    ProtoToolchainForCc,
 }
 
 impl ConfigurationField {
@@ -165,12 +168,18 @@ impl ConfigurationField {
             "cpp" => CppConfigurationField::from_starlark_name(name).map(Self::cpp),
             "coverage" => CoverageConfigurationField::from_starlark_name(name).map(Self::coverage),
             "java" => JavaConfigurationField::from_starlark_name(name).map(Self::java),
+            "proto" => match name {
+                "proto_toolchain_for_java_lite" => Some(Self::ProtoToolchainForJavaLite),
+                "proto_toolchain_for_java" => Some(Self::ProtoToolchainForJava),
+                "proto_toolchain_for_cc" => Some(Self::ProtoToolchainForCc),
+                _ => None,
+            },
             _ => None,
         }
     }
 
     pub fn is_fragment_name(fragment: &str) -> bool {
-        matches!(fragment, "cpp" | "coverage" | "java")
+        matches!(fragment, "cpp" | "coverage" | "java" | "proto")
     }
 
     pub const fn fragment_name(self) -> &'static str {
@@ -179,6 +188,9 @@ impl ConfigurationField {
             Self::JavaToolchainBytecodeOptimizer | Self::JavaLocalOptimizationConfiguration => {
                 "java"
             }
+            Self::ProtoToolchainForJavaLite
+            | Self::ProtoToolchainForJava
+            | Self::ProtoToolchainForCc => "proto",
             _ => "cpp",
         }
     }
@@ -186,6 +198,12 @@ impl ConfigurationField {
     pub const fn field_name(self) -> &'static str {
         if let Some(field) = self.java_field() {
             return field.starlark_name();
+        }
+        match self {
+            Self::ProtoToolchainForJavaLite => return "proto_toolchain_for_java_lite",
+            Self::ProtoToolchainForJava => return "proto_toolchain_for_java",
+            Self::ProtoToolchainForCc => return "proto_toolchain_for_cc",
+            _ => {}
         }
         match (self.cpp_field(), self.coverage_field()) {
             (Some(field), None) => field.starlark_name(),
@@ -209,7 +227,10 @@ impl ConfigurationField {
             Self::CppZipper => CppConfigurationField::Zipper,
             Self::CoverageOutputGenerator
             | Self::JavaToolchainBytecodeOptimizer
-            | Self::JavaLocalOptimizationConfiguration => return None,
+            | Self::JavaLocalOptimizationConfiguration
+            | Self::ProtoToolchainForJavaLite
+            | Self::ProtoToolchainForJava
+            | Self::ProtoToolchainForCc => return None,
         })
     }
 

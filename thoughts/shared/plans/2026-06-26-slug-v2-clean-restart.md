@@ -29,17 +29,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-103-m7a-selected-bcr-regular-0555-r1
+Packet: WP-7-104-m7a-proto-configuration-field-declarations-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
-WP803 admits the source-authentic rules_kotlin 1.9.6 selected-BCR tar's
-regular `0555` file mode. The verified archive and independent Bazel 9.2
-scratch oracle retain exact bytes/mode; a new full-realization Rust test and
-six protected tests passed, with independent design/final reviews. The rebuilt
-authentic build passed the old mode stop and reached protobuf's separate
-`configuration_field(fragment = "proto", ...)` Loading error at row 55.
-Other modes/types, Kotlin/protobuf analysis and M7A close remain deferred.
-WP802 is accepted at `64a07e9c0`.
+WP804 admits three authenticated protobuf v33.4
+`configuration_field(fragment = "proto", ...)` declarations for Java Lite,
+Java and C++ toolchains as compact declaration-only private label defaults.
+Pinned Bazel 9.2 source and an offline scratch oracle distinguish selected
+acceptance from unknown fragment/name and public-attribute failures. Core and
+Loading focused tests passed, with independent design/final reviews. The
+rebuilt authentic smoke cleared the proto stop and reached rules_kotlin's
+separate `provider_callable` hashability failure at row 55. Configured proto
+resolution, other valid proto fields, Kotlin Loading and M7A close remain
+deferred. WP803 is accepted at `b4777a817`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

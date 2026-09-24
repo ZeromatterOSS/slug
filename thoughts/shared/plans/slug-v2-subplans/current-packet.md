@@ -1,146 +1,149 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-103-m7a-selected-bcr-regular-0555-r1
+Packet: WP-7-104-m7a-proto-configuration-field-declarations-r1
 Status: ACCEPTED 2026-09-24; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit a regular tar entry with mode `0555` in the existing selected-BCR
-`tar.gz` materializer on Linux/Unix. The source-authentic rules_kotlin 1.9.6
-archive must pass Slug's current `selected BCR unsupported entry mode` stop
-when the normalized-PATH authentic build demands its `REPO.bazel` source
-observation. A later independently typed stop is acceptable. `REPO.bazel` is
-the lookup that triggers materialization, not an archive member or special
-mode rule.
+Admit three source-authentic protobuf v33.4 `configuration_field`
+declarations for `proto_toolchain_for_java_lite`, `proto_toolchain_for_java`
+and `proto_toolchain_for_cc` on fragment `proto` as typed, declaration-only
+private `attr.label` defaults in Bzl Loading. The authentic normalized-PATH
+build must pass its current row-55 invalid-fragment stop. A later
+independently typed stop is acceptable; protobuf configured toolchain
+resolution, target success and M7A close are not claimed.
 
-Exact Bazel 9.2 slice: for an admitted regular entry with header mode `0555`,
-extract its payload bytes and set the output mode to `mode | 0400` (`0555`),
-then preserve the header mtime as already implemented. Slug-native: the
-existing finite tar entry/mode grammar, Unicode/path/namespace/size limits,
-directory `0755` normalization, Rust Host observations and structurally
-associated immutable source identity. Unsupported/deferred: other previously
-rejected regular/directory modes, symlink/hardlink/special tar entries, local
-PAX and broader Bazel decompressor parity, non-Unix mode materialization,
-rules_kotlin Loading/analysis/toolchain success and M7A close. Preserve all
-accepted mode, integrity, cancellation, error and publication boundaries.
+Exact Bazel 9.2 slice: recognize the three selected annotated fields at
+`.bzl` evaluation, preserve their late-bound identities through private
+label defaults, and retain the existing distinct invalid-fragment/invalid-
+field diagnostics. Slug-native: finite field admission and the existing
+compact field-plus-tools-repository identity. Unsupported/deferred:
+configured resolution of these fields, the other proto fields, proto
+fragment access/options semantics, and broader protobuf/toolchain behavior.
+Do not return fabricated default labels or silently treat the configured
+fields as `None`.
 
 ## Source, owner and decision
 
-The pinned Bazel 9.2 `ArchiveRepoSpecBuilder.java:35-58` and
-`tools/build_defs/repo/http.bzl:194-218` route a BCR archive to the ordinary
-decompressor. `CompressedTarFunction.java:88-147` strips the prefix, writes a
-regular file, then calls `chmod(entry.getMode() | 0400)` and preserves mtime;
-its `CompressedTarFunctionTest.java:45-66` covers extraction but has no
-mode-specific assertion. The authenticated rules_kotlin 1.9.6 BCR
-`source.json` names the tar with SHA-256
-`3b772976fec7bdcda1d84b9d39b176589424c047eb2175bed09aac630e50af43`.
-Verified local archive bytes have 86 regular entries at `0555`, 22 directories
-at already-admitted `0755`, no links and no `REPO.bazel`. The first header is
-regular `BUILD.bazel` with raw USTAR mode `0000555\0`; Bazel's extracted
-`BUILD.bazel` is also a regular `0555` file with matching bytes. This is a
-direct discriminator, not a claim that all Bazel tar modes are supported.
+Pinned Bazel 9.2 `BazelBuildApiGlobals.java:96-109` resolves
+`configuration_field` against registered fragments and annotated fields;
+`BazelRuleClassProvider.java:253-259` registers `proto`, and
+`ProtoConfiguration.java:188-230` annotates the selected three names. The
+native options use related but sometimes different spellings (notably
+`proto_toolchain_for_javalite`) and already have Slug descriptors; their
+deferred option status is not configured-field support. Authenticated
+protobuf v33.4 `java_lite_proto_library.bzl:76,172`,
+`bazel_java_proto_library_rule.bzl:77,161` and
+`bazel_cc_proto_library.bzl:126,193` eagerly invoke the three selected
+fields while constructing dict arguments to `toolchains.if_legacy_toolchain`.
+That helper discards the dict under Bazel 9.2's default enabled toolchain
+resolution; argument evaluation still requires the declarations. The direct
+current `rules_java` load closure demonstrates Java Lite and Java; C++ is a
+deliberate, separately oracle-checked sibling in the authenticated protobuf
+source, not a claim about that immediate load closure. The `proto_compiler`
+call in `proto_lang_toolchain_rule.bzl:159` is in an untaken conditional
+branch, but `protobuf.bzl:81` also calls it eagerly outside the demonstrated
+current closure. `proto_toolchain_for_j2objc` is annotated upstream but not
+called in this authenticated archive. Both remain valid Bazel fields, not
+admitted Slug declarations. Preserve the current caller/source
+and `@bazel_tools` repository-mapping identity path.
 
-`app/slug_core_v2/src/runtime/repository_archive_realize.rs::extract` is the
-sole semantic owner. Its regular-mode allowlist rejects `0555` before reading
-the header path or applying `strip_prefix`; its existing regular writer already
-uses `set_mode(mode | 0o400)` and header mtime. Add only `0o555` to that
-regular-mode set. Do not move the gate, special-case `REPO.bazel`, synthesize a
-file, change mode normalization, or alter transport/request/DICE owners.
-Keep existing capture SHA-256 verification, immutable request association,
-generation-scoped errors, activity checks, provisional-root cleanup and final
-observation/promotion. The tar digest includes header mode bytes, so changing
-the mode changes the existing source association; no new key, retained value,
-cache, lock, file discovery or memory owner is needed. The temporary output
-root and capture remain phase/session scratch until accepted or discarded.
-The DICE ownership and no-lock-across-compute guidance in
-`docs/developers/dice.md` remains unchanged.
-
-This is a same-owner one-token allowlist extension in a cohesive archive
-extractor; the file's size does not justify a structural split. The Buck2
-utility-reuse skill is inapplicable because no retained representation,
-hashing utility, collection or clone policy changes.
+The sole declaration owner is
+`app/slug_configuration_v2/src/native/configuration_field.rs`'s flattened
+`#[repr(u8)] ConfigurationField`, consumed by
+`app/slug_loading_v2/src/subrule.rs::configuration_field_global` and the
+existing private `attr.label` late-bound carrier. Add three discriminants
+and only their source-spelled parser/projection. Do not add a public sibling
+enum, map, interner, per-field string, new retained carrier, option
+projection, DICE key or cache. `ConfigurationFieldIdentity` still owns only
+the one-byte field and `CanonicalRepoName`; clone/equality/hash/Allocative,
+source-fingerprint invalidation and immutable rule slices remain structural.
+Ordinary no-field rules retain no extra allocation. Keep the one-byte field
+and current identity layout. `configuration.rs` must reject configured
+resolution of these selected proto fields with a typed unsupported
+diagnostic, following the accepted Java declaration-only precedent. The
+DICE ownership and no-lock-across-compute guidance in
+`docs/developers/dice.md` is unchanged.
 
 ## Evidence and validation
 
-No new Stage 1 fixture is selected: pinned Bazel source specifies the exact
-mode projection; verified source-authentic BCR tar bytes and Bazel's extracted
-mode discriminate the observed gap. An independent tiny scratch Bazel 9.2
-`http_archive` oracle at `/tmp/slug-wp803-mode-oracle` confirms the same
-projection: the local-file tar with regular `BUILD.bazel`, `payload.txt` and
-nested source at `0555` and a directory at `0755` queried successfully on a
-fresh output base (exit 0); extracted files remained mode `555`, directory
-`755`. The successful invocation used `--ignore_all_rc_files` and a `file://`
-URL only. Bazel's `--repository_disable_download` also blocks local file
-URLs, so that flag's preliminary exit 7 is an invocation control, not a
-semantic negative. The scratch tar stays under `/tmp`, not in this checkout.
-The upstream decompressor test is not copied
-because it does not assert modes; the existing Slug tar-header writer supplies
-the stronger focused discriminator. Fixture growth is zero and no archive,
-credential or upstream source is committed.
+An independent pinned Bazel 9.2 offline scratch oracle at
+`/tmp/slug-wp804-proto-field` used `--ignore_all_rc_files` and a fresh output
+base. `query //:good --output=xml` passed for all three private late-bound
+defaults and emitted rule inputs `@bazel_tools//tools/proto:{javalite,java,cc}_toolchain`.
+Separate unknown fragment and
+unknown field cases exited 7 with distinct loading diagnostics; making the
+late-bound attribute public exited 7 with the private-attribute diagnostic.
+Pinned source annotations and the authenticated archive census corroborate
+all three fields. An offline `cquery` with local labels set through the three
+native proto options reached all three selected defaults, but this packet
+does not implement or claim those configured projections in Slug. No BuildBuddy credentials,
+remote transport or NativeLink execution entered this oracle. The scratch
+fixture stays outside this checkout; add no Stage 1 fixture unless the focused
+regression exposes a demonstrated evidence gap.
 
-Add a focused `repository_archive_realize_tests.rs` test using its current
-`append`/`header` writer: a regular `BUILD.bazel` and a nested regular source
-at `0555` with known bytes and mtimes pass full `realize_selected_bcr`, retain
-`0555` on Unix, and preserve the existing verified source association. Keep
-the current reject-mode test's `0600`, `0750` and special-bit controls; add a
-neighboring rejected mode only if it materially distinguishes the new set.
-Reuse existing tests for `0640`, directory `0750`, malformed/special entries,
-active cutoff, source association, transform and file-session generation
-behavior. No weakened assertion or broader archive mode claim is acceptable.
-
-Resolve pinned cargo/rustc from `rust-toolchain`; compile Core library tests
-with Cargo JSON `--no-run`, batch exact selectors through preflight, then run
-the new/protected tests serially. Rebuild `slug_cli_v2` before the authentic
+Add focused Core tests for exact selected spellings, a truly unknown proto
+name, valid-but-deferred proto fields, field/identity/hash/layout and
+explicit configured rejection.
+Add focused Loading tests for Bzl-only API, private label-default retention
+through declaration/freeze, source/repository-mapping identity, and invalid-
+name boundaries; reuse protected Java, C++, coverage and existing unknown-
+fragment tests. Do not invoke a configured proto consumer as a success claim.
+Resolve pinned cargo/rustc from `rust-toolchain`; compile affected library
+tests with Cargo JSON `--no-run`, batch exact selectors through preflight,
+then run selected tests serially. Rebuild `slug_cli_v2` before the authentic
 normalized-PATH build; check/clean `slugd` before and after. Run formatting,
-diff, archive and plan-status checks, and obtain independent DESIGN and FINAL
-reviews. No broad suite, remote-transport, NativeLink or BuildBuddy gate is
-selected by this source-materialization packet.
+diff, archive and plan-status checks and obtain independent DESIGN and FINAL
+reviews. No broad suite or remote-service gate is selected by this
+declaration-only packet.
 
 ## Scope and stops
 
-Base clean main `64a07e9c0`. Allowlist: this manifest and canonical Current
-paragraph; Stage 5 owner contract only for accepted invariant; production
-`app/slug_core_v2/src/runtime/repository_archive_realize.rs`; focused tests
-`app/slug_core_v2/src/runtime/tests/repository_archive_realize_tests.rs`.
-Production growth is approximately one token; proof growth under 90 lines.
-These are review triggers, not permission ceilings. REPLAN if the authenticated
-tar does not use ordinary regular `0555`, Bazel's `0555` output does not match
-the existing writer, mode-only changes escape existing source identity, or
-passing the present stop requires a distinct entry type/transport/DICE owner.
-A later rules_kotlin source or Loading failure is a new packet.
+Base clean main `b4777a817`. Allowlist: this manifest and canonical Current
+paragraph; Stage 4 and Stage 9 owner contracts only after acceptance;
+production `app/slug_configuration_v2/src/native/configuration_field.rs`,
+`app/slug_configuration_v2/src/native/configuration.rs`; focused tests in
+`app/slug_configuration_v2/src/native/tests.rs` and
+`app/slug_loading_v2/src/host_package_load_tests.rs`. Production growth under
+roughly 55 lines and proof under roughly 160 lines are review triggers, not
+permission ceilings. REPLAN if Bazel's selected fields resolve at loading
+to different identities, the authentic calls need configured semantics or a
+new retained owner to pass the present stop, the one-byte layout changes, or
+a later stop cannot be separated from this declaration boundary.
 
 ## Immediate predecessor
 
-WP802 at `64a07e9c0` accepted package-relative Label conversion and typed
-`select()` keys in a generated BUILD. Its five-row Bazel 9.2 fixture and seven
-focused/protected Rust tests passed, and the authentic build advanced from
-rules_python/bazel_skylib to this selected-BCR entry-mode stop at toolchain
-registration row 55. M7A remains partial.
+WP803 at `b4777a817` accepted the source-authentic rules_kotlin 1.9.6
+selected-BCR regular `0555` mode. The CLI rebuild and authentic smoke cleared
+that archive stop and reached the present protobuf `proto` configuration-field
+loading error at row 55. M7A remains partial.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviews returned ACCEPT. The verified
-rules_kotlin 1.9.6 BCR archive's first regular `BUILD.bazel` header and its
-other 85 regular entries are `0555`; its 22 directory entries are `0755`.
-Bazel's extracted `BUILD.bazel` retains `0555`. A separate, offline pinned
-Bazel 9.2 scratch `repository_ctx.extract` query passed on a fresh output
-base (3.46 s), preserving three regular `0555` files and one `0755`
-directory. The sole production change adds `0o555` to the regular tar mode
-set; the writer's byte, mode and mtime projection and all existing safety
-gates are unchanged. No fixture was added because pinned source plus the
-verified authentic archive/extracted result directly discriminate the one
-mode, with the new source-shaped Rust tar-header regression preserving it.
+Independent DESIGN and FINAL reviews returned ACCEPT after the test separated
+the Bazel-invalid `missing` field from valid-but-deferred `proto_compiler` and
+`proto_toolchain_for_j2objc`. The pinned Bazel 9.2 offline scratch oracle
+accepted all three selected private defaults and projected the source default
+toolchain labels; its local-option-override `cquery` also confirmed all three
+Bazel field/option mappings without authorizing Slug configured projection.
+The source-authentic protobuf v33.4 calls and direct rules_java closure were
+independently audited. No Stage 1 fixture was added because the pinned source
+and scratch oracle discriminate this finite Loading slice; no upstream or
+credential material entered the checkout.
 
-The final pinned-toolchain Core JSON library test compile passed (2.66 s).
-Exact preflight selected seven nonignored tests; the new full-realization
-test and six protected mode/rejection/source-association/file-session tests
-each passed. The CLI rebuild passed (2.49 s). The authentic normalized-PATH
-smoke passed the old selected-BCR entry-mode stop, then failed separately at
-row 55 in `@@protobuf+//bazel/private:java_lite_proto_library.bzl:76` on
-`configuration_field(fragment = "proto", ...)` with `invalid configuration
-fragment name 'proto'`. No `slugd` remained before or after. Format, diff,
-archive and plan-status checks passed. The scratch oracle and reviews were
-independent; packet wall-clock/review durations were not separately timed.
-No remote transport, NativeLink or BuildBuddy authentication path was used.
-Other tar modes/types and full Kotlin/protobuf Loading remain deferred; M7A
-and M8 remain open.
+Pinned-nightly Core and Loading JSON library test compiles passed. Exact
+preflight verified three Core and four Loading nonignored selectors. The three
+Core tests and four Loading tests passed; after the final deferred-field
+assertion edit, the Loading compile and preflight were repeated and the
+changed exact test passed again. The two new Loading tests cover frozen
+aspect/rule and actual package recording; the Core test pins one-byte field,
+unchanged identity layout/hash and typed configured rejection. The CLI rebuild
+passed. Authentic one-shot `slug build //:probe` from the normalized-PATH
+scratch workspace cleared the old proto fragment stop and failed separately
+at row 55 in
+`@@rules_kotlin+//src/main/starlark/core/options:opts.javac.bzl:64:13`:
+`Value of type provider_callable is not hashable`. No `slugd` remained before
+or after. Format, diff and plan-status checks passed. No remote cache,
+NativeLink or BuildBuddy gate was selected. The exact declaration slice is
+accepted; configured proto semantics, other valid fields, Kotlin hashability,
+target success and M7A close remain deferred.

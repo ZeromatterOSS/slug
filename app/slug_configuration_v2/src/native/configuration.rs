@@ -339,6 +339,7 @@ pub enum SlugConfigurationError {
     NonVisibleNativeLabel { option: &'static str },
     InvalidCppConfiguration { reason: &'static str },
     UnsupportedJavaConfigurationField { field: ConfigurationField },
+    UnsupportedProtoConfigurationField { field: ConfigurationField },
     ActionEnvironment { reason: &'static str },
 }
 
@@ -419,6 +420,11 @@ impl fmt::Display for SlugConfigurationError {
             Self::UnsupportedJavaConfigurationField { field } => write!(
                 formatter,
                 "configuration_field(fragment = \"java\", name = \"{}\") configured resolution is unsupported",
+                field.field_name()
+            ),
+            Self::UnsupportedProtoConfigurationField { field } => write!(
+                formatter,
+                "configuration_field(fragment = \"proto\", name = \"{}\") configured resolution is unsupported",
                 field.field_name()
             ),
             Self::ActionEnvironment { reason } => {
@@ -1085,6 +1091,16 @@ impl SlugConfiguration {
     ) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
         if identity.field().java_field().is_some() {
             return Err(SlugConfigurationError::UnsupportedJavaConfigurationField {
+                field: identity.field(),
+            });
+        }
+        if matches!(
+            identity.field(),
+            ConfigurationField::ProtoToolchainForJavaLite
+                | ConfigurationField::ProtoToolchainForJava
+                | ConfigurationField::ProtoToolchainForCc
+        ) {
+            return Err(SlugConfigurationError::UnsupportedProtoConfigurationField {
                 field: identity.field(),
             });
         }

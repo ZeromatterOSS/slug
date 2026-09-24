@@ -36122,6 +36122,172 @@ fn bazel_configuration_field_is_bzl_only_and_fails_closed() {
 }
 
 #[test]
+fn proto_configuration_fields_retain_private_defaults_and_tools_mapping() {
+    const SOURCE: &str = r#"
+def _aspect_impl(target, ctx): return []
+def _if_legacy_toolchain(attrs): return {}
+DISCARDED = _if_legacy_toolchain({
+    "_unused": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java_lite")),
+})
+FIELDS = aspect(implementation = _aspect_impl, attrs = {
+    "_lite": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java_lite")),
+    "_java": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java")),
+    "_cc": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_cc")),
+})
+"#;
+    let owner = |label: &str, tools: &str| BzlModuleIdentity {
+        label: CanonicalLabel::parse(label).unwrap(),
+        workspace_path: PathBuf::from("/protobuf/bazel/private/probe.bzl"),
+        repository_mapping: Arc::from([(
+            ApparentRepoName::new("bazel_tools").unwrap(),
+            CanonicalRepoName::new(tools).unwrap(),
+        )]),
+    };
+    let retained = |module: &FrozenModule| {
+        assert_eq!(
+            DictRef::from_value(module.get("DISCARDED").unwrap().value().to_value())
+                .unwrap()
+                .len(),
+            0
+        );
+        let aspect = module
+            .get("FIELDS")
+            .unwrap()
+            .downcast::<FrozenAspectDefinition>()
+            .unwrap();
+        assert_eq!(aspect.late_bound_attributes.len(), 3);
+        aspect
+            .late_bound_attributes
+            .iter()
+            .map(|attribute| attribute.identity.clone())
+            .collect::<Vec<_>>()
+    };
+
+    let first = eval_bzl_with_identity(
+        SOURCE,
+        owner("@@protobuf+//bazel/private:probe.bzl", "bazel_tools+one"),
+    )
+    .unwrap();
+    let same_mapping_other_source = eval_bzl_with_identity(
+        SOURCE,
+        owner("@@other+//bazel/private:probe.bzl", "bazel_tools+one"),
+    )
+    .unwrap();
+    let remapped = eval_bzl_with_identity(
+        SOURCE,
+        owner("@@protobuf+//bazel/private:probe.bzl", "bazel_tools+two"),
+    )
+    .unwrap();
+    let restored = eval_bzl_with_identity(
+        SOURCE,
+        owner("@@protobuf+//bazel/private:probe.bzl", "bazel_tools+one"),
+    )
+    .unwrap();
+    let first = retained(&first);
+    assert_eq!(
+        first
+            .iter()
+            .map(|identity| identity.field().field_name())
+            .collect::<Vec<_>>(),
+        [
+            "proto_toolchain_for_java_lite",
+            "proto_toolchain_for_java",
+            "proto_toolchain_for_cc"
+        ]
+    );
+    assert!(
+        first
+            .iter()
+            .all(|identity| identity.field().fragment_name() == "proto")
+    );
+    assert!(
+        first
+            .iter()
+            .all(|identity| identity.tools_repository().as_str() == "bazel_tools+one")
+    );
+    assert_ne!(first[0], first[1]);
+    assert_ne!(first[1], first[2]);
+    assert_eq!(first, retained(&same_mapping_other_source));
+    assert_ne!(first, retained(&remapped));
+    assert_eq!(first, retained(&restored));
+
+    assert!(
+        eval_global(
+            "X = configuration_field(fragment = 'proto', name = 'proto_toolchain_for_java_lite')",
+            &build_file_loading_globals()
+        )
+        .is_err()
+    );
+    let missing = eval_bzl_with_identity(
+        "X = configuration_field(fragment = 'proto', name = 'missing')",
+        owner("@@protobuf+//bazel/private:probe.bzl", "bazel_tools+one"),
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(
+        missing.contains("invalid configuration field name 'missing' on fragment 'proto'"),
+        "{missing}"
+    );
+    // Bazel admits these names; Slug deliberately leaves them unsupported.
+    for name in ["proto_compiler", "proto_toolchain_for_j2objc"] {
+        assert!(
+            eval_bzl_with_identity(
+                &format!("X = configuration_field(fragment = 'proto', name = '{name}')"),
+                owner("@@protobuf+//bazel/private:probe.bzl", "bazel_tools+one"),
+            )
+            .is_err(),
+            "{name} must stay outside the selected Slug slice"
+        );
+    }
+    let error = eval_bzl_with_identity(
+        "def impl(ctx): return []\nPUBLIC = rule(implementation = impl, attrs = {'late': attr.label(default = configuration_field(fragment = 'proto', name = 'proto_toolchain_for_java_lite'))})",
+        owner("@@protobuf+//bazel/private:probe.bzl", "bazel_tools+one"),
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("the attribute must be private"), "{error}");
+}
+
+#[tokio::test]
+async fn proto_configuration_fields_survive_frozen_rule_package_recording() {
+    const BUILD: &[u8] = b"load(':defs.bzl', 'RULE')\nRULE(name = 'subject', visibility = ['//visibility:public'])\n";
+    const DEFS: &[u8] = br#"def _impl(ctx): return []
+RULE = rule(implementation = _impl, attrs = {
+    "_lite": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java_lite")),
+    "_java": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_java")),
+    "_cc": attr.label(default = configuration_field(fragment = "proto", name = "proto_toolchain_for_cc")),
+})
+"#;
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let outcome = load_repository_package_fixture_on(
+        &dice,
+        &[("BUILD.bazel", BUILD), ("defs.bzl", DEFS)],
+        792,
+    )
+    .await;
+    let PackageTargetKind::StarlarkRule(rule) =
+        &repository_package_terminal(&outcome).targets[0].kind
+    else {
+        panic!("expected recorded Starlark rule")
+    };
+    assert_eq!(
+        rule.late_bound_rule_attributes().collect::<Vec<_>>(),
+        [
+            ("_lite", "proto_toolchain_for_java_lite"),
+            ("_java", "proto_toolchain_for_java"),
+            ("_cc", "proto_toolchain_for_cc"),
+        ]
+    );
+    for attribute in rule.configured_dependency_attributes() {
+        let ConfiguredDependencyDefault::ConfigurationField(identity) = attribute.default() else {
+            panic!("{} lost its late-bound default", attribute.name())
+        };
+        assert_eq!(identity.field().fragment_name(), "proto");
+        assert_eq!(identity.tools_repository().as_str(), "bazel_tools");
+    }
+}
+
+#[test]
 fn bazel_zero_argument_depset_freezes_empty_in_bzl_and_build_globals() {
     let source = "events = []\ndef eager(a = depset(), b = depset(), c = depset(), d = depset(), e = depset()):\n    events.append(\"body\")\nEMPTY = depset()\nONE = depset([\"first\", \"second\"])\n";
     let bzl = eval_bzl_with_identity(

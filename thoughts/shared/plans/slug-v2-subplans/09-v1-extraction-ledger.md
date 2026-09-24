@@ -2766,6 +2766,20 @@ second owner or default-`None` carrier is `REPLAN`; deletion requires a complete
 reviewed Java option producer and configured-resolution packet. Commit
 `4d59d7451` terminally accepts this no-extraction representation.
 
+`WP-7-104-m7a-proto-configuration-field-declarations-r1` also reuses that
+representation without V1/Buck2 extraction. Append only three source-selected
+`proto` discriminants to the flattened one-byte `ConfigurationField`; keep
+`ConfigurationFieldIdentity` as field plus `CanonicalRepoName`, frozen rule
+slices as the sole declaration carrier, and existing source-fingerprint
+invalidation. The configured error is scratch and explicitly unsupported;
+the native proto option registry remains a separate deferred owner. No new
+map, interner, cache, string payload, Arc, DICE key, placeholder label or
+ordinary-rule allocation is admitted. Focused proof pins field/identity
+layout, structural equality/hash, mapping A/B/A, freeze/package retention
+and fail-closed configured behavior. This no-extraction slice is accepted;
+the next authentic stop is Kotlin provider-callable hashability, not a change
+to retained configuration-field representation.
+
 `WP-4-7A-build-imported-bzl-label-caller-provenance-audit-r1` also requires no
 V1/Buck2 extraction. Reuse `CompactString`, `BzlModuleIdentity`, immutable
 `Arc<[T]>`, constant-time Arc clone and the identity's existing `Allocative`

@@ -977,6 +977,72 @@ mod command_configuration_tests {
     }
 
     #[test]
+    fn selected_proto_fields_are_typed_compact_and_fail_closed() {
+        let selected = [
+            (
+                "proto_toolchain_for_java_lite",
+                ConfigurationField::ProtoToolchainForJavaLite,
+            ),
+            (
+                "proto_toolchain_for_java",
+                ConfigurationField::ProtoToolchainForJava,
+            ),
+            (
+                "proto_toolchain_for_cc",
+                ConfigurationField::ProtoToolchainForCc,
+            ),
+        ];
+        assert!(ConfigurationField::is_fragment_name("proto"));
+        assert_eq!(size_of::<ConfigurationField>(), 1);
+        #[cfg(target_pointer_width = "64")]
+        assert_eq!(size_of::<ConfigurationFieldIdentity>(), 32);
+        for (name, expected) in selected {
+            let field = ConfigurationField::from_starlark_names("proto", name).unwrap();
+            assert_eq!(field, expected);
+            assert_eq!(field.fragment_name(), "proto");
+            assert_eq!(field.field_name(), name);
+            assert_eq!(field.cpp_field(), None);
+            assert_eq!(field.coverage_field(), None);
+            assert_eq!(field.java_field(), None);
+            let identity = ConfigurationFieldIdentity::new(
+                field,
+                CanonicalRepoName::new("bazel_tools+").unwrap(),
+            );
+            assert_eq!(
+                configuration()
+                    .configuration_field_label(&identity)
+                    .unwrap_err()
+                    .to_string(),
+                format!(
+                    "configuration_field(fragment = \"proto\", name = \"{name}\") configured resolution is unsupported"
+                )
+            );
+        }
+        for name in ["not_a_field", "proto_toolchain_for_javalite"] {
+            assert_eq!(ConfigurationField::from_starlark_names("proto", name), None);
+        }
+        // These are valid Bazel 9.2 annotations, deliberately deferred here.
+        for name in ["proto_compiler", "proto_toolchain_for_j2objc"] {
+            assert_eq!(ConfigurationField::from_starlark_names("proto", name), None);
+        }
+
+        let identity = |field, tools| {
+            ConfigurationFieldIdentity::new(field, CanonicalRepoName::new(tools).unwrap())
+        };
+        let hash = |value: &ConfigurationFieldIdentity| {
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        };
+        let first = identity(selected[0].1, "bazel_tools+");
+        let restored = identity(selected[0].1, "bazel_tools+");
+        assert_eq!(first, restored);
+        assert_eq!(hash(&first), hash(&restored));
+        assert_ne!(first, identity(selected[1].1, "bazel_tools+"));
+        assert_ne!(first, identity(selected[0].1, "bazel_tools+next"));
+    }
+
+    #[test]
     fn coverage_command_override_observes_mapping_last_wins_and_boolean_independence() {
         let base = configuration();
         let mapping = mapping();

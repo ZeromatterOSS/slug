@@ -9265,3 +9265,26 @@ materialization-entry-mode stop at registration row 55. Rule initializers,
 unknown-apparent nonvisible Label values, eager select-key semantics, mixed
 equivalent-key precedence and broad configured/toolchain behavior remain
 deferred; M7A is still partial.
+
+### Selected protobuf configuration-field declarations accepted (2026-09-24)
+
+WP804 adds three authenticated protobuf v33.4 `proto` fields to the existing
+finite Bzl-only `configuration_field` declaration owner:
+`proto_toolchain_for_java_lite`, `proto_toolchain_for_java` and
+`proto_toolchain_for_cc`. The immediate rules_java closure requires the first
+two; the third is a separately oracle-checked sibling in the authenticated
+archive. Pinned Bazel 9.2 annotations and an offline scratch query show all
+three private label defaults; a local-option-override cquery proves Bazel's
+field/option mapping but is not Slug configured parity. The valid
+`proto_compiler` and `proto_toolchain_for_j2objc` fields remain outside this
+Slug-native finite admission; only truly unknown names are Bazel-invalid.
+
+The existing one-byte flattened field, field-plus-tools-repository identity,
+private late-bound attribute slices and source-fingerprint invalidation remain
+the only retained owners. Configured resolution explicitly fails closed.
+Focused Core/Loading tests cover layout, identity/hash, source and mapping
+A/B/A, frozen declaration and package recording, Bzl-only/private gates and
+the unsupported configured boundary. The authentic rebuilt build passed its
+former `proto` fragment error and reached a separate rules_kotlin
+`provider_callable` hashability failure at row 55. Other proto declarations,
+configured proto semantics, Kotlin success and M7A close remain deferred.
