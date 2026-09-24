@@ -722,8 +722,7 @@ struct WhichLimits;
     let raw = std::path::Path::new(component);
     if !raw.is_absolute() { return Ok(None); }
     let normalized = NormalizedAbsolutePath::new(raw).map_err(|_| RepositoryRuleInvocationError::WhichLimit)?;
-    if normalized.as_path() != raw { return Err(RepositoryRuleInvocationError::WhichLimit); }
-    NormalizedAbsolutePath::new(raw.join(program)).map(Some).map_err(|_| RepositoryRuleInvocationError::WhichLimit)
+    NormalizedAbsolutePath::new(normalized.as_path().join(program)).map(Some).map_err(|_| RepositoryRuleInvocationError::WhichLimit)
 }
 
 #[rustfmt::skip] fn admit_which_candidate(candidates: &mut Vec<NormalizedAbsolutePath>, candidate: NormalizedAbsolutePath) -> Result<(), RepositoryRuleInvocationError> {
@@ -2660,6 +2659,20 @@ def implementation(ctx):
         let one = NormalizedAbsolutePath::new("/one/tool").unwrap();
         let two = NormalizedAbsolutePath::new("/two/tool").unwrap();
         assert!(matches!(
+            invoke_which(source, Some("/one/sub/../:relative::/two:"), &SmallMap::new()),
+            Err(RepositoryRuleInvocationError::WhichNeed(path)) if path == one
+        ));
+        let normalized_first = invoke_which(
+            source,
+            Some("/one/sub/../:relative::/two:"),
+            &SmallMap::from_iter([(one.dupe(), RepositoryWhichCandidate::Executable)]),
+        )
+        .unwrap();
+        assert_eq!(
+            normalized_first.plan.effects()[0].content(),
+            br#"/one/tool|"/one/tool"|True|ok"#
+        );
+        assert!(matches!(
             invoke_which(source, Some("/one:relative::/two:"), &SmallMap::new()),
             Err(RepositoryRuleInvocationError::WhichNeed(path)) if path == one
         ));
@@ -2741,6 +2754,10 @@ def implementation(ctx):
         assert_eq!(
             which_candidates(Some(&maximum), "x").unwrap().len(),
             WhichLimits::CANDIDATES
+        );
+        assert_eq!(
+            which_candidates(Some("/usr/../bin:/bin/.:/bin//:relative::"), "sh").unwrap(),
+            [NormalizedAbsolutePath::new("/bin/sh").unwrap()]
         );
         assert_eq!(
             which_candidates(Some("/bin"), "\u{a0}x\u{a0}").unwrap()[0]

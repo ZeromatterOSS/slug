@@ -1,162 +1,124 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-137-m7a-generated-repository-symlink-r1
+Packet: WP-7-138-m7a-repository-which-path-normalization-r1
 Status: ACCEPTED; independent DESIGN and FINAL reviews accepted; M7A remains partial
 
 ## Outcome and compatibility
 
-Admit the two authentic generated `rules_cc` 0.2.17 Linux
-`repository_ctx.symlink` calls: a source path returned by
-`repository_ctx.path(Label(...))` for an existing external repository file,
-and a nonempty safe repository-relative string destination. Produce a real
-POSIX symlink in the generated repository, in invocation order, without
-overwriting an existing destination. The Starlark call shape and selected
-link/file loading behavior are **exact** for this subset under Bazel 9.2.
-Slug's generated-root location, materialization/source-association bytes,
-safe-path rejection diagnostics and Rust Host observations are **Slug-native**.
-Direct String/Label or host-path sources, root Label sources, dangling sources,
-directory links, generated-source links, Windows copy/junction behavior,
-symlink/archive mixtures, arbitrary destination path objects, complete C++
-toolchain setup and root Build are **unsupported/deferred**. Existing exact
-slices remain exact; no Java runtime/helper enters Slug.
+Admit lexical normalization of an absolute Unix `PATH` component before
+`repository_ctx.which` probes a program. The selected component, first-hit
+ordering, returned path spelling and repository result are **exact** for this
+Bazel 9.2 slice. Existing fixed program/PATH/component/candidate caps, tracked
+Host observations, Rust valid-Unicode path representation and diagnostics are
+**Slug-native**. Relative and empty entries remain ignored. Windows/PATHEXT,
+non-UTF-8 environment and program names, process-race snapshots, uncapped
+arbitrary PATHs and `repository_ctx.execute` are **unsupported/deferred**. No
+existing accepted exact slice is widened silently, and no JVM enters Slug.
 
-## Pinned source and authentic demand
+## Pinned evidence and authentic demand
 
-Pinned Bazel 9.2 `StarlarkRepositoryContext.java:197-254` resolves
-`symlink(target, link_name)`, checks the destination under the repository,
-creates parents and calls native `createSymbolicLink` without pre-deleting
-the destination. `StarlarkBaseExternalContext.java:313-322` owns the lexical
-destination check; `RepositoryUtils.java:54-76` checks a Label package but
-not the named source file. Unix `UnixFileSystem.java:299-307` uses POSIX
-symlink; Windows behavior is different and deferred. Positive upstream
-evidence is `StarlarkRepositoryContextTest.java:566-575`,
-`StarlarkRepositoryIntegrationTest.java:91-123` and
-`starlark_repository_test.sh:151-173`. The cached `rules_cc` 0.2.17
-`cc/private/toolchain/unix_cc_configure.bzl:348-370` resolves two `@rules_cc`
-Labels to path objects, then links them as `cc_toolchain_config.bzl` and
-`armeabi_cc_toolchain_config.bzl`. An isolated ignored-RC Bazel 9.2 probe at
-`/tmp/slug-wp837-symlink-O6wkPT` queried `@linked//:through_link` with exit
-zero and observed a native BUILD symlink; that probe is diagnostic until a
-checked-in offline fixture is generated and independently verified.
+Pinned Bazel 9.2 `StarlarkBaseExternalContext.java:2334-2352` runs
+`PathFragment.create(p)` for each `PATH` entry before absolute filtering,
+candidate construction and executable probing. `PathFragmentTest.java:692-704`
+and `:802-807` prove lexical `.`/`..` normalization; the selected
+`StarlarkRepositoryContextTest.java:236-256` checks `which` ordering and
+relative-entry filtering, but does not directly test `..` entries. A fresh
+ignored-RC, download-disabled Bazel 9.2 query in
+`/tmp/slug-wp838-which-dotdot-nLDbcM` returned `@selected//:found` (exit 0)
+when a repository rule called `which("sh")` under `PATH=/usr/../bin`. The
+selected rules_shell 0.6.1 `sh_config.bzl:121-138` calls `which("bash")`, then
+`which("sh")` on miss. Slug's ambient `PATH` is 657 bytes/25 entries, below
+all caps, but contains an absolute `..` component before the first executable
+shell; the current preflight rejects it as `WhichLimit`. With explicit bounded
+`PATH=/bin:/usr/bin:/usr/local/bin`, the authentic Rust-toolchain `//:probe`
+clears rules_shell and next stops at selected rules_cc 0.2.17
+`unix_cc_configure.bzl:273` calling unsupported `repository_ctx.execute`.
 
-## Semantic owner and decision
+## Owner and decision
 
-The existing selected repository-rule effect DICE key and replay loop own
-the call, prepared Label path and observed external source bytes. The
-`repository_ctx.symlink` method accepts only a prepared external Label-derived
-`RepositoryStarlarkPath` and relative string destination, requests
-`RepositorySourceNeed` as `read`/`template` do, and records no partial plan on
-Need/error/cancellation. Both source path/route and exact source bytes must
-participate through existing observed dependencies; A→B→A source-byte edits
-and source rematerialization must restore the result. Do not infer bytes from
-a physical path or read the filesystem outside its DICE owner.
+Keep the existing synchronous repository-rule context and selected file-effect
+replay owner. `which_candidates` filters nonabsolute entries and maps each
+absolute entry through `NormalizedAbsolutePath::new`, which lexically clamps
+parents at the filesystem root; build the candidate from that normalized path
+instead of requiring the raw spelling to equal it. Preserve fixed caps and
+deduplication, program Java-trim behavior and the current ordered prepared
+candidate Need protocol. The existing environment snapshot/selected-owner
+certificate owns `PATH`; replay verifies the declared cell before Host
+resolved-path observations and publishes only the terminal invocation. No
+new DICE key, direct filesystem read, cache, retained data shape or async task.
+Normalizing different raw PATH spellings to one candidate never erases the raw
+tracked environment input: A→B→A must reselect/restabilize correctly.
 
-Extend the existing `GeneratedRepositoryFileEffectPlan` with one ordered
-Symlink variant; keep `File` and `Archive` unchanged. Retain destination as
-`CompactString`, source as the existing immutable Label-path value, and one
-shared `Arc<[u8]>` observed source value for structural equality and exact
-content identity. Reuse the existing `SmallSet` destination de-duplication,
-`Allocative` and immutable plan Arc; add no interner, global cache, DICE key,
-evaluator-heap borrow or Buck2/V1 donor import. The plan's retained memory
-releases with its DICE value/request. A symlink-containing plan uses a new
-domain-separated ordered Slug source association including kind, destination,
-source path/namespace and exact bytes; never reuse the file-only association
-without those inputs. Keep symlink/archive mixtures fail-closed.
+The 3,000-line repository context remains cohesive for this bounded helper and
+its colocated tests; extraction would add an owner seam for a one-line semantic
+change. Do not change general path normalization or repository execution.
 
-Core's existing provisional generated-repository writer creates parent
-directories and the actual Unix symlink inside its temporary root, rejects
-duplicate/ancestor destination conflicts and symlinked destination ancestors,
-and publishes only after all ordered effects succeed and session validation
-accepts. No link may escape via a destination ancestor. Before exact
-acceptance, prove with a lifecycle test that the external immutable source
-root remains retained while an accepted generated link can be read across
-warm/reselected same-daemon requests, and that abort/discard/shutdown release
-both roots. If existing retention does not prove this, add the smallest
-transfer-owned Core lease inside this packet only after independent design
-review; do not put a tempdir handle in DICE or silently copy the source.
-The existing large repository context and Core writer files remain cohesive
-owners because this change extends their current method/effect application
-tables, not a new repository execution path.
+## Proof and validation
 
-## Evidence and validation
+Add a small offline Stage 1 fixture `repository-rule-which-normalized-path`
+with fixture-level `PATH=/usr/../bin`, a local generated repository that
+requires `which("sh")` to return `/bin/sh`, and one anchored query row. Its
+provenance cites the pinned source/tests and isolated probe above; fresh
+ignored-RC Bazel 9.2 generation, independent fresh verification and rebuilt
+Slug replay must pass. Expected fixture growth is five files/one row. No
+credential-bearing RC, upstream archive or network dependency is copied.
 
-Add one minimal offline Stage 1 fixture `repository-rule-symlink` using an
-external local module source file, `path(Label)` and generated BUILD symlink.
-Its query row must distinguish successful generated BUILD loading; Rust
-materialization tests must separately assert native symlink kind/target.
-Generate with fresh ignored-RC Bazel 9.2, verify in an independent fresh
-root, and replay with rebuilt Slug. The fixture records pinned provenance,
-exact anchored stdout, no credential-bearing RC or copied upstream archive.
-It is expected to add about 8 files/1 row, below the Stage 1 growth trigger.
-Protect existing generated-source, file-effect and Label-path fixtures.
-
-Focused Bzlmod builder tests cover order, structural equality, cross-kind
-duplicate/ancestor conflicts, path traversal and source-byte distinctions.
-Focused Loading tests cover typed ABI, path-then-source Need, selected call
-atomicity, external route/source edits, A→B→A and rejection of unsupported
-forms. Core tests prove real symlink, link target, order, nested destination,
-conflict, failed/aborted provisional cleanup, source-root retention and
-reselection. Resolve pinned nightly via `rustup which --toolchain`; serialize
-Cargo, compile with JSON `--no-run`, preflight all exact selectors with
-`scripts/v2_test_preflight.py`, run focused/protected tests and named Core/CLI
-dependents. Format Rust; run diff, plan, archive and fixture-hygiene checks.
-Rebuild `slug_cli_v2`, clean `slugd` before/after one authentic `//:probe`
-smoke, and record its next first error without claiming full closure.
-Independent DESIGN and FINAL reviews are required for the new retained effect
-and Core lifecycle boundary.
+Focused Rust tests prove normalized `..`/`.`/repeated-slash components,
+relative ignoring, candidate deduplication, normalized first Need, existing
+limits, and returned path. Extend the selected-owner observed test with a
+same-candidate raw-spelling A→B→A (`/which/first` versus
+`/which/../which/first`): assert B's raw environment is retained, the Host
+candidate remains normalized, and A restores. Protect ordered Host frontier
+and mode/symlink checks. Run exact-selector preflight, focused/protected
+Loading tests, JSON no-run compile, format/diff/plan/archive/fixture hygiene,
+and `cargo build -p slug_cli_v2` before `SLUG_V2_BIN` replay. Serialize Cargo.
+Clean `slugd` before and after the authentic ambient-PATH `//:probe` smoke;
+report only its first new stop, not full C++ or root Build closure.
 
 ## Scope and stops
 
-Base clean main `b29d00c76`. Allowlist: this manifest and canonical Current;
-`app/slug_loading_v2/src/repository_rule_context.rs`, the exhaustive plan-error
-renderer in `app/slug_loading_v2/src/registration_diagnostic.rs`, and existing
-focused tests in `app/slug_loading_v2/src/module_extension_repository_file_effect.rs`;
-`app/slug_bzlmod_v2/src/generated_repository_file_effect.rs` and `lib.rs`;
-`app/slug_core_v2/src/runtime/repository_io.rs`;
-`tests/v2_oracle/fixtures/repository-rule-symlink/**`; compact Stage 4/5 and
-Stage 9 owner/disposition notes after acceptance. Review triggers are roughly
-150-300 production and 200-400 proof lines, not caps. No generic path API,
-archive extractor, repository route/key, action symlink, remote transport,
-configuration identity or Windows implementation change. `REPLAN` if source
-bytes cannot be observed through the existing selected owner, if a source
-root can disappear while an accepted generated link remains live without a
-bounded Core lease, if exact link behavior requires unmodeled external path
-forms, or if the only viable correction is a copied file masquerading as a
-symlink. A smaller source copy may be proposed only as explicitly Slug-native
-in a new decision, never as this packet's exact completion.
+Base clean main `95fc985e8`. Allowlist: this manifest and canonical Current;
+`app/slug_loading_v2/src/repository_rule_context.rs` and, only if needed for
+raw-environment A→B→A proof, existing focused tests in
+`app/slug_loading_v2/src/module_extension_repository_file_effect.rs`;
+`tests/v2_oracle/fixtures/repository-rule-which-normalized-path/**`; compact
+Stage 4 owner and Stage 9 disposition notes after acceptance. No changes to
+the general `NormalizedAbsolutePath` constructor, DICE key/observation owner,
+candidate caps, Windows behavior, `execute`, rules_cc special cases, remote
+transport or configuration identity. Expected production delta under 15 lines
+and proof under 100 Rust lines plus one fixture; counts are review triggers,
+not caps. Independent design and final review required. `REPLAN` if Bazel
+does not return normalized `/bin/sh` in the checked-in oracle, if raw PATH
+identity is lost in selected-owner replay, or if the correction needs a new
+filesystem/async owner.
 
 ## Immediate predecessor
 
-WP836 at `b29d00c76` admitted configured `config_setting` aliases for
-toolchain settings and moved the authentic first stop to generated `rules_cc`
-`repository_ctx.symlink`. M7A remains partial.
+WP837 at `95fc985e8` accepted the bounded generated repository symlink
+surface. M7A remains partial. Its authentic ambient-PATH smoke exposed this
+`which` rejection; the bounded-PATH replay establishes later
+`repository_ctx.execute` as a separate first stop after this repair.
 
-## Acceptance evidence (2026-09-24)
+## Validation evidence (2026-09-24)
 
-The existing selected repository-rule owner now replays an external
-Label-derived path and DICE-observed bytes before publishing a distinct
-ordered symlink effect. Core writes a real Unix link, checks destination
-ancestors and conflicts, and keeps accepted source roots alive through warm
-reselection; discard and shutdown release provisional/retained roots. The
-source Label-path key computes the repository materialization result key,
-whose request is selected from the DICE activation closure. The new observed
-test proves source bytes A→B→A and a changed materialization root/instance;
-the Core lifecycle test proves acceptance, reselection, discard and teardown.
-No new DICE key, retained cache or lease was needed.
+The one-line semantic correction builds each candidate from the normalized
+absolute component. Two repository-context tests prove normalized first Need,
+returned path and dot/dot-dot/repeated-slash deduplication. The selected
+file-effect test now changes only raw PATH spelling across A→B→A, retaining
+B's raw environment while observing the same normalized Host candidate and
+restoring A. JSON no-run compilation and exact-selector preflight pass;
+repository-context tests pass 24/24 and selected file-effect tests 25/25.
+`cargo fmt --all -- --check`, diff, plan-status and archive checks pass.
 
-The one-row offline `repository-rule-symlink` fixture passed fresh ignored-RC
-Bazel 9.2 generation and independent fresh verification, then rebuilt Slug
-replay (exit zero, exact `@linked//:through_link`). Its canonical `@@source+`
-Label avoids a separate root `.bzl` apparent-repository visibility boundary;
-the selected external path-object-to-link call shape is unchanged. Two new
-Bzlmod builder tests, three new Loading tests, two new Core tests, all 24
-repository-context tests, nine retained-plan tests, six generated Core tests,
-and four protected selected-effect tests pass. Pinned JSON no-run compiles,
-`slug_cli_v2` rebuild, rustfmt and independent FINAL review pass. The
-authentic Rust-toolchain `//:probe` cquery now first stops at selected
-`rules_shell++sh_configure+local_config_shell` `repository_ctx.which` limits
-(exit 2); this is progression evidence, not full C++/root Build closure.
-The final scope remains the exact Unix existing external Label-derived file
-slice stated above; omitted path forms, dangling/directory/Windows links,
-symlink/archive mixtures, exact Bazel identity bytes and M7A completion stay
-deferred.
+The five-file/one-row fixture passed fresh ignored-RC Bazel 9.2 generation,
+independent fresh Bazel verification and rebuilt Slug replay. `slug_cli_v2`
+rebuilt before the fixture and authentic smoke. No stale `slugd` existed
+before or after the smoke. The authentic ambient-PATH `//:probe` cquery no
+longer reports the rules_shell `which` limit; its first stop is selected
+rules_cc 0.2.17 missing `repository_ctx.execute` (exit 2), not full toolchain
+or Build closure. Fixture discovery passes. The broad Python oracle unit
+suite reports 123 passed and three pre-existing assertions against unrelated
+`load-invalidation`/`simple-rule-action` fixtures; it is not a WP838 fixture
+failure. Independent FINAL review accepted the bounded Unix classification,
+same-candidate environment proof and exact fixture; `repository_ctx.execute`
+remains a separate packet.

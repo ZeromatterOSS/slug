@@ -1,0 +1,26 @@
+[fixture]
+name = "repository-rule-which-normalized-path"
+description = "Bazel 9.2 repository_ctx.which normalizes an absolute Unix PATH component before searching."
+comparison = "semantic"
+startup_argv = ["--ignore_all_rc_files"]
+env = { PATH = "/usr/../bin" }
+oracle_notes = "Offline Unix probe. /usr/../bin lexically resolves to /bin, where sh is executable. The repository rule requires which('sh') to return the normalized /bin/sh spelling before writing a generated BUILD target. This isolates absolute PATH normalization from the separate repository_ctx.execute surface. The fixture has no module dependency, network download, credential RC or copied upstream archive."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java:2304-2352 (which and PATH search)",
+  "src/test/java/com/google/devtools/build/lib/vfs/PathFragmentTest.java:692-704,802-807 (lexical dot and dot-dot normalization)",
+  "src/test/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryContextTest.java:236-256 (which search ordering and relative-entry filtering)",
+  "rules_shell 0.6.1 shell/private/repositories/sh_config.bzl:121-138 (Unix which bash/sh fallback)",
+]
+translation_notes = "The fixture substitutes a fixed /usr/../bin PATH and sh for the authentic ambient PATH and rules_shell's bash-then-sh lookup. The returned path spelling and generated target distinguish normalization from a lexical-limit rejection or an unnormalized result. Existing Slug-native caps, host observation details, Windows PATH/PATHEXT, and repository_ctx.execute are outside this row."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture repository-rule-which-normalized-path --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture repository-rule-which-normalized-path --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
+
+[[commands]]
+name = "absolute_dotdot_path_returns_normalized_shell"
+argv = ["query", "@selected//:normalized_sh", "--output=label", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\A@selected//:normalized_sh\n?\Z']

@@ -2931,3 +2931,11 @@ interner, map, cache, DICE key, lock, evaluator borrow or additional lease
 is introduced. The cold generated-repository boundary does not warrant a
 new benchmark. Builder order/identity tests, observed source A→B→A and route
 mutation, real-link and retained-root lifecycle tests cover the boundary.
+
+WP838 reuses the existing `NormalizedAbsolutePath` lexical constructor for
+Unix repository-`which` PATH candidates and the selected owner's tracked raw
+environment and Host-path observation keys. It changes no retained shape,
+interner, hashing, compact collection, DICE key, lock, cache, async memory or
+V1/Buck2 import. The cold normalization helper needs no performance gate;
+same-candidate raw-PATH A→B→A and the offline Bazel/Slug fixture cover its
+identity and observable behavior.

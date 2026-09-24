@@ -1,0 +1,4 @@
+module(name = "which_normalized_path_probe")
+
+which_repo = use_repo_rule("//:repo.bzl", "which_repo")
+which_repo(name = "selected")

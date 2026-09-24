@@ -9802,3 +9802,15 @@ proves warm reuse, source-byte A→B→A and materialization-route changes. The
 one-row Bazel 9.2/Slug generated-BUILD fixture passes. Other source/destination
 forms, dangling and directory links, Windows behavior and full Build remain
 deferred.
+
+### Unix repository which PATH normalization accepted (WP838, 2026-09-24)
+
+Selected `repository_ctx.which` now lexically normalizes each absolute Unix
+`PATH` component before probing, matching Bazel 9.2 `PathFragment.create` for
+the admitted bounded slice. A fresh ignored-RC oracle fixture requires
+`PATH=/usr/../bin` to return `/bin/sh`; the rebuilt Slug replay passes.
+Focused tests cover normalized candidate order/deduplication, raw-PATH
+same-candidate A→B→A and unchanged Host observation ownership. The ambient
+authentic Rust-toolchain replay clears rules_shell and first stops at separate
+rules_cc 0.2.17 `repository_ctx.execute([cc, "-v"]).stderr`. Fixed limits,
+general process execution and full C++/root Build remain deferred.

@@ -29,20 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-137-m7a-generated-repository-symlink-r1
-Status: ACCEPTED; M7A remains partial
+Packet: WP-7-138-m7a-repository-which-path-normalization-r1
+Status: ACCEPTED; independent DESIGN and FINAL reviews accepted; M7A remains partial
 
-WP837 accepts the authentic generated `rules_cc` Unix
-`repository_ctx.symlink` slice: an existing external Label-derived source
-path, safe relative destination and a real ordered link. The selected
-repository-rule effect owner observes source bytes through DICE and retains
-a distinct structural symlink effect; Core's accepted-root lifecycle keeps
-its source alive across reselection. A one-row Bazel 9.2/Slug offline fixture,
-focused/protected tests and independent DESIGN/FINAL reviews pass. The
-authentic Rust-toolchain `//:probe` next stops at a separate selected
-`rules_shell` `repository_ctx.which` limit. Root, host, dangling, directory
-and Windows links, symlink/archive mixtures, full C++ toolchain and root Build
-remain deferred. See `slug-v2-subplans/current-packet.md`; M7A is partial.
+WP838 validates a bounded exact correction to Unix `repository_ctx.which`:
+normalize absolute `PATH` entries lexically as pinned Bazel 9.2 does before
+probing. A fresh ignored-RC Bazel fixture and rebuilt Slug both accept
+`PATH=/usr/../bin`; same-candidate raw-PATH A→B→A retains the existing DICE
+environment and Host-path observation owners. The ambient authentic replay
+clears rules_shell and reaches separate unsupported `repository_ctx.execute`
+in rules_cc 0.2.17. Independent DESIGN and FINAL reviews accepted; full C++ toolchain
+and root Build remain deferred. See
+`slug-v2-subplans/current-packet.md`; M7A is partial.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

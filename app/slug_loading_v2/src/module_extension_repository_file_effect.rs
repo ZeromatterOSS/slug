@@ -3306,6 +3306,64 @@ ext = module_extension(implementation = impl)
             .collect::<Vec<_>>();
         assert_eq!(prints, ["before-which", "after-which"]);
 
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            environment_snapshot(&[("PATH", "/which/../which/first:/which/second")]),
+            environment_frontier(&["PATH"]),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(normalized_spelling)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("noncanonical PATH spelling must reuse normalized candidates")
+        };
+        assert_eq!(
+            normalized_spelling
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .plan(),
+            observed.result().as_ref().as_ref().unwrap().plan()
+        );
+        assert_eq!(
+            normalized_spelling
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .host()
+                .environment()
+                .map(|(name, value)| (name, value.map(|value| value.as_ref())))
+                .collect::<Vec<_>>(),
+            [("PATH", Some("/which/../which/first:/which/second"))]
+        );
+        assert!(
+            normalized_spelling
+                .observations()
+                .observations()
+                .keys()
+                .any(|demand| demand.path().as_path() == Path::new("/which/first/tool"))
+        );
+        transaction = with_host_inputs_for(
+            transaction,
+            workspace.dupe(),
+            Some(tracker.clone()),
+            RepositoryPlatform::new("linux", "x86_64"),
+            snapshot_a.clone(),
+            environment_frontier(&["PATH"]),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(restored_spelling)) =
+            transaction.compute(&key).await.unwrap()
+        else {
+            panic!("raw PATH A/B/A restore must complete")
+        };
+        assert_eq!(restored_spelling, observed);
+
         let baseline = transaction.compute(&PathObservationEpochKey).await.unwrap();
         let both_executable = replace_which_lstat(
             &baseline,
