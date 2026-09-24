@@ -8272,7 +8272,10 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 "a target declared by rule() requires a string `name`"
             ))
         })?;
-        let visibility = names.get("visibility").copied();
+        let visibility = names
+            .get("visibility")
+            .copied()
+            .filter(|value| !value.is_none());
         let implementation = self.implementation;
         let definition_source = self.definition_source.clone();
         let source_identities_by_filename = self.source_identities_by_filename.clone();
@@ -8425,10 +8428,12 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                             declaration.name
                         );
                     }
-                    // Bazel ignores direct None for ordinary rule attributes after
-                    // validating their names, so the declared default (or mandatory
-                    // check) supplies the value without explicit provenance.
-                    let explicit = if !builtin && !declaration.name.starts_with('_') {
+                    // Bazel ignores direct None for visibility and ordinary public
+                    // attributes after validating their names, so defaults apply
+                    // without explicit provenance.
+                    let explicit = if declaration.name == "visibility"
+                        || (!builtin && !declaration.name.starts_with('_'))
+                    {
                         explicit.filter(|value| !value.is_none())
                     } else {
                         explicit

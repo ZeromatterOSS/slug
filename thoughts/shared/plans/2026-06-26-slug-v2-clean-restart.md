@@ -29,20 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-134-m7a-build-module-metadata-r1
+Packet: WP-7-135-m7a-starlark-rule-none-visibility-r1
 Status: ACCEPTED; M7A remains partial
 
-WP834 accepts exact Bazel 9.2 BUILD `module_name()` / `module_version()`
-and loaded-macro `native.module_*` values for root and selected Bzlmod
-module repositories. Stage 5 projects evaluated declarations from tracked
-selected routes/root anchor into the caller BUILD package context. Five
-portable oracle rows pass fresh Bazel 9.2 generation, independent Bazel
-verification and rebuilt Slug replay; focused DICE/context/fail-closed
-tests and independent DESIGN/FINAL reviews pass. The authentic `//:probe`
-advances beyond `@@platforms` 1.1.0 `BUILD:21` and first stops in the
-separate `package_metadata` `license()` visibility boundary. Generated,
-direct-local and builtin metadata, full Python/root bootstrap and M7A
-remain open. WP833 is `6a9a0960f`.
+WP835 accepts Bazel 9.2's known Starlark-rule `visibility=None` omission:
+the authentic `package_metadata` 0.0.3 legacy `license()` wrapper forwards
+that value to `_license = rule(...)`, and Slug now applies the caller
+package default with default attribute provenance. Two offline oracle rows
+pass fresh Bazel generation, independent verification and rebuilt Slug
+replay; focused same-DICE/negative tests and independent DESIGN/FINAL
+reviews pass. The authentic `//:probe` first stops later on a separate
+generated `rules_java` target that is not a `config_setting`. No additional
+native-rule or symbolic-macro surface, full license semantics or M7A is
+admitted here. Existing accepted slices remain exact.
+WP834's module metadata slice was accepted at `ac3710b76`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

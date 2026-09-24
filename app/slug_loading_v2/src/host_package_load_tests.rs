@@ -34672,6 +34672,142 @@ async fn public_starlark_rule_direct_none_replays_declared_default_a_b_a() {
     assert!(RepositoryPackageLoadKey::equality(&a, &restored));
 }
 
+#[tokio::test]
+async fn root_starlark_rule_none_visibility_uses_package_default_and_replays_a_b_a() {
+    const DEFS: &str = "def _impl(ctx): fail('implementation must stay lazy')\n\
+        probe = rule(implementation = _impl)\n\
+        def forwarded(name, visibility = None): probe(name = name, visibility = visibility)\n";
+    const BUILD_A: &str = "load(':defs.bzl', 'probe', 'forwarded')\n\
+        package(default_visibility = ['//visibility:public'])\n\
+        probe(name = 'omitted')\n\
+        probe(name = 'direct_none', visibility = None)\n\
+        forwarded(name = 'forwarded_none')\n\
+        probe(name = 'empty', visibility = [])\n\
+        probe(name = 'explicit_public', visibility = ['//visibility:public'])\n";
+    let build_b = BUILD_A.replace(
+        "package(default_visibility = ['//visibility:public'])",
+        "package(default_visibility = ['//visibility:private'])",
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let source = |build: &str, variant| {
+        EpochBuilder::workspace_sources("", build, &[("defs.bzl", DEFS)], variant).build()
+    };
+    let a = compute_package(&dice, source(BUILD_A, 969), package_policy()).await;
+    let b = compute_package(&dice, source(&build_b, 970), package_policy()).await;
+    let restored = compute_package(&dice, source(BUILD_A, 971), package_policy()).await;
+    for (outcome, default) in [
+        (&a, RuleVisibility::Public),
+        (&b, RuleVisibility::Private),
+        (&restored, RuleVisibility::Public),
+    ] {
+        let package = terminal_package(outcome);
+        let expected = if default.is_public() {
+            "public"
+        } else {
+            "private"
+        };
+        let expected = CoercedAttributeValue::LabelList(Arc::from([CanonicalLabel::parse(
+            &format!("@@//visibility:{expected}"),
+        )
+        .unwrap()]));
+        for name in ["omitted", "direct_none", "forwarded_none"] {
+            let target = package
+                .targets
+                .iter()
+                .find(|target| target.name == name)
+                .unwrap();
+            assert!(matches!(
+                &target.visibility,
+                VisibilitySource::PackageDefault
+            ));
+            assert_eq!(package.effective_visibility(target), Some(default.clone()));
+            let attribute = starlark_attr(package, name, "visibility");
+            assert_eq!(attribute.provenance, AttributeProvenance::Default, "{name}");
+            assert_eq!(attribute.value, expected, "{name}");
+        }
+        let empty = package
+            .targets
+            .iter()
+            .find(|target| target.name == "empty")
+            .unwrap();
+        assert!(matches!(
+            &empty.visibility,
+            VisibilitySource::Declared(RuleVisibility::Private)
+        ));
+        assert_eq!(
+            starlark_attr(package, "empty", "visibility").provenance,
+            AttributeProvenance::Explicit
+        );
+        let public = package
+            .targets
+            .iter()
+            .find(|target| target.name == "explicit_public")
+            .unwrap();
+        assert!(matches!(
+            &public.visibility,
+            VisibilitySource::Declared(RuleVisibility::Public)
+        ));
+        assert_eq!(
+            starlark_attr(package, "explicit_public", "visibility").provenance,
+            AttributeProvenance::Explicit
+        );
+    }
+    assert!(!RootPackageLoadKey::equality(&a, &b));
+    assert!(RootPackageLoadKey::equality(&a, &restored));
+
+    for (variant, call, expected) in [
+        (
+            972,
+            "probe(name='bad', visibility='//visibility:public')",
+            "attribute `visibility` must be a list of labels",
+        ),
+        (973, "probe(name='bad', unknown=None)", "unknown attribute"),
+        (
+            974,
+            "probe(name='bad', visibility=select({'//conditions:default':None}))",
+            "attribute `visibility` must be a list of labels",
+        ),
+    ] {
+        let build = format!("load(':defs.bzl', 'probe')\n{call}\n");
+        let outcome = compute_package(&dice, source(&build, variant), package_policy()).await;
+        assert!(terminal_error(&outcome).contains(expected), "{call}");
+    }
+}
+
+#[tokio::test]
+async fn external_starlark_rule_forwarded_none_visibility_uses_calling_package_default() {
+    const DEFS: &[u8] = b"def _impl(ctx): fail('implementation must stay lazy')\nprobe = rule(implementation = _impl)\ndef forwarded(name, visibility = None): probe(name = name, visibility = visibility)\n";
+    const BUILD: &[u8] = b"load(':defs.bzl', 'probe', 'forwarded')\npackage(default_visibility = ['//visibility:public'])\nprobe(name = 'omitted')\nprobe(name = 'direct_none', visibility = None)\nforwarded(name = 'forwarded_none')\n";
+    let outcome =
+        load_repository_package_fixture(&[("BUILD.bazel", BUILD), ("defs.bzl", DEFS)], 975).await;
+    let package = repository_package_terminal(&outcome);
+    for name in ["omitted", "direct_none", "forwarded_none"] {
+        let target = package
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap();
+        assert!(matches!(
+            &target.visibility,
+            VisibilitySource::PackageDefault
+        ));
+        assert_eq!(
+            package.effective_visibility(target),
+            Some(RuleVisibility::Public)
+        );
+        let attribute = starlark_attr(package, name, "visibility");
+        assert_eq!(attribute.provenance, AttributeProvenance::Default, "{name}");
+        assert_eq!(
+            attribute.value,
+            CoercedAttributeValue::LabelList(Arc::from([CanonicalLabel::parse(
+                "@@//visibility:public"
+            )
+            .unwrap(),])),
+            "{name}"
+        );
+    }
+}
+
 fn eval_bzl_with_identity(
     source: &str,
     owner: BzlModuleIdentity,

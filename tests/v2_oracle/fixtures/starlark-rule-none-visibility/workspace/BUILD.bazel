@@ -1,0 +1,7 @@
+load(":defs.bzl", "wrapped_rule")
+
+package(default_visibility = ["//visibility:public"])
+
+wrapped_rule(name = "omitted")
+wrapped_rule(name = "forwarded_none", visibility = None)
+wrapped_rule(name = "explicit_private", visibility = ["//visibility:private"])

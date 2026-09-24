@@ -9776,3 +9776,17 @@ DICE-retained state. Root package A/B/A, selected-registry caller-context,
 negative-binding and unsupported-route tests pass, alongside five portable
 Bazel/Slug Query rows. The authentic replay advances to the separate
 `package_metadata` license visibility stop; complete root bootstrap is open.
+
+### Starlark-rule direct-None visibility accepted (WP835, 2026-09-24)
+
+Known `visibility=None` on a Starlark `rule()` invocation is omission after
+name validation: the caller BUILD package default supplies effective
+visibility, `VisibilitySource::PackageDefault` and default built-in attribute
+provenance. This covers a legacy wrapper forwarding its default `None`, as
+in `package_metadata` 0.0.3, without a license-specific rule path. Explicit
+empty/private/public lists stay distinct; scalar, unknown-name `None` and
+`select` values still reject. Existing root/repository package DICE owners
+and source dependencies are unchanged. Focused root/external A/B/A and
+negative tests, WP813 native-alias controls and a two-row Bazel/Slug Query
+fixture pass. The authentic build advances to a separate generated
+`rules_java` non-`config_setting` stop; full bootstrap remains open.

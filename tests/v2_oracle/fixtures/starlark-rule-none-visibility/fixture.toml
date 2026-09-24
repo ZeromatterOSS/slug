@@ -1,0 +1,31 @@
+[fixture]
+name = "starlark-rule-none-visibility"
+description = "A legacy wrapper forwards omitted and direct None visibility to a Starlark rule under the calling BUILD package's public default; an explicit private list remains distinct."
+comparison = "message_shape"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Self-contained offline Loading and admitted label-query evidence. Anchored stdout compares the effective public pair and explicit-private control; progress and diagnostic bytes are not parity claims. This isolates a known Starlark rule visibility=None argument, not native rule-class or symbolic-macro semantics, license providers, complete package_metadata loading, or the authentic root Build. No copied upstream archive or credential-bearing RC is used."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java:1883-1896",
+  "src/main/java/com/google/devtools/build/lib/packages/AttributeProvider.java:204-242,302-315",
+  "src/main/java/com/google/devtools/build/lib/packages/RuleOrMacroInstance.java:564-575",
+  "src/main/java/com/google/devtools/build/lib/packages/Target.java:159-170",
+]
+translation_notes = "The local legacy wrapper reduces package_metadata 0.0.3 licenses/rules/license.bzl:97-115 to its discriminating _rule(name=name, visibility=visibility) call. A root BUILD public package default makes omission and forwarded None visibly equivalent, while an explicit private list checks that non-None visibility is still honored. The existing starlark-rule-direct-none-default fixture separately covers ordinary attribute defaults and unknown-None rejection."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture starlark-rule-none-visibility --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture starlark-rule-none-visibility --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
+
+[[commands]]
+name = "omitted_and_forwarded_none_inherit_public"
+argv = ["query", "attr(\"visibility\", \"^\\[//visibility:public\\]$\", //:all)", "--output=label", "--order_output=full", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\A//:omitted\n//:forwarded_none\n?\Z']
+
+[[commands]]
+name = "explicit_private_list_remains_declared"
+argv = ["query", "attr(\"visibility\", \"^\\[//visibility:private\\]$\", //:all)", "--output=label", "--order_output=full", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\A//:explicit_private\n?\Z']

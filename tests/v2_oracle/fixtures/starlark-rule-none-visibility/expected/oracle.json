@@ -1,0 +1,80 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "attr(\"visibility\", \"^\\[//visibility:public\\]$\", //:all)",
+        "--output=label",
+        "--order_output=full",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "attr(\"visibility\", \"^\\[//visibility:public\\]$\", //:all)",
+        "--output=label",
+        "--order_output=full",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "omitted_and_forwarded_none_inherit_public",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...",
+      "normalized_stdout": "//:omitted\n//:forwarded_none",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n",
+      "stdout": "//:omitted\n//:forwarded_none\n"
+    },
+    {
+      "argv": [
+        "query",
+        "attr(\"visibility\", \"^\\[//visibility:private\\]$\", //:all)",
+        "--output=label",
+        "--order_output=full",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "attr(\"visibility\", \"^\\[//visibility:private\\]$\", //:all)",
+        "--output=label",
+        "--order_output=full",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "explicit_private_list_remains_declared",
+      "normalized_stderr": "",
+      "normalized_stdout": "//:explicit_private",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "//:explicit_private\n"
+    }
+  ],
+  "fixture": "starlark-rule-none-visibility",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
