@@ -40266,6 +40266,97 @@ async fn repository_package_load_keeps_unselected_nonvisible_alias() {
 }
 
 #[tokio::test]
+async fn bzl_native_cc_toolchain_suite_is_an_empty_filegroup_with_ignored_kwargs() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(':suite.bzl', 'cc_toolchain_suite')\npackage(default_visibility = ['//visibility:public'])\ncc_toolchain_suite(name = 'toolchain', toolchains = {'cpu|gcc': ':missing_cc'}, visibility = ['//visibility:private'])\nnative.filegroup(name = 'direct', srcs = [])\n",
+        ),
+        (
+            "suite.bzl",
+            b"def cc_toolchain_suite(**kwargs):\n    native.cc_toolchain_suite(**kwargs)\n",
+        ),
+    ];
+    let outcome = load_repository_package_fixture(files, 844).await;
+    let package = repository_package_terminal(&outcome);
+    assert_eq!(
+        package
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["toolchain", "direct"]
+    );
+    let suite = &package.targets[0];
+    assert!(matches!(
+        &suite.kind,
+        PackageTargetKind::Filegroup {
+            srcs,
+            srcs_explicit: false,
+        } if srcs.is_empty()
+    ));
+    assert!(matches!(
+        &suite.visibility,
+        VisibilitySource::PackageDefault
+    ));
+    assert_eq!(
+        package.effective_visibility(suite),
+        Some(RuleVisibility::Public)
+    );
+    let attributes = package.native_attributes("toolchain").unwrap();
+    assert!(attributes.get("toolchains").is_none());
+    assert!(matches!(
+        &attributes.get("srcs").unwrap().1.value,
+        CoercedAttributeValue::LabelList(srcs) if srcs.is_empty()
+    ));
+    assert!(matches!(
+        &package.targets[1].kind,
+        PackageTargetKind::Filegroup {
+            srcs,
+            srcs_explicit: true,
+        } if srcs.is_empty()
+    ));
+}
+
+#[tokio::test]
+async fn bzl_native_cc_toolchain_suite_preserves_name_conflicts_and_build_native_absence() {
+    let duplicate = load_repository_package_fixture(
+        &[
+            (
+                "BUILD.bazel",
+                b"load(':suite.bzl', 'cc_toolchain_suite')\ncc_toolchain_suite(name = 'toolchain', toolchains = {})\nnative.filegroup(name = 'toolchain')\n",
+            ),
+            (
+                "suite.bzl",
+                b"def cc_toolchain_suite(**kwargs):\n    native.cc_toolchain_suite(**kwargs)\n",
+            ),
+        ],
+        845,
+    )
+    .await;
+    assert!(
+        repository_package_error(&duplicate).contains("target 'toolchain' declared more than once")
+    );
+
+    let direct = load_repository_package_fixture(
+        &[(
+            "BUILD.bazel",
+            b"native.cc_toolchain_suite(name = 'toolchain')\n",
+        )],
+        846,
+    )
+    .await;
+    assert!(repository_package_error(&direct).contains("cc_toolchain_suite"));
+
+    let orphan = eval_global(
+        "native.cc_toolchain_suite(name = 'orphan')",
+        &loading_globals(),
+    )
+    .unwrap_err();
+    assert!(orphan.contains("Bazel package global invoked without package state"));
+}
+
+#[tokio::test]
 async fn repository_package_load_renders_missing_and_cycle_and_recovers_on_same_dice() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut missing_epoch = EpochBuilder::external_sources(

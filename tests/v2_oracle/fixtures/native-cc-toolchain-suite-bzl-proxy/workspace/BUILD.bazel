@@ -1,0 +1,12 @@
+load(":defs.bzl", "cc_toolchain_suite")
+
+package(default_visibility = ["//visibility:public"])
+
+cc_toolchain_suite(
+    name = "toolchain",
+    toolchains = {
+        "k8|gcc": ":missing_cc",
+        "k8": ":missing_cc",
+    },
+    visibility = ["//visibility:private"],
+)

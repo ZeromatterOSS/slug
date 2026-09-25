@@ -1,0 +1,45 @@
+[fixture]
+name = "native-cc-toolchain-suite-bzl-proxy"
+description = "Bazel 9.2's injected native.cc_toolchain_suite in a .bzl wrapper declares an empty filegroup and ignores suite kwargs."
+comparison = "semantic"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Self-contained Bzlmod-only fixture with no external module, download, copied upstream asset or credential RC. A local .bzl wrapper mirrors rules_cc's native.cc_toolchain_suite forwarding. The toolchains value names a nonexistent target; successful kind, deps and configured queries prove it is discarded. An explicit private visibility kwarg is also discarded, so the suite inherits the BUILD package's public default and is visible from observer/."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/starlark/builtins_bzl/bazel/exports.bzl:53-56 (injected cc_toolchain_suite creates filegroup from name only)",
+  "src/main/java/com/google/devtools/build/lib/packages/BazelStarlarkEnvironment.java:450-499 (injection into .bzl native binding)",
+  "src/main/java/com/google/devtools/build/lib/bazel/rules/CcRules.java:56-57 and src/main/java/com/google/devtools/build/lib/analysis/BaseRuleClasses.java:421-500 (un-injected tombstone is not the active rule)",
+  "src/main/java/com/google/devtools/build/lib/rules/filegroup/FilegroupRule.java:27-80 and Filegroup.java:49-122 (empty filegroup declaration and configured behavior)",
+  "rules_cc 0.2.17 cc/toolchains/cc_toolchain_suite.bzl:17-18 and cc/private/toolchain/BUILD.tpl:81-89 (authentic wrapper and generated call)",
+  "src/test/shell/bazel/cc_integration_test.sh:914-950 (fake suite builds without C++ toolchain selection)",
+]
+translation_notes = "The local wrapper reproduces the authentic forwarding call but omits the rest of rules_cc and generated BUILD. The nonexistent toolchains label distinguishes a discarded keyword map from legacy suite dependency analysis; the explicit private kwarg tests inherited public package visibility. The cquery row proves ordinary empty-filegroup analysis, not CcToolchainInfo, legacy --crosstool_top selection, or real cc_toolchain behavior. Direct BUILD-global cc_toolchain_suite and builtins-injection override flags are outside this row."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture native-cc-toolchain-suite-bzl-proxy --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture native-cc-toolchain-suite-bzl-proxy --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
+
+[[commands]]
+name = "injected_suite_is_filegroup"
+argv = ["query", "//:toolchain", "--output=label_kind", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\Afilegroup rule //:toolchain\n?\Z']
+
+[[commands]]
+name = "ignored_toolchains_have_no_dependency_edge"
+argv = ["query", "deps(//:toolchain)", "--output=label", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\A//:toolchain\n?\Z']
+
+[[commands]]
+name = "ignored_private_kwarg_inherits_public_package_default"
+argv = ["query", "visible(//observer:observer, //:toolchain)", "--output=label", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\A//:toolchain\n?\Z']
+
+[[commands]]
+name = "empty_suite_filegroup_configures"
+argv = ["cquery", "//:toolchain", "--output=starlark", "--starlark:expr=str(target.label)"]
+expected_exit = 0
+stdout_patterns = ['\A@@//:toolchain\n?\Z']

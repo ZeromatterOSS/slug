@@ -10258,6 +10258,7 @@ impl fmt::Display for BzlmodNativeModule {
 }
 
 static NATIVE_METHODS: MethodsStatic = MethodsStatic::new();
+static BZL_ONLY_NATIVE_METHODS: MethodsStatic = MethodsStatic::new();
 
 #[starlark_module]
 fn module_metadata_native_methods(builder: &mut MethodsBuilder) {
@@ -10724,6 +10725,20 @@ fn native_methods(builder: &mut MethodsBuilder) {
     }
 }
 
+#[starlark_module]
+fn bzl_only_native_methods(builder: &mut MethodsBuilder) {
+    fn cc_toolchain_suite<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        name: &str,
+        #[starlark(kwargs)] _kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        // Bazel 9's injected binding discards every argument except name.
+        // The native suite is only a tombstone; this declares an empty filegroup.
+        filegroup_global(name, None, None, eval)
+    }
+}
+
 #[starlark_value(type = "native")]
 impl<'v> StarlarkValue<'v> for NativeModule {
     fn get_methods() -> Option<&'static Methods> {
@@ -10737,6 +10752,7 @@ impl<'v> StarlarkValue<'v> for BzlNativeModule {
         static METHODS: MethodsStatic = MethodsStatic::new();
         METHODS.methods(|builder| {
             NATIVE_METHODS.populate(native_methods, builder);
+            BZL_ONLY_NATIVE_METHODS.populate(bzl_only_native_methods, builder);
             module_metadata_native_methods(builder);
         })
     }
@@ -10748,6 +10764,7 @@ impl<'v> StarlarkValue<'v> for BzlmodNativeModule {
         static METHODS: MethodsStatic = MethodsStatic::new();
         METHODS.methods(|builder| {
             NATIVE_METHODS.populate(native_methods, builder);
+            BZL_ONLY_NATIVE_METHODS.populate(bzl_only_native_methods, builder);
             module_metadata_native_methods(builder);
             builder.set_attribute(
                 "bazel_version",

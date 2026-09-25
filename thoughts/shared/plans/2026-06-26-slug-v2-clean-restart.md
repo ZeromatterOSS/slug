@@ -29,17 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-143-m7a-repository-gcc-include-prefix-r1
+Packet: WP-7-144-m7a-cc-suite-empty-filegroup-r1
 Status: ACCEPTED; M7A remains partial
 
-WP843 adds only the source-authored seventh, executable
-`builtin_include_directory_paths` effect after WP841's six-effect GCC
-prefix, with Slug-native shape-only Core admission and finite byte cap;
-the execute grammar is unchanged. Focused Core tests and fresh three-row
-Bazel/Slug evidence pass. Authentic cquery now clears GCC prefix/probes and
-stops at Loading's missing `native.cc_toolchain_suite` in generated rules_cc
-`BUILD`; independent FINAL review accepted the bounded slice. WP842 dirname remains
-accepted at `97dd73e9e`; full rules_cc toolchain/root Build remain deferred. See
+WP844 adds Bazel 9.2's default builtins-injected
+`native.cc_toolchain_suite` as an empty filegroup with name-only
+semantics, discarding the generated suite map and other kwargs. This is
+not legacy suite selection. Focused Loading tests and fresh four-row
+Bazel/Slug evidence pass. Authentic cquery clears the suite method and
+next stops at an upstream `@bazel_tools` package required by rules_cc's
+`cc_toolchain` default; independent FINAL review accepted the slice. WP843's
+bounded seventh GCC effect remains accepted at `8a86218b3`. Real C++
+providers and root Build remain deferred. See
 `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

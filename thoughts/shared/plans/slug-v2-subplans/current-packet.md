@@ -1,172 +1,158 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-143-m7a-repository-gcc-include-prefix-r1
+Packet: WP-7-144-m7a-cc-suite-empty-filegroup-r1
 Status: ACCEPTED; M7A remains partial
 
 ## Outcome and compatibility
 
-Advance the authentic Rust-toolchain `cquery //:probe --output=label` past
-Core's post-WP842 rejection of the seven-effect selected rules_cc GCC
-prefix, then report its first new stop. Admit precisely one ordered,
-regular, executable `builtin_include_directory_paths` file after the
-accepted two symlinks, `tools/cpp/empty.cc`, and three generated wrapper
-files, preceding an already-admitted finite GCC execute form. Do not
-claim the eventual `BUILD.tpl` render, toolchain closure, root C++ analysis,
-arbitrary repository file prefixes, or M7A closure.
+Advance the authentic Rust-toolchain `cquery //:probe --output=label`
+past generated rules_cc `local_config_cc//:BUILD:84`'s
+`native.cc_toolchain_suite` call, then report the first new stop.
+Implement only Bazel 9.2's default builtins-injected `.bzl` native
+binding: require `name`, evaluate but discard all extra keyword values,
+and declare an otherwise empty `filegroup(name = name)` with inherited
+package defaults. No C++ suite mapping, selection or provider is admitted.
 
-The source-authored ordered effect kind, destination, default-executable
-mode and first following `-Wthread-safety` compiler-option argv are
-**exact** within pinned Bazel 9.2/rules_cc 0.2.17 and the selected Linux
-GCC branch. Core's shape-only admission cannot independently attest
-Starlark source provenance: it also allows this prefix before any of the
-already-admitted finite GCC probe forms. That policy, the size cap,
-confined execution, Rust Host observation and generated-repository
-display/path identity are **Slug-native**. The generated file's actual
-bytes remain owned by Loading's existing Starlark execution and DICE
-transcript. Arbitrary headers contents/size, extra effects, changed
-order/mode, Clang/Darwin/Windows branches, arbitrary execute argv and full
-rules_cc/Bazel toolchain bytes are **unsupported/deferred**. WP839/841
-execute and prefix slices and WP842 dirname remain unchanged.
+The default Bazel 9.2 injected declaration's filegroup kind, name-only
+arguments, empty `srcs`, ignored `toolchains`/`visibility` kwargs,
+inherited package visibility and absent suite dependency edges are
+**exact**. Slug's existing structural target/configuration identity,
+source observation and valid-Unicode Host behavior remain **Slug-native**.
+Direct BUILD-global `cc_toolchain_suite`, builtins-injection overrides,
+the un-injected Java tombstone rule, legacy `--crosstool_top` resolution,
+real `cc_toolchain`/`CcToolchainInfo` semantics and full toolchain/root
+Build closure are **unsupported/deferred**. Preserve all WP839–843 exact
+and native slices without widening them.
 
-## Source basis and boundary
+## Source basis and next boundary
 
-Pinned rules_cc `unix_cc_configure.bzl:362-372,430-470` authors the
-accepted six effects. `lib_cc_configure.bzl:282-303` writes
-`builtin_include_directory_paths` with `repository_ctx.file` and no
-explicit mode; pinned Bazel 9.2
-`StarlarkBaseExternalContext.java:1444-1503` defaults it executable
-(the annotation is at lines 1462-1465).
-The content derives from `cc`, compiler-reported include directories,
-and `BAZEL_IGNORE_SYSTEM_HEADERS_VERSIONS`, or a fixed ignore-headers
-branch. `unix_cc_configure.bzl:627` invokes the writer; line 628 starts
-`repository_ctx.template("BUILD", ..., substitutions)`. Before that
-template effect is emitted, the `compile_flags` substitution at lines
-660-669 evaluates `_add_compiler_option_if_supported`; its first execute
-uses `-Wthread-safety` with `empty.cc` as at lines 144-154. There is no
-intervening source-authored effect. The next rejected argv was not captured
-by the prior diagnostic, so its identification remains source-order
-inference until authentic replay.
+Pinned Bazel 9.2 `src/main/starlark/builtins_bzl/bazel/exports.bzl:53-56`
+exports `cc_toolchain_suite` as
+`lambda name, **kwargs: _builtins.toplevel.native.filegroup(name = name)`.
+`BazelStarlarkEnvironment.java:450-499` injects exported rules into
+`.bzl` `native`; lines 506-537 also describe BUILD-global injection,
+which this packet does not implement. `CcRules.java:56-57` registers only
+an `EmptyRule` placeholder, whose configured factory fails; it is not
+the default active suite behavior. Pinned rules_cc 0.2.17
+`cc/toolchains/cc_toolchain_suite.bzl:17-18` forwards `**kwargs` to
+`native.cc_toolchain_suite`. Its generated `BUILD.tpl:81-89` passes
+`name="toolchain"` and a four-entry `toolchains` map. The wrapper call
+thus creates an empty filegroup, not toolchain selection. The next
+source-ordered generated `BUILD.tpl:91-109` call is `cc_toolchain`,
+loaded through `@cc_compatibility_proxy`; this packet does not pre-admit
+that distinct Starlark rule or its configured semantics.
 
-The preceding authentic stop identified call index 14 with seven effects,
-4,145 aggregate file bytes, and `builtin_include_directory_paths` last.
-That observation is not a general maximum: header-path output varies by
-host and environment. Core currently rejects every effect after the three
-wrappers (`repository_process.rs:306-397`); its finite compiler-option
-grammar already includes `-Wthread-safety`. Loading already captures
-`repository_ctx.file` bytes/mode and immutable prefix per execute, and the
-existing structural DICE/replay owner includes environment and ordered
-effects. No new Loading implementation, key, lock or filesystem probe is
-required.
+Slug's `package.rs:10362-10752` shares a base `native_methods` set
+between BUILD, `.bzl` and Bzlmod modules; this packet must add a
+separate `.bzl`-only method set to `BzlNativeModule` and
+`BzlmodNativeModule`, not to BUILD's `NativeModule`.
+`filegroup_global` at lines 3441-3456 already
+records a native filegroup, sets its generator, and inherits package
+visibility when no explicit value is supplied. The recorder at lines
+1628-1682 retains empty `srcs`; existing configured filegroup analysis
+owns that target. The new binding must not route the discarded kwargs
+through `set_native_overrides` or coerce/resolve their labels. A changed
+ignored map is a changed source observation but not a configuration-
+affecting target input; no DICE key, lock, rule class, retained variant,
+interner, hash identity, action or cache owner is introduced.
 
-## Core policy, ownership and memory
+## Evidence and implementation boundary
 
-Extend only Core's selected generated-GCC prefix validator. Preserve the
-existing sole `empty.cc`, two-link-plus-source, and exact six-effect forms.
-After the three wrappers, permit either end-of-effects or exactly one
-`File` at `builtin_include_directory_paths`, executable, content at most
-64 KiB; reject archives, wrong kind/path/order/mode, an eighth effect,
-or overflow before staging. Keep each wrapper at most 64 KiB and their
-combined cap at most 128 KiB; the full admitted regular-file prefix is
-therefore at most 192 KiB plus the fixed source. Do not parse, rewrite,
-retain a second copy of, or claim parity for the seventh file's bytes.
-Retain the current Homebrew-presence gate for expanded prefixes and the
-unchanged finite argv, environment, timeout, output and sandbox policies.
+Add one `native.cc_toolchain_suite` method in a `.bzl`-only native-method
+set, accepting required `name` and arbitrary extra kwargs but calling
+`filegroup_global(name, None, None, eval)` without reading or retaining
+the map. Keep ordinary `native.filegroup` and target-name conflict
+behavior. BUILD's `native` object must not gain this method; loaded `.bzl`
+calls outside package evaluation still fail without a package recorder.
+Do not add top-level BUILD global `cc_toolchain_suite`, a native suite schema/variant, legacy
+selection, or special analysis of the resulting filegroup.
 
-The selected repository-rule invocation remains the semantic owner.
-The existing Arc-backed immutable effect plan and structural byte/mode
-identity invalidate DICE replay. The prefix materializer stages ordered
-effects into a private read-only `/exec`; the bounded GCC argv only names
-`empty.cc`, not the seventh file. No representation, interner, new retained
-collection, hashing scheme, action/cache transport or path identity changes
-are admitted. The byte cap prevents unbounded staging while preserving
-source-authored content below it; over-cap authentic hosts fail closed.
+Add a small independent offline fixture with a `.bzl` wrapper
+`def cc_toolchain_suite(**kwargs): native.cc_toolchain_suite(**kwargs)`.
+Its BUILD has public package default, invokes the wrapper with
+`name="toolchain"`, a `toolchains` value naming nonexistent `:missing_cc`,
+and explicit private visibility. Bazel 9.2 queries must establish that
+the target has filegroup kind, `deps(//:toolchain)` contains only itself,
+and `visible(//observer:observer, //:toolchain)` includes it because the
+private kwarg was discarded. A configured `cquery //:toolchain` must
+succeed as an empty filegroup. The fixture checks the injected default,
+not real suite resolution or generator metadata. Generate and
+independently verify expected Bazel results in fresh ignored-RC roots,
+then replay through rebuilt Slug. No BuildBuddy auth file is read.
 
-## Evidence and validation
-
-Add an independent third query row to
-`repository-rule-execute-gcc-probes`, preserving the original two rows
-and expected objects. Its local-override symlink source, fixed PATH and
-six inert preceding effects match the accepted row; it then writes a small
-default-executable `builtin_include_directory_paths`, executes precisely
-`[cc, "-Wthread-safety", "-o", "/dev/null", "-c",
-str(ctx.path("tools/cpp/empty.cc"))]`, checks stable result fields without
-assuming flag support or host-specific diagnostics, and emits a distinct
-filegroup. The synthetic file proves shape/staging, not authentic generated
-header bytes. Generate and independently verify Bazel 9.2 expected output
-in fresh ignored-RC roots, without reading credentials, then replay all
-three rows through a rebuilt Slug CLI.
-
-Focused Core tests must prove exact seven-effect shape acceptance and
-fail-closed wrong path/kind/order/mode, eighth effect, seventh-file oversize
-and existing six-effect preservation. Add a confined execution test for the
-admitted compiler-option form after seven effects: executable seventh-file
-content must try an unconditional stdout/stderr sentinel and a host marker
-write, with neither output nor marker observed. Existing tests protect the
-prior argv/environment/sandbox forms. Run exact test preflight, focused Cargo
-tests, CLI build, offline fixture, and an authentic cquery. The authentic
-smoke must clear the former seven-effect guard and reach a source-attributed
-first new stop; resource errors or the same guard are diagnostic only, not
-acceptance. Record resource state; do not blindly retry. Serialize Cargo,
-clean stale `slugd` before and after daemon-sensitive tests, and run format,
+Focused Loading tests must cover `.bzl` wrapper name-only conversion,
+discarded missing `toolchains` label, ignored private visibility, empty
+srcs/inherited visibility, unavailable direct BUILD-native method,
+existing direct `native.filegroup`, and
+duplicate name rejection. Reuse existing package source A→B→A DICE
+coverage unless a demonstrated gap appears; the ignored map must not
+become a retained configured dependency. Run JSON `--no-run`, exact test
+preflight, focused Loading tests, CLI build after the production edit,
+fresh offline Bazel/Slug fixture, then authentic cquery. The smoke must
+clear the `native.cc_toolchain_suite` absence and reach a source-attributed
+first new stop; an earlier error or resource failure is diagnostic only.
+Serialize Cargo, check/clean stale `slugd` around smokes, and run format,
 diff, plan-status, archive and fixture hygiene.
 
-Independent DESIGN review must accept the effect cap and provenance before
-production edits. Independent FINAL review verifies actual diff, tests,
-fresh oracle and authentic result. Update compact Stage 5/9 notes only after
-acceptance.
+Independent DESIGN review must accept the injected-vs-tombstone and
+discarded-kwargs contract before production edits. Independent FINAL
+review checks actual diff and evidence; compact Stage 4/9 owner notes
+follow acceptance.
 
-Allowlist: this packet and canonical Current; Core
-`app/slug_core_v2/src/runtime/repository_process.rs` and colocated tests;
-`tests/v2_oracle/fixtures/repository-rule-execute-gcc-probes/{fixture.toml,
-expected/oracle.json,workspace/MODULE.bazel,workspace/repo.bzl}`;
-compact Stage 5/9 notes after acceptance. No Loading, repository IO,
-materializer, DICE, action, remote-cache or other fixture edits.
+Allowlist: this packet and canonical Current;
+`app/slug_loading_v2/src/package.rs` and
+`app/slug_loading_v2/src/host_package_load_tests.rs`, with no new
+owner file unless a demonstrated gap requires one;
+`tests/v2_oracle/fixtures/native-cc-toolchain-suite-bzl-proxy/` small
+source/manifest/expected files; compact Stage 4/9 notes only after
+acceptance. No Core, DICE, Analysis, native attr schema, repository IO,
+remote cache, action or other fixture edits.
 
-`REPLAN` if the seventh effect is not a default-executable regular file in
-the selected source branch, if authentic call14 requires a new argv form
-or other effect before this one, if bounded content cannot stage safely,
-if the existing Loading/DICE owner does not structurally own its bytes and
-mode, or if a source-authored over-cap file prevents the authentic replay.
-Any later unadmitted effect/argv is a new packet boundary, not permission
-to widen this one.
+`REPLAN` if the selected wrapper does not actually receive default
+builtins injection, if ignored kwargs change package/configured output
+in the pinned oracle, if the suite target is not an empty filegroup,
+if source-authentic replay requires suite selection before the next
+stop, or if implementing it needs a new retained owner or legacy
+resolution. A later `cc_toolchain`/provider boundary is a separate
+packet, not permission to widen this one.
 
 ## Acceptance receipt
 
-Independent DESIGN review ACCEPT followed explicit classification of Core's
-shape-only admission as Slug-native and a required adversarial inert-file
-test. The pinned Bazel `repository_ctx.file` executable default was
-independently corrected to `StarlarkBaseExternalContext.java:1462-1465`.
-Core JSON `--no-run` passed (14.7 s); exact test preflight found both
-selected tests, which passed 2/2, and the full Core repository-process
-module passed 20/20. The rebuilt `slug_cli_v2` completed after the Core
-production edit. Fresh ignored-RC Bazel 9.2 generation and independent
-verification passed all three GCC fixture rows (4.43/4.38 s), with the
-original two expected command objects unchanged; the rebuilt Slug CLI
-passed all three rows (9.5 s). The authentic Rust-toolchain alias workspace
-`cquery //:probe --output=label` exited 2 after about 62 s, clearing the
-seven-effect guard and all subsequent GCC execute probes through rules_cc's
-`BUILD` template emission. Its new first stop is generated
-`@@rules_cc++cc_configure_extension+local_config_cc//:BUILD:84` invoking
-the pinned rules_cc `cc/toolchains/cc_toolchain_suite.bzl:18` wrapper, where
-Loading lacks `native.cc_toolchain_suite`. The actual call-14 argv still
-was not separately logged; the source-order inference is strengthened by
-progression, not represented as a captured transcript. Host had 30 GiB
-available `/tmp` and 28 GiB available RAM during the replay; no `slugd`
-remained afterward. Format, diff, plan-status and archive checks passed;
-fixture has no copied upstream asset, credential RC or downloaded module.
-Independent FINAL review ACCEPT verified the bounded guard, adversarial
-nonexecution proof, source default-mode anchor, fresh offline evidence and
-authentic new stop, while retaining the uncaptured-argv caveat. Compact
-Stage 5/9 owner and memory notes were updated after acceptance. Packet
-elapsed was roughly 20 minutes from WP842 acceptance through FINAL review.
+Independent DESIGN review ACCEPT required the `.bzl`-only method set so
+BUILD's `NativeModule` does not gain this binding. Pinned nightly toolchain
+resolved. Loading JSON `--no-run` passed (13.6 s); exact preflight found
+both focused tests, and both passed. `cargo build -p slug_cli_v2` passed
+after the Loading production edit (8.7 s). Fresh ignored-RC Bazel 9.2
+generation and independent verification passed all four fixture rows
+(5.25/5.56 s after correcting a Slug-unsupported cquery progress flag),
+with filegroup kind, no missing-label dependency edge, inherited public
+visibility and configured success. The rebuilt Slug CLI passed all four
+rows (12.4 s). The first Slug fixture run's cquery parse failure was
+caused solely by `--noshow_progress` in the new manifest; no production
+change was needed, and the corrected manifest was re-oracled fresh.
+
+The authentic Rust-toolchain alias workspace `cquery //:probe
+--output=label` exited 2 after about 64 s and cleared the prior absent
+`native.cc_toolchain_suite` method. Its new first stop is a missing
+`@@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check`
+package. Pinned rules_cc
+`cc/private/rules_impl/cc_toolchain.bzl:335-336` authors this implicit
+`cc_toolchain` label default through `semantics.get_repo()`; no suite
+selection or configured C++ provider was claimed. `@bazel_tools` content
+must be ported verbatim in a later packet, not fabricated here. Host had
+about 29 GiB available RAM before replay; no `slugd` remained afterward.
+Format, diff, plan-status, archive and fixture hygiene passed. Independent
+FINAL review ACCEPT verified the `.bzl`-only route, no legacy suite
+selection, focused tests, fresh oracle and authentic next stop. Compact
+Stage 4/9 owner and memory notes were updated after acceptance. Packet
+elapsed was roughly 20 minutes from WP843 acceptance through FINAL review.
 
 ## Immediate predecessor
 
-WP842 at `97dd73e9e` accepted selected `path.dirname` for Which and
-observed-present Host origins with fresh three-row Bazel/Slug evidence,
-focused Loading tests and independent FINAL review. Authentic cquery
-advanced from the line-500 dirname error to Core's seven-effect prefix
-guard. Its temporary diagnostic identified the seventh effect but did not
-capture the rejected argv; the diagnostic was removed and Core remained
-unchanged. M7A remains partial. The full WP842 receipt remains in that
-commit's `current-packet.md`.
+WP843 at `8a86218b3` accepted the bounded seventh GCC include-path
+file with fresh three-row Bazel/Slug evidence, 20/20 Core process tests
+and independent FINAL review. Authentic cquery cleared the GCC prefix
+and subsequent probes and reached generated `BUILD`'s missing
+`native.cc_toolchain_suite`; the rejected call-14 argv was not
+separately captured. The full WP843 receipt remains in that commit's
+`current-packet.md`. M7A remains partial.

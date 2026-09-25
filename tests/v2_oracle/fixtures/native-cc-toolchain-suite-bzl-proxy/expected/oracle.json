@@ -1,0 +1,140 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "//:toolchain",
+        "--output=label_kind",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:toolchain",
+        "--output=label_kind",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "injected_suite_is_filegroup",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...",
+      "normalized_stdout": "filegroup rule //:toolchain",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n",
+      "stdout": "filegroup rule //:toolchain\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//:toolchain)",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//:toolchain)",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "ignored_toolchains_have_no_dependency_edge",
+      "normalized_stderr": "",
+      "normalized_stdout": "//:toolchain",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "//:toolchain\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//observer:observer, //:toolchain)",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//observer:observer, //:toolchain)",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "ignored_private_kwarg_inherits_public_package_default",
+      "normalized_stderr": "",
+      "normalized_stdout": "//:toolchain",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "//:toolchain\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:toolchain",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:toolchain",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "empty_suite_filegroup_configures",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:toolchain (4 packages loaded, 6 targets configured)\nINFO: Analyzed target //:toolchain (4 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//:toolchain",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:toolchain (4 packages loaded, 6 targets configured)\nINFO: Analyzed target //:toolchain (4 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.204s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//:toolchain\n"
+    }
+  ],
+  "fixture": "native-cc-toolchain-suite-bzl-proxy",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

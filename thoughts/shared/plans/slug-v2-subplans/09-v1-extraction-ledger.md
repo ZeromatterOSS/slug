@@ -2995,3 +2995,16 @@ bounded staging/retention cost is not a speedup claim. Focused Core tests,
 an independent fresh Bazel/Slug row and authentic progression to generated
 rules_cc `BUILD` loading discriminate the change; toolchain closure and
 an exact call-14 argv transcript remain open.
+
+WP844 reuses the existing native Filegroup target, attribute schema,
+package visibility and configured filegroup owner for Bazel 9's
+builtins-injected `.bzl` suite shim. The source-evaluated but ignored
+`**kwargs` map is evaluator scratch; it is neither retained as a target
+attribute nor followed as a dependency. Package-source DICE observation
+already invalidates a changed call, while target equality correctly
+preserves the same empty filegroup when only ignored arguments change.
+No new key, retained variant/collection, interner, hash shortcut, global
+cache, lock or memory-accounting shape is introduced. Two Loading tests,
+four fresh Bazel/Slug rows and authentic progression to the missing
+`@bazel_tools` whitelist package discriminate the change; no speedup,
+legacy selection or C++ provider claim is made.

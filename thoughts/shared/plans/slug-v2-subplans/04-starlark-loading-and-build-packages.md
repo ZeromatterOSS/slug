@@ -9814,3 +9814,20 @@ same-candidate A→B→A and unchanged Host observation ownership. The ambient
 authentic Rust-toolchain replay clears rules_shell and first stops at separate
 rules_cc 0.2.17 `repository_ctx.execute([cc, "-v"]).stderr`. Fixed limits,
 general process execution and full C++/root Build remain deferred.
+
+### Injected cc_toolchain_suite empty filegroup accepted (WP844, 2026-09-24)
+
+Pinned Bazel 9.2's default builtins injects `.bzl`
+`native.cc_toolchain_suite(name, **kwargs)` as
+`native.filegroup(name=name)`: `toolchains`, explicit visibility and all
+other kwargs are evaluated then discarded. Slug's `.bzl`-only native
+method reuses the existing empty-filegroup recorder and inherited package
+visibility without a suite rule class, dependency edge or legacy
+selection. Direct BUILD-native and BUILD-global suite bindings, injection
+overrides and real C++ providers remain unsupported. Two focused Loading
+tests and four fresh Bazel/Slug rows cover empty kind, missing-label
+nondependency, inherited public visibility and configured success.
+Authentic Rust-toolchain cquery clears the prior suite absence and next
+stops at a separate rules_cc `cc_toolchain` default whose upstream
+`@bazel_tools` whitelist package is missing from Slug's snapshot. Full
+toolchain and M7A remain open.
