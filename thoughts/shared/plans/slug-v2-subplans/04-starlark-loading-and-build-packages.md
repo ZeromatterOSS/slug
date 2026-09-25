@@ -9831,3 +9831,15 @@ Authentic Rust-toolchain cquery clears the prior suite absence and next
 stops at a separate rules_cc `cc_toolchain` default whose upstream
 `@bazel_tools` whitelist package is missing from Slug's snapshot. Full
 toolchain and M7A remain open.
+
+### Default Apple SDK DottedVersion accepted (WP850, 2026-09-25)
+
+The `.bzl`-only `apple_common.dotted_version` constructor now returns a
+typed, truthy, immutable value for the five pinned `apple_support` 1.24.2
+empty-version SDK defaults: `8.4`, `10.11`, `9.0`, `2.0`, `1.0`. It preserves
+source spelling for `str`/`repr`/`to_string` and has pairwise consistent
+equality/hash. Other inputs fail closed; broad parsing, aliases and
+`compare_to` are deferred. Four focused Loading tests pass. The rebuilt
+authentic cquery clears the former `xcode_config.bzl:400` constructor
+stop and first stops at the separate `XcodeVersionConfig(...)` provider
+call on line 98. Provider construction and M7A closure remain open.

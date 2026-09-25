@@ -3067,3 +3067,13 @@ V1/Buck2 import or memory-accounting form is introduced. Target/exec,
 negative and whole-config A/B/A tests plus authentic progression to the
 separate `apple_common.dotted_version` stop discriminate this ingress;
 no speedup, Xcode provider or generated-repository claim is made.
+
+WP850 adds one small evaluator-local, immutable `Allocative` value for the
+five pinned Apple SDK defaults. It stores static original spelling plus
+two numeric components, with no general parser or duplicate native
+configuration-option state. The value may freeze into an existing loaded
+module; source invalidation remains with that module's certificate.
+No DICE key, cache, interner, Host observation, lock, V1/Buck2 import or
+new memory-accounting shape is added. Four focused Loading tests and the
+authentic progression to the separate `XcodeVersionConfig` provider-call
+stop discriminate this slice; no speedup or provider claim is made.

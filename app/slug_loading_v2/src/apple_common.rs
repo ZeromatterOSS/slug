@@ -9,9 +9,11 @@
  */
 
 use std::fmt;
+use std::hash::Hash;
 
 use allocative::Allocative;
 use starlark::any::ProvidesStaticType;
+use starlark::collections::StarlarkHasher;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -81,10 +83,72 @@ starlark::starlark_simple_value!(AppleToolchain);
 #[starlark_value(type = "apple_toolchain")]
 impl<'v> StarlarkValue<'v> for AppleToolchain {}
 
+// The pinned apple_support empty-version branch passes only these five
+// provider defaults. This is a separate Starlark value from the native
+// DottedVersion.Option configuration representation, whose equality is
+// deliberately spelling-sensitive in Bazel.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct DefaultSdkDottedVersion {
+    spelling: &'static str,
+    components: (u8, u8),
+}
+
+impl DefaultSdkDottedVersion {
+    fn parse(version: &str) -> anyhow::Result<Self> {
+        let (spelling, components) = match version {
+            "8.4" => ("8.4", (8, 4)),
+            "10.11" => ("10.11", (10, 11)),
+            "9.0" => ("9.0", (9, 0)),
+            "2.0" => ("2.0", (2, 0)),
+            "1.0" => ("1.0", (1, 0)),
+            _ => anyhow::bail!("unsupported apple_common.dotted_version input '{version}'"),
+        };
+        Ok(Self {
+            spelling,
+            components,
+        })
+    }
+}
+
+impl fmt::Display for DefaultSdkDottedVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.spelling)
+    }
+}
+
+starlark::starlark_simple_value!(DefaultSdkDottedVersion);
+
+#[starlark_value(type = "DottedVersion")]
+impl<'v> StarlarkValue<'v> for DefaultSdkDottedVersion {
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other).is_some_and(|other| self.components == other.components))
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.components.hash(hasher);
+        Ok(())
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        (attribute == "to_string").then(|| heap.alloc(self.spelling))
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec!["to_string".to_owned()]
+    }
+}
+
 #[starlark_module]
 fn apple_common_methods(builder: &mut MethodsBuilder) {
     fn apple_toolchain<'v>(#[starlark(this)] _this: Value<'v>) -> anyhow::Result<AppleToolchain> {
         Ok(AppleToolchain)
+    }
+
+    fn dotted_version<'v>(
+        #[starlark(this)] _this: Value<'v>,
+        version: &str,
+    ) -> anyhow::Result<DefaultSdkDottedVersion> {
+        DefaultSdkDottedVersion::parse(version)
     }
 }
 
@@ -162,7 +226,7 @@ mod tests {
             let module = evaluate(source, globals).unwrap();
             assert_eq!(
                 module.get("REFLECTION").unwrap().value().to_string(),
-                "[\"Objc\", \"XcodeVersionConfig\", \"apple_toolchain\", \"platform\"]"
+                "[\"Objc\", \"XcodeVersionConfig\", \"apple_toolchain\", \"dotted_version\", \"platform\"]"
             );
             assert_eq!(
                 starlark_provider_identity(module.get("OBJ").unwrap().value()),
@@ -174,7 +238,7 @@ mod tests {
             );
         }
         assert!(evaluate("X=apple_common", build_file_loading_globals()).is_err());
-        for name in "platform_type XcodeProperties apple_host_system_env target_apple_env new_objc_provider dotted_version get_apple_config"
+        for name in "platform_type XcodeProperties apple_host_system_env target_apple_env new_objc_provider get_apple_config"
             .split_whitespace()
         {
             assert!(
@@ -191,6 +255,57 @@ mod tests {
             "X=apple_common.platform.ios_device()",
             "X=apple_common.platform.no_such_platform",
             "X=apple_common.platform.ios_device.no_such_field",
+        ] {
+            assert!(evaluate(source, loading_globals()).is_err(), "{source}");
+        }
+    }
+
+    #[test]
+    fn default_sdk_dotted_versions_are_typed_truthy_hashable_and_frozen() {
+        let source = r#"
+spellings = ['8.4', '10.11', '9.0', '2.0', '1.0']
+values = [apple_common.dotted_version(s) for s in spellings]
+lookup = {values[i]: i for i in range(len(values))}
+def verify():
+    for i in range(len(values)):
+        value = values[i]
+        if type(value) != 'DottedVersion' or not value:
+            fail('DottedVersion type/truth: %s' % spellings[i])
+        if str(value) != spellings[i] or repr(value) != spellings[i] or value.to_string != spellings[i]:
+            fail('DottedVersion original spelling: %s' % spellings[i])
+        again = apple_common.dotted_version(spellings[i])
+        if value != again or lookup[again] != i or value == spellings[i]:
+            fail('DottedVersion equality/hash: %s' % spellings[i])
+        for j in range(len(values)):
+            if (value == values[j]) != (i == j):
+                fail('DottedVersion pairwise equality: %s/%s' % (i, j))
+verify()
+FROZEN_DOTTED_VERSION = values[2]
+"#;
+        for globals in [loading_globals(), bzlmod_loading_globals()] {
+            let module = evaluate(source, globals).unwrap();
+            let frozen = module.get("FROZEN_DOTTED_VERSION").unwrap();
+            let value = frozen.value();
+            assert_eq!(value.get_type(), "DottedVersion");
+            assert_eq!(value.to_string(), "9.0");
+            let scratch = Module::new();
+            assert_eq!(
+                value
+                    .get_attr("to_string", scratch.heap())
+                    .unwrap()
+                    .unwrap()
+                    .to_string(),
+                "\"9.0\""
+            );
+        }
+        for source in [
+            "X=apple_common.dotted_version('1')",
+            "X=apple_common.dotted_version('8.4.0')",
+            "X=apple_common.dotted_version('')",
+            "X=apple_common.dotted_version(None)",
+            "X=apple_common.dotted_version(8)",
+            "X=apple_common.dotted_version()",
+            "X=apple_common.dotted_version('8.4', '9.0')",
         ] {
             assert!(evaluate(source, loading_globals()).is_err(), "{source}");
         }

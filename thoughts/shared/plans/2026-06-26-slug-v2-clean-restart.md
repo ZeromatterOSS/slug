@@ -29,18 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-149-m7a-default-apple-rule-fragment-r1
+Packet: WP-7-150-m7a-default-apple-dotted-version-r1
 Status: ACCEPTED; M7A remains partial
 
-WP849 admits the default, structurally configuration-backed Apple
-rule-fragment fields needed by pinned `apple_support` 1.24.2's
-empty-version `xcode_config`. Configuration, Loading and Analysis focused
+WP850 admits the five default SDK `DottedVersion` values consumed by pinned
+`apple_support` 1.24.2 on the Linux empty-version path. Focused Loading
 tests pass with independent FINAL review. The rebuilt authentic cquery
-clears `ctx.fragments.apple` and now first stops at the separate
-`apple_common.dotted_version` call in `xcode_config.bzl:400`.
-Non-null dotted options, subrule/aspect Apple fragments, provider
-construction, generated-repository bytes and M7A closure remain deferred.
-WP848 at `4a57c89fe` accepted the finite built-in definition source. See
+clears `apple_common.dotted_version` at `xcode_config.bzl:400` and now
+first stops at the separate `XcodeVersionConfig(...)` provider call on
+line 98. General DottedVersion grammar, provider/repository semantics and
+M7A closure remain deferred. WP849 at `f69efff42` accepted the default
+Apple fragment and exposed the prior stop. See
 `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
