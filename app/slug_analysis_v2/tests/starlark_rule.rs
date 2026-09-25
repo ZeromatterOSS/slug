@@ -12681,6 +12681,138 @@ consumer(name = "generated_owner_bad", scalar = ":owner")
 }
 
 #[tokio::test]
+async fn xcode_version_info_default_provider_methods_and_source_a_b_a() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    let definitions = |availability: &str| {
+        r#"ObservedInfo = provider(fields = ["value"])
+KEY = apple_common.XcodeVersionConfig
+
+def _producer(ctx):
+    return [KEY(
+        ios_sdk_version = "8.4",
+        ios_minimum_os_version = "8.4",
+        visionos_sdk_version = "1.0",
+        visionos_minimum_os_version = "1.0",
+        watchos_sdk_version = "2.0",
+        watchos_minimum_os_version = "2.0",
+        tvos_sdk_version = "9.0",
+        tvos_minimum_os_version = "9.0",
+        macos_sdk_version = "10.11",
+        macos_minimum_os_version = "10.11",
+        xcode_version = None,
+        availability = "AVAILABILITY",
+        xcode_version_flag = None,
+        include_xcode_execution_info = False,
+    )]
+
+def _consumer(ctx):
+    dep = ctx.attr.dep
+    if KEY not in dep:
+        fail("typed XcodeVersionInfo provider is missing")
+    info = dep[KEY]
+    if info.xcode_version() != None:
+        fail("empty Xcode version changed")
+    if info.availability() != "unknown":
+        fail("default Xcode availability changed")
+    if info.execution_info() != {
+        "requires-darwin": "",
+        "supports-xcode-requirements-set": "",
+    }:
+        fail("default Xcode execution requirements changed")
+
+    sdk_versions = [
+        (apple_common.platform.ios_device, "8.4"),
+        (apple_common.platform.ios_simulator, "8.4"),
+        (apple_common.platform.visionos_device, "1.0"),
+        (apple_common.platform.visionos_simulator, "1.0"),
+        (apple_common.platform.watchos_device, "2.0"),
+        (apple_common.platform.watchos_simulator, "2.0"),
+        (apple_common.platform.tvos_device, "9.0"),
+        (apple_common.platform.tvos_simulator, "9.0"),
+        (apple_common.platform.macos, "10.11"),
+        (apple_common.platform.catalyst, "10.11"),
+    ]
+    for platform, expected in sdk_versions:
+        actual = info.sdk_version_for_platform(platform)
+        if type(actual) != "DottedVersion" or str(actual) != expected:
+            fail("SDK version for %s: %s" % (platform.name, actual))
+
+    minimum_versions = [
+        (apple_common.platform_type.ios, "8.4"),
+        (apple_common.platform_type.visionos, "1.0"),
+        (apple_common.platform_type.watchos, "2.0"),
+        (apple_common.platform_type.tvos, "9.0"),
+        (apple_common.platform_type.macos, "10.11"),
+        (apple_common.platform_type.catalyst, "8.4"),
+    ]
+    for platform_type, expected in minimum_versions:
+        actual = info.minimum_os_for_platform_type(platform_type)
+        if type(actual) != "DottedVersion" or str(actual) != expected:
+            fail("minimum OS for %s: %s" % (platform_type, actual))
+    if str(info.sdk_version_for_platform(struct(name = "catalyst"))) != "10.11":
+        fail("equivalent platform struct changed the Catalyst SDK")
+    return [ObservedInfo(value = "default Xcode methods verified")]
+
+producer = rule(implementation = _producer, provides = [KEY])
+consumer = rule(
+    implementation = _consumer,
+    attrs = {"dep": attr.label(providers = [KEY])},
+)
+"#
+        .replace("AVAILABILITY", availability)
+    };
+    let source = workspace.join("defs.bzl");
+    fs::write(&source, definitions("UNKNOWN")).unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(':defs.bzl', 'consumer', 'producer')\nproducer(name = 'xcode')\nconsumer(name = 'observed', dep = ':xcode')\n",
+    )
+    .unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let configuration = test_configuration();
+    let key = |target: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{target}")).unwrap(),
+            configuration.clone(),
+        )
+    };
+    let producer = analyze_request(&dice, &workspace, &key("xcode"), None, false)
+        .await
+        .unwrap();
+    assert!(
+        producer
+            .providers()
+            .contains(&ProviderIdentity::builtin("XcodeVersionInfo"))
+    );
+    let observed = ProviderId::new("//:defs.bzl", "ObservedInfo").unwrap();
+    let initial = analyze_request(&dice, &workspace, &key("observed"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        provider_value(&initial, &observed),
+        "default Xcode methods verified"
+    );
+
+    fs::write(&source, definitions("LOCAL")).unwrap();
+    let error = analyze_request(&dice, &workspace, &key("observed"), None, false)
+        .await
+        .unwrap_err();
+    assert!(error.contains("LOCAL"), "{error}");
+
+    fs::write(&source, definitions("UNKNOWN")).unwrap();
+    let restored = analyze_request(&dice, &workspace, &key("observed"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        provider_value(&restored, &observed),
+        "default Xcode methods verified"
+    );
+    assert_eq!(initial, restored);
+}
+
+#[tokio::test]
 async fn feature_flag_info_configured_return_lookup_and_fail_closed_boundaries() {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();

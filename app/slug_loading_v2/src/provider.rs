@@ -84,6 +84,10 @@ pub(crate) use template_variable_info::TemplateVariableInfoConstructor;
 pub use template_variable_info::alloc_frozen_template_variable_info;
 pub use template_variable_info::template_variable_info;
 
+pub use crate::xcode_version_info::alloc_default_xcode_version_info;
+pub use crate::xcode_version_info::default_xcode_version_info;
+pub use crate::xcode_version_info::is_default_xcode_version_info;
+
 pub fn starlark_label(value: Value<'_>) -> Option<CanonicalLabel> {
     StarlarkLabel::from_value(value).map(|value| value.canonical().clone())
 }
@@ -133,6 +137,8 @@ impl<'v> StarlarkValue<'v> for BuiltinProviderKey {
     }
 }
 
+// Objc remains declaration-only. The Xcode key shares this compact identity
+// class but admits only the authenticated empty-version constructor tuple.
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Hash, Allocative)]
 pub enum DeclarationOnlyAppleProviderKind {
@@ -157,6 +163,22 @@ impl fmt::Display for DeclarationOnlyAppleProviderKey {
 starlark::starlark_simple_value!(DeclarationOnlyAppleProviderKey);
 #[starlark_value(type = "Provider")]
 impl<'v> StarlarkValue<'v> for DeclarationOnlyAppleProviderKey {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        match self.0 {
+            DeclarationOnlyAppleProviderKind::XcodeVersionInfo => {
+                crate::xcode_version_info::construct(args, eval)
+            }
+            DeclarationOnlyAppleProviderKind::ObjcInfo => Err(starlark::Error::new_other(
+                anyhow::anyhow!("apple_common.Objc construction is unsupported"),
+            )),
+        }
+    }
+
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
         "slug.apple-common.declaration-provider".hash(hasher);
         self.0.hash(hasher);
@@ -1736,6 +1758,9 @@ pub fn configured_target_provider_identity(
     value: Value<'_>,
 ) -> starlark::Result<Option<ProviderIdentity>> {
     if let Some(key) = DeclarationOnlyAppleProviderKey::from_value(value) {
+        if matches!(key.0, DeclarationOnlyAppleProviderKind::XcodeVersionInfo) {
+            return Ok(Some(ProviderIdentity::builtin("XcodeVersionInfo")));
+        }
         return Err(starlark::Error::new_other(anyhow::anyhow!(
             "apple_common.{} is declaration-only; configured-target membership and indexing are unsupported",
             key.0.names().1
@@ -2058,6 +2083,11 @@ mod tests {
         let hash = |value: starlark::values::Value<'_>| value.get_hashed().unwrap().hash();
         assert_ne!(hash(objc.to_value()), hash(xcode.to_value()));
         assert_ne!(hash(objc.to_value()), hash(ordinary.to_value()));
+        assert_eq!(
+            configured_target_provider_identity(xcode.to_value()).unwrap(),
+            Some(ProviderIdentity::builtin("XcodeVersionInfo"))
+        );
+        assert!(configured_target_provider_identity(objc.to_value()).is_err());
     }
 
     #[test]

@@ -3077,3 +3077,16 @@ No DICE key, cache, interner, Host observation, lock, V1/Buck2 import or
 new memory-accounting shape is added. Four focused Loading tests and the
 authentic progression to the separate `XcodeVersionConfig` provider-call
 stop discriminate this slice; no speedup or provider claim is made.
+
+WP851 retains the authenticated empty-Xcode result as one compact,
+immutable `Allocative` provider variant in the existing provider collection;
+the evaluator-local five-method facade is rebuilt on dependent lookup. The
+14-keyword gate carries all admitted semantic input, while the configured
+rule key and loaded-source certificates already own option/source
+invalidation. A generic occurrence cannot impersonate this typed builtin.
+No evaluator closure, second provider store, new DICE key, interner, hash
+shortcut, cache, Host observation, lock, V1/Buck2 import or new memory-
+accounting form is added. Focused identity, frozen-facade, configured
+producer/consumer and source A/B/A tests plus authentic progression to the
+separate `rules_cc` Apple `single_arch_platform` stop discriminate this
+slice; no speedup or broad Xcode/configured-C++ claim is made.

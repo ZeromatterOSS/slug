@@ -141,6 +141,7 @@ pub use providers::RunfilesConflictPolicy;
 pub use providers::RunfilesSupport;
 pub use providers::RunfilesSymlink;
 pub use providers::RunfilesSymlinkDepset;
+pub use providers::XcodeVersionInfo;
 pub use runfiles::RunfilesError;
 pub use runfiles::RunfilesLayout;
 pub use runfiles::RunfilesLayoutDiagnostic;

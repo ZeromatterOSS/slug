@@ -2611,7 +2611,14 @@ pub(crate) fn evaluate_loaded_rule(
     let mut lowerer = AnalysisValueLowerer::from_module(&module);
     let mut provider_values = Vec::with_capacity(returned.len());
     for (index, value) in returned.into_iter().enumerate() {
-        if let Some(info) = slug_loading_v2::provider::feature_flag_info(value) {
+        if slug_loading_v2::provider::is_default_xcode_version_info(value) {
+            // The pinned default Xcode provider has callable fields. Retain its
+            // validated semantic variant instead of asking the generic value
+            // lowerer to serialize evaluator-local Starlark functions.
+            provider_values.push(ProviderValue::XcodeVersionInfo(
+                slug_build_api_v2::XcodeVersionInfo::default_empty_version(),
+            ));
+        } else if let Some(info) = slug_loading_v2::provider::feature_flag_info(value) {
             provider_values.push(ProviderValue::FeatureFlagInfo(info));
         } else if let Some(fields) = StarlarkDefaultInfo::fields_from_value(value) {
             let test_rule = rule_capability.as_ref().is_some_and(|capability| {

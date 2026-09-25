@@ -1937,6 +1937,20 @@ Authentic cquery clears `ctx.fragments.apple` and next stops at
 construction, Xcode selection and generated repository semantics are
 not admitted.
 
+## Default XcodeVersionInfo provider (WP851, 2026-09-24)
+
+The pinned `apple_support` empty-Xcode path now authenticates its exact
+14-keyword `apple_common.XcodeVersionConfig` tuple and publishes a typed,
+immutable builtin `XcodeVersionInfo` provider. A configured dependent can
+index that key and call all five source-backed methods; SDK and minimum-OS
+results are typed DottedVersions, with Catalyst's distinct macOS SDK and iOS
+minimum. `apple_common.platform_type` exposes six pinned string members.
+Invalid tuples and a generic occurrence spoofing the builtin identity fail
+closed; Objc remains declaration-only. Source A/B/A on one DICE passes.
+The rebuilt authentic cquery clears `xcode_config.bzl:98` and next stops at
+`rules_cc`'s unmodeled `ctx.fragments.apple.single_arch_platform.platform_type`.
+Non-default Xcode, generated repository bytes and configured C++ remain open.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

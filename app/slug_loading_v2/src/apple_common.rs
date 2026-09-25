@@ -33,6 +33,7 @@ use crate::provider::DeclarationOnlyAppleProviderKind;
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct AppleCommon {
     platform: FrozenValue,
+    platform_type: FrozenValue,
 }
 
 impl fmt::Display for AppleCommon {
@@ -49,6 +50,9 @@ impl<'v> StarlarkValue<'v> for AppleCommon {
         if attribute == "platform" {
             return Some(self.platform.to_value());
         }
+        if attribute == "platform_type" {
+            return Some(self.platform_type.to_value());
+        }
         let kind = match attribute {
             "Objc" => DeclarationOnlyAppleProviderKind::ObjcInfo,
             "XcodeVersionConfig" => DeclarationOnlyAppleProviderKind::XcodeVersionInfo,
@@ -58,7 +62,7 @@ impl<'v> StarlarkValue<'v> for AppleCommon {
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        ["Objc", "XcodeVersionConfig", "platform"]
+        ["Objc", "XcodeVersionConfig", "platform", "platform_type"]
             .map(str::to_owned)
             .into()
     }
@@ -88,13 +92,13 @@ impl<'v> StarlarkValue<'v> for AppleToolchain {}
 // DottedVersion.Option configuration representation, whose equality is
 // deliberately spelling-sensitive in Bazel.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-struct DefaultSdkDottedVersion {
+pub(crate) struct DefaultSdkDottedVersion {
     spelling: &'static str,
     components: (u8, u8),
 }
 
 impl DefaultSdkDottedVersion {
-    fn parse(version: &str) -> anyhow::Result<Self> {
+    pub(crate) fn parse(version: &str) -> anyhow::Result<Self> {
         let (spelling, components) = match version {
             "8.4" => ("8.4", (8, 4)),
             "10.11" => ("10.11", (10, 11)),
@@ -182,7 +186,22 @@ pub(crate) fn apple_common_globals(builder: &mut GlobalsBuilder) {
         })
         .collect::<Vec<_>>();
     let platform = builder.alloc(AllocStruct(members));
-    builder.set("apple_common", AppleCommon { platform });
+    // Bazel 9.2 builtins_bzl/common/objc/apple_platform.bzl:27-34.
+    let platform_type = builder.alloc(AllocStruct([
+        ("ios", builder.alloc("ios")),
+        ("visionos", builder.alloc("visionos")),
+        ("watchos", builder.alloc("watchos")),
+        ("tvos", builder.alloc("tvos")),
+        ("macos", builder.alloc("macos")),
+        ("catalyst", builder.alloc("catalyst")),
+    ]));
+    builder.set(
+        "apple_common",
+        AppleCommon {
+            platform,
+            platform_type,
+        },
+    );
 }
 
 #[cfg(test)]
@@ -226,7 +245,7 @@ mod tests {
             let module = evaluate(source, globals).unwrap();
             assert_eq!(
                 module.get("REFLECTION").unwrap().value().to_string(),
-                "[\"Objc\", \"XcodeVersionConfig\", \"apple_toolchain\", \"dotted_version\", \"platform\"]"
+                "[\"Objc\", \"XcodeVersionConfig\", \"apple_toolchain\", \"dotted_version\", \"platform\", \"platform_type\"]"
             );
             assert_eq!(
                 starlark_provider_identity(module.get("OBJ").unwrap().value()),
@@ -238,7 +257,7 @@ mod tests {
             );
         }
         assert!(evaluate("X=apple_common", build_file_loading_globals()).is_err());
-        for name in "platform_type XcodeProperties apple_host_system_env target_apple_env new_objc_provider get_apple_config"
+        for name in "XcodeProperties apple_host_system_env target_apple_env new_objc_provider get_apple_config"
             .split_whitespace()
         {
             assert!(
@@ -343,6 +362,7 @@ def verify():
         ('watchos', None): platform.watchos_device,
         ('watchos', 'simulator'): platform.watchos_simulator,
     }
+
     if len(swift_table) != 9 or swift_table[('xros', 'simulator')] != platform.visionos_simulator:
         fail('Swift platform table')
     for name, plist, platform_type, is_device in expected:
@@ -382,6 +402,44 @@ IOS_REPR = repr(platform.ios_device)
                 "struct"
             );
         }
+    }
+
+    #[test]
+    fn platform_type_is_the_six_member_pinned_string_struct() {
+        let source = r#"
+types = apple_common.platform_type
+expected = ['ios', 'visionos', 'watchos', 'tvos', 'macos', 'catalyst']
+def verify():
+    if type(types) != 'struct' or dir(types) != sorted(expected):
+        fail('platform_type namespace shape')
+    for name in expected:
+        if getattr(types, name) != name:
+            fail('platform_type member: %s' % name)
+verify()
+FROZEN_TYPES = types
+"#;
+        for globals in [loading_globals(), bzlmod_loading_globals()] {
+            let module = evaluate(source, globals).unwrap();
+            let binding = module.get("FROZEN_TYPES").unwrap();
+            let types = binding.value();
+            let scratch = Module::new();
+            assert_eq!(
+                types
+                    .get_attr("catalyst", scratch.heap())
+                    .unwrap()
+                    .unwrap()
+                    .unpack_str(),
+                Some("catalyst")
+            );
+        }
+        assert!(
+            evaluate(
+                "X=apple_common.platform_type.no_such_type",
+                loading_globals()
+            )
+            .is_err()
+        );
+        assert!(evaluate("X=apple_common.platform_type()", loading_globals()).is_err());
     }
 
     #[test]

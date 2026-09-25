@@ -106,6 +106,7 @@ mod testing_bootstrap;
 mod testing_bootstrap_tests;
 mod transition;
 pub mod visibility;
+mod xcode_version_info;
 
 pub use attrs::AttributeKind;
 pub use attrs::AttributeProvenance;
