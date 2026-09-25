@@ -872,7 +872,44 @@ def _exec_parent(ctx):
     exec_probe()
     return [DefaultInfo()]
 fragment_exec_parent = rule(implementation = _exec_parent, subrules = [exec_probe])
+def _apple_defaults(ctx):
+    apple = ctx.fragments.apple
+    if apple.xcode_version_flag != None: fail("unexpected Xcode version flag")
+    if [
+        apple.ios_sdk_version_flag,
+        apple.macos_sdk_version_flag,
+        apple.tvos_sdk_version_flag,
+        apple.watchos_sdk_version_flag,
+        apple.ios_minimum_os_flag,
+        apple.macos_minimum_os_flag,
+        apple.tvos_minimum_os_flag,
+        apple.watchos_minimum_os_flag,
+    ] != [None, None, None, None, None, None, None, None]: fail("unexpected Apple SDK or minimum-OS flag")
+    if apple.prefer_mutual_xcode != True: fail("unexpected mutual-Xcode preference")
+    if apple.include_xcode_exec_requirements != False: fail("unexpected Xcode execution requirements")
+    if ctx.fragments.cpp.minimum_os_version() != None: fail("unexpected C++ minimum-OS flag")
+    return [DefaultInfo()]
+apple_defaults = rule(implementation = _apple_defaults, fragments = ["apple", "cpp"])
+def _apple_undeclared(ctx):
+    value = ctx.fragments.apple
+    return [DefaultInfo()]
+apple_undeclared = rule(implementation = _apple_undeclared)
+def _apple_unknown(ctx):
+    value = ctx.fragments.apple.unknown
+    return [DefaultInfo()]
+apple_unknown = rule(implementation = _apple_unknown, fragments = ["apple"])
+def _apple_inactive_sub(ctx, parent_fragments):
+    return parent_fragments.apple
+apple_inactive_sub = subrule(implementation = _apple_inactive_sub)
+def _apple_inactive(ctx):
+    apple_inactive_sub(ctx.fragments)
+    return [DefaultInfo()]
+apple_inactive = rule(implementation = _apple_inactive, fragments = ["apple"], subrules = [apple_inactive_sub])
 "#,
+    );
+    epoch.package(
+        "apple",
+        "load('//tools/build_defs/cc:fragments.bzl', 'apple_defaults', 'apple_inactive', 'apple_undeclared', 'apple_unknown')\napple_defaults(name='defaults')\napple_inactive(name='inactive')\napple_undeclared(name='undeclared')\napple_unknown(name='unknown')\n",
     );
     epoch.package(
         "subject",
@@ -1313,6 +1350,59 @@ async fn configured_fragment_facades_project_methods_and_fail_closed() {
     )
     .await;
     assert!(exec_fastbuild.is_ok(), "{exec_fastbuild:?}");
+}
+
+#[tokio::test]
+async fn configured_apple_fragment_projects_default_fields_and_fails_closed() {
+    for route in [AnalysisRoute::Legacy, AnalysisRoute::Observed] {
+        for (kind, configuration) in [
+            ("target", configuration(None)),
+            (
+                "exec",
+                ConfigurationKey::from_slug(
+                    configuration(None)
+                        .slug_configuration()
+                        .unwrap()
+                        .to_exec()
+                        .unwrap(),
+                ),
+            ),
+        ] {
+            let result = analyze_result(
+                &Dice::builder().build(DetectCycles::Enabled),
+                semantic_epoch().build(),
+                "@@//apple:defaults",
+                configuration,
+                Arc::new(Tracker::default()),
+                route,
+            )
+            .await;
+            assert!(result.is_ok(), "{route:?}/{kind}: {result:?}");
+        }
+    }
+
+    for (target, expected) in [
+        (
+            "undeclared",
+            "has to declare 'apple' as a required fragment",
+        ),
+        ("unknown", "has no attribute `unknown`"),
+        (
+            "inactive",
+            "cannot access field or method 'apple' of rule fragment collection outside of its own implementation function",
+        ),
+    ] {
+        let error = analyze(
+            &Dice::builder().build(DetectCycles::Enabled),
+            semantic_epoch().build(),
+            &format!("@@//apple:{target}"),
+            configuration(None),
+            Arc::new(Tracker::default()),
+            AnalysisRoute::Legacy,
+        )
+        .await;
+        assert!(error.contains(expected), "{target}: {error}");
+    }
 }
 
 #[tokio::test]

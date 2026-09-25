@@ -1,4 +1,5 @@
 mod action_environment;
+mod apple_fragment;
 mod cache_grammar;
 mod configuration;
 mod configuration_field;
@@ -20,6 +21,7 @@ mod tests;
 pub use action_environment::CanonicalStringMap;
 pub use action_environment::CanonicalStringSet;
 pub use action_environment::RetainedActionEnvironment;
+pub use apple_fragment::AppleFragmentProjection;
 pub use cache_grammar::CacheFieldValue;
 pub use cache_grammar::format_cache_field;
 pub use configuration::NativeStringListOption;

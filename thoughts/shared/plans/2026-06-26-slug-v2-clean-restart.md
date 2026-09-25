@@ -29,19 +29,18 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-148-m7a-builtin-xcode-extension-definition-r1
+Packet: WP-7-149-m7a-default-apple-rule-fragment-r1
 Status: ACCEPTED; M7A remains partial
 
-WP848 admits the pinned built-in `bazel_tools` Xcode extension
-definition source for the authentic `local_config_xcode` demand. It
-preserves graph-selected built-in identity and the complete host mapping,
-while other built-in extensions and canonical-definition loading remain
-deferred. Focused Bzlmod/Loading tests and independent FINAL review pass;
-the rebuilt authentic cquery clears the former route panic and stops at
-`@@apple_support+//xcode:xcode_config.bzl:34` on the unavailable `apple`
-fragment. Extension effects, generated repository bytes, Apple provider
-semantics and M7A closure remain deferred. WP847 at `54f03db41` accepted
-the configured Apple label projection. See
+WP849 admits the default, structurally configuration-backed Apple
+rule-fragment fields needed by pinned `apple_support` 1.24.2's
+empty-version `xcode_config`. Configuration, Loading and Analysis focused
+tests pass with independent FINAL review. The rebuilt authentic cquery
+clears `ctx.fragments.apple` and now first stops at the separate
+`apple_common.dotted_version` call in `xcode_config.bzl:400`.
+Non-null dotted options, subrule/aspect Apple fragments, provider
+construction, generated-repository bytes and M7A closure remain deferred.
+WP848 at `4a57c89fe` accepted the finite built-in definition source. See
 `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

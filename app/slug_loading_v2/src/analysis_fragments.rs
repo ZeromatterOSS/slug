@@ -7,6 +7,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use compact_str::CompactString;
 use slug_build_api_v2::RetainedCppFragment;
+use slug_configuration_v2::AppleFragmentProjection;
 use slug_configuration_v2::CppFragmentProjection;
 use slug_identity_v2::CanonicalLabel;
 use starlark::any::ProvidesStaticType;
@@ -33,9 +34,8 @@ use crate::builtin_restriction::source_identities_for_evaluator;
 use crate::provider::alloc_starlark_label;
 use crate::subrule_invocation::AnalysisCallToken;
 
-const ACTIVE_FRAGMENT_NAMES_EXCEPT_CPP_AND_COVERAGE: &[&str] = &[
+const ACTIVE_FRAGMENT_NAMES_EXCEPT_APPLE_CPP_AND_COVERAGE: &[&str] = &[
     "android",
-    "apple",
     "bazel_android",
     "bazel_py",
     "j2objc",
@@ -371,6 +371,155 @@ mod compile_input_tests;
 #[path = "analysis_fragments/toolchain_provider_tests.rs"]
 mod toolchain_provider_tests;
 
+#[cfg(test)]
+#[path = "analysis_fragments/apple_fragment_tests.rs"]
+mod apple_fragment_tests;
+
+/// Bazel's source-backed Apple fields for the admitted default/null path.
+/// The projection validates the retained configuration before publication.
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct AppleFragmentValue {
+    projection: AppleFragmentProjection,
+}
+
+impl AppleFragmentValue {
+    pub fn new(projection: AppleFragmentProjection) -> Self {
+        Self { projection }
+    }
+
+    fn optional<'v>(value: Option<&str>, heap: Heap<'v>) -> Value<'v> {
+        value.map_or_else(Value::new_none, |value| heap.alloc_str(value).to_value())
+    }
+}
+
+impl fmt::Display for AppleFragmentValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<apple configuration fragment>")
+    }
+}
+
+starlark::starlark_simple_value!(AppleFragmentValue);
+
+#[starlark_module]
+fn apple_fragment_methods(builder: &mut MethodsBuilder) {
+    #[starlark(attribute)]
+    fn xcode_version_flag<'v>(
+        this: &AppleFragmentValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(AppleFragmentValue::optional(
+            this.projection.xcode_version_flag()?,
+            heap,
+        ))
+    }
+
+    #[starlark(attribute)]
+    fn ios_sdk_version_flag<'v>(
+        this: &AppleFragmentValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(AppleFragmentValue::optional(
+            this.projection.ios_sdk_version_flag()?,
+            heap,
+        ))
+    }
+
+    #[starlark(attribute)]
+    fn macos_sdk_version_flag<'v>(
+        this: &AppleFragmentValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(AppleFragmentValue::optional(
+            this.projection.macos_sdk_version_flag()?,
+            heap,
+        ))
+    }
+
+    #[starlark(attribute)]
+    fn tvos_sdk_version_flag<'v>(
+        this: &AppleFragmentValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(AppleFragmentValue::optional(
+            this.projection.tvos_sdk_version_flag()?,
+            heap,
+        ))
+    }
+
+    #[starlark(attribute)]
+    fn watchos_sdk_version_flag<'v>(
+        this: &AppleFragmentValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(AppleFragmentValue::optional(
+            this.projection.watchos_sdk_version_flag()?,
+            heap,
+        ))
+    }
+
+    #[starlark(attribute)]
+    fn ios_minimum_os_flag<'v>(
+        this: &AppleFragmentValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(AppleFragmentValue::optional(
+            this.projection.ios_minimum_os_flag()?,
+            heap,
+        ))
+    }
+
+    #[starlark(attribute)]
+    fn macos_minimum_os_flag<'v>(
+        this: &AppleFragmentValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(AppleFragmentValue::optional(
+            this.projection.macos_minimum_os_flag()?,
+            heap,
+        ))
+    }
+
+    #[starlark(attribute)]
+    fn tvos_minimum_os_flag<'v>(
+        this: &AppleFragmentValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(AppleFragmentValue::optional(
+            this.projection.tvos_minimum_os_flag()?,
+            heap,
+        ))
+    }
+
+    #[starlark(attribute)]
+    fn watchos_minimum_os_flag<'v>(
+        this: &AppleFragmentValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(AppleFragmentValue::optional(
+            this.projection.watchos_minimum_os_flag()?,
+            heap,
+        ))
+    }
+
+    #[starlark(attribute)]
+    fn prefer_mutual_xcode(this: &AppleFragmentValue) -> anyhow::Result<bool> {
+        Ok(this.projection.prefer_mutual_xcode()?)
+    }
+
+    #[starlark(attribute)]
+    fn include_xcode_exec_requirements(this: &AppleFragmentValue) -> anyhow::Result<bool> {
+        Ok(this.projection.include_xcode_exec_requirements()?)
+    }
+}
+
+#[starlark_value(type = "apple")]
+impl<'v> StarlarkValue<'v> for AppleFragmentValue {
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(apple_fragment_methods)
+    }
+}
+
 /// Bazel's public coverage fragment contains no caller restriction. The
 /// optional canonical label is the complete configured projection.
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
@@ -424,6 +573,8 @@ pub struct RuleFragmentCollection {
     #[allocative(skip)]
     cpp: FrozenValue,
     #[allocative(skip)]
+    apple: FrozenValue,
+    #[allocative(skip)]
     coverage: FrozenValue,
 }
 
@@ -432,12 +583,14 @@ impl RuleFragmentCollection {
         token: AnalysisCallToken,
         declarations: Arc<SmallSet<CompactString>>,
         cpp: FrozenValue,
+        apple: FrozenValue,
         coverage: FrozenValue,
     ) -> Self {
         Self {
             token,
             declarations,
             cpp,
+            apple,
             coverage,
         }
     }
@@ -453,6 +606,18 @@ starlark::starlark_simple_value!(RuleFragmentCollection);
 
 #[starlark_module]
 fn rule_fragment_methods(builder: &mut MethodsBuilder) {
+    #[starlark(attribute)]
+    fn apple<'v>(this: &RuleFragmentCollection) -> anyhow::Result<Value<'v>> {
+        this.token
+            .require_active("apple", "rule fragment collection")?;
+        if !this.declarations.contains("apple") {
+            anyhow::bail!(
+                "rule has to declare 'apple' as a required fragment in order to access it"
+            );
+        }
+        Ok(this.apple.to_value())
+    }
+
     #[starlark(attribute)]
     fn cpp<'v>(this: &RuleFragmentCollection) -> anyhow::Result<Value<'v>> {
         this.token
@@ -484,7 +649,7 @@ impl<'v> StarlarkValue<'v> for RuleFragmentCollection {
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        ACTIVE_FRAGMENT_NAMES_EXCEPT_CPP_AND_COVERAGE
+        ACTIVE_FRAGMENT_NAMES_EXCEPT_APPLE_CPP_AND_COVERAGE
             .iter()
             .map(|name| (*name).to_owned())
             .collect()

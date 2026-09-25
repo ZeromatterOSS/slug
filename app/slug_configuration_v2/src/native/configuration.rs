@@ -339,6 +339,7 @@ pub enum SlugConfigurationError {
     UnexpectedNativeLabel { option: &'static str },
     NonVisibleNativeLabel { option: &'static str },
     InvalidCppConfiguration { reason: &'static str },
+    UnsupportedAppleConfiguration { option: &'static str },
     UnsupportedJavaConfigurationField { field: ConfigurationField },
     UnsupportedProtoConfigurationField { field: ConfigurationField },
     ActionEnvironment { reason: &'static str },
@@ -417,6 +418,12 @@ impl fmt::Display for SlugConfigurationError {
             }
             Self::InvalidCppConfiguration { reason } => {
                 write!(formatter, "invalid C++ configuration: {reason}")
+            }
+            Self::UnsupportedAppleConfiguration { option } => {
+                write!(
+                    formatter,
+                    "Apple configuration option {option} is unsupported"
+                )
             }
             Self::UnsupportedJavaConfigurationField { field } => write!(
                 formatter,

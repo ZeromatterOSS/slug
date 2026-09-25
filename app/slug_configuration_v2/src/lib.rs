@@ -6,6 +6,7 @@ pub mod native;
 pub use command::CommandConfigurationOccurrence;
 pub use command::CommandConfigurationOverlay;
 pub use command::NativeCommandOption;
+pub use native::AppleFragmentProjection;
 pub use native::BazelPathError;
 pub use native::CanonicalStringMap;
 pub use native::CanonicalStringSet;

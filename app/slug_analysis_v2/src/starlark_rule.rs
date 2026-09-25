@@ -53,6 +53,7 @@ use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SpawnSpec;
 use slug_build_api_v2::SymlinkSpec;
 use slug_build_api_v2::SymlinkTarget;
+use slug_configuration_v2::AppleFragmentProjection;
 use slug_configuration_v2::CanonicalStringMap;
 use slug_configuration_v2::CppFragmentProjection;
 use slug_configuration_v2::HostPathFlavor;
@@ -65,6 +66,7 @@ use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::SubruleIdentity;
+use slug_loading_v2::analysis_fragments::AppleFragmentValue;
 use slug_loading_v2::analysis_fragments::CoverageFragmentValue;
 use slug_loading_v2::analysis_fragments::CppFragmentValue;
 use slug_loading_v2::analysis_fragments::RuleFragmentCollection;
@@ -2343,6 +2345,10 @@ pub(crate) fn evaluate_loaded_rule(
         || implementation
             .subrule_invocations()
             .any(|(_, _, _, fragments)| fragments.contains("coverage"));
+    let needs_apple_fragment = implementation
+        .required_fragments()
+        .iter()
+        .any(|fragment| fragment == "apple");
     let cpp_fragment = if needs_cpp_fragment {
         let structural_configuration =
             key.configuration().slug_configuration().ok_or_else(|| {
@@ -2366,6 +2372,18 @@ pub(crate) fn evaluate_loaded_rule(
         module
             .frozen_heap()
             .alloc(CoverageFragmentValue::new(output_generator))
+    } else {
+        FrozenValue::new_none()
+    };
+    let apple_fragment = if needs_apple_fragment {
+        let structural_configuration =
+            key.configuration().slug_configuration().ok_or_else(|| {
+                "configured fragment projection requires structural configuration".to_owned()
+            })?;
+        module.frozen_heap().alloc(AppleFragmentValue::new(
+            AppleFragmentProjection::new(structural_configuration.clone())
+                .map_err(|error| error.to_string())?,
+        ))
     } else {
         FrozenValue::new_none()
     };
@@ -2555,6 +2573,7 @@ pub(crate) fn evaluate_loaded_rule(
             analysis_context.root_token(),
             root_fragment_declarations,
             cpp_fragment,
+            apple_fragment,
             coverage_fragment,
         ));
         let context = module.heap().alloc(AnalysisContextGen {

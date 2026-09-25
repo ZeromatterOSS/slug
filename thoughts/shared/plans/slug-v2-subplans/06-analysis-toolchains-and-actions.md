@@ -1922,6 +1922,21 @@ substitute for the aspect overlay. The zero-edge WP825 path remains eligible.
 The selected fail-closed, sibling and zero-edge controls pass; configured
 aspect application, generated providers and actions remain deferred.
 
+## Default Apple rule-fragment ingress (WP849, 2026-09-25)
+
+Configured root rules declaring `apple` now receive an evaluator-local
+facade over the existing structural `SlugConfiguration` option vector.
+Only the pinned `apple_support` 1.24.2 empty-Xcode-config path's null
+Xcode/SDK/minimum-OS flags and two option-backed booleans are exposed;
+non-null dotted/text state fails closed before rule invocation. The
+existing declaration and active-call gate owns access, while subrule/aspect
+Apple fragments remain unsupported. Target/exec and both Analysis routes,
+Loading lifetime negatives and whole-configuration A/B/A tests pass.
+Authentic cquery clears `ctx.fragments.apple` and next stops at
+`apple_common.dotted_version` in `xcode_config.bzl:400`. Provider
+construction, Xcode selection and generated repository semantics are
+not admitted.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

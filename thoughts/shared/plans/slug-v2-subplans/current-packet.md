@@ -1,183 +1,167 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-148-m7a-builtin-xcode-extension-definition-r1
+Packet: WP-7-149-m7a-default-apple-rule-fragment-r1
 Status: ACCEPTED; M7A remains partial
 
 ## Outcome and compatibility
 
-Advance the authentic Rust-toolchain alias `cquery //:probe --output=label`
-past the post-WP847 selected-extension panic, then report the first
-new stop. Admit the pinned built-in `bazel_tools` module's one demanded
-definition, `@@bazel_tools//tools/osx:xcode_configure.bzl` export
-`xcode_configure_extension`, as a request-owned built-in source for its
-`local_config_xcode` repository demand. The selected graph's built-in
-route identity and definition-host mapping must survive into the
-Loading request; never construct a `HostCanonicalSelectedModuleDefinition`
-for the built-in route.
+Advance the rebuilt authentic Rust-toolchain
+`cquery //:probe --output=label` past the WP848 stop at
+`@@apple_support+//xcode:xcode_config.bzl:34` (`ctx.fragments.apple`),
+then report the first new stop. Admit only the Bazel 9.2 configured
+rule-context Apple fragment fields consumed on the pinned Linux
+`local_config_xcode` empty-version path. Expose the fragment only to a
+root rule declaring `fragments = ["apple", ...]`, with the same active-call
+guard as the existing C++/coverage facades. Retain the structurally owned
+configured target options as the sole source; do not synthesize an Apple
+object from label text, Host OS, or evaluator defaults.
 
-The Bazel 9.2 built-in definition label/export, ownership by the
-`bazel_tools` module and selected generated-repository name/mapping
-are `exact` within this source ingress. Slug's immutable route/source
-identity, DICE keys, observations and repository display identity
-remain `Slug-native`. Extension invocation effects, generated repository
-bytes, `@apple_support` Loading/providers, general built-in extensions,
-Apple/Xcode provider semantics, full C++ toolchain analysis, exact
-Bazel configuration/output identity and M7A closure remain
-`unsupported/deferred`. Preserve WP837-847 accepted slices.
+Declared-fragment access and the default/null values of the source-backed
+fields are `exact` for the pinned Bazel 9.2 plus apple_support 1.24.2
+slice. Rust valid-Unicode option text, full configuration and output
+identity, the evaluator-local facade and structural DICE identity remain
+`Slug-native`. Non-null dotted-version objects, unadmitted explicit Apple
+command options, other Apple members, subrule/aspect Apple fragments,
+Xcode selection, `apple_common.dotted_version` and
+`XcodeVersionConfig`/provider behavior, generated-repository bytes,
+non-Linux Apple paths and M7A closure remain `unsupported/deferred`.
+No generic Apple-fragment parity claim follows from `dir(ctx.fragments)`.
 
-## Demand, pinned source and semantic owner
+## Pinned source, owner and boundary
 
-The rebuilt authentic cquery twice passed the old Apple-field guard
-then exited 134 at `selected_repo_spec.rs:2901`, with backtrace
-`selected_extension_definition_source:4477` ->
-`selected_extension_demand::owner_inputs:641`. The panic is a built-in
-route reaching a selected-module view; the backtrace does not identify
-the requesting target or extension. The source-authored
-`@bazel_tools//tools/cpp:host_xcodes` alias targets
-`@local_config_xcode//:host_xcodes`, and built-in MODULE declares
-`xcode_configure_extension`/`use_repo(local_config_xcode)`. This is
-the finite authentic demand, not a claim that the backtrace proves
-the owner ID.
+The WP848 authentic replay exited 2 at the source-backed Apple access,
+not at the previous built-in-route panic. Pinned
+`apple_support` 1.24.2 `xcode/xcode_config.bzl:29-35,55-113,128-178`
+(SHA-256 of `xcode_config.bzl`:
+`7db1f74ab1dfac13e3988d8ab29578e6fd4ccddf82beb0e2f98d232b57e482ca`)
+declares Apple and C++ fragments, reads Apple first, and selects the
+explicit/no-version branch for the Linux built-in Xcode stub with empty
+version attrs. In source order that branch reads `xcode_version_flag`,
+four nullable SDK-version flags, four nullable minimum-OS flags and
+`include_xcode_exec_requirements`; `prefer_mutual_xcode` is read only
+on the local/remote Xcode branch. The existing C++ facade owns the
+later `minimum_os_version()` call. Bazel 9.2
+`AppleConfigurationApi.java:57-133`,
+`AppleConfiguration.java:92-113,261-315` and
+`AppleCommandLineOptions.java:49-168,304-318` define the option-backed
+field types/defaults. `XcodeConfigTest.testEmptyConfig_noVersionFlag`
+anchors the no-version default; the explicit-SDK test and
+`AppleFragmentTest` cover later/non-stub branches, not this packet.
 
-Pinned Bazel 9.2 `src/MODULE.tools:16-17,40` and
-`tools/osx/xcode_configure.bzl:325-329` define the extension and
-its source file; the latter has no top-level `load()` imports.
-`tools/cpp/BUILD.tools:124-128` supplies the alias.
-`BazelDepGraphFunction.java:105-134,187-215` and
-`BazelDepGraphValue.java:130-159` resolve the definition through
-the built-in module's mapping and assign
-`bazel_tools+xcode_configure_extension+local_config_xcode`
-under the pinned nonconflicting extension set.
-`SingleExtensionValue.java:69-74` agrees on the generated name.
-Upstream `BazelDepGraphFunctionTest:321-326` and
-`ModuleExtensionResolutionTest:3081-3177` discriminate namespace
-and mapping behavior; the direct Apple shell test is Darwin-only,
-so it is not a Linux acceptance oracle. Reuse WP847's fresh
-query/cquery default-label oracle; do not add a duplicate fixture
-without a demonstrated gap.
+The configured target's `SlugConfiguration` already retains all relevant
+native Apple options in its Arc-backed structural vector, included in
+configured-key equality/invalidation. Add an evaluator-local Apple
+projection analogous to `CppFragmentProjection`; it holds only a cheap
+clone of that existing configuration and validates the named options
+before publication. Nullable `xcode_version`/DottedVersion options may
+project `None` only when the retained value is actually absent. A
+non-null dotted option must fail closed, because Bazel returns a
+`DottedVersionApi`, not a Rust string. A non-null Xcode-version text
+option also remains unsupported within this default-only packet.
+Project the two source-backed booleans from their retained native
+values: `experimental_prefer_mutual_xcode` and
+`experimental_include_xcode_execution_requirements`; the former is
+available as a typed field but not claimed as exercised by the empty
+stub. Do not bake SDK fallback defaults (8.4 etc.) into the fragment:
+the pinned Starlark provider source applies those later.
 
-Slug `HostSelectedExtensionDemandKey` already selects the generated
-name's typed extension owner, and
-`HostSelectedExtensionOwnerInputsKey` already depends on selected
-routes/mappings and retains the definition-host mapping plus matching
-module inputs. A built-in provenance carries a
-`BuiltinBazelToolsRouteIdentity` whose snapshot and manifest digest
-come from the DICE-owned built-in module producer. Project this
-identity into a distinct
-`HostSelectedExtensionDefinitionSource::BuiltinBazelTools` variant
-only for the exact Xcode label/export and only when the host route is
-the canonical built-in `bazel_tools` route. Match that provenance
-before any selected-definition view. Other built-in definitions
-return the existing typed unsupported outcome, not a panic.
-Keep the public canonical selected-definition key's
-`BuiltinDeferred` result unchanged.
+The rule-context construction in `starlark_rule.rs` already computes
+fragments from `key.configuration().slug_configuration()` and the
+rule's required-fragment declarations. Create the Apple value only
+for a declaring root rule; a missing structural configuration or
+invalid/unsupported retained option fails before rule invocation.
+`RuleFragmentCollection` in Loading owns active-call/declaration checks
+and exposes only the named fields. No new DICE key, Host read, cache,
+lock, fallback scan, Java runtime or source bytes enter Slug. The
+configured rule key and existing loaded-rule source certificate own
+invalidation, cancellation and final publication; the facade is
+evaluator scratch, not a second retained configuration owner.
 
-`RootRepositoryRoute::for_selected_extension_definition` may turn
-the new source into its existing `RootRepositorySource::BuiltinBazelTools`
-route, copying the graph's identity rather than regenerating
-`CURRENT`. Loading's existing external-Bzl route should consume
-the verbatim built-in source; no new loader or special Java/Bazel
-runtime is admitted. The pinned definition file has no top-level
-imports, so the existing built-in Root route's empty Bzl-load mapping
-is sufficient only for this source file. Keep the full selected
-definition-host mapping separately in the request for invocation
-and generated-repository ownership; do not treat the empty route
-mapping as general built-in mapping parity. Source bytes remain the
-existing built-in catalog/capability observation, and transient
-`Need`, complete errors, cancellation and final publication continue
-through their existing DICE owners. No new key, lock, Host read,
-fallback scan, global cache or direct filesystem path is allowed.
-
-The new enum variant is DICE-retained semantic state. Retain only
-the cheap copyable built-in route identity and existing
-Arc/CompactString/Allocative request machinery; no new collection,
-interner, hash shortcut, clone-heavy snapshot copy or memory-accounting
-form. Full request Eq/Allocative must still distinguish changed graph
-mapping and built-in manifest identity. The touched
-`selected_repo_spec.rs` and `host_module.rs` exceed the plan's
-large-file trigger, but the new branches remain in their existing
-route projection/constructor owners; splitting selected graph or
-root-route responsibilities for this finite variant would add an
-unnecessary second semantic owner.
+The affected configuration, Loading and Analysis files cross the
+large-file trigger. Keep projection/type and the finite API in the
+existing `native`/`analysis_fragments` owners; keep the one assembly
+branch with the current fragment construction in `starlark_rule.rs`.
+No new monolithic fragment file or duplicate option store is warranted.
+Any new projection is Arc/Dupe/Allocative-compatible and reuses the
+single structural option vector, following the Stage 9 retained-utility
+policy; there is no new interner, compact collection or hash scheme.
 
 ## Evidence and validation
 
-Add a focused built-in owner-input test using the existing synthetic
-selected mapping: exact Xcode owner -> new source/graph identity ->
-built-in Root route; other built-in extension -> typed unsupported;
-missing/duplicate/inconsistent host routes retain their errors.
-Add a DICE test of actual pinned built-in MODULE demand through
-`HostSelectedExtensionDemandKey` and
-`HostSelectedExtensionOwnerInputsKey` that verifies the exact
-`local_config_xcode` canonical name, complete selected mapping,
-and stable warm result. Prove changed/restored host-mapping structural
-request identity with A/B/A input projections using the same route
-identity. Preserve the existing
-`BuiltinDeferred` canonical-definition negative and built-in catalog
-byte/usage tests. Add one direct Loading test that loads the pinned
-Xcode `.bzl` through the new source route and checks its exported
-definition before invoking or instantiating the extension. No static
-source-string assertion substitutes for that test.
+Add focused configuration tests that read the structural default
+target and exec Apple options, verify the exact `None`/boolean values,
+reject synthetic non-null dotted/text states or malformed types without
+turning them into strings, and prove an A/B/A structural projection
+identity using an admitted option mutation. Label such an A/B/A test
+as whole-configuration retention, not Apple-option CLI replay: current
+`NativeCommandOption` does not admit Apple SDK/Xcode flags. Add one
+direct rule-analysis test in `slug_analysis_v2/tests/subrule.rs` beside
+the existing C++/coverage facade tests: declared Apple access and all
+default-path fields, undeclared access denial, active-call expiry,
+target/exec defaults and unsupported-member denial. Reuse existing
+synthetic fixture machinery; no copied `apple_support` file or new
+oracle fixture unless a discriminating gap is demonstrated.
 
-Use JSON `--no-run`, exact-name preflight, focused Bzlmod tests and a
-direct `slug_loading_v2` compile check; serialize Cargo. Rebuild
-`slug_cli_v2` after production changes, check/clean stale `slugd`,
-then run one bounded authentic one-shot cquery and record the first
-new stop without assigning an unlabelled error to Xcode. Format,
-diff, plan-status and archive checks close validation. Independent
-DESIGN and FINAL reviews gate edit and acceptance. Update compact
-Stage 5/9 owner notes only after acceptance.
+Use JSON `--no-run`, batch exact-name preflight and focused configuration,
+Loading (if touched tests) and Analysis tests with serialized Cargo.
+Compile the direct downstream CLI; rebuild `slug_cli_v2` after Rust
+changes, check/clean stale `slugd`, then run one bounded authentic
+one-shot cquery and record the next labelled stop. Reuse WP848's
+accepted Bazel 9.2/Source evidence. Format, `git diff --check`,
+plan-status and archive checks close validation. Independent DESIGN
+and FINAL reviews gate edit and acceptance; Stage 9/appropriate owner
+notes update only after acceptance.
 
-Allowlist: this manifest and canonical Current;
-`app/slug_bzlmod_v2/src/{selected_repo_spec.rs,host_module.rs}`;
-`app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs`;
-`app/slug_loading_v2/src/module_extension.rs` tests only if needed
-for isolated source-loading proof; compact Stage 5/9 notes after
-acceptance. No Loading production, Core, registry, repository
-generator, Apple provider, remote cache/action or fixture edit.
-
-`REPLAN` if source loading requires a generic built-in mapping change
-or canonical-route owner before this finite definition can be
-observed; if the selected graph lacks the built-in identity or
-complete host mapping; if invocation must execute to discriminate
-source selection; or if exact Bazel source contradicts the finite
-tuple. Ordinary compile/test failures or a stale CLI stay in this
-packet. A later generated-repository/`@apple_support` stop is
-separate.
+Allowlist: this manifest and canonical Current; new
+`app/slug_configuration_v2/src/native/apple_fragment.rs` plus
+`native/{mod.rs,configuration.rs}` and `lib.rs` exports/tests;
+`app/slug_loading_v2/src/analysis_fragments.rs` and its owned tests;
+`app/slug_analysis_v2/src/starlark_rule.rs` and
+`app/slug_analysis_v2/tests/subrule.rs`; compact Stage 9/owner notes
+after acceptance. No Bzlmod, Core, provider, repository generator,
+remote-cache/action or fixture edit. `REPLAN` if the authentic rule
+requires a non-null dotted value before this finite ingress can be
+observed; if configuration options lack structural ownership; if
+another source needs a generic Apple fragment to distinguish this
+stop; or if provider construction must execute to validate fragment
+projection. Ordinary compilation or test failures stay in packet.
 
 ## Immediate predecessor
 
-Independent DESIGN review ACCEPT verified the exact tuple gate,
-graph-selected built-in identity, retained definition-host mapping,
-unchanged canonical-definition negative and no-load source boundary.
-It required the direct pre-invocation Loading proof and structural
-host-mapping A/B/A gate now stated above.
+Independent DESIGN review ACCEPT verified the structural configuration
+owner, exact default/null claim, non-null dotted/text fail-closed gate,
+root-rule-only declaration boundary and bounded first-stop evidence.
+It permits a direct Loading token/collection unit for active-call expiry
+if the root-rule Analysis fixture cannot expose an expired context.
 
-WP847 at `54f03db41` accepted the configured Apple Xcode label
-projection from the structural native option. Configuration tests
-passed 93/93; the rebuilt authentic cquery newly exposed the
-built-in selected-extension route panic above. Independent DESIGN
-and FINAL reviews accepted that bounded projection; M7A remains
-partial.
+WP848 at `4a57c89fe` accepted the finite built-in Xcode extension
+definition source with independent DESIGN/FINAL review and five
+focused/protected tests. The rebuilt authentic cquery passed the former
+built-in-route panic and first stopped at the pinned `apple_support`
+rule's `ctx.fragments.apple` access. Xcode extension effects,
+generated-repository bytes and Apple provider semantics remain open.
 
 ## Acceptance receipt
 
-Independent FINAL review ACCEPT verified the exact tuple gate, graph-selected
-route identity, retained complete host mapping and unchanged unsupported
-boundaries. JSON no-run builds for `slug_bzlmod_v2` and `slug_loading_v2`
-passed; exact-name preflight selected two new Bzlmod tests, one new Loading
-test and two existing `BuiltinDeferred` negatives. All five passed. The
-new tests cover missing/duplicate/inconsistent routes, other built-in
-definitions, A/B/A mapping equality, actual pinned built-in MODULE demand,
-warm DICE owner inputs and direct Xcode `.bzl` export loading before
-invocation. `cargo fmt --all -- --check`, `git diff --check`, plan-status and
-archive checks passed. The rebuilt `slug_cli_v2` authentic one-shot
-`cquery //:probe --output=label` exited 2 at
-`@@apple_support+//xcode:xcode_config.bzl:34:22`: `ctx.fragments.apple` is
-unavailable. The former selected-route panic is absent; no Xcode repository
-or Apple-provider parity is inferred. No stale `slugd` was present before
-or after. Compilation and focused tests took roughly 75 seconds; the
-authentic replay took roughly 65 seconds. The packet used existing
-Arc/CompactString/Allocative structures and one cheap copyable route
-identity, without a new key, collection, interner or memory-accounting
-form.
+Independent FINAL review ACCEPT verified the structural configuration
+owner, default/null typed fields, root-rule declaration/lifetime gate,
+non-null text/dotted refusal and deferred subrule/provider boundaries.
+JSON no-run builds for `slug_configuration_v2` (lib),
+`slug_loading_v2` (lib) and `slug_analysis_v2 --test subrule` passed.
+Exact-name preflight selected three new configuration tests, two new
+Loading tests, one new Analysis test and the protected existing fragment
+facade test; all seven passed. The configuration tests verify target/exec
+default values, synthetic non-null/malformed rejection and whole-config
+A/B/A identity; the Analysis test covers both routes, target/exec and
+negative access. `cargo fmt --all -- --check`, `git diff --check`,
+plan-status and archive checks passed. Rebuilt `slug_cli_v2` authentic
+one-shot `cquery //:probe --output=label` exited 2 after roughly 65
+seconds: pinned `xcode_config.bzl:76` called `_dotted_version_or_default`,
+which first stopped at `apple_common.dotted_version` on line 400. The
+prior `ctx.fragments.apple` stop is absent; no Xcode provider or generated
+repository parity is inferred. No stale `slugd` was present before or
+after. Focused compile/test preparation took roughly 110 seconds;
+the CLI rebuild took roughly 37 seconds. The evaluator-local projection
+reuses a cheap Arc clone of the existing structural configuration;
+no new DICE key, collection, interner, Host read or memory-accounting
+form was added.

@@ -3054,3 +3054,16 @@ actual built-in MODULE demand/warm DICE and pinned-source Loading tests
 discriminate the admission. Authentic cquery reaches a later
 `apple_support` fragment error; no performance gain, generated-repository
 effect or Apple-provider claim is made.
+
+WP849 adds an evaluator-local Apple fragment projection holding one cheap
+clone of the existing Arc-backed structural `SlugConfiguration`; it adds no
+second option store or DICE-retained representation. The configured rule key
+already includes every native Apple option, while constructor validation
+rejects non-null dotted/text values that cannot be represented exactly on
+this default path. The Loading facade reuses the existing root-rule
+declaration/active-call token; subrules remain deferred. No new DICE key,
+collection, interner, hash shortcut, global cache, Host observation, lock,
+V1/Buck2 import or memory-accounting form is introduced. Target/exec,
+negative and whole-config A/B/A tests plus authentic progression to the
+separate `apple_common.dotted_version` stop discriminate this ingress;
+no speedup, Xcode provider or generated-repository claim is made.
