@@ -184,6 +184,11 @@ const FILES: &[(&str, &str, bool)] = &[
         false,
     ),
     (
+        "tools/build_defs/cc/whitelists/parse_headers_and_layering_check/BUILD",
+        "cce7a8a7321bdcd332d89d01581a3023bc7d73765e8e303419b91f890ebda583",
+        false,
+    ),
+    (
         "tools/build_defs/repo/BUILD",
         "58fc51781cf26bfbcbd2c615f4cd0bd64892c3f7332e403eb1a885fea27ff3ca",
         false,
@@ -480,6 +485,37 @@ async fn exact_catalog_bytes_digests_and_archive_modes_are_owned() {
 }
 
 #[tokio::test]
+async fn builtin_cc_whitelist_source_file_is_exact_and_has_directory_ancestors() {
+    const PATH: &str = "tools/build_defs/cc/whitelists/parse_headers_and_layering_check/BUILD";
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let file = read(&dice, PATH).await.unwrap();
+    assert_eq!(
+        file.bytes(),
+        &include_bytes!(
+            "../builtin/bazel_tools/tools/build_defs/cc/whitelists/parse_headers_and_layering_check/BUILD"
+        )[..]
+    );
+    assert_eq!(file.bytes().len(), 241);
+    assert_eq!(
+        hex::encode(file.sha256()),
+        "cce7a8a7321bdcd332d89d01581a3023bc7d73765e8e303419b91f890ebda583"
+    );
+    assert!(!file.executable());
+    for directory in [
+        "tools/build_defs/cc/whitelists",
+        "tools/build_defs/cc/whitelists/parse_headers_and_layering_check",
+    ] {
+        assert!(matches!(
+            read(&dice, directory).await,
+            Err(BuiltinBazelToolsSourceFileError::WrongKind {
+                actual: BuiltinBazelToolsSourceKind::Directory,
+                ..
+            })
+        ));
+    }
+}
+
+#[tokio::test]
 async fn runtime_jdk_build_uses_build_tools_bytes_not_source_tree_wrapper() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let build = read(&dice, "tools/jdk/BUILD").await.unwrap();
@@ -627,9 +663,9 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
         if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-            "129fa30549446c3b0b8d90b0a21b8b3143225135e3b6ec82ea7de5cec0964c20"
+            "331063679b7adc7084be104a455c13df476cdda2aa13acb07edf2dc7e12d9e7c"
         } else {
-            "b0efdad2c5a0eedced946a68e0fb50708ecabc3e027fb4e84a67e8dc73b3c11d"
+            "f4e5f390e55c75e9a91fb3dadf950927c8b0b56ab7ea7da99d4c5eed6d9d5151"
         }
     );
 }
@@ -650,6 +686,7 @@ fn embedded_catalog_paths_remain_exact_with_bazel_input_metadata() {
         "tools/build_defs/build_info/BUILD.bazel",
         "tools/build_defs/build_info/templates/BUILD.bazel",
         "tools/build_defs/cc/BUILD.bazel",
+        "tools/build_defs/cc/whitelists/parse_headers_and_layering_check/BUILD.bazel",
         "tools/build_defs/repo/BUILD.bazel",
         "tools/cpp/BUILD.bazel",
         "tools/cpp/modules_tools/BUILD.bazel",

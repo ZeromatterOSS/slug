@@ -3008,3 +3008,15 @@ cache, lock or memory-accounting shape is introduced. Two Loading tests,
 four fresh Bazel/Slug rows and authentic progression to the missing
 `@bazel_tools` whitelist package discriminate the change; no speedup,
 legacy selection or C++ provider claim is made.
+
+WP845 adds one pinned 241-byte non-executable source file to the existing
+sorted built-in `@bazel_tools` catalog. Its path/bytes/mode participate in
+the existing ordered manifest hash, yielding a changed Slug-native route
+identity; source-file and directory-listing DICE keys derive directly from
+the catalog. The local compile-data sidecar is excluded from runtime
+identity. No new key, retained representation, interner, hash scheme,
+Host observation, lock or memory-accounting shape is introduced. Focused
+catalog tests, four fresh Bazel/Slug query rows and authentic progression
+to a later nondefault-`licenses` Analysis guard discriminate the addition.
+The guard does not name the triggering filegroup, and no configured C++
+closure or memory/performance gain is claimed.

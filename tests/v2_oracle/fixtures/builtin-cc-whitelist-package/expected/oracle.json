@@ -1,0 +1,140 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed",
+        "--output=label_kind",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed",
+        "--output=label_kind",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "whitelist_target_kind",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...",
+      "normalized_stdout": "package group @bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\n",
+      "stdout": "package group @bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed)",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed)",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "whitelist_has_no_dependency_edge",
+      "normalized_stderr": "",
+      "normalized_stdout": "@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs",
+        "--output=label_kind",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs",
+        "--output=label_kind",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "packaging_srcs_target_kind",
+      "normalized_stderr": "",
+      "normalized_stdout": "filegroup rule @bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "filegroup rule @bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs)",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs)",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [
+        "--ignore_all_rc_files"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "packaging_srcs_has_build_edge",
+      "normalized_stderr": "",
+      "normalized_stdout": "@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:BUILD\n@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs",
+      "startup_argv": [],
+      "stderr": "",
+      "stdout": "@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:BUILD\n@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs\n"
+    }
+  ],
+  "fixture": "builtin-cc-whitelist-package",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

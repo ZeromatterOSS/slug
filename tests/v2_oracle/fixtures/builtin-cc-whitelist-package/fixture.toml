@@ -1,0 +1,42 @@
+[fixture]
+name = "builtin-cc-whitelist-package"
+description = "Bazel 9.2 embedded @bazel_tools C++ whitelist package exports the empty package group and its BUILD-only source filegroup."
+comparison = "semantic"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Self-contained Bzlmod workspace with no external module, download, copied source asset or credential RC. The two exact @bazel_tools targets are Bazel's embedded runtime content. Catalog byte and packages=[] assertions are separate pinned-source tests."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "tools/build_defs/cc/whitelists/parse_headers_and_layering_check/BUILD:1-12 (exact runtime package contents)",
+  "tools/build_defs/BUILD:18-30 and tools/BUILD:41-50 (embedded @bazel_tools inclusion)",
+  "rules_cc 0.2.17 cc/private/rules_impl/cc_toolchain.bzl:335-338 (authentic implicit package-group default)",
+]
+translation_notes = "The fixture directly queries Bazel's embedded package without generating a toolchain or copying upstream BUILD bytes. Label-kind rows distinguish the package group from the packaging filegroup. Dependency rows prove no invented package-group include and the filegroup's sole BUILD source edge; only the independent catalog byte test proves packages=[]."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture builtin-cc-whitelist-package --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture builtin-cc-whitelist-package --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
+
+[[commands]]
+name = "whitelist_target_kind"
+argv = ["query", "@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed", "--output=label_kind", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\Apackage group @bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed\n?\Z']
+
+[[commands]]
+name = "whitelist_has_no_dependency_edge"
+argv = ["query", "deps(@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed)", "--output=label", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\A@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:disabling_parse_headers_and_layering_check_allowed\n?\Z']
+
+[[commands]]
+name = "packaging_srcs_target_kind"
+argv = ["query", "@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs", "--output=label_kind", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\Afilegroup rule @bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs\n?\Z']
+
+[[commands]]
+name = "packaging_srcs_has_build_edge"
+argv = ["query", "deps(@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs)", "--output=label", "--noshow_progress"]
+expected_exit = 0
+stdout_patterns = ['\A@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:BUILD\n@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:srcs\n?\Z']

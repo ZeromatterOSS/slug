@@ -615,6 +615,22 @@ test pass. Authentic cquery clears the GCC probes and reaches generated
 rules_cc `BUILD` loading, where `native.cc_toolchain_suite` is unsupported;
 call-14 argv was not separately captured and full toolchain/M7A remain open.
 
+### Built-in C++ whitelist package accepted (WP845, 2026-09-25)
+
+Slug's immutable `@bazel_tools` catalog now includes the single exact
+Bazel 9.2 `tools/build_defs/cc/whitelists/parse_headers_and_layering_check/BUILD`
+file: 241 non-executable bytes with an empty package group and a `:srcs`
+filegroup. A local `BUILD.bazel` sidecar supplies compile data but is not
+runtime content. Existing source/listing DICE owners expose the file and
+its ancestor directories; the ordered Slug-native catalog manifest identity
+changes without a new key or hash scheme. Fresh four-row Bazel/Slug queries
+and byte/mode tests pass. Authentic Rust-toolchain cquery clears the former
+missing-package stop and reaches the configured native-filegroup
+nondefault-`licenses` guard. Both this runtime BUILD and rules_cc's
+generated `BUILD.tpl` declare `licenses(["notice"])`; the diagnostic omits
+the target label, so the exact triggering filegroup and C++ closure remain
+open.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

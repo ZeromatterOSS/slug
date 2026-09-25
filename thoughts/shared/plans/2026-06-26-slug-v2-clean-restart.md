@@ -29,18 +29,19 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-144-m7a-cc-suite-empty-filegroup-r1
+Packet: WP-7-145-m7a-bazel-tools-cc-whitelist-r1
 Status: ACCEPTED; M7A remains partial
 
-WP844 adds Bazel 9.2's default builtins-injected
-`native.cc_toolchain_suite` as an empty filegroup with name-only
-semantics, discarding the generated suite map and other kwargs. This is
-not legacy suite selection. Focused Loading tests and fresh four-row
-Bazel/Slug evidence pass. Authentic cquery clears the suite method and
-next stops at an upstream `@bazel_tools` package required by rules_cc's
-`cc_toolchain` default; independent FINAL review accepted the slice. WP843's
-bounded seventh GCC effect remains accepted at `8a86218b3`. Real C++
-providers and root Build remain deferred. See
+WP845 ports verbatim the single pinned Bazel 9.2
+`@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:BUILD`
+file into Slug's immutable catalog, plus exact byte/mode and offline
+package evidence. The real empty whitelist is not replaced by Bazel's
+permissive test mock. Fresh four-row Bazel/Slug evidence and focused
+catalog tests pass; authentic cquery clears the missing package and next
+stops on nondefault configured filegroup `licenses`. Independent FINAL
+review accepted the slice; the error does not identify which filegroup.
+WP844's injected suite shim remains accepted at
+`0cdf1b9b5`. Real C++ providers and root Build remain deferred. See
 `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
