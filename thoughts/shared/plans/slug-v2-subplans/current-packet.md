@@ -1,159 +1,149 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-151-m7a-default-xcode-version-info-r1
+Packet: WP-7-152-m7a-default-apple-single-arch-platform-r1
 Status: accepted; M7A remains partial
 
 ## Outcome and compatibility
 
 Advance the rebuilt authentic Rust-toolchain `cquery //:probe --output=label`
-past the WP850 stop at pinned `@@apple_support+//xcode:xcode_config.bzl:98`:
-`apple_common.XcodeVersionConfig(...)` is currently only a declaration key.
-Admit the pinned Linux `local_config_xcode` empty-version constructor tuple,
-its genuine `XcodeVersionInfo` provider publication, configured-target
-membership/indexing, and its five function-valued fields. The constructor
-must eagerly validate every named argument, and the retained value must
-represent all source-observed semantic facts without keeping evaluator
-closures. A downstream rule must be able to call `xcode_version()`,
-`availability()`, `execution_info()`, `sdk_version_for_platform(platform)`
-and `minimum_os_for_platform_type(platform_type)` on the returned provider.
-The last two return typed DottedVersion values and preserve the pinned
-default SDK/minimum versions. Admit `apple_common.platform_type`'s six
-upstream string members for typed calls. The minimum-OS method compares
-their literal strings; the SDK method reads a Starlark platform struct's
-`.name`, so a structurally equivalent struct with a recognized name has
-the same result. This does not admit general Apple fragment behavior.
+past WP851's first stop at pinned
+`@@rules_cc++cc_configure_extension+local_config_cc//:cc_toolchain_config.bzl:38`:
+`ctx.fragments.apple.single_arch_platform.platform_type`. Admit the
+default Apple fragment selector's actual Bazel `apple_platform` MACOS value,
+including its four fields, type, repr, immutability, same-type equality and
+hashability. The platform type string must feed the already admitted typed
+`XcodeVersionInfo.minimum_os_for_platform_type` method as `"macos"`, giving
+typed default minimum OS `10.11`. This is one semantic slice in the full
+Rust-toolchain cquery, not configured C++ or M7A closure.
 
-For the exact 14-argument default tuple, provider identity, required-keyword
-shape, eager validation, callable field results, platform mapping and
-configured-provider lookup are `exact` against Bazel 9.2 plus pinned
-apple_support 1.24.2. Structural retained representation, Rust valid-Unicode
-diagnostics and Slug's configured identity remain `Slug-native`. Other
-constructor tuples, non-default Xcode selection, provider variants, general
-DottedVersion grammar, Java ApplePlatform objects, Objc provider
-construction/indexing, generated-repository bytes and M7A closure remain
-`unsupported/deferred`. The public API is finite; unknown or unmodeled
-inputs fail closed rather than collapsing to this default provider.
+For `apple_platform_type="macos"`, empty `apple_split_cpu` and absent/empty
+`macos_cpus` under the already admitted default Apple option path, the
+selector and MACOS value's type, four fields and repr are `exact` against
+Bazel 9.2. Rust-native allocation/identity, valid-Unicode diagnostics and
+Slug's structural configuration identity are `Slug-native`; do not claim
+Bazel enum pointer identity or numeric hash bytes. Nondefault platform
+types, nonempty split CPU or macOS CPU lists, all other single-arch Apple
+selection, unsupported Apple fields, Xcode variants, generated repository
+bytes and configured C++ closure remain `unsupported/deferred`. Invalid or
+unmodeled selector values fail closed on this attribute, never silently
+projecting MACOS.
 
-## Pinned source, owner and boundary
+## Pinned source and semantic owner
 
-WP850's rebuilt authentic cquery first stopped at `xcode_config.bzl:98`.
-Pinned `apple_support` 1.24.2 `xcode_config.bzl:55-126` (SHA-256
-`7db1f74ab1dfac13e3988d8ab29578e6fd4ccddf82beb0e2f98d232b57e482ca`)
-passes ten paired SDK/minimum strings: iOS `8.4`, visionOS `1.0`, watchOS
-`2.0`, tvOS `9.0`, macOS `10.11`; then `xcode_version=None`,
-`availability="UNKNOWN"`, `xcode_version_flag=None`, and
-`include_xcode_execution_info=False`. Bazel 9.2 builtins
-`common/objc/apple_common.bzl:19-46` aliases `XcodeVersionConfig` to
-`common/xcode/providers.bzl`'s `XcodeVersionInfo`; its initializer at
-`providers.bzl:19-134` eagerly reparses ten versions, creates two execution
-requirements, and returns five callable fields. Its provider declaration
-at :136-173 and `common/objc/apple_platform.bzl:19-72` establish identity,
-schema and platform values. `XcodeConfigTest.java:459-612` covers the
-constructor, methods and eager bad-input error; the empty default is
-anchored at :53-62. Non-default vectors in that test are deferred here.
+Bazel 9.2 `AppleConfiguration.java:109-156,212-258` selects the Apple platform
+from `apple_platform_type`, the nonempty split CPU or first platform CPU, and
+`ApplePlatform.forTarget`; its actual getter does not read CoreOptions.cpu.
+`AppleCommandLineOptions.java:188-208,274-280` declares the three defaults.
+On Linux x86_64 the default CPU is `x86_64`, and both supported default host
+architectures map to `ApplePlatform.MACOS` through
+`ApplePlatform.java:40-72,110-183`. `ApplePlatformApi.java:23-82` declares
+Starlark type `apple_platform` and the four fields. `ApplePlatform.java:87-108,
+194-203` supplies immutable/hashable enum behavior and lowercase repr.
+`XcodeConfigTest.java:615-670` exercises the default Apple platform-type to
+minimum-OS expression; `ObjcStarlarkTest.java:386-466` checks another
+platform's exposed type/repr. Pinned rules_cc 0.2.17
+`cc/private/toolchain/unix_cc_toolchain_config.bzl:37-40,1748` has this one
+Apple access, followed by the WP851 Xcode provider call. Its source digest is
+recorded in `target/wp757/source-attribution.json`; no new oracle fixture is
+needed for the already source-discriminated default case.
 
-Loading owns the `apple_common` key and evaluator-local provider facade.
-The constructor validates exactly the 14 named values before returning a
-typed default instance. Do not expose a raw string, ordinary empty provider,
-or evaluator closure as a substitute for Bazel's callable fields. Build API
-owns a dedicated compact, immutable `ProviderValue::XcodeVersionInfo`
-variant, not an overloaded generic `ProviderOccurrence` with fake fields.
-Analysis returns that typed value from the rule result, retains it under
-builtin identity `XcodeVersionInfo`, and rematerializes the same finite
-callable facade for a dependent target. Relax configured-target lookup only
-for this key/typed variant; keep Objc's declaration-only rejection.
-Reject a generic `ProviderOccurrence` claiming builtin `XcodeVersionInfo`
-so an untyped occurrence cannot bypass the finite constructor gate.
-The existing configured rule key, structural configuration options and
-loaded-source certificates own dependencies/invalidation; the finite
-constructor accepts no extra semantic input. A source/option change that
-leaves the exact tuple may equality-cut off; any changed tuple fails closed.
-The new retained value is DICE-owned through the existing configured-target
-provider collection, not borrowed from evaluator scratch. There is no new
-DICE key, cache, interner, lock, Host read or global registry. Use the
-existing `SmallMap`, Arc/Dupe and Allocative patterns rather than a second
-provider store; Stage 9's retained-utility policy applies.
-
-Large-file boundary: `provider.rs` and `starlark_rule.rs` already exceed the
-plan guide's review trigger. Put the finite constructor/facade in a narrow
-Loading sibling module, with only key invoke/extractor and return-lowering
-hooks in those owners. Do not mix this provider with general callable
-serialization or Apple configuration flags.
+`SlugConfiguration` already retains the complete native option vector and
+the configured rule key owns all option identity, target/exec transitions and
+invalidation. `AppleFragmentProjection` is a cheap evaluator-local view of
+that structural owner. Add a lazy typed selector gate there for the three
+option values; do not gate `AppleFragmentProjection::new`, which must retain
+WP849's unrelated admitted fields for nondefault selectors. Loading owns a
+zero-state evaluator-local `apple_platform` MACOS value with four literal
+fields: `name="macos"`, `platform_type="macos"`,
+`name_in_plist="MacOSX"`, `is_device=True`, repr `macos`. Its type,
+equality/hash and reflection must not be faked by the distinct
+`apple_common.platform.macos` Starlark struct. The existing root-rule
+fragment declaration/call-lifetime gate applies unchanged, including
+undeclared and expired access. Analysis already constructs the fragment from
+the configured structural value; no production Analysis hook or DICE owner
+changes. No new retained option store, DICE key, Host read, cache, interner,
+lock, closure, or global registry. Use existing Starlark simple-value hash
+and `Allocative` patterns; no Buck2/V1 import or graph representation change.
 
 ## Evidence and validation
 
-Use the pinned Bazel source and `XcodeConfigTest` as the accepted source
-regression. Add focused Loading tests for the 14-argument shape, all five
-methods, six platform types/ten platform instances, eager invalid-input
-refusal, literal platform-type input, a cloned platform struct and
-wrong-name/shape refusal, wrong/missing/extra/positional args,
-freeze/global lifetime, and
-preserved Objc negatives. Add Build API identity/equality/publication tests
-for the typed retained variant. Add a direct configured-rule test returning
-the provider and a dependent indexing it by
-`apple_common.XcodeVersionConfig` and calling each method; protect generic
-unsupported function-field rejection. Split the protected coincidentally
-named `XcodeVersionInfo` occurrence test: `ProviderCollection::from_values`
-must reject that untyped occurrence before publication, while typed Xcode
-membership/indexing succeeds and Objc operations stay denied. Exercise
-source A/B/A in one DICE by changing the producer from `availability="UNKNOWN"`
-to unsupported `"LOCAL"`, requiring a fail-closed dependent, then restoring
-the source and its structural result; this proves no stale success, not a
-second admitted tuple or pointer reuse. Assert the dependent's exact method
-results: `None`, lowercase `unknown`, exactly the two empty-valued
-execution requirements, and every SDK/minimum mapping including catalyst's
-iOS minimum versus macOS SDK. Reuse synthetic rule
-fixtures; add no new oracle fixture unless a discriminating source gap is
-found.
+Add a configuration projection test for default target/exec selection and
+direct negative option-value checks for nondefault/malformed platform type,
+split CPU and macOS CPU list using the validator called by the lazy getter.
+Inspect that wiring and preserve the prior-field regression: the new gate
+must not run in `AppleFragmentProjection::new`. Internal Apple selectors are
+not in the command-option overlay, so do not invent a CLI A/B/A path. Reuse
+WP849's whole-configuration A/B/A as structural equality evidence and test
+that a changed unrelated option does not alias the projection. Add Loading
+tests under an active declared Apple fragment for exact type/fields/repr,
+equality and matching hashability across two independently allocated MACOS
+values, distinction from an ordinary struct, and
+unknown-field refusal; preserve undeclared/expired fragment negatives.
+Extend the existing configured target/exec Apple-fragment test in both
+Analysis routes to call the platform type and the WP851 Xcode minimum-OS
+method, asserting `10.11` where the same provider prerequisite is available;
+otherwise use a focused direct rule whose provider comes from a real
+configured dependency, not an authored stand-in. Test the public
+production-wrapper path, not only a manually allocated facade.
 
-Use JSON `--no-run` and exact-name preflight for focused Loading, Build API
-and Analysis tests; serialize Cargo with one target directory. Compile the
-direct CLI dependent and rebuild `slug_cli_v2` before the authentic replay.
-Check/clean stale `slugd`, then run one bounded authentic one-shot cquery
-and record its first new labelled stop. The old line-98 provider-call and
-any function-field-lowering error must be absent; this does not prove full
-Xcode repository or M7A parity. Format, `git diff --check`, plan-status and
-archive checks close validation. Independent DESIGN and FINAL reviews gate
-implementation and acceptance; update compact Stage 6/9 owner notes only
-after acceptance.
+Resolve the pinned Rust toolchain first. Serialize Cargo; compile focused
+Configuration, Loading and Analysis test executables with JSON `--no-run`,
+batch exact-name preflight, then execute only selected tests and protected
+fragment/Xcode controls. Rebuild `slug_cli_v2` before the authentic replay;
+check/clean stale `slugd` before and after. One bounded one-shot cquery must
+clear `single_arch_platform.platform_type` and its immediately following
+Xcode minimum-OS call; record the first new labelled stop or success. The
+old Apple field/type/method errors must be absent, but a later stop cannot
+prove full toolchain analysis. Run rustfmt, `git diff --check`, plan-status
+and archive checks. Independent DESIGN review gates implementation; FINAL
+review gates acceptance. Update compact Stage 6/9 owner notes only after
+acceptance.
 
-Allowlist: this manifest and canonical Current; Loading
-`app/slug_loading_v2/src/{apple_common.rs,provider.rs,lib.rs}` and one narrow
-new Xcode provider module; Build API `app/slug_build_api_v2/src/{providers/mod.rs,lib.rs}`
-and a narrow provider test module; Analysis
-`app/slug_analysis_v2/src/{analysis_value.rs,starlark_rule.rs}` and focused
-`tests/starlark_rule.rs`; compact Stage 6/9 owner notes after acceptance.
-No Bzlmod, Core, repository generator, remote-cache/action or fixture edit.
-`REPLAN` if the authentic tuple differs, the five callable fields cannot be
-represented and rematerialized without generic closure retention, actual
-consumers require a new identity/configuration owner, or source-backed
-provider behavior beyond the finite default is needed before this gate can
-be observed. Ordinary compiler/test failures remain inside this packet.
+Allowlist: this manifest and canonical Current; Configuration
+`app/slug_configuration_v2/src/native/apple_fragment.rs`; Loading
+`app/slug_loading_v2/src/analysis_fragments.rs` and
+`app/slug_loading_v2/src/analysis_fragments/apple_fragment_tests.rs`;
+Analysis `app/slug_analysis_v2/tests/subrule.rs` or one focused existing
+configured-rule test file if its real-provider dependency requires it;
+compact Stage 6/9 notes after acceptance. No Bzlmod, Core, repository
+generator, Build API, remote-cache/action, runtime fixture or general Apple
+option parser edit. `REPLAN` if the default selector does not yield MACOS,
+the typed value requires new retained/Host identity, the authentic consumer
+demands nondefault selection before this gate can be observed, or a real
+configured dependency cannot be tested inside this ownership boundary.
+Compiler/test corrections inside the accepted contract are not REPLAN.
 
 ## Immediate predecessor
 
-WP850 at `44b9c1708` accepted the five default DottedVersion values with
-independent DESIGN/FINAL review. Its rebuilt authentic cquery cleared the
-line-400 constructor stop and first stopped at the separate line-98
-`XcodeVersionConfig(...)` provider call. WP849's non-null Apple option gate,
-broader provider/repository behavior and M7A closure remain open.
+WP851 at `6cb0858ec` accepted the exact default `XcodeVersionInfo` tuple,
+typed publication and five callable fields. Its rebuilt authentic cquery
+cleared the apple_support provider-call stop and first reached the separate
+rules_cc `single_arch_platform.platform_type` field. Nondefault Apple/Xcode
+state and M7A remain open.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviews: ACCEPT. The focused Build API
-`xcode_version_info` tests pass 2/2; Loading `apple_common::tests` pass 5/5
-and `xcode_version_info::tests` pass 2/2. The Analysis typed-key test,
-producer/consumer five-method and source A/B/A test, and protected generic
-function-field rejection each pass. Exact-name preflight verified the selected
-tests before execution. `cargo fmt --all -- --check`, `git diff --check`,
-plan-status and archive checks complete the packet hygiene.
+Independent DESIGN and FINAL reviews: ACCEPT. Pinned Bazel 9.2 source and
+tests establish the default selector and typed MACOS fields; the Slug
+Configuration owner tests pass 4/4, Loading Apple fragment tests pass 3/3,
+configured Analysis target/exec Legacy/Observed test passes 1/1, and the
+real Xcode producer/consumer source A/B/A test with fragment platform type
+feeding a typed `10.11` minimum passes 1/1. Protected generic function-field
+rejection passes 1/1. JSON `--no-run` compiles and batched exact-name
+preflights selected each focused test executable. The helper-level negative
+selector tests and source-inspected lazy getter gate do not claim a public
+nondefault configuration route.
 
-The rebuilt `slug_cli_v2` authentic one-shot
-`cquery //:probe --output=label` in the existing Rust-toolchain fixture
-cleared `@@apple_support+//xcode:xcode_config.bzl:98` and did not hit generic
-function-field lowering. Its first new stop is
-`@@rules_cc++cc_configure_extension+local_config_cc//:cc_toolchain_config.bzl:38`:
-`ctx.fragments.apple.single_arch_platform.platform_type` is unavailable.
-The exit was 2, not a successful query. No stale `slugd` was present before
-or after the replay. This is a new deferred Apple-fragment boundary, not
-Xcode repository, configured C++ or M7A acceptance.
+`cargo build -p slug_cli_v2` passes. The rebuilt broad one-shot
+`cquery //:probe --output=label` exits 2 at a different label,
+`@@platforms//os:none is not a config_setting`; it is not a successful
+Rust-toolchain query and alone would not prove the Apple call executed.
+A temporary root `//:local_probe` alias to the authentic generated
+`@@rules_cc++cc_configure_extension+local_config_cc//:local` rule in the
+same scratch fixture isolates that rule. Its rebuilt one-shot cquery exits
+0 with the configured alias label; the unchanged rule necessarily evaluates
+`_target_os_version(ctx)` at rules_cc line 1748, which reads this Apple
+platform field and invokes the WP851 Xcode minimum-OS method. The temporary
+alias was removed and the scratch BUILD restored. No stale `slugd` was
+present before/after. Formatting, diff, plan-status and archive checks pass.
+The next `@@platforms//os:none` selector boundary and M7A remain open.

@@ -8,6 +8,7 @@ use starlark::environment::Globals;
 use starlark::environment::Module;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
+use starlark::values::structs::AllocStruct;
 
 use super::*;
 use crate::subrule_invocation::AnalysisEvaluationContext;
@@ -84,9 +85,58 @@ fn apple_rule_fragment_is_declared_and_expires_with_its_root_call() {
         module.get("RESULT").unwrap().to_repr(),
         "[True, True, True, True, True, True, True, True, True, True, True]"
     );
+    let module_heap = module.heap();
+    module.set(
+        "ORDINARY",
+        module_heap.alloc(AllocStruct([
+            ("name", module_heap.alloc("macos")),
+            ("platform_type", module_heap.alloc("macos")),
+            ("name_in_plist", module_heap.alloc("MacOSX")),
+            ("is_device", module_heap.alloc(true)),
+        ])),
+    );
+    eval(
+        &module,
+        "PLATFORM = fragments.apple.single_arch_platform\n\
+         PLATFORM_AGAIN = fragments.apple.single_arch_platform\n\
+         PLATFORM_RESULT = [\n\
+             type(PLATFORM) == 'apple_platform',\n\
+             repr(PLATFORM) == 'macos',\n\
+             PLATFORM.name == 'macos',\n\
+             PLATFORM.platform_type == 'macos',\n\
+             PLATFORM.name_in_plist == 'MacOSX',\n\
+             PLATFORM.is_device == True,\n\
+             dir(PLATFORM) == ['is_device', 'name', 'name_in_plist', 'platform_type'],\n\
+             PLATFORM == PLATFORM_AGAIN,\n\
+             {PLATFORM: 'macos'}[PLATFORM_AGAIN] == 'macos',\n\
+             PLATFORM != ORDINARY,\n\
+         ]\n",
+    )
+    .unwrap();
+    assert_eq!(
+        module.get("PLATFORM_RESULT").unwrap().to_repr(),
+        "[True, True, True, True, True, True, True, True, True, True]"
+    );
+    let first = module.get("PLATFORM").unwrap();
+    let second = module.get("PLATFORM_AGAIN").unwrap();
+    assert!(!first.ptr_eq(second));
+    assert!(first.equals(second).unwrap());
+    assert_eq!(
+        first.get_hashed().unwrap().hash(),
+        second.get_hashed().unwrap().hash()
+    );
+    assert!(
+        eval(
+            &module,
+            "UNKNOWN = fragments.apple.single_arch_platform.unknown\n"
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("has no attribute `unknown`")
+    );
     drop(guard);
     assert!(
-        eval(&module, "EXPIRED = fragments.apple\n")
+        eval(&module, "EXPIRED = fragments.apple.single_arch_platform\n")
             .unwrap_err()
             .to_string()
             .contains("outside of its own implementation function")
@@ -112,9 +162,36 @@ fn apple_rule_fragment_rejects_undeclared_access() {
         .enter_root_context(&module, Value::new_none())
         .unwrap();
     assert!(
-        eval(&module, "UNDECLARED = fragments.apple\n")
-            .unwrap_err()
-            .to_string()
-            .contains("rule has to declare 'apple'")
+        eval(
+            &module,
+            "UNDECLARED = fragments.apple.single_arch_platform\n"
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("rule has to declare 'apple'")
     );
+}
+
+#[test]
+fn default_macos_platform_freezes_without_losing_type_or_fields() {
+    let module = Module::new();
+    module.set(
+        "PLATFORM",
+        module.heap().alloc_simple(DefaultMacosApplePlatform),
+    );
+    let frozen = module.freeze().unwrap();
+    let binding = frozen.get("PLATFORM").unwrap();
+    let platform = binding.value();
+    assert_eq!(platform.get_type(), "apple_platform");
+    assert_eq!(platform.to_repr(), "macos");
+    let scratch = Module::new();
+    assert_eq!(
+        platform
+            .get_attr("platform_type", scratch.heap())
+            .unwrap()
+            .unwrap()
+            .unpack_str(),
+        Some("macos")
+    );
+    assert!(platform.get_hashed().is_ok());
 }

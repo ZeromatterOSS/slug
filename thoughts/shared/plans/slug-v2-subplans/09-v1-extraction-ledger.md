@@ -3090,3 +3090,15 @@ accounting form is added. Focused identity, frozen-facade, configured
 producer/consumer and source A/B/A tests plus authentic progression to the
 separate `rules_cc` Apple `single_arch_platform` stop discriminate this
 slice; no speedup or broad Xcode/configured-C++ claim is made.
+
+WP852 reuses the existing Arc-backed structural Apple configuration
+projection. The new selector reads three option values only on attribute
+access and allocates a zero-state, evaluator-local `Allocative` MACOS
+`apple_platform` value. Its fixed Starlark hash and same-type equality do
+not enter graph identity; the full configured rule key still owns option
+equality and invalidation. There is no second option store, new retained
+representation, DICE key, global interner/cache, Host read, lock or
+Buck2/V1 import. Focused selector/type/hash/fragment-lifetime tests and an
+isolated authentic generated rules_cc query discriminate this default
+projection. No performance claim, nondefault Apple selection or configured
+C++ closure is inferred.

@@ -400,8 +400,58 @@ impl fmt::Display for AppleFragmentValue {
 
 starlark::starlark_simple_value!(AppleFragmentValue);
 
+/// Bazel 9.2's Java ApplePlatform.MACOS singleton, not the distinct
+/// `apple_common.platform.macos` Starlark struct. Only the default selector
+/// may construct this evaluator-local value.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct DefaultMacosApplePlatform;
+
+impl fmt::Display for DefaultMacosApplePlatform {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("macos")
+    }
+}
+
+starlark::starlark_simple_value!(DefaultMacosApplePlatform);
+
+#[starlark_value(type = "apple_platform")]
+impl<'v> StarlarkValue<'v> for DefaultMacosApplePlatform {
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "name" | "platform_type" => Some(heap.alloc_str("macos").to_value()),
+            "name_in_plist" => Some(heap.alloc_str("MacOSX").to_value()),
+            "is_device" => Some(Value::new_bool(true)),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        ["is_device", "name", "name_in_plist", "platform_type"]
+            .map(str::to_owned)
+            .into()
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(Self::from_value(other).is_some())
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "slug.apple-platform.macos".hash(hasher);
+        Ok(())
+    }
+}
+
 #[starlark_module]
 fn apple_fragment_methods(builder: &mut MethodsBuilder) {
+    #[starlark(attribute)]
+    fn single_arch_platform<'v>(
+        this: &AppleFragmentValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        this.projection.single_arch_platform_is_default_macos()?;
+        Ok(heap.alloc_simple(DefaultMacosApplePlatform))
+    }
+
     #[starlark(attribute)]
     fn xcode_version_flag<'v>(
         this: &AppleFragmentValue,

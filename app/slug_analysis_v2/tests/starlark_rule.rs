@@ -12750,6 +12750,10 @@ def _consumer(ctx):
         actual = info.minimum_os_for_platform_type(platform_type)
         if type(actual) != "DottedVersion" or str(actual) != expected:
             fail("minimum OS for %s: %s" % (platform_type, actual))
+    selected_platform_type = ctx.fragments.apple.single_arch_platform.platform_type
+    selected_minimum = info.minimum_os_for_platform_type(selected_platform_type)
+    if selected_platform_type != "macos" or type(selected_minimum) != "DottedVersion" or str(selected_minimum) != "10.11":
+        fail("default Apple platform did not select the macOS minimum OS")
     if str(info.sdk_version_for_platform(struct(name = "catalyst"))) != "10.11":
         fail("equivalent platform struct changed the Catalyst SDK")
     return [ObservedInfo(value = "default Xcode methods verified")]
@@ -12758,6 +12762,7 @@ producer = rule(implementation = _producer, provides = [KEY])
 consumer = rule(
     implementation = _consumer,
     attrs = {"dep": attr.label(providers = [KEY])},
+    fragments = ["apple"],
 )
 "#
         .replace("AVAILABILITY", availability)

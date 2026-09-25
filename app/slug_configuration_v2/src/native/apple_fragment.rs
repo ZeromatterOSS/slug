@@ -7,6 +7,7 @@ use super::configuration::OptionValue;
 use super::configuration::SlugConfiguration;
 use super::configuration::SlugConfigurationError;
 use super::value::NativeOccurrence;
+use super::value::NativeValue;
 
 const APPLE_OPTIONS: &str = "com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions";
 
@@ -105,6 +106,47 @@ impl AppleFragmentProjection {
             "experimental_include_xcode_execution_requirements",
         )
     }
+
+    /// Bazel 9.2's default selector maps either supported host architecture
+    /// to ApplePlatform.MACOS. Keep this check lazy: other admitted Apple
+    /// fragment fields remain available with nondefault selector options.
+    pub fn single_arch_platform_is_default_macos(&self) -> Result<(), SlugConfigurationError> {
+        Self::validate_default_macos_selector(
+            self.option("apple_platform_type")?,
+            self.option("apple_split_cpu")?,
+            self.option("macos_cpus")?,
+        )
+    }
+
+    fn validate_default_macos_selector(
+        platform_type: &OptionValue,
+        split_cpu: &OptionValue,
+        macos_cpus: &OptionValue,
+    ) -> Result<(), SlugConfigurationError> {
+        if !matches!(platform_type, OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Text(value))) if value == "macos")
+        {
+            return Err(SlugConfigurationError::UnsupportedAppleConfiguration {
+                option: "apple_platform_type",
+            });
+        }
+        if !matches!(split_cpu, OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Text(value))) if value.is_empty())
+        {
+            return Err(SlugConfigurationError::UnsupportedAppleConfiguration {
+                option: "apple_split_cpu",
+            });
+        }
+        let default_macos_cpus = match macos_cpus {
+            OptionValue::Native(NativeOccurrence::Absent) => true,
+            OptionValue::Native(NativeOccurrence::List(values)) => values.0.is_empty(),
+            _ => false,
+        };
+        if !default_macos_cpus {
+            return Err(SlugConfigurationError::UnsupportedAppleConfiguration {
+                option: "macos_cpus",
+            });
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -118,6 +160,7 @@ mod tests {
     use crate::native::host::HostConversionInputs;
     use crate::native::host::HostPathFlavor;
     use crate::native::value::NativeValue;
+    use crate::native::value::NativeValues;
 
     fn default_target() -> SlugConfiguration {
         let host = HostConversionInputs::new(
@@ -154,7 +197,85 @@ mod tests {
                 assert_eq!(value, None);
             }
             assert!(!apple.include_xcode_exec_requirements().unwrap());
+            assert_eq!(apple.single_arch_platform_is_default_macos(), Ok(()));
         }
+    }
+
+    #[test]
+    fn apple_single_arch_platform_rejects_nondefault_and_malformed_selectors() {
+        let apple = AppleFragmentProjection::new(default_target()).unwrap();
+        let defaults = [
+            apple.option("apple_platform_type").unwrap().clone(),
+            apple.option("apple_split_cpu").unwrap().clone(),
+            apple.option("macos_cpus").unwrap().clone(),
+        ];
+        assert_eq!(
+            AppleFragmentProjection::validate_default_macos_selector(
+                &defaults[0],
+                &defaults[1],
+                &defaults[2]
+            ),
+            Ok(())
+        );
+        assert!(matches!(
+            &defaults[2],
+            OptionValue::Native(NativeOccurrence::List(values)) if values.0.is_empty()
+        ));
+        for (index, option, invalid) in [
+            (
+                0,
+                "apple_platform_type",
+                OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Text("ios".into()))),
+            ),
+            (
+                0,
+                "apple_platform_type",
+                OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Bool(true))),
+            ),
+            (
+                1,
+                "apple_split_cpu",
+                OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Text("arm64".into()))),
+            ),
+            (
+                1,
+                "apple_split_cpu",
+                OptionValue::Native(NativeOccurrence::Absent),
+            ),
+            (
+                2,
+                "macos_cpus",
+                OptionValue::Native(NativeOccurrence::List(NativeValues(Arc::from([
+                    NativeValue::Text("arm64".into()),
+                ])))),
+            ),
+            (
+                2,
+                "macos_cpus",
+                OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Text("arm64".into()))),
+            ),
+        ] {
+            let mut values = defaults.clone();
+            values[index] = invalid;
+            assert_eq!(
+                AppleFragmentProjection::validate_default_macos_selector(
+                    &values[0], &values[1], &values[2]
+                ),
+                Err(SlugConfigurationError::UnsupportedAppleConfiguration { option })
+            );
+            // The default projection still serves the previously admitted fields;
+            // the getter alone invokes the selector validator above.
+            assert_eq!(apple.xcode_version_flag().unwrap(), None);
+            assert!(apple.prefer_mutual_xcode().unwrap());
+        }
+        assert_eq!(
+            AppleFragmentProjection::validate_default_macos_selector(
+                &defaults[0],
+                &defaults[1],
+                &OptionValue::Native(NativeOccurrence::Absent)
+            ),
+            Ok(())
+        );
     }
 
     #[test]

@@ -874,6 +874,13 @@ def _exec_parent(ctx):
 fragment_exec_parent = rule(implementation = _exec_parent, subrules = [exec_probe])
 def _apple_defaults(ctx):
     apple = ctx.fragments.apple
+    platform = apple.single_arch_platform
+    if type(platform) != "apple_platform" or repr(platform) != "macos":
+        fail("unexpected default Apple platform type or repr")
+    if dir(platform) != ["is_device", "name", "name_in_plist", "platform_type"]:
+        fail("unexpected default Apple platform fields")
+    if [platform.name, platform.platform_type, platform.name_in_plist, platform.is_device] != ["macos", "macos", "MacOSX", True]:
+        fail("unexpected default Apple platform values")
     if apple.xcode_version_flag != None: fail("unexpected Xcode version flag")
     if [
         apple.ios_sdk_version_flag,

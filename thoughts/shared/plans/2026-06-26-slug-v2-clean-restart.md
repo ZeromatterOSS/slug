@@ -29,19 +29,17 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-151-m7a-default-xcode-version-info-r1
+Packet: WP-7-152-m7a-default-apple-single-arch-platform-r1
 Status: accepted; M7A remains partial
 
-WP851 accepts the pinned `apple_support` 1.24.2 default
-`XcodeVersionConfig(...)` tuple at `xcode_config.bzl:98`, typed builtin
-provider publication, configured lookup and five callable default-path
-methods. Independent DESIGN/FINAL reviews and focused tests pass. A rebuilt
-authentic cquery clears line 98 and next stops at the deferred
-`rules_cc` Apple fragment `single_arch_platform` field. Non-default Xcode
-selection, generated repository semantics and M7A closure remain open.
-WP850 at `44b9c1708` accepted the five default SDK DottedVersion values.
-See
-`slug-v2-subplans/current-packet.md`.
+WP852 accepts the pinned default MACOS `apple_platform` projection from
+`ctx.fragments.apple.single_arch_platform`, with nondefault selectors
+still unsupported. Independent DESIGN/FINAL review and focused tests pass.
+An isolated rebuilt authentic `rules_cc` cc_toolchain_config cquery clears
+the field and subsequent Xcode minimum-OS call; the broader Rust-toolchain
+cquery exits at a separate `@@platforms//os:none` config-setting boundary.
+WP851 at `6cb0858ec` accepted the default Xcode provider and exposed this
+Apple stop. M7A remains partial. See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

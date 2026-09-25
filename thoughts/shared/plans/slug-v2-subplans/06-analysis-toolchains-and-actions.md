@@ -1951,6 +1951,20 @@ The rebuilt authentic cquery clears `xcode_config.bzl:98` and next stops at
 `rules_cc`'s unmodeled `ctx.fragments.apple.single_arch_platform.platform_type`.
 Non-default Xcode, generated repository bytes and configured C++ remain open.
 
+## Default Apple single-arch platform (WP852, 2026-09-24)
+
+The existing structural Apple fragment now lazily validates the default
+`apple_platform_type="macos"`, empty split CPU and empty macOS CPU list
+when `single_arch_platform` is accessed. It exposes a distinct typed
+`apple_platform` MACOS value, not the separate `apple_common.platform.macos`
+struct: four pinned fields, lowercase repr and enum-like equality/hashability.
+Nondefault selectors fail closed on this attribute without narrowing the
+previously admitted fragment fields. Target/exec Legacy/Observed and real
+configured Xcode minimum-OS tests pass. An isolated authentic generated
+rules_cc cc_toolchain_config cquery succeeds through the Apple/Xcode call;
+the broader Rust-toolchain cquery next stops at `@@platforms//os:none` being
+treated as a config_setting. That selector and full configured C++ remain open.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.
