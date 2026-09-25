@@ -23,6 +23,17 @@ testonly prerequisites, package-group aliases and nonneutral unmodeled native
 attributes fail closed. Loading/query declarations remain unchanged. This is a
 full-toolchain prerequisite, not installed-tool or full cc_toolchain acceptance.
 
+WP846 admits one Bazel 9.2 package-default legacy license case in configured
+native filegroup analysis: a Default-provenance singleton `licenses=["notice"]`
+is retained by Loading/query and ignored only by the filegroup's provider/
+action construction under default license options. Explicit target licenses,
+other inherited values, `output_licenses`, other nonneutral attrs and opt-in
+license checking remain closed. Root/external forwarding and same-DICE
+notice-to-restricted-to-notice tests pass; fresh Bazel/Slug configured queries
+match. Authentic Rust-toolchain cquery clears the license guard and next
+stops at `_xcode_config` Apple configuration-field resolution. The error
+does not name the owning target; no C++ closure is claimed.
+
 M2 configured analysis is accepted with Slug-native configuration/path identity.
 WP-7-35 adds `ctx.actions.declare_directory(filename, sibling=None)` through the
 active analysis token and existing artifact owner. A phase-local declaration map

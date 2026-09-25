@@ -26,6 +26,8 @@ async fn native_filegroup_rejects_unadmitted_own_attribute_capabilities() {
                 "\nfilegroup(name='unsupported_{name}',srcs=['a.txt'],{name}={value})\n"
             ));
         }
+        // Package defaults apply to all filegroups, including ones declared above.
+        build.push_str("\nlicenses(['notice'])\n");
         fs::write(path, build).unwrap();
     }
     let dice = Dice::builder().build(DetectCycles::Enabled);
@@ -45,12 +47,19 @@ async fn native_filegroup_rejects_unadmitted_own_attribute_capabilities() {
                 "{name}: {error}"
             );
         }
-        assert!(
-            workspace
-                .request(&dice, external, "single", configuration(&[]))
-                .await
-                .is_ok()
+        let result = workspace
+            .request(&dice, external, "single", configuration(&[]))
+            .await
+            .unwrap();
+        assert!(result.actions().is_empty());
+        let source = source_paths(external, &["a.txt"]);
+        assert_eq!(info(&result).file_artifacts().len(), 1);
+        assert_eq!(info(&result).file_artifacts()[0].path().as_ref(), source[0]);
+        assert_eq!(
+            info(&result).executable.as_ref().unwrap().path().as_ref(),
+            source[0]
         );
+        assert_eq!(paths(&info(&result).data_runfiles.files), source);
     }
 }
 

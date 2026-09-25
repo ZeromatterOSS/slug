@@ -1,0 +1,6 @@
+licenses(["notice"])
+
+filegroup(
+    name = "inherited",
+    srcs = ["payload.txt"],
+)

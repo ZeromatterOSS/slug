@@ -1,0 +1,24 @@
+[fixture]
+name = "native-filegroup-package-license"
+description = "Bazel 9.2 configures a native filegroup inheriting package-default licenses([\"notice\"])."
+comparison = "semantic"
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Self-contained Bzlmod workspace with one source file, no external module or credential RC. The configured query distinguishes successful analysis of an inherited package license from Slug's previous nondefault-license guard. Explicit target licenses, other license values and opt-in license checking are outside this fixture."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/packages/Rule.java:733-747 (explicit rule license or inherited package declaration)",
+  "src/main/java/com/google/devtools/build/lib/rules/filegroup/Filegroup.java:44-118 (configured filegroup source forwarding)",
+  "src/main/java/com/google/devtools/build/lib/analysis/config/CoreOptions.java:706-711 (default license-checking option)",
+]
+translation_notes = "The root BUILD declares only a package license and a source filegroup. The cquery row proves the filegroup configures with inherited notice; separate focused Analysis tests protect provenance and fail-closed boundaries."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture native-filegroup-package-license --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture native-filegroup-package-license --tool bazel --bazel /usr/bin/bazel --run-root <independent-fresh-root>"
+
+[[commands]]
+name = "inherited_notice_filegroup_configures"
+argv = ["cquery", "//:inherited", "--output=label"]
+expected_exit = 0
+stdout_patterns = ['\A//:inherited \((?:[0-9a-f]{7}|slugcfg-v2:[0-9a-f]{64})\)\n?\Z']

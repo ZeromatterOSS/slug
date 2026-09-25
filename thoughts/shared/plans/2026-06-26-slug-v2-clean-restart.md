@@ -29,19 +29,20 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-145-m7a-bazel-tools-cc-whitelist-r1
+Packet: WP-7-146-m7a-filegroup-package-license-r1
 Status: ACCEPTED; M7A remains partial
 
-WP845 ports verbatim the single pinned Bazel 9.2
-`@bazel_tools//tools/build_defs/cc/whitelists/parse_headers_and_layering_check:BUILD`
-file into Slug's immutable catalog, plus exact byte/mode and offline
-package evidence. The real empty whitelist is not replaced by Bazel's
-permissive test mock. Fresh four-row Bazel/Slug evidence and focused
-catalog tests pass; authentic cquery clears the missing package and next
-stops on nondefault configured filegroup `licenses`. Independent FINAL
-review accepted the slice; the error does not identify which filegroup.
-WP844's injected suite shim remains accepted at
-`0cdf1b9b5`. Real C++ providers and root Build remain deferred. See
+WP846 adds a provenance-gated Analysis admission for native filegroups
+inheriting package `licenses(["notice"])`, preserving loaded metadata while
+leaving explicit/other licenses and opt-in checking deferred. Fresh ignored-RC
+Bazel 9.2 and rebuilt Slug cquery evidence passes; focused Analysis tests
+pass. Authentic cquery clears the license guard and next stops at Apple
+`_xcode_config` configured-field resolution. Independent FINAL review
+accepted the slice; no exact triggering target is claimed.
+WP845's exact
+built-in whitelist package remains accepted at `df7c4992b`; its authentic
+stop was the nondefault filegroup-license guard. Real C++ providers and
+root Build remain deferred. See
 `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

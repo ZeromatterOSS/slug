@@ -3020,3 +3020,14 @@ catalog tests, four fresh Bazel/Slug query rows and authentic progression
 to a later nondefault-`licenses` Analysis guard discriminate the addition.
 The guard does not name the triggering filegroup, and no configured C++
 closure or memory/performance gain is claimed.
+
+WP846 uses Loading's existing Default-versus-Explicit provenance and
+retained native license StringList to admit only package-inherited
+`["notice"]` in configured filegroup analysis. The resolved attribute
+remains a phase-local borrow in the existing guard; source/provider/action
+representations, configured keys, package equality, DICE ownership,
+invalidation and restoration are unchanged. No new collection, interner,
+hash scheme, lock, global cache or memory-accounting shape is introduced.
+Root/external and same-DICE tests plus fresh Bazel/Slug configured queries
+discriminate the admission; authentic cquery reaches the separate Apple
+configuration-field stop. No speedup or broad license-checking claim is made.

@@ -6,6 +6,7 @@ use slug_build_api_v2::ProviderIdentity;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::RetainedRunfiles;
 use slug_build_api_v2::RunfilesConflictPolicy;
+use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::RuleVisibility;
 
 use super::*;
@@ -106,6 +107,18 @@ async fn prepare(
             }
             let value = resolve_configured_attribute(&attribute.value, &conditions.values)
                 .map_err(|e| e.to_string())?;
+            // Bazel's native filegroup forwards sources without consuming the
+            // package's default notice license under default license options.
+            if name == "licenses"
+                && attribute.provenance == AttributeProvenance::Default
+                && matches!(
+                    &value,
+                    CoercedAttributeValue::StringList(values)
+                        if values.len() == 1 && values[0].as_str() == "notice"
+                )
+            {
+                continue;
+            }
             if !neutral(&value) {
                 return Err(format!("native filegroup nondefault {name} is unsupported"));
             }
