@@ -3042,3 +3042,15 @@ The full configuration library passes 93/93 and authentic cquery reaches
 a separate Bzlmod built-in selected-extension route panic. Its caller
 does not identify the demanded target or prove Xcode repository/provider
 analysis; no speedup or broad Apple parity is claimed.
+
+WP848 adds one DICE-retained selected-definition source variant holding only
+the existing copyable `BuiltinBazelToolsRouteIdentity`. The selected graph
+owns the route identity; the existing Arc-backed request retains the full
+definition-host mapping and participates in structural equality. The Root
+route reuses its built-in source/capability; no new key, collection, interner,
+hash shortcut, global cache, lock, Host observation, V1/Buck2 import or
+memory-accounting form is introduced. Synthetic A/B/A mapping equality,
+actual built-in MODULE demand/warm DICE and pinned-source Loading tests
+discriminate the admission. Authentic cquery reaches a later
+`apple_support` fragment error; no performance gain, generated-repository
+effect or Apple-provider claim is made.

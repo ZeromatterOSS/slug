@@ -41,6 +41,7 @@ use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 use url::Url;
 
+use crate::BuiltinBazelToolsRouteIdentity;
 use crate::ModuleRegistrationPattern;
 use crate::NonrootRepoOverride;
 use crate::OverrideAttributeKey;
@@ -4370,6 +4371,9 @@ pub struct HostSelectedExtensionDefinitionLoadRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum HostSelectedExtensionDefinitionSource {
     Root,
+    BuiltinBazelTools {
+        route_identity: BuiltinBazelToolsRouteIdentity,
+    },
     Selected {
         definition: HostCanonicalSelectedModuleDefinition,
         apparent_repo: ApparentRepoName,
@@ -4457,12 +4461,12 @@ impl HostSelectedExtensionDefinitionLoadRequest {
     }
 }
 
-pub(super) fn selected_extension_definition_source(
+fn selected_extension_definition_source(
     routes: &Arc<HostSelectedModuleRoutes>,
     mapping: &HostSelectedRepositoryMapping,
-    label: &CanonicalLabel,
+    id: &HostSelectedExtensionId,
 ) -> Option<HostSelectedExtensionDefinitionSource> {
-    let canonical_repo = label.package().repo();
+    let canonical_repo = id.bzl_file.package().repo();
     if canonical_repo.is_root() {
         return Some(HostSelectedExtensionDefinitionSource::Root);
     }
@@ -4470,6 +4474,30 @@ pub(super) fn selected_extension_definition_source(
         CanonicalRouteMatch::Unique(ordinal) => ordinal,
         CanonicalRouteMatch::Missing | CanonicalRouteMatch::Duplicate { .. } => return None,
     };
+    let route = &routes.entries[ordinal];
+    if let HostGraphModuleSource::Discovered(module) = &route.entry.source {
+        if let HostDiscoveredModuleProvenance::BuiltinBazelTools { route_identity, .. } =
+            &module.provenance
+        {
+            let correct_host = matches!(
+                &route.entry.key,
+                HostGraphModuleKey::Module { name, version }
+                    if name.as_str() == "bazel_tools" && version.is_empty()
+            ) && route.canonical_repo.as_str() == "bazel_tools"
+                && &mapping.context_repo == canonical_repo;
+            let pinned_definition = id.kind == HostSelectedExtensionOwnerKind::ModuleExtension
+                && id.isolation.is_none()
+                && canonical_repo.as_str() == "bazel_tools"
+                && id.bzl_file.package().package().as_str() == "tools/osx"
+                && id.bzl_file.target().as_str() == "xcode_configure.bzl"
+                && id.extension_name.as_str() == "xcode_configure_extension";
+            return (correct_host && pinned_definition).then_some(
+                HostSelectedExtensionDefinitionSource::BuiltinBazelTools {
+                    route_identity: *route_identity,
+                },
+            );
+        }
+    }
     let definition = HostCanonicalSelectedModuleDefinition {
         routes: Arc::new(Ok((**routes).clone())),
         ordinal,
@@ -4608,19 +4636,16 @@ fn selected_extension_definition_load_requests(
             continue;
         }
         seen.insert(usage.id.clone(), usage.unique_name.clone());
-        let source = selected_extension_definition_source(
-            &predecessor.routes,
-            root_mapping,
-            &usage.id.bzl_file,
-        )
-        .ok_or_else(|| {
-            HostSelectedExtensionDefinitionLoadRequestsError(
-                HostSelectedExtensionDefinitionLoadRequestsErrorInner::Unsupported {
-                    owner: usage.owner.clone(),
-                    id: usage.id.clone(),
-                },
-            )
-        })?;
+        let source =
+            selected_extension_definition_source(&predecessor.routes, root_mapping, &usage.id)
+                .ok_or_else(|| {
+                    HostSelectedExtensionDefinitionLoadRequestsError(
+                        HostSelectedExtensionDefinitionLoadRequestsErrorInner::Unsupported {
+                            owner: usage.owner.clone(),
+                            id: usage.id.clone(),
+                        },
+                    )
+                })?;
         let imports = predecessor
             .usages
             .iter()

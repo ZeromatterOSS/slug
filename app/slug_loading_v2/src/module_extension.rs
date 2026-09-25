@@ -2849,6 +2849,7 @@ mod tests {
     use slug_bzlmod_v2::host_repository_materialization_request;
     use slug_bzlmod_v2::install_registry_io;
     use slug_identity_v2::ApparentRepoName;
+    use slug_identity_v2::CanonicalRepoName;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
@@ -2872,6 +2873,11 @@ mod tests {
     use crate::bzl_module::HostPreparedModuleExtensionInputsObservationError;
     use crate::bzl_module::HostPreparedModuleExtensionInputsObservationKey;
     use crate::bzl_module::ObservedHostPreparedModuleExtensionInputs;
+    use crate::canonical_repository_route_tests::tests::EXTENSION_A;
+    use crate::canonical_repository_route_tests::tests::WORKSPACE;
+    use crate::canonical_repository_route_tests::tests::builtin_graph_dice;
+    use crate::canonical_repository_route_tests::tests::builtin_graph_module;
+    use crate::canonical_repository_route_tests::tests::transaction;
 
     #[test]
     fn prepared_observation_surface_is_sibling_module_usable() {
@@ -5421,6 +5427,121 @@ mod tests {
                 .unwrap();
         }
         updater.commit_with_data(data).await
+    }
+
+    #[tokio::test]
+    async fn selected_builtin_xcode_definition_loads_before_invocation() {
+        let dice = builtin_graph_dice();
+        let module = builtin_graph_module();
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let requested =
+            CanonicalRepoName::new("bazel_tools+xcode_configure_extension+local_config_xcode")
+                .unwrap();
+        let mut tx = transaction(&dice, &module, EXTENSION_A, true, None).await;
+
+        let demand = tx
+            .compute(&HostSelectedExtensionDemandKey::new(
+                workspace.dupe(),
+                requested.clone(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(demand) = demand else {
+            panic!("built-in Xcode demand returned Need");
+        };
+        let demand = demand.as_ref().as_ref().unwrap();
+        assert_eq!(demand.requested(), &requested);
+        assert_eq!(
+            demand.owner().unique_name().as_str(),
+            "bazel_tools+xcode_configure_extension"
+        );
+
+        let inputs = tx
+            .compute(&HostSelectedExtensionOwnerInputsKey::new(
+                workspace.dupe(),
+                demand.owner().clone(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(inputs) = inputs else {
+            panic!("built-in Xcode owner inputs returned Need");
+        };
+        let inputs = inputs.as_ref().as_ref().unwrap();
+        let request = inputs.request();
+        assert_eq!(
+            request.parts().0,
+            &CanonicalLabel::parse("@@bazel_tools//tools/osx:xcode_configure.bzl").unwrap()
+        );
+        assert_eq!(request.parts().1, "xcode_configure_extension");
+        assert_eq!(request.parts().2.as_str(), "bazel_tools");
+        assert_eq!(
+            request
+                .parts()
+                .3
+                .get("local_config_xcode")
+                .unwrap()
+                .as_str(),
+            requested.as_str()
+        );
+        assert_eq!(
+            request.parts().3.get("apple_support").unwrap().as_str(),
+            "apple_support+"
+        );
+        let mut warm = transaction(&dice, &module, EXTENSION_A, true, None).await;
+        let warm_inputs = warm
+            .compute(&HostSelectedExtensionOwnerInputsKey::new(
+                workspace.dupe(),
+                demand.owner().clone(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(warm_inputs) = warm_inputs else {
+            panic!("warm built-in Xcode owner inputs returned Need");
+        };
+        assert_eq!(warm_inputs.as_ref().as_ref().unwrap(), inputs);
+        let HostSelectedExtensionDefinitionSource::BuiltinBazelTools { route_identity } =
+            request.source()
+        else {
+            panic!("Xcode definition did not select the built-in source");
+        };
+        let route = RootRepositoryRoute::for_selected_extension_definition(
+            workspace.dupe(),
+            request.source(),
+        )
+        .expect("selected built-in Xcode definition has a root route");
+        assert!(route.is_builtin_bazel_tools());
+        assert_eq!(route.canonical_repo().as_str(), "bazel_tools");
+        assert_eq!(
+            route.source_capability(),
+            slug_bzlmod_v2::HostRepositorySourceCapability::builtin(
+                workspace.dupe(),
+                ApparentRepoName::new("bazel_tools").unwrap(),
+                CanonicalRepoName::new("bazel_tools").unwrap(),
+                route_identity.clone(),
+            )
+            .unwrap()
+        );
+
+        let label = RepositoryBzlLabel::new(
+            request.parts().0.package().package().clone(),
+            RootPackageBzlTarget::parse(request.parts().0.target().as_str()).unwrap(),
+        )
+        .unwrap();
+        let bzl = tx
+            .compute(&ExternalBzlModuleEvalKey::new_bzlmod(route, label))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(bzl) = bzl else {
+            panic!("built-in Xcode definition load returned Need");
+        };
+        let bzl = bzl.as_ref().as_ref().unwrap();
+        assert!(bzl.manifest.direct_children.is_empty());
+        assert_eq!(bzl.manifest.reachable.len(), 1);
+        let projection = owner_projection(bzl, request).unwrap();
+        assert!(projection.manifest.direct_children.is_empty());
+        assert!(projection.definition.tag_classes.is_empty());
+        assert!(projection.definition.environment.is_empty());
+        assert_eq!(projection.definition.facts_version, 0);
     }
 
     #[tokio::test]

@@ -631,6 +631,22 @@ generated `BUILD.tpl` declare `licenses(["notice"])`; the diagnostic omits
 the target label, so the exact triggering filegroup and C++ closure remain
 open.
 
+### Built-in Xcode extension definition ingress accepted (WP848, 2026-09-25)
+
+The selected-extension owner admits only the pinned built-in
+`@@bazel_tools//tools/osx:xcode_configure.bzl%xcode_configure_extension`
+definition for the `local_config_xcode` demand. It copies the selected
+graph's built-in route identity into the existing Root source route and
+retains the complete definition-host mapping in the request. Other built-in
+extensions remain typed unsupported, and the public canonical selected-
+definition key still returns `BuiltinDeferred`; there is no generic built-in
+Bzl-load mapping admission. Direct pinned-source Loading, actual built-in
+MODULE demand/warm DICE, route-error and A/B/A mapping tests pass. Authentic
+cquery clears the former built-in-route panic and next stops at
+`@@apple_support+//xcode:xcode_config.bzl:34` on `ctx.fragments.apple`.
+Extension invocation effects, generated repository bytes, Apple providers,
+and M7A closure remain deferred.
+
 ## Historical evidence
 
 Full checkpoint chronology and exact source/validation receipts remain at

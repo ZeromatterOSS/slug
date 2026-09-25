@@ -1413,6 +1413,16 @@ impl RootRepositoryRoute {
         workspace: NormalizedAbsolutePath,
         source: &HostSelectedExtensionDefinitionSource,
     ) -> Option<Self> {
+        if let HostSelectedExtensionDefinitionSource::BuiltinBazelTools { route_identity } = source
+        {
+            return Some(Self {
+                workspace,
+                apparent_repo: ApparentRepoName::new("bazel_tools").ok()?,
+                module_name: CompactString::new("bazel_tools"),
+                canonical_repo: CanonicalRepoName::new("bazel_tools").ok()?,
+                source: RootRepositorySource::BuiltinBazelTools(*route_identity),
+            });
+        }
         let HostSelectedExtensionDefinitionSource::Selected {
             definition,
             apparent_repo,

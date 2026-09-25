@@ -638,7 +638,7 @@ fn owner_inputs(
         unique_name: owner.unique_name.clone(),
         base_mapping: mapping.clone(),
         mapping: mapping.clone(),
-        source: selected_extension_definition_source(&mappings.routes, mapping, &owner.id.bzl_file)
+        source: selected_extension_definition_source(&mappings.routes, mapping, &owner.id)
             .ok_or_else(|| {
                 HostSelectedExtensionOwnerInputsError(OwnerInputsError::Unsupported {
                     owner: owner.dupe(),
@@ -1885,12 +1885,9 @@ mod tests {
             extension_projection: testing_extension_mapping_projection(),
         });
 
-        let expected = selected_extension_definition_source(
-            &mappings.routes,
-            &mappings.mappings[1],
-            &id.bzl_file,
-        )
-        .unwrap();
+        let expected =
+            selected_extension_definition_source(&mappings.routes, &mappings.mappings[1], &id)
+                .unwrap();
         let inputs = owner_inputs(owner, &mappings).unwrap();
         assert_eq!(inputs.request().source(), &expected);
         let HostSelectedExtensionDefinitionSource::Selected {
@@ -1912,6 +1909,289 @@ mod tests {
         assert!(matches!(
             inputs.request().source(),
             HostSelectedExtensionDefinitionSource::Selected { .. }
+        ));
+    }
+
+    fn builtin_xcode_owner_mappings() -> (
+        Arc<HostSelectedExtensionOwner>,
+        HostSelectedExtensionMappings,
+        crate::BuiltinBazelToolsRouteIdentity,
+    ) {
+        let (_, mut mappings) = owner_inputs_mappings();
+        let builtin_key = HostGraphModuleKey::Module {
+            name: "bazel_tools".into(),
+            version: crate::module_version::BazelModuleVersion::parse("").unwrap(),
+        };
+        let id = HostSelectedExtensionId {
+            bzl_file: CanonicalLabel::parse("@@bazel_tools//tools/osx:xcode_configure.bzl")
+                .unwrap(),
+            extension_name: "xcode_configure_extension".into(),
+            isolation: None,
+            kind: HostSelectedExtensionOwnerKind::ModuleExtension,
+        };
+        let unique_name = "bazel_tools+xcode_configure_extension";
+        let generated = "bazel_tools+xcode_configure_extension+local_config_xcode";
+        let owner = Arc::new(HostSelectedExtensionOwner {
+            id: id.clone(),
+            unique_name: CanonicalRepoName::new(unique_name).unwrap(),
+        });
+        let route_identity = crate::BuiltinBazelToolsSnapshot::CURRENT.route_identity();
+        let mut builtin_module = NonrootModuleBuilder::new(
+            NonrootModuleKey::new("bazel_tools", ""),
+            "bazel_tools",
+            "",
+            "bazel_tools",
+        );
+        builtin_module
+            .extension_usages
+            .push(crate::NonrootExtensionUsage {
+                bzl_label: "//tools/osx:xcode_configure.bzl".into(),
+                extension_name: id.extension_name.clone(),
+                proxies: Arc::from([crate::NonrootExtensionProxy {
+                    proxy_name: "xcode_configure".into(),
+                    containing_file: crate::LogicalModuleFileId::new("/MODULE.bazel"),
+                    dev_dependency: false,
+                    location: span(),
+                    imports: crate::NonrootRepoImports::from_local_to_exported(
+                        SmallMap::from_iter([(
+                            CompactString::new("local_config_xcode"),
+                            CompactString::new("local_config_xcode"),
+                        )]),
+                    )
+                    .unwrap(),
+                }]),
+                tags: Arc::from([]),
+                repo_overrides: Arc::new(SmallMap::new()),
+                isolation: None,
+            });
+        let builtin_module = builtin_module.build().unwrap();
+        let base_entries = SmallMap::from_iter([
+            (
+                ApparentRepoName::new("bazel_tools").unwrap(),
+                CanonicalRepoName::new("bazel_tools").unwrap(),
+            ),
+            (
+                ApparentRepoName::new("platforms").unwrap(),
+                CanonicalRepoName::new("platforms").unwrap(),
+            ),
+            (
+                ApparentRepoName::new("apple_support").unwrap(),
+                CanonicalRepoName::new("apple_support+").unwrap(),
+            ),
+        ]);
+        let base_mapping = HostSelectedRepositoryMapping {
+            context_repo: CanonicalRepoName::new("bazel_tools").unwrap(),
+            order: base_entries.keys().cloned().collect(),
+            entries: Arc::new(base_entries.clone()),
+        };
+        let mut final_entries = base_entries;
+        final_entries.insert(
+            ApparentRepoName::new("local_config_xcode").unwrap(),
+            CanonicalRepoName::new(generated).unwrap(),
+        );
+        let final_mapping = HostSelectedRepositoryMapping {
+            context_repo: base_mapping.context_repo.clone(),
+            order: final_entries.keys().cloned().collect(),
+            entries: Arc::new(final_entries),
+        };
+        let mut routes = mappings.routes.entries.to_vec();
+        routes[1] = HostSelectedModuleRoute {
+            entry: HostSelectedModuleEntry {
+                key: builtin_key.clone(),
+                source: HostGraphModuleSource::Discovered(Arc::new(HostDiscoveredModule {
+                    module: builtin_module,
+                    provenance: HostDiscoveredModuleProvenance::BuiltinBazelTools {
+                        route_identity,
+                        module_sha256: [0; 32],
+                    },
+                })),
+                dependencies: Arc::from([]),
+                original_dependencies: Arc::from([]),
+                nodep_dependencies: Arc::from([]),
+            },
+            canonical_repo: CanonicalRepoName::new("bazel_tools").unwrap(),
+            mapping: base_mapping.clone(),
+            registry_repo_spec: None,
+        };
+        mappings.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: routes.into(),
+            extension_projection: testing_extension_mapping_projection(),
+        });
+        mappings.root_usages = Arc::from([]);
+        let mut xcode_usage = usage(builtin_key, id, unique_name, generated);
+        xcode_usage.imports = Arc::new(SmallMap::from_iter([(
+            ApparentRepoName::new("local_config_xcode").unwrap(),
+            CanonicalRepoName::new(generated).unwrap(),
+        )]));
+        mappings.usages = Arc::from([xcode_usage]);
+        mappings.base_mappings = Arc::from([mappings.base_mappings[0].clone(), base_mapping]);
+        mappings.mappings = Arc::from([mappings.mappings[0].clone(), final_mapping]);
+        (owner, mappings, route_identity)
+    }
+
+    #[test]
+    fn builtin_xcode_owner_inputs_copy_graph_identity_and_reject_other_builtin_extensions() {
+        let (owner, mappings, route_identity) = builtin_xcode_owner_mappings();
+        let inputs = owner_inputs(owner.dupe(), &mappings).unwrap();
+        let request = inputs.request();
+        assert_eq!(
+            request.parts().0.to_string(),
+            "@@bazel_tools//tools/osx:xcode_configure.bzl"
+        );
+        assert_eq!(request.parts().1, "xcode_configure_extension");
+        assert_eq!(request.parts().2.as_str(), "bazel_tools");
+        assert_eq!(
+            request
+                .parts()
+                .3
+                .get("local_config_xcode")
+                .unwrap()
+                .as_str(),
+            "bazel_tools+xcode_configure_extension+local_config_xcode"
+        );
+        assert_eq!(
+            request.parts().3.get("apple_support").unwrap().as_str(),
+            "apple_support+"
+        );
+        assert!(matches!(
+            request.source(),
+            HostSelectedExtensionDefinitionSource::BuiltinBazelTools {
+                route_identity: actual,
+            } if *actual == route_identity
+        ));
+        let route = crate::RootRepositoryRoute::for_selected_extension_definition(
+            NormalizedAbsolutePath::new("/selected-extension-demand-test").unwrap(),
+            request.source(),
+        )
+        .unwrap();
+        assert_eq!(route.canonical_repo().as_str(), "bazel_tools");
+        assert_eq!(route.module_name(), "bazel_tools");
+        assert!(matches!(
+            route.source(),
+            crate::RootRepositorySource::BuiltinBazelTools(actual)
+                if *actual == route_identity
+        ));
+        assert_eq!(inputs.modules().len(), 1);
+        assert_eq!(inputs.modules()[0].parts().0.as_str(), "bazel_tools");
+
+        let mut other_owner = (*owner).clone();
+        other_owner.id.bzl_file =
+            CanonicalLabel::parse("@@bazel_tools//tools/test:extensions.bzl").unwrap();
+        other_owner.id.extension_name = "remote_coverage_tools_extension".into();
+        other_owner.unique_name =
+            CanonicalRepoName::new("bazel_tools+remote_coverage_tools_extension").unwrap();
+        let other_owner = Arc::new(other_owner);
+        let mut other_mappings = mappings.clone();
+        let mut other_usage = mappings.usages[0].clone();
+        other_usage.id = other_owner.id.clone();
+        other_usage.unique_name = other_owner.unique_name.clone();
+        other_usage.imports = Arc::new(SmallMap::from_iter([(
+            ApparentRepoName::new("remote_coverage_tools").unwrap(),
+            CanonicalRepoName::new(
+                "bazel_tools+remote_coverage_tools_extension+remote_coverage_tools",
+            )
+            .unwrap(),
+        )]));
+        other_mappings.usages = Arc::from([other_usage]);
+        assert!(matches!(
+            owner_inputs(other_owner.clone(), &other_mappings),
+            Err(HostSelectedExtensionOwnerInputsError(
+                OwnerInputsError::Unsupported { owner: rejected }
+            )) if rejected == other_owner
+        ));
+
+        let mut missing = mappings.clone();
+        missing.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: missing.routes.entries[..1].into(),
+            extension_projection: testing_extension_mapping_projection(),
+        });
+        assert!(matches!(
+            owner_inputs(owner.dupe(), &missing),
+            Err(HostSelectedExtensionOwnerInputsError(
+                OwnerInputsError::Missing { .. }
+            ))
+        ));
+        let mut duplicate = mappings.clone();
+        let mut routes = duplicate.routes.entries.to_vec();
+        routes.push(routes[1].clone());
+        duplicate.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: routes.into(),
+            extension_projection: testing_extension_mapping_projection(),
+        });
+        assert!(matches!(
+            owner_inputs(owner.dupe(), &duplicate),
+            Err(HostSelectedExtensionOwnerInputsError(
+                OwnerInputsError::Inconsistent { .. }
+            ))
+        ));
+        let mut inconsistent = mappings;
+        let mut final_mappings = inconsistent.mappings.to_vec();
+        final_mappings[1].context_repo = CanonicalRepoName::root();
+        inconsistent.mappings = final_mappings.into();
+        assert!(matches!(
+            owner_inputs(owner, &inconsistent),
+            Err(HostSelectedExtensionOwnerInputsError(
+                OwnerInputsError::Inconsistent { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn builtin_xcode_owner_inputs_restore_mapping_structural_equality() {
+        let (owner, a_mappings, route_identity) = builtin_xcode_owner_mappings();
+        let mut b_mappings = a_mappings.clone();
+        let mut final_mappings = b_mappings.mappings.to_vec();
+        let mut entries = (*final_mappings[1].entries).clone();
+        entries.insert(
+            ApparentRepoName::new("local_config_xcode").unwrap(),
+            CanonicalRepoName::new("platforms").unwrap(),
+        );
+        final_mappings[1].entries = Arc::new(entries);
+        b_mappings.mappings = final_mappings.into();
+        let a = owner_inputs(owner.dupe(), &a_mappings).unwrap();
+        let b = owner_inputs(owner.dupe(), &b_mappings).unwrap();
+        let restored = owner_inputs(owner, &a_mappings).unwrap();
+        assert!(matches!(
+            a.request().source(),
+            HostSelectedExtensionDefinitionSource::BuiltinBazelTools {
+                route_identity: actual,
+            } if *actual == route_identity
+        ));
+        assert_eq!(a.request().source(), b.request().source());
+        assert_eq!(a.request().source(), restored.request().source());
+        assert_eq!(
+            a.request()
+                .parts()
+                .3
+                .get("local_config_xcode")
+                .unwrap()
+                .as_str(),
+            "bazel_tools+xcode_configure_extension+local_config_xcode"
+        );
+        assert_eq!(
+            b.request()
+                .parts()
+                .3
+                .get("local_config_xcode")
+                .unwrap()
+                .as_str(),
+            "platforms"
+        );
+        assert_ne!(a.request(), b.request());
+        assert_eq!(a.request(), restored.request());
+        assert_ne!(a, b);
+        assert_eq!(a, restored);
+        let complete = |inputs: HostSelectedExtensionOwnerInputs| ->
+            <HostSelectedExtensionOwnerInputsKey as Key>::Value {
+                SourcePreparationOutcome::Complete(Arc::new(Ok(inputs)))
+            };
+        assert!(!HostSelectedExtensionOwnerInputsKey::equality(
+            &complete(a.clone()),
+            &complete(b),
+        ));
+        assert!(HostSelectedExtensionOwnerInputsKey::equality(
+            &complete(a),
+            &complete(restored),
         ));
     }
 
