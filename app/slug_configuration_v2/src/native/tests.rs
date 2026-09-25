@@ -1058,7 +1058,7 @@ mod command_configuration_tests {
     }
 
     #[test]
-    fn selected_apple_xcode_field_is_typed_compact_and_fails_closed() {
+    fn selected_apple_xcode_field_projects_retained_label_in_target_and_exec() {
         assert!(ConfigurationField::is_fragment_name("apple"));
         assert_eq!(size_of::<ConfigurationField>(), 1);
         #[cfg(target_pointer_width = "64")]
@@ -1103,13 +1103,41 @@ mod command_configuration_tests {
         assert_ne!(first, proto);
         assert_eq!(first.field(), field);
         assert_eq!(first.tools_repository().as_str(), "bazel_tools+one");
-        assert_eq!(
-            configuration()
-                .configuration_field_label(&first)
-                .unwrap_err()
-                .to_string(),
-            "configuration_field(fragment = \"apple\", name = \"xcode_config_label\") configured resolution is unsupported"
-        );
+        let configured = CanonicalLabel::parse("@@bazel_tools//tools/cpp:host_xcodes").unwrap();
+        let loading_fallback =
+            CanonicalLabel::parse("@@bazel_tools//tools/objc:host_xcodes").unwrap();
+        assert_ne!(configured, loading_fallback);
+        let target = SlugConfiguration::default_target(
+            &HostConversionInputs::new(
+                Some(AutoCpuToken::K8),
+                Some(HostPathFlavor::Unix),
+                None,
+                Arc::from([]),
+                Arc::from([]),
+            )
+            .unwrap()
+            .with_action_environment_host(
+                super::super::host::ActionEnvironmentHost::without_environment(
+                    super::super::host::ActionEnvironmentHostOs::Linux,
+                ),
+            ),
+        )
+        .unwrap();
+        let exec = target.to_exec().unwrap();
+        for (kind, configuration) in [("target", &target), ("exec", &exec)] {
+            for identity in [&first, &restored, &remapped] {
+                assert_eq!(
+                    configuration.configuration_field_label(identity).unwrap(),
+                    Some(configured.clone()),
+                    "{kind}: {identity:?}"
+                );
+            }
+            assert_ne!(
+                configuration.configuration_field_label(&first).unwrap(),
+                Some(loading_fallback.clone()),
+                "{kind} must not use the loading fallback"
+            );
+        }
     }
 
     #[test]

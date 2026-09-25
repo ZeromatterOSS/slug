@@ -34,6 +34,15 @@ match. Authentic Rust-toolchain cquery clears the license guard and next
 stops at `_xcode_config` Apple configuration-field resolution. The error
 does not name the owning target; no C++ closure is claimed.
 
+WP847 projects the admitted Apple `xcode_config_label` configured field
+from the owning structural `xcode_version_config` Label option, yielding
+the pinned Bazel 9.2 cpp `host_xcodes` default in both target and exec
+configurations. It does not use the distinct objc Loading fallback or add
+an option override, Xcode provider, repository effect or DICE owner.
+Configuration tests pass 93/93; the rebuilt authentic cquery next
+panics in Bzlmod selected-extension routing. The panic's requester is
+unlabelled, so configured C++/Xcode closure remains unproved.
+
 M2 configured analysis is accepted with Slug-native configuration/path identity.
 WP-7-35 adds `ctx.actions.declare_directory(filename, sibling=None)` through the
 active analysis token and existing artifact owner. A phase-local declaration map

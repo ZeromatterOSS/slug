@@ -3031,3 +3031,14 @@ hash scheme, lock, global cache or memory-accounting shape is introduced.
 Root/external and same-DICE tests plus fresh Bazel/Slug configured queries
 discriminate the admission; authentic cquery reaches the separate Apple
 configuration-field stop. No speedup or broad license-checking claim is made.
+
+WP847 uses the existing native option vector and `native_label` projection
+for one configured Apple field; the default canonical cpp `host_xcodes`
+Label is already retained and structurally included in configuration
+equality. Target/exec projection and Loading-fallback distinction are
+covered without adding a DICE key, retained representation, collection,
+interner, hash scheme, Host observation, lock or memory-accounting form.
+The full configuration library passes 93/93 and authentic cquery reaches
+a separate Bzlmod built-in selected-extension route panic. Its caller
+does not identify the demanded target or prove Xcode repository/provider
+analysis; no speedup or broad Apple parity is claimed.

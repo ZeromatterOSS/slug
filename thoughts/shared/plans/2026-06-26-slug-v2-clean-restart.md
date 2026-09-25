@@ -29,20 +29,24 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-146-m7a-filegroup-package-license-r1
+Packet: WP-7-147-m7a-apple-xcode-configured-field-r1
 Status: ACCEPTED; M7A remains partial
 
-WP846 adds a provenance-gated Analysis admission for native filegroups
-inheriting package `licenses(["notice"])`, preserving loaded metadata while
-leaving explicit/other licenses and opt-in checking deferred. Fresh ignored-RC
-Bazel 9.2 and rebuilt Slug cquery evidence passes; focused Analysis tests
-pass. Authentic cquery clears the license guard and next stops at Apple
-`_xcode_config` configured-field resolution. Independent FINAL review
-accepted the slice; no exact triggering target is claimed.
-WP845's exact
-built-in whitelist package remains accepted at `df7c4992b`; its authentic
-stop was the nondefault filegroup-license guard. Real C++ providers and
-root Build remain deferred. See
+WP847 implements the bounded exact configured projection of the Apple
+`xcode_config_label` field from the owning structural native
+`xcode_version_config` option. The Bazel 9.2 configured default is
+`@bazel_tools//tools/cpp:host_xcodes`, distinct from the
+`//tools/objc:host_xcodes` Loading annotation fallback. The authentic
+post-WP846 stop is the field rejection; the diagnostic lacks an owning
+target label. Configuration tests pass 93/93 and the rebuilt authentic
+cquery now first panics in the Bzlmod selected-extension route; its
+unlabelled path does not establish Xcode-provider progress. Independent
+FINAL review accepted this narrow projection. Explicit option overrides, the Xcode
+repository/provider graph, full toolchain analysis and root Build
+remain deferred. WP846
+at `bcc16845f` accepted the provenance-gated inherited-notice
+filegroup slice; WP845 at `df7c4992b` accepted the verbatim
+built-in whitelist package. See
 `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

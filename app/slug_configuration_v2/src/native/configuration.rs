@@ -49,6 +49,7 @@ const PROJECTION_MAGIC: &[u8] = b"slugcfg\0";
 const PROJECTION_VERSION: u16 = 2;
 const PLATFORM_OPTIONS: &str = "com.google.devtools.build.lib.analysis.PlatformOptions";
 const CPP_OPTIONS: &str = "com.google.devtools.build.lib.rules.cpp.CppOptions";
+const APPLE_OPTIONS: &str = "com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions";
 const CORE_OPTIONS: &str = "com.google.devtools.build.lib.analysis.config.CoreOptions";
 const SHELL_OPTIONS: &str = "com.google.devtools.build.lib.analysis.ShellConfiguration.Options";
 const COVERAGE_OPTIONS: &str =
@@ -340,7 +341,6 @@ pub enum SlugConfigurationError {
     InvalidCppConfiguration { reason: &'static str },
     UnsupportedJavaConfigurationField { field: ConfigurationField },
     UnsupportedProtoConfigurationField { field: ConfigurationField },
-    UnsupportedAppleConfigurationField { field: ConfigurationField },
     ActionEnvironment { reason: &'static str },
 }
 
@@ -426,11 +426,6 @@ impl fmt::Display for SlugConfigurationError {
             Self::UnsupportedProtoConfigurationField { field } => write!(
                 formatter,
                 "configuration_field(fragment = \"proto\", name = \"{}\") configured resolution is unsupported",
-                field.field_name()
-            ),
-            Self::UnsupportedAppleConfigurationField { field } => write!(
-                formatter,
-                "configuration_field(fragment = \"apple\", name = \"{}\") configured resolution is unsupported",
                 field.field_name()
             ),
             Self::ActionEnvironment { reason } => {
@@ -1101,9 +1096,7 @@ impl SlugConfiguration {
             });
         }
         if identity.field() == ConfigurationField::AppleXcodeConfigLabel {
-            return Err(SlugConfigurationError::UnsupportedAppleConfigurationField {
-                field: identity.field(),
-            });
+            return self.native_label(APPLE_OPTIONS, "xcode_version_config");
         }
         if matches!(
             identity.field(),
