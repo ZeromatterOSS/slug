@@ -34,17 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-171-m7a-filegroup-data-implicit-source-r1
+Packet: WP-7-172-m7a-action-file-sibling-declaration-r1
 Status: accepted; independent DESIGN/FINAL accepted; M7A remains partial
 
-WP871 accepts implicit source eligibility for retained native filegroup data,
-excluding symbolic-macro-only declarations and existing symbolic macro names
-through retained metadata while preserving the old srcs predicate. Independent
-DESIGN/FINAL, 15 focused tests in 1.165s and Core/CLI pass. Unchanged authentic
-query in 83.533s clears host-tools source admission and reaches
-`actions.declare_file(..., sibling=...)`; original three hashes and actual process
-cleanup pass. Next bounded slice is genuine File sibling declaration through the
-existing action sink. Full bootstrap and Windows remain deferred.
+WP872 accepts genuine File sibling declaration through the existing public binder
+and native action sink. Unix path normalization and componentwise confinement keep
+the current context's root/owner; active-token, interning, kind-conflict and action
+registration owners remain unchanged. Independent DESIGN/FINAL, 15 focused tests in
+0.444s and Core/CLI pass. Unchanged authentic query in 76.973s clears declaration
+and symlink construction and reaches rules_rust's legacy `Target.files` access.
+Original hashes, actual cleanup and hygiene gates pass. Next candidate reuses the
+existing frozen DefaultInfo.files projection; legacy-flag and missing-default
+boundaries need explicit design disposition. Windows sibling is a minimal refusal;
+directory sibling and full query/execution/bootstrap closure remain deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

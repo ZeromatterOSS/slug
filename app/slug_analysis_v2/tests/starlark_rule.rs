@@ -15141,3 +15141,181 @@ plain = rule(implementation = _plain)
     assert_eq!(provider_value(&zero, &provider), "zero");
     assert_eq!(zero.actions().len(), 1);
 }
+
+/// Pinned ActionFactory141-162 and StarlarkRuleContextTest1144-1189: sibling
+/// location is independent of current output ownership; symlink remains native.
+#[tokio::test]
+async fn declared_file_siblings_feed_native_symlinks_and_restore_source_configuration() {
+    use slug_build_api_v2::AnalysisArtifact;
+
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name='root')\nbazel_dep(name='dep',version='1.0.0')\nlocal_path_override(module_name='dep',path='dep')\n").unwrap();
+    fs::create_dir_all(workspace.join("dep")).unwrap();
+    fs::write(
+        workspace.join("dep/MODULE.bazel"),
+        "module(name='dep',version='1.0.0')\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("dep/REPO.bazel"), "").unwrap();
+    fs::write(workspace.join("dep/.bazelignore"), "").unwrap();
+    let source = r#"def _producer(ctx):
+    out = ctx.actions.declare_file('sub/input.o')
+    ctx.actions.write(out, 'producer')
+    return [DefaultInfo(files=depset([out]))]
+producer = rule(implementation=_producer)
+def _probe(ctx):
+    src = ctx.actions.declare_file('source.link', sibling=ctx.file.src)
+    same = ctx.actions.declare_file(filename='./source.link', sibling=ctx.file.src)
+    if src != same: fail('sibling declaration identity changed')
+    dep = ctx.actions.declare_file(filename='dependency.link', sibling=ctx.file.dep)
+    ctx.actions.symlink(output=src, target_file=ctx.file.src)
+    ctx.actions.symlink(output=dep, target_file=ctx.file.dep)
+    return [DefaultInfo(files=depset([src, dep]))]
+probe = rule(implementation=_probe, attrs={'src':attr.label(allow_single_file=True), 'dep':attr.label(allow_single_file=True, cfg='exec')})
+"#;
+    let build = "load(':defs.bzl','producer','probe')\nexports_files(['lib/input.h','lib/other.h'])\nproducer(name='producer')\nprobe(name='subject',src='lib/input.h',dep=':producer')\n";
+    for package in [
+        &workspace,
+        &workspace.join("pkg"),
+        &workspace.join("dep/pkg"),
+    ] {
+        fs::create_dir_all(package.join("lib")).unwrap();
+        fs::write(package.join("defs.bzl"), source).unwrap();
+        fs::write(package.join("BUILD.bazel"), build).unwrap();
+        for file in ["input.h", "other.h"] {
+            fs::write(package.join("lib").join(file), "source\n").unwrap();
+        }
+    }
+    for observed in [false, true] {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        for (package, label, prefix) in [
+            (workspace.clone(), "@@//:subject", ""),
+            (workspace.join("pkg"), "@@//pkg:subject", "pkg/"),
+            (
+                workspace.join("dep/pkg"),
+                "@@dep+//pkg:subject",
+                "external/dep+/pkg/",
+            ),
+        ] {
+            let request = |config: ConfigurationKey| {
+                let workspace = &workspace;
+                let dice = &dice;
+                async move {
+                    let tracker = Arc::new(RootActivationTracker::default());
+                    let epoch = root_epoch(workspace);
+                    if observed {
+                        observed_root_target_request_with_inputs(
+                            dice,
+                            workspace,
+                            label,
+                            config,
+                            tracker,
+                            epoch,
+                            &[("dep+", "dep")],
+                        )
+                        .await
+                    } else {
+                        root_target_request_with_inputs(
+                            dice,
+                            workspace,
+                            label,
+                            config,
+                            tracker,
+                            epoch,
+                            &[("dep+", "dep")],
+                        )
+                        .await
+                    }
+                }
+            };
+            let target = cc_configure_features::config(&[]);
+            let execution = ConfigurationKey::from_slug(
+                target.slug_configuration().unwrap().to_exec().unwrap(),
+            );
+            for (execution, config) in [(false, target), (true, execution)] {
+                let first = request(config.clone()).await.unwrap_or_else(|error| {
+                    panic!("observed={observed} execution={execution} {label}: {error}")
+                });
+                assert_eq!(first.actions().len(), 2);
+                let owner = first.configured_target_key().unwrap().artifact_owner();
+                let files = first.providers().default_info().unwrap().file_artifacts();
+                for (index, relative) in ["lib/source.link", "sub/dependency.link"]
+                    .into_iter()
+                    .enumerate()
+                {
+                    let AnalysisArtifact::Derived {
+                        owner: actual,
+                        output,
+                    } = &files[index]
+                    else {
+                        panic!("current declaration")
+                    };
+                    assert_eq!(actual, &owner);
+                    assert_eq!(
+                        output.root().configuration(),
+                        config.slug_configuration().unwrap()
+                    );
+                    assert_eq!(output.root_relative_path(), format!("{prefix}{relative}"));
+                    let link = first.actions()[index].symlink_spec().unwrap();
+                    assert_eq!(link.output(), output);
+                    let SymlinkTarget::Artifact { input, .. } = link.target() else {
+                        panic!("artifact symlink")
+                    };
+                    if index == 0 {
+                        assert!(matches!(input, AnalysisArtifact::Source(_)));
+                        assert_eq!(input.path(), format!("{prefix}lib/input.h"));
+                    } else {
+                        let AnalysisArtifact::Derived {
+                            owner: dependency,
+                            output: input,
+                        } = input
+                        else {
+                            panic!("derived dependency")
+                        };
+                        assert_ne!(dependency, &owner);
+                        assert_eq!(input.root_relative_path(), format!("{prefix}sub/input.o"));
+                        let structural = config.slug_configuration().unwrap();
+                        let expected = structural
+                            .to_exec_for_platform(&structural.host_platform_label().unwrap())
+                            .unwrap();
+                        assert!(
+                            input.root().configuration() == &expected,
+                            "dependency must use the selected host execution platform"
+                        );
+                    }
+                }
+                for (path, original, changed) in [
+                    (
+                        package.join("BUILD.bazel"),
+                        build,
+                        build.replace("src='lib/input.h'", "src='lib/other.h'"),
+                    ),
+                    (
+                        package.join("defs.bzl"),
+                        source,
+                        source.replace("source.link", "changed.link"),
+                    ),
+                ] {
+                    fs::write(&path, changed).unwrap();
+                    assert_ne!(request(config.clone()).await.unwrap(), first);
+                    fs::write(path, original).unwrap();
+                    assert_eq!(request(config.clone()).await.unwrap(), first);
+                }
+                let changed = cc_configure_features::config(&[(
+                    NativeCommandOption::ExperimentalSaveFeatureState,
+                    "true",
+                )]);
+                let changed = if execution {
+                    ConfigurationKey::from_slug(
+                        changed.slug_configuration().unwrap().to_exec().unwrap(),
+                    )
+                } else {
+                    changed
+                };
+                assert_ne!(request(changed).await.unwrap(), first);
+                assert_eq!(request(config).await.unwrap(), first);
+            }
+        }
+    }
+    fs::remove_dir_all(workspace).unwrap();
+}

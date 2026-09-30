@@ -55,6 +55,212 @@ fn internal() -> FrozenModule {
     module.freeze().unwrap()
 }
 
+#[derive(Debug, Default)]
+struct DeclarationSink(Mutex<Vec<(String, Option<AnalysisArtifact>)>>);
+
+impl AnalysisActionSink for DeclarationSink {
+    fn declare_file(
+        &self,
+        filename: &str,
+        sibling: Option<&AnalysisArtifact>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        self.0
+            .lock()
+            .unwrap()
+            .push((filename.to_owned(), sibling.cloned()));
+        // Binding proof only: production declaration ownership is tested in Analysis.
+        Ok(AnalysisArtifactValue::new(AnalysisArtifact::Source(
+            CanonicalLabel::parse("@@//:recorded").unwrap(),
+        )))
+    }
+    fn write(&self, _: Value<'_>, _: Value<'_>, _: bool) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn run_shell(&self, _: Value<'_>, _: &str, _: Value<'_>) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn run(&self, _: AnalysisRunRequest<'_>) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn artifact_symlink(
+        &self,
+        _: Value<'_>,
+        _: Value<'_>,
+        _: bool,
+        _: Option<&str>,
+    ) -> anyhow::Result<()> {
+        unreachable!()
+    }
+    fn absolute_symlink(&self, _: Value<'_>, _: &str, _: Option<&str>) -> anyhow::Result<()> {
+        unreachable!()
+    }
+}
+
+#[test]
+fn declare_file_sibling_binding_forwards_files_and_preserves_active_scope() {
+    let module = Module::new();
+    let source = AnalysisArtifact::Source(CanonicalLabel::parse("@@//pkg:source.rlib").unwrap());
+    let derived = crate::cc_common::solib_tests::artifact();
+    let frozen = Module::new();
+    frozen.set(
+        "frozen_sibling",
+        frozen
+            .heap()
+            .alloc_simple(AnalysisArtifactValue::new(derived.clone())),
+    );
+    let frozen = frozen.freeze().unwrap();
+    let frozen_sibling = frozen.get("frozen_sibling").unwrap();
+    module.import_public_symbols(&frozen);
+    module.set("frozen_sibling", frozen_sibling.value());
+    module.set(
+        "sibling",
+        module
+            .heap()
+            .alloc_simple(AnalysisArtifactValue::new(source.clone())),
+    );
+    assert!(module.get("sibling").unwrap().unpack_frozen().is_none());
+    assert!(
+        module
+            .get("frozen_sibling")
+            .unwrap()
+            .unpack_frozen()
+            .is_some()
+    );
+    let sink = Arc::new(DeclarationSink::default());
+    let context = AnalysisEvaluationContext::new(
+        Arc::from([]),
+        [],
+        CanonicalLabel::parse("@@//:subject").unwrap(),
+        sink.clone(),
+        FrozenValue::new_none(),
+        Arc::from([]),
+    );
+    let _guard = context
+        .enter_root_context(&module, module.heap().alloc(AllocList([7])))
+        .unwrap();
+    let base = actions(&module, &context);
+    let mut eval = Evaluator::new(&module);
+    eval.extra = Some(&context);
+    let wrapped = wrap(base, None, false, &mut eval).unwrap();
+    for receiver in [base, wrapped] {
+        module.set("receiver", receiver);
+        execute(&mut eval, "omitted = receiver.declare_file('omitted')\nnone = receiver.declare_file(filename='none', sibling=None)\nmutable = receiver.declare_file('mutable', sibling=sibling)\nfrozen = receiver.declare_file(filename='frozen', sibling=frozen_sibling)\n").unwrap();
+        for name in ["omitted", "none", "mutable", "frozen"] {
+            assert!(AnalysisArtifactValue::from_starlark(module.get(name).unwrap()).is_some());
+        }
+        let count = sink.0.lock().unwrap().len();
+        for expression in [
+            "receiver.declare_file('bad', sibling=1)",
+            "receiver.declare_file('bad', sibling='file')",
+            "receiver.declare_file('bad', sibling=[])",
+            "receiver.declare_file('bad', sibling=struct(path='file'))",
+            "receiver.declare_file('bad', sibling)",
+            "receiver.declare_file(path='legacy')",
+            "receiver.declare_file(1)",
+            "receiver.declare_file('bad', filename='duplicate')",
+        ] {
+            assert!(execute(&mut eval, expression).is_err(), "{expression}");
+            assert_eq!(sink.0.lock().unwrap().len(), count);
+        }
+    }
+    let expected = vec![
+        ("omitted".to_owned(), None),
+        ("none".to_owned(), None),
+        ("mutable".to_owned(), Some(source.clone())),
+        ("frozen".to_owned(), Some(derived.clone())),
+    ];
+    assert_eq!(
+        *sink.0.lock().unwrap(),
+        expected
+            .iter()
+            .chain(&expected)
+            .cloned()
+            .collect::<Vec<_>>()
+    );
+
+    let identity = Arc::new(SubruleIdentity {
+        defining_label: CanonicalLabel::parse("@@//:subrule.bzl").unwrap(),
+        exported_name: "helper".into(),
+    });
+    context.stack.lock().unwrap().frames.push(CallFrame {
+        token: 1,
+        caller: Some(identity.clone()),
+        direct: Arc::from([]),
+    });
+    let token = AnalysisCallToken {
+        token: 1,
+        stack: context.stack.clone(),
+    };
+    let subrule_guard = CallFrameGuard {
+        token: token.clone(),
+    };
+    let subrule = module.heap().alloc_simple(AnalysisActions::new(
+        context.payload.action_sink.clone(),
+        token,
+        "subrule context",
+        AnalysisActionCallScope::Subrule(identity),
+    ));
+    let sub_wrapped = wrap(subrule, None, false, &mut eval).unwrap();
+    for receiver in [subrule, sub_wrapped] {
+        module.set("receiver", receiver);
+        execute(
+            &mut eval,
+            "receiver.declare_file('subrule', sibling=frozen_sibling)\n",
+        )
+        .unwrap();
+    }
+    assert_eq!(
+        &sink.0.lock().unwrap()[8..],
+        &[
+            ("subrule".to_owned(), Some(derived.clone())),
+            ("subrule".to_owned(), Some(derived))
+        ]
+    );
+    module.set(
+        "root_method",
+        wrapped
+            .get_attr("declare_file", module.heap())
+            .unwrap()
+            .unwrap(),
+    );
+    module.set(
+        "sub_method",
+        sub_wrapped
+            .get_attr("declare_file", module.heap())
+            .unwrap()
+            .unwrap(),
+    );
+    let count = sink.0.lock().unwrap().len();
+    let error = execute(&mut eval, "root_method('suspended', sibling=1)").unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("outside of its own implementation"),
+        "{error}"
+    );
+    assert_eq!(sink.0.lock().unwrap().len(), count);
+    drop(subrule_guard);
+    for sibling in ["None", "sibling", "1"] {
+        let error = execute(
+            &mut eval,
+            &format!("sub_method('expired', sibling={sibling})"),
+        )
+        .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("outside of its own implementation"),
+            "{error}"
+        );
+        assert_eq!(sink.0.lock().unwrap().len(), count);
+    }
+    execute(&mut eval, "root_method('restored', sibling=sibling)\n").unwrap();
+    assert_eq!(
+        sink.0.lock().unwrap().last(),
+        Some(&("restored".to_owned(), Some(source)))
+    );
+}
+
 #[test]
 fn preserved_soname_normalizes_linux_paths_and_requires_wrapper_positional_binding() {
     let module = Module::new();
@@ -459,6 +665,14 @@ fn escaped_link_wrapper_methods_reject_after_success_and_error() {
             );
             assert!(!message.contains("unsupported/deferred"), "{message}");
         }
+        let error = execute(&mut eval, "ordinary('unused', sibling=1)").unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("outside of its own implementation function"),
+            "{error}"
+        );
+        assert!(!error.to_string().contains("sibling must be"), "{error}");
         assert!(sink.0.lock().unwrap().is_empty());
     }
 }

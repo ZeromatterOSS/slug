@@ -1458,8 +1458,60 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
         Ok(output)
     }
 
-    fn declare_file(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
-        self.declare_output(path, ActionOutputKind::File)
+    fn declare_file(
+        &self,
+        filename: &str,
+        sibling: Option<&AnalysisArtifact>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
+        let flavor = self
+            .root
+            .configuration()
+            .configured_action_path_flavor()
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        if flavor == HostPathFlavor::Windows {
+            if sibling.is_some() {
+                anyhow::bail!("ctx.actions.declare_file sibling on Windows is deferred");
+            }
+            return self.declare_output(filename, ActionOutputKind::File);
+        }
+        let package = slug_build_api_v2::repository_relative_output_path(
+            self.owner.label().package().repo(),
+            &self.package_path,
+        );
+        let package = package.trim_end_matches('/');
+        let sibling_path = sibling.map(|artifact| match artifact {
+            AnalysisArtifact::Derived { output, .. } => {
+                std::borrow::Cow::Borrowed(output.root_relative_path())
+            }
+            AnalysisArtifact::WorkspaceStatus(status) => {
+                std::borrow::Cow::Borrowed(status.short_path())
+            }
+            AnalysisArtifact::Source(_) => artifact.path(),
+        });
+        let directory = sibling_path.as_ref().map_or(package, |path| {
+            path.rsplit_once('/').map_or("", |(parent, _)| parent)
+        });
+        let path = if filename.starts_with('/') || directory.is_empty() {
+            filename.to_owned()
+        } else {
+            format!("{directory}/{filename}")
+        };
+        let path = NormalizedBazelPath::new(flavor, &path)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        let path = path.as_str();
+        if path.starts_with('/')
+            || (!package.is_empty()
+                && path != package
+                && !path
+                    .strip_prefix(package)
+                    .is_some_and(|suffix| suffix.starts_with('/')))
+        {
+            anyhow::bail!(
+                "the output artifact '{path}' is not under package directory '{package}' for target '{}'",
+                self.owner.label()
+            );
+        }
+        self.declare_bin_relative_output(path.to_owned(), ActionOutputKind::File)
     }
 
     fn declare_compile_output(&self, path: String) -> anyhow::Result<AnalysisArtifactValue> {

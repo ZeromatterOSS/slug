@@ -47,6 +47,16 @@ from new data candidates while legacy srcs eligibility remains unchanged. Nested
 unexported data Files keep Null identity and unconditional File runfiles inclusion.
 External generated-label reconstruction remains separately deferred.
 
+The native declare_file binder accepts positional/named filename and a named-only
+genuine File or None sibling. Under admitted Linux paths, sibling supplies its
+output-directory-relative parent only; existing path normalization and componentwise
+repository/package confinement precede the shared declaration sink. Every new File
+keeps the current context's configured owner and bin root, including source,
+foreign-owner/configuration derived, directory and status File siblings. Existing
+interning, type conflicts, active-token guards and write/symlink registration remain
+authoritative; declaration itself creates no action. Directory sibling declarations,
+Windows sibling behavior and alternate repository layout remain deferred.
+
 WP846 admits one Bazel 9.2 package-default legacy license case in configured
 native filegroup analysis: a Default-provenance singleton `licenses=["notice"]`
 is retained by Loading/query and ignored only by the filegroup's provider/

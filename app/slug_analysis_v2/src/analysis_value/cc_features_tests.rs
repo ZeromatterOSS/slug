@@ -18,7 +18,11 @@ use super::*;
 #[derive(Debug)]
 struct NoActions;
 impl AnalysisActionSink for NoActions {
-    fn declare_file(&self, _: &str) -> anyhow::Result<AnalysisArtifactValue> {
+    fn declare_file(
+        &self,
+        _: &str,
+        _: Option<&AnalysisArtifact>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
         unreachable!("feature configuration does not declare actions")
     }
     fn write(&self, _: Value<'_>, _: Value<'_>, _: bool) -> anyhow::Result<()> {

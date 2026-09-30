@@ -27,7 +27,11 @@ use crate::subrule_invocation::AnalysisRunRequest;
 struct NoopActionSink;
 
 impl AnalysisActionSink for NoopActionSink {
-    fn declare_file(&self, _path: &str) -> anyhow::Result<AnalysisArtifactValue> {
+    fn declare_file(
+        &self,
+        _path: &str,
+        _sibling: Option<&slug_build_api_v2::AnalysisArtifact>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
         unreachable!("caller-authentication proof declares no actions")
     }
 

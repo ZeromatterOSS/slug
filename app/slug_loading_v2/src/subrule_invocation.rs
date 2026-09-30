@@ -167,7 +167,11 @@ pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
         anyhow::bail!("native Solib construction is unavailable in this analysis context")
     }
 
-    fn declare_file(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue>;
+    fn declare_file(
+        &self,
+        filename: &str,
+        sibling: Option<&AnalysisArtifact>,
+    ) -> anyhow::Result<AnalysisArtifactValue>;
     fn declare_directory(&self, _path: &str) -> anyhow::Result<AnalysisArtifactValue> {
         anyhow::bail!("directory declarations are unavailable in this analysis context")
     }
@@ -1880,13 +1884,27 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         actions.action_sink.transform_build_info(request)
     }
 
-    fn declare_file(this: Value, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
+    fn declare_file(
+        this: Value,
+        filename: &str,
+        #[starlark(require = named)] sibling: Option<Value>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
         let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         actions
             .token
             .require_active("declare_file", actions.context_name)?;
-        actions.action_sink.declare_file(path)
+        let sibling = sibling
+            .filter(|value| !value.is_none())
+            .map(|value| {
+                AnalysisArtifactValue::from_starlark(value)
+                    .map(AnalysisArtifactValue::artifact)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("ctx.actions.declare_file sibling must be a File or None")
+                    })
+            })
+            .transpose()?;
+        actions.action_sink.declare_file(filename, sibling)
     }
 
     fn declare_directory(

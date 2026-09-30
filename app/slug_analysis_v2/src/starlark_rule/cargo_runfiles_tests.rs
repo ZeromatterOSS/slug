@@ -32,7 +32,11 @@ struct Declarations {
     actions: Mutex<CtxActions>,
 }
 impl AnalysisActionSink for Declarations {
-    fn declare_file(&self, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
+    fn declare_file(
+        &self,
+        path: &str,
+        _: Option<&AnalysisArtifact>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
         let output = self
             .actions
             .lock()

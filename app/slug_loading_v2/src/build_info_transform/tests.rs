@@ -101,7 +101,11 @@ impl AnalysisActionSink for Sink {
         // These typed Files exercise callback result lifetime and metadata.
         Ok(AnalysisArtifactValue::new(artifact))
     }
-    fn declare_file(&self, _: &str) -> anyhow::Result<AnalysisArtifactValue> {
+    fn declare_file(
+        &self,
+        _: &str,
+        _: Option<&AnalysisArtifact>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
         unreachable!()
     }
     fn write(&self, _: Value<'_>, _: Value<'_>, _: bool) -> anyhow::Result<()> {

@@ -1,148 +1,159 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-171-m7a-filegroup-data-implicit-source-r1
+Packet: WP-7-172-m7a-action-file-sibling-declaration-r1
 Status: accepted; independent DESIGN/FINAL accepted; M7A remains partial
 
 ## Outcome and compatibility
 
-Baseline `50a71f761` (WP870). Admit implicit source labels referenced only by
-native filegroup data through the existing package declaration predicate and
-tracked source-resolution owner. Advance the unchanged authentic Rust-toolchain
-cquery beyond the missing host-tools
-`lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld/ld.lld` target if that physical
-source is present; its archive membership is currently unverified. Do not claim
-that it exists or change archive/symlink policy from a target-not-found error.
-Exact bounded same-package data-label eligibility and source File/runfiles
-semantics; artifact paths and configuration identity remain Slug-native. Existing
-macro, visibility, unsupported filesystem-kind, coverage/output-group and other
-native-attribute boundaries remain deferred or explicitly refused. Windows stays
-minimal; full toolchain/query/bootstrap and M8 remain unproved.
+Baseline `ed00e59da` (WP871). Admit genuine File `sibling` for the existing public
+`ctx.actions.declare_file(filename, *, sibling=None)` method and current native
+declaration sink. Advance the unchanged authentic Rust-toolchain query beyond
+rules_rust private/utils.bzl:516. Exact bounded Linux File binding, parent-relative
+path normalization, componentwise package confinement and current-context ownership;
+structural artifact/configuration identity and output paths remain Slug-native.
+No sibling root/owner is copied. Files may originate from other rules/configurations
+or be source/directory/status Files; location alone determines eligibility.
+Directory declarations with non-None sibling, alternate sibling-repository layout,
+backslash/NUL path spellings and full action/execution/bootstrap closure remain
+unsupported/deferred. Windows keeps its existing ordinary declaration behavior and
+a minimal explicit sibling refusal; no Windows implementation or test expansion.
 
-Pinned Bazel 9.2 clean `8220c619` Package.java:873–965 creates assumed InputFile
-for same-package referenced label-typed attributes, excluding existing target/
-macro and symbolic-macro-only declarations; it is not limited to srcs.
-TargetRecorder.java:230–231/429 collects Rule.getLabels; PackageFactoryTest.java:
-301–338 testCreationOfInputFiles and VisibilityTest.java:785–806 protect implicit
-file and export policy. FilegroupRule.java:60–62 admits data LABEL_LIST Files.
-Reuse WP870's exact data runfiles split, source/actual-File identity and declared
-selected edges. Slug dice.rs:2740's package_declares_source_label recognizes only
-Filegroup.srcs. Driver:5355–5413 rejects data-only implicit Null labels BEFORE
-physical observation. Source-admitted preparation:793–877 and source_file.rs:
-203–205/246–306 already own nested label paths and canonical repository tracked
-resolution. Generated archive extractor:161–164 explicitly rejects symlink/
-hardlink/GNU-longlink rather than dropping them; current receipts do not justify
-archive changes. The real host-tools template/archive is not retained after
-one-shot temporary-root cleanup, so the generic declaration gap and replay must
-be distinguished from an asserted physical file.
+Pinned clean Bazel 9.2 `8220c619`: StarlarkActionFactoryApi.java:118–153 declares
+filename positional/named and sibling named-only genuine File|None default None.
+StarlarkActionFactory.java:141–162 checks mutable context, uses package directory
+without sibling or Artifact.getOutputDirRelativePath(...).replaceName(filename),
+checks componentwise package confinement, then current ruleContext/newFileRoot.
+Artifact.java:507–508/783–785 uses root-relative derived paths and nonsibling-layout
+source execution paths; status File root-relative names match short_path.
+PathFragment.java:775–786 and PathFragmentTest.java:337–355 show replaceName uses
+parent.getRelative, including nested/dot/parent/empty/absolute replacements; docs'
+base-name wording does not replace that behavior. StarlarkRuleContextTest.java:
+1144–1189 covers nested declarations and tool source siblings; directory-sibling
+API examples are source guidance only while that public method remains deferred.
+StarlarkIntegrationTest.java:3896–3950 covers outside-package sibling and absolute
+output refusal. Existing rules_rust utility's following symlink call already has a
+genuine native binder and action owner; declaration must not fabricate contents.
 
-## Owner, invariants and scope
+## Owner and invariants
 
-Extend only the existing Filegroup arm of package_declares_source_label: preserve
-its srcs candidates. For new data candidates, exclude targets with symbolic macro
-origin and labels equal to existing symbolic macro instance names using retained
-macro_origin/macro_instances metadata. Consult genuine retained native data values through
-package.native_attributes, using the existing CoercedAttributeValue.labels walk.
-Selector values and concatenations supply declaration candidates; condition keys
-must not become source candidates. Candidate presence is eligibility only;
-filegroup's existing configured join still observes only selected labels.
-Keep package inventory, immutable attributes/source certificates, macro/source
-admission, Null identity and SourceFileState/Need/error semantics with their
-existing owners. Every actual existence check stays in DICE-owned source_file;
-no filesystem scan, fabricated artifact, fallback, export or hardcoded ld.lld.
+Loading's AnalysisActions binder validates its existing active token before reading
+or delegating the sibling. Forward a synchronous Option<&AnalysisArtifact> through
+the existing AnalysisActionSink.declare_file method; no new facade/default bridge.
+The same binder supports wrapped link-action facades and subrule scope; suspended
+root or expired handles cannot mutate the sink. Bind the first argument as filename,
+matching Bazel; historical path= spelling has no migration obligation.
 
-No retained representation/key/lock/cache/action/heap/async owner is added.
-Candidate vectors are phase scratch using existing cheap label handles; retained
-native attributes, source observations and configured provider publication retain
-their existing equality, validity and release boundaries. DICE ownership doc and
-Stage 9 native-filegroup utility disposition apply; no extraction/donor or
-performance claim. Independent DESIGN/FINAL for the shared source-admission
-boundary. The very large dice.rs module remains its existing native dispatch/
-package declaration predicate owner; this small branch does not justify adjacent
-refactoring or general implicit-source activation.
+Analysis SynchronousAnalysisActionSink remains the only declaration owner.
+Source sibling uses its existing nonsibling-layout source path; derived sibling
+uses output.root_relative_path, status File uses status.short_path. Derive only the
+parent directory, combine a relative filename or keep an absolute replacement,
+normalize through existing NormalizedBazelPath Unix owner, and enforce current
+repository/package prefix componentwise (equality or prefix followed by slash;
+empty root-package prefix admits relative paths). Refuse absolute paths and existing
+unsupported output spellings before declaration state. Keep validation, declaration
+SmallMap interning/type conflicts, current DerivedArtifactRoot/current configured
+owner and action registration with declare_bin_relative_output. Do not require
+sibling-owner equality and do not use execution-path configuration prefixes.
+No action is created by declaring a File. Existing write/symlink registration and
+input identity remain authoritative and may consume the resulting declaration.
 
-Allowlist: Analysis src/dice.rs only the declaration predicate; existing
-Analysis tests/native_filegroup/{mod.rs,BUILD.fixture,data.rs,fixture.toml};
-manifest/canonical and Stage 6 current native-filegroup paragraph. No Loading,
-source_file, archive, configuration, CLI or dependency changes. Estimate
-production <20/proof <120 net Rust lines. Reuse authored fixture/Workspace and
-both existing analysis routes; nested data Files must NOT be exports_files or
-srcs references, otherwise the proof bypasses this gap. Existing implicit srcs,
-explicit exports, data policies/guards and selector metadata remain protected.
+New path strings/borrowed sibling are call scratch; existing evaluation-scoped
+SmallMap holds declarations until evaluation exit, then only immutable structural
+Derived artifacts/actions/providers survive. No new DICE key, retained collection,
+interner, cache, lock, async task, evaluator heap borrow or Host observation.
+Existing token, declaration mutex and registry validity/release boundaries apply;
+no lock spans a DICE computation. Reuse the existing path and compact declaration
+utilities; no donor or performance claim. Stage 9 default link-action phase facade
+reuse (WP858) and DICE ownership doc apply. Existing large production modules remain
+the binding table and synchronous sink owners; a small method extension does not
+justify adjacent extraction. Independent DESIGN/FINAL required for public sink and
+artifact/lifecycle boundary.
 
-## Proof, validation and decision boundaries
+## Scope and proof
 
-Add unexported nested data-only authored regular sources. Both routes/root and
-external/target and exec must preserve srcs-only output files/executable,
-unconditional actual File data contribution even under include-files=False,
-Null source edges and zero own actions. Selected data excludes an unselected
-missing candidate; selecting it refuses. Same-DICE declaration/source A/B/A,
-missing/delete/recreate and directory-to-file restoration must use existing
-observed epoch helpers and recover the exact original provider result. Physical-file negatives protect symbolic-macro-only data references and macro-name
-collisions; an ordinary nonmacro data reference is eligible. Unknown
-unmentioned labels and selector condition keys remain ineligible. Preserve
-existing implicit srcs and protected native data/visibility/testonly/coverage
-proofs. No new fixture assets beyond tiny authored files in the existing setup;
-add precise Package/Test source anchors to current provenance.
+Allowlist: Loading src/subrule_invocation.rs (trait + declare_file binder only),
+its link_actions/tests.rs, and signature-only test sink implementations in
+builtin_restriction_tests.rs, cc_common/solib_tests.rs, build_info_transform/tests.rs;
+Analysis src/starlark_rule.rs (declare_file only), existing context_lifecycle_tests.rs,
+signature-only analysis_value/cc_features_tests.rs and starlark_rule/cargo_runfiles_tests.rs,
+and two signature-only callers in starlark_rule/build_info_transform/tests.rs;
+Analysis tests/starlark_rule.rs one focused genuine integration test (reuse authored
+scratch/root helpers), manifest/canonical and Stage 6 current declaration paragraph.
+No action registry, artifact identity, source materializer, configuration/path utility,
+CLI or dependency changes. Estimate production <90 and proof <250 net Rust lines;
+reuse existing fixtures and only tiny authored rule/source files, no copied module.
 
-Root serial pinned Cargo JSON Analysis starlark_rule no-run 60s, exact ordinary
-nonignored preflight and focused 20s runtime, Core check and CLI rebuild before
-unchanged three-hash authentic supervised 180s replay. Its observed 77s setup
-proves the real bootstrap boundary; smaller authored source proofs cannot verify
-archive membership or actual query progress. Actual process cleanup and scoped
-format/diff/archive/status gates. These are operation caps, not user limits.
-REPLAN if eligibility needs a new source owner, visibility/macro bypass, physical
-path policy, archive/link admission or missing file fabrication. A later genuine
-physical absence or unsupported kind is a truthful successor boundary, not query
-success. M7A/bootstrap closure remains partial.
+Loading binding proves positional/named filename, omitted/None/genuine mutable and
+frozen Files, named-only sibling and invalid types, forwarding to sink, wrapped and
+subrule active scope, suspended/expired bound-method refusals before sink mutation.
+Analysis real sink proves nested source sibling, other-owner/config derived sibling,
+directory and status File locations, current root/owner, repeat interning, type
+collision, normalization-equivalent declarations, componentwise confinement and
+absolute/path refusals with unchanged declaration state, no own actions. Root,
+nested and external packages and target/exec configurations must preserve owners.
+One genuine rule integration uses ctx.file input and derived dependency sibling,
+then existing symlink registration; both analysis routes and same-DICE source/
+declaration/configuration A/B/A prove action input/output ownership and restoration.
+Do not claim execution success. Existing context teardown and wrapper tests remain
+protected; public directory sibling refusal remains explicit.
+
+Root serial pinned Cargo JSON Loading/Analysis lib and Analysis starlark_rule no-run
+60s; exact ordinary nonignored preflight and focused runtime 20s per executable;
+Core check and CLI rebuild before unchanged three-hash authentic 180s supervised
+replay. Observed 83.533s setup is necessary to verify real toolchain progress;
+small authored tests cannot establish it. Actual process cleanup, scoped format,
+diff/archive/status and fixture hygiene gates. These are operation caps, not user
+limits. REPLAN only for a new artifact/path owner, copied sibling root/configuration,
+lifecycle bypass, broad directory/Windows activation, or genuinely unsupported
+required path semantics. Later query refusal is successor evidence, not closure.
 
 ## Predecessor
 
-WP870 `50a71f761` accepts configured data and required typed Loading declarations.
-Independent DESIGN/Loading delta/FINAL, 29 focused tests in 1.006s, Core/CLI pass.
-Unchanged query 77.271s exit 2 clears data refusal and reaches the missing host-
-tools ld.lld target; three hashes and actual cleanup pass. Receipts: target/wp870.
+WP871 `ed00e59da`: independent DESIGN/FINAL, 15 focused tests in 1.165s, Analysis
+compile 7.03s, Core 4.33s and CLI 11.85s. Authentic 83.533s exit 2 clears implicit
+host-tools source admission and reaches declare_file sibling. Original hashes and
+actual cleanup pass; source/macro ownership retained. Receipts: target/wp871.
 
 ## Validation receipt
 
-Independent DESIGN accepted both metadata-based symbolic-macro exclusions.
-Production is 20 net Rust lines; proof/setup slightly exceeds the 120-line estimate
-because both macro guards and declaration/delete/directory restoration are distinct
-requirements. Actual proof/setup is 175 net Rust lines, still one existing fixture
-and one focused selector; no copied assets or authentic workspace mutations.
-Initial Core compile corrected the existing native_attributes.get
-schema/value tuple destructuring. Core final passes in 4.33s; CLI rebuilt in 11.85s.
-Initial 15-test group passed 14 protected cases and found an incorrect proof
-expectation for unknown external observed direct-root labels: the existing
-route-shape guard
-refuses before source eligibility. Direct-root unknown/condition-key negatives
-protect their existing route refusal, not a dynamically exercised predicate path;
-the unchanged CoercedAttributeValue.labels selector-value-only walk provides the
-condition-key exclusion. Macro data child negatives exercise the new predicate.
-Failure receipts are preserved. A second proof failure revealed that the generic
-fixture epoch omitted empty-directory Lstat observations and absent source paths.
-The existing root_epoch_with_missing helper now records genuine absent known
-fixture paths; a tiny child file makes the directory visible to its existing
-snapshot collector. This is proof preparation, not a production observation bypass;
-selected/deleted sources must now fail target-not-found, and directories must report
-unsupported Directory kind. The accepted source owner/design remains unchanged.
+Independent DESIGN accepted current-context ownership, Unix normalization and the
+borrowed public sink argument. Actual production 70/proof 552 net Rust lines
+versus <90/<250 estimate. The proof growth is the required independent binder,
+owner/path/kind matrix and both-route source/declaration/configuration restoration,
+plus mandatory recording-sink and signature-only adapters; one new binder selector,
+one native-sink selector and one genuine integration selector reuse existing modules.
+No copied fixture/module asset or authentic workspace mutation; tiny authored root,
+nested and external repository fixtures only. No Windows proof or implementation
+expansion; the sibling branch is a minimal explicit refusal.
 
-Unchanged authentic replay: 83.533s, exit 2, original three hashes unchanged, actual
-pre/post process checks empty. It clears the host-tools source target and reaches
-rules_rust private/utils.bzl:516 actions.declare_file(..., sibling=rlib_file), which
-rejects the unsupported named argument. Physical host-tools admission was sufficient
-for this replay; archive/symlink policy was not changed. Query/bootstrap remain
-partial. Receipts: target/wp871.
+Analysis lib preparation initially found two existing build-info test callers that
+needed an explicit None sibling. They are signature-only and now in the allowlist;
+production design unchanged. Initial Loading proof imported a frozen symbol as
+private, then used Module.get (public-only); binding now explicitly republishes the
+same owned frozen value after retaining its heap reference, preserving the mutable/
+frozen discriminator. Initial integration expectation used plain to_exec instead of
+selected host-platform execution configuration; corrected to the existing exact
+transition owner, with full equality. A subsequent external fixture preparation
+Need was corrected by authored empty REPO.bazel/.bazelignore like existing helpers.
+These proof/invocation failures remain recorded and are not accepted gates.
 
-Final Analysis compile 7.03s; exact preflight selects 15 ordinary nonignored cases,
-all pass in 1.165s. Fourteen protected cases and the new case cover both routes,
-root/external target/exec, selected missing-path refusal, macro-only and macro-name
-exclusions, declaration A/B/A, delete/recreate and Directory-to-file restoration.
-Recorded proof corrections include exact observed-versus-prepared direct-root
-refusal expectations; failed groups are not accepted gates. Scoped rustfmt,
-diff, archive and plan status pass. No Windows implementation was added.
+Final pinned prepares: Analysis lib 6.76s, Loading lib 4.83s, Analysis integration
+7.15s. Exact ordinary nonignored preflight/runtime: Analysis 8/8 in 0.114s,
+Loading 6/6 in 0.016s and integration 1/1 in 0.314s (15 focused, 0.444s total).
+Native ownership/location/interner/kind guards, wrapped/root/subrule lifecycle,
+source and exec-derived symlink ownership, both routes and complete A/B/A
+restoration pass. Core check 3.39s and CLI rebuild 9.90s pass.
 
-Independent FINAL accepted source ownership, both macro guards and proof growth.
-Packet window approximately 13:13–13:45 UTC (32 minutes, including proof preparation
-corrections and independent review); final compile/runtime measurements above are
-operation receipts, not a workflow-speed claim. Observable gate: authentic Rust
-host-tools data sources now resolve; next frontier is File sibling declaration.
+Unchanged authentic query 76.973s exit 2 clears sibling declaration and native
+symlink construction; next refusal is rules_rust toolchain.bzl:142 legacy Target.files
+missing in _symlink_sysroot_tree. All three original hashes unchanged and actual
+pre/post process checks empty. This is progress, not query/execution/bootstrap
+closure. Receipts and preserved failures: target/wp872.
+
+Independent FINAL accepted current-context ownership, location-only siblings,
+lifecycle/path guards and justified proof growth. Scoped rustfmt, git diff --check,
+archive/status and plan consistency gates pass. Packet window approximately
+13:48–14:26 UTC (38 minutes, including independent review and proof corrections).
+Observable gate: genuine sibling declarations and following symlink construction
+now pass in the authentic toolchain; legacy Target.files is the next frontier.
+No performance, execution or milestone-closure claim.

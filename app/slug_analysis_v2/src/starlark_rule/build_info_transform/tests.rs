@@ -83,7 +83,7 @@ fn actual_sink_preserves_status_output_metadata_order_and_failed_registration_at
         assert_eq!(declarations, *sink.declared_outputs.lock().unwrap());
     }
     assert!(
-        sink.declare_file("volatile.h").is_err(),
+        sink.declare_file("volatile.h", None).is_err(),
         "ordinary redeclaration cannot erase constant metadata"
     );
     sink.declare_directory("tree.h").unwrap();
@@ -91,7 +91,7 @@ fn actual_sink_preserves_status_output_metadata_order_and_failed_registration_at
         sink.transform_build_info(request(BuildInfoTransformKind::Version, "tree.h"))
             .is_err()
     );
-    let ordinary = sink.declare_file("ordinary.h").unwrap();
+    let ordinary = sink.declare_file("ordinary.h", None).unwrap();
     let heap = FrozenHeap::new();
     sink.write(
         heap.alloc(ordinary).to_value(),

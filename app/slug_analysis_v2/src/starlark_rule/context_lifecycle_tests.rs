@@ -8,6 +8,7 @@ use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 
 use super::*;
+use crate::ConfigurationKey;
 
 pub(super) fn configuration() -> crate::ConfigurationKey {
     let host = HostConversionInputs::new(
@@ -61,6 +62,145 @@ pub(super) fn declaration_sink(key: &ConfiguredTargetKey) -> Arc<SynchronousAnal
         )
         .unwrap(),
     })
+}
+
+/// Bazel 9.2 ActionFactory141-162/Artifact507-508: sibling contributes location,
+/// while the current context supplies root/owner; PathFragment775-786 normalizes.
+#[test]
+fn native_file_sibling_declarations_preserve_current_ownership_confinement_and_interning() {
+    let target = configuration();
+    for repo in ["", "dep+"] {
+        for package in ["", "pkg", "pkg/nested"] {
+            for config in [
+                target.clone(),
+                ConfigurationKey::from_slug(
+                    target.slug_configuration().unwrap().to_exec().unwrap(),
+                ),
+            ] {
+                let key = ConfiguredTargetKey::new(
+                    CanonicalLabel::parse(&format!("@@{repo}//{package}:subject")).unwrap(),
+                    config,
+                );
+                let mut sink = declaration_sink(&key);
+                Arc::get_mut(&mut sink).unwrap().package_path = package.to_owned();
+                let prefix = slug_build_api_v2::repository_relative_output_path(
+                    key.label().package().repo(),
+                    package,
+                )
+                .trim_end_matches('/')
+                .to_owned();
+                let relative = if prefix.is_empty() {
+                    "sub".to_owned()
+                } else {
+                    format!("{prefix}/sub")
+                };
+                let source = AnalysisArtifact::Source(
+                    CanonicalLabel::parse(&format!("@@{repo}//{package}:sub/input.h")).unwrap(),
+                );
+                let foreign = ConfiguredTargetKey::new(
+                    CanonicalLabel::parse("@@other+//elsewhere:producer").unwrap(),
+                    if key.configuration() == &target {
+                        ConfigurationKey::from_slug(
+                            target.slug_configuration().unwrap().to_exec().unwrap(),
+                        )
+                    } else {
+                        target.clone()
+                    },
+                );
+                let foreign_root = DerivedArtifactRoot::bin(
+                    foreign
+                        .configuration()
+                        .slug_configuration()
+                        .unwrap()
+                        .clone(),
+                )
+                .unwrap();
+                let first = sink.declare_file("out.o", Some(&source)).unwrap();
+                for sibling in [
+                    source.clone(),
+                    AnalysisArtifact::Derived {
+                        owner: foreign.artifact_owner(),
+                        output: ActionOutput::new(
+                            foreign_root.clone(),
+                            format!("{relative}/foreign.o"),
+                            ActionOutputKind::File,
+                        ),
+                    },
+                    AnalysisArtifact::Derived {
+                        owner: foreign.artifact_owner(),
+                        output: ActionOutput::new(
+                            foreign_root.clone(),
+                            format!("{relative}/directory"),
+                            ActionOutputKind::Directory,
+                        ),
+                    },
+                ] {
+                    let repeated = sink
+                        .declare_file("nested/.././out.o", Some(&sibling))
+                        .unwrap();
+                    assert_eq!(repeated.artifact(), first.artifact());
+                }
+                assert_eq!(
+                    sink.declare_file("sub/out.o", None).unwrap().artifact(),
+                    first.artifact()
+                );
+                let AnalysisArtifact::Derived { owner, output } = first.artifact() else {
+                    panic!("derived declaration")
+                };
+                assert_eq!(owner, &key.artifact_owner());
+                assert_eq!(output.root(), &sink.root);
+                assert_eq!(output.root_relative_path(), format!("{relative}/out.o"));
+                let status =
+                    AnalysisArtifact::WorkspaceStatus(sink.workspace_status.stable().clone());
+                let status_path = if prefix.is_empty() {
+                    "status.o".to_owned()
+                } else {
+                    format!("{prefix}/status.o")
+                };
+                let declared = sink.declare_file(&status_path, Some(&status)).unwrap();
+                let AnalysisArtifact::Derived { output, .. } = declared.artifact() else {
+                    panic!("status sibling declaration")
+                };
+                assert_eq!(output.root_relative_path(), status_path);
+                let empty = sink.declare_file("", Some(&source)).unwrap();
+                assert_eq!(
+                    empty.artifact(),
+                    sink.declare_file(".", Some(&source)).unwrap().artifact()
+                );
+                let count = sink.declared_outputs.lock().unwrap().len();
+                for filename in [
+                    "../../../../../../escape.o",
+                    "/absolute.o",
+                    "back\\slash.o",
+                    "nul\0byte.o",
+                ] {
+                    assert!(
+                        sink.declare_file(filename, Some(&source)).is_err(),
+                        "{filename:?}"
+                    );
+                    assert_eq!(sink.declared_outputs.lock().unwrap().len(), count);
+                }
+                if !prefix.is_empty() {
+                    let outside = AnalysisArtifact::Derived {
+                        owner: foreign.artifact_owner(),
+                        output: ActionOutput::new(
+                            foreign_root,
+                            format!("{prefix}-suffix/input.h"),
+                            ActionOutputKind::File,
+                        ),
+                    };
+                    assert!(sink.declare_file("out.o", Some(&outside)).is_err());
+                    assert_eq!(sink.declared_outputs.lock().unwrap().len(), count);
+                }
+                sink.declare_directory("sub/conflict").unwrap();
+                let count = sink.declared_outputs.lock().unwrap().len();
+                let error = sink.declare_file("conflict", Some(&source)).unwrap_err();
+                assert!(error.to_string().contains("different type"), "{error}");
+                assert_eq!(sink.declared_outputs.lock().unwrap().len(), count);
+                assert!(sink.actions.lock().unwrap().registry().actions().is_empty());
+            }
+        }
+    }
 }
 
 fn check_rule_context_teardown(fail: bool) {

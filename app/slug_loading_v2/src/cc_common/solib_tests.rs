@@ -71,7 +71,11 @@ impl AnalysisActionSink for RecordingSink {
             .push((library.artifact().clone(), directory.to_owned()));
         Ok(AnalysisArtifactValue::new(returned_artifact()))
     }
-    fn declare_file(&self, _: &str) -> anyhow::Result<AnalysisArtifactValue> {
+    fn declare_file(
+        &self,
+        _: &str,
+        _: Option<&AnalysisArtifact>,
+    ) -> anyhow::Result<AnalysisArtifactValue> {
         unreachable!()
     }
     fn write(&self, _: Value<'_>, _: Value<'_>, _: bool) -> anyhow::Result<()> {
