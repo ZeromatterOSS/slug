@@ -2027,6 +2027,21 @@ stops at ctx.coverage_instrumented in rules_cc cc_helper.bzl:304. Coverage,
 implementation_deps compilation/link propagation and toolchain closure remain
 unproved; Windows execution remains deferred.
 
+## Disabled coverage instrumentation method (WP857, 2026-09-30)
+
+Public ctx.coverage_instrumented accepts omitted/None or a genuine Target and
+returns False when the caller's retained structural configuration disables
+coverage. Argument validation and invocation-token checks precede projection;
+an extracted method expires after successful or failed evaluation. Enabled
+coverage refuses explicitly, retaining filter/test/provider ownership for a
+future packet. No coverage fragment declaration, dependency-configuration read,
+new semantic state or action is introduced. Twelve focused checks and
+independent reviews pass, including same-DICE configuration/source restoration,
+both exec resets and an enabled caller with an exec-disabled Target. The
+unchanged authentic cquery clears this method and next stops at
+cc_internal.wrap_link_actions during rules_cc linking-context creation. Full
+coverage and linking/toolchain closure remain deferred; Linux remains priority.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

@@ -123,6 +123,7 @@ use starlark::values::tuple::TupleRef;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::analysis_value::AnalysisConfiguredTargetValue;
 use crate::analysis_value::AnalysisValueLowerer;
 use crate::analysis_value::AnalysisValueMaterializer;
 use crate::analysis_value::lower_runfiles_symlink_depset;
@@ -380,6 +381,21 @@ fn runfiles_symlinks(
 
 #[starlark_module]
 fn analysis_context_methods(builder: &mut MethodsBuilder) {
+    fn coverage_instrumented<'v>(
+        this: &AnalysisContext<'v>,
+        target: Option<Value<'v>>,
+    ) -> anyhow::Result<bool> {
+        this.token
+            .require_active("coverage_instrumented", "rule context")?;
+        if let Some(target) = target {
+            anyhow::ensure!(
+                target.is_none() || AnalysisConfiguredTargetValue::from_value(target).is_some(),
+                "ctx.coverage_instrumented target must be a Target or None"
+            );
+        }
+        this.cc_context.coverage_instrumented()
+    }
+
     fn runfiles<'v>(
         this: &AnalysisContext<'v>,
         #[starlark(default = UnpackListOrTuple::default())] files: UnpackListOrTuple<Value<'v>>,

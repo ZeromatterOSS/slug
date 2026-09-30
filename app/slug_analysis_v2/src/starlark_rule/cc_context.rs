@@ -16,6 +16,17 @@ pub(super) struct CcContextProjection {
 }
 
 impl CcContextProjection {
+    pub(super) fn coverage_instrumented(&self) -> anyhow::Result<bool> {
+        let configuration = self.configuration.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("ctx.coverage_instrumented requires structural configuration")
+        })?;
+        anyhow::ensure!(
+            !configuration.coverage_enabled()?,
+            "ctx.coverage_instrumented with coverage enabled is unsupported/deferred"
+        );
+        Ok(false)
+    }
+
     pub(super) fn merged_genfiles(&self) -> anyhow::Result<bool> {
         Ok(self
             .configuration

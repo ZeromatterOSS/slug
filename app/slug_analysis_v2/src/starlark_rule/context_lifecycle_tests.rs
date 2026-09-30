@@ -134,7 +134,7 @@ fn check_rule_context_teardown(fail: bool) {
         AstModule::parse(
             "context.bzl",
             format!(
-                "def implementation(ctx):\n    saved.append(ctx.actions)\n    captured.extend([ctx.file, ctx.files, ctx.files.input, ctx.info_file, ctx.version_file])\n    {}\ndef mutate():\n    captured[2].append(None)\nsaved = []\ncaptured = []\n",
+                "def implementation(ctx):\n    saved.append(ctx.actions)\n    methods.append(ctx.coverage_instrumented)\n    captured.extend([ctx.file, ctx.files, ctx.files.input, ctx.info_file, ctx.version_file])\n    {}\ndef mutate():\n    captured[2].append(None)\nsaved = []\nmethods = []\ncaptured = []\n",
                 if fail {
                     "fail('intentional failure')"
                 } else {
@@ -267,6 +267,22 @@ fn check_rule_context_teardown(fail: bool) {
         assert_eq!(label.to_str(), "@@//pkg:subject");
     }
     drop(guard);
+    // Captured while active, the bound method must check its original token
+    // before this deliberately unconfigured fixture can inspect configuration.
+    let methods = ListRef::from_value(module.get("methods").unwrap()).unwrap();
+    let error = eval
+        .eval_function(methods.content()[0], &[], &[])
+        .unwrap_err();
+    let message = error.to_string();
+    assert!(
+        message.contains("coverage_instrumented")
+            && message.contains("outside of its own implementation function"),
+        "{message}"
+    );
+    assert!(
+        !message.contains("requires structural configuration"),
+        "{message}"
+    );
     for field in ["info_file", "version_file"] {
         assert!(
             ctx.get_attr(field, module.heap()).unwrap().is_none(),

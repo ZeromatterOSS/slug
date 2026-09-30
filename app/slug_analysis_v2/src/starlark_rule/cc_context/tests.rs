@@ -151,3 +151,42 @@ fn execution_os_fails_closed_without_required_structural_owners() {
             .contains("resolved default execution platform")
     );
 }
+
+#[test]
+fn coverage_instrumented_uses_owned_configuration_and_fails_closed() {
+    use slug_configuration_v2::CommandConfigurationOccurrence;
+    use slug_configuration_v2::CommandConfigurationOverlay;
+    use slug_configuration_v2::NativeCommandOption;
+
+    let mut ctx = projection(Some(ActionEnvironmentHostOs::Linux), &[]);
+    let disabled = ctx.configuration.clone().unwrap();
+    assert!(!ctx.coverage_instrumented().unwrap());
+    let overlay: CommandConfigurationOverlay = vec![CommandConfigurationOccurrence::native(
+        NativeCommandOption::CollectCodeCoverage,
+        Some("true"),
+        false,
+    )]
+    .into();
+    ctx.configuration = Some(
+        disabled
+            .with_command_configuration(disabled.starlark_options().clone(), &overlay)
+            .unwrap(),
+    );
+    let error = ctx.coverage_instrumented().unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("with coverage enabled is unsupported/deferred"),
+        "{error}"
+    );
+    ctx.configuration = Some(disabled);
+    assert!(!ctx.coverage_instrumented().unwrap());
+    ctx.configuration = None;
+    let error = ctx.coverage_instrumented().unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("ctx.coverage_instrumented requires structural configuration"),
+        "{error}"
+    );
+}

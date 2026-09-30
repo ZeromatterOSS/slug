@@ -34,16 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-156-m7a-cpp-implementation-deps-option-r1
+Packet: WP-7-157-m7a-disabled-coverage-instrumentation-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP856 accepts the private experimental_cc_implementation_deps Boolean getter
-and typed command option through existing owners, with exact textual Boolean
-conversion and exec propagation. Twenty-six focused tests and independent
-reviews pass. The rebuilt byte-identical authentic Rust-toolchain cquery clears
-the getter and next stops at analysis_ctx.coverage_instrumented in rules_cc
-cc_helper.bzl:304. Full C++ dependency/action closure, coverage and Windows
-execution remain deferred. See `slug-v2-subplans/current-packet.md`.
+WP857 accepts public ctx.coverage_instrumented(target=None) for coverage-disabled
+caller configurations, with genuine Target/None validation and invocation
+lifetime checks. Twelve focused tests and independent reviews pass. The rebuilt
+unchanged authentic Rust-toolchain cquery clears this method and next stops at
+cc_internal.wrap_link_actions during rules_cc linking-context creation. Enabled
+coverage, full linking/toolchain closure and Windows execution stay deferred.
+See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
