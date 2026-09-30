@@ -9,6 +9,7 @@ use super::*;
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod authentic_builtin;
+mod data;
 mod direct_constraints;
 mod lifecycle;
 mod rejection;
@@ -56,6 +57,30 @@ impl Workspace {
     ) -> Result<Arc<ConfiguredNodeResult>, String> {
         let repo = if external { "dep+" } else { "" };
         root_target_request_with_inputs(
+            dice,
+            &self.0,
+            &format!("@@{repo}//:{name}"),
+            config,
+            Arc::new(RootActivationTracker::default()),
+            root_epoch(&self.0),
+            &[("dep+", "dep")],
+        )
+        .await
+    }
+
+    async fn request_data(
+        &self,
+        dice: &Arc<Dice>,
+        observed: bool,
+        external: bool,
+        name: &str,
+        config: ConfigurationKey,
+    ) -> Result<Arc<ConfiguredNodeResult>, String> {
+        if !observed {
+            return self.request(dice, external, name, config).await;
+        }
+        let repo = if external { "dep+" } else { "" };
+        observed_root_target_request_with_inputs(
             dice,
             &self.0,
             &format!("@@{repo}//:{name}"),
@@ -374,7 +399,6 @@ async fn native_visibility_cycles_cardinality_and_unsupported_modes_fail_closed(
             ("macro_private", "visibility"),
             ("zero_tool", "executable"),
             ("multi_tool", "executable"),
-            ("with_data", "data"),
             ("with_group", "output_group"),
         ] {
             let error = workspace
@@ -382,7 +406,7 @@ async fn native_visibility_cycles_cardinality_and_unsupported_modes_fail_closed(
                 .await
                 .unwrap_err();
             assert!(error.to_lowercase().contains(expected), "{name}: {error}");
-            if matches!(name, "with_data" | "with_group") {
+            if name == "with_group" {
                 assert!(error.contains("unsupported"), "{name}: {error}");
             }
         }

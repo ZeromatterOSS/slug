@@ -96,21 +96,26 @@ mod command_configuration_tests {
         .unwrap();
         assert!(base.check_visibility().unwrap());
         assert!(base.filegroup_runfiles_for_data().unwrap());
+        assert!(base.always_include_files_in_data().unwrap());
         for option in [
             NativeCommandOption::CheckVisibility,
             NativeCommandOption::IncompatibleFilegroupRunfilesForData,
+            NativeCommandOption::IncompatibleAlwaysIncludeFilesInData,
         ] {
             assert_eq!(
                 NativeCommandOption::from_name(option.canonical_name()),
                 Some(option)
             );
             assert!(option.is_boolean());
-            let project = |configuration: &SlugConfiguration| {
-                if option == NativeCommandOption::CheckVisibility {
-                    configuration.check_visibility().unwrap()
-                } else {
+            let project = |configuration: &SlugConfiguration| match option {
+                NativeCommandOption::CheckVisibility => configuration.check_visibility().unwrap(),
+                NativeCommandOption::IncompatibleFilegroupRunfilesForData => {
                     configuration.filegroup_runfiles_for_data().unwrap()
                 }
+                NativeCommandOption::IncompatibleAlwaysIncludeFilesInData => {
+                    configuration.always_include_files_in_data().unwrap()
+                }
+                _ => unreachable!("only filegroup policies are tested"),
             };
             let changed = base
                 .with_command_configuration(
@@ -121,6 +126,7 @@ mod command_configuration_tests {
             assert!(!project(&changed));
             assert_ne!(base, changed);
             assert_ne!(base.canonical_bytes(), changed.canonical_bytes());
+            assert_ne!(base.projection(), changed.projection());
             assert!(!project(&changed.to_exec().unwrap()));
             assert!(!project(
                 &changed
@@ -146,13 +152,47 @@ mod command_configuration_tests {
                 )
                 .unwrap();
             assert_eq!(restored, base);
-            assert!(
-                base.with_command_configuration(
-                    base.starlark_options().clone(),
-                    &vec![native(option, "invalid")].into()
-                )
-                .is_err()
-            );
+            assert_eq!(restored.canonical_bytes(), base.canonical_bytes());
+            assert_eq!(restored.projection(), base.projection());
+            let platform = base.host_platform_label().unwrap();
+            for (configuration, expected) in [(&base, true), (&changed, false)] {
+                let exec = configuration.to_exec().unwrap();
+                assert_eq!(configuration.to_exec().unwrap(), exec);
+                let platform_exec = configuration.to_exec_for_platform(&platform).unwrap();
+                assert_eq!(
+                    platform_exec.to_exec_for_platform(&platform).unwrap(),
+                    platform_exec
+                );
+                for view in [configuration.clone(), exec, platform_exec] {
+                    assert_eq!(project(&view), expected);
+                    for (text, value) in [("true", true), ("0", false)] {
+                        let matched = view.matches_config_setting(
+                            &[(option.canonical_name().into(), text.into())],
+                            &[],
+                        );
+                        if option == NativeCommandOption::CheckVisibility {
+                            assert_eq!(
+                                matched,
+                                Err(super::super::NativeConfigSettingMatchError::NonConfigurableOption(
+                                    "check_visibility".into(),
+                                )),
+                            );
+                        } else {
+                            assert_eq!(matched.unwrap(), expected == value);
+                        }
+                    }
+                }
+            }
+            for text in ["invalid", "null", "NULL", " true", "false "] {
+                assert!(
+                    base.with_command_configuration(
+                        base.starlark_options().clone(),
+                        &vec![native(option, text)].into()
+                    )
+                    .is_err(),
+                    "invalid Boolean {text:?} must fail before publication"
+                );
+            }
         }
     }
 

@@ -74,6 +74,7 @@ pub enum NativeCommandOption {
     IncompatibleUseSpecificToolFiles,
     IncompatibleRemoveLegacyWholeArchive,
     ExperimentalSaveFeatureState,
+    IncompatibleAlwaysIncludeFilesInData,
 }
 
 impl NativeCommandOption {
@@ -115,6 +116,9 @@ impl NativeCommandOption {
             "cs_fdo_instrument" => Self::CsFdoInstrument,
             "collect_code_coverage" => Self::CollectCodeCoverage,
             "check_visibility" => Self::CheckVisibility,
+            "incompatible_always_include_files_in_data" => {
+                Self::IncompatibleAlwaysIncludeFilesInData
+            }
             "incompatible_filegroup_runfiles_for_data" => {
                 Self::IncompatibleFilegroupRunfilesForData
             }
@@ -178,6 +182,9 @@ impl NativeCommandOption {
             Self::CsFdoInstrument => "cs_fdo_instrument",
             Self::CollectCodeCoverage => "collect_code_coverage",
             Self::CheckVisibility => "check_visibility",
+            Self::IncompatibleAlwaysIncludeFilesInData => {
+                "incompatible_always_include_files_in_data"
+            }
             Self::IncompatibleFilegroupRunfilesForData => {
                 "incompatible_filegroup_runfiles_for_data"
             }
@@ -205,6 +212,7 @@ impl NativeCommandOption {
             self,
             Self::CollectCodeCoverage
                 | Self::CheckVisibility
+                | Self::IncompatibleAlwaysIncludeFilesInData
                 | Self::IncompatibleFilegroupRunfilesForData
                 | Self::CcDotdFiles
                 | Self::SaveTemps

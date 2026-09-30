@@ -10,9 +10,10 @@ configuration transitions, toolchain resolution, and action declarations.
 ### Current state
 
 Native filegroup analysis reuses configured condition/child observations and
-retained native srcs, never Loading's flattened branch candidates. The admitted
-no-data/default-output-group/no-coverage slice forwards stable files and distinct
-compile-order default/data runfiles, honors the native data-runfiles flag, and
+retained native srcs/data, never Loading's flattened branch candidates. The admitted
+default-output-group/no-coverage slice keeps files and executable srcs-only and
+forwards stable files and distinct compile-order default/data runfiles, honors
+the native srcs-data-runfiles flag, and
 publishes singleton FilesToRun without RunfilesSupport or own actions. Empty
 InstrumentedFilesInfo uses the existing builtin occurrence owner and an empty-only
 native facade; hidden/validation groups use ordinary rule completion. Source and
@@ -20,8 +21,25 @@ derived artifacts preserve their original owners. Bounded visibility honors publ
 and ordinary same-package edges (or check_visibility=false); requested aliases own
 visibility, actual targets own testonly checks. Restricted/macro-nonpublic visibility,
 testonly prerequisites, package-group aliases and nonneutral unmodeled native
-attributes fail closed. Loading/query declarations remain unchanged. This is a
+attributes fail closed. Named data declaration admission reuses the existing
+Loading attribute owner and query metadata. This is a
 full-toolchain prerequisite, not installed-tool or full cc_toolchain acceptance.
+
+Loading retains named data selectors/concatenations, omission/default provenance
+and the union of srcs/data condition keys; literal/branch duplicates fail there,
+while selected concatenation duplicates fail in Analysis. Selected data
+prerequisites share target configuration, condition/child joins,
+cycle/Need/error handling and per-attribute indices. Default runfiles merge data
+contributions before srcs default runfiles; data runfiles begin with srcs files,
+then data contributions and conditional srcs data runfiles. Each rule data
+contribution includes stable-wrapped files only when the retained
+incompatible_always_include_files_in_data Boolean is True, then its data runfiles.
+Actual source/generated File dependencies, including aliases, always contribute
+files. The appended typed command option defaults True and carries through exec.
+Both partitions propagate package closure and validations regardless of runfiles
+flags. Bazel 9.2 Filegroup:61-105, Runfiles:669-773 and AliasConfiguredTarget:166-168
+pin this split; no second retained representation or action owner is added.
+External generated-label reconstruction remains separately deferred.
 
 WP846 admits one Bazel 9.2 package-default legacy license case in configured
 native filegroup analysis: a Default-provenance singleton `licenses=["notice"]`
@@ -1988,7 +2006,7 @@ Native srcs-only filegroup now shares WP853's structurally eligible condition
 key with native alias; pinned FilegroupRule inherits enabled toolchain
 resolution and owns a target platform. Effective/default constraint matching,
 requested-key identity, alias resolution, peer ambiguity and mixed-match
-refusal remain with the existing owners. Nondefault filegroup attributes remain
+refusal remain with the existing owners. Other nondefault filegroup attributes remain
 unsupported. Target/exec matching and platform/selector/default-source A/B/A
 pass, with existing forwarding, source lifecycle, refusal and alias controls.
 The actual catalog def_parser forwards no_op.bat with one null source edge,

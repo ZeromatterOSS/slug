@@ -1,4 +1,4 @@
-//! Native srcs-only filegroup: selected graph inputs, no action implementation.
+//! Native filegroup: selected graph inputs, no action implementation.
 use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetOrder;
@@ -30,6 +30,7 @@ pub(super) async fn analyze(
 #[derive(Clone, Copy)]
 enum InputRole {
     Source(usize),
+    Data(usize),
     Condition,
     Visibility,
 }
@@ -57,11 +58,14 @@ async fn prepare(
                 .filegroup_runfiles_for_data()
                 .map_err(|e| e.to_string())?,
             configuration
+                .always_include_files_in_data()
+                .map_err(|e| e.to_string())?,
+            configuration
                 .check_visibility()
                 .map_err(|e| e.to_string())?,
         ))
     })();
-    let (data_policy, check_visibility) = match policy {
+    let (data_policy, include_data_files, check_visibility) = match policy {
         Ok(policy) => policy,
         Err(error) => return analysis_semantic_complete(Err(AnalysisError::message(error))),
     };
@@ -97,6 +101,7 @@ async fn prepare(
             if matches!(
                 name,
                 "srcs"
+                    | "data"
                     | "visibility"
                     | "$config_dependencies"
                     | "name"
@@ -124,17 +129,33 @@ async fn prepare(
                 return Err(format!("native filegroup nondefault {name} is unsupported"));
             }
         }
-        let srcs = resolve_configured_attribute(
-            &attrs.get("srcs").expect("native srcs").1.value,
-            &conditions.values,
-        )
-        .map_err(|e| e.to_string())?;
-        match srcs {
-            CoercedAttributeValue::LabelList(labels) => Ok(labels),
-            _ => Err("native filegroup srcs must resolve to labels".to_owned()),
-        }
+        let labels = |name| {
+            let value = resolve_configured_attribute(
+                &attrs.get(name).expect("native label list").1.value,
+                &conditions.values,
+            )
+            .map_err(|e| e.to_string())?;
+            match value {
+                CoercedAttributeValue::LabelList(labels) => {
+                    if name == "data" {
+                        let mut seen = SmallSet::new();
+                        for label in labels.iter() {
+                            if !seen.insert(label) {
+                                return Err(format!(
+                                    "Label '{label}' is duplicated in the 'data' attribute of rule '{}'",
+                                    target.label().target()
+                                ));
+                            }
+                        }
+                    }
+                    Ok(labels)
+                }
+                _ => Err(format!("native filegroup {name} must resolve to labels")),
+            }
+        };
+        Ok((labels("srcs")?, labels("data")?))
     })();
-    let labels = match selected {
+    let (labels, data_labels) = match selected {
         Ok(labels) => labels,
         Err(e) => return analysis_semantic_complete(Err(AnalysisError::message(e))),
     };
@@ -152,6 +173,12 @@ async fn prepare(
         .enumerate()
         .map(|(i, l)| (InputRole::Source(i), l.clone()))
         .chain(
+            data_labels
+                .iter()
+                .enumerate()
+                .map(|(i, l)| (InputRole::Data(i), l.clone())),
+        )
+        .chain(
             conditions
                 .packages
                 .iter()
@@ -166,7 +193,7 @@ async fn prepare(
     let cycle_guard = ctx.cycle_guard::<ConfiguredAnalysisCycleGuard>();
     let future = ctx.compute_join(inputs, |ctx, (role, label)| {
         Box::pin(async move {
-            let result = if matches!(role, InputRole::Source(_)) {
+            let result = if matches!(role, InputRole::Source(_) | InputRole::Data(_)) {
                 source_child(ctx, mode, workspace, &label, target.configuration()).await
             } else {
                 compute_configured_child(
@@ -196,6 +223,7 @@ async fn prepare(
     let mut outer = None;
     let mut error = None;
     let mut sources = Vec::new();
+    let mut data = Vec::new();
     let mut extra_rows = Vec::new();
     let mut edges = Vec::new();
     for (role, label, outcome) in outcomes {
@@ -214,12 +242,22 @@ async fn prepare(
                         error.get_or_insert_with(|| e.clone());
                     }
                     Ok(child) => match role {
-                        InputRole::Source(index) => {
+                        InputRole::Source(index) | InputRole::Data(index) => {
+                            let attribute = if matches!(role, InputRole::Source(_)) {
+                                "srcs"
+                            } else {
+                                "data"
+                            };
                             edges.push(crate::ConfiguredEdge::new(child.key().clone(), crate::ConfiguredEdgeKind::Attribute {
-                            attribute: "srcs".into(), index: index as u32, hidden: false,
-                            dependency: crate::configured_target::ConfiguredAttributeDependency::Target,
-                        }));
-                            sources.push((label, child.dupe()));
+                                attribute: attribute.into(), index: index as u32, hidden: false,
+                                dependency: crate::configured_target::ConfiguredAttributeDependency::Target,
+                            }));
+                            let children = if matches!(role, InputRole::Source(_)) {
+                                &mut sources
+                            } else {
+                                &mut data
+                            };
+                            children.push((label, child.dupe(), false));
                         }
                         InputRole::Condition => {
                             extra_rows.push(RunfilesPackageClosureRow::from_result(child))
@@ -245,16 +283,24 @@ async fn prepare(
     if let Some(e) = error {
         return analysis_semantic_complete(Err(e));
     }
-    for (label, child) in &sources {
+    for (attribute, (label, child, is_file)) in sources
+        .iter_mut()
+        .map(|child| ("srcs", child))
+        .chain(data.iter_mut().map(|child| ("data", child)))
+    {
         let actual = semantic_value!(
             compute_actual_child(ctx, mode, workspace.dupe(), child.dupe())
                 .await
                 .map(|result| result.map(|value| value.as_ref().clone()))
         );
+        *is_file = matches!(
+            actual.kind(),
+            ConfiguredNodeKind::SourceFile | ConfiguredNodeKind::GeneratedFile
+        );
         if *actual.kind() == ConfiguredNodeKind::PackageGroup {
             return analysis_semantic_complete(Err(AnalysisError::message(
                 if child.key() == actual.key() {
-                    format!("package group {label} is misplaced in filegroup srcs")
+                    format!("package group {label} is misplaced in filegroup {attribute}")
                 } else {
                     format!("native filegroup alias to package group is unsupported: {label}")
                 },
@@ -292,23 +338,36 @@ async fn prepare(
                 Ok(package) => package,
                 Err(e) => return analysis_semantic_complete(Err(package_inventory_error(e))),
             };
-            if let Err(e) = admit_visibility(package, target.label(), dependency_package, label) {
+            if let Err(e) = admit_visibility(
+                package,
+                target.label(),
+                dependency_package,
+                label,
+                attribute,
+            ) {
                 return analysis_semantic_complete(Err(AnalysisError::message(e)));
             }
         }
     }
     let children = sources
         .into_iter()
-        .map(|(_, child)| child)
+        .map(|(_, child, _)| child)
         .collect::<Vec<_>>();
-    let providers = match providers(&children, data_policy) {
+    let data = data
+        .into_iter()
+        .map(|(_, child, is_file)| (child, is_file))
+        .collect::<Vec<_>>();
+    let providers = match providers(&children, &data, data_policy, include_data_files) {
         Ok(p) => p,
         Err(e) => return analysis_semantic_complete(Err(AnalysisError::message(e))),
     };
     let closure = match collect_runfiles_packages(
         package,
         &edges,
-        children.iter().map(Arc::as_ref),
+        children
+            .iter()
+            .map(Arc::as_ref)
+            .chain(data.iter().map(|(child, _)| child.as_ref())),
         extra_rows,
     ) {
         Ok(closure) => closure,
@@ -372,6 +431,7 @@ fn admit_visibility(
     owner: &CanonicalLabel,
     package: &LoadedPackage,
     label: &CanonicalLabel,
+    attribute: &str,
 ) -> Result<(), String> {
     let declaration = package
         .targets
@@ -398,7 +458,7 @@ fn admit_visibility(
         return Ok(());
     }
     Err(format!(
-        "native filegroup srcs visibility is unsupported or private: {owner} -> {label}"
+        "native filegroup {attribute} visibility is unsupported or private: {owner} -> {label}"
     ))
 }
 
@@ -433,7 +493,9 @@ async fn source_child(
 
 fn providers(
     children: &[Arc<ConfiguredNodeResult>],
+    data: &[(Arc<ConfiguredNodeResult>, bool)],
     data_policy: bool,
+    include_data_files: bool,
 ) -> Result<ProviderCollection, String> {
     let defaults = children
         .iter()
@@ -454,13 +516,51 @@ fn providers(
     } else {
         None
     };
-    let default_runfiles = runfiles(None, defaults.iter().map(|info| &info.default_runfiles))?;
+    // Each data prerequisite adds its files (when eligible), then DATA_RUNFILES,
+    // in declared order. File targets have no RunfilesProvider in Bazel, including
+    // aliases to Files; their files are unconditional and have no rule runfiles.
+    let data_runfiles = data
+        .iter()
+        .filter_map(|(child, is_file)| {
+            child
+                .providers()
+                .default_info()
+                .map(|info| (info, *is_file))
+        })
+        .map(|(info, is_file)| {
+            if is_file {
+                runfiles(Some(info.files().clone()), [])
+            } else {
+                let files = if include_data_files {
+                    Some(
+                        AnalysisDepset::new(
+                            DepsetOrder::Default,
+                            vec![],
+                            vec![info.files().clone()],
+                        )
+                        .map_err(|e| e.to_string())?,
+                    )
+                } else {
+                    None
+                };
+                runfiles(files, [&info.data_runfiles])
+            }
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    let default_runfiles = runfiles(
+        None,
+        data_runfiles
+            .iter()
+            .chain(defaults.iter().map(|info| &info.default_runfiles)),
+    )?;
     let data_runfiles = runfiles(
         Some(files.clone()),
-        defaults
-            .iter()
-            .filter(|_| data_policy)
-            .map(|info| &info.data_runfiles),
+        data_runfiles.iter().chain(
+            defaults
+                .iter()
+                .filter(|_| data_policy)
+                .map(|info| &info.data_runfiles),
+        ),
     )?;
     let default = DefaultInfo::from_effective(files, default_runfiles, data_runfiles, executable)
         .map_err(|e| e.to_string())?;
@@ -478,6 +578,7 @@ fn providers(
     .map_err(|e| e.to_string())?;
     let validations = children
         .iter()
+        .chain(data.iter().map(|(child, _)| child))
         .filter_map(|child| child.providers().output_group_info())
         .filter_map(|info| info.groups().get("_validation"))
         .filter(|files| !files.is_empty())

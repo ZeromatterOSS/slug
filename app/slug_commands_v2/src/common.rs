@@ -767,6 +767,7 @@ mod tests {
             ("incompatible_remove_legacy_whole_archive", true),
             ("incompatible_use_specific_tool_files", true),
             ("experimental_save_feature_state", false),
+            ("incompatible_always_include_files_in_data", true),
         ] {
             for (flags, expected) in [
                 (vec![], default),
@@ -783,6 +784,14 @@ mod tests {
                         &request.configuration_overlay,
                     )
                     .unwrap();
+                assert_eq!(
+                    prepared.always_include_files_in_data().unwrap(),
+                    if name == "incompatible_always_include_files_in_data" {
+                        expected
+                    } else {
+                        true
+                    }
+                );
                 let projection = CppFragmentProjection::new(prepared).unwrap();
                 assert_eq!(
                     projection.experimental_cc_implementation_deps().unwrap(),
@@ -835,6 +844,7 @@ mod tests {
             "incompatible_use_specific_tool_files",
             "force_pic",
             "experimental_save_feature_state",
+            "incompatible_always_include_files_in_data",
         ] {
             for text in ["null", "NULL", "invalid", " true", "false "] {
                 let flag = format!("--{name}={text}");
@@ -885,6 +895,10 @@ mod tests {
             (
                 "incompatible_filegroup_runfiles_for_data",
                 NativeCommandOption::IncompatibleFilegroupRunfilesForData,
+            ),
+            (
+                "incompatible_always_include_files_in_data",
+                NativeCommandOption::IncompatibleAlwaysIncludeFilesInData,
             ),
             ("cc_dotd_files", NativeCommandOption::CcDotdFiles),
             ("save_temps", NativeCommandOption::SaveTemps),

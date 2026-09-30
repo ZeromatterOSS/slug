@@ -1630,9 +1630,13 @@ impl PackageRecorder {
         name: String,
         srcs: Option<CoercedAttributeValue>,
         visibility: Option<Vec<VisibilityArgument>>,
+        data: Option<CoercedAttributeValue>,
     ) -> anyhow::Result<()> {
         let srcs_explicit = srcs.is_some();
         let srcs_value = srcs.unwrap_or_else(empty_labels);
+        let data_explicit = data.is_some();
+        let data_value = data.unwrap_or_else(empty_labels);
+        reject_filegroup_data_duplicates(&data_value, &name)?;
         let mut srcs = Vec::new();
         srcs_value.labels(&mut srcs);
         // A configurable `srcs` keeps each branch for query candidates while
@@ -1654,7 +1658,21 @@ impl PackageRecorder {
                 },
             });
         }
-        let config_dependencies = selector_key_labels(&srcs_value);
+        if data_explicit {
+            native_overrides.push(NativeAttributeOverride {
+                slot: class.slot("data").expect("filegroup schema").0,
+                value: NativeAttributeValue {
+                    provenance: AttributeProvenance::Explicit,
+                    value: data_value.clone(),
+                },
+            });
+        }
+        let mut config_dependencies = selector_key_labels(&srcs_value);
+        for label in selector_key_labels(&data_value) {
+            if !config_dependencies.contains(&label) {
+                config_dependencies.push(label);
+            }
+        }
         if !config_dependencies.is_empty() {
             native_overrides.push(NativeAttributeOverride {
                 slot: class
@@ -3000,6 +3018,33 @@ fn implicit_test_matches_suite(metadata: &TestMetadata, suite_tags: &[CompactStr
     })
 }
 
+// Duplicates across mutually exclusive branches are allowed. Concatenated
+// selectors are checked again after selection by native filegroup analysis.
+fn reject_filegroup_data_duplicates(
+    value: &CoercedAttributeValue,
+    name: &str,
+) -> anyhow::Result<()> {
+    match value {
+        CoercedAttributeValue::LabelList(labels) => {
+            reject_duplicate_canonical_labels(labels, "data", name)?
+        }
+        CoercedAttributeValue::Selector { branches, default } => {
+            for (_, branch) in branches.iter() {
+                reject_filegroup_data_duplicates(branch, name)?;
+            }
+            if let Some(default) = default {
+                reject_filegroup_data_duplicates(default, name)?;
+            }
+        }
+        CoercedAttributeValue::Concatenation(left, right) => {
+            reject_filegroup_data_duplicates(left, name)?;
+            reject_filegroup_data_duplicates(right, name)?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 fn reject_duplicate_canonical_labels(
     labels: &[CanonicalLabel],
     attribute: &str,
@@ -3442,13 +3487,23 @@ fn filegroup_global<'v>(
     name: &str,
     srcs: Option<Value<'v>>,
     visibility: Option<UnpackVisibility>,
+    data: Option<Value<'v>>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<NoneType> {
     let recorder = PackageRecorder::from_evaluator(eval)?;
     let srcs = srcs
         .map(|srcs| coerce_starlark_value(recorder, AttributeKind::LabelList, "srcs", true, srcs))
         .transpose()?;
-    recorder.filegroup(name.to_owned(), srcs, visibility.map(|value| value.items))?;
+    let data = data
+        .filter(|value| !value.is_none())
+        .map(|data| coerce_starlark_value(recorder, AttributeKind::LabelList, "data", true, data))
+        .transpose()?;
+    recorder.filegroup(
+        name.to_owned(),
+        srcs,
+        visibility.map(|value| value.items),
+        data,
+    )?;
     recorder.set_native_generator_from_evaluator(name, eval)?;
     Ok(NoneType)
 }
@@ -9636,10 +9691,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         name: &str,
         srcs: Option<Value<'v>>,
         visibility: Option<UnpackVisibility>,
+        #[starlark(require = named)] data: Option<Value<'v>>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        filegroup_global(name, srcs, visibility, eval)?;
+        filegroup_global(name, srcs, visibility, data, eval)?;
         let recorder = PackageRecorder::from_evaluator(eval)?;
         recorder.set_native_overrides(name, kwargs)?;
         Ok(NoneType)
@@ -10467,10 +10523,11 @@ fn native_methods(builder: &mut MethodsBuilder) {
         name: &str,
         srcs: Option<Value<'v>>,
         visibility: Option<UnpackVisibility>,
+        #[starlark(require = named)] data: Option<Value<'v>>,
         #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        filegroup_global(name, srcs, visibility, eval)?;
+        filegroup_global(name, srcs, visibility, data, eval)?;
         let recorder = PackageRecorder::from_evaluator(eval)?;
         recorder.set_native_overrides(name, kwargs)?;
         Ok(NoneType)
@@ -10735,7 +10792,7 @@ fn bzl_only_native_methods(builder: &mut MethodsBuilder) {
     ) -> anyhow::Result<NoneType> {
         // Bazel 9's injected binding discards every argument except name.
         // The native suite is only a tombstone; this declares an empty filegroup.
-        filegroup_global(name, None, None, eval)
+        filegroup_global(name, None, None, None, eval)
     }
 }
 

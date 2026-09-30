@@ -34,15 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-169-m7a-save-feature-state-projection-r1
+Packet: WP-7-170-m7a-native-filegroup-data-r1
 Status: accepted; M7A remains partial
 
-WP869 admits the private save_feature_state getter over the retained experimental
-flag with its False default and typed command admission. Independent DESIGN/FINAL
-reviews, 27 focused tests and Core/CLI pass. The unchanged query in 76.673s clears
-this getter and reaches native filegroup nondefault data refusal; fixture hashes
-and cleanup pass. Full enabled feature-state/linking/bootstrap and Windows remain
-deferred. The next packet will bound the existing filegroup data owner.
+WP870 admits native filegroup data prerequisites/runfiles and their retained
+always-include-files policy, including the required typed Loading selector path.
+Independent DESIGN/FINAL, 29 focused tests and Core/CLI pass. The unchanged query
+in 77.271s clears data refusal and reaches a missing Rust host-tools ld.lld target;
+three original hashes and actual cleanup pass. Full toolchain/query/bootstrap and
+Windows execution remain deferred. The next packet will bound that missing target.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

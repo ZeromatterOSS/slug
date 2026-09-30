@@ -1187,6 +1187,11 @@ impl SlugConfiguration {
         self.core_bool("incompatible_filegroup_runfiles_for_data")
     }
 
+    /// CoreOptions policy for native data prerequisites, independent of srcs runfiles.
+    pub fn always_include_files_in_data(&self) -> Result<bool, SlugConfigurationError> {
+        self.core_bool("incompatible_always_include_files_in_data")
+    }
+
     pub fn check_visibility(&self) -> Result<bool, SlugConfigurationError> {
         self.core_bool("check_visibility")
     }
@@ -1405,6 +1410,7 @@ fn typed_native_command_descriptor(
         NativeCommandOption::CollectCodeCoverage
         | NativeCommandOption::CheckVisibility
         | NativeCommandOption::IncompatibleFilegroupRunfilesForData
+        | NativeCommandOption::IncompatibleAlwaysIncludeFilesInData
         | NativeCommandOption::CompilationMode
         | NativeCommandOption::HostCompilationMode
         | NativeCommandOption::Features

@@ -40650,6 +40650,9 @@ mod cc_freeze_tests;
 #[path = "artifact_root_helper_tests.rs"]
 mod artifact_root_helper_tests;
 
+#[path = "filegroup_data_tests.rs"]
+mod filegroup_data_tests;
+
 fn package_relative_materialized_epoch(
     build: &str,
     defs: &str,
