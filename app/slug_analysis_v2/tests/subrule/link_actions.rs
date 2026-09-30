@@ -21,7 +21,13 @@ fn epoch(marker: &str) -> PathObservationEpoch {
         "/workspace/rules_cc/rules/link_actions.bzl",
         &format!(
             r#"i = cc_common.internal_DO_NOT_USE()
-Proof = provider(fields = ["root", "sub", "root_soname", "sub_soname", "marker"])
+Proof = provider(fields = ["root", "sub", "root_soname", "sub_soname", "root_libraries", "sub_libraries", "marker"])
+NamedLibraryInfo = provider(fields = ["type", "name", "is_whole_archive"])
+def _libraries(name):
+    first = NamedLibraryInfo(type = "object_file", name = name, is_whole_archive = False)
+    equal = NamedLibraryInfo(type = "object_file", name = name, is_whole_archive = False)
+    whole = NamedLibraryInfo(type = "static_library", name = "whole/" + name, is_whole_archive = True)
+    return i.intern_seq([first, equal, whole, first])
 def _wrap(actions):
     first = i.wrap_link_actions(actions)
     second = i.wrap_link_actions(first, None)
@@ -35,7 +41,7 @@ def _child(ctx, parent):
         fail("wrapped subrule declaration lost File identity")
     soname = i.dynamic_library_soname(wrapped, output.short_path, True)
     wrapped.write(output, "sub:{marker}")
-    return output, soname
+    return output, soname, _libraries(soname)
 child = subrule(implementation = _child)
 def _root(ctx):
     wrapped = _wrap(ctx.actions)
@@ -46,10 +52,10 @@ def _root(ctx):
         fail("wrapped root declaration lost File identity")
     root_soname = i.dynamic_library_soname(wrapped, output.short_path, True)
     wrapped.write(output, "root:{marker}")
-    sub, sub_soname = child(ctx)
+    sub, sub_soname, sub_libraries = child(ctx)
     if sub != ctx.actions.declare_file("sub_{marker}.pic.a"):
         fail("root and subrule wrappers used different declaration owners")
-    return [DefaultInfo(files = depset([output, sub])), Proof(root = output, sub = sub, root_soname = root_soname, sub_soname = sub_soname, marker = "{marker}")]
+    return [DefaultInfo(files = depset([output, sub])), Proof(root = output, sub = sub, root_soname = root_soname, sub_soname = sub_soname, root_libraries = _libraries(root_soname), sub_libraries = sub_libraries, marker = "{marker}")]
 subject = rule(implementation = _root, subrules = [child])
 def _locked(ctx, outer):
     wrapped = _wrap(outer)
@@ -172,6 +178,40 @@ async fn configured_request(
     .await
 }
 
+fn assert_libraries(value: &slug_build_api_v2::AnalysisValue, basename: &str) {
+    let AnalysisValueKind::Tuple(values) = value.kind() else {
+        panic!("intern_seq must publish a tuple");
+    };
+    assert_eq!(values.len(), 4);
+    assert_eq!(values[0], values[1]);
+    assert_eq!(values[0], values[3]);
+    for (index, value) in values.iter().enumerate() {
+        let AnalysisValueKind::Provider(metadata) = value.kind() else {
+            panic!("intern_seq must preserve the metadata provider type");
+        };
+        let whole = index == 2;
+        let kind = if whole {
+            "static_library"
+        } else {
+            "object_file"
+        };
+        let name = if whole {
+            format!("whole/{basename}")
+        } else {
+            basename.to_owned()
+        };
+        assert!(
+            matches!(metadata.field("type").unwrap().kind(), AnalysisValueKind::String(actual) if actual == kind)
+        );
+        assert!(
+            matches!(metadata.field("name").unwrap().kind(), AnalysisValueKind::String(actual) if actual == name)
+        );
+        assert!(
+            matches!(metadata.field("is_whole_archive").unwrap().kind(), AnalysisValueKind::Boolean(actual) if actual == whole)
+        );
+    }
+}
+
 fn assert_writes(result: &slug_analysis_v2::ConfiguredNodeResult, marker: &str) {
     assert_eq!(result.actions().len(), 2);
     let proof = result
@@ -190,6 +230,10 @@ fn assert_writes(result: &slug_analysis_v2::ConfiguredNodeResult, marker: &str) 
         let basename = format!("{field}_{marker}{suffix}");
         assert!(
             matches!(proof.field(&format!("{field}_soname")).unwrap().kind(), AnalysisValueKind::String(actual) if actual == basename)
+        );
+        assert_libraries(
+            proof.field(&format!("{field}_libraries")).unwrap(),
+            &basename,
         );
         assert_eq!(action.mnemonic(), "FileWrite");
         assert_eq!(

@@ -2059,6 +2059,16 @@ unchanged authentic cquery clears wrapping and next reaches dynamic_library_sona
 on the PIC static-library path. Sharing, helper counters and full link actions
 remain deferred; the facade is not complete Bazel wrapper parity.
 
+The link metadata intern_seq surface uses existing sequence iteration,
+AllocTuple and structural immutability capabilities, including user-provider
+fields. It accepts genuine list/tuple/range with recursively immutable elements,
+captures the outer sequence and preserves original element types/values as
+Slug-native. Required positional binding and outer tuple length/slot order
+match CcStarlarkInternal:397-405. Mutable elements refuse; upstream weak
+representative substitution (also observable for equal mixed numerics/signed
+zero), global canonical sharing and performance parity remain deferred. No
+new interner/cache, retained Value owner or publication rule is introduced.
+
 ## Preserved library SONAME (WP859, 2026-09-30)
 
 The private link facade owns dynamic_library_soname wrapper validation. Three

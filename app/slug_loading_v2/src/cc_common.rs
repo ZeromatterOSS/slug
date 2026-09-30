@@ -38,6 +38,8 @@ use crate::builtin_restriction::source_identities_for_evaluator;
 use crate::provider::BzlEvaluationContext;
 use crate::subrule_invocation::AnalysisActions;
 
+mod sequence;
+
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct CcCommonModule;
 starlark::starlark_simple_value!(CcCommonModule);
@@ -80,6 +82,14 @@ impl<'v> StarlarkValue<'v> for CcInternalModule {
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn intern_seq<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = pos)] seq: Value<'v>,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        sequence::immutable_tuple(seq, heap)
+    }
+
     fn dynamic_library_soname<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = pos)] actions: Value<'v>,
