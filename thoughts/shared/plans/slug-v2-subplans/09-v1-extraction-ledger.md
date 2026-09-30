@@ -3125,3 +3125,13 @@ No new retained representation, collection, cache, interner, Host observation,
 lock or donor utility is added. Twenty-nine focused tests and unchanged
 bootstrap progression to cpp.grte_top discriminate this slice. No performance,
 Windows execution or full toolchain/C++ claim is made.
+
+## Default link-action phase facade reuse (WP858, 2026-09-30)
+
+Reuse the existing Arc-backed/Allocative AnalysisActions sink/token/scope through
+one private evaluator-phase wrapper. Constant-time cloning shares those owners;
+ordinary methods use the existing binding table and publication rejects wrapped
+handles. No retained heap borrow, graph key, cache, collection, interner or donor
+import; static method metadata is input-independent. Seventeen focused checks
+and independent reviews protect nesting, scope, lifecycle, shared declarations
+and source/configuration restoration. No performance or memory-reduction claim.

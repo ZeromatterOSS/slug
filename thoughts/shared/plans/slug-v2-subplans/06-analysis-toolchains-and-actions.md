@@ -2042,6 +2042,22 @@ unchanged authentic cquery clears this method and next stops at
 cc_internal.wrap_link_actions during rules_cc linking-context creation. Full
 coverage and linking/toolchain closure remain deferred; Linux remains priority.
 
+## Default link-actions wrapper (WP858, 2026-09-30)
+
+The private link facade composes over the original AnalysisActions handle.
+Default positional None/False binding returns a fresh occurrence with the same
+sink/token/context name/scope; the shared ordinary method table and genuine
+base/wrapper unpack preserve declaration, registration and context recovery.
+Wrapping permits suspended live frames, while ordinary mutations retain their
+original top-frame restrictions. Wrapper-only shareable declarations and
+alternate construction modes refuse explicitly. No new semantic action owner,
+registry/configuration or graph state is added. Seventeen focused checks and
+independent reviews prove shared FileWrite ownership, conflicts, caller/scope/
+expiry checks, both-route same-DICE restoration and publication refusal. The
+unchanged authentic cquery clears wrapping and next reaches dynamic_library_soname
+on the PIC static-library path. Sharing, helper counters and full link actions
+remain deferred; the facade is not complete Bazel wrapper parity.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

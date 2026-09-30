@@ -1,123 +1,143 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-157-m7a-disabled-coverage-instrumentation-r1
+Packet: WP-7-158-m7a-default-link-actions-wrapper-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Advance the byte-identical authentic Rust-toolchain cquery past missing
-analysis_ctx.coverage_instrumented at rules_cc cc/common/cc_helper.bzl:304.
-Expose the public ctx.coverage_instrumented(target=None) method for structurally
-coverage-disabled configurations. Accept omitted/explicit None and positional
-or named genuine Target (including source-file Targets); return primitive
-False only after type and active-context validation. Coverage-enabled calls
-fail explicitly as unsupported/deferred rather than guessing provider/filter
-results. No coverage fragment declaration is required.
+Advance the unchanged authentic Rust-toolchain cquery past cc_internal.
+wrap_link_actions at rules_cc cc/private/link/
+create_linking_context_from_compilation_outputs.bzl:105 via cc_library.bzl:152.
+Admit wrap_link_actions(actions, build_configuration=None,
+sharable_artifacts=False), all three positional-only, for genuine live actions
+in the current evaluator. Return a fresh private wrapper facade preserving the
+original sink, token, context name and root/subrule scope. Its already-admitted
+ordinary methods reuse the same action binder/declaration/registration owners.
+Expose wrapper shareable artifact/directory methods only as explicit deferred
+refusals; non-None configuration and sharable True are likewise deferred.
+The authentic caller has compilation outputs; this is adapter admission, not
+an empty-output or full link-action proof.
 
-This method shape and disabled short circuit are exact, pinned to Bazel 9.2
-8220c6198837d5c13d53fea211cf3282aa12408a StarlarkRuleContext.java:761-773,
-StarlarkRuleContextApi.java:223-248 and StarlarkRuleContextTest.java:3401-3455
-plus the frozen-context matrix at 3470. CoreOptions.java:566 owns False default.
-InstrumentedFilesCollector.java:153 owns enabled filter/test-target inclusion;
-those semantics, InstrumentedFilesInfo, coverage actions and full C++/toolchain
-closure remain deferred. Configuration/DICE/path/diagnostic identity remains
-Slug-native. Linux remains the priority; no Windows implementation or execution
-claim is added.
+Exact admitted binding/default and inherited ordinary-operation semantics are
+pinned to Bazel9.2 8220c619 CcStarlarkInternal.java:442-483,
+StarlarkActionFactory.java:121 and its inherited mutators, and Param.java:78/94.
+CppLinkActionBuilder.java:44-99 owns unadmitted config/sharing construction.
+Upstream arbitrary non-configuration arguments fall back to caller config;
+that lane is narrowed/deferred here. Upstream wrapper has no own private-caller
+or mutability check; Slug's evaluator/live-owner checks and facade/type/identity,
+configuration/path/action identity remain Slug-native. Shareable declarations,
+alternate configuration, factory-local run_shell helper counters,
+linkstamp/LTO/link argument construction and full
+CppLink/CppArchive actions/toolchain closure remain unsupported/deferred.
+Linux is priority; no Windows implementation or execution claim.
 
 ## Ownership and scope
 
-AnalysisContextGen already retains CcContextProjection with immutable structural
-SlugConfiguration, produced from the sole configured target key. Add a small
-coverage-disabled projection over its existing configuration.coverage_enabled()
-getter. Missing/malformed configuration fails closed. Do not store a Boolean
-copy or read an explicit dependency's configuration: pinned Bazel reads the
-caller ctx. Analysis method-table admission validates Target/None using existing
-AnalysisConfiguredTargetValue and invokes AnalysisCallToken.require_active at
-call time, including extracted bound methods. Default binding uses the existing
-Starlark method parameter mechanism. No source-label heuristics, new DICE key,
-cache, lock, provider side store, action, command flag or fallback. Existing
-configuration structurally owns equality/invalidation; publication/lifetimes
-follow docs/developers/dice.md and existing rule-context token contracts.
-Both existing exec projections reset collect_code_coverage False; preserve
-that owner unchanged and prove coverage-on target refusal versus exec False.
-The result is a primitive and retains no context/evaluator memory.
+Existing AnalysisActions owns sink/token/context_name/scope. Add a private
+phase-local WrappedLinkActions value composed over its unchanged handle;
+wrapper method tables reuse analysis_actions_methods plus explicit deferred
+extensions. A genuine-actions unpack helper accepts only existing base and
+private wrapper, used by ordinary action binders and existing actions2ctx_cheat/
+solib consumers so inherited factory use preserves original authorization.
+Wrapping reuses actions_to_context for current evaluator, live frame and
+registered-root validation; suspended frames remain wrappable, but their
+ordinary mutations still require the original top-frame token. Do not create
+fresh authorization, a replacement context, action owner/configuration or
+registry. Both root/subrule handles preserve scope through nested wrapping.
+Existing DICE configured/action publication, Need/errors and dependencies remain
+unchanged; docs/developers/dice.md applies. No new key, cache, lock or state
+repair. Wrapper construction cannot mutate the sink.
 
-Allowlist: Analysis src/starlark_rule.rs only context method/import/test
-registration, src/starlark_rule/cc_context.rs only projection helper,
-src/starlark_rule/cc_context/tests.rs only focused owner regression,
-src/starlark_rule/context_lifecycle_tests.rs only bound-method lifecycle
-regression, tests/subrule.rs only module registration andnew
-tests/subrule/coverage_instrumented.rs; this manifest/canonical Current and
-compact Stage6 acceptance note. Existing 2768-line starlark_rule.rs remains
-cohesive for method registration; no new fixture/function family enters it.
-Integration tests live separately. Production growth estimate under35lines;
-no new representation or performance claim. Independent DESIGN precedes
-implementation, FINAL gates acceptance. Baseline a16478dd5.
+Memory is evaluator-phase scratch: one private facade with constant-time
+Arc-backed handle clone, released with its heap; captured handles remain
+inactive after their original frame exits. No retained evaluator borrow or
+new collection/interner. Preserve Allocative and existing Arc-backed sink/token/
+scope; no donor import or performance claim. Reuse Stage9 action-handle and
+phase-facade rows (WP778/WP767/WP765), following slug-buck2-utility-reuse.
+Existing 2000-line subrule_invocation.rs gets only unpack/module registration
+and binder substitution; wrapper logic/tests live in a bounded child module.
+Existing cc_common.rs receives one narrow registration and two native-unpack
+substitutions. Production growth is105lines including the bounded wrapper/refusal method
+table (slightly above the initial100-line estimate), ordinary binder
+behavior otherwise unchanged.
+
+Allowlist: Loading src/cc_common.rs, src/subrule_invocation.rs,
+new src/subrule_invocation/link_actions.rs and its tests.rs;
+Analysis tests/subrule.rs only module registration plus narrow shared harness
+materialization injection (existing default helper unchanged) and new
+tests/subrule/link_actions.rs; this manifest/canonical Current and compact
+Stage6/Stage9 acceptance notes. No native linkargs/soname/action activation,
+provider or generic spawn extension. Baseline55a802f38. Independent DESIGN
+precedes implementation, FINAL gates acceptance.
 
 ## Evidence and validation
 
-Reuse pinned disabled-coverage and context-lifetime source regressions. Real
-configured rule tests discriminate default/explicit disabled, omitted and
-explicit None, positional/named rule Target and source-file Target, primitive
-bool result, invalid scalar/list/struct/File/Label inputs, wrong arity/named
-parameter and coverage-enabled explicit refusal. Configuration-off/on/off and
-source A/B/A must use one DICE for both Legacy/Observed routes. Both exec
-projections of an enabled target return False and target remains refused.
-No fragment declaration or provider lookup is needed. Existing dependency
-materialization protects Target identity. Owner tests cover missing structural
-state and False/enabled handling. Existing malformed coverage Boolean validation
-is inherited from Configuration's typed getter; add only if its evidence is
-missing. Capture a bound method while active; invoking it after success/error
-must fail via token, never return False. Keep zero actions and existing
-root/subrule authorization controls. Subrule coverage_instrumented API is not
-admitted by this packet (SubruleContextApi has a different surface).
-Enabled upstream filter/provider assertions are deferred because this slice
-refuses that phase. Reuse existing rules_cc bytes; no copied public fixture.
+Reuse pinned wrapper implementation (no direct upstream wrapper test found).
+Loading tests exercise all default positional forms, fresh wrapper occurrence,
+nested wrapping, genuine base/wrapper unpack, missing/fake/foreign/expired
+handles/registration, alternative config and sharing refusal, invalid arity/
+named/type binding, and deferred shareable declaration methods. Preserve root
+context recovery and suspended frame semantics; wrapper mutation must reject
+outer actions inside a child and expired bound methods. Wrapper extensions
+must leave declaration/action state unchanged. Existing base action method
+availability must not grow from the wrapped extensions.
 
-Resolve pinned nightly-2025-09-14; serialize Cargo. Compile Analysis unit and
-subrule integration executables with JSON --no-run in separate60s preparation
-bounds, batch exact nonignored preflight, then run focused selected tests.
-Runtime expected under a few seconds. Compile named Core direct dependent and
-rebuild slug_cli_v2 before authentic one-shot replay from durable
-target/wp856/authentic-workspace, same cquery //:probe --output=label and same
-three receipt hashes. Use supervised180s cap (operation cap, not user deadline)
-justified by fresh public source preparation; smaller tests do not prove the
-actual generated-toolchain closure advanced. Check slugd before/after in the
-actual execution environment, supervisor cleans process group. Record first
-new stop/success, fixture hashes and timing; full closure remains unclaimed.
-Rustfmt/diff/archive/status checks; root integrates/commits accepted work.
+Real Analysis root/subrule integration must prove shared ordinary declaration/
+registration owners via an admitted FileWrite (not a new link action), shared
+File identity/conflict handling, nested wrapper actions2ctx recovery, preserved
+root/subrule action scope and source/configuration A/B/A on the same DICE in
+Legacy/Observed routes. Use existing FileWrite/action registry evidence; no
+remote run needed. Root/outer tokens remain locked in child frames; no wrapped
+handle publication is admitted. Existing extraction/lifecycle and solib/native
+action tests protect unpack changes. No copied public fixture. The declared local rules_cc module preserves private
+accessor provenance. Its materialization receipt is included with the existing
+builtin receipt before eager source preparation via one shared test-harness
+helper; no duplicated snapshot/policy setup or production owner bypass.
 
-REPLAN if the current configured context cannot own this Boolean/lifecycle
-without new provenance or semantic state. Routine invocation/compile/test
-corrections stay within this contract.
+Pinned nightly serial Cargo JSON --no-run compile Loading and Analysis named
+executables within separate60s preparation caps. Batch exact nonignored
+preflight then focused runtime expected a fewseconds; Core direct-dependent
+check and CLIrebuild before unchanged authentic cquery from persistent
+target/wp856/authentic-workspace, exact WP855threehashes. Supervised180s
+operationcap justified by fresh public source preparation; check slugd
+before/after in actualenvironment and supervisorcleanup. First newstop/success
+is observable outcome, not full linkclosure. Rustfmt/diff/archive/status apply.
+Root owns integration/acceptedcommit. REPLAN if default wrapper needs a new
+semantic config/action owner or cannot preserve token/scope/heap lifetime.
+Routine invocation/compile/test corrections remain in scope.
 
 ## Immediate predecessor
 
-WP856 a16478dd5 accepts experimental_cc_implementation_deps getter/typed option
-and exact textual Boolean null rejection; independent DESIGN/FINAL and26focused
-tests pass. The byte-identical recovered authentic cquery clears the getter in
-83.944s and next reaches ctx.coverage_instrumented at rules_cc cc_helper.bzl:304.
-Raw evidence target/wp856. M7A and M8 remain unproved; Windows is deferred.
+WP85755a802f38 accepts coverage-disabled instrumentation with genuineTarget/None
+and lifetime validation. Independent DESIGN/FINAL and12focusedchecks pass;
+rebuilt unchanged authentic cquery clears it in82.989s and next stops at
+wrap_link_actions. Evidence target/wp857. M7A/M8 unproved; Windows deferred.
 
 ## Acceptance receipt (2026-09-30)
 
-Independent DESIGN/FINAL ACCEPT. Twelve exact nonignored focused checks pass:
-five Analysis unit/lifecycle and seven integration/protection tests, 0.496s
-total runtime. The integration discriminator proves an enabled caller refuses
-an explicit exec-disabled Target, rather than using dependency configuration.
-Default/None/Target shapes, invalid binding/type, real same-DICE restoration,
-both exec resets, zero actions and extracted-method expiry pass. Pinned serial
-preparation: unit11.55s, integration5.56s, Corecheck33.67s, CLIbuild6.09s.
-Rustfmt, diff, archive and scheduling checks pass. Production grows27lines,
-with no new retained state, semantic owner, key or lock.
+Independent DESIGN/FINAL ACCEPT. Seventeen exact nonignored focused checks pass:
+Loading11 and Analysis6, total runtime0.346s. They prove fresh/nested facade
+identity, unchanged sink/token/scope, genuine/current/live owner checks,
+suspended and expired token refusal, shared FileWrite declarations/registration,
+root/subrule scope, source/configuration A/B/A in both DICE routes, conflicts,
+wrapper-only deferred extensions and provider-publication refusal. Existing
+base lifecycle, solib, coverage and action-restoration protections pass.
+Pinned serial preparation: finalLoading22.67s, finalIntegration1.59s,
+Corecheck15.26s and CLIbuild23.95s. Initial test-only compiler/selector errors
+and eager-source fixture acquisition failure were corrected without changing
+production semantics. The shared harness now includes the declared local
+rules_cc materialization receipt before initial source preparation; existing
+callers use empty additional receipts and retain their prior setup. No source
+identity spoof or private-accessor bypass. Rustfmt/diff/archive/status pass.
 
-The rebuilt authentic `cquery //:probe --output=label` exits2 in82.989s,
-clearing coverage_instrumented and reaching the separate
-cc_internal.wrap_link_actions at rules_cc
-cc/private/link/create_linking_context_from_compilation_outputs.bzl:105 via
-cc_library.bzl:152. Original BUILD/MODULE/lock hashes remain unchanged; durable
-WP856 recovered fixture is reused. Supervisor cleanup and actual-environment
-process checks pass. Evidence is in target/wp857. The packet evidence window
-starts07:02:20UTC and closes around07:14UTC (includes review/preparation/replay).
-Full coverage filters/providers/actions, link actions/toolchain closure and
-M7A/M8 remain unproved; no Windows execution claim is added.
+Production grows105lines, including a bounded private facade and explicit
+refusal table. It clones existing constant-time Arc-backed handles without a
+new retained semantic owner/key/lock or evaluator borrow. The unchanged rebuilt
+authentic `cquery //:probe --output=label` exits2 in81.433s, clears wrapping and
+first reaches dynamic_library_soname at rules_cc cpp_link_action.bzl:193 via
+cc_linking_helper.bzl:635 on the PIC static-library path. Original three hashes
+remain unchanged. Supervisor cleanup and actual-environment process checks
+pass. Evidence target/wp858; measured packet evidence window07:22:44UTC to
+around07:49UTC includes review/test-harness corrections/preparation/replay.
+Full shareable/alternate-config factories, helper counters, link actions and
+toolchain closure/M7A/M8 remain unproved; no Windows execution claim.

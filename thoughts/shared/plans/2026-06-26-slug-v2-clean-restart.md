@@ -34,16 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-157-m7a-disabled-coverage-instrumentation-r1
+Packet: WP-7-158-m7a-default-link-actions-wrapper-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP857 accepts public ctx.coverage_instrumented(target=None) for coverage-disabled
-caller configurations, with genuine Target/None validation and invocation
-lifetime checks. Twelve focused tests and independent reviews pass. The rebuilt
-unchanged authentic Rust-toolchain cquery clears this method and next stops at
-cc_internal.wrap_link_actions during rules_cc linking-context creation. Enabled
-coverage, full linking/toolchain closure and Windows execution stay deferred.
-See `slug-v2-subplans/current-packet.md`.
+WP858 accepts the default link-actions wrapper over existing genuine handles,
+preserving sink/token/scope and current-evaluator ownership. Seventeen focused
+checks and independent reviews pass. The rebuilt unchanged authentic cquery
+clears wrapping and next stops at dynamic_library_soname on the PIC static
+library path. Sharing/alternate configuration, helper counters, full link
+closure and Windows execution remain deferred. See
+`slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

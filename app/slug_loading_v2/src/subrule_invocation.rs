@@ -1302,7 +1302,13 @@ pub struct AnalysisActions {
     scope: AnalysisActionCallScope,
 }
 
+pub(crate) mod link_actions;
+
 impl AnalysisActions {
+    pub(crate) fn from_starlark(value: Value<'_>) -> Option<&Self> {
+        Self::from_value(value).or_else(|| link_actions::unpack(value))
+    }
+
     pub fn register_dynamic_library_symlink(
         &self,
         library: Value<'_>,
@@ -1348,7 +1354,7 @@ pub(crate) fn actions_to_context<'v>(
     actions: Value<'v>,
     eval: &Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<Value<'v>> {
-    let actions = AnalysisActions::from_value(actions)
+    let actions = AnalysisActions::from_starlark(actions)
         .ok_or_else(|| anyhow::anyhow!("actions2ctx_cheat requires genuine ctx.actions"))?;
     let evaluation = AnalysisEvaluationContext::from_evaluator(eval)?;
     if !Arc::ptr_eq(&actions.token.stack, &evaluation.stack) {
@@ -1745,7 +1751,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] output_file_name: &'v str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AnalysisArtifactValue> {
-        let actions = AnalysisActions::from_value(this)
+        let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         actions
             .token
@@ -1767,7 +1773,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] output_file_name: &'v str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AnalysisArtifactValue> {
-        let actions = AnalysisActions::from_value(this)
+        let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         actions
             .token
@@ -1783,7 +1789,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
     }
 
     fn declare_file(this: Value, path: &str) -> anyhow::Result<AnalysisArtifactValue> {
-        let actions = AnalysisActions::from_value(this)
+        let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         actions
             .token
@@ -1796,7 +1802,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         filename: &str,
         #[starlark(require = named)] sibling: Option<Value>,
     ) -> anyhow::Result<AnalysisArtifactValue> {
-        let actions = AnalysisActions::from_value(this)
+        let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         actions
             .token
@@ -1813,7 +1819,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         content: Value,
         #[starlark(default = false)] is_executable: bool,
     ) -> anyhow::Result<NoneType> {
-        let actions = AnalysisActions::from_value(this)
+        let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         actions
             .token
@@ -1840,7 +1846,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] resource_set: Option<Value<'v>>,
         #[starlark(require = named)] toolchain: Option<Value<'v>>,
     ) -> anyhow::Result<NoneType> {
-        let actions = AnalysisActions::from_value(this)
+        let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         let request = bind_run_shell_request(
             actions.scope.clone(),
@@ -1868,7 +1874,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
     }
 
     fn args<'v>(this: Value<'v>, heap: Heap<'v>) -> anyhow::Result<Value<'v>> {
-        let actions = AnalysisActions::from_value(this)
+        let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         actions.token.require_active("args", actions.context_name)?;
         Ok(heap.alloc_complex(StarlarkArgs {
@@ -1899,7 +1905,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] resource_set: Option<Value<'v>>,
         #[starlark(require = named)] toolchain: Option<Value<'v>>,
     ) -> anyhow::Result<NoneType> {
-        let actions = AnalysisActions::from_value(this)
+        let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         let request = bind_run_request(
             actions.action_sink.as_ref(),
@@ -1933,7 +1939,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] is_executable: bool,
         #[starlark(require = named)] progress_message: Option<&'v str>,
     ) -> anyhow::Result<NoneType> {
-        let actions = AnalysisActions::from_value(this)
+        let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         actions
             .token

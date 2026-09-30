@@ -69,6 +69,8 @@ mod coverage_instrumented;
 mod grte_top;
 #[path = "subrule/implementation_deps.rs"]
 mod implementation_deps;
+#[path = "subrule/link_actions.rs"]
+mod link_actions;
 
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
@@ -316,6 +318,27 @@ async fn analyze_result(
     tracker: Arc<Tracker>,
     route: AnalysisRoute,
 ) -> Result<Arc<slug_analysis_v2::ConfiguredNodeResult>, String> {
+    analyze_result_with_materializations(
+        dice,
+        epoch,
+        target,
+        configuration,
+        tracker,
+        route,
+        Vec::new(),
+    )
+    .await
+}
+
+async fn analyze_result_with_materializations(
+    dice: &Arc<Dice>,
+    epoch: PathObservationEpoch,
+    target: &str,
+    configuration: ConfigurationKey,
+    tracker: Arc<Tracker>,
+    route: AnalysisRoute,
+    additional_materializations: Vec<RepositoryMaterializationEpochEntry>,
+) -> Result<Arc<slug_analysis_v2::ConfiguredNodeResult>, String> {
     let data = UserComputationData {
         cycle_detector: Some(analysis_cycle_detector()),
         activation_tracker: Some(tracker),
@@ -375,12 +398,13 @@ async fn analyze_result(
             },
             RepositoryMaterializationResultEpoch::new(
                 workspace(),
-                [RepositoryMaterializationEpochEntry {
+                std::iter::once(RepositoryMaterializationEpochEntry {
                     request,
                     result: RepositoryMaterializationResult::Success(
                         RepositoryMaterializationSuccess::Local,
                     ),
-                }],
+                })
+                .chain(additional_materializations),
             )
             .unwrap(),
         )])

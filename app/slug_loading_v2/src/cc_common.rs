@@ -80,6 +80,21 @@ impl<'v> StarlarkValue<'v> for CcInternalModule {
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn wrap_link_actions<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = pos)] actions: Value<'v>,
+        #[starlark(require = pos)] build_configuration: Option<Value<'v>>,
+        #[starlark(require = pos, default = false)] sharable_artifacts: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::subrule_invocation::link_actions::wrap(
+            actions,
+            build_configuration,
+            sharable_artifacts,
+            eval,
+        )
+    }
+
     fn is_tree_artifact<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = pos)] artifact: Value<'v>,
@@ -310,7 +325,7 @@ fn cc_internal_methods(builder: &mut MethodsBuilder) {
                 "dynamic_library_symlink supports only preserve_name=False and prefix_consumer=False"
             );
         }
-        let actions = AnalysisActions::from_value(actions)
+        let actions = AnalysisActions::from_starlark(actions)
             .ok_or_else(|| anyhow::anyhow!("dynamic_library_symlink requires ctx.actions"))?;
         Ok(eval
             .heap()
@@ -328,7 +343,7 @@ fn cc_internal_methods(builder: &mut MethodsBuilder) {
         let actions = ctx
             .get_attr("actions", eval.heap())
             .map_err(|error| anyhow::anyhow!(error.to_string()))?
-            .and_then(AnalysisActions::from_value)
+            .and_then(AnalysisActions::from_starlark)
             .ok_or_else(|| anyhow::anyhow!("absolute_symlink requires a rule or subrule ctx"))?;
         actions.register_absolute_symlink(output, target_path, progress_message)?;
         Ok(NoneType)
