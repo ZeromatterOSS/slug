@@ -828,7 +828,9 @@ expansion enters the accepted scalar recipe/parameter policy pipeline; it adds
 no retained action representation, utility import, identity owner, interner or
 cache. Module freeze preserves original variable/cache seeds. Registration
 snapshot timing remains Slug-native; nested identity hashing and execution-time
-expansion stay deferred. No performance claim or new donor disposition.
+expansion stay deferred. WP864 appends Gcc to the same retained format enum and
+uses existing phase scratch allocation/serializer/publication boundaries; no
+container or owner changes. No performance claim or new donor disposition.
 
 The active bounded basic Args/run/symlink successor's first pre-review returned
 `REPLAN` while accepting the environment dependency and borrowed sink. Its

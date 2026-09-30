@@ -15,7 +15,7 @@ def _args(configuration, variables, parameter_file_type = None):
     return cc_internal.get_link_args(feature_configuration = configuration, action_name = ACTION,
         build_variables = variables, parameter_file_type = parameter_file_type)
 
-def _consume(ctx, configuration, scope):
+def _consume(ctx, configuration, scope, parameter_file_type):
     wrapped = cc_internal.wrap_link_actions(ctx.actions)
     values = ['dup', 'with space', 'dup']
     variables = cc_internal.cc_toolchain_variables(vars = {
@@ -23,7 +23,7 @@ def _consume(ctx, configuration, scope):
         'values': values, 'linker_param_file': 'LINKER_PARAM_FILE_PLACEHOLDER',
     })
     lazy = _args(configuration, variables)
-    flagged = _args(configuration, variables, 'UNQUOTED')
+    flagged = _args(configuration, variables, parameter_file_type)
     write = wrapped.declare_file(scope + '.params')
     run = wrapped.declare_file(scope + '.run')
     param = wrapped.declare_file(scope + '.flagged')
@@ -68,9 +68,9 @@ def _impl(ctx):
         else:
             scope_guard(configuration)
         fail('action guard unexpectedly succeeded')
-    outputs = _consume(ctx, configuration, 'root') + child(configuration, 'sub')
+    outputs = _consume(ctx, configuration, 'root', ctx.attr.parameter_file_type) + child(configuration, 'sub', ctx.attr.parameter_file_type)
     return [DefaultInfo(files = depset(outputs)), Proof(marker = 'MARKER', mode = ctx.fragments.cpp.compilation_mode())]
-subject = rule(implementation = _impl, fragments = ['cpp'], attrs = {'guard': attr.string()}, subrules = [child, locked, escaped, scope_guard])
+subject = rule(implementation = _impl, fragments = ['cpp'], attrs = {'guard': attr.string(), 'parameter_file_type': attr.string(default = 'UNQUOTED')}, subrules = [child, locked, escaped, scope_guard])
 "#;
 
 fn source(root: &std::path::Path, marker: &str) {
@@ -81,7 +81,12 @@ fn source(root: &std::path::Path, marker: &str) {
     .unwrap();
 }
 
-fn assert_actions(result: &ConfiguredNodeResult, marker: &str, mode: &str) {
+fn assert_actions(
+    result: &ConfiguredNodeResult,
+    marker: &str,
+    mode: &str,
+    parameter_file_type: &str,
+) {
     assert_eq!(field(result, "marker").as_str(), Some(marker));
     assert_eq!(field(result, "mode").as_str(), Some(mode));
     assert_eq!(result.actions().len(), 6);
@@ -123,7 +128,12 @@ fn assert_actions(result: &ConfiguredNodeResult, marker: &str, mode: &str) {
                     param.path(),
                     format!("{}-0.params", action.outputs()[0].path())
                 );
-                assert_eq!(param.bytes(), format!("{}\n", argv.join("\n")).as_bytes());
+                let bytes = if parameter_file_type == "GCC_QUOTED" {
+                    format!("{stamp}\ndup\nwith\\ space\ndup\nbefore-write\nbefore-run\n--tail\n")
+                } else {
+                    format!("{}\n", argv.join("\n"))
+                };
+                assert_eq!(param.bytes(), bytes.as_bytes());
                 assert_eq!(
                     expanded.argv(),
                     [
@@ -153,9 +163,12 @@ fn assert_actions(result: &ConfiguredNodeResult, marker: &str, mode: &str) {
 
 #[tokio::test]
 async fn immutable_link_args_use_generic_root_subrule_snapshots_and_restore_inputs() {
-    for observed in [false, true] {
+    for (observed, parameter_file_type) in [false, true]
+        .into_iter()
+        .flat_map(|observed| ["UNQUOTED", "GCC_QUOTED"].map(|format| (observed, format)))
+    {
         let root = workspace_with(
-            "subject(name='subject')",
+            &format!("subject(name='subject',parameter_file_type='{parameter_file_type}')"),
             &SUBJECT.replace("MARKER", "A"),
             &[],
         );
@@ -164,12 +177,12 @@ async fn immutable_link_args_use_generic_root_subrule_snapshots_and_restore_inpu
         let first = request_with_route(&dice, &root, "subject", fast.clone(), observed)
             .await
             .unwrap();
-        assert_actions(&first, "A", "fastbuild");
+        assert_actions(&first, "A", "fastbuild", parameter_file_type);
         let dbg = config(&[(NativeCommandOption::CompilationMode, "dbg")]);
         let changed = request_with_route(&dice, &root, "subject", dbg.clone(), observed)
             .await
             .unwrap();
-        assert_actions(&changed, "A", "dbg");
+        assert_actions(&changed, "A", "dbg", parameter_file_type);
         assert_ne!(changed, first);
         assert_eq!(
             request_with_route(&dice, &root, "subject", fast.clone(), observed)
@@ -194,7 +207,7 @@ async fn immutable_link_args_use_generic_root_subrule_snapshots_and_restore_inpu
             )
             .await
             .unwrap();
-            assert_actions(&result, "A", mode);
+            assert_actions(&result, "A", mode, parameter_file_type);
         }
         assert_eq!(
             request_with_route(&dice, &root, "subject", dbg, observed)
@@ -206,7 +219,7 @@ async fn immutable_link_args_use_generic_root_subrule_snapshots_and_restore_inpu
         let changed_source = request_with_route(&dice, &root, "subject", fast.clone(), observed)
             .await
             .unwrap();
-        assert_actions(&changed_source, "B", "fastbuild");
+        assert_actions(&changed_source, "B", "fastbuild", parameter_file_type);
         assert_ne!(changed_source, first);
         source(&root, "A");
         assert_eq!(

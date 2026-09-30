@@ -535,6 +535,7 @@ pub enum RetainedParamFileFormat {
     Shell,
     Multiline,
     FlagPerLine,
+    Gcc,
 }
 
 #[derive(Debug, Clone, Allocative, Dupe)]
@@ -583,10 +584,12 @@ impl RetainedArgsRecipe {
     }
 
     fn render_param_lines(&self, lines: Vec<String>) -> String {
-        let lines = if self.write_format == RetainedParamFileFormat::Shell {
-            lines.iter().map(|value| shell_escape(value)).collect()
-        } else {
-            lines
+        let lines = match self.write_format {
+            RetainedParamFileFormat::Shell => {
+                lines.iter().map(|value| shell_escape(value)).collect()
+            }
+            RetainedParamFileFormat::Gcc => lines.iter().map(|value| gcc_escape(value)).collect(),
+            RetainedParamFileFormat::Multiline | RetainedParamFileFormat::FlagPerLine => lines,
         };
         if lines.is_empty() {
             String::new()
@@ -1108,6 +1111,25 @@ fn render_analysis_integer(value: &crate::analysis_value::AnalysisInteger) -> St
         result.push('-');
     }
     result.extend(digits.iter().rev().map(|digit| char::from(b'0' + *digit)));
+    result
+}
+
+// Bazel 9.2 GccParamFileEscaper.java:37-60. Only these ASCII characters
+// require a prefix; Unicode whitespace and shell metacharacters stay literal.
+fn gcc_escape(value: &str) -> String {
+    if value.is_empty() {
+        return "''".to_owned();
+    }
+    let mut result = String::with_capacity(value.len());
+    for character in value.chars() {
+        if matches!(
+            character,
+            '\'' | '"' | '\\' | ' ' | '\t' | '\r' | '\n' | '\u{c}' | '\u{b}'
+        ) {
+            result.push('\\');
+        }
+        result.push(character);
+    }
     result
 }
 

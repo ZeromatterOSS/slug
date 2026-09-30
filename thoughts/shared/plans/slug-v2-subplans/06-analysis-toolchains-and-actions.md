@@ -2080,12 +2080,16 @@ lazy at construction; supported string modes derive the first literal-placeholde
 policy immediately. Consumption checks linker_param_file before expansion and
 filters every matching argument, including None/empty/Boolean conversion cases;
 percent escaping and exactly-one-placeholder validation precede retained policy.
-None/UNQUOTED/SHELL_QUOTED reuse existing serializers, defaulting to shell when
+None/UNQUOTED/SHELL_QUOTED reuse existing serializers. GCC_QUOTED appends the
+retained Gcc format and pinned nine-character ASCII backslash encoder, including
+empty arguments and one LF per argument; raw argv stays unchanged. Rust valid-
+Unicode/UTF-8 storage remains Slug-native. All modes default to shell when
 no policy is produced. Loading consumes on the current heap after its binding/
 lifecycle checks and hands scalar recipes to the original ArgsWrite/Spawn sink.
 Registration snapshots and later sink error ordering are Slug-native; upstream
 execution-time expansion, nested structural classification/identity hashing,
-multiple-placeholder flags and GCC/Windows formats remain deferred. No new
+multiple-placeholder flags, arbitrary legacy byte strings and Windows format
+remain deferred. No new
 retained action/key/cache/identity owner or native link action family is added.
 Both-route root/subrule snapshots, forced parameter bytes, source/configuration
 restoration, original-variable freeze and actual GC protect this handoff.

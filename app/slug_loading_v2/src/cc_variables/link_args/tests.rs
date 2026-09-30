@@ -122,7 +122,7 @@ fn link_args_requires_four_named_genuine_inputs_and_refuses_other_formats() {
     for format in ["True", "'invalid'", "'gcc_quoted'"] {
         assert!(create(&module, format).is_err());
     }
-    for format in ["'GCC_QUOTED'", "'WINDOWS'"] {
+    for format in ["'WINDOWS'"] {
         let error = create(&module, format).unwrap_err();
         assert!(
             error.to_string().contains("unsupported/deferred"),
@@ -143,13 +143,15 @@ fn link_args_none_is_lazy_and_string_mode_expands_again_on_consumption() {
     let module = fixture(&["%{items}"], Some("items"));
     create(&module, "None").unwrap();
     assert!(render(module.get("out").unwrap(), module.heap()).is_err());
-    assert!(create(&module, "'UNQUOTED'").is_err());
+    for mode in ["'UNQUOTED'", "'GCC_QUOTED'"] {
+        assert!(create(&module, mode).is_err());
+    }
     execute(
         &module,
         "items = ['first']\nvars = i.cc_toolchain_variables(vars={'items': items})",
     )
     .unwrap();
-    for mode in ["None", "'UNQUOTED'"] {
+    for mode in ["None", "'UNQUOTED'", "'GCC_QUOTED'"] {
         create(&module, mode).unwrap();
         execute(&module, "items.append('next')").unwrap();
         let expected = module.get("items").unwrap().to_repr();
@@ -177,6 +179,7 @@ fn link_args_parameter_policy_escapes_percent_filters_all_occurrences_and_defaul
     for (mode, format) in [
         ("'UNQUOTED'", RetainedParamFileFormat::Multiline),
         ("'SHELL_QUOTED'", RetainedParamFileFormat::Shell),
+        ("'GCC_QUOTED'", RetainedParamFileFormat::Gcc),
     ] {
         create(&module, mode).unwrap();
         let out = module.get("out").unwrap();
@@ -190,14 +193,18 @@ fn link_args_parameter_policy_escapes_percent_filters_all_occurrences_and_defaul
     assert!(captured.param_file.is_none());
     assert_eq!(captured.format, RetainedParamFileFormat::Shell);
     let no_placeholder = fixture(&["keep"], None);
-    create(&no_placeholder, "'UNQUOTED'").unwrap();
-    let captured = snapshot(no_placeholder.get("out").unwrap(), no_placeholder.heap()).unwrap();
-    assert!(captured.param_file.is_none());
-    assert_eq!(captured.format, RetainedParamFileFormat::Shell);
+    for mode in ["'UNQUOTED'", "'GCC_QUOTED'"] {
+        create(&no_placeholder, mode).unwrap();
+        let captured = snapshot(no_placeholder.get("out").unwrap(), no_placeholder.heap()).unwrap();
+        assert!(captured.param_file.is_none());
+        assert_eq!(captured.format, RetainedParamFileFormat::Shell);
+    }
     let multiple = fixture(&["%{linker_param_file}/%{linker_param_file}"], None);
     execute(&multiple, "vars = i.cc_toolchain_variables(vars={'linker_param_file':'LINKER_PARAM_FILE_PLACEHOLDER'})").unwrap();
-    let error = create(&multiple, "'UNQUOTED'").unwrap_err();
-    assert!(error.to_string().contains("exactly one %s"), "{error}");
+    for mode in ["'UNQUOTED'", "'GCC_QUOTED'"] {
+        let error = create(&multiple, mode).unwrap_err();
+        assert!(error.to_string().contains("exactly one %s"), "{error}");
+    }
 }
 
 #[test]

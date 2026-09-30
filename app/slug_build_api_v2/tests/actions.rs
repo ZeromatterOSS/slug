@@ -946,6 +946,7 @@ fn args_write_formats_and_ignores_spawn_only_param_policy() {
     ];
     let shell = RetainedArgsRecipe::new(calls.clone(), RetainedParamFileFormat::Shell);
     let multiline = RetainedArgsRecipe::new(calls.clone(), RetainedParamFileFormat::Multiline);
+    let gcc = RetainedArgsRecipe::new(calls.clone(), RetainedParamFileFormat::Gcc);
     let flag_per_line = RetainedArgsRecipe::new(calls, RetainedParamFileFormat::FlagPerLine);
     assert_eq!(
         shell.render_write_content(),
@@ -958,6 +959,12 @@ fn args_write_formats_and_ignores_spawn_only_param_policy() {
     assert_eq!(
         flag_per_line.render_write_content(),
         "--flag=two words\nquote'd\n"
+    );
+
+    assert_eq!(gcc.render(), multiline.render());
+    assert_eq!(
+        gcc.render_write_content(),
+        "--flag\ntwo\\ words\nquote\\'d\n"
     );
 
     let output = ActionOutput::new(
@@ -1839,83 +1846,160 @@ fn param_args(
 }
 
 #[test]
-fn forced_param_files_preserve_formats_order_and_spill_numbering() {
-    use RetainedParamFileFormat::FlagPerLine;
+fn gcc_param_files_escape_pinned_ascii_and_keep_format_identity() {
+    use RetainedParamFileFormat::Gcc;
     use RetainedParamFileFormat::Multiline;
-    use RetainedParamFileFormat::Shell;
-    let values = [(Some("--flag"), "two words"), (None, "quote'd"), (None, "")];
-    let spec = param_spawn(
-        vec![
-            RetainedCommandLineSegment::LiteralRun(Arc::from(["before".into()])),
-            param_args(Shell, &[(None, "inline")], None),
-            param_args(Shell, &values, Some(("@%s", true))),
-            RetainedCommandLineSegment::LiteralRun(Arc::from(["between".into()])),
-            param_args(Multiline, &values, Some(("--params=%%%s%%", true))),
-            param_args(FlagPerLine, &values, Some(("@%s", true))),
-            param_args(Multiline, &[], Some(("@%s", true))),
-            RetainedCommandLineSegment::LiteralRun(Arc::from(["after".into()])),
-        ],
-        &["pkg/primary", "pkg/secondary"],
+    // GccParamFileEscaperTest.java:32-51, with Slug-native UTF-8/control cases.
+    for (raw, escaped) in [
+        ("", "''"),
+        ("foo", "foo"),
+        ("'foo'", "\\'foo\\'"),
+        ("\"foo\"", "\\\"foo\\\""),
+        ("\\foo", "\\\\foo"),
+        ("foo bar", "foo\\ bar"),
+        ("foo\tbar", "foo\\\tbar"),
+        ("foo\rbar", "foo\\\rbar"),
+        ("foo\n'foo'\n", "foo\\\n\\'foo\\'\\\n"),
+        ("foo\u{c}bar", "foo\\\u{c}bar"),
+        ("foo\u{b}bar", "foo\\\u{b}bar"),
+        ("${filename%.c}.o;", "${filename%.c}.o;"),
+        ("héllo\u{a0}世界\0", "héllo\u{a0}世界\0"),
+    ] {
+        let segment = param_args(Gcc, &[(None, raw), (None, raw)], Some(("@%s", true)));
+        let RetainedCommandLineSegment::ArgsSnapshot(args) = &segment else {
+            unreachable!()
+        };
+        assert_eq!(args.recipe().render(), [raw, raw]);
+        let bytes = format!("{escaped}\n{escaped}\n");
+        assert_eq!(args.recipe().render_write_content(), bytes);
+        let spec = param_spawn(vec![segment], &["pkg/gcc"]);
+        assert_eq!(spec.render_argv(), ["tools/runner", raw, raw]);
+        let expanded = spec.expand_forced_param_files().unwrap();
+        assert_eq!(expanded.param_files()[0].bytes(), bytes.as_bytes());
+    }
+    let empty = param_spawn(
+        vec![param_args(Gcc, &[], Some(("@%s", true)))],
+        &["pkg/gcc"],
     );
-    let expanded = spec.expand_forced_param_files().unwrap();
+    assert!(
+        empty.expand_forced_param_files().unwrap().param_files()[0]
+            .bytes()
+            .is_empty()
+    );
+    let gcc = param_args(Gcc, &[(None, "safe")], None);
+    let multiline = param_args(Multiline, &[(None, "safe")], None);
+    let specs = [gcc.clone(), multiline.clone()].map(|segment| param_spawn(vec![segment], &[]));
+    assert_eq!(specs[0].render_argv(), specs[1].render_argv());
+    let [
+        RetainedCommandLineSegment::ArgsSnapshot(gcc),
+        RetainedCommandLineSegment::ArgsSnapshot(multiline),
+    ] = [&gcc, &multiline]
+    else {
+        unreachable!()
+    };
     assert_eq!(
-        expanded.argv(),
-        [
-            "tools/runner",
-            "before",
-            "inline",
-            &format!("@{}", root_support::exec_path("pkg/primary-0.params")),
-            "between",
-            &format!(
-                "--params=%{}%",
-                root_support::exec_path("pkg/primary-1.params")
-            ),
-            &format!("@{}", root_support::exec_path("pkg/primary-2.params")),
-            "quote'd",
-            "",
-            &format!("@{}", root_support::exec_path("pkg/primary-3.params")),
-            "after"
-        ]
+        gcc.recipe().render_write_content(),
+        multiline.recipe().render_write_content()
     );
-    assert_eq!(
-        expanded
-            .param_files()
-            .iter()
-            .map(|file| (file.path().to_owned(), file.bytes()))
-            .collect::<Vec<_>>(),
-        vec![
-            (
-                root_support::exec_path("pkg/primary-0.params"),
-                b"--flag\n'two words'\n'quote'\\''d'\n''\n".as_slice()
-            ),
-            (
-                root_support::exec_path("pkg/primary-1.params"),
-                b"--flag\ntwo words\nquote'd\n\n".as_slice()
-            ),
-            (
-                root_support::exec_path("pkg/primary-2.params"),
-                b"--flag=two words\n".as_slice()
-            ),
-            (
-                root_support::exec_path("pkg/primary-3.params"),
-                b"".as_slice()
-            ),
-        ]
+    assert_ne!(
+        specs[0], specs[1],
+        "format remains structural even for equal bytes"
     );
-    assert_eq!(expanded, spec.expand_forced_param_files().unwrap());
-    let reordered = param_spawn(
-        spec.command_line().segments().to_vec(),
-        &["pkg/secondary", "pkg/primary"],
-    );
-    assert_eq!(
-        reordered.expand_forced_param_files().unwrap().param_files()[0].path(),
-        root_support::exec_path("pkg/secondary-0.params")
-    );
-    let inline = param_spawn(vec![param_args(Multiline, &values, None)], &[]);
-    assert_eq!(
-        inline.expand_forced_param_files().unwrap().argv(),
-        inline.render_argv()
-    );
+    assert_eq!(RetainedParamFileFormat::Shell as usize, 0);
+    assert_eq!(RetainedParamFileFormat::Multiline as usize, 1);
+    assert_eq!(RetainedParamFileFormat::FlagPerLine as usize, 2);
+    assert_eq!(RetainedParamFileFormat::Gcc as usize, 3);
+}
+
+#[test]
+fn forced_param_files_preserve_formats_order_and_spill_numbering() {
+    for (format, expected_bytes) in [
+        (
+            RetainedParamFileFormat::Multiline,
+            b"--flag\ntwo words\nquote'd\n\n".as_slice(),
+        ),
+        (
+            RetainedParamFileFormat::Gcc,
+            b"--flag\ntwo\\ words\nquote\\'d\n''\n".as_slice(),
+        ),
+    ] {
+        use RetainedParamFileFormat::FlagPerLine;
+        use RetainedParamFileFormat::Multiline;
+        use RetainedParamFileFormat::Shell;
+        let values = [(Some("--flag"), "two words"), (None, "quote'd"), (None, "")];
+        let spec = param_spawn(
+            vec![
+                RetainedCommandLineSegment::LiteralRun(Arc::from(["before".into()])),
+                param_args(Shell, &[(None, "inline")], None),
+                param_args(Shell, &values, Some(("@%s", true))),
+                RetainedCommandLineSegment::LiteralRun(Arc::from(["between".into()])),
+                param_args(format, &values, Some(("--params=%%%s%%", true))),
+                param_args(FlagPerLine, &values, Some(("@%s", true))),
+                param_args(Multiline, &[], Some(("@%s", true))),
+                RetainedCommandLineSegment::LiteralRun(Arc::from(["after".into()])),
+            ],
+            &["pkg/primary", "pkg/secondary"],
+        );
+        let expanded = spec.expand_forced_param_files().unwrap();
+        assert_eq!(
+            expanded.argv(),
+            [
+                "tools/runner",
+                "before",
+                "inline",
+                &format!("@{}", root_support::exec_path("pkg/primary-0.params")),
+                "between",
+                &format!(
+                    "--params=%{}%",
+                    root_support::exec_path("pkg/primary-1.params")
+                ),
+                &format!("@{}", root_support::exec_path("pkg/primary-2.params")),
+                "quote'd",
+                "",
+                &format!("@{}", root_support::exec_path("pkg/primary-3.params")),
+                "after"
+            ]
+        );
+        assert_eq!(
+            expanded
+                .param_files()
+                .iter()
+                .map(|file| (file.path().to_owned(), file.bytes()))
+                .collect::<Vec<_>>(),
+            vec![
+                (
+                    root_support::exec_path("pkg/primary-0.params"),
+                    b"--flag\n'two words'\n'quote'\\''d'\n''\n".as_slice()
+                ),
+                (
+                    root_support::exec_path("pkg/primary-1.params"),
+                    expected_bytes
+                ),
+                (
+                    root_support::exec_path("pkg/primary-2.params"),
+                    b"--flag=two words\n".as_slice()
+                ),
+                (
+                    root_support::exec_path("pkg/primary-3.params"),
+                    b"".as_slice()
+                ),
+            ]
+        );
+        assert_eq!(expanded, spec.expand_forced_param_files().unwrap());
+        let reordered = param_spawn(
+            spec.command_line().segments().to_vec(),
+            &["pkg/secondary", "pkg/primary"],
+        );
+        assert_eq!(
+            reordered.expand_forced_param_files().unwrap().param_files()[0].path(),
+            root_support::exec_path("pkg/secondary-0.params")
+        );
+        let inline = param_spawn(vec![param_args(Multiline, &values, None)], &[]);
+        assert_eq!(
+            inline.expand_forced_param_files().unwrap().argv(),
+            inline.render_argv()
+        );
+    }
 }
 
 #[test]

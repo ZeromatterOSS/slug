@@ -807,6 +807,13 @@ fn remote_action_cache_detects_orphaned_output_blobs() {
 }
 
 fn forced_command(value: &str) -> slug_build_api_v2::ExpandedSpawnCommandLine {
+    forced_command_with_format(value, RetainedParamFileFormat::Multiline)
+}
+
+fn forced_command_with_format(
+    value: &str,
+    format: RetainedParamFileFormat,
+) -> slug_build_api_v2::ExpandedSpawnCommandLine {
     use slug_build_api_v2::RetainedArgCall;
     use slug_build_api_v2::RetainedCommandLineSegment;
     use slug_build_api_v2::RetainedScalarArg;
@@ -825,7 +832,7 @@ fn forced_command(value: &str) -> slug_build_api_v2::ExpandedSpawnCommandLine {
                         RetainedScalarValue::String(value.into()),
                         None::<&str>,
                     ))],
-                    RetainedParamFileFormat::Multiline,
+                    format,
                 ),
                 Some(RetainedSpawnParamFilePolicy::new("@%s", true)),
             ),
@@ -859,100 +866,103 @@ fn forced_param_files_merge_exact_bytes_and_merkle_topology() {
         )]);
     let base = ReapiInputTree::from_action(&action).unwrap();
     let original = base.clone();
-    let command = forced_command("héllo world");
-    assert_eq!(
-        command.argv(),
-        [
-            "tools/runner".to_owned(),
-            format!("@{}", root_support::path("pkg/out.txt-0.params"))
-        ]
-    );
-    let merged = base.with_spawn_param_files(&command).unwrap();
-    assert_eq!(base, original);
-    assert_eq!(merged, base.with_spawn_param_files(&command).unwrap());
-    assert_eq!(merged.inline_blobs()[0], base.inline_blobs()[0]);
-    assert_eq!(merged.inline_blobs().len(), 2);
-    let blob = &merged.inline_blobs()[1];
-    assert_eq!(blob.data(), "héllo world\n".as_bytes());
-    assert_eq!(
-        blob.digest(),
-        &ReapiDigest::of_bytes("héllo world\n".as_bytes())
-    );
-    let entry = merged
-        .entries()
-        .iter()
-        .find(|entry| entry.path() == root_support::path("pkg/out.txt-0.params"))
-        .unwrap();
-    assert_eq!(entry.digest(), blob.digest());
-    assert_eq!(entry.kind(), InputTreeEntryKind::ParamFile);
-    assert!(merged.entries().contains(&base.entries()[1]));
-    let decode = |digest: &ReapiDigest| {
-        let blob = merged
-            .directory_blobs()
-            .iter()
-            .find(|blob| blob.digest() == digest)
-            .unwrap();
-        assert_eq!(blob.digest(), &ReapiDigest::of_bytes(blob.data()));
-        slug_reapi_v2::proto::Directory::decode(blob.data()).unwrap()
-    };
-    let root = decode(merged.root_digest());
-    assert_eq!(root.files.len(), 1);
-    assert_eq!(root.files[0].name, "existing");
-    assert_eq!(
-        root.directories
-            .iter()
-            .map(|node| node.name.as_str())
-            .collect::<Vec<_>>(),
-        ["bazel-out", "src"]
-    );
-    let mut parent = root;
-    for component in [
-        "bazel-out",
-        root_support::root().configuration_component(),
-        "bin",
+    for (format, expected) in [
+        (RetainedParamFileFormat::Multiline, "héllo world\n"),
+        (RetainedParamFileFormat::Gcc, "héllo\\ world\n"),
     ] {
-        let node = parent
-            .directories
+        let command = forced_command_with_format("héllo world", format);
+        assert_eq!(
+            command.argv(),
+            [
+                "tools/runner".to_owned(),
+                format!("@{}", root_support::path("pkg/out.txt-0.params"))
+            ]
+        );
+        let merged = base.with_spawn_param_files(&command).unwrap();
+        assert_eq!(base, original);
+        assert_eq!(merged, base.with_spawn_param_files(&command).unwrap());
+        assert_eq!(merged.inline_blobs()[0], base.inline_blobs()[0]);
+        assert_eq!(merged.inline_blobs().len(), 2);
+        let blob = &merged.inline_blobs()[1];
+        assert_eq!(blob.data(), expected.as_bytes());
+        assert_eq!(blob.digest(), &ReapiDigest::of_bytes(expected.as_bytes()));
+        let entry = merged
+            .entries()
             .iter()
-            .find(|node| node.name == component)
+            .find(|entry| entry.path() == root_support::path("pkg/out.txt-0.params"))
             .unwrap();
-        let digest = node.digest.as_ref().unwrap();
-        parent =
-            decode(&ReapiDigest::parse(&format!("{}/{}", digest.hash, digest.size_bytes)).unwrap());
+        assert_eq!(entry.digest(), blob.digest());
+        assert_eq!(entry.kind(), InputTreeEntryKind::ParamFile);
+        assert!(merged.entries().contains(&base.entries()[1]));
+        let decode = |digest: &ReapiDigest| {
+            let blob = merged
+                .directory_blobs()
+                .iter()
+                .find(|blob| blob.digest() == digest)
+                .unwrap();
+            assert_eq!(blob.digest(), &ReapiDigest::of_bytes(blob.data()));
+            slug_reapi_v2::proto::Directory::decode(blob.data()).unwrap()
+        };
+        let root = decode(merged.root_digest());
+        assert_eq!(root.files.len(), 1);
+        assert_eq!(root.files[0].name, "existing");
+        assert_eq!(
+            root.directories
+                .iter()
+                .map(|node| node.name.as_str())
+                .collect::<Vec<_>>(),
+            ["bazel-out", "src"]
+        );
+        let mut parent = root;
+        for component in [
+            "bazel-out",
+            root_support::root().configuration_component(),
+            "bin",
+        ] {
+            let node = parent
+                .directories
+                .iter()
+                .find(|node| node.name == component)
+                .unwrap();
+            let digest = node.digest.as_ref().unwrap();
+            parent = decode(
+                &ReapiDigest::parse(&format!("{}/{}", digest.hash, digest.size_bytes)).unwrap(),
+            );
+        }
+        assert_eq!(
+            parent
+                .directories
+                .iter()
+                .map(|node| node.name.as_str())
+                .collect::<Vec<_>>(),
+            ["pkg"]
+        );
+        let pkg_digest = parent.directories[0].digest.as_ref().unwrap();
+        let pkg = decode(
+            &ReapiDigest::parse(&format!("{}/{}", pkg_digest.hash, pkg_digest.size_bytes)).unwrap(),
+        );
+        assert_eq!(pkg.files.len(), 1);
+        assert_eq!(pkg.files[0].name, "out.txt-0.params");
+        assert!(!pkg.files[0].is_executable);
+        assert_eq!(
+            pkg.files[0].digest.as_ref().unwrap().hash,
+            blob.digest().hash()
+        );
+        assert_eq!(
+            pkg.files[0].digest.as_ref().unwrap().size_bytes,
+            blob.data().len() as i64
+        );
+        assert!(pkg.directories.is_empty());
+        assert_eq!(merged.directory_blobs().len(), 6);
+        assert_ne!(merged.root_digest(), base.root_digest());
+        assert_ne!(
+            merged.root_digest(),
+            base.with_spawn_param_files(&forced_command_with_format("changed", format))
+                .unwrap()
+                .root_digest()
+        );
+        assert!(merged.with_spawn_param_files(&command).is_err());
     }
-    assert_eq!(
-        parent
-            .directories
-            .iter()
-            .map(|node| node.name.as_str())
-            .collect::<Vec<_>>(),
-        ["pkg"]
-    );
-    let pkg_digest = parent.directories[0].digest.as_ref().unwrap();
-    let pkg = decode(
-        &ReapiDigest::parse(&format!("{}/{}", pkg_digest.hash, pkg_digest.size_bytes)).unwrap(),
-    );
-    assert_eq!(pkg.files.len(), 1);
-    assert_eq!(pkg.files[0].name, "out.txt-0.params");
-    assert!(!pkg.files[0].is_executable);
-    assert_eq!(
-        pkg.files[0].digest.as_ref().unwrap().hash,
-        blob.digest().hash()
-    );
-    assert_eq!(
-        pkg.files[0].digest.as_ref().unwrap().size_bytes,
-        blob.data().len() as i64
-    );
-    assert!(pkg.directories.is_empty());
-    assert_eq!(merged.directory_blobs().len(), 6);
-    assert_ne!(merged.root_digest(), base.root_digest());
-    assert_ne!(
-        merged.root_digest(),
-        base.with_spawn_param_files(&forced_command("changed"))
-            .unwrap()
-            .root_digest()
-    );
-    assert!(merged.with_spawn_param_files(&command).is_err());
 }
 
 #[test]

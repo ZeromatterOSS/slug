@@ -94,7 +94,8 @@ pub(crate) fn construct<'v>(
         Some(match parameter_file_type.unpack_str() {
             Some("UNQUOTED") => RetainedParamFileFormat::Multiline,
             Some("SHELL_QUOTED") => RetainedParamFileFormat::Shell,
-            Some(kind @ ("GCC_QUOTED" | "WINDOWS")) => {
+            Some("GCC_QUOTED") => RetainedParamFileFormat::Gcc,
+            Some(kind @ "WINDOWS") => {
                 anyhow::bail!("get_link_args parameter_file_type={kind} is unsupported/deferred")
             }
             Some(_) => anyhow::bail!("get_link_args parameter_file_type is invalid"),

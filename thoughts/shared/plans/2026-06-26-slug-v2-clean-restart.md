@@ -34,14 +34,14 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-163-m7a-immutable-link-args-r1
-Status: accepted bounded slice; corrected independent DESIGN/FINAL ACCEPT; M7A remains partial
+Packet: WP-7-164-m7a-gcc-link-param-files-r1
+Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP863 accepts immutable LinkArgs for None/UNQUOTED/SHELL_QUOTED over existing
-feature/variable/Args owners. Corrected DESIGN/FINAL,37focused checks/Core/CLI
-pass. Unchanged authentic cquery77.565s replaces missing-method error with
-GCC_QUOTED refusal at the same call; helper remains partial. GCC serialization
-is the confirmed next prerequisite. Hashes/cleanup pass; Windows deferred.
+WP864 accepts GCC escaping through the existing retained format/recipe owner,
+42 focused checks0.681s, Core/CLI and independent DESIGN/FINAL. Unchanged cquery
+77.418s clears GCC and next refuses callable resource_set at finalize:381;
+fixture hashes and process cleanup pass. Exact ASCII encoder, inherited Slug-
+native Unicode/snapshot contracts; Windows and full linking remain deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
