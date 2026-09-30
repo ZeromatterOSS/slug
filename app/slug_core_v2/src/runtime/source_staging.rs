@@ -23,9 +23,13 @@ pub(in crate::runtime) fn source_spawn(
             "CppCompile discovery-aware source staging is not admitted",
         ));
     }
-    action
+    let spawn = action
         .spawn_spec()
-        .ok_or_else(|| error("source staging requires a typed Spawn"))
+        .ok_or_else(|| error("source staging requires a typed Spawn"))?;
+    if spawn.resource_set().is_some() {
+        return Err(error("Spawn resource_set execution is not admitted"));
+    }
+    Ok(spawn)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -181,6 +185,9 @@ pub(in crate::runtime) fn visit_files_to_run(
 pub(in crate::runtime) fn declared_artifacts(
     spawn: &SpawnSpec,
 ) -> Result<SmallSet<AnalysisArtifact>, Arc<str>> {
+    if spawn.resource_set().is_some() {
+        return Err(error("Spawn resource_set execution is not admitted"));
+    }
     if spawn.unused_inputs_list().is_some() {
         return Err(error(
             "unused-input pruning is not admitted for source staging",

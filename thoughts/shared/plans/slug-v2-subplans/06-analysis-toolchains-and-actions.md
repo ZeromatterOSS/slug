@@ -2094,6 +2094,17 @@ retained action/key/cache/identity owner or native link action family is added.
 Both-route root/subrule snapshots, forced parameter bytes, source/configuration
 restoration, original-variable freeze and actual GC protect this handoff.
 
+The sole pinned rules_cc0.2.17 link resource callback admits registration only:
+concrete Def plus unique canonical/parsed/evaluated source identity and exact
+retained opening call span authenticate its fixed module-global expression.
+Failed authority remains ordinary late unsupported handling. SpawnSpec retains
+one compact immutable kind in publication equality, without callback Value,
+heap or estimate. Root wrapped registration and both-route source/configuration
+restoration use unchanged public finalize; genuine child preserves earlier
+suspended-root workspace_name refusal. Core source/prerequisite input traversal
+and shared REAPI Spawn projection refuse this metadata before execution/CAS;
+generic callbacks, estimates, resource overrides and scheduling remain deferred.
+
 ## Preserved library SONAME (WP859, 2026-09-30)
 
 The private link facade owns dynamic_library_soname wrapper validation. Three

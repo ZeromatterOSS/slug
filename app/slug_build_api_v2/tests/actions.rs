@@ -701,6 +701,48 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
         ))
     };
     let base = make("tool", "arg", "out", "env", "req", "Mnemonic", "progress");
+    use slug_build_api_v2::actions::RetainedSpawnResourceSet;
+    let source = CanonicalLabel::parse(RetainedSpawnResourceSet::SOURCE_LABEL).unwrap();
+    let recipe =
+        RetainedSpawnResourceSet::new(source.clone(), RetainedSpawnResourceSet::SOURCE_DIGEST)
+            .unwrap();
+    assert_eq!(recipe.source(), RetainedSpawnResourceSet::SOURCE_LABEL);
+    assert_eq!(recipe.digest(), &RetainedSpawnResourceSet::SOURCE_DIGEST);
+    assert_eq!(std::mem::size_of::<Option<RetainedSpawnResourceSet>>(), 1);
+    assert!(
+        RetainedSpawnResourceSet::new(
+            CanonicalLabel::parse("@@rules_cc+//cc/private/link:other.bzl").unwrap(),
+            RetainedSpawnResourceSet::SOURCE_DIGEST,
+        )
+        .is_err()
+    );
+    let mut changed_digest = RetainedSpawnResourceSet::SOURCE_DIGEST;
+    changed_digest[0] ^= 1;
+    assert!(RetainedSpawnResourceSet::new(source, changed_digest).is_err());
+    let ordinary = base.spawn_spec().unwrap();
+    assert_eq!(ordinary.resource_set(), None);
+    let retained = ordinary.clone().with_resource_set(recipe);
+    assert_eq!(retained.resource_set(), Some(recipe));
+    assert_eq!(retained.render_argv(), ordinary.render_argv());
+    assert_eq!(retained.command_line(), ordinary.command_line());
+    assert_ne!(ordinary, &retained);
+    let with_resource = ActionSpec::spawn(retained.clone());
+    assert_ne!(base, with_resource);
+    assert_eq!(with_resource, ActionSpec::spawn(retained));
+    let forced = param_spawn(
+        vec![param_args(
+            RetainedParamFileFormat::Gcc,
+            &[(None, "same bytes")],
+            Some(("@%s", true)),
+        )],
+        &["pkg/params"],
+    );
+    let forced_resource = forced.clone().with_resource_set(recipe);
+    assert_ne!(forced, forced_resource);
+    assert_eq!(
+        forced.expand_forced_param_files().unwrap(),
+        forced_resource.expand_forced_param_files().unwrap(),
+    );
     for changed in [
         make("other", "arg", "out", "env", "req", "Mnemonic", "progress"),
         make("tool", "other", "out", "env", "req", "Mnemonic", "progress"),

@@ -10,6 +10,7 @@ mod cc_linker;
 mod cc_toolchain;
 mod compile_context;
 mod compile_outputs;
+mod resource_set;
 
 const REPOSITORIES: &[(&str, &str)] = &[
     ("rules_rust+", "rules_rust"),

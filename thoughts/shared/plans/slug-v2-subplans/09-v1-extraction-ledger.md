@@ -832,6 +832,12 @@ expansion stay deferred. WP864 appends Gcc to the same retained format enum and
 uses existing phase scratch allocation/serializer/publication boundaries; no
 container or owner changes. No performance claim or new donor disposition.
 
+The finite link resource registration slice adds a one-byte optional kind to
+existing SpawnSpec equality, with static pinned identity metadata and no retained
+Value/closure/float/label/digest duplication. Existing source manifests retain
+authority; failed authority and execution remain closed. No donor/container/
+cache/key/locking change or measured allocation/performance improvement.
+
 The active bounded basic Args/run/symlink successor's first pre-review returned
 `REPLAN` while accepting the environment dependency and borrowed sink. Its
 focused correction binds mutable Args to the starlark-rust evaluator heap,

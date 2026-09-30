@@ -24,6 +24,52 @@ use super::*;
 mod cpp_compile_tests;
 
 #[test]
+fn resource_metadata_refuses_before_source_and_generated_prerequisites() {
+    use slug_build_api_v2::actions::RetainedSpawnResourceSet;
+    let owner = key("consumer", false);
+    let recipe = RetainedSpawnResourceSet::new(
+        CanonicalLabel::parse(RetainedSpawnResourceSet::SOURCE_LABEL).unwrap(),
+        RetainedSpawnResourceSet::SOURCE_DIGEST,
+    )
+    .unwrap();
+    let missing = artifact(&key("missing", false), "missing", ActionOutputKind::File);
+    let ordinary = spawn(vec![missing], vec![output("done")]);
+    let retained = ActionSpec::spawn(
+        ordinary
+            .spawn_spec()
+            .unwrap()
+            .clone()
+            .with_resource_set(recipe),
+    );
+    let closure =
+        ValidatedActionClosure::new(Arc::from([node(owner.clone(), vec![retained])])).unwrap();
+    let action = &closure.owners()[0].actions()[0];
+    assert_eq!(
+        crate::runtime::dice::source_staging::source_spawn(action)
+            .unwrap_err()
+            .as_ref(),
+        "Spawn resource_set execution is not admitted",
+    );
+    assert_eq!(
+        ActionPrerequisitePlan::new(&closure, &owner, 0)
+            .unwrap_err()
+            .as_ref(),
+        "Spawn resource_set execution is not admitted",
+    );
+    let ordinary =
+        ValidatedActionClosure::new(Arc::from([node(owner.clone(), vec![ordinary])])).unwrap();
+    assert!(
+        crate::runtime::dice::source_staging::source_spawn(&ordinary.owners()[0].actions()[0])
+            .is_ok()
+    );
+    assert!(
+        ActionPrerequisitePlan::new(&ordinary, &owner, 0)
+            .unwrap_err()
+            .contains("producer")
+    );
+}
+
+#[test]
 fn build_info_transforms_and_constant_outputs_refuse_before_prerequisite_traversal() {
     use slug_build_api_v2::BuildInfoCallbackRecipe;
     use slug_build_api_v2::BuildInfoTransformKind;

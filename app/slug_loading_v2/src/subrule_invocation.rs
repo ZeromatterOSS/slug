@@ -106,6 +106,13 @@ pub enum AnalysisToolchainRequest<'v> {
     Value(Value<'v>),
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum AnalysisResourceSet {
+    None,
+    Unsupported,
+    Recipe(slug_build_api_v2::actions::RetainedSpawnResourceSet),
+}
+
 #[derive(Debug, Clone)]
 pub struct AnalysisSpawnRequest<'v> {
     pub scope: AnalysisActionCallScope,
@@ -122,7 +129,7 @@ pub struct AnalysisSpawnRequest<'v> {
     pub execution_requirements: Option<Value<'v>>,
     pub exec_group: Option<&'v str>,
     pub shadowed_action: Option<Value<'v>>,
-    pub has_resource_set: bool,
+    pub resource_set: AnalysisResourceSet,
     pub toolchain: AnalysisToolchainRequest<'v>,
 }
 
@@ -1625,14 +1632,17 @@ fn bind_shell_command(value: Value<'_>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn bind_resource_set(value: Option<Value<'_>>, operation: &str) -> anyhow::Result<bool> {
+fn bind_resource_set(
+    value: Option<Value<'_>>,
+    operation: &str,
+) -> anyhow::Result<AnalysisResourceSet> {
     let Some(value) = value.filter(|value| !value.is_none()) else {
-        return Ok(false);
+        return Ok(AnalysisResourceSet::None);
     };
     let callable: Option<StarlarkCallable<'_>> = StarlarkCallable::unpack_value(value)
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
     if callable.is_some() {
-        return Ok(true);
+        return Ok(AnalysisResourceSet::Unsupported);
     }
     anyhow::bail!("ctx.actions.{operation} resource_set must be callable or None")
 }
@@ -1706,7 +1716,7 @@ fn bind_run_request<'v>(
     bind_input_manifests(input_manifests, "run")?;
     let exec_group = bind_optional_string(exec_group, "ctx.actions.run exec_group")?;
     let shadowed_action = bind_shadowed_action(shadowed_action, "run")?;
-    let has_resource_set = bind_resource_set(resource_set, "run")?;
+    let resource_set = bind_resource_set(resource_set, "run")?;
     let toolchain = bind_toolchain(toolchain, "run")?;
     Ok(AnalysisSpawnRequest {
         scope,
@@ -1723,7 +1733,7 @@ fn bind_run_request<'v>(
         execution_requirements,
         exec_group,
         shadowed_action,
-        has_resource_set,
+        resource_set,
         toolchain,
     })
 }
@@ -1767,7 +1777,7 @@ fn bind_run_shell_request<'v>(
     bind_input_manifests(input_manifests, "run_shell")?;
     let exec_group = bind_optional_string(exec_group, "ctx.actions.run_shell exec_group")?;
     let shadowed_action = bind_shadowed_action(shadowed_action, "run_shell")?;
-    let has_resource_set = bind_resource_set(resource_set, "run_shell")?;
+    let resource_set = bind_resource_set(resource_set, "run_shell")?;
     let toolchain = bind_toolchain(toolchain, "run_shell")?;
     Ok(AnalysisSpawnRequest {
         scope,
@@ -1784,7 +1794,7 @@ fn bind_run_shell_request<'v>(
         execution_requirements,
         exec_group,
         shadowed_action,
-        has_resource_set,
+        resource_set,
         toolchain,
     })
 }
@@ -1955,7 +1965,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] shadowed_action: Option<Value<'v>>,
         #[starlark(require = named)] resource_set: Option<Value<'v>>,
         #[starlark(require = named)] toolchain: Option<Value<'v>>,
-        heap: Heap<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
@@ -1980,7 +1990,13 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
             toolchain,
         )?;
         actions.token.require_active("run", actions.context_name)?;
-        request.arguments = prepare_link_arguments(request.arguments, heap)?;
+        request.arguments = prepare_link_arguments(request.arguments, eval.heap())?;
+        if matches!(request.resource_set, AnalysisResourceSet::Unsupported)
+            && let Some(recipe) =
+                resource_set.and_then(|callback| crate::resource_set::authenticate(callback, eval))
+        {
+            request.resource_set = AnalysisResourceSet::Recipe(recipe);
+        }
         actions.action_sink.spawn(request)?;
         Ok(NoneType)
     }

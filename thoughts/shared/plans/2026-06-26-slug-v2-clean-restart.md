@@ -34,15 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-164-m7a-gcc-link-param-files-r1
+Packet: WP-7-165-m7a-pinned-link-resource-registration-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP864 accepts GCC escaping through the existing retained format/recipe owner,
-42 focused checks0.681s, Core/CLI and independent DESIGN/FINAL. Unchanged cquery
-77.418s clears GCC and next refuses callable resource_set at finalize:381;
-fixture hashes and process cleanup pass. Exact ASCII encoder, inherited Slug-
-native Unicode/snapshot contracts; Windows and full linking remain deferred.
-See `slug-v2-subplans/current-packet.md`.
+WP865 accepts finite pinned link resource registration on existing SpawnSpec,
+with explicit Core/REAPI execution refusal.57focused1.163s/Core/CLI and independent
+DESIGN/FINAL pass. Unchanged cquery76.818s clears resource registration and next
+refuses preserve_name=False SONAME atcpp_link_action193; hashes/cleanup pass.
+Generic callbacks, resource scheduling, Windows and full link closure remain
+deferred. See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

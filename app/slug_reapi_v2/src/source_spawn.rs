@@ -72,6 +72,12 @@ pub(crate) fn spawn_command(
     action: &slug_analysis_v2::ConfiguredAction,
     remote_defaults: &BTreeMap<String, String>,
 ) -> Result<ReapiCommand, String> {
+    if action
+        .spawn_spec()
+        .is_some_and(|spawn| spawn.resource_set().is_some())
+    {
+        return Err("Spawn resource_set REAPI execution is not admitted".to_owned());
+    }
     let context = action.context();
     if context.execution_platform().is_none() {
         return Err("Spawn REAPI plan requires a selected execution platform".to_owned());

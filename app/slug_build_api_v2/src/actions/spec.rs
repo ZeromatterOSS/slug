@@ -24,6 +24,7 @@ use slug_configuration_v2::NormalizedBazelPath;
 use slug_configuration_v2::RetainedActionEnvironment;
 
 use crate::actions::BuildInfoTransformSpec;
+use crate::actions::RetainedSpawnResourceSet;
 use crate::actions::cargo_runfiles_args::RetainedCargoRunfilesArgs;
 use crate::actions::cpp_compile::CppCompileSpec;
 use crate::actions::runfiles_support::RunfilesSupportActionSpec;
@@ -916,6 +917,7 @@ pub struct SpawnSpec {
     execution_requirements: CanonicalStringMap,
     mnemonic: CompactString,
     progress_message: Option<CompactString>,
+    resource_set: Option<RetainedSpawnResourceSet>,
 }
 
 impl SpawnSpec {
@@ -943,7 +945,17 @@ impl SpawnSpec {
             execution_requirements,
             mnemonic: mnemonic.into(),
             progress_message: progress_message.map(Into::into),
+            resource_set: None,
         }
+    }
+
+    pub fn with_resource_set(mut self, resource_set: RetainedSpawnResourceSet) -> Self {
+        self.resource_set = Some(resource_set);
+        self
+    }
+
+    pub fn resource_set(&self) -> Option<RetainedSpawnResourceSet> {
+        self.resource_set
     }
 
     pub fn invocation(&self) -> &RetainedSpawnInvocation {
@@ -992,6 +1004,7 @@ impl SpawnSpec {
             && self.execution_requirements == other.execution_requirements
             && self.mnemonic == other.mnemonic
             && self.progress_message == other.progress_message
+            && self.resource_set == other.resource_set
             && self
                 .command_line
                 .publication_eq_with(&other.command_line, &mut state)

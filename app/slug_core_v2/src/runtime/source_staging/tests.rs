@@ -3,6 +3,45 @@ use std::fs;
 use super::*;
 
 #[test]
+fn resource_metadata_refuses_before_malformed_declared_inputs() {
+    use slug_build_api_v2::actions::RetainedSpawnResourceSet;
+    let recipe = RetainedSpawnResourceSet::new(
+        CanonicalLabel::parse(RetainedSpawnResourceSet::SOURCE_LABEL).unwrap(),
+        RetainedSpawnResourceSet::SOURCE_DIGEST,
+    )
+    .unwrap();
+    let source = AnalysisArtifact::Source(CanonicalLabel::parse("@@//:unobserved").unwrap());
+    let mut malformed = FilesToRunProvider::empty();
+    malformed.executable = Some(source.clone());
+    for unused in [None, Some(source.clone())] {
+        let ordinary = SpawnSpec::new(
+            RetainedSpawnInvocation::Executable(SpawnExecutable::Artifact(source.clone())),
+            slug_build_api_v2::RetainedCommandLine::new(vec![]),
+            ArtifactInputs::new(vec![ArtifactInputSource::FilesToRun(malformed.clone())]),
+            ArtifactInputs::new(vec![]),
+            vec![],
+            unused.clone(),
+            Default::default(),
+            Default::default(),
+            "Spawn",
+            None::<&str>,
+        );
+        let previous = declared_artifacts(&ordinary).unwrap_err();
+        assert!(previous.contains(if unused.is_some() {
+            "pruning"
+        } else {
+            "omit its executable"
+        }));
+        assert_eq!(
+            declared_artifacts(&ordinary.with_resource_set(recipe))
+                .unwrap_err()
+                .as_ref(),
+            "Spawn resource_set execution is not admitted",
+        );
+    }
+}
+
+#[test]
 fn workspace_status_descriptors_reject_before_source_staging() {
     let pair = slug_build_api_v2::WorkspaceStatusArtifacts::new(
         NormalizedAbsolutePath::new("/workspace").unwrap(),

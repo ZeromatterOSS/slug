@@ -1586,7 +1586,7 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             operation,
         )?;
         validate_supported_spawn_options(&request, operation)?;
-        let mut action = slug_build_api_v2::ActionSpec::spawn(SpawnSpec::new(
+        let mut spec = SpawnSpec::new(
             invocation,
             command_line,
             inputs,
@@ -1597,7 +1597,13 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             execution_requirements,
             mnemonic,
             request.progress_message,
-        ));
+        );
+        if let slug_loading_v2::subrule_invocation::AnalysisResourceSet::Recipe(recipe) =
+            request.resource_set
+        {
+            spec = spec.with_resource_set(recipe);
+        }
+        let mut action = slug_build_api_v2::ActionSpec::spawn(spec);
         if let Some(name) = exec_group_name(&selected_group) {
             action = action.with_exec_group(name);
         }
@@ -2060,7 +2066,10 @@ fn validate_supported_spawn_options(
     {
         anyhow::bail!("ctx.actions.{operation} shadowed_action is not supported");
     }
-    if request.has_resource_set {
+    if matches!(
+        request.resource_set,
+        slug_loading_v2::subrule_invocation::AnalysisResourceSet::Unsupported
+    ) {
         anyhow::bail!("ctx.actions.{operation} callable resource_set is not supported");
     }
     Ok(())

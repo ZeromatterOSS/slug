@@ -407,6 +407,40 @@ stage = rule(implementation = _impl, attrs = {'input': attr.label(allow_single_f
 #[test]
 fn native_spawn_plan_rejects_unmodeled_policy_and_output_collisions() {
     let workspace = Workspace::new();
+    let prepared = workspace.prepare();
+    let action = prepared.configured_action();
+    assert!(spawn_command(action, &defaults()).is_ok());
+    let recipe = slug_build_api_v2::actions::RetainedSpawnResourceSet::new(
+        slug_identity_v2::CanonicalLabel::parse(
+            slug_build_api_v2::actions::RetainedSpawnResourceSet::SOURCE_LABEL,
+        )
+        .unwrap(),
+        slug_build_api_v2::actions::RetainedSpawnResourceSet::SOURCE_DIGEST,
+    )
+    .unwrap();
+    let guarded = slug_analysis_v2::ConfiguredNodeResult::new_rule(
+        workspace.owner.clone(),
+        slug_build_api_v2::ProviderCollection::from_values(vec![], false).unwrap(),
+        None,
+        slug_build_api_v2::RunfilesPackageDepset::empty(),
+    )
+    .with_action_specs(
+        vec![slug_build_api_v2::ActionSpec::spawn(
+            action
+                .spawn_spec()
+                .unwrap()
+                .clone()
+                .with_resource_set(recipe),
+        )],
+        vec![action.context().clone()],
+    )
+    .unwrap();
+    // Both source and generated REAPI routes use this policy projection before
+    // input serialization, parameter expansion, CAS transfer or Execute.
+    assert_eq!(
+        spawn_command(&guarded.actions()[0], &defaults()).unwrap_err(),
+        "Spawn resource_set REAPI execution is not admitted"
+    );
     for (changed, expected) in [
         (
             workspace.defs.replace(
