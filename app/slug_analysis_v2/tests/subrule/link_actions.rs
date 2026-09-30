@@ -21,7 +21,7 @@ fn epoch(marker: &str) -> PathObservationEpoch {
         "/workspace/rules_cc/rules/link_actions.bzl",
         &format!(
             r#"i = cc_common.internal_DO_NOT_USE()
-Proof = provider(fields = ["root", "sub", "marker"])
+Proof = provider(fields = ["root", "sub", "root_soname", "sub_soname", "marker"])
 def _wrap(actions):
     first = i.wrap_link_actions(actions)
     second = i.wrap_link_actions(first, None)
@@ -30,24 +30,26 @@ def _child(ctx, parent):
     wrapped = _wrap(ctx.actions)
     if i.actions2ctx_cheat(wrapped) != parent:
         fail("wrapped subrule actions did not recover the root ctx")
-    output = wrapped.declare_file("sub.txt")
-    if output != ctx.actions.declare_file("sub.txt"):
+    output = wrapped.declare_file("sub_{marker}.pic.a")
+    if output != ctx.actions.declare_file("sub_{marker}.pic.a"):
         fail("wrapped subrule declaration lost File identity")
+    soname = i.dynamic_library_soname(wrapped, output.short_path, True)
     wrapped.write(output, "sub:{marker}")
-    return output
+    return output, soname
 child = subrule(implementation = _child)
 def _root(ctx):
     wrapped = _wrap(ctx.actions)
     if i.actions2ctx_cheat(wrapped) != ctx:
         fail("nested wrapped actions did not recover their ctx")
-    output = ctx.actions.declare_file("root.txt")
-    if output != wrapped.declare_file("root.txt"):
+    output = ctx.actions.declare_file("root_{marker}.a")
+    if output != wrapped.declare_file("root_{marker}.a"):
         fail("wrapped root declaration lost File identity")
+    root_soname = i.dynamic_library_soname(wrapped, output.short_path, True)
     wrapped.write(output, "root:{marker}")
-    sub = child(ctx)
-    if sub != ctx.actions.declare_file("sub.txt"):
+    sub, sub_soname = child(ctx)
+    if sub != ctx.actions.declare_file("sub_{marker}.pic.a"):
         fail("root and subrule wrappers used different declaration owners")
-    return [DefaultInfo(files = depset([output, sub])), Proof(root = output, sub = sub, marker = "{marker}")]
+    return [DefaultInfo(files = depset([output, sub])), Proof(root = output, sub = sub, root_soname = root_soname, sub_soname = sub_soname, marker = "{marker}")]
 subject = rule(implementation = _root, subrules = [child])
 def _locked(ctx, outer):
     wrapped = _wrap(outer)
@@ -180,7 +182,15 @@ fn assert_writes(result: &slug_analysis_v2::ConfiguredNodeResult, marker: &str) 
     assert!(
         matches!(proof.field("marker").unwrap().kind(), AnalysisValueKind::String(actual) if actual == marker)
     );
-    for (action, field) in result.actions().iter().zip(["root", "sub"]) {
+    for (action, (field, suffix)) in result
+        .actions()
+        .iter()
+        .zip([("root", ".a"), ("sub", ".pic.a")])
+    {
+        let basename = format!("{field}_{marker}{suffix}");
+        assert!(
+            matches!(proof.field(&format!("{field}_soname")).unwrap().kind(), AnalysisValueKind::String(actual) if actual == basename)
+        );
         assert_eq!(action.mnemonic(), "FileWrite");
         assert_eq!(
             action.kind(),
@@ -192,7 +202,7 @@ fn assert_writes(result: &slug_analysis_v2::ConfiguredNodeResult, marker: &str) 
         assert_eq!(action.outputs().len(), 1);
         assert_eq!(
             action.outputs()[0].root_relative_path(),
-            format!("subject/{field}.txt")
+            format!("subject/{basename}")
         );
         let AnalysisValueKind::Artifact(file) = proof.field(field).unwrap().kind() else {
             panic!("{field} must retain its File identity");

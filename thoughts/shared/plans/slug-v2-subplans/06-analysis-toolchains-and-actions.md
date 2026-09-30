@@ -2058,6 +2058,20 @@ unchanged authentic cquery clears wrapping and next reaches dynamic_library_sona
 on the PIC static-library path. Sharing, helper counters and full link actions
 remain deferred; the facade is not complete Bazel wrapper parity.
 
+## Preserved library SONAME (WP859, 2026-09-30)
+
+The private link facade owns dynamic_library_soname wrapper validation. Three
+required positional arguments and True-mode Linux normalized basename match
+pinned Bazel9.2 CcStarlarkInternal:239/SolibSymlinkAction:306/UnixOsPathPolicy:65.
+A borrowed reverse segment reduction allocates only the resulting primitive
+string; existing current/live/registration checks remain Slug-native. Static
+archive names are admitted without suffix filtering. False ST-mnemonic naming
+and non-Linux path policy explicitly refuse. Eighteen focused checks prove
+binding, normalization, lifecycle and root/subrule primitive string publication
+under both-route same-DICE source/configuration restoration. No new semantic
+owner or action mutation. Unchanged authentic cquery clears soname and first
+reaches cpp.start_end_lib; full link closure remains unproved.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

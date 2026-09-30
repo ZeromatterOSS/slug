@@ -46,6 +46,47 @@ fn wrapped_methods(builder: &mut MethodsBuilder) {
     deferred_methods(builder);
 }
 
+pub(crate) fn soname<'v>(
+    actions: Value<'v>,
+    path: &str,
+    preserve_name: bool,
+    eval: &Evaluator<'v, '_, '_>,
+) -> anyhow::Result<Value<'v>> {
+    anyhow::ensure!(
+        WrappedLinkActions::from_value(actions).is_some(),
+        "dynamic_library_soname requires wrapped link actions"
+    );
+    actions_to_context(actions, eval)?;
+    anyhow::ensure!(
+        preserve_name,
+        "dynamic_library_soname preserve_name=False is unsupported/deferred"
+    );
+    anyhow::ensure!(
+        cfg!(target_os = "linux"),
+        "dynamic_library_soname platform path policy is unsupported/deferred"
+    );
+    Ok(eval.heap().alloc_str(linux_basename(path)).to_value())
+}
+
+// Bazel 9.2 SolibSymlinkAction.java:306 and UnixOsPathPolicy.java:65.
+// Reduce only the basename; pending parents cancel segments while scanning back.
+fn linux_basename(path: &str) -> &str {
+    let mut parents = 0usize;
+    for segment in path.rsplit('/') {
+        match segment {
+            "" | "." => {}
+            ".." => parents += 1,
+            _ if parents > 0 => parents -= 1,
+            _ => return segment,
+        }
+    }
+    if parents > 0 && !path.starts_with('/') {
+        ".."
+    } else {
+        ""
+    }
+}
+
 #[starlark_module]
 fn deferred_methods(builder: &mut MethodsBuilder) {
     fn declare_shareable_artifact<'v>(

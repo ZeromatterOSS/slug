@@ -4,6 +4,7 @@ use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 use starlark::values::list::AllocList;
 
+use super::soname;
 use super::wrap;
 use crate::package::loading_globals;
 use crate::provider::BzlEvaluationContext;
@@ -52,6 +53,82 @@ fn internal() -> FrozenModule {
     execute(&mut eval, "i = cc_common.internal_DO_NOT_USE()\n").unwrap();
     drop(eval);
     module.freeze().unwrap()
+}
+
+#[test]
+fn preserved_soname_normalizes_linux_paths_and_requires_wrapper_positional_binding() {
+    let module = Module::new();
+    module.import_public_symbols(&internal());
+    let (context, sink) = context();
+    let _guard = context
+        .enter_root_context(&module, module.heap().alloc(AllocList([7])))
+        .unwrap();
+    module.set("actions", actions(&module, &context));
+    let mut eval = Evaluator::new(&module);
+    eval.extra = Some(&context);
+    execute(&mut eval, "wrapped = i.wrap_link_actions(actions)\n").unwrap();
+    for (path, expected) in [
+        ("foo/bar", "bar"),
+        ("/foo/bar", "bar"),
+        ("foo/", "foo"),
+        ("/foo/", "foo"),
+        ("foo", "foo"),
+        ("/foo", "foo"),
+        ("/", ""),
+        ("", ""),
+        (".", ""),
+        ("foo/..", ""),
+        ("../a/..", ".."),
+        ("a/../..", ".."),
+        ("/a/../..", ""),
+        ("a/b/../../c/../..", ".."),
+        ("/a/b/../../c/../..", ""),
+        ("../../a/b/..", "a"),
+        ("../../a/b/../../..", ".."),
+        ("a/../b/../../c", "c"),
+        ("a//./b/../libx.pic.a//", "libx.pic.a"),
+        ("../rules_cc+/a/./../libx.pic.a", "libx.pic.a"),
+        ("foo..", "foo.."),
+        (r"a\..\lib.dll", r"a\..\lib.dll"),
+        ("α/β/../库.a", "库.a"),
+    ] {
+        module.set("path", module.heap().alloc_str(path).to_value());
+        execute(
+            &mut eval,
+            "result = i.dynamic_library_soname(wrapped, path, True)\n",
+        )
+        .unwrap();
+        assert_eq!(module.get("result").unwrap().unpack_str(), Some(expected));
+    }
+    for (expression, diagnostic) in [
+        (
+            "i.dynamic_library_soname(wrapped, 'a.so', False)",
+            "preserve_name=False is unsupported/deferred",
+        ),
+        (
+            "i.dynamic_library_soname(actions, 'a.so', True)",
+            "requires wrapped link actions",
+        ),
+    ] {
+        let error = execute(&mut eval, expression).unwrap_err();
+        assert!(error.to_string().contains(diagnostic), "{error}");
+    }
+    for expression in [
+        "i.dynamic_library_soname(wrapped, 'a.so')",
+        "i.dynamic_library_soname(wrapped, 'a.so', True, None)",
+        "i.dynamic_library_soname(actions=wrapped, path='a.so', preserve_name=True)",
+        "i.dynamic_library_soname(wrapped, path='a.so', preserve_name=True)",
+        "i.dynamic_library_soname(wrapped, 'a.so', preserve_name=True)",
+        "i.dynamic_library_soname(wrapped, None, True)",
+        "i.dynamic_library_soname(wrapped, 7, True)",
+        "i.dynamic_library_soname(wrapped, 'a.so', None)",
+        "i.dynamic_library_soname(wrapped, 'a.so', 1)",
+        "i.dynamic_library_soname(None, 'a.so', True)",
+        "i.dynamic_library_soname(struct(), 'a.so', True)",
+    ] {
+        assert!(execute(&mut eval, expression).is_err(), "{expression}");
+    }
+    assert!(sink.0.lock().unwrap().is_empty());
 }
 
 #[test]
@@ -164,7 +241,20 @@ fn default_link_wrapper_rejects_missing_foreign_and_expired_owners() {
     );
     eval.extra = Some(&a);
     let wrapped = wrap(a_actions, None, false, &mut eval).unwrap();
+    eval.extra = None;
+    assert!(soname(wrapped, "lib.a", true, &eval).is_err());
+    eval.extra = Some(&b);
+    let error = soname(wrapped, "lib.a", true, &eval).unwrap_err();
+    assert!(error.to_string().contains("another evaluation"), "{error}");
+    eval.extra = Some(&a);
+    let registration = crate::evaluator_roots::analysis_context(&module).unwrap();
+    crate::evaluator_roots::set_analysis_context(&module, Value::new_none());
+    let error = soname(wrapped, "lib.a", true, &eval).unwrap_err();
+    assert!(error.to_string().contains("registered"), "{error}");
+    crate::evaluator_roots::set_analysis_context(&module, registration);
     drop(guard);
+    let error = soname(wrapped, "lib.a", true, &eval).unwrap_err();
+    assert!(error.to_string().contains("expired"), "{error}");
     for expired in [a_actions, wrapped] {
         let error = wrap(expired, None, false, &mut eval).unwrap_err();
         assert!(error.to_string().contains("expired"), "{error}");
@@ -208,6 +298,12 @@ fn suspended_link_wrappers_preserve_root_and_subrule_scope() {
     let sub_wrapped = wrap(subrule, None, false, &mut eval).unwrap();
     for wrapped in [root_wrapped, sub_wrapped] {
         assert!(actions_to_context(wrapped, &eval).unwrap().ptr_eq(original));
+        assert_eq!(
+            soname(wrapped, "../repo+/lib.pic.a", true, &eval)
+                .unwrap()
+                .unpack_str(),
+            Some("lib.pic.a")
+        );
     }
     assert_eq!(
         AnalysisActions::from_starlark(sub_wrapped).unwrap().scope,
@@ -236,6 +332,7 @@ fn suspended_link_wrappers_preserve_root_and_subrule_scope() {
         "{error}"
     );
     drop(subrule_guard);
+    assert!(soname(sub_wrapped, "lib.pic.a", true, &eval).is_err());
     let error = wrap(sub_wrapped, None, false, &mut eval).unwrap_err();
     assert!(error.to_string().contains("expired"), "{error}");
     assert!(
@@ -250,6 +347,7 @@ fn suspended_link_wrappers_preserve_root_and_subrule_scope() {
 fn escaped_link_wrapper_methods_reject_after_success_and_error() {
     for fail in [false, true] {
         let module = Module::new();
+        module.import_public_symbols(&internal());
         let (context, sink) = context();
         let base = actions(&module, &context);
         let mut eval = Evaluator::new(&module);
@@ -259,6 +357,7 @@ fn escaped_link_wrapper_methods_reject_after_success_and_error() {
                 context.enter_root_context(&module, module.heap().alloc(AllocList([7])))?;
             let wrapped = wrap(base, None, false, &mut eval)?;
             module.set("wrapped", wrapped);
+            execute(&mut eval, "helper = i.dynamic_library_soname\n")?;
             for (name, method) in [
                 ("ordinary", "declare_file"),
                 ("shareable", "declare_shareable_artifact"),
@@ -278,6 +377,18 @@ fn escaped_link_wrapper_methods_reject_after_success_and_error() {
             Ok(())
         })();
         assert_eq!(result.is_err(), fail);
+        let error = eval
+            .eval_function(
+                module.get("helper").unwrap(),
+                &[
+                    module.get("wrapped").unwrap(),
+                    module.heap().alloc_str("lib.pic.a").to_value(),
+                    Value::new_bool(true),
+                ],
+                &[],
+            )
+            .unwrap_err();
+        assert!(error.to_string().contains("expired"), "{error}");
         for name in ["ordinary", "shareable", "directory"] {
             let error = eval
                 .eval_function(

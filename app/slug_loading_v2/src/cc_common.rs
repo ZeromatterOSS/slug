@@ -80,6 +80,16 @@ impl<'v> StarlarkValue<'v> for CcInternalModule {
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn dynamic_library_soname<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = pos)] actions: Value<'v>,
+        #[starlark(require = pos)] path: &str,
+        #[starlark(require = pos)] preserve_name: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::subrule_invocation::link_actions::soname(actions, path, preserve_name, eval)
+    }
+
     fn wrap_link_actions<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = pos)] actions: Value<'v>,

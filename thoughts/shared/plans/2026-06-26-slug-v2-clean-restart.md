@@ -34,16 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-158-m7a-default-link-actions-wrapper-r1
+Packet: WP-7-159-m7a-preserved-library-soname-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP858 accepts the default link-actions wrapper over existing genuine handles,
-preserving sink/token/scope and current-evaluator ownership. Seventeen focused
-checks and independent reviews pass. The rebuilt unchanged authentic cquery
-clears wrapping and next stops at dynamic_library_soname on the PIC static
-library path. Sharing/alternate configuration, helper counters, full link
-closure and Windows execution remain deferred. See
-`slug-v2-subplans/current-packet.md`.
+WP859 accepts True-mode dynamic_library_soname on genuine default link
+wrappers: exact Linux normalized basename and required positional binding,
+with existing Slug-native evaluator/lifetime guards. Eighteen focused checks
+pass; unchanged rebuilt authentic cquery clears soname and first stops at
+cpp.start_end_lib in81.071s. False naming, full link closure and non-Linux
+policy remain deferred. See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
