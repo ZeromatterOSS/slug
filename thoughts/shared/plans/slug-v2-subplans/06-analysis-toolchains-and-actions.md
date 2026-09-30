@@ -2011,17 +2011,21 @@ The rebuilt unchanged authentic Rust-toolchain cquery clears grte_top and next
 stops at cpp.experimental_cc_implementation_deps() in rules_cc semantics.bzl:114.
 M7A and full C++/toolchain closure remain partial; Windows execution is deferred.
 
-## Private C++ requested-option getters (WP856/WP860/WP862)
+## Private C++ requested-option getters
 
 Retained CppOptions booleans back the private zero-argument methods
-experimental_cc_implementation_deps, start_end_lib and
-incompatible_use_specific_tool_files and their appended typed command options.
+experimental_cc_implementation_deps, start_end_lib,
+incompatible_use_specific_tool_files and incompatible_remove_legacy_whole_archive
+and their appended typed command options.
 All default True and carry through the existing exec mapping. The specific-tool
 files getter delegates to the existing cpp_compile_use_specific_tool_files
 policy owner used by compile-action construction; no second producer is added.
 Bazel9.2 CppConfiguration:468/866, CppOptions:150/970 and
 builtin_exec_platforms:303/305 pin the first two projections; specific-tool
-files uses CppConfiguration:790-796, CppOptions:828-837 and exec:313. Requesting start_end_lib
+files uses CppConfiguration:790-796, CppOptions:828-837 and exec:313. The remove-
+legacy-whole-archive projection uses CppConfiguration:484-491, CppOptions:790-799
+and exec:309; it reads the existing retained Boolean and adds no whole-archive
+heuristic. Requesting start_end_lib
 does not establish toolchain feature support. Shared textual Boolean conversion
 rejects literal null/NULL; actual-null default materialization remains False.
 Configuration/config_setting use the same converted structural state. Current

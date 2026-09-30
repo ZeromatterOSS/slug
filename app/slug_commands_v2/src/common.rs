@@ -709,6 +709,10 @@ mod tests {
             ),
             ("start_end_lib", NativeCommandOption::StartEndLib),
             (
+                "incompatible_remove_legacy_whole_archive",
+                NativeCommandOption::IncompatibleRemoveLegacyWholeArchive,
+            ),
+            (
                 "incompatible_use_specific_tool_files",
                 NativeCommandOption::IncompatibleUseSpecificToolFiles,
             ),
@@ -756,6 +760,7 @@ mod tests {
         for name in [
             "experimental_cc_implementation_deps",
             "start_end_lib",
+            "incompatible_remove_legacy_whole_archive",
             "incompatible_use_specific_tool_files",
         ] {
             for (flags, expected) in [
@@ -783,6 +788,16 @@ mod tests {
                     }
                 );
                 assert_eq!(
+                    projection
+                        .incompatible_remove_legacy_whole_archive()
+                        .unwrap(),
+                    if name == "incompatible_remove_legacy_whole_archive" {
+                        expected
+                    } else {
+                        true
+                    }
+                );
+                assert_eq!(
                     projection.start_end_lib().unwrap(),
                     if name == "start_end_lib" {
                         expected
@@ -803,6 +818,7 @@ mod tests {
         for name in [
             "experimental_cc_implementation_deps",
             "start_end_lib",
+            "incompatible_remove_legacy_whole_archive",
             "incompatible_use_specific_tool_files",
             "force_pic",
         ] {

@@ -1,98 +1,92 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-166-m7a-native-mangled-soname-r1
+Packet: WP-7-167-m7a-remove-legacy-whole-archive-projection-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Baseline659273f8c (WP865). Advance unchanged authentic Linux Rust-toolchain
-cquery beyond confirmed dynamic_library_soname preserve_name=False refusal at
-rules_cc cpp_link_action.bzl:193 on dynamic link creation. Reuse existing Solib
-Slug-native naming and existing Linux path normalization; preserve accepted
-True basename exact slice and all wrapper/current/live/token guards. Windows
-path policy stays refused/minimal; no Windows implementation or execution.
+Baseline6c18f52a2 (WP866). Advance unchanged authentic Linux Rust-toolchain
+cquery beyond missing cpp.incompatible_remove_legacy_whole_archive() at
+rules_cc finalize_link_action436 on dynamic link creation. Admit only this
+private zero-argument Boolean getter and its typed command option.
+Exact option/default/Boolean conversion/exec carry/getter/current-private-caller
+policy; existing configuration/output semantic identity remains Slug-native.
+Windows remains minimal/refused; full archive semantics/link execution deferred.
 
-Pinned Bazel9.2 8220c619 CcStarlarkInternal:247-253 passes PathFragment.create
-(path) and constructing configuration mnemonic. SolibSymlinkAction:306-320:
-False returns lib + optional mnemonic suffix from first ST- through end + '_'
-+ Actions.escapedPath(normalized full supplied path). Actions:45-52 escapes
-underscore/slash/backslash/colon/@ to _U/_S/_B/_C/_A. No extension/relative-path
-checks, 255 limit or hashing belong to soname; hashing belongs separate solib
-output construction249-258. CcLibraryConfiguredTargetTest:2482 covers ST names.
+Pinned Bazel9.2 clean8220c619 CppConfiguration484-491 checks private
+Starlarkification caller and returns cppOptions.removeLegacyWholeArchive;
+CppOptions790-799 Boolean defaulttrue, LOADING_AND_ANALYSIS/incompatible;
+builtin_exec_platforms309 explicitly carries this option. LibraryLinkingTest
+47-85 disables option for legacy generated-library whole archive behavior;
+its full link action/execution is outside this getter slice. Existing pinned
+rules_cc0.2.17 finalize_link_action436-443 returnsFalse immediately if True;
+False and dynamic mode also returnFalse before separate legacy_whole_archive
+getter. Generic whole-archive heuristic remains unchanged rules_cc Starlark.
 
-Decision: False naming is explicitly Slug-native, omitting Bazel ST mnemonic
-bytes exactly as accepted SolibSymlinkSpec naming. Linux normalization and five
-escape substitutions over supplied Rust Unicode strings match pinned rules;
-Bazel transition mnemonic bytes, exact output/path/config identity and other
-platform paths remain unsupported/deferred. Never invent prefix from Slug
-configuration token/hash or infer transition origin. Existing full structural
-configured owner identity remains authoritative; primitive names do not alias
-semantic configurations. No claim that external short_path equals a solib
-input's root-relative path. Each producer supplies its own original path.
+## Owner and scope
 
-## Owners, scope and proof
+Existing descriptor registry/native bindingA12.48 already retains exact Boolean
+and default. Append NativeCommandOption variant, from_name/canonical/is_boolean;
+existing Commands parser captures ordered raw/negated occurrences and existing
+Configuration converts them. CppFragmentProjection validates/reads sole retained
+CppOptions value via native_bool; Loading uses existing check(eval) on each
+invocation, including transferred methods retaining original configuration.
+No hardcoded True, new parser, state/key/cache/option descriptor, semantic owner,
+DICE lock, fragment layout, scheduler or action. Configuration and configured
+analysis DICE keys/equality own changed option; phase scratch getter returnsbool.
+Representation unchanged: no donor import or retained-memory/performance claim.
 
-BuildAPI SolibSymlinkSpec already formats lib+escape(root_relative_path) before
-shortening. Extract a bounded associated slug_native_soname(normalized_path:&str)
-->String using the unchanged escaper; its ctor reuses then retains existing
-shorten/filetype/relative guards. Loading False calls existing
-NormalizedBazelPath::new(HostPathFlavor::Unix,path), then shared unshortened
-formatter; returns primitive string on current heap. True keeps borrowed
-linux_basename unchanged. All states are existing phase scratch/evaluator
-values, not new retained fields/containers/actions/identity/cache/key/lock.
-Existing configured/source DICE owners capture resulting scalar provider/Args
-values; read docs/developers/dice.md. No utility import/performance claim.
+Allowlist: Configuration src/command.rs, native/cpp_fragment.rs and existing
+native/cpp_start_end_lib_tests.rs; Loading src/analysis_fragments.rs and existing
+analysis_fragments/toolchain_provider_tests.rs; Commands src/common.rs tests;
+Analysis tests/subrule/implementation_deps.rs; manifest/canonical and Stage6
+existing private-requested-options paragraph. No new fixture/harness/helper or
+embedded source copy; reuse existing matrices. Estimate production<30/proof<120
+netRustlines; cohesive production owners are358/804/1099lines and get only
+matching arms/small existing-method sibling, tests remain split. Independent DESIGN/FINAL
+because public command/projection and private caller boundary.
 
-Allowlist: BuildAPI src/actions/solib_symlink.rs bounded formatter+existingtests;
-Loading src/subrule_invocation/link_actions.rs and childtests.rs;
-Analysis tests/subrule/link_actions.rs existing helper/Proof only;
-manifest/canonical and compact Stage6 existing SONAME/Solib owner notes. No
-configuration projection/transition owner, public builtin binder shape changes,
-new fixture, action execution or filename-shortening change. Estimate production
-below35/proof below90 netRust lines. Independent DESIGN then FINAL because
-shared formatter/public native naming boundary; no new architecture owner.
+## Proof and validation
 
-Loading existing True vectors remain; add False literal vectors empty/root,
-dot/repeated slash/parents/root clamping, relative external short spelling,
-all five escapes plus Unicode/NUL and long>255 unshortened. Wrong types/wrapper/
-missing/foreign/expired/suspended guards protected for both flags. BuildAPI
-existing naming/equality/long filename tests must protect unchanged native
-Solib output bytes/shortening/owner identity and shared formatter difference.
-Existing Analysis root/subrule helper adds False primitive provider fields
-without replacing True or existing file actions/library sequence proof;
-assert exact native names, both-route config/source restoration including exec
-where existing harness supports. Generic resource registration and existing
-LinkArgs gates remain protected through direct compile dependencies/replay.
+Extend existing Configuration independent-option matrix: defaultTrue/False,
+A/B/A structural bytes/projection/config_setting, both exec paths/idempotence,
+malformed absence/text/label rejected at constructor; protect other getters.
+Loading existing private method matrix proves zeroarity/current allowed and
+forbidden caller/transfer original configuration plus independent crossed
+values under target/exec. Analysis existing root/subrule provider primitive
+proof adds both getters, Boolean/equality checks, crossed independent state,
+both-route target/exec and same-DICE source/config A/B/A; no actions.
+Commands existing public Cquery parse matrix adds positive/no/raw/orderedflags,
+malformednull/invalid/whitespace and negated-value rejection; defaultothers
+unchanged. Preserve all old protected assertions/selectors.
 
-Root serial pinned Cargo JSON no-run60s BuildAPIlib/Loadinglib/Analysissubrule;
-exact nonignored preflight and focused runtime; Corecheck/CLI rebuild before
-unchanged three-hash authentic supervised180s replay (76s prerequisitecost).
+Root serial pinned Cargo JSON no-run60s Configurationlib/Loadinglib/Commandslib/
+Analysissubrule, exact nonignored preflight and focused20s runtime; Corecheck/
+CLIbuild before unchanged three-hash authentic supervised180s replay. Its76s
+prerequisite is necessary to prove actual public dynamic caller advances and
+reveal next missing bootstrap surface; smaller getters cannot establish closure.
 Actual process cleanup, scopedrustfmt/diff/archive/status. Caps not userlimits.
-REPLAN if existing formatter cannot preserve ctor bytes, True exactness or
-fullpath normalization, or new mnemonic/transition semantic owner is required.
-A Slug-native False result is not a fallback/parity claim; matching Bazel ST
-bytes stays a separate future configuration/output-identity milestone.
+REPLAN if retained descriptor/exec mapping cannot express actual option, caller
+policy must widen, or new whole-archive/action owner required. Full linking,
+legacy_whole_archive getter/heuristic, resource execution, M7A/M8 unproved.
 
 ## Predecessor
 
-WP865659273f8c independent DESIGN/FINAL;57focused1.163s/Core/CLI pass. Unchanged
-cquery76.818s exit2 clears static resource registration and next refuses False
-SONAME193 on dynamic path; three hashes/cleanup/sourcefixture unchanged.
-target/wp865. Resource execution, full linking/query/bootstrap/M8 deferred.
+WP8666c18f52a2 independent DESIGN/FINAL;38focused0.442s/Core/CLI pass. Unchanged
+query76.423s exit2 clears nativeFalseSONAME and next missingcppgetter436;
+three original input hashes/cleanup pass. target/wp866; exactST names deferred.
 
-## Validation receipt
+## Focused receipt
 
-Fresh pinned offline Cargo: BuildAPI4/4 (0.064s, prep3.57s), Loading28/28
-(0.064s, prep10.11s), Analysissubrule6/6 (0.314s, prep9.36s); all exact ordinary
-nonignored selectors preflighted on rebuilt executables. Corecheck3.19s and
-CLIbuild8.71s pass. Production net11/proof91 lines; paired authority/lifetime
-guards and distinct vectors justify one line over proof estimate, no new
-fixtures/helpers/retained representation. Scoped formatting/diff/archive/status
-pass. Unchanged authentic query76.423s exit2 clears False SONAME193 and reaches
-cpp.incompatible_remove_legacy_whole_archive missing at finalize_link_action436.
-Three original input hashes match before/after; actual process checks empty.
-Receipts target/wp866. Query/link/bootstrap/M8 remain unproved.
+Fresh pinned offline Cargo JSON/preflight: Configuration11/11 (0.032s,
+prep1.06s), Loading8/8 (0.064s, prep19.21s), Commands2/2 (0.003s, prep11.53s),
+Analysissubrule6/6 (0.464s, prep5.57s). All27 exact ordinary nonignored tests
+pass0.563s. Corecheck8.09s passes; scopedformat/diff/archive/status pass.
+Production net25/proof58 Rustlines within estimates; no newfixture/helper/
+semantic representation. CLIbuild20.34s passes. Unchanged authentic query76.470s exit2 clears dynamic
+link registration and reaches coverage_common.instrumented_files_info at
+cc_helper1049. Three original hashes match before/after; actual process checks
+empty before/after. target/wp867; independent FINAL ACCEPT.
 
-Independent FINAL ACCEPT: shared formatter preserves original ctor bytes and
-True exact slice, bounded False normalization and both-flag guards; proof growth
-is justified. Packet window10:58–11:20UTC (2026-09-30); no speedup claim.
+Packet window11:20–11:34UTC (2026-09-30); no speedup claim. Independent review
+confirms appended ordinals, sole structural value and current-caller authority.

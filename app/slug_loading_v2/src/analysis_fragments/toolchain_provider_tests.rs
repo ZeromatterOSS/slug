@@ -239,7 +239,7 @@ fn cpp_grte_top_method_checks_current_caller_even_when_transferred() {
     }
 }
 
-const PRIVATE_BOOLEAN_METHODS: [(NativeCommandOption, &str); 3] = [
+const PRIVATE_BOOLEAN_METHODS: [(NativeCommandOption, &str); 4] = [
     (
         NativeCommandOption::ExperimentalCcImplementationDeps,
         "experimental_cc_implementation_deps",
@@ -248,6 +248,10 @@ const PRIVATE_BOOLEAN_METHODS: [(NativeCommandOption, &str); 3] = [
     (
         NativeCommandOption::IncompatibleUseSpecificToolFiles,
         "incompatible_use_specific_tool_files",
+    ),
+    (
+        NativeCommandOption::IncompatibleRemoveLegacyWholeArchive,
+        "incompatible_remove_legacy_whole_archive",
     ),
 ];
 
@@ -273,8 +277,8 @@ fn configured_implementation_deps(enabled: bool) -> SlugConfiguration {
 
 #[test]
 fn cpp_implementation_deps_method_is_a_private_zero_argument_boolean() {
-    // Bazel 9.2 CppConfiguration.java:468-472,790-796,866-883 and
-    // CppOptions.java:150-163,828-837,970-979 own these independent methods.
+    // Bazel 9.2 CppConfiguration.java:468-491,790-796,866-883 and
+    // CppOptions.java:150-163,790-799,828-837,970-979 own these independent methods.
     let platform = CanonicalLabel::parse("@@//platforms:exec").unwrap();
     for (option, name) in PRIVATE_BOOLEAN_METHODS {
         let source = format!("def call():\n    return cpp.{name}()\nresult = call()");
@@ -358,44 +362,52 @@ fn cpp_private_boolean_methods_preserve_independent_target_and_exec_values() {
     let platform = CanonicalLabel::parse("@@//platforms:exec").unwrap();
     for (implementation_deps, start_end_lib) in [(false, true), (true, false)] {
         for specific_tools in [false, true] {
-            let base = configured_implementation_deps(implementation_deps);
-            let target = base
-                .with_command_configuration(
-                    base.starlark_options().clone(),
-                    &CommandConfigurationOverlay::from(vec![
-                        CommandConfigurationOccurrence::native(
-                            NativeCommandOption::StartEndLib,
-                            Some(if start_end_lib { "true" } else { "false" }),
-                            false,
-                        ),
-                        CommandConfigurationOccurrence::native(
-                            NativeCommandOption::IncompatibleUseSpecificToolFiles,
-                            Some(if specific_tools { "true" } else { "false" }),
-                            false,
-                        ),
-                    ]),
-                )
-                .unwrap();
-            let expected = format!(
-                "[{}, {}, {}]",
-                if implementation_deps { "True" } else { "False" },
-                if start_end_lib { "True" } else { "False" },
-                if specific_tools { "True" } else { "False" },
-            );
-            for configuration in [
-                target.clone(),
-                target.to_exec().unwrap(),
-                target.to_exec_for_platform(&platform).unwrap(),
-            ] {
-                assert_eq!(
-                    evaluate(
-                        configuration,
-                        true,
-                        "def call():\n    return [cpp.experimental_cc_implementation_deps(), cpp.start_end_lib(), cpp.incompatible_use_specific_tool_files()]\nresult = call()",
+            for remove_legacy in [false, true] {
+                let base = configured_implementation_deps(implementation_deps);
+                let target = base
+                    .with_command_configuration(
+                        base.starlark_options().clone(),
+                        &CommandConfigurationOverlay::from(vec![
+                            CommandConfigurationOccurrence::native(
+                                NativeCommandOption::StartEndLib,
+                                Some(if start_end_lib { "true" } else { "false" }),
+                                false,
+                            ),
+                            CommandConfigurationOccurrence::native(
+                                NativeCommandOption::IncompatibleUseSpecificToolFiles,
+                                Some(if specific_tools { "true" } else { "false" }),
+                                false,
+                            ),
+                            CommandConfigurationOccurrence::native(
+                                NativeCommandOption::IncompatibleRemoveLegacyWholeArchive,
+                                Some(if remove_legacy { "true" } else { "false" }),
+                                false,
+                            ),
+                        ]),
                     )
-                    .unwrap(),
-                    expected,
+                    .unwrap();
+                let expected = format!(
+                    "[{}, {}, {}, {}]",
+                    if implementation_deps { "True" } else { "False" },
+                    if start_end_lib { "True" } else { "False" },
+                    if specific_tools { "True" } else { "False" },
+                    if remove_legacy { "True" } else { "False" },
                 );
+                for configuration in [
+                    target.clone(),
+                    target.to_exec().unwrap(),
+                    target.to_exec_for_platform(&platform).unwrap(),
+                ] {
+                    assert_eq!(
+                        evaluate(
+                            configuration,
+                            true,
+                            "def call():\n    return [cpp.experimental_cc_implementation_deps(), cpp.start_end_lib(), cpp.incompatible_use_specific_tool_files(), cpp.incompatible_remove_legacy_whole_archive()]\nresult = call()",
+                        )
+                        .unwrap(),
+                        expected,
+                    );
+                }
             }
         }
     }

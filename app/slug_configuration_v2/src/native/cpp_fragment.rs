@@ -34,6 +34,7 @@ impl CppFragmentProjection {
         projection.grte_top()?;
         projection.experimental_cc_implementation_deps()?;
         projection.start_end_lib()?;
+        projection.incompatible_remove_legacy_whole_archive()?;
         projection.incompatible_use_specific_tool_files()?;
         projection.force_pic()?;
         projection.apple_generate_dsym()?;
@@ -132,6 +133,11 @@ impl CppFragmentProjection {
 
     pub fn start_end_lib(&self) -> Result<bool, SlugConfigurationError> {
         self.configuration.native_bool(CPP_OPTIONS, "start_end_lib")
+    }
+
+    pub fn incompatible_remove_legacy_whole_archive(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration
+            .native_bool(CPP_OPTIONS, "incompatible_remove_legacy_whole_archive")
     }
 
     pub fn incompatible_use_specific_tool_files(&self) -> Result<bool, SlugConfigurationError> {

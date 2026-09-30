@@ -34,13 +34,14 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-166-m7a-native-mangled-soname-r1
+Packet: WP-7-167-m7a-remove-legacy-whole-archive-projection-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP866 admits False SONAME through existing native Solib naming; True remains
-exact, Bazel ST naming/Windows deferred.38focused0.442s/Core/CLI pass; unchanged
-query76.423s advances to cpp.incompatible_remove_legacy_whole_archive436.
-No new configuration or execution owner; full closure remains unproved.
+WP867 exposes the existing remove-legacy-whole-archive Boolean through the
+private fragment and typed command owner.27focused0.563s/Core/CLI pass;
+unchanged query76.470s clears dynamic link registration and reaches
+coverage_common.instrumented_files_info1049. Full linking/coverage/bootstrap
+and Windows remain deferred; existing configuration owner stays.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

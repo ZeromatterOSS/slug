@@ -1,5 +1,5 @@
-//! Bazel 9.2 CppOptions:150-163,828-837 defaults and
-//! builtin_exec_platforms:305,313 exec propagation.
+//! Bazel 9.2 CppOptions:150-163,790-799,828-837 defaults and
+//! builtin_exec_platforms:305,309,313 exec propagation.
 use super::*;
 use crate::CppFragmentProjection;
 
@@ -20,8 +20,12 @@ fn base() -> SlugConfiguration {
     .unwrap()
 }
 
-const OPTIONS: [(NativeCommandOption, &str); 2] = [
+const OPTIONS: [(NativeCommandOption, &str); 3] = [
     (NativeCommandOption::StartEndLib, "start_end_lib"),
+    (
+        NativeCommandOption::IncompatibleRemoveLegacyWholeArchive,
+        "incompatible_remove_legacy_whole_archive",
+    ),
     (
         NativeCommandOption::IncompatibleUseSpecificToolFiles,
         "incompatible_use_specific_tool_files",
@@ -51,7 +55,10 @@ fn projected(projection: &CppFragmentProjection, option: NativeCommandOption) ->
         NativeCommandOption::IncompatibleUseSpecificToolFiles => {
             projection.incompatible_use_specific_tool_files().unwrap()
         }
-        _ => unreachable!("only the two requested Boolean methods are tested"),
+        NativeCommandOption::IncompatibleRemoveLegacyWholeArchive => projection
+            .incompatible_remove_legacy_whole_archive()
+            .unwrap(),
+        _ => unreachable!("only the requested Boolean methods are tested"),
     }
 }
 
