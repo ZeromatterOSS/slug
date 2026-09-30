@@ -70,6 +70,7 @@ pub enum NativeCommandOption {
     MinimumOsVersion,
     Stamp,
     ExperimentalCcImplementationDeps,
+    StartEndLib,
 }
 
 impl NativeCommandOption {
@@ -86,6 +87,7 @@ impl NativeCommandOption {
             "experimental_omitfp" => Self::ExperimentalOmitfp,
             "force_pic" => Self::ForcePic,
             "experimental_cc_implementation_deps" => Self::ExperimentalCcImplementationDeps,
+            "start_end_lib" => Self::StartEndLib,
             "apple_generate_dsym" => Self::AppleGenerateDsym,
             "experimental_use_llvm_covmap" => Self::ExperimentalUseLlvmCovmap,
             "incompatible_dont_enable_host_nonhost_crosstool_features" => {
@@ -143,6 +145,7 @@ impl NativeCommandOption {
             Self::ExperimentalOmitfp => "experimental_omitfp",
             Self::ForcePic => "force_pic",
             Self::ExperimentalCcImplementationDeps => "experimental_cc_implementation_deps",
+            Self::StartEndLib => "start_end_lib",
             Self::AppleGenerateDsym => "apple_generate_dsym",
             Self::ExperimentalUseLlvmCovmap => "experimental_use_llvm_covmap",
             Self::IncompatibleDontEnableHostNonhostCrosstoolFeatures => {
@@ -199,6 +202,7 @@ impl NativeCommandOption {
                 | Self::IncompatibleStrictActionEnv
                 | Self::ForcePic
                 | Self::ExperimentalCcImplementationDeps
+                | Self::StartEndLib
                 | Self::AppleGenerateDsym
                 | Self::ExperimentalUseLlvmCovmap
                 | Self::IncompatibleDontEnableHostNonhostCrosstoolFeatures

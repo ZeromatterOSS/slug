@@ -34,15 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-159-m7a-preserved-library-soname-r1
+Packet: WP-7-160-m7a-cpp-start-end-lib-option-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP859 accepts True-mode dynamic_library_soname on genuine default link
-wrappers: exact Linux normalized basename and required positional binding,
-with existing Slug-native evaluator/lifetime guards. Eighteen focused checks
-pass; unchanged rebuilt authentic cquery clears soname and first stops at
-cpp.start_end_lib in81.071s. False naming, full link closure and non-Linux
-policy remain deferred. See `slug-v2-subplans/current-packet.md`.
+WP860 admits private cpp.start_end_lib zeroarg Boolean projection and
+command admission from the existing retained option, defaultTrue and exec
+carry. Twenty-nine focused checks and Core/CLI pass; unchanged rebuilt
+cquery82.489s clears the getter and first reaches cc_internal.intern_seq.
+Original structural owners/private caller checks remain authoritative. Full
+link closure and Windows execution remain deferred. See
+`slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

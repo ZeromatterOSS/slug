@@ -702,25 +702,28 @@ mod tests {
 
     #[test]
     fn cpp_implementation_deps_command_capture_defers_boolean_conversion() {
-        let name = "experimental_cc_implementation_deps";
-        for (flag, raw, negated) in [
-            (format!("--{name}"), None, false),
-            (format!("--no{name}"), None, true),
-            (format!("--{name}=false"), Some("false"), false),
-            (format!("--{name}=invalid"), Some("invalid"), false),
-            (format!("--{name}=null"), Some("null"), false),
-            (format!("--{name}=NULL"), Some("NULL"), false),
+        for (name, option) in [
+            (
+                "experimental_cc_implementation_deps",
+                NativeCommandOption::ExperimentalCcImplementationDeps,
+            ),
+            ("start_end_lib", NativeCommandOption::StartEndLib),
         ] {
-            assert_eq!(
-                occurrence(&flag).unwrap(),
-                Some(CommandConfigurationOccurrence::native(
-                    NativeCommandOption::ExperimentalCcImplementationDeps,
-                    raw,
-                    negated,
-                ))
-            );
+            for (flag, raw, negated) in [
+                (format!("--{name}"), None, false),
+                (format!("--no{name}"), None, true),
+                (format!("--{name}=false"), Some("false"), false),
+                (format!("--{name}=invalid"), Some("invalid"), false),
+                (format!("--{name}=null"), Some("null"), false),
+                (format!("--{name}=NULL"), Some("NULL"), false),
+            ] {
+                assert_eq!(
+                    occurrence(&flag).unwrap(),
+                    Some(CommandConfigurationOccurrence::native(option, raw, negated))
+                );
+            }
+            assert!(occurrence(&format!("--no{name}=true")).is_err());
         }
-        assert!(occurrence(&format!("--no{name}=true")).is_err());
     }
 
     #[test]
@@ -746,45 +749,46 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-        for (args, expected) in [
-            (vec!["//:probe"], true),
-            (
-                vec!["//:probe", "--noexperimental_cc_implementation_deps"],
-                false,
-            ),
-            (
-                vec![
-                    "//:probe",
-                    "--noexperimental_cc_implementation_deps",
-                    "--experimental_cc_implementation_deps",
-                ],
-                true,
-            ),
-            (
-                vec![
-                    "//:probe",
-                    "--experimental_cc_implementation_deps=true",
-                    "--experimental_cc_implementation_deps=0",
-                ],
-                false,
-            ),
-        ] {
-            let request = CqueryRequest::parse(&args).unwrap();
-            let prepared = base
-                .with_command_configuration(
-                    base.starlark_options().clone(),
-                    &request.configuration_overlay,
-                )
-                .unwrap();
-            assert_eq!(
-                CppFragmentProjection::new(prepared)
-                    .unwrap()
-                    .experimental_cc_implementation_deps()
-                    .unwrap(),
-                expected
-            );
+        for name in ["experimental_cc_implementation_deps", "start_end_lib"] {
+            for (flags, expected) in [
+                (vec![], true),
+                (vec![format!("--no{name}")], false),
+                (vec![format!("--no{name}"), format!("--{name}")], true),
+                (vec![format!("--{name}=true"), format!("--{name}=0")], false),
+            ] {
+                let mut args = vec!["//:probe"];
+                args.extend(flags.iter().map(String::as_str));
+                let request = CqueryRequest::parse(&args).unwrap();
+                let prepared = base
+                    .with_command_configuration(
+                        base.starlark_options().clone(),
+                        &request.configuration_overlay,
+                    )
+                    .unwrap();
+                let projection = CppFragmentProjection::new(prepared).unwrap();
+                assert_eq!(
+                    projection.experimental_cc_implementation_deps().unwrap(),
+                    if name == "experimental_cc_implementation_deps" {
+                        expected
+                    } else {
+                        true
+                    }
+                );
+                assert_eq!(
+                    projection.start_end_lib().unwrap(),
+                    if name == "start_end_lib" {
+                        expected
+                    } else {
+                        true
+                    }
+                );
+            }
         }
-        for name in ["experimental_cc_implementation_deps", "force_pic"] {
+        for name in [
+            "experimental_cc_implementation_deps",
+            "start_end_lib",
+            "force_pic",
+        ] {
             for text in ["null", "NULL", "invalid", " true", "false "] {
                 let flag = format!("--{name}={text}");
                 assert!(occurrence(&flag).unwrap().is_some());

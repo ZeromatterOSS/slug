@@ -239,12 +239,20 @@ fn cpp_grte_top_method_checks_current_caller_even_when_transferred() {
     }
 }
 
-fn configured_implementation_deps(enabled: bool) -> SlugConfiguration {
+const PRIVATE_BOOLEAN_METHODS: [(NativeCommandOption, &str); 2] = [
+    (
+        NativeCommandOption::ExperimentalCcImplementationDeps,
+        "experimental_cc_implementation_deps",
+    ),
+    (NativeCommandOption::StartEndLib, "start_end_lib"),
+];
+
+fn configured_private_bool(option: NativeCommandOption, enabled: bool) -> SlugConfiguration {
     let base = configured(None, false);
     base.with_command_configuration(
         base.starlark_options().clone(),
         &CommandConfigurationOverlay::from(vec![CommandConfigurationOccurrence::native(
-            NativeCommandOption::ExperimentalCcImplementationDeps,
+            option,
             Some(if enabled { "true" } else { "false" }),
             false,
         )]),
@@ -252,39 +260,47 @@ fn configured_implementation_deps(enabled: bool) -> SlugConfiguration {
     .unwrap()
 }
 
+fn configured_implementation_deps(enabled: bool) -> SlugConfiguration {
+    configured_private_bool(
+        NativeCommandOption::ExperimentalCcImplementationDeps,
+        enabled,
+    )
+}
+
 #[test]
 fn cpp_implementation_deps_method_is_a_private_zero_argument_boolean() {
-    // Bazel 9.2 CppConfiguration.java:866-883 and CppOptions.java:970-979.
-    assert_eq!(
-        evaluate(
-            configured(None, false),
-            true,
-            "def call():\n    return cpp.experimental_cc_implementation_deps()\nresult = call()"
-        )
-        .unwrap(),
-        "True"
-    );
+    // Bazel 9.2 CppConfiguration.java:468-472,866-883 and
+    // CppOptions.java:150-163,970-979 own these independent Boolean methods.
     let platform = CanonicalLabel::parse("@@//platforms:exec").unwrap();
-    for enabled in [false, true] {
-        let target = configured_implementation_deps(enabled);
-        let expected = if enabled { "True" } else { "False" };
-        for configuration in [
-            target.clone(),
-            target.to_exec().unwrap(),
-            target.to_exec_for_platform(&platform).unwrap(),
-        ] {
-            assert_eq!(
-                evaluate(configuration.clone(), true,
-                    "def call():\n    value = cpp.experimental_cc_implementation_deps()\n    return [hasattr(cpp, 'experimental_cc_implementation_deps'), type(value), value]\nresult = call()").unwrap(),
-                format!("[True, \"bool\", {expected}]")
-            );
-            for call in [
-                "cpp.experimental_cc_implementation_deps(True)",
-                "cpp.experimental_cc_implementation_deps(unexpected = True)",
+    for (option, name) in PRIVATE_BOOLEAN_METHODS {
+        let source = format!("def call():\n    return cpp.{name}()\nresult = call()");
+        assert_eq!(
+            evaluate(configured(None, false), true, &source).unwrap(),
+            "True"
+        );
+        for enabled in [false, true] {
+            let target = configured_private_bool(option, enabled);
+            let expected = if enabled { "True" } else { "False" };
+            for configuration in [
+                target.clone(),
+                target.to_exec().unwrap(),
+                target.to_exec_for_platform(&platform).unwrap(),
             ] {
-                assert!(
-                    evaluate(configuration.clone(), true, &format!("result = {call}")).is_err()
+                let source = format!(
+                    "def call():\n    value = cpp.{name}()\n    return [hasattr(cpp, '{name}'), type(value), value]\nresult = call()"
                 );
+                assert_eq!(
+                    evaluate(configuration.clone(), true, &source).unwrap(),
+                    format!("[True, \"bool\", {expected}]")
+                );
+                for call in [
+                    format!("cpp.{name}(True)"),
+                    format!("cpp.{name}(unexpected = True)"),
+                ] {
+                    assert!(
+                        evaluate(configuration.clone(), true, &format!("result = {call}")).is_err()
+                    );
+                }
             }
         }
     }
@@ -292,48 +308,82 @@ fn cpp_implementation_deps_method_is_a_private_zero_argument_boolean() {
 
 #[test]
 fn cpp_implementation_deps_transferred_method_checks_current_caller() {
-    for enabled in [false, true] {
-        let target = configured_implementation_deps(enabled);
-        let expected = if enabled { "True" } else { "False" };
-        let direct =
-            "def call():\n    return cpp.experimental_cc_implementation_deps()\nresult = call()";
-        assert_eq!(evaluate(target.clone(), true, direct).unwrap(), expected);
-        let error = evaluate(target.clone(), false, direct)
+    for (option, name) in PRIVATE_BOOLEAN_METHODS {
+        for enabled in [false, true] {
+            let target = configured_private_bool(option, enabled);
+            let expected = if enabled { "True" } else { "False" };
+            let direct = format!("def call():\n    return cpp.{name}()\nresult = call()");
+            assert_eq!(evaluate(target.clone(), true, &direct).unwrap(), expected);
+            let error = evaluate(target.clone(), false, &direct)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("private API"), "{error}");
+            let trusted =
+                evaluate_module(target, true, &format!("bound = cpp.{name}"), None).unwrap();
+            evaluate_module(
+                configured_private_bool(option, !enabled),
+                false,
+                "saved = bound",
+                Some(&trusted),
+            )
+            .unwrap();
+            let invocation = "def call():\n    return bound()\nresult = call()";
+            let allowed = evaluate_module(
+                configured_private_bool(option, !enabled),
+                true,
+                invocation,
+                Some(&trusted),
+            )
+            .unwrap();
+            assert_eq!(allowed.get("result").unwrap().value().to_repr(), expected);
+            let error = evaluate_module(
+                configured_private_bool(option, !enabled),
+                false,
+                invocation,
+                Some(&trusted),
+            )
             .unwrap_err()
             .to_string();
-        assert!(error.contains("private API"), "{error}");
-        let trusted = evaluate_module(
-            target,
-            true,
-            "bound = cpp.experimental_cc_implementation_deps",
-            None,
-        )
-        .unwrap();
-        evaluate_module(
-            configured_implementation_deps(!enabled),
-            false,
-            "saved = bound",
-            Some(&trusted),
-        )
-        .unwrap();
-        let invocation = "def call():\n    return bound()\nresult = call()";
-        let allowed = evaluate_module(
-            configured_implementation_deps(!enabled),
-            true,
-            invocation,
-            Some(&trusted),
-        )
-        .unwrap();
-        assert_eq!(allowed.get("result").unwrap().value().to_repr(), expected);
-        let error = evaluate_module(
-            configured_implementation_deps(!enabled),
-            false,
-            invocation,
-            Some(&trusted),
-        )
-        .unwrap_err()
-        .to_string();
-        assert!(error.contains("private API"), "{error}");
+            assert!(error.contains("private API"), "{error}");
+        }
+    }
+}
+
+#[test]
+fn cpp_private_boolean_methods_preserve_independent_target_and_exec_values() {
+    let platform = CanonicalLabel::parse("@@//platforms:exec").unwrap();
+    for (implementation_deps, start_end_lib) in [(false, true), (true, false)] {
+        let base = configured_implementation_deps(implementation_deps);
+        let target = base
+            .with_command_configuration(
+                base.starlark_options().clone(),
+                &CommandConfigurationOverlay::from(vec![CommandConfigurationOccurrence::native(
+                    NativeCommandOption::StartEndLib,
+                    Some(if start_end_lib { "true" } else { "false" }),
+                    false,
+                )]),
+            )
+            .unwrap();
+        let expected = format!(
+            "[{}, {}]",
+            if implementation_deps { "True" } else { "False" },
+            if start_end_lib { "True" } else { "False" },
+        );
+        for configuration in [
+            target.clone(),
+            target.to_exec().unwrap(),
+            target.to_exec_for_platform(&platform).unwrap(),
+        ] {
+            assert_eq!(
+                evaluate(
+                    configuration,
+                    true,
+                    "def call():\n    return [cpp.experimental_cc_implementation_deps(), cpp.start_end_lib()]\nresult = call()",
+                )
+                .unwrap(),
+                expected,
+            );
+        }
     }
 }
 

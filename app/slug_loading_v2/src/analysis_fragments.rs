@@ -170,6 +170,14 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
             .map_err(anyhow::Error::from)
     }
 
+    fn start_end_lib(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        this.check(eval)?;
+        Ok(this.retained.projection().start_end_lib()?)
+    }
+
     fn use_llvm_coverage_map_format(
         this: &CppFragmentValue,
         eval: &mut Evaluator<'_, '_, '_>,

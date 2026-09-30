@@ -1,114 +1,116 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-159-m7a-preserved-library-soname-r1
+Packet: WP-7-160-m7a-cpp-start-end-lib-option-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
 ## Outcome and compatibility
 
-Advance the unchanged authentic Rust-toolchain cquery past cc_internal.
-dynamic_library_soname at rules_cc cc/private/link/cpp_link_action.bzl:193.
-Admit dynamic_library_soname(actions, path, preserve_name), three required
-positional-only arguments, for genuine private WrappedLinkActions and
-preserve_name=True. Return the Linux lexically normalized path basename,
-including empty/root, repeated/trailing separators and dot/parent segments.
-Do not restrict suffixes: authentic PIC static archives also call this helper.
-False is explicit unsupported/deferred because its Bazel ST- mnemonic bytes
-remain unowned; never substitute Slug configuration/path identity for them.
-
-Exact binding/type and True-mode string algorithm: pinned Bazel9.2 8220c619
-CcStarlarkInternal.java:239-253, SolibSymlinkAction.java:306-318,
-PathFragment.java:125-143, UnixOsPathPolicy.java:65-101 and
-OsPathPolicy.java:94-126. PathFragmentTest.java:310-319 pins basename cases;
-normalization tests and source cover dot/parent reduction. No direct SONAME
-test found. CcLibraryConfiguredTargetTest.java:357 concerns deferred False
-linking. rules_cc cpp_link_action.bzl:193-196 uses True for PIC static
-archive (target_types.bzl PIC row). Backslash is an ordinary Linux character.
-Valid Unicode strings follow existing Slug-native string contract. Non-Linux
-invocation explicitly refuses unsupported platform path policy. Windows
-policy and execution remain deferred; user requests minimal Windows work.
+Advance unchanged authentic Rust-toolchain cquery past cpp.start_end_lib()
+at rules_cc cc/private/link/finalize_link_action.bzl:135. Admit the private
+zero-argument Boolean getter and --[no]start_end_lib using the already retained
+CppOptions.start_end_lib descriptor, True default and shared Boolean converter.
+Exact named slice: Bazel9.2 8220c619 CppConfiguration.java:463-473,
+CppOptions.java:150-165, builtin_exec_platforms.bzl:305 and Boolean converter
+Converters.java:38-68. CcModule.java:189-191/BuiltinRestriction.java:181-183
+pin the default private allowlist. No direct getter test found; downstream
+CcCommonTest.java:392/425 and LinkCommandLineTest.java:276/300/323 cover
+feature+enabled and disabled-option use. Full link execution tests remain
+unadmitted; the pinned getter/options and focused source regression suffice.
+Getter checks current invoking private caller, not
+getter-extraction provenance. Exec carries the target Boolean unchanged.
+The rule's actual use is a conjunction with supports_start_end_lib; this packet
+admits option observation, not linker feature/action execution. Linux priority;
+Windows-specific work deferred under user instruction. Existing valid Unicode,
+structural configuration/path/action identity remains Slug-native.
 
 ## Ownership and scope
 
-Existing private wrapper owns unchanged AnalysisActions handle. Require that
-private wrapper specifically (base actions are excluded by upstream Java type),
-then reuse actions_to_context current evaluator/live frame/root registration
-validation. Suspended live owners remain readable; expired/missing/foreign
-owners fail. These stronger existing evaluator guards are Slug-native;
-upstream helper has no own caller or mutable check. String result is phase
-scratch allocated on evaluator heap and may publish as an ordinary string;
-no wrapper handle publication, new configuration/action owner, DICE key,
-retained memory, registry, lock or action mutation. Existing DICE configured
-publication/dependencies remain unchanged; docs/developers/dice.md applies.
-True ignores mnemonic mathematically; upstream False reads context config,
-not alternate wrapper construction config. Full link actions remain unproved.
+SlugConfiguration retained typed option records remain sole semantic owner.
+Append NativeCommandOption::StartEndLib (existing repr ordinals preserved),
+name/canonical Boolean admission; existing command capture/preparation owns
+conversion/last-wins/negation and structural configuration input. No new
+option descriptor or alternate converter. CppFragmentProjection validates
+native_bool(CPP_OPTIONS, start_end_lib) during construction and projects it.
+Loading zeroarg method uses existing invocation-time CppFragmentValue.check;
+transferred method retains original config but checks current caller. Existing
+private allowlist/missing fragment/root/subrule token contracts apply.
 
-Use a bounded local Linux basename reduction in link_actions child module;
-do not introduce a shared path utility or file-system observation. A reverse
-segment scan can cancel pending parent components and return a borrowed final
-segment; unresolved relative parents yield '..', absolute parents stop at root.
-No retained collection/clone or performance claim. Existing cc_common.rs is
-large; add only narrow registration delegating to this cohesive child owner.
-Production estimate below55lines; tests below200 newlines.
+No DICE key, lock, cache, repair, toolchain lookup, action or environment read.
+Existing configured keys track structural configuration/source and publish
+primitive bool results; true/false change identity, restoration uses same DICE.
+Exec preserves retained option via existing mapping, not a new override.
+Projection is existing evaluator scratch backed by shared config; bool adds no
+retained memory. docs/developers/dice.md and accepted WP856 private Boolean
+owner contract apply. New metadata enum variant uses existing encoding; no
+Bazel checksum or mnemonic identity claim. Existing large common.rs and
+analysis_fragments.rs receive only bounded test/registration deltas; semantic
+getter stays in existing small cpp_fragment.rs. Production estimate below35
+lines, test growth below200; keep tests cohesive/use existing helpers.
 
-Allowlist: Loading src/cc_common.rs and
-src/subrule_invocation/link_actions.rs, its tests.rs; Analysis
-tests/subrule/link_actions.rs extending existing private-accessor/materialization
-fixture; this manifest/canonical Current plus compact Stage6 acceptance note.
-Baseline328755f4f. No full linker, false-mode naming, solib/action activation,
-generic spawn, donor code, public oracle fixture or Windows implementation.
-Independent DESIGN before code, FINAL before acceptance.
+Allowlist: Configuration src/command.rs, src/native/cpp_fragment.rs,
+src/native/configuration.rs only focused test-module registration plus new
+src/native/cpp_start_end_lib_tests.rs; Loading src/analysis_fragments.rs and
+src/analysis_fragments/toolchain_provider_tests.rs; Commands src/common.rs
+only tests; Analysis tests/subrule/implementation_deps.rs existing private
+Boolean fixture; this manifest/canonical Current and compact Stage6 note.
+Baseline d40eb4c87. No linker, archive/start-lib action activation, new public
+oracle fixture, Windows implementation or donor change. Independent DESIGN
+before implementation, FINAL before acceptance.
 
 ## Evidence and validation
 
-Loading tests: pinned basename and normalization vectors, external '../'
-short paths, static archive names, Linux backslash/Unicode, required positional
-binding and types, genuine wrapper-only refusal, deferred False, missing,
-foreign and expired owner validation. Suspended root/subrule read success and
-captured helper invocation after success/error must preserve owner checks.
-Recording sink remains unchanged (pure helper); protect existing wrapper and
-solib tests. Reuse accepted lifecycle guards rather than duplicate unrelated
-action testing. Real Analysis fixture uses wrapped root/subrule File short_path,
-publishes exact strings beside existing FileWrite outputs; source/config A/B/A
-on same DICE in Legacy/Observed routes protects reuse. Existing conflicts,
-scope and publication guards remain unchanged. No new public fixture growth.
+Reuse pinned registry/default and WP856 shared Boolean conversion evidence.
+Focused owner checks cover True default, false/true/last-wins structural
+identity/restoration, independent implementation-deps vs start_end_lib values,
+legacy/selected exec carry and idempotence, malformed retained values rejected
+at construction, config_setting observing same Boolean, invalid/null text.
+Command tests exercise actual public parse/capture/preparation/negation with
+no extra native descriptor. Loading tests cover bool callable/zeroarg binding,
+private direct/ transferred invocations checked at current caller, original
+bound configuration and target/exec values. Protect existing fragment/lifecycle
+checks. Analysis extends existing root/subrule fixture with independent
+primitive Boolean fields: crossed values discriminate wrong-option aliasing,
+source/config A/B/A in both same-DICE routes and exec restoration. Preserve
+prior implementation-deps assertions. No fixture growth or copied assets.
 
-Pinned nightly serial Cargo JSON --no-run for Loading/Analysis, each60s
-preparation cap; batch exact nonignored preflight then runtime expected under
-one second. Core direct-dependent check and CLI rebuild. Unchanged original
-three-hash cquery from target/wp856/authentic-workspace, supervised180s
-operation cap justified by fresh public source preparation observed81s in
-WP858; no smaller fixture proves the real finite closure frontier. Supervisor
-cleanup/process checks in actual environment before/after. Rustfmt/diff/archive/
-plan status checks. Root integrates/commits. These are operation bounds, not
-user deadlines. REPLAN only if True requires new semantic ownership or path
-normalization contradicts pinned Linux source; routine corrections stay here.
+Pinned nightly serial Cargo JSON --no-run Config/Commands/Loading/Analysis,
+separate60s preparation caps; batch exact nonignored preflight then focused
+runtime expected under a fewseconds. Core direct-dependent check and CLI
+rebuild before unchanged originalthreehash authentic cquery. Supervised180s
+operationcap justified by observed81s fresh publicsource preparation; no smaller
+fixture establishes actual finite closure frontier. Actual environment Slug
+process checks and supervisor cleanup before/after. Rustfmt/diff/archive/status.
+Root integrates/commits. Bounds are operation caps, not user limits. REPLAN
+if getter needs new config/action ownership or source contradicts mapping;
+routine invocation/compile/test corrections remain in scope.
 
 ## Immediate predecessor
 
-WP858328755f4f accepts default wrapper over original sink/token/scope. DESIGN/
-FINAL and17focused tests pass; rebuilt unchanged authentic cquery81.433s first
-reaches dynamic_library_soname on PIC static-library path. Three original
-fixture hashes unchanged; no remaining processes. Evidence target/wp858.
-M7A/M8/full toolchain and link closure remain unproved.
+WP859 d40eb4c87 admits True SONAME on genuine wrapper with exact Linux
+basename and Slug-native lifetime checks. DESIGN/FINAL,18focused checks and
+Core/CLI pass. Unchanged authentic cquery81.071s clears soname then first
+reaches start_end_lib, originalthreehashes unchanged, cleanup pass. Evidence
+target/wp859. False naming/non-Linux/full link closure/M7A/M8 remain deferred.
 
 ## Acceptance receipt (2026-09-30)
 
-Independent DESIGN/FINAL ACCEPT. Eighteen exact
-nonignored focused tests pass (Loading12, Analysis6), total runtime0.346s.
-Pinned serial preparation finalLoading4.71s, Integration8.85s, Corecheck3.22s,
-CLIbuild8.58s. Production51lines, tests111Loading plus net10Analysis; no new
-fixture or semantic owner. Tests prove Linux normalized basename including
-static/external/Unicode/backslash paths, strict positional/wrapper binding,
-False refusal, current/missing/foreign/expired ownership, suspended reads and
-captured helper expiry after success/error. Published root/subrule strings
-change/restore under source A/B/A and preserve results under config A/B/A in
-both existing DICE routes, with unchanged FileWrite ownership/conflict guards.
+Independent DESIGN/FINAL ACCEPT. Twenty-nine exact
+nonignored focused checks pass: Configuration11/Commands4/Loading8/Analysis6,
+total runtime0.463s. Final serial preparationConfig0.49s, Commands13.00s,
+Loading20.78s, Integration6.31s, Core8.68s, CLI23.45s. Initial test-only None
+inference and missing Linux exec-host fixture errors were corrected; final
+all-gate evidence applies. Production17lines plus4test registration lines;
+net tests200lines (Config97/Loading50/Commands+Analysis53), no new public
+fixture. Existing tests were parameterized without dropping prior rows;
+independent crossed Booleans, both exec paths, original transferred config and
+current caller gates, real command parse/preparation, malformed state and
+same-DICE source/config restoration are discriminating.
 
-The rebuilt unchanged authentic cquery exits2 in81.071s, clears soname and
-first reaches cpp.start_end_lib at finalize_link_action.bzl:135 via
-cpp_link_action.bzl:204. Original three hashes unchanged. Supervisor cleanup
-and actual-environment process checks pass; Rustfmt/diff/archive/status pass.
-Evidence target/wp859; measured evidence window07:58:57UTC to after08:09:57UTC
-includes design/review, preparation and replay. No performance speedup claim.
-False ST-mnemonic naming, non-Linux policy, full link/toolchain closure and
-M7A/M8 remain unproved.
+Unchanged rebuilt authentic cquery exits2 in82.489s, clears start_end_lib and
+first reaches cc_internal.intern_seq at finalize_link_action.bzl:161 on the
+PIC archive path. Original three hashes unchanged. Supervisor cleanup and
+actual-environment process checks pass; format/diff/archive/status pass.
+Evidence target/wp860; measured evidence window08:15:17UTC to after08:27:22UTC
+includes review/test-fixture corrections/preparation/replay. No performance
+speedup claim. Full link/toolchain closure, M7A/M8 and Windows execution
+remain unproved.

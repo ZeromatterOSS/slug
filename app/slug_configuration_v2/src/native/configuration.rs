@@ -2621,3 +2621,7 @@ mod cpp_grte_top_tests;
 #[cfg(test)]
 #[path = "cpp_implementation_deps_tests.rs"]
 mod cpp_implementation_deps_tests;
+
+#[cfg(test)]
+#[path = "cpp_start_end_lib_tests.rs"]
+mod cpp_start_end_lib_tests;
