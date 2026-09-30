@@ -2740,7 +2740,27 @@ fn platform_semantic_fact(
 fn package_declares_source_label(package: &LoadedPackage, label: &CanonicalLabel) -> bool {
     package.targets.iter().any(|target| match &target.kind {
         PackageTargetKind::StarlarkRule(rule) => rule.dependencies().contains(label),
-        PackageTargetKind::Filegroup { srcs, .. } => srcs.contains(label),
+        PackageTargetKind::Filegroup { srcs, .. } => {
+            if srcs.contains(label) {
+                return true;
+            }
+            if package.macro_origin(&target.name).is_some()
+                || package
+                    .macro_instances
+                    .iter()
+                    .any(|instance| instance.name.as_str() == label.target().as_str())
+            {
+                return false;
+            }
+            let mut labels = Vec::new();
+            if let Some((_, data)) = package
+                .native_attributes(&target.name)
+                .and_then(|attributes| attributes.get("data"))
+            {
+                data.value.labels(&mut labels);
+            }
+            labels.contains(label)
+        }
         PackageTargetKind::LabelFlag(flag) => flag.default() == label,
         _ => false,
     })

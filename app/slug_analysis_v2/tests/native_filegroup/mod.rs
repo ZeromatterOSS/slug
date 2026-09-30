@@ -28,7 +28,10 @@ impl Workspace {
         fs::write(root.join("dep/REPO.bazel"), "").unwrap();
         fs::write(root.join("dep/.bazelignore"), "").unwrap();
         for package in [&root, &root.join("dep")] {
-            fs::write(package.join("defs.bzl"), include_str!("defs.bzl")).unwrap();
+            fs::write(
+                package.join("defs.bzl"),
+                format!("{}\ndef _data_macro(name, visibility):\n    native.filegroup(name=name + '_group', data=['nested/macro-only.txt'], visibility=visibility)\ndata_macro = macro(implementation=_data_macro)\n", include_str!("defs.bzl")),
+            ).unwrap();
             fs::write(package.join("BUILD.bazel"), include_str!("BUILD.fixture")).unwrap();
             for file in [
                 "a.txt",
@@ -44,6 +47,16 @@ impl Workspace {
             }
             fs::create_dir_all(package.join("other")).unwrap();
             fs::write(package.join("other/BUILD.bazel"), "filegroup(name='private')\nalias(name='public_alias',actual=':private',visibility=['//visibility:public'])\n").unwrap();
+            fs::create_dir_all(package.join("nested")).unwrap();
+            for file in [
+                "nested/data-only.txt",
+                "nested/data-alt.txt",
+                "nested/macro-only.txt",
+                "nested/data-condition.txt",
+                "data_macro",
+            ] {
+                fs::write(package.join(file), "authored implicit data source\n").unwrap();
+            }
         }
         Self(root)
     }
@@ -76,17 +89,36 @@ impl Workspace {
         name: &str,
         config: ConfigurationKey,
     ) -> Result<Arc<ConfiguredNodeResult>, String> {
-        if !observed {
-            return self.request(dice, external, name, config).await;
-        }
         let repo = if external { "dep+" } else { "" };
+        let epoch = root_epoch_with_missing(
+            &self.0,
+            [&self.0, &self.0.join("dep")]
+                .into_iter()
+                .flat_map(|package| {
+                    ["nested/data-only.txt", "nested/data-missing.txt"]
+                        .map(|name| package.join(name))
+                })
+                .filter(|path| !path.exists()),
+        );
+        if !observed {
+            return root_target_request_with_inputs(
+                dice,
+                &self.0,
+                &format!("@@{repo}//:{name}"),
+                config,
+                Arc::new(RootActivationTracker::default()),
+                epoch,
+                &[("dep+", "dep")],
+            )
+            .await;
+        }
         observed_root_target_request_with_inputs(
             dice,
             &self.0,
             &format!("@@{repo}//:{name}"),
             config,
             Arc::new(RootActivationTracker::default()),
-            root_epoch(&self.0),
+            epoch,
             &[("dep+", "dep")],
         )
         .await

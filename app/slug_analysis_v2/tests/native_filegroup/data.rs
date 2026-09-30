@@ -2,6 +2,149 @@
 use super::*;
 
 #[tokio::test]
+async fn native_implicit_nested_data_sources_preserve_selection_macro_guards_and_restoration() {
+    let workspace = Workspace::new();
+    for observed in [false, true] {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        for external in [false, true] {
+            let package = if external {
+                workspace.0.join("dep")
+            } else {
+                workspace.0.clone()
+            };
+            let build = package.join("BUILD.bazel");
+            let original = fs::read_to_string(&build).unwrap();
+            let base = configuration(&[
+                (
+                    NativeCommandOption::IncompatibleAlwaysIncludeFilesInData,
+                    "false",
+                ),
+                (NativeCommandOption::HostCompilationMode, "fastbuild"),
+            ]);
+            for (execution, config) in [(false, base.clone()), (true, exec(&base))] {
+                let request = |name: &'static str| {
+                    workspace.request_data(&dice, observed, external, name, config.clone())
+                };
+                let first = request("data_implicit").await.unwrap();
+                assert!(first.actions().is_empty());
+                let default = info(&first);
+                assert_eq!(paths(default.files()), source_paths(external, &["a.txt"]));
+                assert_eq!(
+                    default.executable.as_ref(),
+                    default.file_artifacts().first()
+                );
+                assert_eq!(default.files_to_run.executable, default.executable);
+                assert_eq!(
+                    paths(&default.default_runfiles.files),
+                    source_paths(external, &["nested/data-only.txt"])
+                );
+                assert_eq!(
+                    paths(&default.data_runfiles.files),
+                    source_paths(external, &["a.txt", "nested/data-only.txt"])
+                );
+                let data = first.edges().iter().filter(|edge| matches!(edge.kind(), ConfiguredEdgeKind::Attribute { attribute, index: 0, .. } if attribute == "data")).collect::<Vec<_>>();
+                assert_eq!(data.len(), 1);
+                let repo = if external { "dep+" } else { "" };
+                assert_eq!(
+                    data[0].target(),
+                    &ConfiguredNodeKey::Null(
+                        CanonicalLabel::parse(&format!("@@{repo}//:nested/data-only.txt")).unwrap()
+                    )
+                );
+                assert!(
+                    !first.edges().iter().any(|edge| edge
+                        .target()
+                        .label()
+                        .to_string()
+                        .contains("data-missing"))
+                );
+                for name in ["nested/data-alt.txt", "nested/data-condition.txt"] {
+                    let error = request(name).await.unwrap_err();
+                    let expected = if external && observed {
+                        "external repository configured target shape is not supported"
+                    } else {
+                        "not found"
+                    };
+                    assert!(error.contains(expected), "{name}: {error}");
+                }
+                for name in ["data_macro_group", "data_macro_collision"] {
+                    let error = request(name).await.unwrap_err();
+                    assert!(error.contains("not found"), "{name}: {error}");
+                }
+                let opt = configuration(&[
+                    (
+                        NativeCommandOption::IncompatibleAlwaysIncludeFilesInData,
+                        "false",
+                    ),
+                    (NativeCommandOption::CompilationMode, "opt"),
+                    (NativeCommandOption::HostCompilationMode, "opt"),
+                ]);
+                let error = workspace
+                    .request_data(
+                        &dice,
+                        observed,
+                        external,
+                        "data_implicit",
+                        if execution { exec(&opt) } else { opt },
+                    )
+                    .await
+                    .unwrap_err();
+                assert!(
+                    error.contains("data-missing.txt") && error.contains("not found"),
+                    "{error}"
+                );
+                assert_eq!(request("data_implicit").await.unwrap(), first);
+
+                fs::write(
+                    &build,
+                    original.replace("['nested/data-only.txt']", "['nested/data-alt.txt']"),
+                )
+                .unwrap();
+                let changed = request("data_implicit").await.unwrap();
+                assert_ne!(changed, first);
+                assert_eq!(
+                    paths(&info(&changed).default_runfiles.files),
+                    source_paths(external, &["nested/data-alt.txt"])
+                );
+                fs::write(&build, &original).unwrap();
+                assert_eq!(request("data_implicit").await.unwrap(), first);
+                assert!(request("nested/data-alt.txt").await.unwrap_err().contains(
+                    if external && observed {
+                        "external repository configured target shape is not supported"
+                    } else {
+                        "not found"
+                    }
+                ));
+
+                let source = package.join("nested/data-only.txt");
+                let bytes = fs::read(&source).unwrap();
+                fs::remove_file(&source).unwrap();
+                let error = request("data_implicit").await.unwrap_err();
+                assert!(
+                    error.contains("data-only.txt") && error.contains("not found"),
+                    "{error}"
+                );
+                fs::write(&source, &bytes).unwrap();
+                assert_eq!(request("data_implicit").await.unwrap(), first);
+                fs::remove_file(&source).unwrap();
+                fs::create_dir(&source).unwrap();
+                fs::write(source.join("child"), "authored directory observation\n").unwrap();
+                let error = request("data_implicit").await.unwrap_err();
+                assert!(
+                    error.contains("data-only.txt")
+                        && error.contains("unsupported filesystem kind Directory"),
+                    "{error}"
+                );
+                fs::remove_file(source.join("child")).unwrap();
+                fs::remove_dir(&source).unwrap();
+                fs::write(&source, &bytes).unwrap();
+                assert_eq!(request("data_implicit").await.unwrap(), first);
+            }
+        }
+    }
+}
+
+#[tokio::test]
 async fn native_data_policies_preserve_files_order_alias_kinds_and_auxiliary_runfiles() {
     let workspace = Workspace::new();
     for observed in [false, true] {

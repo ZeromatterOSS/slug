@@ -39,6 +39,12 @@ files. The appended typed command option defaults True and carries through exec.
 Both partitions propagate package closure and validations regardless of runfiles
 flags. Bazel 9.2 Filegroup:61-105, Runfiles:669-773 and AliasConfiguredTarget:166-168
 pin this split; no second retained representation or action owner is added.
+Native filegroup data-only same-package source eligibility reuses retained data
+label values and the existing tracked source resolver. Selector condition keys are
+excluded by the value walker; only selected joins observe physical sources.
+Symbolic-macro-only references and names of existing macro instances are excluded
+from new data candidates while legacy srcs eligibility remains unchanged. Nested
+unexported data Files keep Null identity and unconditional File runfiles inclusion.
 External generated-label reconstruction remains separately deferred.
 
 WP846 admits one Bazel 9.2 package-default legacy license case in configured

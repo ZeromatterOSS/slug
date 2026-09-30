@@ -34,15 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-170-m7a-native-filegroup-data-r1
-Status: accepted; M7A remains partial
+Packet: WP-7-171-m7a-filegroup-data-implicit-source-r1
+Status: accepted; independent DESIGN/FINAL accepted; M7A remains partial
 
-WP870 admits native filegroup data prerequisites/runfiles and their retained
-always-include-files policy, including the required typed Loading selector path.
-Independent DESIGN/FINAL, 29 focused tests and Core/CLI pass. The unchanged query
-in 77.271s clears data refusal and reaches a missing Rust host-tools ld.lld target;
-three original hashes and actual cleanup pass. Full toolchain/query/bootstrap and
-Windows execution remain deferred. The next packet will bound that missing target.
+WP871 accepts implicit source eligibility for retained native filegroup data,
+excluding symbolic-macro-only declarations and existing symbolic macro names
+through retained metadata while preserving the old srcs predicate. Independent
+DESIGN/FINAL, 15 focused tests in 1.165s and Core/CLI pass. Unchanged authentic
+query in 83.533s clears host-tools source admission and reaches
+`actions.declare_file(..., sibling=...)`; original three hashes and actual process
+cleanup pass. Next bounded slice is genuine File sibling declaration through the
+existing action sink. Full bootstrap and Windows remain deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
