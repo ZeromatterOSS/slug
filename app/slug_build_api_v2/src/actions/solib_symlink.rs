@@ -54,7 +54,7 @@ impl SolibSymlinkSpec {
                 "input does not match the native shared-library filetypes",
             ));
         }
-        let filename = shorten(&format!("lib{}", escape(output.root_relative_path())));
+        let filename = shorten(&Self::slug_native_soname(output.root_relative_path()));
         let output = ActionOutput::new(
             output_root,
             format!("{solib_directory}/{filename}"),
@@ -65,6 +65,12 @@ impl SolibSymlinkSpec {
 
     pub fn input(&self) -> &AnalysisArtifact {
         &self.input
+    }
+
+    /// Unshortened naming over the caller's normalized path. This shares Slug's
+    /// existing Solib policy without Bazel configuration ST mnemonic bytes.
+    pub fn slug_native_soname(normalized_path: &str) -> String {
+        format!("lib{}", escape(normalized_path))
     }
 
     pub fn output(&self) -> &ActionOutput {
@@ -214,10 +220,19 @@ mod tests {
         .unwrap();
         assert_ne!(spec.output(), different_repo.output());
         assert_eq!(escape("_/:@\\"), "_U_S_C_A_B");
+        assert_eq!(
+            SolibSymlinkSpec::slug_native_soname("_/:@\\"),
+            "lib_U_S_C_A_B"
+        );
     }
 
     #[test]
     fn long_names_count_utf16_and_hash_utf8_preserving_final_extension() {
+        let path = format!("{}.so", "a".repeat(256));
+        assert_eq!(
+            SolibSymlinkSpec::slug_native_soname(&path),
+            format!("lib{path}")
+        );
         let exactly = format!("lib{}", "a".repeat(252));
         assert_eq!(shorten(&exactly), exactly);
         assert_eq!(

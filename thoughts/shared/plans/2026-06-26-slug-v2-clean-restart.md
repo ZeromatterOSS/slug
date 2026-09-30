@@ -34,15 +34,14 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-165-m7a-pinned-link-resource-registration-r1
+Packet: WP-7-166-m7a-native-mangled-soname-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP865 accepts finite pinned link resource registration on existing SpawnSpec,
-with explicit Core/REAPI execution refusal.57focused1.163s/Core/CLI and independent
-DESIGN/FINAL pass. Unchanged cquery76.818s clears resource registration and next
-refuses preserve_name=False SONAME atcpp_link_action193; hashes/cleanup pass.
-Generic callbacks, resource scheduling, Windows and full link closure remain
-deferred. See `slug-v2-subplans/current-packet.md`.
+WP866 admits False SONAME through existing native Solib naming; True remains
+exact, Bazel ST naming/Windows deferred.38focused0.442s/Core/CLI pass; unchanged
+query76.423s advances to cpp.incompatible_remove_legacy_whole_archive436.
+No new configuration or execution owner; full closure remains unproved.
+See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

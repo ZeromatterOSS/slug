@@ -21,7 +21,7 @@ fn epoch(marker: &str) -> PathObservationEpoch {
         "/workspace/rules_cc/rules/link_actions.bzl",
         &format!(
             r#"i = cc_common.internal_DO_NOT_USE()
-Proof = provider(fields = ["root", "sub", "root_soname", "sub_soname", "root_libraries", "sub_libraries", "marker"])
+Proof = provider(fields = ["root", "sub", "root_soname", "sub_soname", "root_native_soname", "sub_native_soname", "root_libraries", "sub_libraries", "marker"])
 NamedLibraryInfo = provider(fields = ["type", "name", "is_whole_archive"])
 def _libraries(name):
     first = NamedLibraryInfo(type = "object_file", name = name, is_whole_archive = False)
@@ -40,8 +40,9 @@ def _child(ctx, parent):
     if output != ctx.actions.declare_file("sub_{marker}.pic.a"):
         fail("wrapped subrule declaration lost File identity")
     soname = i.dynamic_library_soname(wrapped, output.short_path, True)
+    native_soname = i.dynamic_library_soname(wrapped, output.short_path, False)
     wrapped.write(output, "sub:{marker}")
-    return output, soname, _libraries(soname)
+    return output, soname, _libraries(soname), native_soname
 child = subrule(implementation = _child)
 def _root(ctx):
     wrapped = _wrap(ctx.actions)
@@ -51,11 +52,12 @@ def _root(ctx):
     if output != wrapped.declare_file("root_{marker}.a"):
         fail("wrapped root declaration lost File identity")
     root_soname = i.dynamic_library_soname(wrapped, output.short_path, True)
+    root_native_soname = i.dynamic_library_soname(wrapped, output.short_path, False)
     wrapped.write(output, "root:{marker}")
-    sub, sub_soname, sub_libraries = child(ctx)
+    sub, sub_soname, sub_libraries, sub_native_soname = child(ctx)
     if sub != ctx.actions.declare_file("sub_{marker}.pic.a"):
         fail("root and subrule wrappers used different declaration owners")
-    return [DefaultInfo(files = depset([output, sub])), Proof(root = output, sub = sub, root_soname = root_soname, sub_soname = sub_soname, root_libraries = _libraries(root_soname), sub_libraries = sub_libraries, marker = "{marker}")]
+    return [DefaultInfo(files = depset([output, sub])), Proof(root = output, sub = sub, root_soname = root_soname, sub_soname = sub_soname, root_native_soname = root_native_soname, sub_native_soname = sub_native_soname, root_libraries = _libraries(root_soname), sub_libraries = sub_libraries, marker = "{marker}")]
 subject = rule(implementation = _root, subrules = [child])
 def _locked(ctx, outer):
     wrapped = _wrap(outer)
@@ -231,6 +233,10 @@ fn assert_writes(result: &slug_analysis_v2::ConfiguredNodeResult, marker: &str) 
         assert!(
             matches!(proof.field(&format!("{field}_soname")).unwrap().kind(), AnalysisValueKind::String(actual) if actual == basename)
         );
+        let native_soname = format!("libsubject_S{field}_U{marker}{suffix}");
+        assert!(
+            matches!(proof.field(&format!("{field}_native_soname")).unwrap().kind(), AnalysisValueKind::String(actual) if actual == native_soname)
+        );
         assert_libraries(
             proof.field(&format!("{field}_libraries")).unwrap(),
             &basename,
@@ -282,6 +288,27 @@ async fn wrapped_link_actions_share_filewrite_owners_and_restore_source_configur
         .await;
         assert_writes(&configured, "A");
         assert_ne!(configured, first);
+        assert_eq!(
+            request(&dice, &tracker, route, "A", configuration.clone()).await,
+            first
+        );
+
+        let target = configuration.slug_configuration().unwrap();
+        let platform = target.host_platform_label().unwrap();
+        for execution in [
+            target.to_exec().unwrap(),
+            target.to_exec_for_platform(&platform).unwrap(),
+        ] {
+            let result = request(
+                &dice,
+                &tracker,
+                route,
+                "A",
+                ConfigurationKey::from_slug(execution),
+            )
+            .await;
+            assert_writes(&result, "A");
+        }
         assert_eq!(
             request(&dice, &tracker, route, "A", configuration.clone()).await,
             first

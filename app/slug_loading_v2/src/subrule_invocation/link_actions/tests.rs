@@ -100,18 +100,51 @@ fn preserved_soname_normalizes_linux_paths_and_requires_wrapper_positional_bindi
         .unwrap();
         assert_eq!(module.get("result").unwrap().unpack_str(), Some(expected));
     }
-    for (expression, diagnostic) in [
+    for (path, expected) in [
+        ("", "lib"),
+        ("/", "lib_S"),
+        ("a//./b/../lib_x.so/", "liba_Slib_Ux.so"),
+        ("../../a/../lib.so", "lib.._S.._Slib.so"),
+        ("/a/../../lib.so", "lib_Slib.so"),
+        (r"a\@b:c_d.so", "liba_B_Ab_Cc_Ud.so"),
         (
-            "i.dynamic_library_soname(wrapped, 'a.so', False)",
-            "preserve_name=False is unsupported/deferred",
+            "../rules_cc+/a/./../libx.pic.a",
+            "lib.._Srules_Ucc+_Slibx.pic.a",
         ),
-        (
-            "i.dynamic_library_soname(actions, 'a.so', True)",
-            "requires wrapped link actions",
-        ),
+        ("α/β/../库.a", "libα_S库.a"),
+        ("a\0b", "liba\0b"),
+        ("archive.a", "libarchive.a"),
+        ("plain", "libplain"),
     ] {
-        let error = execute(&mut eval, expression).unwrap_err();
-        assert!(error.to_string().contains(diagnostic), "{error}");
+        module.set("path", module.heap().alloc_str(path).to_value());
+        execute(
+            &mut eval,
+            "result = i.dynamic_library_soname(wrapped, path, False)\n",
+        )
+        .unwrap();
+        assert_eq!(module.get("result").unwrap().unpack_str(), Some(expected));
+    }
+    let long = "a".repeat(256) + ".so";
+    module.set("path", module.heap().alloc_str(&long).to_value());
+    execute(
+        &mut eval,
+        "result = i.dynamic_library_soname(wrapped, path, False)\n",
+    )
+    .unwrap();
+    assert_eq!(
+        module.get("result").unwrap().unpack_str(),
+        Some(("lib".to_owned() + &long).as_str())
+    );
+    for flag in ["True", "False"] {
+        let error = execute(
+            &mut eval,
+            &format!("i.dynamic_library_soname(actions, 'a.so', {flag})"),
+        )
+        .unwrap_err();
+        assert!(
+            error.to_string().contains("requires wrapped link actions"),
+            "{error}"
+        );
     }
     for expression in [
         "i.dynamic_library_soname(wrapped, 'a.so')",
@@ -127,6 +160,10 @@ fn preserved_soname_normalizes_linux_paths_and_requires_wrapper_positional_bindi
         "i.dynamic_library_soname(struct(), 'a.so', True)",
     ] {
         assert!(execute(&mut eval, expression).is_err(), "{expression}");
+        assert!(
+            execute(&mut eval, &expression.replace("True", "False")).is_err(),
+            "{expression}"
+        );
     }
     assert!(sink.0.lock().unwrap().is_empty());
 }
@@ -242,19 +279,27 @@ fn default_link_wrapper_rejects_missing_foreign_and_expired_owners() {
     eval.extra = Some(&a);
     let wrapped = wrap(a_actions, None, false, &mut eval).unwrap();
     eval.extra = None;
-    assert!(soname(wrapped, "lib.a", true, &eval).is_err());
+    for preserve in [true, false] {
+        assert!(soname(wrapped, "lib.a", preserve, &eval).is_err());
+    }
     eval.extra = Some(&b);
-    let error = soname(wrapped, "lib.a", true, &eval).unwrap_err();
-    assert!(error.to_string().contains("another evaluation"), "{error}");
+    for preserve in [true, false] {
+        let error = soname(wrapped, "lib.a", preserve, &eval).unwrap_err();
+        assert!(error.to_string().contains("another evaluation"), "{error}");
+    }
     eval.extra = Some(&a);
     let registration = crate::evaluator_roots::analysis_context(&module).unwrap();
     crate::evaluator_roots::set_analysis_context(&module, Value::new_none());
-    let error = soname(wrapped, "lib.a", true, &eval).unwrap_err();
-    assert!(error.to_string().contains("registered"), "{error}");
+    for preserve in [true, false] {
+        let error = soname(wrapped, "lib.a", preserve, &eval).unwrap_err();
+        assert!(error.to_string().contains("registered"), "{error}");
+    }
     crate::evaluator_roots::set_analysis_context(&module, registration);
     drop(guard);
-    let error = soname(wrapped, "lib.a", true, &eval).unwrap_err();
-    assert!(error.to_string().contains("expired"), "{error}");
+    for preserve in [true, false] {
+        let error = soname(wrapped, "lib.a", preserve, &eval).unwrap_err();
+        assert!(error.to_string().contains("expired"), "{error}");
+    }
     for expired in [a_actions, wrapped] {
         let error = wrap(expired, None, false, &mut eval).unwrap_err();
         assert!(error.to_string().contains("expired"), "{error}");
@@ -304,6 +349,12 @@ fn suspended_link_wrappers_preserve_root_and_subrule_scope() {
                 .unpack_str(),
             Some("lib.pic.a")
         );
+        assert_eq!(
+            soname(wrapped, "../repo+/lib.pic.a", false, &eval)
+                .unwrap()
+                .unpack_str(),
+            Some("lib.._Srepo+_Slib.pic.a")
+        );
     }
     assert_eq!(
         AnalysisActions::from_starlark(sub_wrapped).unwrap().scope,
@@ -332,7 +383,9 @@ fn suspended_link_wrappers_preserve_root_and_subrule_scope() {
         "{error}"
     );
     drop(subrule_guard);
-    assert!(soname(sub_wrapped, "lib.pic.a", true, &eval).is_err());
+    for preserve in [true, false] {
+        assert!(soname(sub_wrapped, "lib.pic.a", preserve, &eval).is_err());
+    }
     let error = wrap(sub_wrapped, None, false, &mut eval).unwrap_err();
     assert!(error.to_string().contains("expired"), "{error}");
     assert!(
@@ -377,18 +430,20 @@ fn escaped_link_wrapper_methods_reject_after_success_and_error() {
             Ok(())
         })();
         assert_eq!(result.is_err(), fail);
-        let error = eval
-            .eval_function(
-                module.get("helper").unwrap(),
-                &[
-                    module.get("wrapped").unwrap(),
-                    module.heap().alloc_str("lib.pic.a").to_value(),
-                    Value::new_bool(true),
-                ],
-                &[],
-            )
-            .unwrap_err();
-        assert!(error.to_string().contains("expired"), "{error}");
+        for preserve in [true, false] {
+            let error = eval
+                .eval_function(
+                    module.get("helper").unwrap(),
+                    &[
+                        module.get("wrapped").unwrap(),
+                        module.heap().alloc_str("lib.pic.a").to_value(),
+                        Value::new_bool(preserve),
+                    ],
+                    &[],
+                )
+                .unwrap_err();
+            assert!(error.to_string().contains("expired"), "{error}");
+        }
         for name in ["ordinary", "shareable", "directory"] {
             let error = eval
                 .eval_function(

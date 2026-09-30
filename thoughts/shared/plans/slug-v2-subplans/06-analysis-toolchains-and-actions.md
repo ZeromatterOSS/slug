@@ -2105,19 +2105,23 @@ suspended-root workspace_name refusal. Core source/prerequisite input traversal
 and shared REAPI Spawn projection refuse this metadata before execution/CAS;
 generic callbacks, estimates, resource overrides and scheduling remain deferred.
 
-## Preserved library SONAME (WP859, 2026-09-30)
+## Library SONAME
 
 The private link facade owns dynamic_library_soname wrapper validation. Three
 required positional arguments and True-mode Linux normalized basename match
-pinned Bazel9.2 CcStarlarkInternal:239/SolibSymlinkAction:306/UnixOsPathPolicy:65.
+pinned Bazel9.2 CcStarlarkInternal:247-253/SolibSymlinkAction:306/UnixOsPathPolicy:65.
 A borrowed reverse segment reduction allocates only the resulting primitive
 string; existing current/live/registration checks remain Slug-native. Static
-archive names are admitted without suffix filtering. False ST-mnemonic naming
-and non-Linux path policy explicitly refuse. Eighteen focused checks prove
-binding, normalization, lifecycle and root/subrule primitive string publication
-under both-route same-DICE source/configuration restoration. No new semantic
-owner or action mutation. Unchanged authentic cquery clears soname and first
-reaches cpp.start_end_lib; full link closure remains unproved.
+archive names are admitted without suffix filtering. False uses existing Linux
+NormalizedBazelPath and shared unshortened Solib lib+escaped-full-path formatter;
+this is explicitly Slug-native without Bazel ST configuration mnemonic bytes.
+Each caller supplies its original path: external short_path and root-relative
+Solib input spellings remain distinct. Solib constructor bytes, shortening and
+full configured input identity remain unchanged. ST naming, exact configuration/
+output identity and non-Linux path policy remain deferred. Existing root/subrule
+proof retains True basenames, library sequences and FileWrite identities while
+adding False strings under both-route source/target/exec restoration. No new
+retained semantic owner or action mutation; full link closure remains unproved.
 
 ## Historical evidence
 

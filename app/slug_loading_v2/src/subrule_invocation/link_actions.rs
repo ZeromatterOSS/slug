@@ -58,14 +58,19 @@ pub(crate) fn soname<'v>(
     );
     actions_to_context(actions, eval)?;
     anyhow::ensure!(
-        preserve_name,
-        "dynamic_library_soname preserve_name=False is unsupported/deferred"
-    );
-    anyhow::ensure!(
         cfg!(target_os = "linux"),
         "dynamic_library_soname platform path policy is unsupported/deferred"
     );
-    Ok(eval.heap().alloc_str(linux_basename(path)).to_value())
+    if preserve_name {
+        Ok(eval.heap().alloc_str(linux_basename(path)).to_value())
+    } else {
+        let normalized = slug_configuration_v2::NormalizedBazelPath::new(
+            slug_configuration_v2::native::host::HostPathFlavor::Unix,
+            path,
+        )?;
+        let name = slug_build_api_v2::SolibSymlinkSpec::slug_native_soname(normalized.as_str());
+        Ok(eval.heap().alloc_str(&name).to_value())
+    }
 }
 
 // Bazel 9.2 SolibSymlinkAction.java:306 and UnixOsPathPolicy.java:65.
