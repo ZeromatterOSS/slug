@@ -86,7 +86,8 @@ async fn prepare(
             mode,
             workspace,
             target.configuration(),
-            selectors
+            selectors,
+            false,
         )
         .await
     );

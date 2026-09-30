@@ -29,17 +29,16 @@ never selects work. This compaction changes no accepted compatibility surface.
 
 ### Current packet
 
-Packet: WP-7-152-m7a-default-apple-single-arch-platform-r1
+Packet: WP-7-153-m7a-alias-direct-constraint-select-r1
 Status: accepted; M7A remains partial
 
-WP852 accepts the pinned default MACOS `apple_platform` projection from
-`ctx.fragments.apple.single_arch_platform`, with nondefault selectors
-still unsupported. Independent DESIGN/FINAL review and focused tests pass.
-An isolated rebuilt authentic `rules_cc` cc_toolchain_config cquery clears
-the field and subsequent Xcode minimum-OS call; the broader Rust-toolchain
-cquery exits at a separate `@@platforms//os:none` config-setting boundary.
-WP851 at `6cb0858ec` accepted the default Xcode provider and exposed this
-Apple stop. M7A remains partial. See `slug-v2-subplans/current-packet.md`.
+WP853 accepts direct constraint-value keys in configured native alias
+`select()`, with structural owner eligibility and existing target-platform
+matching. Independent DESIGN/FINAL review and 14 focused tests pass. The
+rebuilt unchanged Rust-toolchain cquery clears the `@@platforms//os:none`
+condition error and next stops at missing `@@bazel_tools//tools/def_parser`.
+Other owners, mixed matching specialization and full toolchain/C++ closure
+remain deferred; M7A remains partial. See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

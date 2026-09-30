@@ -1965,6 +1965,23 @@ rules_cc cc_toolchain_config cquery succeeds through the Apple/Xcode call;
 the broader Rust-toolchain cquery next stops at `@@platforms//os:none` being
 treated as a config_setting. That selector and full configured C++ remain open.
 
+## Native alias direct constraint selectors (WP853, 2026-09-29)
+
+Configured native alias `actual` selectors now accept direct constraint values,
+including alias keys, target/exec platforms and omitted-setting defaults.
+Eligibility participates in the sole condition key's structural identity;
+nested aliases obtain their own eligibility while an ineligible outer owner
+still rejects a terminal constraint. Existing observed constraint/platform
+owners retain source dependencies. Direct matching keys are peers; equal
+selected values pass and differing values are ambiguous. Mixed direct and
+config_setting multi-match fails closed, with existing config_setting
+specialization preserved. Fourteen focused tests and independent reviews pass,
+including owner cache separation, Need/cycles and same-DICE platform/source/
+default-source A/B/A. The unchanged rebuilt authentic Rust-toolchain cquery
+clears the `@@platforms//os:none` condition error and next stops at missing
+`@@bazel_tools//tools/def_parser`. Other owners and full toolchain/C++ closure
+remain deferred.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

@@ -76,6 +76,7 @@ use starlark_map::small_set::SmallSet;
 use crate::build_setting::matches_expected_text;
 use crate::configured_analysis_cycle_detector::ConfiguredAnalysisCycleGuard;
 use crate::configured_attribute::ConfiguredAttributeCondition;
+use crate::configured_attribute::ConfiguredAttributeConditionKind;
 use crate::configured_attribute::ResolvedRuleAttribute;
 use crate::configured_attribute::resolve_configured_attribute;
 use crate::configured_target::ConfiguredAttributeDependency;
@@ -213,11 +214,13 @@ pub struct ConfiguredNodeAnalysisKey {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 pub struct ConfiguredNodeAnalysisObservationKey(ConfiguredNodeAnalysisKey);
 
-/// The sole configured `config_setting` match owner.
+/// The sole configured selector-condition match owner. Owner eligibility for
+/// direct constraint values participates in DICE identity.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 pub struct ConfiguredConditionKey {
     workspace: NormalizedAbsolutePath,
     target: ConfiguredTargetKey,
+    allow_direct_constraint_value: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
@@ -270,7 +273,20 @@ impl ConfiguredConditionKey {
                 "configured-condition matching requires a structural Slug configuration",
             ));
         }
-        Ok(Self { workspace, target })
+        Ok(Self {
+            workspace,
+            target,
+            allow_direct_constraint_value: false,
+        })
+    }
+
+    fn for_alias(
+        workspace: NormalizedAbsolutePath,
+        target: ConfiguredTargetKey,
+    ) -> Result<Self, AnalysisError> {
+        let mut key = Self::new(workspace, target)?;
+        key.allow_direct_constraint_value = true;
+        Ok(key)
     }
 
     pub fn workspace(&self) -> &NormalizedAbsolutePath {
@@ -900,6 +916,7 @@ fn resolve_configured_condition_target<'a>(
     workspace: &'a NormalizedAbsolutePath,
     configuration: &'a ConfigurationKey,
     requested: &'a CanonicalLabel,
+    allow_direct_constraint_value: bool,
 ) -> Pin<
     Box<
         dyn Future<Output = AnalysisSemanticOutcome<(CanonicalLabel, ConfiguredPackageValue)>>
@@ -946,6 +963,18 @@ fn resolve_configured_condition_target<'a>(
                 PackageTargetKind::ConfigSetting { .. } => {
                     return analysis_semantic_complete(Ok((label, inventory)));
                 }
+                PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintValue {
+                    ..
+                }) if allow_direct_constraint_value => {
+                    return analysis_semantic_complete(Ok((label, inventory)));
+                }
+                PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintValue {
+                    ..
+                }) => {
+                    return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                        "target {requested} is not a valid select() condition for this owner"
+                    ))));
+                }
                 PackageTargetKind::Alias { actual } => {
                     let actual = match actual {
                         slug_loading_v2::package::AliasActual::Visible(actual) => actual,
@@ -968,6 +997,7 @@ fn resolve_configured_condition_target<'a>(
                             workspace,
                             configuration,
                             selector_labels,
+                            true,
                         )
                         .await
                     );
@@ -1006,6 +1036,7 @@ async fn compute_configured_condition(
             &key.workspace,
             key.target.configuration(),
             key.target.label(),
+            key.allow_direct_constraint_value,
         )
         .await
     );
@@ -1023,6 +1054,44 @@ async fn compute_configured_condition(
             package.build_file.clone(),
         )));
     };
+    if matches!(
+        &target.kind,
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintValue { .. })
+    ) {
+        let requested = ConfiguredTargetKey::new(selected, key.target.configuration().clone());
+        let constraint =
+            semantic_value!(compute_configured_constraint(ctx, &key.workspace, &requested).await);
+        let platform_key = ConfiguredTargetPlatformKey::new(
+            key.workspace.dupe(),
+            key.target.configuration().clone(),
+        )
+        .expect("configured condition has structural configuration");
+        let platform = match ctx.compute(&platform_key).await {
+            Ok(LoadingPreparationOutcome::Need(need)) => {
+                return LoadingPreparationOutcome::Need(need);
+            }
+            Ok(LoadingPreparationOutcome::Complete(Err(error))) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            Ok(LoadingPreparationOutcome::Complete(Ok(value))) => match value.as_ref() {
+                Ok(platform) => platform.dupe(),
+                Err(error) => return analysis_semantic_complete(Err(error.clone())),
+            },
+            Err(error) => {
+                return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                    "computing target platform for {}: {error}",
+                    key.target.label()
+                ))));
+            }
+        };
+        return analysis_semantic_complete(Ok(
+            if platform_has_actual_constraint(&platform, &constraint) {
+                ConfiguredConditionMatch::Match
+            } else {
+                ConfiguredConditionMatch::NoMatch
+            },
+        ));
+    }
     let PackageTargetKind::ConfigSetting { declaration } = &target.kind else {
         return analysis_semantic_complete(Err(AnalysisError::message(format!(
             "target {} is not a config_setting",
@@ -1273,6 +1342,7 @@ async fn prepare_configured_attribute_conditions(
     workspace: &NormalizedAbsolutePath,
     configuration: &ConfigurationKey,
     selector_labels: Vec<CanonicalLabel>,
+    allow_direct_constraint_value: bool,
 ) -> AnalysisSemanticOutcome<PreparedConfiguredConditions> {
     if selector_labels.is_empty() {
         return analysis_semantic_complete(Ok(PreparedConfiguredConditions {
@@ -1285,10 +1355,12 @@ async fn prepare_configured_attribute_conditions(
     let condition_workspace = workspace.dupe();
     let condition_outcomes = ctx
         .compute_join(selector_labels.iter().cloned(), |ctx, label| {
-            let key = ConfiguredConditionKey::new(
-                condition_workspace.dupe(),
-                ConfiguredTargetKey::new(label.clone(), condition_configuration.clone()),
-            )
+            let target = ConfiguredTargetKey::new(label.clone(), condition_configuration.clone());
+            let key = if allow_direct_constraint_value {
+                ConfiguredConditionKey::for_alias(condition_workspace.dupe(), target)
+            } else {
+                ConfiguredConditionKey::new(condition_workspace.dupe(), target)
+            }
             .expect("configured rule carries a structural configuration");
             Box::pin(async move { (label, ctx.compute(&key).await) })
         })
@@ -1350,6 +1422,7 @@ async fn prepare_configured_attribute_conditions(
         configuration,
         selector_labels,
         &truth,
+        allow_direct_constraint_value,
     )
     .await
 }
@@ -1361,6 +1434,7 @@ async fn load_configured_condition_declarations(
     configuration: &ConfigurationKey,
     labels: Vec<CanonicalLabel>,
     truth: &SmallMap<CanonicalLabel, bool>,
+    allow_direct_constraint_value: bool,
 ) -> AnalysisSemanticOutcome<PreparedConfiguredConditions> {
     let outcomes = ctx
         .compute_join(labels.iter().cloned(), |ctx, label| {
@@ -1371,6 +1445,7 @@ async fn load_configured_condition_declarations(
                     workspace,
                     configuration,
                     &label,
+                    allow_direct_constraint_value,
                 )
                 .await;
                 (label, outcome)
@@ -1434,21 +1509,41 @@ async fn load_configured_condition_declarations(
                 loaded.build_file.clone(),
             )));
         };
-        let PackageTargetKind::ConfigSetting { declaration } = &target.kind else {
-            return analysis_semantic_complete(Err(AnalysisError::message(format!(
-                "target {label} is not a config_setting"
-            ))));
+        let kind = match &target.kind {
+            PackageTargetKind::ConfigSetting { declaration } => {
+                let predicates = semantic_value!(
+                    label_flag::predicates(
+                        ctx,
+                        mode,
+                        workspace,
+                        configuration,
+                        loaded,
+                        declaration
+                    )
+                    .await
+                );
+                ConfiguredAttributeConditionKind::ConfigSetting {
+                    declaration: declaration.clone(),
+                    normalized_flags: predicates.normalized,
+                }
+            }
+            PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintValue {
+                ..
+            }) if allow_direct_constraint_value => {
+                ConfiguredAttributeConditionKind::ConstraintValue
+            }
+            _ => {
+                return analysis_semantic_complete(Err(AnalysisError::message(format!(
+                    "target {label} is not a config_setting"
+                ))));
+            }
         };
-        let predicates = semantic_value!(
-            label_flag::predicates(ctx, mode, workspace, configuration, loaded, declaration).await
-        );
         conditions.push(ConfiguredAttributeCondition {
             matches: *truth
                 .get(&label)
                 .expect("every completed condition stores truth"),
             label,
-            declaration: declaration.clone(),
-            normalized_flags: predicates.normalized,
+            kind,
         });
     }
 
@@ -1500,6 +1595,7 @@ async fn prepare_configured_rule_attributes(
         workspace,
         configured_target.configuration(),
         selector_labels,
+        false,
     )
     .await
     {
@@ -1521,24 +1617,26 @@ async fn prepare_configured_rule_attributes(
             !attribute.value.selector_key_labels().iter().any(|label| {
                 conditions.values.iter().any(|condition| {
                     &condition.label == label
-                        && omitted_transition_outputs.iter().any(|output| {
-                            if output.is_native_option() {
-                                output.canonical().target().as_str() == "platforms"
-                                    && condition
-                                        .declaration
-                                        .values()
-                                        .value()
-                                        .iter()
-                                        .any(|(name, _)| name == "platforms")
-                            } else {
-                                condition
-                                    .declaration
-                                    .flag_values()
-                                    .value()
-                                    .iter()
-                                    .any(|(setting, _)| setting == output.canonical())
-                            }
-                        })
+                        && condition
+                            .config_setting_declaration()
+                            .is_some_and(|declaration| {
+                                omitted_transition_outputs.iter().any(|output| {
+                                    if output.is_native_option() {
+                                        output.canonical().target().as_str() == "platforms"
+                                            && declaration
+                                                .values()
+                                                .value()
+                                                .iter()
+                                                .any(|(name, _)| name == "platforms")
+                                    } else {
+                                        declaration
+                                            .flag_values()
+                                            .value()
+                                            .iter()
+                                            .any(|(setting, _)| setting == output.canonical())
+                                    }
+                                })
+                            })
                 })
             })
         })
@@ -3490,6 +3588,7 @@ async fn prepare_toolchain_target_settings(
         workspace,
         configuration,
         selector_labels,
+        false,
     )
     .await
     {
@@ -3553,6 +3652,7 @@ async fn prepare_toolchain_target_settings(
                     .any(|condition| &condition.label == label)
             })
             .collect(),
+        false,
     )
     .await
     {
@@ -5695,6 +5795,7 @@ impl ConfiguredNodeAnalysisKey {
                     &self.workspace,
                     configured_target.configuration(),
                     selector_labels,
+                    false,
                 )
                 .await
                 {
@@ -5861,6 +5962,7 @@ impl ConfiguredNodeAnalysisKey {
                     &self.workspace,
                     configured_target.configuration(),
                     selector_labels,
+                    true,
                 )
                 .await
                 {

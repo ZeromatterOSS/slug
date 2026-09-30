@@ -27,9 +27,28 @@ use slug_loading_v2::package::ConfigSettingTarget;
 #[derive(Debug, Clone)]
 pub(crate) struct ConfiguredAttributeCondition {
     pub(crate) label: CanonicalLabel,
-    pub(crate) declaration: ConfigSettingTarget,
+    pub(crate) kind: ConfiguredAttributeConditionKind,
     pub(crate) matches: bool,
-    pub(crate) normalized_flags: Arc<[(CanonicalLabel, CompactString)]>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ConfiguredAttributeConditionKind {
+    ConfigSetting {
+        declaration: ConfigSettingTarget,
+        normalized_flags: Arc<[(CanonicalLabel, CompactString)]>,
+    },
+    ConstraintValue,
+}
+
+impl ConfiguredAttributeCondition {
+    pub(crate) fn config_setting_declaration(&self) -> Option<&ConfigSettingTarget> {
+        match &self.kind {
+            ConfiguredAttributeConditionKind::ConfigSetting { declaration, .. } => {
+                Some(declaration)
+            }
+            ConfiguredAttributeConditionKind::ConstraintValue => None,
+        }
+    }
 }
 
 /// One request-local value aligned with the loading declaration. It may be
@@ -50,6 +69,7 @@ pub(crate) enum ConfiguredAttributeError {
         first: CanonicalLabel,
         second: CanonicalLabel,
     },
+    UnsupportedMixedConditions,
     Concatenation(String),
 }
 
@@ -65,6 +85,9 @@ impl fmt::Display for ConfiguredAttributeError {
             Self::Ambiguous { first, second } => write!(
                 f,
                 "configurable attribute has ambiguous matching conditions {first} and {second}"
+            ),
+            Self::UnsupportedMixedConditions => f.write_str(
+                "mixed matching constraint_value and config_setting selector keys are unsupported",
             ),
             Self::Concatenation(error) => f.write_str(error),
         }
@@ -98,6 +121,23 @@ pub(crate) fn resolve_configured_attribute(
                     .and_then(|value| resolve_configured_attribute(value, conditions));
             }
 
+            // The existing config_setting specialization slice omits constraint
+            // settings. Do not choose a possibly wrong winner across provider
+            // kinds until the complete mixed refinement relation is owned.
+            if matching.iter().any(|(condition, _)| {
+                matches!(
+                    &condition.kind,
+                    ConfiguredAttributeConditionKind::ConstraintValue
+                )
+            }) && matching.iter().any(|(condition, _)| {
+                matches!(
+                    &condition.kind,
+                    ConfiguredAttributeConditionKind::ConfigSetting { .. }
+                )
+            }) {
+                return Err(ConfiguredAttributeError::UnsupportedMixedConditions);
+            }
+
             let maximal = matching
                 .iter()
                 .enumerate()
@@ -107,12 +147,24 @@ pub(crate) fn resolve_configured_attribute(
                         .enumerate()
                         .any(|(other_index, (other, _))| {
                             candidate_index != &other_index
-                                && config_setting_refines(
-                                    &other.declaration,
-                                    &candidate.declaration,
-                                    &other.normalized_flags,
-                                    &candidate.normalized_flags,
-                                )
+                                && match (&other.kind, &candidate.kind) {
+                                    (
+                                        ConfiguredAttributeConditionKind::ConfigSetting {
+                                            declaration: other,
+                                            normalized_flags: other_flags,
+                                        },
+                                        ConfiguredAttributeConditionKind::ConfigSetting {
+                                            declaration: candidate,
+                                            normalized_flags: candidate_flags,
+                                        },
+                                    ) => config_setting_refines(
+                                        other,
+                                        candidate,
+                                        other_flags,
+                                        candidate_flags,
+                                    ),
+                                    _ => false,
+                                }
                         })
                 })
                 .map(|(_, value)| *value)

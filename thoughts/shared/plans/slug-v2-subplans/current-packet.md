@@ -1,149 +1,151 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-152-m7a-default-apple-single-arch-platform-r1
+Packet: WP-7-153-m7a-alias-direct-constraint-select-r1
 Status: accepted; M7A remains partial
 
 ## Outcome and compatibility
 
 Advance the rebuilt authentic Rust-toolchain `cquery //:probe --output=label`
-past WP851's first stop at pinned
-`@@rules_cc++cc_configure_extension+local_config_cc//:cc_toolchain_config.bzl:38`:
-`ctx.fragments.apple.single_arch_platform.platform_type`. Admit the
-default Apple fragment selector's actual Bazel `apple_platform` MACOS value,
-including its four fields, type, repr, immutability, same-type equality and
-hashability. The platform type string must feed the already admitted typed
-`XcodeVersionInfo.minimum_os_for_platform_type` method as `"macos"`, giving
-typed default minimum OS `10.11`. This is one semantic slice in the full
-Rust-toolchain cquery, not configured C++ or M7A closure.
+past `@@platforms//os:none is not a config_setting`. Pinned rules_rust
+0.73.0 `ffi/cc/allocator_library/BUILD.bazel:3-22` uses `none`, `wasi`, and
+`windows` constraint values as direct keys in native `alias.actual`'s
+`select()`. Under the Linux target platform all three must miss and select
+the default; under a selected matching platform a direct branch must win.
+This packet admits direct constraint-value keys for configured native alias
+selection only. It does not admit the Rust-toolchain or configured C++ closure.
 
-For `apple_platform_type="macos"`, empty `apple_split_cpu` and absent/empty
-`macos_cpus` under the already admitted default Apple option path, the
-selector and MACOS value's type, four fields and repr are `exact` against
-Bazel 9.2. Rust-native allocation/identity, valid-Unicode diagnostics and
-Slug's structural configuration identity are `Slug-native`; do not claim
-Bazel enum pointer identity or numeric hash bytes. Nondefault platform
-types, nonempty split CPU or macOS CPU lists, all other single-arch Apple
-selection, unsupported Apple fields, Xcode variants, generated repository
-bytes and configured C++ closure remain `unsupported/deferred`. Invalid or
-unmodeled selector values fail closed on this attribute, never silently
-projecting MACOS.
+For that bounded alias owner, configured target-platform matching, explicit or
+default constraint values, selected branch and invalid-key rejection are
+`exact` to Bazel 9.2. Structural configuration/DICE identity, Rust valid-
+Unicode diagnostics and path tokens remain `Slug-native`. Direct constraint
+keys for other owner kinds, mixed direct-constraint/config_setting multi-match,
+nondefault Apple/Xcode, full toolchain
+and configured C++ closure are `unsupported/deferred` and fail closed rather
+than claiming general `select()` parity.
 
 ## Pinned source and semantic owner
 
-Bazel 9.2 `AppleConfiguration.java:109-156,212-258` selects the Apple platform
-from `apple_platform_type`, the nonempty split CPU or first platform CPU, and
-`ApplePlatform.forTarget`; its actual getter does not read CoreOptions.cpu.
-`AppleCommandLineOptions.java:188-208,274-280` declares the three defaults.
-On Linux x86_64 the default CPU is `x86_64`, and both supported default host
-architectures map to `ApplePlatform.MACOS` through
-`ApplePlatform.java:40-72,110-183`. `ApplePlatformApi.java:23-82` declares
-Starlark type `apple_platform` and the four fields. `ApplePlatform.java:87-108,
-194-203` supplies immutable/hashable enum behavior and lowercase repr.
-`XcodeConfigTest.java:615-670` exercises the default Apple platform-type to
-minimum-OS expression; `ObjcStarlarkTest.java:386-466` checks another
-platform's exposed type/repr. Pinned rules_cc 0.2.17
-`cc/private/toolchain/unix_cc_toolchain_config.bzl:37-40,1748` has this one
-Apple access, followed by the WP851 Xcode provider call. Its source digest is
-recorded in `target/wp757/source-attribution.json`; no new oracle fixture is
-needed for the already source-discriminated default case.
+Bazel 9.2 `ConfigConditions.java:59-88` accepts `ConstraintValueInfo` only
+when the owning rule has a target platform. `ConfigurableAttributesTest.java:
+1660-1790` proves direct matching, rejection without toolchain resolution,
+and alias-with-select eligibility. `ConstraintValueInfo.java:65-96` compares
+the requested value to the target platform's effective value, including a
+setting default through `ConstraintCollection.get`. `Alias.java:80-94`
+enables toolchain resolution when alias has selector keys.
+`ConfigMatchingProvider.java:199-229` gives direct constraint providers empty
+refinement criteria.
+The authentic selector comes from pinned rules_rust `allocator_library` via
+`rust_host_tools`'s `allocator_library=None`, the rule default label flag and
+that flag's alias default.
 
-`SlugConfiguration` already retains the complete native option vector and
-the configured rule key owns all option identity, target/exec transitions and
-invalidation. `AppleFragmentProjection` is a cheap evaluator-local view of
-that structural owner. Add a lazy typed selector gate there for the three
-option values; do not gate `AppleFragmentProjection::new`, which must retain
-WP849's unrelated admitted fields for nondefault selectors. Loading owns a
-zero-state evaluator-local `apple_platform` MACOS value with four literal
-fields: `name="macos"`, `platform_type="macos"`,
-`name_in_plist="MacOSX"`, `is_device=True`, repr `macos`. Its type,
-equality/hash and reflection must not be faked by the distinct
-`apple_common.platform.macos` Starlark struct. The existing root-rule
-fragment declaration/call-lifetime gate applies unchanged, including
-undeclared and expired access. Analysis already constructs the fragment from
-the configured structural value; no production Analysis hook or DICE owner
-changes. No new retained option store, DICE key, Host read, cache, interner,
-lock, closure, or global registry. Use existing Starlark simple-value hash
-and `Allocative` patterns; no Buck2/V1 import or graph representation change.
+The existing `ConfiguredConditionKey` is the sole DICE owner of condition
+truth and its observed package/constraint/platform dependencies. Encode alias
+direct-constraint eligibility structurally in that key, so a completed value
+cannot be reused for an ineligible owner. Keep the requested selector label
+as dependency identity while resolving aliases to the terminal config_setting
+or constraint value. Use the existing `ConfiguredTargetPlatformKey`,
+`compute_configured_constraint` and `platform_has_actual_constraint`; do not
+infer platform from host OS, execution platform, paths or displays. The
+prepared selector declaration is attempt-local scratch and must distinguish
+config_setting from direct constraint value for refinement. Direct values
+have empty provider refinement criteria. Preserve prior config_setting
+behavior; reject a mixed direct-constraint/config_setting multi-match before
+choosing a potentially wrong branch. Two matching direct keys remain peers:
+equal selected values may pass, differing values are ambiguous.
 
-## Evidence and validation
+Only native alias callers supply eligibility, and only when their `actual`
+has selector keys. A nested alias's `actual` selector obtains eligibility
+from that nested alias independently; it does not inherit the outer condition
+owner's gate. An ineligible outer owner still rejects a direct terminal
+constraint key reached through an alias. Other current callers are
+ineligible in this packet even if Bazel may allow some in a later
+owner-specific packet. This is a bounded
+fail-closed subset, not a statement that Bazel disallows them. Alias-chain
+Need/error/cycle behavior, target/exec configuration, package tracking and
+source A/B/A remain with the existing observed DICE graph. No lock across a
+DICE compute, new cache, interner, second platform store, Host read or donor
+import. The key is DICE-retained and `Allocative`; selector declarations and
+normalization are analysis-attempt scratch. Existing Buck2-derived `SmallMap`,
+`SmallSet`, Arc and structural equality patterns are retained, with no new
+hot-path collection. `docs/developers/dice.md` and retained Buck2 DICE key
+ownership remain the architecture reference.
 
-Add a configuration projection test for default target/exec selection and
-direct negative option-value checks for nondefault/malformed platform type,
-split CPU and macOS CPU list using the validator called by the lazy getter.
-Inspect that wiring and preserve the prior-field regression: the new gate
-must not run in `AppleFragmentProjection::new`. Internal Apple selectors are
-not in the command-option overlay, so do not invent a CLI A/B/A path. Reuse
-WP849's whole-configuration A/B/A as structural equality evidence and test
-that a changed unrelated option does not alias the projection. Add Loading
-tests under an active declared Apple fragment for exact type/fields/repr,
-equality and matching hashability across two independently allocated MACOS
-values, distinction from an ordinary struct, and
-unknown-field refusal; preserve undeclared/expired fragment negatives.
-Extend the existing configured target/exec Apple-fragment test in both
-Analysis routes to call the platform type and the WP851 Xcode minimum-OS
-method, asserting `10.11` where the same provider prerequisite is available;
-otherwise use a focused direct rule whose provider comes from a real
-configured dependency, not an authored stand-in. Test the public
-production-wrapper path, not only a manually allocated facade.
+## Evidence, validation and scope
 
-Resolve the pinned Rust toolchain first. Serialize Cargo; compile focused
-Configuration, Loading and Analysis test executables with JSON `--no-run`,
-batch exact-name preflight, then execute only selected tests and protected
-fragment/Xcode controls. Rebuild `slug_cli_v2` before the authentic replay;
-check/clean stale `slugd` before and after. One bounded one-shot cquery must
-clear `single_arch_platform.platform_type` and its immediately following
-Xcode minimum-OS call; record the first new labelled stop or success. The
-old Apple field/type/method errors must be absent, but a later stop cannot
-prove full toolchain analysis. Run rustfmt, `git diff --check`, plan-status
-and archive checks. Independent DESIGN review gates implementation; FINAL
-review gates acceptance. Update compact Stage 6/9 owner notes only after
-acceptance.
+Reuse the pinned Bazel source/tests above. Add a focused Slug synthetic alias
+test with sibling OS values, Linux select() default and a selected non-Linux
+branch. Add an omitted-platform-setting direct-key match through
+`default_constraint_value`, then an explicit different value overriding that
+setting default. Cover target and exec configurations, alias-to-constraint,
+invalid target kind, ineligible key, Need/cycle, and mandatory same-DICE
+target-platform and source A/B/A restoration in the existing
+configured-analysis fixtures. A separate public fixture is only
+needed if an existing focused fixture cannot show the owner gate; any new
+fixture must follow the Stage 1 provenance contract. Preserve existing
+config_setting and alias-selector tests. Rebuild `slug_cli_v2`, clean stale
+`slugd` before/after daemon-sensitive work, then run one bounded unchanged
+authentic `//:probe` cquery and record its first new labelled stop or success.
+Use Bazel RC discovery without reading or copying `~/.bazelrc`; optional
+BuildBuddy transport does not replace local NativeLink real-transport gates.
+Serialize Cargo, run focused tests, `git diff --check`,
+`scripts/v2_archive_status.sh` and `scripts/v2_plan_status.py`. Independent
+DESIGN review gates implementation; FINAL review gates acceptance.
 
-Allowlist: this manifest and canonical Current; Configuration
-`app/slug_configuration_v2/src/native/apple_fragment.rs`; Loading
-`app/slug_loading_v2/src/analysis_fragments.rs` and
-`app/slug_loading_v2/src/analysis_fragments/apple_fragment_tests.rs`;
-Analysis `app/slug_analysis_v2/tests/subrule.rs` or one focused existing
-configured-rule test file if its real-provider dependency requires it;
-compact Stage 6/9 notes after acceptance. No Bzlmod, Core, repository
-generator, Build API, remote-cache/action, runtime fixture or general Apple
-option parser edit. `REPLAN` if the default selector does not yield MACOS,
-the typed value requires new retained/Host identity, the authentic consumer
-demands nondefault selection before this gate can be observed, or a real
-configured dependency cannot be tested inside this ownership boundary.
-Compiler/test corrections inside the accepted contract are not REPLAN.
+Allowlist: this manifest and canonical Current; `app/slug_analysis_v2/src/
+dice.rs`, `app/slug_analysis_v2/src/configured_attribute.rs` and focused
+`app/slug_analysis_v2/tests/` files; compact Stage 6/9 owner notes after
+acceptance. `dice/filegroup.rs` is allowlisted only for adding an explicit
+ineligible call argument. No Loading, Configuration, Bzlmod, Core, Build API,
+remote-cache/action or repository-generator change. The large `dice.rs`
+remains the cohesive configured-analysis owner for this bounded change; no
+broader split or performance claim. `REPLAN` if an alias cannot obtain the
+target platform through existing structural owners, exact alias eligibility
+requires new Loading metadata, or preserving mixed-selector safety needs a
+new general refinement owner. Compiler/test selector corrections inside this
+contract are not `REPLAN`.
 
 ## Immediate predecessor
 
-WP851 at `6cb0858ec` accepted the exact default `XcodeVersionInfo` tuple,
-typed publication and five callable fields. Its rebuilt authentic cquery
-cleared the apple_support provider-call stop and first reached the separate
-rules_cc `single_arch_platform.platform_type` field. Nondefault Apple/Xcode
-state and M7A remain open.
+WP852 at `570d14118` accepted default MACOS `single_arch_platform`. Its
+isolated generated rules_cc cquery passed, while broader Rust-toolchain
+cquery first stopped at `@@platforms//os:none is not a config_setting`.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviews: ACCEPT. Pinned Bazel 9.2 source and
-tests establish the default selector and typed MACOS fields; the Slug
-Configuration owner tests pass 4/4, Loading Apple fragment tests pass 3/3,
-configured Analysis target/exec Legacy/Observed test passes 1/1, and the
-real Xcode producer/consumer source A/B/A test with fragment platform type
-feeding a typed `10.11` minimum passes 1/1. Protected generic function-field
-rejection passes 1/1. JSON `--no-run` compiles and batched exact-name
-preflights selected each focused test executable. The helper-level negative
-selector tests and source-inspected lazy getter gate do not claim a public
-nondefault configuration route.
+Independent DESIGN and FINAL reviews: ACCEPT. The existing condition key now
+includes alias direct-constraint eligibility in structural Eq/Hash/Allocative;
+requested selector labels remain dependency identity, and existing observed
+constraint/target-platform owners determine effective matching. Attempt-local
+condition kinds preserve config_setting specialization, direct peer equality
+and ambiguity, and fail closed on mixed matching provider kinds.
 
-`cargo build -p slug_cli_v2` passes. The rebuilt broad one-shot
-`cquery //:probe --output=label` exits 2 at a different label,
-`@@platforms//os:none is not a config_setting`; it is not a successful
-Rust-toolchain query and alone would not prove the Apple call executed.
-A temporary root `//:local_probe` alias to the authentic generated
-`@@rules_cc++cc_configure_extension+local_config_cc//:local` rule in the
-same scratch fixture isolates that rule. Its rebuilt one-shot cquery exits
-0 with the configured alias label; the unchanged rule necessarily evaluates
-`_target_os_version(ctx)` at rules_cc line 1748, which reads this Apple
-platform field and invokes the WP851 Xcode minimum-OS method. The temporary
-alias was removed and the scratch BUILD restored. No stale `slugd` was
-present before/after. Formatting, diff, plan-status and archive checks pass.
-The next `@@platforms//os:none` selector boundary and M7A remain open.
+Pinned Bazel 9.2 source/tests are the source regression. JSON `--no-run`
+compilation and batched exact-name preflight succeeded; 14 selected Analysis
+integration tests pass (0.21 seconds). They cover target/exec and omitted-setting
+defaults, explicit overrides, platform/source/default-source A/B/A, both owner
+cache orders, nested alias eligibility and terminal refusal, peer equal-value
+selection and ambiguity, mixed-match rejection, wrong kinds, Need recovery and
+literal/nested selector cycles. Protected config_setting, condition-alias,
+external-condition invalidation, specialization and alias-Need controls pass.
+The final test compile took 8.69 seconds; the final current-source offline
+`cargo build -p slug_cli_v2` passed in 0.11 seconds. Continuation validation and
+review occupied approximately 14 minutes from the first recorded compile;
+the inherited unfinished candidate's earlier implementation time is unmeasured.
+
+The unchanged authentic fixture `/tmp/slug-wp797-authentic-2YQmSt` retains its
+BUILD, MODULE and lockfile hashes. Rebuilt one-shot
+`cquery //:probe --output=label` exits 2 at the new labelled stop
+`@@bazel_tools//tools/def_parser`: missing BUILD file. The earlier
+`@@platforms//os:none is not a config_setting` error is absent. The replay took
+approximately 88 seconds based on output timestamps, inside its supervised
+180-second bound; this is an advancement receipt, not a successful toolchain
+query. Sandbox registry denial and 30/60-second preparation timeouts did not
+prove the gate. A 20-second diagnostic showed active CPU/network preparation;
+direct registry access was verified and the final unchanged network-enabled
+replay established the terminal. No credential contents were read or copied.
+No stale slugd was present before/after. Raw compile, preflight, runtime and
+replay receipts remain under `target/wp853/`.
+
+Rustfmt, `git diff --check`, archive and plan-status checks pass. Full
+Rust-toolchain/configured-C++ closure, the new bazel_tools package boundary,
+other direct-key owners and mixed matching specialization remain deferred.

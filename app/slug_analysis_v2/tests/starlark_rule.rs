@@ -14528,6 +14528,355 @@ async fn configurable_alias_selects_actual_and_restores_same_key() {
 }
 
 #[tokio::test]
+async fn native_alias_direct_constraint_selects_target_exec_defaults_and_restores() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name='root')\n").unwrap();
+    let build = workspace.join("BUILD.bazel");
+    let source = |fallback: &str| {
+        format!(
+            r#"constraint_setting(name='os', default_constraint_value=':none')
+constraint_value(name='none', constraint_setting=':os')
+constraint_value(name='linux', constraint_setting=':os')
+constraint_value(name='windows', constraint_setting=':os')
+constraint_value(name='wasi', constraint_setting=':os')
+platform(name='linux_platform', constraint_values=[':linux'])
+platform(name='windows_platform', constraint_values=[':windows'])
+platform(name='omitted_platform')
+filegroup(name='default_leaf', srcs=[])
+filegroup(name='changed_leaf', srcs=[])
+filegroup(name='none_leaf', srcs=[])
+filegroup(name='windows_leaf', srcs=[])
+filegroup(name='wasi_leaf', srcs=[])
+alias(name='windows_key', actual=':windows')
+alias(name='selected', actual=select({{
+    ':none': ':none_leaf',
+    ':wasi': ':wasi_leaf',
+    ':windows_key': ':windows_leaf',
+    '//conditions:default': ':{fallback}',
+}}))
+"#
+        )
+    };
+    fs::write(&build, source("default_leaf")).unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let selected_label = CanonicalLabel::parse("@@//:selected").unwrap();
+    let configuration = |platform: &str, exec: bool| {
+        let platform = CanonicalLabel::parse(&format!("@@//:{platform}")).unwrap();
+        let target = test_configuration()
+            .slug_configuration()
+            .unwrap()
+            .with_host_platform_label(&platform);
+        ConfigurationKey::from_slug(if exec {
+            target.to_exec_for_platform(&platform).unwrap()
+        } else {
+            target
+        })
+    };
+    let linux = ConfiguredTargetKey::new(
+        selected_label.clone(),
+        configuration("linux_platform", false),
+    );
+    let first = analyze_request(&dice, &workspace, &linux, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        first.edges()[0].target().label().to_string(),
+        "@@//:default_leaf"
+    );
+
+    let windows = ConfiguredTargetKey::new(
+        selected_label.clone(),
+        configuration("windows_platform", false),
+    );
+    let selected_windows = analyze_request(&dice, &workspace, &windows, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        selected_windows.edges()[0].target().label().to_string(),
+        "@@//:windows_leaf",
+        "alias-to-constraint selector key must match the terminal value"
+    );
+    assert_ne!(selected_windows, first);
+    assert_eq!(
+        analyze_request(&dice, &workspace, &linux, None, false)
+            .await
+            .unwrap(),
+        first,
+        "target-platform A/B/A must restore the original configured result"
+    );
+
+    let omitted = ConfiguredTargetKey::new(
+        selected_label.clone(),
+        configuration("omitted_platform", false),
+    );
+    let selected_default = analyze_request(&dice, &workspace, &omitted, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        selected_default.edges()[0].target().label().to_string(),
+        "@@//:none_leaf",
+        "an omitted platform setting must use its default constraint value"
+    );
+    for (platform, expected) in [
+        ("linux_platform", "@@//:default_leaf"),
+        ("windows_platform", "@@//:windows_leaf"),
+        ("omitted_platform", "@@//:none_leaf"),
+    ] {
+        let key = ConfiguredTargetKey::new(selected_label.clone(), configuration(platform, true));
+        let result = analyze_request(&dice, &workspace, &key, None, false)
+            .await
+            .unwrap();
+        assert_eq!(result.edges()[0].target().label().to_string(), expected);
+        assert_eq!(
+            result.edges()[0]
+                .target()
+                .configured_target()
+                .unwrap()
+                .configuration(),
+            key.configuration(),
+            "selected alias child must retain the exec configuration"
+        );
+    }
+
+    fs::write(&build, source("changed_leaf")).unwrap();
+    let changed = analyze_request(&dice, &workspace, &linux, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        changed.edges()[0].target().label().to_string(),
+        "@@//:changed_leaf"
+    );
+    assert_ne!(changed, first);
+    fs::write(&build, source("default_leaf")).unwrap();
+    assert_eq!(
+        analyze_request(&dice, &workspace, &linux, None, false)
+            .await
+            .unwrap(),
+        first,
+        "source A/B/A must restore the original configured result"
+    );
+
+    fs::write(
+        &build,
+        source("default_leaf").replace(
+            "default_constraint_value=':none'",
+            "default_constraint_value=':windows'",
+        ),
+    )
+    .unwrap();
+    let changed_default = analyze_request(&dice, &workspace, &omitted, None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        changed_default.edges()[0].target().label().to_string(),
+        "@@//:windows_leaf",
+        "editing the setting default must invalidate direct-key truth"
+    );
+    assert_ne!(changed_default, selected_default);
+    assert_eq!(
+        analyze_request(&dice, &workspace, &linux, None, false)
+            .await
+            .unwrap()
+            .edges()[0]
+            .target()
+            .label()
+            .to_string(),
+        "@@//:default_leaf",
+        "an explicit platform value must override the edited setting default"
+    );
+    fs::write(&build, source("default_leaf")).unwrap();
+    assert_eq!(
+        analyze_request(&dice, &workspace, &omitted, None, false)
+            .await
+            .unwrap(),
+        selected_default,
+        "setting-default source A/B/A must restore the original configured result"
+    );
+}
+
+#[tokio::test]
+async fn native_alias_direct_constraint_rejects_wrong_kind_and_ineligible_owner() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name='root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "Selected = provider(fields={'value':''})\ndef _probe(ctx): return [DefaultInfo(), Selected(value=ctx.attr.text)]\nprobe = rule(implementation=_probe, attrs={'text':attr.string()})\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(':defs.bzl', 'probe')
+constraint_setting(name='os')
+constraint_value(name='linux', constraint_setting=':os')
+constraint_setting(name='cpu')
+constraint_value(name='x86', constraint_setting=':cpu')
+platform(name='linux_platform', constraint_values=[':linux', ':x86'])
+config_setting(name='fast', values={'compilation_mode':'fastbuild'})
+config_setting(name='opt', values={'compilation_mode':'opt'})
+filegroup(name='plain', srcs=[])
+filegroup(name='first', srcs=[])
+filegroup(name='second', srcs=[])
+alias(name='linux_key', actual=':linux')
+alias(name='nested_setting_key', actual=select({':linux':':fast', '//conditions:default':':opt'}))
+alias(name='nested_constraint_key', actual=select({':linux':':linux', '//conditions:default':':x86'}))
+alias(name='nested_selected', actual=select({':nested_constraint_key':':first', '//conditions:default':':second'}))
+alias(name='equal', actual=select({':linux':':first', ':x86':':first'}))
+alias(name='ambiguous', actual=select({':linux':':first', ':x86':':second'}))
+alias(name='mixed', actual=select({':linux':':first', ':fast':':second'}))
+alias(name='mixed_nonmatch', actual=select({':linux':':first', ':opt':':second'}))
+alias(name='wrong_kind', actual=select({':plain':':first', '//conditions:default':':second'}))
+alias(name='cycle_a', actual=':cycle_b')
+alias(name='cycle_b', actual=':cycle_a')
+alias(name='cycle', actual=select({':cycle_a':':first', '//conditions:default':':second'}))
+alias(name='selector_cycle', actual=select({':selector_cycle':':linux', '//conditions:default':':linux'}))
+alias(name='nested_cycle', actual=select({':selector_cycle':':first', '//conditions:default':':second'}))
+probe(name='ineligible', text=select({':linux':'yes', '//conditions:default':'no'}))
+probe(name='ineligible_alias', text=select({':linux_key':'yes', '//conditions:default':'no'}))
+probe(name='nested_setting', text=select({':nested_setting_key':'yes', '//conditions:default':'no'}))
+probe(name='ineligible_nested', text=select({':nested_constraint_key':'yes', '//conditions:default':'no'}))
+"#,
+    )
+    .unwrap();
+    let configuration = ConfigurationKey::from_slug(
+        test_configuration()
+            .slug_configuration()
+            .unwrap()
+            .with_host_platform_label(&CanonicalLabel::parse("@@//:linux_platform").unwrap()),
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = |name: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{name}")).unwrap(),
+            configuration.clone(),
+        )
+    };
+    let ineligible_first = analyze_request(&dice, &workspace, &key("ineligible"), None, false)
+        .await
+        .unwrap_err();
+    assert!(
+        ineligible_first.contains("not a valid select() condition"),
+        "{ineligible_first}"
+    );
+    let equal = analyze_request(&dice, &workspace, &key("equal"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(equal.edges()[0].target().label().to_string(), "@@//:first");
+    let nested_setting = analyze_request(&dice, &workspace, &key("nested_setting"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        provider_value(
+            &nested_setting,
+            &ProviderId::new("//:defs.bzl", "Selected").unwrap(),
+        ),
+        "yes",
+        "a nested alias obtains direct-key eligibility before returning a config_setting"
+    );
+    let nested_selected = analyze_request(&dice, &workspace, &key("nested_selected"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        nested_selected.edges()[0].target().label().to_string(),
+        "@@//:first"
+    );
+    let mixed_nonmatch = analyze_request(&dice, &workspace, &key("mixed_nonmatch"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        mixed_nonmatch.edges()[0].target().label().to_string(),
+        "@@//:first"
+    );
+    for (name, expected) in [
+        ("ambiguous", "ambiguous matching conditions"),
+        (
+            "mixed",
+            "mixed matching constraint_value and config_setting",
+        ),
+        ("wrong_kind", "not a config_setting"),
+        ("cycle", "cycle"),
+        ("nested_cycle", "cycle"),
+        ("ineligible", "not a valid select() condition"),
+        ("ineligible_alias", "not a valid select() condition"),
+        ("ineligible_nested", "not a valid select() condition"),
+    ] {
+        let error = analyze_request(&dice, &workspace, &key(name), None, false)
+            .await
+            .unwrap_err();
+        assert!(error.contains(expected), "{name}: {error}");
+    }
+    assert_eq!(
+        analyze_request(&dice, &workspace, &key("equal"), None, false)
+            .await
+            .unwrap(),
+        equal,
+        "cached ineligible errors must not contaminate the eligible condition key"
+    );
+}
+
+#[tokio::test]
+async fn native_alias_direct_constraint_condition_need_recovers_without_partial_result() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name='root')\n").unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "constraint_value(name='linux', constraint_setting='//missing_setting:os')\nplatform(name='platform', constraint_values=[':linux'])\nfilegroup(name='leaf', srcs=[])\nalias(name='selected', actual=select({':linux':':leaf'}))\n",
+    )
+    .unwrap();
+    let configuration = ConfigurationKey::from_slug(
+        test_configuration()
+            .slug_configuration()
+            .unwrap()
+            .with_host_platform_label(&CanonicalLabel::parse("@@//:platform").unwrap()),
+    );
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:selected").unwrap(),
+        configuration,
+    );
+    let observation = ConfiguredNodeAnalysisObservationKey::new(
+        NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+        key.clone(),
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut updater = dice.updater_with_data(UserComputationData {
+        cycle_detector: Some(analysis_cycle_detector()),
+        ..Default::default()
+    });
+    inject_root_target_inputs(&mut updater, &workspace, root_epoch(&workspace), &[]);
+    let outcome = updater.commit().await.compute(&observation).await.unwrap();
+    let AnalysisPreparationOutcome::Need(needs) = outcome else {
+        panic!("missing constraint setting did not produce Need: {outcome:?}")
+    };
+    let paths = needs
+        .path_observations()
+        .unwrap()
+        .demands()
+        .iter()
+        .map(|demand| demand.path().as_path().to_path_buf())
+        .collect::<Vec<_>>();
+    assert!(
+        paths.contains(&workspace.join("missing_setting")),
+        "{paths:?}"
+    );
+
+    fs::create_dir(workspace.join("missing_setting")).unwrap();
+    fs::write(
+        workspace.join("missing_setting/BUILD.bazel"),
+        "constraint_setting(name='os')\n",
+    )
+    .unwrap();
+    let mut updater = dice.updater();
+    updater
+        .changed_to(path_observation_shards(&root_epoch(&workspace)))
+        .unwrap();
+    updater.commit().await;
+    let result = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    assert_eq!(result.edges()[0].target().label().to_string(), "@@//:leaf");
+}
+
+#[tokio::test]
 async fn configurable_alias_propagates_condition_and_child_needs_without_publication() {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();

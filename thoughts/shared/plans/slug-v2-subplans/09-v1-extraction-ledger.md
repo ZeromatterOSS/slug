@@ -3102,3 +3102,14 @@ Buck2/V1 import. Focused selector/type/hash/fragment-lifetime tests and an
 isolated authentic generated rules_cc query discriminate this default
 projection. No performance claim, nondefault Apple selection or configured
 C++ closure is inferred.
+
+WP853 adds one structural eligibility Boolean to the existing Allocative
+configured-condition DICE key, preserving requested-label identity and observed
+package/constraint/target-platform dependencies. Selector kind and normalized
+config_setting flags are attempt-local scratch using existing Arc/SmallMap/
+SmallSet patterns. Direct constraint matching reuses the existing effective
+platform/default comparison; no second platform store, new key family, cache,
+interner, Host read, lock or donor import is added. Fourteen focused tests and
+unchanged authentic progression to missing `bazel_tools//tools/def_parser`
+discriminate eligibility, defaults, peer semantics, Need/cycles and restoration.
+No performance claim or full Rust-toolchain/C++ closure is inferred.
