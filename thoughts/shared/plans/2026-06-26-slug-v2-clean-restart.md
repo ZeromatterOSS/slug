@@ -34,15 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-155-m7a-cpp-grte-top-projection-r1
-Status: accepted; M7A remains partial
+Packet: WP-7-156-m7a-cpp-implementation-deps-option-r1
+Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP855 accepts the pinned private nullable cpp.grte_top() method and both exec
-projections from retained host state through existing owners. Independent
-DESIGN/FINAL and 19 focused tests pass. The rebuilt unchanged authentic
-Rust-toolchain cquery clears grte_top and next stops at
-`cpp.experimental_cc_implementation_deps()` in rules_cc semantics.bzl:114.
-Linux remains the priority; full Rust-toolchain/C++ closure and Windows
+WP856 accepts the private experimental_cc_implementation_deps Boolean getter
+and typed command option through existing owners, with exact textual Boolean
+conversion and exec propagation. Twenty-six focused tests and independent
+reviews pass. The rebuilt byte-identical authentic Rust-toolchain cquery clears
+the getter and next stops at analysis_ctx.coverage_instrumented in rules_cc
+cc_helper.bzl:304. Full C++ dependency/action closure, coverage and Windows
 execution remain deferred. See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

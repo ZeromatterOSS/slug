@@ -179,7 +179,7 @@ fn ascii_lower(input: &str) -> String {
 fn boolean(input: &str) -> Result<bool, ConvertError> {
     match ascii_lower(input).as_str() {
         "true" | "1" | "yes" | "t" | "y" => Ok(true),
-        "false" | "0" | "no" | "f" | "n" | "null" => Ok(false),
+        "false" | "0" | "no" | "f" | "n" => Ok(false),
         _ => Err(ConvertError::Invalid),
     }
 }

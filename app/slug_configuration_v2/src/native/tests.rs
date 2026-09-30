@@ -2846,7 +2846,6 @@ mod retry7_private_kernel_contract {
             ("No", "false"),
             ("f", "false"),
             ("n", "false"),
-            ("null", "false"),
         ] {
             assert_eq!(
                 converted_field(boolean, input).unwrap(),
@@ -2857,6 +2856,14 @@ mod retry7_private_kernel_contract {
             convert_occurrence(boolean, "maybe"),
             Err(ConvertError::Invalid)
         );
+        // Converters.BooleanConverter distinguishes command text from actual
+        // null; the nullable default domain is checked separately below.
+        for input in ["null", "NULL"] {
+            assert_eq!(
+                convert_occurrence(boolean, input),
+                Err(ConvertError::Invalid)
+            );
+        }
 
         let integer = option(core, "analysis_testing_deps_limit");
         for (input, expected) in [("-16", -16), ("0x10", 16), ("#10", 16), ("020", 16)] {

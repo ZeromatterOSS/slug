@@ -701,6 +701,108 @@ mod tests {
     }
 
     #[test]
+    fn cpp_implementation_deps_command_capture_defers_boolean_conversion() {
+        let name = "experimental_cc_implementation_deps";
+        for (flag, raw, negated) in [
+            (format!("--{name}"), None, false),
+            (format!("--no{name}"), None, true),
+            (format!("--{name}=false"), Some("false"), false),
+            (format!("--{name}=invalid"), Some("invalid"), false),
+            (format!("--{name}=null"), Some("null"), false),
+            (format!("--{name}=NULL"), Some("NULL"), false),
+        ] {
+            assert_eq!(
+                occurrence(&flag).unwrap(),
+                Some(CommandConfigurationOccurrence::native(
+                    NativeCommandOption::ExperimentalCcImplementationDeps,
+                    raw,
+                    negated,
+                ))
+            );
+        }
+        assert!(occurrence(&format!("--no{name}=true")).is_err());
+    }
+
+    #[test]
+    fn cpp_implementation_deps_public_parse_prepares_values_and_rejects_null_text() {
+        use std::sync::Arc;
+
+        use slug_configuration_v2::CppFragmentProjection;
+        use slug_configuration_v2::SlugConfiguration;
+        use slug_configuration_v2::native::host::AutoCpuToken;
+        use slug_configuration_v2::native::host::HostConversionInputs;
+        use slug_configuration_v2::native::host::HostPathFlavor;
+
+        use crate::cquery::CqueryRequest;
+
+        let base = SlugConfiguration::default_target(
+            &HostConversionInputs::new(
+                Some(AutoCpuToken::K8),
+                Some(HostPathFlavor::Unix),
+                None,
+                Arc::from([]),
+                Arc::from([]),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        for (args, expected) in [
+            (vec!["//:probe"], true),
+            (
+                vec!["//:probe", "--noexperimental_cc_implementation_deps"],
+                false,
+            ),
+            (
+                vec![
+                    "//:probe",
+                    "--noexperimental_cc_implementation_deps",
+                    "--experimental_cc_implementation_deps",
+                ],
+                true,
+            ),
+            (
+                vec![
+                    "//:probe",
+                    "--experimental_cc_implementation_deps=true",
+                    "--experimental_cc_implementation_deps=0",
+                ],
+                false,
+            ),
+        ] {
+            let request = CqueryRequest::parse(&args).unwrap();
+            let prepared = base
+                .with_command_configuration(
+                    base.starlark_options().clone(),
+                    &request.configuration_overlay,
+                )
+                .unwrap();
+            assert_eq!(
+                CppFragmentProjection::new(prepared)
+                    .unwrap()
+                    .experimental_cc_implementation_deps()
+                    .unwrap(),
+                expected
+            );
+        }
+        for name in ["experimental_cc_implementation_deps", "force_pic"] {
+            for text in ["null", "NULL", "invalid", " true", "false "] {
+                let flag = format!("--{name}={text}");
+                assert!(occurrence(&flag).unwrap().is_some());
+                let request = CqueryRequest::parse(&["//:probe", flag.as_str()]).unwrap();
+                assert!(
+                    base.with_command_configuration(
+                        base.starlark_options().clone(),
+                        &request.configuration_overlay,
+                    )
+                    .is_err(),
+                    "Configuration must reject {flag}, after Commands captures it"
+                );
+            }
+            assert!(CqueryRequest::parse(&["//:probe", &format!("--no{name}=true")]).is_err());
+        }
+    }
+
+    #[test]
     fn cpp_compile_string_options_preserve_raw_command_occurrences() {
         for (name, option) in [
             ("conlyopt", NativeCommandOption::Conlyopt),

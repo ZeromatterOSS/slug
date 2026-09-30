@@ -159,6 +159,17 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         Ok(this.retained.projection().force_pic()?)
     }
 
+    fn experimental_cc_implementation_deps(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        this.check(eval)?;
+        this.retained
+            .projection()
+            .experimental_cc_implementation_deps()
+            .map_err(anyhow::Error::from)
+    }
+
     fn use_llvm_coverage_map_format(
         this: &CppFragmentValue,
         eval: &mut Evaluator<'_, '_, '_>,

@@ -9854,3 +9854,14 @@ resolving a libc target. Fragment occurrence identity remains unchanged.
 Six focused Loading checks pass with Configuration/Analysis dependents and
 independent DESIGN/FINAL acceptance. Full C++/sysroot behavior remains deferred;
 Windows execution is outside the current Linux bootstrap priority.
+
+### Private C++ implementation-deps Boolean method accepted (WP856, 2026-09-30)
+
+CppFragmentValue.experimental_cc_implementation_deps() returns the sole retained
+Configuration Boolean after the existing invocation-time private caller check,
+including transferred methods. Constructor validation rejects malformed state;
+occurrence identity and publication pairing remain unchanged. Seven focused
+Loading checks and direct Configuration/Commands/Analysis dependents pass,
+including the verbatim rules_cc guard, with independent DESIGN/FINAL ACCEPT.
+The authentic query advances to the separate analysis_ctx.coverage_instrumented
+boundary. Full C++ context/link behavior and coverage stay deferred.

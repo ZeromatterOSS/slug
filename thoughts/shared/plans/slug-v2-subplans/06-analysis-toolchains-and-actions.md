@@ -2011,6 +2011,22 @@ The rebuilt unchanged authentic Rust-toolchain cquery clears grte_top and next
 stops at cpp.experimental_cc_implementation_deps() in rules_cc semantics.bzl:114.
 M7A and full C++/toolchain closure remain partial; Windows execution is deferred.
 
+## Private C++ implementation-deps option getter (WP856, 2026-09-30)
+
+The retained CppOptions Boolean now backs the private zero-argument
+experimental_cc_implementation_deps getter and its appended typed command
+option. Default True and both existing exec projections preserve that value.
+The shared textual Boolean converter rejects literal null/NULL, while the
+separate actual-null default materializer remains False. Configuration and
+config_setting use the same converted state; there is no command-side repair
+or new semantic store. Twenty-six focused cross-crate tests and independent
+reviews cover type/refusal, current callers and transferred methods, the
+verbatim rules_cc guard, root/subrule configuration/source restoration and
+zero actions. The byte-identical authentic query clears this getter and next
+stops at ctx.coverage_instrumented in rules_cc cc_helper.bzl:304. Coverage,
+implementation_deps compilation/link propagation and toolchain closure remain
+unproved; Windows execution remains deferred.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

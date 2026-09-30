@@ -69,6 +69,7 @@ pub enum NativeCommandOption {
     StrictSystemIncludes,
     MinimumOsVersion,
     Stamp,
+    ExperimentalCcImplementationDeps,
 }
 
 impl NativeCommandOption {
@@ -84,6 +85,7 @@ impl NativeCommandOption {
             "host_linkopt" => Self::HostLinkopt,
             "experimental_omitfp" => Self::ExperimentalOmitfp,
             "force_pic" => Self::ForcePic,
+            "experimental_cc_implementation_deps" => Self::ExperimentalCcImplementationDeps,
             "apple_generate_dsym" => Self::AppleGenerateDsym,
             "experimental_use_llvm_covmap" => Self::ExperimentalUseLlvmCovmap,
             "incompatible_dont_enable_host_nonhost_crosstool_features" => {
@@ -140,6 +142,7 @@ impl NativeCommandOption {
             Self::HostLinkopt => "host_linkopt",
             Self::ExperimentalOmitfp => "experimental_omitfp",
             Self::ForcePic => "force_pic",
+            Self::ExperimentalCcImplementationDeps => "experimental_cc_implementation_deps",
             Self::AppleGenerateDsym => "apple_generate_dsym",
             Self::ExperimentalUseLlvmCovmap => "experimental_use_llvm_covmap",
             Self::IncompatibleDontEnableHostNonhostCrosstoolFeatures => {
@@ -195,6 +198,7 @@ impl NativeCommandOption {
                 | Self::ExperimentalOmitfp
                 | Self::IncompatibleStrictActionEnv
                 | Self::ForcePic
+                | Self::ExperimentalCcImplementationDeps
                 | Self::AppleGenerateDsym
                 | Self::ExperimentalUseLlvmCovmap
                 | Self::IncompatibleDontEnableHostNonhostCrosstoolFeatures

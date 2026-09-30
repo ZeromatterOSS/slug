@@ -239,6 +239,134 @@ fn cpp_grte_top_method_checks_current_caller_even_when_transferred() {
     }
 }
 
+fn configured_implementation_deps(enabled: bool) -> SlugConfiguration {
+    let base = configured(None, false);
+    base.with_command_configuration(
+        base.starlark_options().clone(),
+        &CommandConfigurationOverlay::from(vec![CommandConfigurationOccurrence::native(
+            NativeCommandOption::ExperimentalCcImplementationDeps,
+            Some(if enabled { "true" } else { "false" }),
+            false,
+        )]),
+    )
+    .unwrap()
+}
+
+#[test]
+fn cpp_implementation_deps_method_is_a_private_zero_argument_boolean() {
+    // Bazel 9.2 CppConfiguration.java:866-883 and CppOptions.java:970-979.
+    assert_eq!(
+        evaluate(
+            configured(None, false),
+            true,
+            "def call():\n    return cpp.experimental_cc_implementation_deps()\nresult = call()"
+        )
+        .unwrap(),
+        "True"
+    );
+    let platform = CanonicalLabel::parse("@@//platforms:exec").unwrap();
+    for enabled in [false, true] {
+        let target = configured_implementation_deps(enabled);
+        let expected = if enabled { "True" } else { "False" };
+        for configuration in [
+            target.clone(),
+            target.to_exec().unwrap(),
+            target.to_exec_for_platform(&platform).unwrap(),
+        ] {
+            assert_eq!(
+                evaluate(configuration.clone(), true,
+                    "def call():\n    value = cpp.experimental_cc_implementation_deps()\n    return [hasattr(cpp, 'experimental_cc_implementation_deps'), type(value), value]\nresult = call()").unwrap(),
+                format!("[True, \"bool\", {expected}]")
+            );
+            for call in [
+                "cpp.experimental_cc_implementation_deps(True)",
+                "cpp.experimental_cc_implementation_deps(unexpected = True)",
+            ] {
+                assert!(
+                    evaluate(configuration.clone(), true, &format!("result = {call}")).is_err()
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn cpp_implementation_deps_transferred_method_checks_current_caller() {
+    for enabled in [false, true] {
+        let target = configured_implementation_deps(enabled);
+        let expected = if enabled { "True" } else { "False" };
+        let direct =
+            "def call():\n    return cpp.experimental_cc_implementation_deps()\nresult = call()";
+        assert_eq!(evaluate(target.clone(), true, direct).unwrap(), expected);
+        let error = evaluate(target.clone(), false, direct)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("private API"), "{error}");
+        let trusted = evaluate_module(
+            target,
+            true,
+            "bound = cpp.experimental_cc_implementation_deps",
+            None,
+        )
+        .unwrap();
+        evaluate_module(
+            configured_implementation_deps(!enabled),
+            false,
+            "saved = bound",
+            Some(&trusted),
+        )
+        .unwrap();
+        let invocation = "def call():\n    return bound()\nresult = call()";
+        let allowed = evaluate_module(
+            configured_implementation_deps(!enabled),
+            true,
+            invocation,
+            Some(&trusted),
+        )
+        .unwrap();
+        assert_eq!(allowed.get("result").unwrap().value().to_repr(), expected);
+        let error = evaluate_module(
+            configured_implementation_deps(!enabled),
+            false,
+            invocation,
+            Some(&trusted),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("private API"), "{error}");
+    }
+}
+
+#[test]
+fn pinned_rules_cc_implementation_deps_guard_uses_the_owned_boolean() {
+    // Verbatim rules_cc 0.2.17 cc/common/semantics.bzl:113-116 from the
+    // existing pinned rustc-map-each fixture; no C++ dependency propagation.
+    const GUARD: &str = r#"def _check_can_use_implementation_deps(ctx):
+    experimental_cc_implementation_deps = ctx.fragments.cpp.experimental_cc_implementation_deps()
+    if (not experimental_cc_implementation_deps and ctx.attr.implementation_deps):
+        fail("requires --experimental_cc_implementation_deps", attr = "implementation_deps")
+"#;
+    for enabled in [false, true] {
+        for nonempty in [false, true] {
+            let entries = if nonempty { "[1]" } else { "[]" };
+            let source = format!(
+                "{GUARD}\ndef call():\n    ctx = struct(fragments = struct(cpp = cpp), attr = struct(implementation_deps = {entries}))\n    _check_can_use_implementation_deps(ctx)\n    return True\nresult = call()"
+            );
+            let result = evaluate(configured_implementation_deps(enabled), true, &source);
+            if !enabled && nonempty {
+                let error = result.unwrap_err().to_string();
+                assert!(
+                    error.contains("requires --experimental_cc_implementation_deps"),
+                    "{error}"
+                );
+                assert!(error.contains("implementation_deps"), "{error}");
+            } else {
+                assert_eq!(result.unwrap(), "True");
+            }
+        }
+    }
+}
+
 #[test]
 fn toolchain_configuration_public_methods_preserve_nullable_plain_text() {
     for (minimum, expected) in [

@@ -32,6 +32,7 @@ impl CppFragmentProjection {
         projection.proto_profile()?;
         projection.custom_malloc()?;
         projection.grte_top()?;
+        projection.experimental_cc_implementation_deps()?;
         projection.force_pic()?;
         projection.apple_generate_dsym()?;
         projection.dont_enable_host_nonhost()?;
@@ -120,6 +121,11 @@ impl CppFragmentProjection {
 
     pub fn force_pic(&self) -> Result<bool, SlugConfigurationError> {
         self.configuration.native_bool(CPP_OPTIONS, "force_pic")
+    }
+
+    pub fn experimental_cc_implementation_deps(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration
+            .native_bool(CPP_OPTIONS, "experimental_cc_implementation_deps")
     }
 
     pub fn fission_active_for_current_compilation_mode(

@@ -65,6 +65,8 @@ use starlark_map::small_map::SmallMap;
 
 #[path = "subrule/grte_top.rs"]
 mod grte_top;
+#[path = "subrule/implementation_deps.rs"]
+mod implementation_deps;
 
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
