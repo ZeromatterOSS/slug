@@ -73,6 +73,7 @@ pub enum NativeCommandOption {
     StartEndLib,
     IncompatibleUseSpecificToolFiles,
     IncompatibleRemoveLegacyWholeArchive,
+    ExperimentalSaveFeatureState,
 }
 
 impl NativeCommandOption {
@@ -92,6 +93,7 @@ impl NativeCommandOption {
             "incompatible_remove_legacy_whole_archive" => {
                 Self::IncompatibleRemoveLegacyWholeArchive
             }
+            "experimental_save_feature_state" => Self::ExperimentalSaveFeatureState,
             "start_end_lib" => Self::StartEndLib,
             "incompatible_use_specific_tool_files" => Self::IncompatibleUseSpecificToolFiles,
             "apple_generate_dsym" => Self::AppleGenerateDsym,
@@ -154,6 +156,7 @@ impl NativeCommandOption {
             Self::IncompatibleRemoveLegacyWholeArchive => {
                 "incompatible_remove_legacy_whole_archive"
             }
+            Self::ExperimentalSaveFeatureState => "experimental_save_feature_state",
             Self::StartEndLib => "start_end_lib",
             Self::IncompatibleUseSpecificToolFiles => "incompatible_use_specific_tool_files",
             Self::AppleGenerateDsym => "apple_generate_dsym",
@@ -213,6 +216,7 @@ impl NativeCommandOption {
                 | Self::ForcePic
                 | Self::ExperimentalCcImplementationDeps
                 | Self::IncompatibleRemoveLegacyWholeArchive
+                | Self::ExperimentalSaveFeatureState
                 | Self::StartEndLib
                 | Self::IncompatibleUseSpecificToolFiles
                 | Self::AppleGenerateDsym

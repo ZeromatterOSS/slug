@@ -34,13 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-168-m7a-disabled-instrumented-files-info-r1
-Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
+Packet: WP-7-169-m7a-save-feature-state-projection-r1
+Status: accepted; M7A remains partial
 
-WP868 admits disabled instrumented_files_info with complete argument/private
-validation and current-root authority through existing native EMPTY owner.
-45focused0.544s/Core/CLI pass; unchanged query76.917s advances to
-cpp.save_feature_state115. Enabled coverage/full closure/Windows stay deferred.
+WP869 admits the private save_feature_state getter over the retained experimental
+flag with its False default and typed command admission. Independent DESIGN/FINAL
+reviews, 27 focused tests and Core/CLI pass. The unchanged query in 76.673s clears
+this getter and reaches native filegroup nondefault data refusal; fixture hashes
+and cleanup pass. Full enabled feature-state/linking/bootstrap and Windows remain
+deferred. The next packet will bound the existing filegroup data owner.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

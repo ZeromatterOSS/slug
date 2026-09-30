@@ -1,5 +1,5 @@
-//! Bazel 9.2 CppOptions:150-163,790-799,828-837 defaults and
-//! builtin_exec_platforms:305,309,313 exec propagation.
+//! Bazel 9.2 CppOptions:150-163,790-799,819-837 defaults and
+//! builtin_exec_platforms:305,309,313,324 exec propagation.
 use super::*;
 use crate::CppFragmentProjection;
 
@@ -20,15 +20,22 @@ fn base() -> SlugConfiguration {
     .unwrap()
 }
 
-const OPTIONS: [(NativeCommandOption, &str); 3] = [
-    (NativeCommandOption::StartEndLib, "start_end_lib"),
+const OPTIONS: [(NativeCommandOption, &str, bool); 4] = [
+    (NativeCommandOption::StartEndLib, "start_end_lib", true),
     (
         NativeCommandOption::IncompatibleRemoveLegacyWholeArchive,
         "incompatible_remove_legacy_whole_archive",
+        true,
     ),
     (
         NativeCommandOption::IncompatibleUseSpecificToolFiles,
         "incompatible_use_specific_tool_files",
+        true,
+    ),
+    (
+        NativeCommandOption::ExperimentalSaveFeatureState,
+        "experimental_save_feature_state",
+        false,
     ),
 ];
 
@@ -51,6 +58,9 @@ fn set(
 
 fn projected(projection: &CppFragmentProjection, option: NativeCommandOption) -> bool {
     match option {
+        NativeCommandOption::ExperimentalSaveFeatureState => {
+            projection.save_feature_state().unwrap()
+        }
         NativeCommandOption::StartEndLib => projection.start_end_lib().unwrap(),
         NativeCommandOption::IncompatibleUseSpecificToolFiles => {
             projection.incompatible_use_specific_tool_files().unwrap()
@@ -64,13 +74,13 @@ fn projected(projection: &CppFragmentProjection, option: NativeCommandOption) ->
 
 #[test]
 fn start_end_lib_preserves_structural_identity_restoration_exec_and_config_setting() {
-    for (option, name) in OPTIONS {
+    for (option, name, default) in OPTIONS {
         let original = base();
-        let disabled = set(&original, option, false);
-        assert_ne!(original, disabled);
-        assert_ne!(original.canonical_bytes(), disabled.canonical_bytes());
-        assert_ne!(original.projection(), disabled.projection());
-        let restored = set(&disabled, option, true);
+        let toggled = set(&original, option, !default);
+        assert_ne!(original, toggled);
+        assert_ne!(original.canonical_bytes(), toggled.canonical_bytes());
+        assert_ne!(original.projection(), toggled.projection());
+        let restored = set(&toggled, option, default);
         assert_eq!(restored, original);
         assert_eq!(restored.canonical_bytes(), original.canonical_bytes());
         assert_eq!(restored.projection(), original.projection());
@@ -78,7 +88,7 @@ fn start_end_lib_preserves_structural_identity_restoration_exec_and_config_setti
         assert_eq!(NativeCommandOption::from_name(name), Some(option));
         assert!(option.is_boolean());
         let platform = CanonicalLabel::parse("@@//platforms:exec").unwrap();
-        for (configuration, expected) in [(original, true), (disabled, false)] {
+        for (configuration, expected) in [(original, default), (toggled, !default)] {
             for view in [
                 configuration.clone(),
                 configuration.to_exec().unwrap(),
@@ -87,8 +97,10 @@ fn start_end_lib_preserves_structural_identity_restoration_exec_and_config_setti
                 let projection = CppFragmentProjection::new(view.clone()).unwrap();
                 assert_eq!(projected(&projection, option), expected);
                 assert!(projection.experimental_cc_implementation_deps().unwrap());
-                for (other, _) in OPTIONS.into_iter().filter(|(other, _)| *other != option) {
-                    assert!(projected(&projection, other));
+                for (other, _, other_default) in
+                    OPTIONS.into_iter().filter(|(other, _, _)| *other != option)
+                {
+                    assert_eq!(projected(&projection, other), other_default);
                 }
                 for (text, value) in [("true", true), ("0", false)] {
                     assert_eq!(
@@ -107,7 +119,7 @@ fn start_end_lib_preserves_structural_identity_restoration_exec_and_config_setti
 #[test]
 fn start_end_lib_rejects_malformed_retained_state_at_projection_construction() {
     let original = base();
-    for (_, name) in OPTIONS {
+    for (_, name, _) in OPTIONS {
         for value in [
             OptionValue::Native(NativeOccurrence::Absent),
             OptionValue::Native(NativeOccurrence::Scalar(NativeValue::Text("true".into()))),

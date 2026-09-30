@@ -11,16 +11,17 @@ fn epoch(marker: &str) -> PathObservationEpoch {
     epoch.file(
         "/workspace/tools/build_defs/cc/implementation_deps.bzl",
         &format!(
-            r#"ImplementationDepsInfo = provider(fields = ["root", "sub", "root_start_end", "sub_start_end", "root_specific", "sub_specific", "root_remove_legacy", "sub_remove_legacy", "marker"])
+            r#"ImplementationDepsInfo = provider(fields = ["root", "sub", "root_start_end", "sub_start_end", "root_specific", "sub_specific", "root_remove_legacy", "sub_remove_legacy", "root_save_feature_state", "sub_save_feature_state", "marker"])
 def _sub(ctx):
-    return ctx.fragments.cpp.experimental_cc_implementation_deps(), ctx.fragments.cpp.start_end_lib(), ctx.fragments.cpp.incompatible_use_specific_tool_files(), ctx.fragments.cpp.incompatible_remove_legacy_whole_archive()
+    return ctx.fragments.cpp.experimental_cc_implementation_deps(), ctx.fragments.cpp.start_end_lib(), ctx.fragments.cpp.incompatible_use_specific_tool_files(), ctx.fragments.cpp.incompatible_remove_legacy_whole_archive(), ctx.fragments.cpp.save_feature_state()
 sub = subrule(implementation = _sub, fragments = ["cpp"])
 def _root(ctx):
     root = ctx.fragments.cpp.experimental_cc_implementation_deps()
     start_end = ctx.fragments.cpp.start_end_lib()
     specific = ctx.fragments.cpp.incompatible_use_specific_tool_files()
     remove_legacy = ctx.fragments.cpp.incompatible_remove_legacy_whole_archive()
-    child, child_start_end, child_specific, child_remove_legacy = sub()
+    save_feature_state = ctx.fragments.cpp.save_feature_state()
+    child, child_start_end, child_specific, child_remove_legacy, child_save_feature_state = sub()
     if type(root) != "bool" or type(child) != "bool":
         fail("implementation_deps option did not return bool")
     if root != child: fail("root and subrule implementation_deps options diverged")
@@ -33,7 +34,10 @@ def _root(ctx):
     if type(remove_legacy) != "bool" or type(child_remove_legacy) != "bool":
         fail("incompatible_remove_legacy_whole_archive option did not return bool")
     if remove_legacy != child_remove_legacy: fail("root and subrule remove legacy whole archive options diverged")
-    return [DefaultInfo(), ImplementationDepsInfo(root = root, sub = child, root_start_end = start_end, sub_start_end = child_start_end, root_specific = specific, sub_specific = child_specific, root_remove_legacy = remove_legacy, sub_remove_legacy = child_remove_legacy, marker = "{marker}")]
+    if type(save_feature_state) != "bool" or type(child_save_feature_state) != "bool":
+        fail("save_feature_state option did not return bool")
+    if save_feature_state != child_save_feature_state: fail("root and subrule save feature state options diverged")
+    return [DefaultInfo(), ImplementationDepsInfo(root = root, sub = child, root_start_end = start_end, sub_start_end = child_start_end, root_specific = specific, sub_specific = child_specific, root_remove_legacy = remove_legacy, sub_remove_legacy = child_remove_legacy, root_save_feature_state = save_feature_state, sub_save_feature_state = child_save_feature_state, marker = "{marker}")]
 subject = rule(implementation = _root, fragments = ["cpp"], subrules = [sub])
 "#
         ),
@@ -81,6 +85,7 @@ fn configured_policies(
     start_end: bool,
     specific: bool,
     remove_legacy: bool,
+    save_feature_state: bool,
 ) -> ConfigurationKey {
     let base = configured_options(implementation_deps, start_end)
         .slug_configuration()
@@ -95,6 +100,11 @@ fn configured_policies(
         CommandConfigurationOccurrence::native(
             NativeCommandOption::IncompatibleRemoveLegacyWholeArchive,
             Some(if remove_legacy { "true" } else { "false" }),
+            false,
+        ),
+        CommandConfigurationOccurrence::native(
+            NativeCommandOption::ExperimentalSaveFeatureState,
+            Some(if save_feature_state { "true" } else { "false" }),
             false,
         ),
     ]
@@ -130,6 +140,7 @@ fn assert_projection(
     start_end: bool,
     specific: bool,
     remove_legacy: bool,
+    save_feature_state: bool,
     marker: &str,
 ) {
     assert!(result.actions().is_empty());
@@ -147,6 +158,8 @@ fn assert_projection(
         ("sub_specific", specific),
         ("root_remove_legacy", remove_legacy),
         ("sub_remove_legacy", remove_legacy),
+        ("root_save_feature_state", save_feature_state),
+        ("sub_save_feature_state", save_feature_state),
     ] {
         assert!(
             matches!(returned.field(field).unwrap().kind(), AnalysisValueKind::Boolean(actual) if actual == expected)
@@ -164,8 +177,8 @@ async fn root_subrule_implementation_deps_preserves_target_exec_and_restores_con
         let tracker = Arc::new(Tracker::default());
         let default = request(&dice, &tracker, route, "A", configuration(None)).await;
         let disabled = request(&dice, &tracker, route, "A", configured(false)).await;
-        assert_projection(&default, true, true, true, true, "A");
-        assert_projection(&disabled, false, true, true, true, "A");
+        assert_projection(&default, true, true, true, true, false, "A");
+        assert_projection(&disabled, false, true, true, true, false, "A");
         assert_ne!(default, disabled);
 
         // Configuration A/B/A and repeat restoration share one DICE instance.
@@ -175,7 +188,7 @@ async fn root_subrule_implementation_deps_preserves_target_exec_and_restores_con
             (configuration(None), true),
         ] {
             let result = request(&dice, &tracker, route, "A", configuration).await;
-            assert_projection(&result, value, true, true, true, "A");
+            assert_projection(&result, value, true, true, true, false, "A");
             assert_eq!(
                 result,
                 if value {
@@ -186,7 +199,7 @@ async fn root_subrule_implementation_deps_preserves_target_exec_and_restores_con
             );
         }
 
-        for (value, start_end, specific, remove_legacy) in [
+        for (value, start_end, specific, remove_legacy, save_feature_state) in [
             (true, true, true),
             (false, true, true),
             (true, false, true),
@@ -199,12 +212,36 @@ async fn root_subrule_implementation_deps_preserves_target_exec_and_restores_con
         .into_iter()
         .flat_map(|(value, start_end, specific)| {
             [true, false].map(|remove_legacy| (value, start_end, specific, remove_legacy))
+        })
+        .flat_map(|(value, start_end, specific, remove_legacy)| {
+            [false, true].map(|save_feature_state| {
+                (
+                    value,
+                    start_end,
+                    specific,
+                    remove_legacy,
+                    save_feature_state,
+                )
+            })
         }) {
-            let target_configuration =
-                configured_policies(value, start_end, specific, remove_legacy);
+            let target_configuration = configured_policies(
+                value,
+                start_end,
+                specific,
+                remove_legacy,
+                save_feature_state,
+            );
             let expected = request(&dice, &tracker, route, "A", target_configuration.clone()).await;
-            assert_projection(&expected, value, start_end, specific, remove_legacy, "A");
-            if start_end && specific && remove_legacy {
+            assert_projection(
+                &expected,
+                value,
+                start_end,
+                specific,
+                remove_legacy,
+                save_feature_state,
+                "A",
+            );
+            if start_end && specific && remove_legacy && !save_feature_state {
                 assert_eq!(
                     expected,
                     if value {
@@ -239,7 +276,15 @@ async fn root_subrule_implementation_deps_preserves_target_exec_and_restores_con
                     ConfigurationKey::from_slug(execution),
                 )
                 .await;
-                assert_projection(&result, value, start_end, specific, remove_legacy, "A");
+                assert_projection(
+                    &result,
+                    value,
+                    start_end,
+                    specific,
+                    remove_legacy,
+                    save_feature_state,
+                    "A",
+                );
             }
             let restored = request(&dice, &tracker, route, "A", target_configuration).await;
             assert_eq!(restored, expected);
@@ -253,17 +298,38 @@ async fn root_subrule_implementation_deps_preserves_target_exec_and_restores_con
 
 #[tokio::test]
 async fn root_subrule_implementation_deps_restores_source_in_one_dice() {
-    for (route, remove_legacy) in [AnalysisRoute::Legacy, AnalysisRoute::Observed]
-        .into_iter()
-        .flat_map(|route| [true, false].map(|remove_legacy| (route, remove_legacy)))
+    for (route, remove_legacy, save_feature_state) in
+        [AnalysisRoute::Legacy, AnalysisRoute::Observed]
+            .into_iter()
+            .flat_map(|route| [true, false].map(|remove_legacy| (route, remove_legacy)))
+            .flat_map(|(route, remove_legacy)| {
+                [false, true].map(|save_feature_state| (route, remove_legacy, save_feature_state))
+            })
     {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let tracker = Arc::new(Tracker::default());
-        let configuration = configured_policies(false, false, false, remove_legacy);
+        let configuration =
+            configured_policies(false, false, false, remove_legacy, save_feature_state);
         let first = request(&dice, &tracker, route, "A", configuration.clone()).await;
         let changed = request(&dice, &tracker, route, "B", configuration.clone()).await;
-        assert_projection(&first, false, false, false, remove_legacy, "A");
-        assert_projection(&changed, false, false, false, remove_legacy, "B");
+        assert_projection(
+            &first,
+            false,
+            false,
+            false,
+            remove_legacy,
+            save_feature_state,
+            "A",
+        );
+        assert_projection(
+            &changed,
+            false,
+            false,
+            false,
+            remove_legacy,
+            save_feature_state,
+            "B",
+        );
         assert_ne!(changed, first);
         let restored = request(&dice, &tracker, route, "A", configuration).await;
         assert_eq!(restored, first);

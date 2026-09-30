@@ -33,6 +33,7 @@ impl CppFragmentProjection {
         projection.custom_malloc()?;
         projection.grte_top()?;
         projection.experimental_cc_implementation_deps()?;
+        projection.save_feature_state()?;
         projection.start_end_lib()?;
         projection.incompatible_remove_legacy_whole_archive()?;
         projection.incompatible_use_specific_tool_files()?;
@@ -129,6 +130,11 @@ impl CppFragmentProjection {
     pub fn experimental_cc_implementation_deps(&self) -> Result<bool, SlugConfigurationError> {
         self.configuration
             .native_bool(CPP_OPTIONS, "experimental_cc_implementation_deps")
+    }
+
+    pub fn save_feature_state(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration
+            .native_bool(CPP_OPTIONS, "experimental_save_feature_state")
     }
 
     pub fn start_end_lib(&self) -> Result<bool, SlugConfigurationError> {

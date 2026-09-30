@@ -1,133 +1,91 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-168-m7a-disabled-instrumented-files-info-r1
-Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
+Packet: WP-7-169-m7a-save-feature-state-projection-r1
+Status: accepted; M7A remains partial
 
 ## Outcome and compatibility
 
-Baselinee56c40907 (WP867). Advance unchanged authentic Linux Rust-toolchain
-cquery beyond coverage_common.instrumented_files_info at rules_cc cc_helper1049
-from cc_library272. Admit only genuine configured root ctx with disabled
-coverage, preserving full argument validation before returning the EXISTING
-native InstrumentedFilesInfo.EMPTY. Enabled coverage remains refused.
-Exact binding/default/field conversion/conditional private gate/disabled EMPTY;
-existing structural identity, native EMPTY hash and live/current/root-token
-policy remain Slug-native. Windows stays minimal/refused; no platform work.
+Baseline `8b74acf15` (WP868). Admit private zero-argument
+`cpp.save_feature_state()` and typed `experimental_save_feature_state` command
+admission. The native option, False default, conversion, exec carry, getter and
+current private-caller policy are exact. Existing configuration and output
+identity remain Slug-native. Enabled feature-state artifact/output-group
+production, full query/bootstrap closure and M8 remain unsupported/deferred.
+Windows stays minimal or explicitly unsupported under the user's platform scope.
 
-Pinned Bazel9.2 clean8220c619 CoverageCommonApi45-128 requires ctx positional or
-named, all other fields named/defaulted. CoverageCommon47-110 validates in order:
-extensions None/sequence<string>; reported None/depset<tuple>; baseline None/
-sequence<File>; environment dict<string,string>; support depset<File> or sequence
-of File/depset<File>; conditional default allowlist for any nonempty support/
-reported/environment; source/dependency sequence<string>; metadata sequence<File>.
-Actual code rejects FilesToRunProvider despite advertised error/docs. Reported
-checks top-level tuple only, not pair length or tuple member types. Genuine
-range(0) satisfies sequence fields; nonempty ranges fail element conversions.
-Empty depsets accepted regardless of order/type. Collector107-109 then returns
-InstrumentedFilesInfo.EMPTY immediately for disabled coverage, with no attribute/
-dependency traversal or baseline action. InstrumentedFilesInfo33 owns nativeEMPTY.
-StarlarkIntegrationTest832-866/914-943 proves disabled EMPTY and propagation;
-1197-1233 proves nonempty private extras still fail when disabled. Full enabled
-collection/action tests are outside this slice; malformed argument negatives
-are source-derived. StarlarkRuleContext601 returns wrapped context, close471
-nulls it; this API does not explicitly call checkMutable. Do not claim Slug
-suspended/current token guards are exact Bazel mutable policy.
+Pinned Bazel 9.2 clean `8220c619`: CppConfigurationApi:136–137 declares the
+zero-argument undocumented getter; CppConfiguration:934–937 checks the private
+allowlist and :782–783 returns cppOptions.saveFeatureState. CppOptions:819–826
+names `experimental_save_feature_state`, Boolean default False, AFFECTS_OUTPUTS;
+builtin_exec_platforms:324 carries it to exec. CppConfigurationStarlarkTest:112/
+128–129 denies ordinary callers. CcLibraryConfiguredTargetTest:309–316 and
+cc_integration_test.sh:254–273 prove enabled feature-state files upstream; that
+consumer/action behavior is outside this slice. Both Boolean projections remain
+truthful. The unchanged rules_cc 0.2.17 cc_helper:115 checks False first; existing
+source fixture and sources.json provenance are reused with no new copied asset.
 
-## Owner and decision
+## Owner and scope
 
-Loading testing_bootstrap keeps namespace/provider-key/repr/freezing shape and
-routes the sole coverage operation to a split native binder/validator module.
-Reuse existing ParametersSpec/Arguments machinery so missing differs from
-providedNone; reject extra positional/unknown/duplicate names. No silent
-validation bypass, broad iterable admission or handwritten provider struct.
-Validation-only borrowed input iterators and existing genuine File/depset
-primitives own phase scratch; discard inputs after native call. Reuse existing
-source-identity/default-allowlist checks, without new private allowlist.
+The existing registry/native binding retains the False Boolean. Append
+ExperimentalSaveFeatureState to NativeCommandOption, preserving prior ordinals.
+Commands captures raw/negated ordered flags; Configuration's existing converter
+owns their values. CppFragmentProjection eagerly validates and reads the existing
+native Boolean. Loading checks the current private caller on every invocation,
+including transferred methods retaining the original configuration. Existing
+configured structural keys own source/option inputs and publication equality,
+invalidation and restoration. The projection returns a scratch Boolean; retained
+representations, owners, locks, caches and fragment layout are unchanged. No donor
+or performance claim, hardcoded default, artifact declaration or action is added.
 
-Existing AnalysisEvaluationContext module root registration is authority.
-Factor its exact registered ctx/marker-stack lookup out of actions_to_context
-for reuse, preserving suspended-live actions2ctx behavior. Coverage verifies
-supplied ctx pointer equals registered root and marker belongs to current eval,
-then calls existing evaluator action-sink/service interface's new synchronous
-empty-provider factory. Default unavailable keeps ordinary Loading sinks closed.
-Analysis factory downcasts genuine AnalysisContext, verifies same sink data
-identity and active ctx token, then reads original CcContextProjection structural
-coverage owner; enabled/missing configuration fail closed. Allocate exact
-existing empty occurrence via AnalysisValueMaterializer on eval.frozen_heap(),
-as existing ctx.runfiles470 does. Do not move or duplicate EmptyInstrumentedFiles,
-retained provider identity, lowerer/classifier or materializer validation.
+Allowlist: Configuration src/command.rs, native/cpp_fragment.rs and existing
+native/cpp_start_end_lib_tests.rs; Loading src/analysis_fragments.rs and existing
+analysis_fragments/toolchain_provider_tests.rs; Commands src/common.rs tests;
+Analysis tests/subrule/implementation_deps.rs; manifest/canonical and Stage 6's
+existing private-option-getter paragraph. Production owners remain cohesive with
+small matching siblings; no touched production function exceeds 150 lines and no
+production file exceeds 2,000. Estimates were production <30/proof <140 net Rust
+lines; actual 18/108. Independent DESIGN and FINAL reviews cover the shared
+command/projection/private-access boundary.
 
-Factory arguments are borrowed ctx and caller FrozenHeap; no Value/heap/closure/
-callback stored in Send+Sync sink. Module owns frozen result through freeze;
-existing ProviderOccurrence/AnalysisValue publication owns surviving DICE facts.
-No new service state, key/cache/global registry, option, action or filesystem
-read. Dependency ConfiguredTarget/DICE inputs already include coverage; ordinary
-both-route same-DICE source/config/exec proofs establish invalidation/restoration.
-Representation unchanged: no utility import or performance/retained-memory claim.
+## Proof and validation
 
-## Scope and proof
+Configuration's existing matrix records explicit defaults, toggles away and
+restores them, protects old True defaults and tests canonical bytes, projection,
+config_setting, both exec paths and idempotence. Malformed absence/text/label
+state fails eagerly. Loading's private-method matrix covers both values, zero
+arity, allowed/forbidden current callers and transferred original configurations;
+its crossed target/exec matrix includes the fifth independent Boolean. Commands'
+public Cquery parse matrix distinguishes False default, positive True, negated
+False and ordered raw flags; null, invalid, whitespace and negated-value forms
+remain rejected. Analysis's existing provider/tuple proof covers all 32 flag
+combinations, both routes/exec paths and same-DICE source/configuration restoration
+while retaining old four flags and zero-action assertions.
 
-Allowlist Loading src/lib.rs module hook, testing_bootstrap.rs, new coverage_common.rs (optional
-child tests), subrule_invocation.rs and existing context_lifecycle_tests.rs,
-testing_bootstrap_tests.rs; Analysis starlark_rule.rs minimal factory hook with
-new split starlark_rule/coverage_common.rs, cc_context.rs only shared coverage
-gate if necessary, existing context_lifecycle_tests.rs, new tests/subrule/
-coverage_common.rs and parent subrule.rs hook; manifest/canonical and Stage6
-existing disabled-coverage paragraph. Existing EmptyInstrumentedFiles remains
-unchanged; protect its roundtrip/malformed tests and filegroup producer.
-No new checked-in external source fixture, ruleset shim or direct filesystem.
-Production starlark_rule/subrule owners already exceed2000lines: only small
-trait/default/dispatch/root-lookup hooks there; binder/factory/proof split by
-owner. Estimate production<220/proof<260 netRustlines; review growth against
-actual validating contract, no automatic stop at estimates. Independent DESIGN
-and FINAL before acceptance because public API/provider/current-root authority.
+Serial pinned Cargo JSON no-run preparation passed: Configuration 1.07s,
+Loading 18.90s, Commands 11.44s, Analysis subrule 5.57s. Exact ordinary nonignored
+preflight and runtime passed 11/8/2/6 tests, respectively, in
+0.032/0.114/0.008/0.614s (27 total, 0.768s). Core check 8.26s and CLI rebuild
+20.47s passed. Receipts are in target/wp869. Preparation/runtime/replay caps
+60/20/180s are operation caps, not user limits. The authentic replay is needed to
+prove the actual public output-group caller advances; Boolean tests alone cannot.
 
-Proof: default/explicit ctx binding with empty fields; named values/list/tuple/
-range(0), None-permitted fields; genuine source and generated File metadata and
-baseline ignored in off-state; no nonexistent-attr traversal; nonempty valid
-private extras allowed only from existing actual private caller, forbidden from
-ordinary caller even when disabled; malformed shapes/elements/type/unknown/
-duplicate names fail before offshortcut, reported tuples retain permissive
-source shape and FilesToRunProvider remains rejected. Genuine provider type,
-key membership, both fieldsDefaultempty, equality/hash and freeze/lower/rematerialize
-through genuine dependency Target. Never genericstruct masquerade. Enabled
-caller cannot use disabled dependency ctx; default/disabled/enabled/disabled,
-both exec resets and target restoration, sourceABA both routes. Expired success/
-error, missing/foreign registered roots, fake/subrule/suspended ctx refuse;
-actions2ctx original suspended-live recovery remains protected.
+The unchanged authentic Rust-toolchain cquery ran in 76.673s, exit 2. It clears
+save_feature_state and next stops at `native filegroup nondefault data is
+unsupported`. All three original fixture hashes are unchanged. Actual process
+checks before/after are empty; scoped formatting, diff, archive and plan-status
+checks pass. This advances the consumer boundary without claiming query success.
+Independent DESIGN and FINAL verdicts ACCEPT. Packet window: about 12:13–12:28
+UTC on 2026-09-30, including review and validation.
 
-Root serial pinned Cargo JSON no-run60s Loadinglib/Analysislib/Analysissubrule,
-exact nonignored preflight/focused20s runtime; Corecheck/CLI rebuild before
-unchanged three-hash authentic supervised180s replay. Its76s prerequisite is
-required to prove public rules_cc producer and reveal next bootstrap frontier.
-Actual process cleanup, scopedformat/diff/archive/status. Caps not userlimits.
-REPLAN if complete off-state conversion/private gating cannot be bounded,
-existing native EMPTY cannot be reused without another provider/retained owner,
-or enabled collector/action semantics become necessary. Full linking/query/
-coverage/bootstrap/M8 remain unproved; enabled coverage and Windows deferred.
+REPLAN if the retained descriptor/exec mapping cannot express this option, access
+policy must widen or a new feature-state owner is required. Do not suppress True
+or fabricate feature-state files. Full enabled production/linking/bootstrap stays
+unproved.
 
 ## Predecessor
 
-WP867e56c40907 independent DESIGN/FINAL;27focused0.563s/Core/CLI pass. Unchanged
-query76.470s exit2 clears dynamic link registration and reaches coverage factory;
-three original input hashes/actual process cleanup pass. target/wp867.
-
-## Focused validation receipt
-
-Fresh pinned offline Cargo JSON and exact ordinary nonignored preflights:
-Loading32/32 (0.064s, prep19.98s), Analysislib5/5 (0.016s, prep20.87s),
-Analysissubrule8/8 (0.464s, prep9.15s initial/1.47s corrected).45focused pass
-0.544s. Initial integration7pass/1failure was repeated equal keys in a Starlark
-dictionary literal; corrected only proof to assignment plus one-key/updated
-lookup, preserving equality/hash checks. Initial logs retained. Corecheck14.09s,
-CLIbuild21.07s pass. Scopedformat/diff/archive/status pass; actual prereplay
-process check empty. Production net292/proof365 Rustlines exceed estimates:
-eight distinct conversions plus named binder/private contents/root authority
-and native factory require production; representative negatives/immutable
-provider/real dependency/cfg/source/exec proofs account for test growth.
-Independent source review finds growth justified; no duplicate provider owner,
-external fixture copies or helper proliferation. target/wp868. Unchanged authentic query76.917s exit2 clears coverage factory
-and reaches missing cpp.save_feature_state at cc_helper115 via outputgroups216/
-cc_library306. Original three before/after hashes match; actual process checks
-empty. Independent FINAL ACCEPT, native EMPTY owner/class unchanged.
-Packet window11:34–12:08UTC (2026-09-30); no speedup claim.
+WP868 `8b74acf15` accepted disabled coverage through the existing native empty
+provider. Independent DESIGN/FINAL, 45 focused tests in 0.544s and Core/CLI passed.
+Unchanged query in 76.917s, exit 2, reached the missing getter at cc_helper:115;
+three original hashes and cleanup passed. Receipts: target/wp868. Enabled coverage
+remains deferred.

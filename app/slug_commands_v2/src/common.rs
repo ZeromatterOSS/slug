@@ -709,6 +709,10 @@ mod tests {
             ),
             ("start_end_lib", NativeCommandOption::StartEndLib),
             (
+                "experimental_save_feature_state",
+                NativeCommandOption::ExperimentalSaveFeatureState,
+            ),
+            (
                 "incompatible_remove_legacy_whole_archive",
                 NativeCommandOption::IncompatibleRemoveLegacyWholeArchive,
             ),
@@ -757,14 +761,15 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-        for name in [
-            "experimental_cc_implementation_deps",
-            "start_end_lib",
-            "incompatible_remove_legacy_whole_archive",
-            "incompatible_use_specific_tool_files",
+        for (name, default) in [
+            ("experimental_cc_implementation_deps", true),
+            ("start_end_lib", true),
+            ("incompatible_remove_legacy_whole_archive", true),
+            ("incompatible_use_specific_tool_files", true),
+            ("experimental_save_feature_state", false),
         ] {
             for (flags, expected) in [
-                (vec![], true),
+                (vec![], default),
                 (vec![format!("--no{name}")], false),
                 (vec![format!("--no{name}"), format!("--{name}")], true),
                 (vec![format!("--{name}=true"), format!("--{name}=0")], false),
@@ -798,6 +803,14 @@ mod tests {
                     }
                 );
                 assert_eq!(
+                    projection.save_feature_state().unwrap(),
+                    if name == "experimental_save_feature_state" {
+                        expected
+                    } else {
+                        false
+                    }
+                );
+                assert_eq!(
                     projection.start_end_lib().unwrap(),
                     if name == "start_end_lib" {
                         expected
@@ -821,6 +834,7 @@ mod tests {
             "incompatible_remove_legacy_whole_archive",
             "incompatible_use_specific_tool_files",
             "force_pic",
+            "experimental_save_feature_state",
         ] {
             for text in ["null", "NULL", "invalid", " true", "false "] {
                 let flag = format!("--{name}={text}");

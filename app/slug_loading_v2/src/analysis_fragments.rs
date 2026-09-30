@@ -170,6 +170,14 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
             .map_err(anyhow::Error::from)
     }
 
+    fn save_feature_state(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        this.check(eval)?;
+        Ok(this.retained.projection().save_feature_state()?)
+    }
+
     fn start_end_lib(
         this: &CppFragmentValue,
         eval: &mut Evaluator<'_, '_, '_>,
