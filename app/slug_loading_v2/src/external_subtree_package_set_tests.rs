@@ -730,6 +730,9 @@ async fn real_builtin_catalog_discovers_root_and_prefixed_package_sets() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut updater = dice.updater();
     updater
+        .changed_to(slug_workspace_v2::path_observation_shards(&epoch))
+        .unwrap();
+    updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
     inject_root_package_policy_inputs(
@@ -776,9 +779,11 @@ async fn real_builtin_catalog_discovers_root_and_prefixed_package_sets() {
                 "tools/build_defs/build_info",
                 "tools/build_defs/build_info/templates",
                 "tools/build_defs/cc",
+                "tools/build_defs/cc/whitelists/parse_headers_and_layering_check",
                 "tools/build_defs/repo",
                 "tools/cpp",
                 "tools/cpp/modules_tools",
+                "tools/def_parser",
                 "tools/jdk",
                 "tools/launcher",
                 "tools/python",
@@ -793,9 +798,11 @@ async fn real_builtin_catalog_discovers_root_and_prefixed_package_sets() {
                 "tools/build_defs/build_info",
                 "tools/build_defs/build_info/templates",
                 "tools/build_defs/cc",
+                "tools/build_defs/cc/whitelists/parse_headers_and_layering_check",
                 "tools/build_defs/repo",
                 "tools/cpp",
                 "tools/cpp/modules_tools",
+                "tools/def_parser",
                 "tools/jdk",
                 "tools/launcher",
                 "tools/python",

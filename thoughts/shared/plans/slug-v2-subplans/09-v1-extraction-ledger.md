@@ -3113,3 +3113,15 @@ interner, Host read, lock or donor import is added. Fourteen focused tests and
 unchanged authentic progression to missing `bazel_tools//tools/def_parser`
 discriminate eligibility, defaults, peer semantics, Need/cycles and restoration.
 No performance claim or full Rust-toolchain/C++ closure is inferred.
+
+WP854 reuses the same ConfiguredConditionKey eligibility Boolean for native
+alias and native filegroup: requested label/configuration and observed
+constraint/target-platform/package dependencies completely own shared truth.
+Only the private constructor name and filegroup caller gate change. The two
+pinned def_parser files join the immutable service-owned catalog; directory
+listing and framed manifest identity remain with existing DICE owners.
+Selector declarations stay attempt-local Arc/SmallMap/SmallSet scratch.
+No new retained representation, collection, cache, interner, Host observation,
+lock or donor utility is added. Twenty-nine focused tests and unchanged
+bootstrap progression to cpp.grte_top discriminate this slice. No performance,
+Windows execution or full toolchain/C++ claim is made.

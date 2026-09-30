@@ -1,151 +1,177 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-153-m7a-alias-direct-constraint-select-r1
+Packet: WP-7-154-m7a-def-parser-catalog-filegroup-select-r1
 Status: accepted; M7A remains partial
 
 ## Outcome and compatibility
 
-Advance the rebuilt authentic Rust-toolchain `cquery //:probe --output=label`
-past `@@platforms//os:none is not a config_setting`. Pinned rules_rust
-0.73.0 `ffi/cc/allocator_library/BUILD.bazel:3-22` uses `none`, `wasi`, and
-`windows` constraint values as direct keys in native `alias.actual`'s
-`select()`. Under the Linux target platform all three must miss and select
-the default; under a selected matching platform a direct branch must win.
-This packet admits direct constraint-value keys for configured native alias
-selection only. It does not admit the Rust-toolchain or configured C++ closure.
+Advance the unchanged authentic Rust-toolchain `cquery //:probe --output=label`
+past the missing `@@bazel_tools//tools/def_parser` package. Port the complete
+pinned Linux installed package verbatim (BUILD and no_op.bat) through the
+existing immutable catalog and admit its direct constraint selector through
+configured native srcs-only filegroup. The Linux target/exec selection must
+forward the exact no_op.bat source with no action. A synthetic matching
+platform must choose a direct branch; the authentic Windows target branch
+must not silently fall back to no_op.bat when its C++ source package is absent.
 
-For that bounded alias owner, configured target-platform matching, explicit or
-default constraint values, selected branch and invalid-key rejection are
-`exact` to Bazel 9.2. Structural configuration/DICE identity, Rust valid-
-Unicode diagnostics and path tokens remain `Slug-native`. Direct constraint
-keys for other owner kinds, mixed direct-constraint/config_setting multi-match,
-nondefault Apple/Xcode, full toolchain
-and configured C++ closure are `unsupported/deferred` and fail closed rather
-than claiming general `select()` parity.
+Installed Bazel 9.2 package bytes, release-archive file mode, configured native
+filegroup direct constraint matching and already admitted source forwarding
+are exact. Manifest route identity, structural configuration/DICE identity,
+Rust valid-Unicode diagnostics and path tokens remain Slug-native. Windows
+prebuilt/parser C++ closure, general filegroup attributes, mixed matching
+constraint/config_setting specialization, other direct-key owner kinds and
+full Rust-toolchain/C++ closure remain unsupported/deferred.
+The user's current platform priority is Linux. Windows-specific functionality
+may remain minimal stubs or the existing explicit refusal; do not add Windows
+execution, binary/source closure or compatibility claims. The selected Windows
+negative is only selector/fallback safety on Linux, not Windows testing.
 
-## Pinned source and semantic owner
+## Source and ownership
 
-Bazel 9.2 `ConfigConditions.java:59-88` accepts `ConstraintValueInfo` only
-when the owning rule has a target platform. `ConfigurableAttributesTest.java:
-1660-1790` proves direct matching, rejection without toolchain resolution,
-and alias-with-select eligibility. `ConstraintValueInfo.java:65-96` compares
-the requested value to the target platform's effective value, including a
-setting default through `ConstraintCollection.get`. `Alias.java:80-94`
-enables toolchain resolution when alias has selector keys.
-`ConfigMatchingProvider.java:199-229` gives direct constraint providers empty
-refinement criteria.
-The authentic selector comes from pinned rules_rust `allocator_library` via
-`rust_host_tools`'s `allocator_library=None`, the rule default label flag and
-that flag's alias default.
+Bazel 9.2 `tools/def_parser/BUILD.tools` is installed as package BUILD; the
+source bootstrap BUILD is different and must not substitute. The pinned
+installed package has exactly BUILD (971 bytes, SHA256
+891d56515113353a675db4f62e51380f3816b703b18585361e02de84e16e95ca)
+and no_op.bat (710 bytes, SHA256
+4ebf44828201a3228a0521723c48d26db87565e44ef862fb65d5ead92840f64d).
+Both release ZIP entries are mode 100644, so catalog executable=false;
+installed extraction permissions are not authoritative. BUILD loads the
+already cataloged tools/build_defs.bzl, selects @platforms//os:windows to
+an unavailable prebuilt on a Windows host or third_party/def_parser on a
+Linux host, and otherwise selects no_op.bat. No Java artifact enters Slug.
 
-The existing `ConfiguredConditionKey` is the sole DICE owner of condition
-truth and its observed package/constraint/platform dependencies. Encode alias
-direct-constraint eligibility structurally in that key, so a completed value
-cannot be reused for an ineligible owner. Keep the requested selector label
-as dependency identity while resolving aliases to the terminal config_setting
-or constraint value. Use the existing `ConfiguredTargetPlatformKey`,
-`compute_configured_constraint` and `platform_has_actual_constraint`; do not
-infer platform from host OS, execution platform, paths or displays. The
-prepared selector declaration is attempt-local scratch and must distinguish
-config_setting from direct constraint value for refinement. Direct values
-have empty provider refinement criteria. Preserve prior config_setting
-behavior; reject a mixed direct-constraint/config_setting multi-match before
-choosing a potentially wrong branch. Two matching direct keys remain peers:
-equal selected values may pass, differing values are ambiguous.
+`FilegroupRule.java:27-80` inherits NativeBuildRule without disabling default
+ENABLED toolchain resolution (`RuleClass.java:735`); its configured owner
+therefore has a target platform. `ConfigConditions.java:59-88`,
+`ConstraintValueInfo.java:65-96` and `ConstraintCollection.get` own direct
+value eligibility and effective/default matching. `ConfigMatchingProvider.java:
+199-229` gives direct values empty refinement criteria. WP853 at 6e0e2b55b
+already implements and tests that shared condition semantics for aliases.
 
-Only native alias callers supply eligibility, and only when their `actual`
-has selector keys. A nested alias's `actual` selector obtains eligibility
-from that nested alias independently; it does not inherit the outer condition
-owner's gate. An ineligible outer owner still rejects a direct terminal
-constraint key reached through an alias. Other current callers are
-ineligible in this packet even if Bazel may allow some in a later
-owner-specific packet. This is a bounded
-fail-closed subset, not a statement that Bazel disallows them. Alias-chain
-Need/error/cycle behavior, target/exec configuration, package tracking and
-source A/B/A remain with the existing observed DICE graph. No lock across a
-DICE compute, new cache, interner, second platform store, Host read or donor
-import. The key is DICE-retained and `Allocative`; selector declarations and
-normalization are analysis-attempt scratch. Existing Buck2-derived `SmallMap`,
-`SmallSet`, Arc and structural equality patterns are retained, with no new
-hot-path collection. `docs/developers/dice.md` and retained Buck2 DICE key
-ownership remain the architecture reference.
+Reuse BuiltinBazelToolsSourceFileKey, catalog-derived directory listings,
+manifest identity and existing canonical/apparent routes. Register the two
+verbatim bytes with sorted entries and exact digest checks. The repository
+BUILD.bazel sidecar and compile_data reference are build inputs only and must
+not enter runtime catalog bytes. Catalog identity changes must update both
+host variants in pinned tests without weakening manifest assertions.
 
-## Evidence, validation and scope
+Reuse the WP853 ConfiguredConditionKey eligibility Boolean, renaming its
+private alias-only constructor to describe the admitted native selector
+callers. Native alias and configured native filegroup alone supply true;
+other callers remain false. Their condition truth is identical, so no
+caller-kind identity or second key is required. The existing key remains the
+sole retained DICE owner of truth and observed constraint/platform/package
+dependencies, preserving requested selector labels. The filegroup's existing
+source-selection, null source edges, provider publication and configuration
+ownership remain unchanged. Nested condition aliases retain their independent
+native alias eligibility. Direct peer equality/ambiguity and mixed-match
+refusal are inherited unchanged from WP853. No cache, interner, Host read,
+lock across DICE, platform store or new collection. The catalog is immutable
+service-owned bytes; the Boolean is DICE-retained Allocative state; selector
+declarations remain attempt scratch. The existing Arc/SmallMap/SmallSet and
+DICE ownership contracts in docs/developers/dice.md and Stage 9 apply.
 
-Reuse the pinned Bazel source/tests above. Add a focused Slug synthetic alias
-test with sibling OS values, Linux select() default and a selected non-Linux
-branch. Add an omitted-platform-setting direct-key match through
-`default_constraint_value`, then an explicit different value overriding that
-setting default. Cover target and exec configurations, alias-to-constraint,
-invalid target kind, ineligible key, Need/cycle, and mandatory same-DICE
-target-platform and source A/B/A restoration in the existing
-configured-analysis fixtures. A separate public fixture is only
-needed if an existing focused fixture cannot show the owner gate; any new
-fixture must follow the Stage 1 provenance contract. Preserve existing
-config_setting and alias-selector tests. Rebuild `slug_cli_v2`, clean stale
-`slugd` before/after daemon-sensitive work, then run one bounded unchanged
-authentic `//:probe` cquery and record its first new labelled stop or success.
-Use Bazel RC discovery without reading or copying `~/.bazelrc`; optional
-BuildBuddy transport does not replace local NativeLink real-transport gates.
-Serialize Cargo, run focused tests, `git diff --check`,
-`scripts/v2_archive_status.sh` and `scripts/v2_plan_status.py`. Independent
-DESIGN review gates implementation; FINAL review gates acceptance.
+## Scope and validation
 
-Allowlist: this manifest and canonical Current; `app/slug_analysis_v2/src/
-dice.rs`, `app/slug_analysis_v2/src/configured_attribute.rs` and focused
-`app/slug_analysis_v2/tests/` files; compact Stage 6/9 owner notes after
-acceptance. `dice/filegroup.rs` is allowlisted only for adding an explicit
-ineligible call argument. No Loading, Configuration, Bzlmod, Core, Build API,
-remote-cache/action or repository-generator change. The large `dice.rs`
-remains the cohesive configured-analysis owner for this bounded change; no
-broader split or performance claim. `REPLAN` if an alias cannot obtain the
-target platform through existing structural owners, exact alias eligibility
-requires new Loading metadata, or preserving mixed-selector safety needs a
-new general refinement owner. Compiler/test selector corrections inside this
-contract are not `REPLAN`.
+Allowlist: this manifest and canonical Current; Bzlmod builtin
+bazel_tools/tools/def_parser/{BUILD,no_op.bat,BUILD.bazel},
+app/slug_bzlmod_v2/{BUILD.bazel,src/builtin_repository.rs,
+tests/builtin_bazel_tools.rs}; src/host_module.rs only for the existing
+manifest identity test goldens; Loading's existing
+external_subtree_package_set_tests.rs only for exact catalog inventories and
+the inventory fixture's complete observed-input injection;
+Analysis src/dice.rs (private constructor rename), src/dice/filegroup.rs
+(eligibility), tests/native_filegroup/{mod.rs,authentic_builtin.rs} or one
+new test-only Rust module registered there; compact Stage 5/6/9 notes after
+acceptance. No Loading semantics, Configuration, Core, Build API, toolchain
+execution, repository generator, C++ action or Windows binary import.
+
+Preserve complete pinned catalog byte/hash/mode/manifest and exact recursive
+package inventories. Extend the existing authentic built-in filegroup fixture
+to exercise real catalog def_parser through root apparent reference and
+canonical target/exec configurations: exact no_op.bat source, single source
+edge, unchanged DefaultInfo/FilesToRun forwarding, zero actions. Test selected
+Windows branch refusal and Linux restoration on the same DICE. Add focused
+native filegroup direct-key target/exec matching, omitted setting default,
+explicit override, source/default and platform A/B/A with alias-to-constraint
+keys. Reuse WP853 discriminators for peer/mixed handling, ineligible owners,
+Need/cycles and nested condition aliases, plus existing filegroup forwarding,
+config_setting selector and source lifecycle controls. This extends existing
+fixtures without new public oracle scaffolding.
+
+Independent DESIGN review gates implementation; FINAL review gates acceptance.
+Resolve pinned Rust toolchain, serialize Cargo, JSON --no-run compile selected
+Bzlmod and Analysis executables plus the Loading inventory executable, batch
+exact-name preflight, execute focused tests serially. Rebuild slug_cli_v2
+before the unchanged authentic replay. Check stale slugd before/after; no
+output_base is used, so the replay is one-shot. A network-enabled supervised
+180-second replay is justified by WP853's approximately 88-second fresh source
+preparation; smaller synthetic tests cannot prove installed toolchain
+advancement. This is an operation bound, not a new user limit. Compilation
+preparation remains bounded to 60 seconds per invocation. Record first new
+labelled stop or success, leaving full toolchain closure unclaimed. Run
+rustfmt, git diff --check, archive and plan-status checks. Commit accepted
+work with compact compile/runtime/review/replay evidence.
+
+REPLAN only if pinned package bytes require a new source owner, native
+filegroup direct constraints lack the pinned target-platform prerequisite,
+or the default source cannot use existing forwarding without a new action/
+provider contract. Invocation/compiler/test corrections are not REPLAN.
 
 ## Immediate predecessor
 
-WP852 at `570d14118` accepted default MACOS `single_arch_platform`. Its
-isolated generated rules_cc cquery passed, while broader Rust-toolchain
-cquery first stopped at `@@platforms//os:none is not a config_setting`.
+WP853 at 6e0e2b55b accepted native alias direct constraints. Fourteen focused
+tests and independent DESIGN/FINAL reviews passed. The unchanged authentic
+Rust-toolchain replay cleared platforms//os:none and reached the missing
+bazel_tools//tools/def_parser BUILD. M7A remains partial.
 
 ## Acceptance receipt
 
-Independent DESIGN and FINAL reviews: ACCEPT. The existing condition key now
-includes alias direct-constraint eligibility in structural Eq/Hash/Allocative;
-requested selector labels remain dependency identity, and existing observed
-constraint/target-platform owners determine effective matching. Attempt-local
-condition kinds preserve config_setting specialization, direct peer equality
-and ambiguity, and fail closed on mixed matching provider kinds.
+Independent DESIGN and FINAL reviews: ACCEPT. The two runtime files are
+byte-identical to pinned source and the pinned release ZIP; mode 100644 is
+verified from archive metadata, not installed extraction permissions. The
+sidecar is excluded from the runtime catalog. Both manifest variants retain
+exact framed-hash goldens, and package/directory inventories remain exact.
+Native alias/filegroup condition truth shares the existing structurally gated
+key; other owners remain ineligible and the existing mixed-match gate remains.
+No new source, platform, action or DICE owner is introduced.
 
-Pinned Bazel 9.2 source/tests are the source regression. JSON `--no-run`
-compilation and batched exact-name preflight succeeded; 14 selected Analysis
-integration tests pass (0.21 seconds). They cover target/exec and omitted-setting
-defaults, explicit overrides, platform/source/default-source A/B/A, both owner
-cache orders, nested alias eligibility and terminal refusal, peer equal-value
-selection and ambiguity, mixed-match rejection, wrong kinds, Need recovery and
-literal/nested selector cycles. Protected config_setting, condition-alias,
-external-condition invalidation, specialization and alias-Need controls pass.
-The final test compile took 8.69 seconds; the final current-source offline
-`cargo build -p slug_cli_v2` passed in 0.11 seconds. Continuation validation and
-review occupied approximately 14 minutes from the first recorded compile;
-the inherited unfinished candidate's earlier implementation time is unmeasured.
+Twenty-nine selected tests pass: Bzlmod catalog 5/5 and owners 7/7,
+Loading source/route/inventory 3/3, Analysis 14/14. JSON --no-run compiles and
+batched exact-name preflights selected every executed test. Real canonical and
+root-apparent built-in filegroup routes forward the exact no_op.bat source,
+DefaultInfo/FilesToRun and zero actions in target/exec configurations. Synthetic
+matching/default/override and configuration/platform/selector/default-source
+A/B/A controls pass, along with inherited alias cache/Need/cycle/refinement and
+filegroup forwarding/rejection/source-lifecycle tests. The selected Windows
+negative proves no silent Linux fallback on this Linux host; it claims no
+Windows execution or parser parity.
 
-The unchanged authentic fixture `/tmp/slug-wp797-authentic-2YQmSt` retains its
-BUILD, MODULE and lockfile hashes. Rebuilt one-shot
-`cquery //:probe --output=label` exits 2 at the new labelled stop
-`@@bazel_tools//tools/def_parser`: missing BUILD file. The earlier
-`@@platforms//os:none is not a config_setting` error is absent. The replay took
-approximately 88 seconds based on output timestamps, inside its supervised
-180-second bound; this is an advancement receipt, not a successful toolchain
-query. Sandbox registry denial and 30/60-second preparation timeouts did not
-prove the gate. A 20-second diagnostic showed active CPU/network preparation;
-direct registry access was verified and the final unchanged network-enabled
-replay established the terminal. No credential contents were read or copied.
-No stale slugd was present before/after. Raw compile, preflight, runtime and
-replay receipts remain under `target/wp853/`.
+The existing Loading inventory fixture had stale expected whitelist entries
+from WP845 and injected only the legacy epoch. Its exact inventories now include
+both that existing package and def_parser, and same-epoch observation shards are
+fully injected; the corrected three-test gate passes without missing-key task
+panics. An initial preflight used file names instead of registered module paths;
+listing and exact-selector correction established selection before execution.
+An additional host_module.rs test golden was updated to the same derived
+manifest hashes and its structural route test passes. No production Loading
+semantics changed.
 
-Rustfmt, `git diff --check`, archive and plan-status checks pass. Full
-Rust-toolchain/configured-C++ closure, the new bazel_tools package boundary,
-other direct-key owners and mixed matching specialization remain deferred.
+The current-source offline CLI build passes (25.12 seconds). The unchanged
+`/tmp/slug-wp797-authentic-2YQmSt` one-shot
+`cquery //:probe --output=label` exits 2 after 79.064 seconds,
+inside its 180-second operation bound. BUILD/MODULE/lockfile hashes are unchanged.
+It clears the missing bazel_tools def_parser package and first reports
+`Object of type cpp has no attribute grte_top` at
+`@@rules_cc+//cc/common:cc_helper.bzl:844`, called by cc_library's invalid-options
+check. This is bootstrap advancement, not a successful full-toolchain query.
+No stale slugd was present before/after, and the supervised replay stopped its
+process group. Raw evidence remains under target/wp854/.
+
+Recorded packet window from manifest draft to acceptance is approximately
+20.3 minutes. Final Bzlmod compile 4.56 seconds (initial preparation 14.99),
+Loading compile 7.85 seconds (initial 21.84), Analysis compile 27.86 seconds;
+focused runtime totals approximately 0.45 seconds. Independent review elapsed
+was not measured separately. Rustfmt, diff, archive and plan-status checks pass.
+M7A and the next cpp.grte_top/full C++ closure remain open. The user's Linux
+priority and minimal/deferred Windows implementation are recorded canonically.

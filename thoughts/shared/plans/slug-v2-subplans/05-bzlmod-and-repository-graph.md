@@ -654,3 +654,16 @@ Full checkpoint chronology and exact source/validation receipts remain at
 checkpoint companion files are historical indexes, not append destinations.
 Update this owner only for changed invariants or gates; ordinary acceptance
 belongs in its implementation commit.
+
+### Built-in def_parser package accepted (WP854, 2026-09-29)
+
+The immutable Bazel 9.2 source catalog now owns the complete two-file Linux
+installed tools/def_parser package: BUILD.tools renamed verbatim to BUILD
+(971 bytes) and no_op.bat (710 bytes), both release-archive mode 100644.
+The compile-data BUILD.bazel sidecar is excluded from runtime bytes. Existing
+source/listing and manifest route owners expose this package without new DICE
+keys, materialization or caches. Exact byte/mode/manifest/directory/package
+inventories and real configured source forwarding pass. The installed selector
+is preserved; default Linux target/exec returns no_op.bat, while Windows parser
+source/prebuilt execution remains deferred. The rebuilt unchanged authentic
+cquery clears the missing package and reaches cpp.grte_top in rules_cc.

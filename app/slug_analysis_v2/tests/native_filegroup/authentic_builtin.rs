@@ -26,7 +26,7 @@ impl BuiltinWorkspace {
         fs::write(root.join("MODULE.bazel"), root_module).unwrap();
         fs::write(
             root.join("BUILD.bazel"),
-            "platform(name='linux_platform',constraint_values=['@@platforms//os:linux'])\nplatform(name='windows_platform',constraint_values=['@@platforms//os:windows'])\n",
+            "platform(name='linux_platform',constraint_values=['@@platforms//os:linux'])\nplatform(name='windows_platform',constraint_values=['@@platforms//os:windows'])\nalias(name='def_parser_apparent',actual='@bazel_tools//tools/def_parser:def_parser')\n",
         )
         .unwrap();
         fs::create_dir_all(root.join("platforms/os")).unwrap();
@@ -35,6 +35,13 @@ impl BuiltinWorkspace {
         fs::write(
             root.join("platforms/os/BUILD.bazel"),
             "constraint_setting(name='os')\nconstraint_value(name='linux',constraint_setting=':os')\nconstraint_value(name='windows',constraint_setting=':os')\n",
+        )
+        .unwrap();
+        fs::create_dir_all(root.join("platforms/host")).unwrap();
+        fs::write(root.join("platforms/host/BUILD.bazel"), "").unwrap();
+        fs::write(
+            root.join("platforms/host/constraints.bzl"),
+            "HOST_CONSTRAINTS = ['@platforms//os:linux']\n",
         )
         .unwrap();
         Self(root)
@@ -46,6 +53,7 @@ impl BuiltinWorkspace {
             test_configuration()
                 .slug_configuration()
                 .unwrap()
+                .with_host_platform_label(&CanonicalLabel::parse("@@//:linux_platform").unwrap())
                 .with_transition_target_platform(Some(&platform))
                 .unwrap(),
         )
@@ -132,6 +140,112 @@ const REPOSITORIES: &[(&str, &str)] = &[
 impl Drop for BuiltinWorkspace {
     fn drop(&mut self) {
         fs::remove_dir_all(&self.0).unwrap();
+    }
+}
+
+#[tokio::test]
+async fn authentic_builtin_def_parser_forwards_linux_target_exec_and_refuses_windows() {
+    let workspace = BuiltinWorkspace::new();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let group = "@@bazel_tools//tools/def_parser:def_parser";
+    let source = CanonicalLabel::parse("@@bazel_tools//tools/def_parser:no_op.bat").unwrap();
+    let expected_file = AnalysisArtifact::Source(source.clone());
+    let configuration = |platform: &str, execution: bool| {
+        let target = workspace.configuration(platform);
+        if execution {
+            ConfigurationKey::from_slug(
+                target
+                    .slug_configuration()
+                    .unwrap()
+                    .to_exec_for_platform(
+                        &CanonicalLabel::parse(&format!("@@//:{platform}_platform")).unwrap(),
+                    )
+                    .unwrap(),
+            )
+        } else {
+            target
+        }
+    };
+    for execution in [false, true] {
+        let linux = configuration("linux", execution);
+        let first = workspace
+            .request(&dice, group, linux.clone())
+            .await
+            .unwrap();
+        assert!(first.actions().is_empty());
+        let source_edges = first
+            .edges()
+            .iter()
+            .filter(|edge| matches!(edge.kind(), ConfiguredEdgeKind::Attribute { attribute, .. } if attribute == "srcs"))
+            .collect::<Vec<_>>();
+        assert_eq!(source_edges.len(), 1, "{source_edges:?}");
+        assert_eq!(
+            source_edges[0].target(),
+            &ConfiguredNodeKey::Null(source.clone())
+        );
+        assert!(matches!(
+            source_edges[0].kind(),
+            ConfiguredEdgeKind::Attribute {
+                index: 0,
+                hidden: false,
+                dependency: ConfiguredAttributeDependency::Target,
+                ..
+            }
+        ));
+        let default = info(&first);
+        assert_eq!(default.file_artifacts(), [expected_file.clone()]);
+        assert_eq!(default.executable.as_ref(), Some(&expected_file));
+        assert_eq!(
+            default.files_to_run.executable.as_ref(),
+            Some(&expected_file)
+        );
+        assert_eq!(
+            default.files_to_run.files().to_list(),
+            [AnalysisValue::artifact(expected_file.clone())]
+        );
+        assert!(default.files_to_run.support.is_none());
+        assert!(default.default_runfiles.files.is_empty());
+        assert_eq!(
+            paths(&default.data_runfiles.files),
+            ["external/bazel_tools/tools/def_parser/no_op.bat"]
+        );
+        assert_eq!(
+            expected_file.short_path().as_ref(),
+            "../bazel_tools/tools/def_parser/no_op.bat"
+        );
+
+        let apparent = workspace
+            .request(&dice, "@@//:def_parser_apparent", linux.clone())
+            .await
+            .unwrap();
+        assert!(apparent.actions().is_empty());
+        assert_eq!(info(&apparent), default);
+        assert_eq!(apparent.edges().len(), 1);
+        let child = apparent.edges()[0].target().configured_target().unwrap();
+        assert_eq!(child.label().to_string(), group);
+        assert_eq!(child.configuration(), &linux);
+
+        let error = workspace
+            .request(&dice, group, configuration("windows", execution))
+            .await
+            .unwrap_err();
+        assert!(error.contains("third_party/def_parser"), "{error}");
+        assert!(error.contains("BUILD file not found"), "{error}");
+        let restored = workspace
+            .request(&dice, group, linux.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            restored, first,
+            "Windows failure must not publish a Linux fallback"
+        );
+        assert_eq!(
+            workspace
+                .request(&dice, "@@//:def_parser_apparent", linux)
+                .await
+                .unwrap(),
+            apparent
+        );
     }
 }
 

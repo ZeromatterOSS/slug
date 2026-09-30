@@ -450,6 +450,18 @@ const CATALOG: &[CatalogEntry] = &[
         executable: false,
     },
     CatalogEntry {
+        path: "tools/def_parser/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/def_parser/BUILD"),
+        expected_sha256: "891d56515113353a675db4f62e51380f3816b703b18585361e02de84e16e95ca",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/def_parser/no_op.bat",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/def_parser/no_op.bat"),
+        expected_sha256: "4ebf44828201a3228a0521723c48d26db87565e44ef862fb65d5ead92840f64d",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/jdk/BUILD",
         bytes: include_bytes!("../builtin/bazel_tools/tools/jdk/BUILD"),
         expected_sha256: "0ea0dae7e42fdfb3f2fbe945fae3e84e57e263ac6affd4dc6a74b351868832a6",
@@ -1180,12 +1192,20 @@ mod tests {
                 ("build_defs".to_owned(), PathDirectoryEntryKind::Directory),
                 ("build_defs.bzl".to_owned(), PathDirectoryEntryKind::File),
                 ("cpp".to_owned(), PathDirectoryEntryKind::Directory),
+                ("def_parser".to_owned(), PathDirectoryEntryKind::Directory),
                 ("jdk".to_owned(), PathDirectoryEntryKind::Directory),
                 ("launcher".to_owned(), PathDirectoryEntryKind::Directory),
                 ("osx".to_owned(), PathDirectoryEntryKind::Directory),
                 ("python".to_owned(), PathDirectoryEntryKind::Directory),
                 ("res".to_owned(), PathDirectoryEntryKind::Directory),
                 ("test".to_owned(), PathDirectoryEntryKind::Directory),
+            ]
+        );
+        assert_eq!(
+            listing_rows("tools/def_parser"),
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("no_op.bat".to_owned(), PathDirectoryEntryKind::File),
             ]
         );
         assert_eq!(
@@ -1527,9 +1547,9 @@ mod tests {
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
             if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-                "331063679b7adc7084be104a455c13df476cdda2aa13acb07edf2dc7e12d9e7c"
+                "0cc12333267512ebe791d8f845735c5d9bd5f78b3d6a211f08fdc92ef62bacf7"
             } else {
-                "f4e5f390e55c75e9a91fb3dadf950927c8b0b56ab7ea7da99d4c5eed6d9d5151"
+                "ef108fa963117d4af9776ccbc4e380faa71f5eabda04725d846372459709b172"
             }
         );
         assert_eq!(value.module_sha256, source.sha256());

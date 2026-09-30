@@ -9,6 +9,7 @@ use super::*;
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 mod authentic_builtin;
+mod direct_constraints;
 mod lifecycle;
 mod rejection;
 

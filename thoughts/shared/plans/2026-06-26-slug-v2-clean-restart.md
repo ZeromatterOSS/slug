@@ -27,18 +27,23 @@ never selects work. This compaction changes no accepted compatibility surface.
 | M7B: remaining breadth | deferred until M8; mixed-language repository follows cache library release | run/test/BEP, unrelated rulesets, extra formats and product extensions not demanded by bootstrap |
 | M9: exact identity/inspection bytes | deferred until functional bootstrap | retain four-domain evidence `f00e99db`; exact configuration/output bytes and unadmitted exact ActionKey projections |
 
+Current platform priority is Linux bootstrap. Windows-specific functionality
+may remain minimal stubs or explicit unsupported boundaries until a suitable
+platform is available for effective testing; do not expand Windows execution
+or compatibility work merely to close a Linux bootstrap packet.
+
 ### Current packet
 
-Packet: WP-7-153-m7a-alias-direct-constraint-select-r1
+Packet: WP-7-154-m7a-def-parser-catalog-filegroup-select-r1
 Status: accepted; M7A remains partial
 
-WP853 accepts direct constraint-value keys in configured native alias
-`select()`, with structural owner eligibility and existing target-platform
-matching. Independent DESIGN/FINAL review and 14 focused tests pass. The
-rebuilt unchanged Rust-toolchain cquery clears the `@@platforms//os:none`
-condition error and next stops at missing `@@bazel_tools//tools/def_parser`.
-Other owners, mixed matching specialization and full toolchain/C++ closure
-remain deferred; M7A remains partial. See `slug-v2-subplans/current-packet.md`.
+WP854 accepts the exact installed bazel_tools def_parser package and its
+native filegroup direct constraint selector through existing condition/platform
+owners. Independent DESIGN/FINAL reviews and 29 focused tests pass. The rebuilt
+unchanged Rust-toolchain cquery clears def_parser and next stops at
+`cpp.grte_top()` in rules_cc `cc_helper.bzl:844`. Windows parser and full
+Rust-toolchain/C++ closure remain deferred; M7A remains partial. See
+`slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

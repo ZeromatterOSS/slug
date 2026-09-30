@@ -296,6 +296,16 @@ const FILES: &[(&str, &str, bool)] = &[
         false,
     ),
     (
+        "tools/def_parser/BUILD",
+        "891d56515113353a675db4f62e51380f3816b703b18585361e02de84e16e95ca",
+        false,
+    ),
+    (
+        "tools/def_parser/no_op.bat",
+        "4ebf44828201a3228a0521723c48d26db87565e44ef862fb65d5ead92840f64d",
+        false,
+    ),
+    (
         "tools/jdk/BUILD",
         "0ea0dae7e42fdfb3f2fbe945fae3e84e57e263ac6affd4dc6a74b351868832a6",
         false,
@@ -546,6 +556,24 @@ async fn runtime_python_build_uses_build_tools_bytes_not_source_tree_wrapper() {
 }
 
 #[tokio::test]
+async fn runtime_def_parser_build_uses_build_tools_bytes_not_source_tree_bootstrap() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let build = read(&dice, "tools/def_parser/BUILD").await.unwrap();
+    assert_eq!(build.bytes().len(), 971);
+    assert_eq!(
+        hex::encode(build.sha256()),
+        "891d56515113353a675db4f62e51380f3816b703b18585361e02de84e16e95ca"
+    );
+    // Bazel 9.2's source bootstrap BUILD unconditionally chooses no_op.bat;
+    // embedded_tools installs BUILD.tools with the Windows selector intact.
+    assert_ne!(
+        hex::encode(build.sha256()),
+        "228e297d8a6ad00d2668a804f0bb2c0ec48e554614220281396b59c24cd58f25"
+    );
+    assert!(!build.executable());
+}
+
+#[tokio::test]
 async fn invalid_wrong_kind_and_unsupported_catalog_are_distinct() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     for path in [
@@ -663,9 +691,9 @@ async fn immutable_snapshot_is_invariant_across_dice_instances_and_transactions(
     assert_eq!(
         hex::encode(identity.manifest_sha256()),
         if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-            "331063679b7adc7084be104a455c13df476cdda2aa13acb07edf2dc7e12d9e7c"
+            "0cc12333267512ebe791d8f845735c5d9bd5f78b3d6a211f08fdc92ef62bacf7"
         } else {
-            "f4e5f390e55c75e9a91fb3dadf950927c8b0b56ab7ea7da99d4c5eed6d9d5151"
+            "ef108fa963117d4af9776ccbc4e380faa71f5eabda04725d846372459709b172"
         }
     );
 }
@@ -690,6 +718,7 @@ fn embedded_catalog_paths_remain_exact_with_bazel_input_metadata() {
         "tools/build_defs/repo/BUILD.bazel",
         "tools/cpp/BUILD.bazel",
         "tools/cpp/modules_tools/BUILD.bazel",
+        "tools/def_parser/BUILD.bazel",
         "tools/jdk/BUILD.bazel",
         "tools/launcher/BUILD.bazel",
         "tools/python/BUILD.bazel",

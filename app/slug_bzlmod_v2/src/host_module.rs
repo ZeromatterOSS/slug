@@ -3185,9 +3185,9 @@ mod tests {
         assert_eq!(
             hex::encode(identity.manifest_sha256()),
             if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-                "331063679b7adc7084be104a455c13df476cdda2aa13acb07edf2dc7e12d9e7c"
+                "0cc12333267512ebe791d8f845735c5d9bd5f78b3d6a211f08fdc92ef62bacf7"
             } else {
-                "f4e5f390e55c75e9a91fb3dadf950927c8b0b56ab7ea7da99d4c5eed6d9d5151"
+                "ef108fa963117d4af9776ccbc4e380faa71f5eabda04725d846372459709b172"
             }
         );
 

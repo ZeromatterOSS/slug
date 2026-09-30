@@ -280,7 +280,9 @@ impl ConfiguredConditionKey {
         })
     }
 
-    fn for_alias(
+    // Native aliases with selectors and native filegroups have an admitted
+    // target-platform context; their condition truth can share this key.
+    fn for_native_platform_selector(
         workspace: NormalizedAbsolutePath,
         target: ConfiguredTargetKey,
     ) -> Result<Self, AnalysisError> {
@@ -1357,7 +1359,10 @@ async fn prepare_configured_attribute_conditions(
         .compute_join(selector_labels.iter().cloned(), |ctx, label| {
             let target = ConfiguredTargetKey::new(label.clone(), condition_configuration.clone());
             let key = if allow_direct_constraint_value {
-                ConfiguredConditionKey::for_alias(condition_workspace.dupe(), target)
+                ConfiguredConditionKey::for_native_platform_selector(
+                    condition_workspace.dupe(),
+                    target,
+                )
             } else {
                 ConfiguredConditionKey::new(condition_workspace.dupe(), target)
             }

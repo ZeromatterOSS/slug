@@ -1982,6 +1982,21 @@ clears the `@@platforms//os:none` condition error and next stops at missing
 `@@bazel_tools//tools/def_parser`. Other owners and full toolchain/C++ closure
 remain deferred.
 
+## Native filegroup direct constraint selectors (WP854, 2026-09-29)
+
+Native srcs-only filegroup now shares WP853's structurally eligible condition
+key with native alias; pinned FilegroupRule inherits enabled toolchain
+resolution and owns a target platform. Effective/default constraint matching,
+requested-key identity, alias resolution, peer ambiguity and mixed-match
+refusal remain with the existing owners. Nondefault filegroup attributes remain
+unsupported. Target/exec matching and platform/selector/default-source A/B/A
+pass, with existing forwarding, source lifecycle, refusal and alias controls.
+The actual catalog def_parser forwards no_op.bat with one null source edge,
+unchanged DefaultInfo/FilesToRun and zero actions through canonical and root
+apparent routes. Linux selector safety does not claim Windows execution.
+The unchanged authentic Rust-toolchain cquery next reaches cpp.grte_top at
+rules_cc cc_helper.bzl:844; that field and full configured C++ remain open.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.
