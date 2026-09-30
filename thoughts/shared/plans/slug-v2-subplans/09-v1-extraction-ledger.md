@@ -822,6 +822,14 @@ environment A/B/A; concurrent one-read Host latching; public dependent tests;
 and 597 production / 489 proof / 1,086 total Rust-line caps. Independent
 terminal review returned `ACCEPT`.
 
+WP863's immutable link Args adds only a traced/freezable evaluator adapter over
+the existing shared feature model and original variable owner. Current-heap
+expansion enters the accepted scalar recipe/parameter policy pipeline; it adds
+no retained action representation, utility import, identity owner, interner or
+cache. Module freeze preserves original variable/cache seeds. Registration
+snapshot timing remains Slug-native; nested identity hashing and execution-time
+expansion stay deferred. No performance claim or new donor disposition.
+
 The active bounded basic Args/run/symlink successor's first pre-review returned
 `REPLAN` while accepting the environment dependency and borrowed sink. Its
 focused correction binds mutable Args to the starlark-rust evaluator heap,

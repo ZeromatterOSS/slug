@@ -1,96 +1,129 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-162-m7a-cpp-specific-tool-files-option-r1
-Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
+Packet: WP-7-163-m7a-immutable-link-args-r1
+Status: accepted bounded slice; corrected independent DESIGN/FINAL ACCEPT; M7A remains partial
 
 ## Outcome, compatibility and ownership
 
-Advance unchanged authentic Rust-toolchain cquery past cpp.
-incompatible_use_specific_tool_files() at rules_cc finalize_link_action.bzl:233.
-Admit private zero-argument Boolean getter and closed typed --[no] option from
-existing retained CppOptions descriptor, True default. Exact Bazel9.2 8220c619
-CppConfiguration.java:790-796, CppOptions.java:828-837, default private
-allowlist CcModule:189-191/BuiltinRestriction:181-183 and exec propagate
-builtin_exec_platforms.bzl:313. CcToolchainTest.java:859-883 covers downstream
-compiler/as/ar input selection; direct getter tests not found. This slice
-observes requested policy; full archive/link execution remains unproved.
-Existing Slug-native structural config/path/action identity and Unicode
-contracts apply. Linux priority, Windows work remains deferred.
+Advance unchanged authentic Linux Rust-toolchain cquery past cc_internal.
+get_link_args at rules_cc finalize_link_action.bzl:352, using existing native
+feature/variable expansion and generic Args action publication. Baseline
+WP862 a07544523. Pinned Bazel9.2 8220c619 CcStarlarkInternal.java:408-440
+requires four named-only arguments action_name:string, genuine FeatureConfiguration,
+genuine CcToolchainVariables build_variables, parameter_file_type:string|None;
+no caller/context/action gate. Args.java:119-240 returns immutable unhashable
+Args with all five mutations rejected, not a list or mutable args.
+LinkCommandLine.java:93-153 expands features without toolpath, filters EVERY
+argument containing linker_param_file converted by the existing native string
+projection even with None (empty filters all). Lookup/string conversion precedes
+feature expansion and preserves malformed-parameter error precedence; Boolean/File
+values reuse admitted conversion, sequence/struct errors remain visible. It
+then optional always-use policy uses first literal LINKER_PARAM_FILE_PLACEHOLDER,
+escapes percent before substitution. Retained flags must pass existing shared
+exactly-one-%s validator; multiple literal placeholders are explicitly deferred
+rather than sent to the renderer that assumes validation. LinkCommandLineTest:170/187/202/218/275-337
+covers library/search expansion, param use, static split/filter/no-split.
+Direct get_link_args/FrozenArgs tests not found; adapt pinned regression using
+existing small constructors and Analysis fixture. No new copied public fixture.
 
-Reuse SlugConfiguration.cpp_compile_use_specific_tool_files(), already checked
-native_bool producer used by Analysis compile-action construction. No new
-option state/helper producer. Append NativeCommandOption variant preserving
-existing ordinals, name/canonical Boolean admission; command capture/preparation
-and shared Boolean converter own raw/negated/last-wins input. Projection getter
-must delegate to this existing compile policy owner and validate it at
-CppFragmentProjection construction. Loading invokes original CppFragmentValue
-current-caller check even for transferred methods, retaining bound config.
-Exec clones/carries existing retained option without mapping edits.
+Exact admitted binder/type/immutability, flag order/filter and supported policy, with registration snapshot timing
+classified Slug-native below:
+None, UNQUOTED and SHELL_QUOTED reuse existing serializers. GCC_QUOTED and WINDOWS
+explicit unsupported/deferred, invalid names/type rejected. Windows stays minimal.
+Existing Slug-native output paths/structural identity/Unicode/repr contracts apply.
+Full native archive/link actions, callbacks/resource_set, runtime mapped paths,
+tree expansion and execution closure remain deferred. A different actual requested
+format is a recorded boundary, not permission to approximate its serializer.
 
-Existing DICE structural configured/source keys and primitive/provider
-publication own invalidation/restoration; docs/developers/dice.md applies.
-No key/lock/cache/repair/environment read/action registration or new retained
-memory. Projection uses existing evaluator-phase shared config; bool adds no
-collection/identity scheme. Inherit accepted WP860 requested-Boolean contract
-at146bc1789 current-packet.md; this packet adds only this third private getter.
-Large Loading/Commands files receive narrow method/test deltas; no donor/reuse
-representation change, performance or Windows execution claim.
+Own one immutable traced/freezable evaluator LinkArgsGen<V> retaining existing
+CcFeatureConfiguration (shared immutable model), action CompactString and original
+variables Value/FrozenValue plus optional existing param format/flag. None does
+not expand on construction; string mode expands now to compute policy, then
+expands again at consumption, preserving shallow-live/dotted-cache behavior
+between construction and registration. None-lazy/string-eager construction timing
+is source-exact; expansion into scalar recipes at action registration is inherited
+Slug-native snapshot timing. Upstream execution-time deferred expansion and
+mutations after registration remain unsupported/deferred.
+Freeze uses existing variable freezer; no borrowed heap/scratch retained, new
+semantic store/cache/key/lock/global/interner/donor or retained action representation.
+Evaluator values release with heap; existing module freeze owns any retained seed.
 
-Allowlist: Configuration src/command.rs, src/native/cpp_fragment.rs and
-src/native/cpp_start_end_lib_tests.rs (parameterize existing focused tests);
-Loading src/analysis_fragments.rs and
-src/analysis_fragments/toolchain_provider_tests.rs; Commands src/common.rs
-only tests; Analysis tests/subrule/implementation_deps.rs existing fixture;
-this manifest/canonical Current and compact existing Stage6 requested-Boolean
-note. Baselinebd48a01e2. Production estimate below25lines, tests use existing
-helpers/rows with netgrowth below150. No linker/tool-input action activation,
-registry/native compile-owner edit, public oracle fixture or Windows code.
-Independent DESIGN before implementation, FINAL before acceptance.
+At Loading write/run/run_shell, AFTER existing receiver/binding/lifecycle guards,
+normalize only genuine LinkArgs through current caller heap into existing scalar
+EvaluatorArgsSnapshot/StarlarkArgs before unchanged Analysis sink. This adapter
+must not expose a new mutable value to Starlark. Shared Args mutation binder
+rejects LinkArgs before validation. Later sink-owned output/scope override error
+precedence for multiple-invalid requests remains Slug-native at this snapshot
+phase; every error prevents registration. Existing mutable Args and wrong-typed entries
+preserve behavior. Existing lower_args_snapshot, RetainedArgsRecipe and parameter
+policy own action publication, structural equality/invalidation/source/config A/B/A.
+Source-exact immutable behavior is bounded to all mutation rejection and module
+freeze. Nested struct/provider immutable classification and identity hashing are
+unsupported/deferred; no incomplete structural capability or new occurrence
+owner is added. No new sink API, action family or repair. DICE owner/locking rules from
+ docs/developers/dice.md apply. Stage9 existing generic Args owner remains authority;
+only evaluator adapter added, no utility import/performance claim.
 
-## Evidence and validation
+## Scope and evidence
 
-Existing native cpp_compile_policy_projects_both_scan_flags_and_specific_tools_
-structurally test proves defaultTrue,false and structural A/B/A policy. Protect
-it. Parameterize prior requested-Boolean tests for this option: target/default/
-false structural identity and config_setting, both exec carries/idempotence,
-malformed retained values rejected at projection construction. Shared Boolean
-conversion proof reused; real command capture/public parse validates negation/
-last-wins/null-invalid text. Keep prior implementation-deps/start_end_lib cases.
-Loading zeroarg private direct/transferred callers, bound original config and
-crossed independent three Booleans in target/exec. Analysis existing root/
-subrule fixture publishes independent three bool pairs under crossed values,
-config/source A/B/A in same DICE Legacy/Observed, both exec and target restoration;
-no action mutation. Preserve all prior assertions, no new fixture/materialization.
+Allowlist: Loading cc_common.rs narrow binder; cc_variables.rs child registration;
+new cc_variables/link_args.rs and focused child tests; subrule_invocation.rs
+narrow shared Args receiver/snapshot construction and guarded consumption hooks;
+Analysis tests/cc_feature_expansion/mod.rs child registration and existing
+cc_configure_features/mod.rs minimal request_with_route helper (old wrapper unchanged),
+new cc_feature_expansion/link_args.rs tests reusing workspace_with and exact creator
+sources; existing subrule/link_actions.rs remains protected. Manifest/
+canonical Current; compact Stage6 Args/link metadata and matching Stage9 owner note.
+No production Analysis/sink/build-api serializer/config/fixture/materialization edit.
+Large parent files get narrow hooks; new bounded child owns LinkArgs algorithm.
+Estimate production below300 lines. Actual proof is286Loading plus~282Analysis
+lines, above the initial300 total estimate: separate native construction/freeze
+and real action-consumption/restoration phases require both harnesses. They reuse
+existing constructors/request/creator sources; no duplicated copied fixtures.
+Review actual responsibility boundaries and discriminators.
 
-Pinned nightly serial Cargo JSON --no-run Config/Commands/Loading/Analysis,
-each60s preparation cap; batch exact nonignored preflight then focused runtime
-expected belowfewseconds. Core direct-dependent check and CLI rebuild before
-unchanged originalthreehash authentic cquery from target/wp856 fixture,
-supervised180s operationcap justified by observed83s publicsource preparation;
-smaller fixtures cannot identify the actual finite closure frontier. Actual
-execution-environment process checks and supervisor cleanup before/after.
-Rustfmt/diff/archive/status; root integrates/commits. Bounds are operation caps,
-not user limits. REPLAN only if existing compile-policy producer cannot own
-this getter or exec/source evidence contradicts it; routine corrections stay.
+Loading discriminators: four named-only binding/genuine inputs; None lazy failure
+and mutable list changes; string eager failure then second expansion; no toolpath;
+all-occurrence substring filter incl absent/empty/nonstring; first placeholder/%
+escape/no-placeholder/two-placeholder refusal; supported serializer/default shell without policy; deferred
+formats; all five mutation errors/unhashability/freeze and repeated consuming
+original values with no new cache. Protect prior live/dotted/frozen variable cases.
+Analysis reused feature-creator fixture adds root/subrule wrapped write and generic
+spawn that consume returned Args,
+verify owned scalar recipes/policy/bytes and existing action guards. Protect prior
+subrule FileWrite/soname/immutable-library assertions without editing their fixture. Same-DICE source/config A/B/A both
+Legacy/Observed, target/exec restoration prove original action owner remains.
+
+Independent DESIGN before edits and FINAL actual delta/evidence. Pinned nightly
+serial Cargo JSON Loadinglib/Analysis starlark_rule and protective subrule no-run60s prep each, batch exact
+nonignored preflight and focused runtime belowfewseconds; Core direct-dependent
+check, CLI rebuild. Unchanged originalthreehash authentic fixture supervised180s
+cap justified by observed86s sourceprep, actual process checks/cleanup. Scoped
+rustfmt/diff/archive/planstatus. No hard user12s ceiling. REPLAN if deferred values
+cannot use existing current-heap expansion safely, freeze changes original variable/cache ownership,
+or implementation requires another retained/action owner. Routine corrections stay.
 
 ## Immediate predecessor
 
-WP861bd48a01e2 admits Slug-native immutable intern_seq adapter, exact binding/
-outer tuple shape, original value preservation; global/mutable representative
-substitution deferred. Corrected DESIGN/FINAL and23focused tests pass.
-Unchanged authentic cquery83.148s clears intern_seq and reaches specific-tool
-files getter; hashes/cleanup pass. Evidence target/wp861. M7A/M8/full link
-closure and Windows remain unproved.
+WP862 a07544523 projects specific-tool-files through existing compile-policy owner
+and typed option. Independent DESIGN/FINAL,30focused checks0.514s and Core/CLI pass.
+Authentic unchanged cquery86.208s clears getter, reaches get_link_args:352;
+hashes/cleanup pass. Evidence target/wp862. M7A/M8/full linking unproved.
 
 ## Acceptance receipt
 
-WP862 accepts the existing-owner getter and closed typed option. Independent
-DESIGN/FINAL ACCEPT. Thirty exact nonignored checks pass: Configuration12
-(including existing compile-policy protection), Commands4, Loading8, Analysis6;
-combined runtime0.514s. Serial pinned-nightly preparation: Configuration1.20s,
-Commands13.07s, Loading22.68s, Analysis6.25s, Corecheck8.95s, CLIrebuild24.06s.
-Unchanged authentic cquery exits2 in86.208s, clears the getter and reaches
-cc_internal.get_link_args at finalize_link_action.bzl:352 on PICstatic route.
-Originalthreehashes and actual execution-environment cleanup pass. Scoped
-format/diff/archive/status checks pass. Evidence target/wp862; packet window
-08:54→09:13 UTC. Full C++ link closure/M7A/M8 remain unproved, Windows deferred.
+WP863 accepts the bounded immutable LinkArgs adapter, not full helper closure.
+Corrected independent DESIGN/FINAL ACCEPT. Thirty-seven exact nonignored checks
+pass: Loading26 (sixnew, realGC/freeze and prior variable/wrapper/sequence proofs),
+protective subrule6, Analysis starlark_rule5; runtime0.592s total. Final serial
+pinned-nightly preparation Loading7.50s, subrule16.07s, starlark_rule1.40s,
+Corecheck14.18s, CLIrebuild21.49s. Initial compile/helper visibility/GC invocation
+and new guard-row errors were corrected without changing production ownership;
+original scopeNone checks remain protected. Logs retained target/wp863.
+
+Unchanged authentic cquery exits2 in77.565s: missing get_link_args becomes
+explicit parameter_file_type=GCC_QUOTED refusal at the same finalize:352 call.
+The helper remains partial; the confirmed next prerequisite is GCC serialization.
+Originalthreehashes, actual process cleanup, scoped format/diff/archive/status
+checks pass. Packet09:13→09:55 UTC. Full linking/M7A/M8 remain unproved;
+execution-time expansion/nested identity hashing/Windows stay deferred.

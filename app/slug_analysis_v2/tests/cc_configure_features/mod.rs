@@ -159,6 +159,16 @@ pub(super) async fn request(
     name: &str,
     configuration: ConfigurationKey,
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
+    request_with_route(dice, root, name, configuration, true).await
+}
+
+pub(super) async fn request_with_route(
+    dice: &Arc<Dice>,
+    root: &std::path::Path,
+    name: &str,
+    configuration: ConfigurationKey,
+    observed: bool,
+) -> Result<Arc<ConfiguredNodeResult>, String> {
     let epoch = root_epoch(root);
     let mut updater = dice.updater_with_data(UserComputationData {
         cycle_detector: Some(analysis_cycle_detector()),
@@ -171,10 +181,32 @@ pub(super) async fn request(
     repositories.push(("platforms+", "platforms"));
     inject_root_target_inputs(&mut updater, root, epoch, &repositories);
     let mut tx = updater.commit().await;
+    let workspace = NormalizedAbsolutePath::new(root.to_path_buf()).unwrap();
+    let target = CanonicalLabel::parse(&format!("@@rules_cc+//cc/private:{name}")).unwrap();
+    if !observed {
+        let key = match prepare_configured_node_analysis(&mut tx, workspace, target, configuration)
+            .await
+        {
+            AnalysisPreparationOutcome::Complete(Ok(key)) => key,
+            other => {
+                return Err(format!(
+                    "legacy feature configuration preparation: {other:?}"
+                ));
+            }
+        };
+        return match tx.compute(&key).await.map_err(|error| error.to_string())? {
+            AnalysisPreparationOutcome::Complete(result) => result
+                .as_ref()
+                .as_ref()
+                .cloned()
+                .map_err(ToString::to_string),
+            other => Err(format!("legacy feature configuration: {other:?}")),
+        };
+    }
     let key = match slug_analysis_v2::prepare_configured_node_analysis_observed(
         &mut tx,
-        NormalizedAbsolutePath::new(root.to_path_buf()).unwrap(),
-        CanonicalLabel::parse(&format!("@@rules_cc+//cc/private:{name}")).unwrap(),
+        workspace,
+        target,
         configuration,
     )
     .await

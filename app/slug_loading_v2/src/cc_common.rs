@@ -82,6 +82,23 @@ impl<'v> StarlarkValue<'v> for CcInternalModule {
 
 #[starlark_module]
 fn cc_internal_methods(builder: &mut MethodsBuilder) {
+    fn get_link_args<'v>(
+        #[starlark(this)] _cc_internal: Value<'v>,
+        #[starlark(require = named)] action_name: &str,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] build_variables: Value<'v>,
+        #[starlark(require = named)] parameter_file_type: Value<'v>,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        crate::cc_variables::link_args::construct(
+            feature_configuration,
+            action_name,
+            build_variables,
+            parameter_file_type,
+            heap,
+        )
+    }
+
     fn intern_seq<'v>(
         #[starlark(this)] _cc_internal: Value<'v>,
         #[starlark(require = pos)] seq: Value<'v>,

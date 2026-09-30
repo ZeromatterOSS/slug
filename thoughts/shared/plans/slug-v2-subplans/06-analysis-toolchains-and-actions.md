@@ -2073,6 +2073,23 @@ representative substitution (also observable for equal mixed numerics/signed
 zero), global canonical sharing and performance parity remain deferred. No
 new interner/cache, retained Value owner or publication rule is introduced.
 
+The immutable get_link_args adapter retains genuine native feature configuration
+and original traced/freezable variables. Four required named inputs and mutation
+refusal/module freeze match CcStarlarkInternal:408-440/Args:119-240. None remains
+lazy at construction; supported string modes derive the first literal-placeholder
+policy immediately. Consumption checks linker_param_file before expansion and
+filters every matching argument, including None/empty/Boolean conversion cases;
+percent escaping and exactly-one-placeholder validation precede retained policy.
+None/UNQUOTED/SHELL_QUOTED reuse existing serializers, defaulting to shell when
+no policy is produced. Loading consumes on the current heap after its binding/
+lifecycle checks and hands scalar recipes to the original ArgsWrite/Spawn sink.
+Registration snapshots and later sink error ordering are Slug-native; upstream
+execution-time expansion, nested structural classification/identity hashing,
+multiple-placeholder flags and GCC/Windows formats remain deferred. No new
+retained action/key/cache/identity owner or native link action family is added.
+Both-route root/subrule snapshots, forced parameter bytes, source/configuration
+restoration, original-variable freeze and actual GC protect this handoff.
+
 ## Preserved library SONAME (WP859, 2026-09-30)
 
 The private link facade owns dynamic_library_soname wrapper validation. Three

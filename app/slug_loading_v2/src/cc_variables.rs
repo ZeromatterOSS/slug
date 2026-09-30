@@ -34,6 +34,7 @@ use starlark_map::small_map::SmallMap;
 
 mod access;
 pub(crate) mod dispatch;
+pub(crate) mod link_args;
 mod raw_hash;
 #[cfg(test)]
 mod tests;

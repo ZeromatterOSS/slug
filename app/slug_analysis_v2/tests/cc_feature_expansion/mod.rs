@@ -10,6 +10,7 @@ use super::cc_configure_features::workspace_with;
 use super::*;
 
 mod cache_boundary;
+mod link_args;
 mod link_variables;
 
 macro_rules! source {

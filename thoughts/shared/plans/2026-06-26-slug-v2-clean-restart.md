@@ -34,14 +34,14 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-162-m7a-cpp-specific-tool-files-option-r1
-Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
+Packet: WP-7-163-m7a-immutable-link-args-r1
+Status: accepted bounded slice; corrected independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP862 accepts the private specific-tool-files getter and typed command option,
-reusing the existing compile-policy owner. Independent DESIGN/FINAL ACCEPT;
-30focused checks and Core/CLI gates pass. The unchanged authentic cquery clears
-the getter in86.208s and reaches cc_internal.get_link_args at finalize:352;
-hashes/cleanup pass. Full link closure and Windows remain deferred.
+WP863 accepts immutable LinkArgs for None/UNQUOTED/SHELL_QUOTED over existing
+feature/variable/Args owners. Corrected DESIGN/FINAL,37focused checks/Core/CLI
+pass. Unchanged authentic cquery77.565s replaces missing-method error with
+GCC_QUOTED refusal at the same call; helper remains partial. GCC serialization
+is the confirmed next prerequisite. Hashes/cleanup pass; Windows deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

@@ -270,6 +270,16 @@ impl<'v> Freeze for StarlarkArgs<'v> {
 }
 
 impl<'v> StarlarkArgs<'v> {
+    pub(crate) fn from_snapshot(snapshot: EvaluatorArgsSnapshot<'v>, heap: Heap<'v>) -> Value<'v> {
+        heap.alloc_complex(Self {
+            state: Arc::new(Mutex::new(StarlarkArgsStateGen {
+                calls: snapshot.calls,
+                format: Some(snapshot.format),
+                param_file: snapshot.param_file,
+            })),
+        })
+    }
+
     pub fn snapshot(value: Value<'v>) -> Option<EvaluatorArgsSnapshot<'v>> {
         Self::from_value(value).map(|args| {
             let state = args
@@ -304,16 +314,57 @@ where
     }
 }
 
+fn mutable_args<'v>(this: Value<'v>, operation: &str) -> anyhow::Result<&'v StarlarkArgs<'v>> {
+    anyhow::ensure!(
+        !crate::cc_variables::link_args::is_link_args(this),
+        "cannot modify frozen value"
+    );
+    StarlarkArgs::from_value(this)
+        .ok_or_else(|| anyhow::anyhow!("Args.{operation} receiver is invalid"))
+}
+
+// Keep deferred link expansion on the caller's heap. The temporary mutable
+// recipe goes directly to the existing sink and is never exposed to Starlark.
+fn prepare_link_arguments<'v>(
+    arguments: Option<Value<'v>>,
+    heap: Heap<'v>,
+) -> anyhow::Result<Option<Value<'v>>> {
+    let Some(arguments) = arguments else {
+        return Ok(None);
+    };
+    let has_link_args = if let Some(values) = ListRef::from_value(arguments) {
+        values
+            .iter()
+            .any(crate::cc_variables::link_args::is_link_args)
+    } else if let Some(values) = TupleRef::from_value(arguments) {
+        values
+            .iter()
+            .any(crate::cc_variables::link_args::is_link_args)
+    } else {
+        false
+    };
+    if !has_link_args {
+        return Ok(Some(arguments));
+    }
+    let prepared = arguments
+        .iterate(heap)
+        .map_err(starlark::Error::into_anyhow)?
+        .map(|value| crate::cc_variables::link_args::prepare(value, heap))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(Some(
+        heap.alloc(starlark::values::list::AllocList(prepared)),
+    ))
+}
+
 #[starlark_module]
-fn starlark_args_methods(builder: &mut MethodsBuilder) {
+pub(crate) fn starlark_args_methods(builder: &mut MethodsBuilder) {
     fn add<'v>(
         this: Value<'v>,
         arg_name_or_value: Value<'v>,
         value: Option<Value<'v>>,
         #[starlark(require = named)] format: Option<&str>,
     ) -> anyhow::Result<Value<'v>> {
-        let args = StarlarkArgs::from_value(this)
-            .ok_or_else(|| anyhow::anyhow!("Args.add receiver is invalid"))?;
+        let args = mutable_args(this, "add")?;
         let (arg_name, value) = match value {
             Some(value) => (
                 Some(
@@ -354,8 +405,7 @@ fn starlark_args_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] allow_closure: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
-        let args = StarlarkArgs::from_value(this)
-            .ok_or_else(|| anyhow::anyhow!("Args.add_all receiver is invalid"))?;
+        let args = mutable_args(this, "add_all")?;
         let (arg_name, source) = vector_positionals(arg_name_or_values, values, "add_all")?;
         let map_each = classify_add_all_callback(map_each, allow_closure, eval)?;
         if let Some(format) = format_each {
@@ -400,8 +450,7 @@ fn starlark_args_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = true)] expand_directories: bool,
         #[starlark(require = named, default = false)] allow_closure: bool,
     ) -> anyhow::Result<Value<'v>> {
-        let args = StarlarkArgs::from_value(this)
-            .ok_or_else(|| anyhow::anyhow!("Args.add_joined receiver is invalid"))?;
+        let args = mutable_args(this, "add_joined")?;
         let (arg_name, source) = vector_positionals(arg_name_or_values, values, "add_joined")?;
         reject_callback_options(map_each, allow_closure, "add_joined")?;
         if let Some(format) = format_each {
@@ -440,8 +489,7 @@ fn starlark_args_methods(builder: &mut MethodsBuilder) {
         param_file_arg: &str,
         #[starlark(require = named, default = false)] use_always: bool,
     ) -> anyhow::Result<Value<'v>> {
-        let args = StarlarkArgs::from_value(this)
-            .ok_or_else(|| anyhow::anyhow!("Args.use_param_file receiver is invalid"))?;
+        let args = mutable_args(this, "use_param_file")?;
         validate_named_format("param_file_arg", param_file_arg)?;
         args.state
             .lock()
@@ -451,8 +499,7 @@ fn starlark_args_methods(builder: &mut MethodsBuilder) {
     }
 
     fn set_param_file_format<'v>(this: Value<'v>, format: &str) -> anyhow::Result<Value<'v>> {
-        let args = StarlarkArgs::from_value(this)
-            .ok_or_else(|| anyhow::anyhow!("Args.set_param_file_format receiver is invalid"))?;
+        let args = mutable_args(this, "set_param_file_format")?;
         let format = match format {
             "shell" => RetainedParamFileFormat::Shell,
             "multiline" => RetainedParamFileFormat::Multiline,
@@ -687,7 +734,7 @@ fn vector_source_is_empty(source: &EvaluatorVectorSourceGen<Value<'_>>) -> bool 
     }
 }
 
-fn validate_named_format(name: &str, format: &str) -> anyhow::Result<()> {
+pub(crate) fn validate_named_format(name: &str, format: &str) -> anyhow::Result<()> {
     validate_scalar_format(format)
         .map_err(|_| anyhow::anyhow!("Args {name} must contain exactly one %s placeholder"))
 }
@@ -1813,17 +1860,19 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         actions.action_sink.declare_directory(filename)
     }
 
-    fn write(
-        this: Value,
-        output: Value,
-        content: Value,
+    fn write<'v>(
+        this: Value<'v>,
+        output: Value<'v>,
+        content: Value<'v>,
         #[starlark(default = false)] is_executable: bool,
+        heap: Heap<'v>,
     ) -> anyhow::Result<NoneType> {
         let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         actions
             .token
             .require_active("write", actions.context_name)?;
+        let content = crate::cc_variables::link_args::prepare(content, heap)?;
         actions.action_sink.write(output, content, is_executable)?;
         Ok(NoneType)
     }
@@ -1845,10 +1894,11 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] shadowed_action: Option<Value<'v>>,
         #[starlark(require = named)] resource_set: Option<Value<'v>>,
         #[starlark(require = named)] toolchain: Option<Value<'v>>,
+        heap: Heap<'v>,
     ) -> anyhow::Result<NoneType> {
         let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
-        let request = bind_run_shell_request(
+        let mut request = bind_run_shell_request(
             actions.scope.clone(),
             outputs,
             inputs,
@@ -1869,6 +1919,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         actions
             .token
             .require_active("run_shell", actions.context_name)?;
+        request.arguments = prepare_link_arguments(request.arguments, heap)?;
         actions.action_sink.spawn(request)?;
         Ok(NoneType)
     }
@@ -1904,10 +1955,11 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] shadowed_action: Option<Value<'v>>,
         #[starlark(require = named)] resource_set: Option<Value<'v>>,
         #[starlark(require = named)] toolchain: Option<Value<'v>>,
+        heap: Heap<'v>,
     ) -> anyhow::Result<NoneType> {
         let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
-        let request = bind_run_request(
+        let mut request = bind_run_request(
             actions.action_sink.as_ref(),
             actions.scope.clone(),
             outputs,
@@ -1928,6 +1980,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
             toolchain,
         )?;
         actions.token.require_active("run", actions.context_name)?;
+        request.arguments = prepare_link_arguments(request.arguments, heap)?;
         actions.action_sink.spawn(request)?;
         Ok(NoneType)
     }
