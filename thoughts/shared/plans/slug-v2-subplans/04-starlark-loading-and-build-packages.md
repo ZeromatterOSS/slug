@@ -9843,3 +9843,14 @@ equality/hash. Other inputs fail closed; broad parsing, aliases and
 authentic cquery clears the former `xcode_config.bzl:400` constructor
 stop and first stops at the separate `XcodeVersionConfig(...)` provider
 call on line 98. Provider construction and M7A closure remain open.
+
+### Private nullable C++ libc method accepted (WP855, 2026-09-29)
+
+CppFragmentValue.grte_top() is the pinned zero-argument private Label-or-None
+method. Invocation uses the existing source-provenance allowlist, including
+transferred bound methods; the result uses the existing Label allocation.
+The validated projection reads sole retained Configuration state without
+resolving a libc target. Fragment occurrence identity remains unchanged.
+Six focused Loading checks pass with Configuration/Analysis dependents and
+independent DESIGN/FINAL acceptance. Full C++/sysroot behavior remains deferred;
+Windows execution is outside the current Linux bootstrap priority.

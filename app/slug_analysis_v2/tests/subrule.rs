@@ -63,6 +63,9 @@ use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
 use starlark_map::small_map::SmallMap;
 
+#[path = "subrule/grte_top.rs"]
+mod grte_top;
+
 fn workspace() -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new("/workspace").unwrap()
 }

@@ -31,6 +31,7 @@ impl CppFragmentProjection {
         projection.optional_text("propeller_optimize_absolute_ld_profile")?;
         projection.proto_profile()?;
         projection.custom_malloc()?;
+        projection.grte_top()?;
         projection.force_pic()?;
         projection.apple_generate_dsym()?;
         projection.dont_enable_host_nonhost()?;
@@ -109,6 +110,12 @@ impl CppFragmentProjection {
 
     pub fn custom_malloc(&self) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
         self.configuration.cpp_custom_malloc_label()
+    }
+
+    /// CppConfiguration.getLibcTopLabel returns the already converted option,
+    /// without resolving a target or substituting the toolchain's sysroot.
+    pub fn grte_top(&self) -> Result<Option<CanonicalLabel>, SlugConfigurationError> {
+        self.configuration.cpp_label("grte_top")
     }
 
     pub fn force_pic(&self) -> Result<bool, SlugConfigurationError> {

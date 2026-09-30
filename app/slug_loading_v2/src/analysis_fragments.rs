@@ -200,6 +200,20 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
             .map_or_else(Value::new_none, |label| alloc_starlark_label(heap, label)))
     }
 
+    fn grte_top<'v>(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        this.check(eval)?;
+        Ok(this
+            .retained
+            .projection()
+            .grte_top()?
+            .map_or_else(Value::new_none, |label| {
+                alloc_starlark_label(eval.heap(), label)
+            }))
+    }
+
     fn compilation_mode(
         this: &CppFragmentValue,
         eval: &mut Evaluator<'_, '_, '_>,

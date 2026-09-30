@@ -1997,6 +1997,20 @@ apparent routes. Linux selector safety does not claim Windows execution.
 The unchanged authentic Rust-toolchain cquery next reaches cpp.grte_top at
 rules_cc cc_helper.bzl:844; that field and full configured C++ remain open.
 
+## Private C++ libc option getter (WP855, 2026-09-29)
+
+The root/subrule C++ facade exposes grte_top() through the existing validated
+nullable label projection. Both exec entry points map it from retained
+host_grte_top as pinned builtin_exec_platforms requires; target state and the
+existing LibcTop configuration_field share the same owner. No new option parser,
+DICE key, fragment state, libc target lookup or action is introduced. Host
+command admission stays deferred. Nineteen focused Configuration/Loading/Analysis
+checks cover typed/error state, private current callers, occurrence identity,
+config/source restoration and both exec paths. Independent reviews pass.
+The rebuilt unchanged authentic Rust-toolchain cquery clears grte_top and next
+stops at cpp.experimental_cc_implementation_deps() in rules_cc semantics.bzl:114.
+M7A and full C++/toolchain closure remain partial; Windows execution is deferred.
+
 ## Historical evidence
 
 The original 23,981-line owner record is retained at `c5e7414d7`.

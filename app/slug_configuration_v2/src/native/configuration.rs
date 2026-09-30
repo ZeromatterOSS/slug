@@ -767,6 +767,7 @@ impl SlugConfiguration {
     ) -> Result<(), SlugConfigurationError> {
         let host_features = self.option_value(CORE_OPTIONS, "host_features")?.clone();
         let host_linkopts = self.option_value(CPP_OPTIONS, "host_linkopt")?.clone();
+        let host_grte_top = self.option_value(CPP_OPTIONS, "host_grte_top")?.clone();
         let add_g0 = self.execution_host_os()? != ActionEnvironmentHostOs::Windows;
         let host_compile_flags = |name| -> Result<OptionValue, SlugConfigurationError> {
             let values = self.native_string_list_option(CPP_OPTIONS, name)?;
@@ -803,6 +804,9 @@ impl SlugConfiguration {
                     record.value = OptionValue::Native(NativeOccurrence::Absent);
                 }
                 (CPP_OPTIONS, "fdo_prefetch_hints") => record.value = OptionValue::Label(None),
+                // builtin_exec_platforms.bzl maps this from the host option,
+                // including None, rather than propagating the target sysroot.
+                (CPP_OPTIONS, "grte_top") => record.value = host_grte_top.clone(),
                 (CPP_OPTIONS, "linkopt") => record.value = host_linkopts.clone(),
                 (CPP_OPTIONS, "copt") => record.value = host_copts.clone(),
                 (CPP_OPTIONS, "cxxopt") => record.value = host_cxxopts.clone(),
@@ -2609,3 +2613,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "cpp_grte_top_tests.rs"]
+mod cpp_grte_top_tests;

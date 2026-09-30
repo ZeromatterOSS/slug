@@ -117,6 +117,128 @@ fn evaluate(
     Ok(module.get("result")?.value().to_repr())
 }
 
+fn configured_grte_top(spelling: &str) -> SlugConfiguration {
+    let base = configured(None, false);
+    base.with_command_configuration(
+        base.starlark_options().clone(),
+        &CommandConfigurationOverlay::from(vec![CommandConfigurationOccurrence::native(
+            NativeCommandOption::GrteTop,
+            Some(spelling),
+            false,
+        )]),
+    )
+    .unwrap()
+}
+
+#[test]
+fn cpp_grte_top_method_preserves_nullable_label_shape_and_zero_arity() {
+    // Bazel 9.2 CppConfigurationApi.java:173-179 declares a nullable Label
+    // method; CppConfiguration.java:754-769 checks its private API caller.
+    let default = configured(None, false);
+    let label = configured_grte_top("//libc:discarded");
+    let platform = CanonicalLabel::parse("@@//platforms:exec").unwrap();
+    let reset = configured_grte_top("default");
+    for configuration in [
+        default.clone(),
+        label.to_exec().unwrap(),
+        label.to_exec_for_platform(&platform).unwrap(),
+        reset.clone(),
+    ] {
+        assert_eq!(
+            evaluate(
+                configuration,
+                true,
+                "def call():\n    return [hasattr(cpp, 'grte_top'), cpp.grte_top()]\nresult = call()",
+            )
+            .unwrap(),
+            "[True, None]"
+        );
+    }
+    assert_eq!(default, reset);
+    assert_eq!(
+        evaluate(
+            label.clone(),
+            true,
+            "def call():\n    value = cpp.grte_top()\n    return [type(value), str(value), value.name, value.package, value.repo_name, value.workspace_root, value == Label('@@//libc:everything')]\nresult = call()",
+        )
+        .unwrap(),
+        "[\"Label\", \"@@//libc:everything\", \"everything\", \"libc\", \"\", \"\", True]"
+    );
+    for call in ["cpp.grte_top('bad')", "cpp.grte_top(unexpected = True)"] {
+        assert!(evaluate(label.clone(), true, &format!("result = {call}")).is_err());
+    }
+}
+
+#[test]
+fn cpp_grte_top_method_checks_current_caller_even_when_transferred() {
+    for (configuration, expected) in [
+        (configured(None, false), "None"),
+        (
+            configured_grte_top("//trusted:discarded"),
+            "Label(\"@@//trusted:everything\")",
+        ),
+    ] {
+        let call = "def call():\n    return cpp.grte_top()\nresult = call()";
+        assert_eq!(
+            evaluate(configuration.clone(), true, call).unwrap(),
+            expected
+        );
+        let error = evaluate(configuration.clone(), false, call)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("private API"), "{error}");
+
+        let trusted = evaluate_module(
+            configuration.clone(),
+            true,
+            "bound = cpp.grte_top\nsaved_cpp = cpp",
+            None,
+        )
+        .unwrap();
+        // Obtaining a bound method does not authorize its subsequent caller.
+        evaluate_module(
+            configured(None, false),
+            false,
+            "saved = bound",
+            Some(&trusted),
+        )
+        .unwrap();
+        let transferred_call = "def call():\n    return bound()\nresult = call()";
+        let allowed = evaluate_module(
+            configured_grte_top("//consumer"),
+            true,
+            transferred_call,
+            Some(&trusted),
+        )
+        .unwrap();
+        assert_eq!(allowed.get("result").unwrap().value().to_repr(), expected);
+        let error = evaluate_module(
+            configured(None, false),
+            false,
+            transferred_call,
+            Some(&trusted),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("private API"), "{error}");
+        // Separate facade occurrences remain distinct even over equal options;
+        // the transferred facade preserves its own retained occurrence.
+        for current in [configuration, configured_grte_top("//consumer")] {
+            let compared = evaluate_module(
+                current,
+                true,
+                "alias = saved_cpp\nresult = [alias == saved_cpp, cpp == saved_cpp]",
+                Some(&trusted),
+            )
+            .unwrap();
+            assert_eq!(
+                compared.get("result").unwrap().value().to_repr(),
+                "[True, False]"
+            );
+        }
+    }
+}
+
 #[test]
 fn toolchain_configuration_public_methods_preserve_nullable_plain_text() {
     for (minimum, expected) in [
