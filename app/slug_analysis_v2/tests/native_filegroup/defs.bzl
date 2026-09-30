@@ -21,6 +21,9 @@ def _check_instrumented(info, other):
         fail("native empty Info equality/hash changed")
 
 def _origin(ctx):
+    for dep in ctx.attr.srcs + ctx.attr.deps:
+        if dep.files.to_list() != dep[DefaultInfo].files.to_list():
+            fail("prerequisite Target.files differs from DefaultInfo.files")
     direct = [f for dep in ctx.attr.srcs for f in dep[DefaultInfo].files.to_list()]
     if ctx.attr.generated:
         out = ctx.actions.declare_file(ctx.label.name + ".txt")
@@ -52,6 +55,8 @@ predeclared = rule(implementation = _predeclared, attrs = {"out": attr.output(ma
 
 def _observe(ctx):
     dep = ctx.attr.dep
+    if type(dep.files) != "depset" or dep.files.to_list() != dep[DefaultInfo].files.to_list() or dep.files.to_list() != ctx.files.dep:
+        fail("native Target.files changed files/depset projection")
     if Extra in dep:
         fail("native filegroup forwarded arbitrary child provider")
     if ctx.file.single != ctx.executable.tool or ctx.file.exec_single != ctx.executable.exec_tool:
@@ -60,7 +65,7 @@ def _observe(ctx):
     _check_instrumented(info, ctx.attr.single[InstrumentedFilesInfo])
     return [info, Proof(target = dep, files = ctx.files.dep, file = ctx.file.single,
         executable = ctx.executable.tool, exec_file = ctx.file.exec_single, exec_executable = ctx.executable.exec_tool,
-        instrumented = info, nested = struct(info = info, values = [info], keys = {info: "kept"}))]
+        instrumented = info, nested = struct(info = info, values = [info], keys = {info: "kept"}, target = dep, targets = [dep], target_files = dep.files))]
 
 observe = rule(implementation = _observe, attrs = {
     "dep": attr.label(), "single": attr.label(allow_single_file = True),
@@ -75,6 +80,11 @@ def _consume(ctx):
         fail("File identity changed after configured provider publication")
     if proof.files != proof.target[DefaultInfo].files.to_list():
         fail("captured files changed after publication")
+    for target in [proof.target, proof.nested.target, proof.nested.targets[0]]:
+        if type(target.files) != "depset" or target.files.to_list() != proof.files or target.files.to_list() != target[DefaultInfo].files.to_list():
+            fail("captured Target.files changed after publication")
+    if proof.nested.target_files.to_list() != proof.files:
+        fail("captured Target.files depset changed after publication")
     info = ctx.attr.dep[InstrumentedFilesInfo]
     for nested in [proof.instrumented, proof.nested.info, proof.nested.values[0], proof.nested.keys.keys()[0]]:
         _check_instrumented(info, nested)

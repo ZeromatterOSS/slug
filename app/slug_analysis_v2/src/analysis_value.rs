@@ -445,6 +445,18 @@ pub(crate) struct AnalysisConfiguredTargetValue {
     providers: SmallMap<ProviderIdentity, FrozenValue>,
 }
 
+impl AnalysisConfiguredTargetValue {
+    fn files(&self) -> Option<FrozenValue> {
+        let default = self
+            .providers
+            .get(&ProviderIdentity::builtin("DefaultInfo"))?;
+        BuiltinProviderView::from_value(default.to_value())?
+            .fields
+            .get("files")
+            .copied()
+    }
+}
+
 impl fmt::Display for AnalysisConfiguredTargetValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.retained.identity().label().fmt(f)
@@ -487,16 +499,22 @@ impl<'v> StarlarkValue<'v> for AnalysisConfiguredTargetValue {
     }
 
     fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        (name == "label").then(|| {
-            slug_loading_v2::provider::alloc_starlark_label(
+        match name {
+            "files" => self.files().map(FrozenValue::to_value),
+            "label" => Some(slug_loading_v2::provider::alloc_starlark_label(
                 heap,
                 self.retained.identity().label().clone(),
-            )
-        })
+            )),
+            _ => None,
+        }
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        vec!["label".to_owned()]
+        if self.files().is_some() {
+            vec!["files".to_owned(), "label".to_owned()]
+        } else {
+            vec!["label".to_owned()]
+        }
     }
 }
 
@@ -1503,6 +1521,117 @@ mod tests {
     }
 
     #[test]
+    fn target_files_reuses_default_files_without_executable_or_missing_provider_fallback() {
+        // Bazel 9.2 AbstractConfiguredTarget.get: files is DefaultInfo.files only.
+        let source = AnalysisArtifact::Source(
+            slug_identity_v2::CanonicalLabel::parse("@@//pkg:source.txt").unwrap(),
+        );
+        let owner = AnalysisConfiguredTargetKey::new(
+            slug_identity_v2::CanonicalLabel::parse("@@//pkg:producer").unwrap(),
+            b"configured".as_slice(),
+        );
+        let generated = AnalysisArtifact::Derived {
+            owner: owner.clone(),
+            output: slug_build_api_v2::ActionOutput::new(
+                test_artifact_root(),
+                "pkg/generated.txt",
+                slug_build_api_v2::ActionOutputKind::File,
+            ),
+        };
+        let executable = AnalysisArtifact::Source(
+            slug_identity_v2::CanonicalLabel::parse("@@//pkg:tool").unwrap(),
+        );
+        let files = AnalysisDepset::new(
+            DepsetOrder::Default,
+            vec![
+                AnalysisValue::artifact(generated.clone()),
+                AnalysisValue::artifact(source.clone()),
+            ],
+            vec![],
+        )
+        .unwrap();
+        let info = DefaultInfo::from_executable(executable.clone(), Some(files.clone())).unwrap();
+        assert_eq!(info.files_to_run.executable.as_ref(), Some(&executable));
+        let heap = FrozenHeap::new();
+        let mut materializer = AnalysisValueMaterializer::new(&heap);
+        let value = materializer
+            .target(&ConfiguredTargetValue::new(
+                owner.clone(),
+                ProviderCollection::new(vec![ProviderValue::DefaultInfo(info)]).unwrap(),
+            ))
+            .unwrap();
+        let target = AnalysisConfiguredTargetValue::from_value(value.to_value()).unwrap();
+        Heap::temp(|scratch| {
+            let projected = target.get_attr("files", scratch).unwrap();
+            assert!(projected.ptr_eq(field(builtin(target, "DefaultInfo"), "files").to_value()));
+            let lowered = AnalysisValueLowerer::default()
+                .lower(projected, "$files")
+                .unwrap();
+            assert!(AnalysisValue::depset(files).publication_eq(&lowered));
+            let artifacts = StarlarkDepset::direct_from_value(projected).unwrap();
+            assert_eq!(
+                artifacts
+                    .iter()
+                    .map(|file| AnalysisArtifactValue::from_value(*file)
+                        .unwrap()
+                        .artifact()
+                        .clone())
+                    .collect::<Vec<_>>(),
+                [generated, source]
+            );
+            assert!(target.get_attr("unknown", scratch).is_none());
+        });
+        assert_eq!(target.dir_attr(), ["files", "label"]);
+        for (providers, has_files) in [
+            (
+                ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())])
+                    .unwrap(),
+                true,
+            ),
+            (
+                ProviderCollection::from_values(vec![], false).unwrap(),
+                false,
+            ),
+        ] {
+            let other = materializer
+                .target(&ConfiguredTargetValue::new(owner.clone(), providers))
+                .unwrap();
+            let other_target = AnalysisConfiguredTargetValue::from_value(other.to_value()).unwrap();
+            assert!(target.equals(other.to_value()).unwrap());
+            let mut original_hash = StarlarkHasher::new();
+            let mut other_hash = StarlarkHasher::new();
+            target.write_hash(&mut original_hash).unwrap();
+            other_target.write_hash(&mut other_hash).unwrap();
+            assert_eq!(original_hash.finish_small(), other_hash.finish_small());
+            assert_eq!(
+                other_target.dir_attr().contains(&"files".to_owned()),
+                has_files
+            );
+            Heap::temp(|scratch| {
+                let default = alloc_starlark_provider_callable(&heap, "DefaultInfo").unwrap();
+                assert_eq!(other_target.is_in(default.to_value()).unwrap(), has_files);
+                if has_files {
+                    assert!(
+                        StarlarkDepset::direct_from_value(
+                            other_target.get_attr("files", scratch).unwrap()
+                        )
+                        .unwrap()
+                        .is_empty()
+                    );
+                } else {
+                    assert!(other_target.get_attr("files", scratch).is_none());
+                    assert!(other_target.at(default.to_value(), scratch).is_err());
+                }
+                assert!(
+                    other_target
+                        .at(scratch.alloc("DefaultInfo"), scratch)
+                        .is_err()
+                );
+            });
+        }
+    }
+
+    #[test]
     fn null_target_and_artifact_backed_builtin_provider_survive_nested_round_trip() {
         let label = slug_identity_v2::CanonicalLabel::parse("@@//pkg:source.txt").unwrap();
         let file_providers = |artifact: AnalysisArtifact| {
@@ -1560,11 +1689,32 @@ mod tests {
             .lower(first.to_value(), "$nested")
             .unwrap();
         assert!(nested.publication_eq(&lowered));
+        drop(first_heap);
 
         let second_heap = FrozenHeap::new();
         let second = AnalysisValueMaterializer::new(&second_heap)
             .value(&lowered)
             .unwrap();
+        for (name, value) in starlark_user_provider_fields(second.to_value()).unwrap().1 {
+            if name.ends_with("_target") {
+                let target = AnalysisConfiguredTargetValue::from_value(value).unwrap();
+                Heap::temp(|scratch| {
+                    let files = target.get_attr("files", scratch).unwrap();
+                    assert!(
+                        files.ptr_eq(field(builtin(target, "DefaultInfo"), "files").to_value())
+                    );
+                    let retained_files =
+                        target.retained.providers().default_info().unwrap().files();
+                    assert!(
+                        AnalysisValue::depset(retained_files.clone()).publication_eq(
+                            &AnalysisValueLowerer::default()
+                                .lower(files, "$nested.files")
+                                .unwrap(),
+                        )
+                    );
+                });
+            }
+        }
         let lowered_again = AnalysisValueLowerer::default()
             .lower(second.to_value(), "$nested_again")
             .unwrap();

@@ -626,6 +626,23 @@ fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
 }
 
 #[test]
+fn cquery_request_refuses_unmodeled_target_default_provider_field_policy() {
+    for flag in [
+        "--incompatible_disable_target_default_provider_fields=true",
+        "--incompatible_disable_target_default_provider_fields=false",
+        "--noincompatible_disable_target_default_provider_fields",
+    ] {
+        assert_eq!(
+            CqueryRequest::parse(&[flag, "//pkg:bin"]).unwrap_err(),
+            slug_commands_v2::CommandParseError::InvalidFlagValue {
+                flag: "cquery".to_owned(),
+                message: format!("{flag} is not supported by this cquery"),
+            }
+        );
+    }
+}
+
+#[test]
 fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
     let default = CqueryRequest::parse(&["//pkg:bin"]).unwrap();
     assert_eq!(default.output_mode, CqueryOutputMode::Label);

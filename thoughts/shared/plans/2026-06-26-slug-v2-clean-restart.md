@@ -34,19 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-172-m7a-action-file-sibling-declaration-r1
+Packet: WP-7-173-m7a-target-files-default-projection-r1
 Status: accepted; independent DESIGN/FINAL accepted; M7A remains partial
 
-WP872 accepts genuine File sibling declaration through the existing public binder
-and native action sink. Unix path normalization and componentwise confinement keep
-the current context's root/owner; active-token, interning, kind-conflict and action
-registration owners remain unchanged. Independent DESIGN/FINAL, 15 focused tests in
-0.444s and Core/CLI pass. Unchanged authentic query in 76.973s clears declaration
-and symlink construction and reaches rules_rust's legacy `Target.files` access.
-Original hashes, actual cleanup and hygiene gates pass. Next candidate reuses the
-existing frozen DefaultInfo.files projection; legacy-flag and missing-default
-boundaries need explicit design disposition. Windows sibling is a minimal refusal;
-directory sibling and full query/execution/bootstrap closure remain deferred.
+WP873 accepts legacy Target.files for default-bearing immutable Targets by reusing
+their existing frozen DefaultInfo.files projection. Identity/storage/lifetime stay
+with existing owners; the unmodeled legacy-field flag and missing-default boundary
+remain refused/deferred. Independent reviews, 28 focused tests in1.433s and Core/CLI
+pass. Unchanged authentic79.222s clears Target.files and reaches duplicate sysroot
+symlink output; original hashes and actual cleanup pass. The successor must review
+duplicate action eligibility without weakening structural output conflicts.
+Full bootstrap and Windows remain deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

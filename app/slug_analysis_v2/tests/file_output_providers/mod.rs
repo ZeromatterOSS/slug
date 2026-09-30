@@ -27,9 +27,13 @@ impl Drop for Workspace {
 }
 
 const DEFINITIONS: &str = r#"
-Capture = provider(fields = ["target", "file"])
+Capture = provider(fields = ["target", "file", "files"])
 def _capture(ctx):
-    return [Capture(target = ctx.attr.dep, file = ctx.attr.single[DefaultInfo].files.to_list()[0])]
+    if type(ctx.attr.dep.files) != "depset" or ctx.attr.dep.files.to_list() != ctx.attr.dep[DefaultInfo].files.to_list() or ctx.attr.dep.files.to_list() != ctx.files.dep:
+        fail("Target.files differs from effective DefaultInfo files")
+    if ctx.attr.single.files.to_list() != ctx.attr.single[DefaultInfo].files.to_list():
+        fail("single File Target.files differs from DefaultInfo")
+    return [Capture(target = ctx.attr.dep, file = ctx.attr.single[DefaultInfo].files.to_list()[0], files = ctx.attr.dep.files)]
 capture = rule(implementation = _capture, attrs = {
     "dep": attr.label(allow_files = True),
     "single": attr.label(allow_single_file = True),
@@ -70,6 +74,7 @@ setting(name = "mode", build_setting_default = "original")
 generator(name = "producer", out = "generated.txt")
 alias(name = "generated_alias", actual = ":generated.txt")
 capture(name = "generated_consumer", dep = ":generated_alias", single = ":generated_alias")
+capture(name = "producer_consumer", dep = ":producer", single = ":generated_alias")
 "#;
 
 fn key(name: &str) -> ConfiguredTargetKey {
@@ -92,10 +97,17 @@ fn captured_target(result: &ConfiguredNodeResult) -> &ConfiguredTargetValue {
         .providers()
         .user(&ProviderId::new("//:defs.bzl", "Capture").unwrap())
         .unwrap();
-    match provider.field("target").unwrap().kind() {
+    let target = match provider.field("target").unwrap().kind() {
         AnalysisValueKind::ConfiguredTarget(target) => target,
         other => panic!("expected configured target, got {other:?}"),
-    }
+    };
+    let AnalysisValueKind::Depset(files) = provider.field("files").unwrap().kind() else {
+        panic!("published Target.files depset")
+    };
+    let expected = target.providers().default_info().unwrap().files();
+    assert_eq!(files.order(), expected.order());
+    assert_eq!(files.to_list(), expected.to_list());
+    target
 }
 
 #[tokio::test]
@@ -263,6 +275,23 @@ async fn generated_providers_keep_transitioned_owner_validation_and_alias_a_b_a(
             captured_target(&consumer).providers(),
             generated.providers()
         );
+        let consumer = analyze_request(&dice, &workspace.0, &key("producer_consumer"), None, false)
+            .await
+            .unwrap();
+        assert!(consumer.actions().is_empty());
+        let target = captured_target(&consumer);
+        assert_eq!(target.providers(), producer.providers());
+        let files = target.providers().default_info().unwrap().file_artifacts();
+        let AnalysisArtifact::Derived {
+            owner: explicit_owner,
+            output,
+        } = &files[0]
+        else {
+            panic!("producer explicit files")
+        };
+        assert_eq!(explicit_owner, owner);
+        assert_eq!(output.root_relative_path(), "spare");
+        assert_ne!(files[0], artifact);
         snapshots.push(generated);
     }
     assert_ne!(snapshots[0], snapshots[1]);

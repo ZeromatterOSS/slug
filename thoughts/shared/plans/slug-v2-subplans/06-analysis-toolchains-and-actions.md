@@ -118,7 +118,12 @@ Source and generated-file configured nodes now own singleton file providers;
 generated files additionally forward only their generator's nonempty validations.
 Dependency views consume these providers directly. Ordinary ctx.attr label
 dependencies expose Targets, including sources; callers obtain Files from DefaultInfo
-instead of a source-only projection. One actual-target node identity
+instead of a source-only projection. Default-bearing immutable Targets also expose
+`files` as their existing frozen DefaultInfo.files depset, preserving explicit files
+independently of executable/runfiles/output-group contents. Reflection is conditional
+on that provider; missing-default/package-group legacy fields and the unmodeled
+`incompatible_disable_target_default_provider_fields` option remain deferred/refused.
+One actual-target node identity
 represents configured and null targets, allowing aliases to preserve source identity
 without a configured-only fallback or panic. Source aliases retain source filename
 admissibility checks. Internal merges, private validation overrides, analysis-test
