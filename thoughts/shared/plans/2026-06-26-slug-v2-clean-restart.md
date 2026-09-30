@@ -34,14 +34,13 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-167-m7a-remove-legacy-whole-archive-projection-r1
+Packet: WP-7-168-m7a-disabled-instrumented-files-info-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP867 exposes the existing remove-legacy-whole-archive Boolean through the
-private fragment and typed command owner.27focused0.563s/Core/CLI pass;
-unchanged query76.470s clears dynamic link registration and reaches
-coverage_common.instrumented_files_info1049. Full linking/coverage/bootstrap
-and Windows remain deferred; existing configuration owner stays.
+WP868 admits disabled instrumented_files_info with complete argument/private
+validation and current-root authority through existing native EMPTY owner.
+45focused0.544s/Core/CLI pass; unchanged query76.917s advances to
+cpp.save_feature_state115. Enabled coverage/full closure/Windows stay deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

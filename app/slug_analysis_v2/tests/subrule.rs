@@ -63,6 +63,8 @@ use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
 use starlark_map::small_map::SmallMap;
 
+#[path = "subrule/coverage_common.rs"]
+mod coverage_common;
 #[path = "subrule/coverage_instrumented.rs"]
 mod coverage_instrumented;
 #[path = "subrule/grte_top.rs"]

@@ -84,10 +84,28 @@ fn recovery_rejects_missing_foreign_and_occupied_registration() {
             .to_string()
             .contains("genuine")
     );
+    assert!(
+        instrumented_files_info_empty(Value::new_none(), &eval)
+            .unwrap_err()
+            .to_string()
+            .contains("registered")
+    );
     let original = module.heap().alloc(AllocList([7]));
     let guard = a.enter_root_context(&module, original).unwrap();
     assert!(a.enter_root_context(&module, original).is_err());
     assert!(b.enter_root_context(&module, original).is_err());
+    assert!(
+        instrumented_files_info_empty(Value::new_none(), &eval)
+            .unwrap_err()
+            .to_string()
+            .contains("current genuine")
+    );
+    assert!(
+        instrumented_files_info_empty(original, &eval)
+            .unwrap_err()
+            .to_string()
+            .contains("unavailable")
+    );
     assert!(
         actions_to_context(a_actions, &eval)
             .unwrap()
@@ -101,6 +119,12 @@ fn recovery_rejects_missing_foreign_and_occupied_registration() {
     );
     // Same-number token and evaluator agree, but the registered slot belongs to A.
     eval.extra = Some(&b);
+    assert!(
+        instrumented_files_info_empty(original, &eval)
+            .unwrap_err()
+            .to_string()
+            .contains("registration belongs")
+    );
     assert!(
         actions_to_context(b_actions, &eval)
             .unwrap_err()
@@ -156,6 +180,12 @@ fn suspended_root_and_subrule_frames_recover_one_locked_outer_context() {
     }
     assert!(root.require_active("label", "rule context").is_err());
     assert!(
+        instrumented_files_info_empty(original, &eval)
+            .unwrap_err()
+            .to_string()
+            .contains("outside of its own implementation")
+    );
+    assert!(
         root.require_active("declare_compile_output_file", "rule context")
             .is_err()
     );
@@ -164,6 +194,12 @@ fn suspended_root_and_subrule_frames_recover_one_locked_outer_context() {
         .unwrap();
     drop(subrule_guard);
     root.require_active("label", "rule context").unwrap();
+    assert!(
+        instrumented_files_info_empty(original, &eval)
+            .unwrap_err()
+            .to_string()
+            .contains("unavailable")
+    );
     root.require_active("declare_compile_output_file", "rule context")
         .unwrap();
     assert!(

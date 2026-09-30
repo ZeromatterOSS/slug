@@ -2036,20 +2036,37 @@ There is no command-side repair, new state owner or action registration.
 Implementation-deps, start/end-lib and archive/link tool-input execution remain
 unproved; Windows execution remains deferred.
 
-## Disabled coverage instrumentation method (WP857, 2026-09-30)
+## Disabled coverage APIs
 
 Public ctx.coverage_instrumented accepts omitted/None or a genuine Target and
 returns False when the caller's retained structural configuration disables
 coverage. Argument validation and invocation-token checks precede projection;
 an extracted method expires after successful or failed evaluation. Enabled
 coverage refuses explicitly, retaining filter/test/provider ownership for a
-future packet. No coverage fragment declaration, dependency-configuration read,
-new semantic state or action is introduced. Twelve focused checks and
-independent reviews pass, including same-DICE configuration/source restoration,
-both exec resets and an enabled caller with an exec-disabled Target. The
-unchanged authentic cquery clears this method and next stops at
-cc_internal.wrap_link_actions during rules_cc linking-context creation. Full
-coverage and linking/toolchain closure remain deferred; Linux remains priority.
+future packet. A dependency Target cannot replace the caller's coverage state.
+
+Public coverage_common.instrumented_files_info binds ctx positional/named and
+all eight other fields named, preserving omitted versus suppliedNone. Pinned
+Bazel9.2 CoverageCommonApi45-128/CoverageCommon47-110 require source/dependency/
+extension strings, metadata/baseline Files, environment string dict, support
+Files/nested File depsets and reported top-level tuples; empty ranges/depsets
+are admitted as applicable. Only actual nonempty support/report/environment
+contents require the existing default private allowlist, even when disabled.
+Validate before Collector107-109's disabled shortcut; no attribute/dependency
+traversal or baseline action. Enabled collection remains refused.
+
+Existing evaluator root registration checks the exact supplied ctx and current
+marker stack, followed by active root token. This current/live policy is
+Slug-native; the upstream collector only rejects a closed/null context. A
+synchronous borrowed service factory checks genuine AnalysisContext/sink/token
+and original CcContextProjection configuration, then uses the unchanged native
+InstrumentedFilesInfo.EMPTY materializer on the caller's frozen heap. Existing
+ProviderOccurrence identity/lowering/rematerialization owns surviving facts;
+no genericstruct, duplicate provider class, heap/Value retained in sink, new
+DICE state or action is introduced. Both-route source/configuration restoration,
+both exec resets, provider hashing/key membership/dependency rematerialization,
+private negatives and original suspended-live context recovery protect this
+boundary. Full coverage/linking/bootstrap remains unproved; Windows deferred.
 
 ## Default link-actions wrapper (WP858, 2026-09-30)
 

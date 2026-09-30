@@ -220,10 +220,7 @@ fn callable_matrix_fails_closed_and_lazy_coverage_is_side_effect_free() {
             "X = testing.analysis_test()",
             "testing.analysis_test is unsupported",
         ),
-        (
-            "X = coverage_common.instrumented_files_info()",
-            "coverage_common.instrumented_files_info is unsupported",
-        ),
+        ("X = coverage_common.instrumented_files_info()", "ctx"),
     ] {
         let error = freeze(source).unwrap_err();
         assert!(error.contains(diagnostic), "{error}");

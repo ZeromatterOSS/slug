@@ -186,9 +186,8 @@ pub(crate) fn testing_bootstrap_globals(builder: &mut GlobalsBuilder) {
                 bootstrap.alloc(UnsupportedTestingOperation::new("testing.TestEnvironment"));
             let analysis_test =
                 bootstrap.alloc(UnsupportedTestingOperation::new("testing.analysis_test"));
-            let instrumented_files_info = bootstrap.alloc(UnsupportedTestingOperation::new(
-                "coverage_common.instrumented_files_info",
-            ));
+            let instrumented_files_info =
+                bootstrap.alloc(crate::coverage_common::InstrumentedFilesInfoFunction);
 
             bootstrap.set(
                 "testing",

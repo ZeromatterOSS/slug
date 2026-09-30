@@ -1418,6 +1418,14 @@ impl SynchronousAnalysisActionSink {
 }
 
 impl AnalysisActionSink for SynchronousAnalysisActionSink {
+    fn instrumented_files_info_empty<'v>(
+        &self,
+        ctx: Value<'v>,
+        heap: &starlark::values::FrozenHeap,
+    ) -> anyhow::Result<FrozenValue> {
+        self.materialize_empty_instrumented_files(ctx, heap)
+    }
+
     fn transform_build_info(
         &self,
         request: slug_loading_v2::build_info_transform::BuildInfoTransformRequest<'_>,
@@ -2782,6 +2790,7 @@ mod integer_list_projection_tests {
 
 mod build_info_transform;
 mod cargo_runfiles;
+mod coverage_common;
 
 #[cfg(test)]
 mod cargo_runfiles_tests;

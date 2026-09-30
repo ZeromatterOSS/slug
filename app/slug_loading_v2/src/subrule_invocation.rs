@@ -134,6 +134,13 @@ pub struct AnalysisSpawnRequest<'v> {
 }
 
 pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
+    fn instrumented_files_info_empty<'v>(
+        &self,
+        _ctx: Value<'v>,
+        _heap: &starlark::values::FrozenHeap,
+    ) -> anyhow::Result<FrozenValue> {
+        anyhow::bail!("native empty InstrumentedFilesInfo is unavailable in this analysis context")
+    }
     fn transform_build_info(
         &self,
         _request: crate::build_info_transform::BuildInfoTransformRequest<'_>,
@@ -1427,17 +1434,45 @@ pub(crate) fn actions_to_context<'v>(
             anyhow::bail!("actions2ctx_cheat cannot use expired actions");
         }
     }
+    registered_root_context(evaluation, eval, "actions2ctx_cheat")
+}
+
+fn registered_root_context<'v>(
+    evaluation: &AnalysisEvaluationContext,
+    eval: &Evaluator<'v, '_, '_>,
+    operation: &str,
+) -> anyhow::Result<Value<'v>> {
     let registration = crate::evaluator_roots::analysis_context(eval.module())
-        .ok_or_else(|| anyhow::anyhow!("actions2ctx_cheat requires a registered analysis ctx"))?;
+        .ok_or_else(|| anyhow::anyhow!("{operation} requires a registered analysis ctx"))?;
     let fields = TupleRef::from_value(registration)
         .expect("analysis context registration tuple")
         .content();
     let marker = AnalysisRootContextMarker::from_value(fields[1])
         .expect("analysis context registration marker");
     if !Arc::ptr_eq(&marker.token.stack, &evaluation.stack) {
-        anyhow::bail!("actions2ctx_cheat context registration belongs to another evaluation");
+        anyhow::bail!("{operation} context registration belongs to another evaluation");
     }
     Ok(fields[0])
+}
+
+pub(crate) fn instrumented_files_info_empty<'v>(
+    ctx: Value<'v>,
+    eval: &Evaluator<'v, '_, '_>,
+) -> anyhow::Result<Value<'v>> {
+    let evaluation = AnalysisEvaluationContext::from_evaluator(eval)?;
+    let root = registered_root_context(evaluation, eval, "instrumented_files_info")?;
+    anyhow::ensure!(
+        ctx.ptr_eq(root),
+        "instrumented_files_info requires the current genuine rule ctx"
+    );
+    evaluation
+        .root_token()
+        .require_active("instrumented_files_info", "rule context")?;
+    Ok(evaluation
+        .payload
+        .action_sink
+        .instrumented_files_info_empty(ctx, eval.frozen_heap())?
+        .to_value())
 }
 
 #[cfg(test)]

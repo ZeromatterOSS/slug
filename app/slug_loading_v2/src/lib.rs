@@ -102,6 +102,7 @@ mod subrule;
 pub mod subrule_invocation;
 #[doc(hidden)]
 pub use subrule::SubruleIdentity;
+mod coverage_common;
 mod testing_bootstrap;
 #[cfg(test)]
 mod testing_bootstrap_tests;

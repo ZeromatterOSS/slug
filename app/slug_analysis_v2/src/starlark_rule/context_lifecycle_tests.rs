@@ -148,6 +148,29 @@ fn check_rule_context_teardown(fail: bool) {
     )
     .unwrap();
     let guard = evaluation.enter_root_context(&module, ctx).unwrap();
+    let error = declarations
+        .instrumented_files_info_empty(Value::new_none(), module.frozen_heap())
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("must be a rule context"),
+        "{error}"
+    );
+    let error = declaration_sink(&key)
+        .instrumented_files_info_empty(ctx, module.frozen_heap())
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("different analysis sink"),
+        "{error}"
+    );
+    let error = declarations
+        .instrumented_files_info_empty(ctx, module.frozen_heap())
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("requires structural configuration"),
+        "{error}"
+    );
     let capability = ctx
         .request_value::<&dyn slug_loading_v2::cc_context::CcCompileOutputContext>()
         .unwrap();
@@ -267,6 +290,16 @@ fn check_rule_context_teardown(fail: bool) {
         assert_eq!(label.to_str(), "@@//pkg:subject");
     }
     drop(guard);
+    let error = declarations
+        .instrumented_files_info_empty(ctx, module.frozen_heap())
+        .unwrap_err();
+    let message = error.to_string();
+    assert!(
+        message.contains("instrumented_files_info")
+            && message.contains("outside of its own implementation function")
+            && !message.contains("requires structural configuration"),
+        "{message}"
+    );
     // Captured while active, the bound method must check its original token
     // before this deliberately unconfigured fixture can inspect configuration.
     let methods = ListRef::from_value(module.get("methods").unwrap()).unwrap();
