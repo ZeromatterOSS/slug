@@ -34,16 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-161-m7a-immutable-link-sequence-r1
+Packet: WP-7-162-m7a-cpp-specific-tool-files-option-r1
 Status: accepted; independent DESIGN/FINAL ACCEPT; M7A remains partial
 
-WP861 admits a bounded immutable-sequence intern_seq adapter through existing
-tuple allocation/structural capability. Binding/outer tuple shape are exact;
-original element types/values are Slug-native, with mutable/representative
-substitution and global canonical sharing deferred. Twenty-three focused
-checks and Core/CLI pass. Unchanged cquery83.148s clears intern_seq and first
-reaches cpp.incompatible_use_specific_tool_files. Full link closure/Windows
-remain deferred. See `slug-v2-subplans/current-packet.md`.
+WP862 accepts the private specific-tool-files getter and typed command option,
+reusing the existing compile-policy owner. Independent DESIGN/FINAL ACCEPT;
+30focused checks and Core/CLI gates pass. The unchanged authentic cquery clears
+the getter in86.208s and reaches cc_internal.get_link_args at finalize:352;
+hashes/cleanup pass. Full link closure and Windows remain deferred.
+See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

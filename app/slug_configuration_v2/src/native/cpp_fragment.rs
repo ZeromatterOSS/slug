@@ -34,6 +34,7 @@ impl CppFragmentProjection {
         projection.grte_top()?;
         projection.experimental_cc_implementation_deps()?;
         projection.start_end_lib()?;
+        projection.incompatible_use_specific_tool_files()?;
         projection.force_pic()?;
         projection.apple_generate_dsym()?;
         projection.dont_enable_host_nonhost()?;
@@ -131,6 +132,10 @@ impl CppFragmentProjection {
 
     pub fn start_end_lib(&self) -> Result<bool, SlugConfigurationError> {
         self.configuration.native_bool(CPP_OPTIONS, "start_end_lib")
+    }
+
+    pub fn incompatible_use_specific_tool_files(&self) -> Result<bool, SlugConfigurationError> {
+        self.configuration.cpp_compile_use_specific_tool_files()
     }
 
     pub fn fission_active_for_current_compilation_mode(

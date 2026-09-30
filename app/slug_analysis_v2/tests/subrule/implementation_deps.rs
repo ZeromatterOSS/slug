@@ -11,21 +11,25 @@ fn epoch(marker: &str) -> PathObservationEpoch {
     epoch.file(
         "/workspace/tools/build_defs/cc/implementation_deps.bzl",
         &format!(
-            r#"ImplementationDepsInfo = provider(fields = ["root", "sub", "root_start_end", "sub_start_end", "marker"])
+            r#"ImplementationDepsInfo = provider(fields = ["root", "sub", "root_start_end", "sub_start_end", "root_specific", "sub_specific", "marker"])
 def _sub(ctx):
-    return ctx.fragments.cpp.experimental_cc_implementation_deps(), ctx.fragments.cpp.start_end_lib()
+    return ctx.fragments.cpp.experimental_cc_implementation_deps(), ctx.fragments.cpp.start_end_lib(), ctx.fragments.cpp.incompatible_use_specific_tool_files()
 sub = subrule(implementation = _sub, fragments = ["cpp"])
 def _root(ctx):
     root = ctx.fragments.cpp.experimental_cc_implementation_deps()
     start_end = ctx.fragments.cpp.start_end_lib()
-    child, child_start_end = sub()
+    specific = ctx.fragments.cpp.incompatible_use_specific_tool_files()
+    child, child_start_end, child_specific = sub()
     if type(root) != "bool" or type(child) != "bool":
         fail("implementation_deps option did not return bool")
     if root != child: fail("root and subrule implementation_deps options diverged")
     if type(start_end) != "bool" or type(child_start_end) != "bool":
         fail("start_end_lib option did not return bool")
     if start_end != child_start_end: fail("root and subrule start_end_lib options diverged")
-    return [DefaultInfo(), ImplementationDepsInfo(root = root, sub = child, root_start_end = start_end, sub_start_end = child_start_end, marker = "{marker}")]
+    if type(specific) != "bool" or type(child_specific) != "bool":
+        fail("incompatible_use_specific_tool_files option did not return bool")
+    if specific != child_specific: fail("root and subrule specific tool files options diverged")
+    return [DefaultInfo(), ImplementationDepsInfo(root = root, sub = child, root_start_end = start_end, sub_start_end = child_start_end, root_specific = specific, sub_specific = child_specific, marker = "{marker}")]
 subject = rule(implementation = _root, fragments = ["cpp"], subrules = [sub])
 "#
         ),
@@ -68,6 +72,27 @@ fn configured_options(implementation_deps: bool, start_end: bool) -> Configurati
     )
 }
 
+fn configured_policies(
+    implementation_deps: bool,
+    start_end: bool,
+    specific: bool,
+) -> ConfigurationKey {
+    let base = configured_options(implementation_deps, start_end)
+        .slug_configuration()
+        .unwrap()
+        .clone();
+    let overlay: CommandConfigurationOverlay = vec![CommandConfigurationOccurrence::native(
+        NativeCommandOption::IncompatibleUseSpecificToolFiles,
+        Some(if specific { "true" } else { "false" }),
+        false,
+    )]
+    .into();
+    ConfigurationKey::from_slug(
+        base.with_command_configuration(base.starlark_options().clone(), &overlay)
+            .unwrap(),
+    )
+}
+
 async fn request(
     dice: &Arc<Dice>,
     tracker: &Arc<Tracker>,
@@ -91,6 +116,7 @@ fn assert_projection(
     result: &slug_analysis_v2::ConfiguredNodeResult,
     value: bool,
     start_end: bool,
+    specific: bool,
     marker: &str,
 ) {
     assert!(result.actions().is_empty());
@@ -104,6 +130,8 @@ fn assert_projection(
         ("sub", value),
         ("root_start_end", start_end),
         ("sub_start_end", start_end),
+        ("root_specific", specific),
+        ("sub_specific", specific),
     ] {
         assert!(
             matches!(returned.field(field).unwrap().kind(), AnalysisValueKind::Boolean(actual) if actual == expected)
@@ -121,8 +149,8 @@ async fn root_subrule_implementation_deps_preserves_target_exec_and_restores_con
         let tracker = Arc::new(Tracker::default());
         let default = request(&dice, &tracker, route, "A", configuration(None)).await;
         let disabled = request(&dice, &tracker, route, "A", configured(false)).await;
-        assert_projection(&default, true, true, "A");
-        assert_projection(&disabled, false, true, "A");
+        assert_projection(&default, true, true, true, "A");
+        assert_projection(&disabled, false, true, true, "A");
         assert_ne!(default, disabled);
 
         // Configuration A/B/A and repeat restoration share one DICE instance.
@@ -132,7 +160,7 @@ async fn root_subrule_implementation_deps_preserves_target_exec_and_restores_con
             (configuration(None), true),
         ] {
             let result = request(&dice, &tracker, route, "A", configuration).await;
-            assert_projection(&result, value, true, "A");
+            assert_projection(&result, value, true, true, "A");
             assert_eq!(
                 result,
                 if value {
@@ -143,11 +171,20 @@ async fn root_subrule_implementation_deps_preserves_target_exec_and_restores_con
             );
         }
 
-        for (value, start_end) in [(true, true), (false, true), (true, false), (false, false)] {
-            let target_configuration = configured_options(value, start_end);
+        for (value, start_end, specific) in [
+            (true, true, true),
+            (false, true, true),
+            (true, false, true),
+            (false, false, true),
+            (true, true, false),
+            (false, true, false),
+            (true, false, false),
+            (false, false, false),
+        ] {
+            let target_configuration = configured_policies(value, start_end, specific);
             let expected = request(&dice, &tracker, route, "A", target_configuration.clone()).await;
-            assert_projection(&expected, value, start_end, "A");
-            if start_end {
+            assert_projection(&expected, value, start_end, specific, "A");
+            if start_end && specific {
                 assert_eq!(
                     expected,
                     if value {
@@ -182,7 +219,7 @@ async fn root_subrule_implementation_deps_preserves_target_exec_and_restores_con
                     ConfigurationKey::from_slug(execution),
                 )
                 .await;
-                assert_projection(&result, value, start_end, "A");
+                assert_projection(&result, value, start_end, specific, "A");
             }
             let restored = request(&dice, &tracker, route, "A", target_configuration).await;
             assert_eq!(restored, expected);
@@ -199,11 +236,11 @@ async fn root_subrule_implementation_deps_restores_source_in_one_dice() {
     for route in [AnalysisRoute::Legacy, AnalysisRoute::Observed] {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let tracker = Arc::new(Tracker::default());
-        let configuration = configured_options(false, false);
+        let configuration = configured_policies(false, false, false);
         let first = request(&dice, &tracker, route, "A", configuration.clone()).await;
         let changed = request(&dice, &tracker, route, "B", configuration.clone()).await;
-        assert_projection(&first, false, false, "A");
-        assert_projection(&changed, false, false, "B");
+        assert_projection(&first, false, false, false, "A");
+        assert_projection(&changed, false, false, false, "B");
         assert_ne!(changed, first);
         let restored = request(&dice, &tracker, route, "A", configuration).await;
         assert_eq!(restored, first);

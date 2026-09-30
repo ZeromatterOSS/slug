@@ -708,6 +708,10 @@ mod tests {
                 NativeCommandOption::ExperimentalCcImplementationDeps,
             ),
             ("start_end_lib", NativeCommandOption::StartEndLib),
+            (
+                "incompatible_use_specific_tool_files",
+                NativeCommandOption::IncompatibleUseSpecificToolFiles,
+            ),
         ] {
             for (flag, raw, negated) in [
                 (format!("--{name}"), None, false),
@@ -749,7 +753,11 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-        for name in ["experimental_cc_implementation_deps", "start_end_lib"] {
+        for name in [
+            "experimental_cc_implementation_deps",
+            "start_end_lib",
+            "incompatible_use_specific_tool_files",
+        ] {
             for (flags, expected) in [
                 (vec![], true),
                 (vec![format!("--no{name}")], false),
@@ -782,11 +790,20 @@ mod tests {
                         true
                     }
                 );
+                assert_eq!(
+                    projection.incompatible_use_specific_tool_files().unwrap(),
+                    if name == "incompatible_use_specific_tool_files" {
+                        expected
+                    } else {
+                        true
+                    }
+                );
             }
         }
         for name in [
             "experimental_cc_implementation_deps",
             "start_end_lib",
+            "incompatible_use_specific_tool_files",
             "force_pic",
         ] {
             for text in ["null", "NULL", "invalid", " true", "false "] {

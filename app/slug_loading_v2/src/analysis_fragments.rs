@@ -178,6 +178,17 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         Ok(this.retained.projection().start_end_lib()?)
     }
 
+    fn incompatible_use_specific_tool_files(
+        this: &CppFragmentValue,
+        eval: &mut Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        this.check(eval)?;
+        Ok(this
+            .retained
+            .projection()
+            .incompatible_use_specific_tool_files()?)
+    }
+
     fn use_llvm_coverage_map_format(
         this: &CppFragmentValue,
         eval: &mut Evaluator<'_, '_, '_>,

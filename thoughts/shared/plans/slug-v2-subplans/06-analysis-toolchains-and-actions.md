@@ -2011,13 +2011,17 @@ The rebuilt unchanged authentic Rust-toolchain cquery clears grte_top and next
 stops at cpp.experimental_cc_implementation_deps() in rules_cc semantics.bzl:114.
 M7A and full C++/toolchain closure remain partial; Windows execution is deferred.
 
-## Private C++ requested-option getters (WP856/WP860)
+## Private C++ requested-option getters (WP856/WP860/WP862)
 
 Retained CppOptions booleans back the private zero-argument methods
-experimental_cc_implementation_deps and start_end_lib and their appended typed
-command options. Both default True and carry through the existing exec mapping.
+experimental_cc_implementation_deps, start_end_lib and
+incompatible_use_specific_tool_files and their appended typed command options.
+All default True and carry through the existing exec mapping. The specific-tool
+files getter delegates to the existing cpp_compile_use_specific_tool_files
+policy owner used by compile-action construction; no second producer is added.
 Bazel9.2 CppConfiguration:468/866, CppOptions:150/970 and
-builtin_exec_platforms:303/305 pin the projection; requesting start_end_lib
+builtin_exec_platforms:303/305 pin the first two projections; specific-tool
+files uses CppConfiguration:790-796, CppOptions:828-837 and exec:313. Requesting start_end_lib
 does not establish toolchain feature support. Shared textual Boolean conversion
 rejects literal null/NULL; actual-null default materialization remains False.
 Configuration/config_setting use the same converted structural state. Current
@@ -2025,7 +2029,7 @@ invoking private callers are checked even for transferred bound methods, which
 retain their original configuration. Crossed-value root/subrule and target/exec
 checks prove independent getters and same-DICE source/configuration restoration.
 There is no command-side repair, new state owner or action registration.
-Implementation-deps and start/end-lib link behavior/toolchain closure remain
+Implementation-deps, start/end-lib and archive/link tool-input execution remain
 unproved; Windows execution remains deferred.
 
 ## Disabled coverage instrumentation method (WP857, 2026-09-30)

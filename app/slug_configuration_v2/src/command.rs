@@ -71,6 +71,7 @@ pub enum NativeCommandOption {
     Stamp,
     ExperimentalCcImplementationDeps,
     StartEndLib,
+    IncompatibleUseSpecificToolFiles,
 }
 
 impl NativeCommandOption {
@@ -88,6 +89,7 @@ impl NativeCommandOption {
             "force_pic" => Self::ForcePic,
             "experimental_cc_implementation_deps" => Self::ExperimentalCcImplementationDeps,
             "start_end_lib" => Self::StartEndLib,
+            "incompatible_use_specific_tool_files" => Self::IncompatibleUseSpecificToolFiles,
             "apple_generate_dsym" => Self::AppleGenerateDsym,
             "experimental_use_llvm_covmap" => Self::ExperimentalUseLlvmCovmap,
             "incompatible_dont_enable_host_nonhost_crosstool_features" => {
@@ -146,6 +148,7 @@ impl NativeCommandOption {
             Self::ForcePic => "force_pic",
             Self::ExperimentalCcImplementationDeps => "experimental_cc_implementation_deps",
             Self::StartEndLib => "start_end_lib",
+            Self::IncompatibleUseSpecificToolFiles => "incompatible_use_specific_tool_files",
             Self::AppleGenerateDsym => "apple_generate_dsym",
             Self::ExperimentalUseLlvmCovmap => "experimental_use_llvm_covmap",
             Self::IncompatibleDontEnableHostNonhostCrosstoolFeatures => {
@@ -203,6 +206,7 @@ impl NativeCommandOption {
                 | Self::ForcePic
                 | Self::ExperimentalCcImplementationDeps
                 | Self::StartEndLib
+                | Self::IncompatibleUseSpecificToolFiles
                 | Self::AppleGenerateDsym
                 | Self::ExperimentalUseLlvmCovmap
                 | Self::IncompatibleDontEnableHostNonhostCrosstoolFeatures
